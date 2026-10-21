@@ -16,6 +16,7 @@ import { budgetState, AI_JOBS } from './services/budget.js';
 import { sendWeeklyReport } from './services/report.js';
 import { exportProspects, importProspects } from './services/csv.js';
 import { history, saveSnapshot } from './services/metrics.js';
+import { evolutionHtml } from './services/markdown.js';
 import {
   listProspects, parseFilters, STATUSES as PROSPECT_STATUSES, prospectDetail, addNote, deleteNote, setNextAction,
 } from './services/crm.js';
@@ -136,8 +137,17 @@ export function registerRoutes(router, app) {
       OR (status = 'queued' AND (run_after IS NULL OR run_after <= ?))`).get(now()).n;
     const scheduled = db.prepare("SELECT COUNT(*) n FROM jobs WHERE status = 'queued' AND run_after > ?").get(now()).n;
     const rlRaw = getSetting(db, 'claude_rate_limit_json');
+    // Détail pour le menu « jobs » de la barre du haut : en cours d'abord, puis la file, puis les programmés
+    const jobs = db.prepare(`SELECT j.id, j.type, j.status, j.progress_json, j.run_after, j.started_at, j.created_at, p.id pid, p.name project
+      FROM jobs j LEFT JOIN projects p ON p.id = j.project_id
+      WHERE j.status IN ('queued','running')
+      ORDER BY j.status = 'running' DESC, COALESCE(j.run_after, 0), j.id LIMIT 20`).all().map((r) => ({
+      id: r.id, type: r.type, status: r.status, projectId: r.pid, project: r.project,
+      progress: r.progress_json ? JSON.parse(r.progress_json) : null,
+      runAfter: r.run_after, startedAt: r.started_at, createdAt: r.created_at,
+    }));
     json(res, {
-      temp: cpuTemp(), queue, scheduled, usage: usageSummary(db), budget: budgetState(db), thermalMax: cfg.thermalMax,
+      temp: cpuTemp(), queue, scheduled, jobs, usage: usageSummary(db), budget: budgetState(db), thermalMax: cfg.thermalMax,
       claudeRateLimit: rlRaw ? JSON.parse(rlRaw) : null,
     });
   });
@@ -168,6 +178,8 @@ export function registerRoutes(router, app) {
   router.get('/api/projects/:id/status', ({ res, params }) => {
     const p = getProject(app, pid(params));
     const jobs = latestJobs(db, p.id);
+    // Rendu côté serveur (échappé) : le front n'injecte jamais le Markdown brut de Claude
+    if (jobs.evolution?.result?.markdown) jobs.evolution.result.html = evolutionHtml(jobs.evolution.result.markdown);
     const tplOut = (row) => (row ? { subject: row.subject, subjectB: row.subject_b, body: row.body, status: row.status, updated_at: row.updated_at } : null);
     const templates = { initial: tplOut(getTemplate(db, p.id, 'initial')), followup: tplOut(getTemplate(db, p.id, 'followup')) };
     const stats = prospectStats(db, p.id);

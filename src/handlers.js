@@ -9,12 +9,16 @@ import { EMAIL_RE, createTransport, buildProspectMail, allowedToSend, makeMessag
 import { unsubToken } from './crypto.js';
 import { quotaAlerts } from './services/budget.js';
 import { notify } from './services/notify.js';
+import { evolutionMail } from './services/mailhtml.js';
 import { getProject, repoDir, forgejoToken, globalSmtp, sentSince, getTemplate, saveTemplate, pickVariant } from './projects.js';
 
 const sleep = (ms, signal) => new Promise((resolve, reject) => {
   const t = setTimeout(resolve, ms);
   signal?.addEventListener('abort', () => { clearTimeout(t); reject(new Error('Annulé')); }, { once: true });
 });
+
+// Avancement d'une phase Claude : de `from` à `to` % au fil des messages, sur `maxTurns` au plus (estimation)
+const turnPct = (from, to, n, maxTurns) => Math.round(from + (to - from) * Math.min(1, n / Math.max(1, maxTurns)));
 
 // Une page web peut tenter de faire enregistrer "javascript:…" : seules les URLs http(s) sont gardées
 export function httpUrl(v) {
@@ -95,6 +99,7 @@ export function makeHandlers(app) {
     const original = db.prepare("SELECT subject, message_id FROM mail_log WHERE prospect_id = ? AND kind = 'initial' AND error IS NULL ORDER BY id LIMIT 1");
     const current = db.prepare('SELECT status, followup_at FROM prospects WHERE id = ?');
     let sent = 0, failed = 0;
+    ctx.progress({ sent, failed, total: n, message: `0/${n} ${kind === 'followup' ? 'relances envoyées' : 'envoyés'}`, pct: 0 });
 
     for (const p of candidates.slice(0, n)) {
       if (ctx.cancelled()) break;
@@ -131,7 +136,7 @@ export function makeHandlers(app) {
         failed++;
       }
       const label = kind === 'followup' ? 'relances envoyées' : 'envoyés';
-      ctx.progress({ sent, failed, total: n, message: `${sent + failed}/${n} ${label}` });
+      ctx.progress({ sent, failed, total: n, message: `${sent + failed}/${n} ${label}`, pct: Math.round(((sent + failed) / n) * 100) });
       if (sent + failed < n) await sleep(minDelay + Math.random() * (maxDelay - minDelay), ctx.signal).catch(() => {});
     }
     transport.close();
@@ -141,14 +146,17 @@ export function makeHandlers(app) {
   return {
     async analyze(ctx) {
       const project = getProject(app, ctx.job.project_id);
-      ctx.progress({ message: 'Récupération du repo…' });
+      ctx.progress({ message: 'Récupération du repo…', pct: 3 });
       const dir = repoDir(cfg, project.id);
       const commit = await syncRepo(project.gitUrl, dir, forgejoToken(app));
 
-      ctx.progress({ message: 'Analyse du code par Claude…' });
+      ctx.progress({ message: 'Analyse du code par Claude…', pct: 10 });
       const { prompt, system } = analyzePrompt(project.name);
       const model = getSetting(db, 'analyze_model', 'haiku');
-      const r = await claude({ prompt, system, cwd: dir, model, maxTurns: 20, tools: ['Read', 'Glob', 'Grep'], signal: ctx.signal });
+      const r = await claude({
+        prompt, system, cwd: dir, model, maxTurns: 20, tools: ['Read', 'Glob', 'Grep'], signal: ctx.signal,
+        onTurn: (n) => ctx.progress({ message: `Lecture du code par Claude (étape ${n})…`, pct: turnPct(10, 95, n, 20) }),
+      });
       addUsage(ctx, r);
       if (!r.ok) throw new Error(`Analyse incomplète (${r.subtype})`);
       const profile = extractJson(r.text);
@@ -174,6 +182,14 @@ export function makeHandlers(app) {
         SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM blacklist WHERE email = ?)`);
       let found = 0;
       let pending = '';
+      let turns = 0;
+      let message = 'Recherche en cours…';
+      const maxTurns = Math.min(80, count * 3 + 10);
+      // Le plus avancé des deux : prospects trouvés, ou messages de Claude consommés
+      const report = () => ctx.progress({
+        found, target: count, message,
+        pct: Math.min(99, Math.max(Math.round((found / count) * 100), turnPct(0, 90, turns, maxTurns))),
+      });
       const onText = (text) => {
         pending += text + '\n';
         const lines = pending.split('\n');
@@ -184,16 +200,18 @@ export function makeHandlers(app) {
           const res = insert.run(project.id, p.company, p.email, p.website, p.city, p.sector, p.hook, p.source, p.score, now(), p.email);
           if (res.changes) {
             found++;
-            ctx.progress({ found, target: count, message: `${found}/${count} — ${p.company}` });
+            message = `${found}/${count} — ${p.company}`;
+            report();
           }
         }
       };
-      ctx.progress({ found: 0, target: count, message: 'Recherche en cours…' });
+      report();
       const { prompt, system } = prospectPrompt({ profile: project.profile, target: project.target, count, exclude });
       const model = getSetting(db, 'prospect_model', 'haiku');
       const r = await claude({
         prompt, system, model, tools: ['WebSearch', 'WebFetch'],
-        maxTurns: Math.min(80, count * 3 + 10), onText, signal: ctx.signal,
+        maxTurns, onText, signal: ctx.signal,
+        onTurn: (n) => { turns = n; report(); },
       });
       onText('\n');
       addUsage(ctx, r);
@@ -203,6 +221,7 @@ export function makeHandlers(app) {
     async template(ctx) {
       const project = getProject(app, ctx.job.project_id, { secrets: true });
       if (!project.profile) throw new Error('Analyse le projet d\'abord');
+      ctx.progress({ message: 'Rédaction du modèle par Claude…', pct: 40 });
       const { prompt, system } = templatePrompt({ profile: project.profile, target: project.target || {}, senderName: project.smtp?.fromName });
       const r = await claude({ prompt, system, model: 'haiku', maxTurns: 1, tools: [], signal: ctx.signal });
       addUsage(ctx, r);
@@ -215,6 +234,7 @@ export function makeHandlers(app) {
     async followup_template(ctx) {
       const project = getProject(app, ctx.job.project_id, { secrets: true });
       if (!project.profile) throw new Error('Analyse le projet d\'abord');
+      ctx.progress({ message: 'Rédaction de la relance par Claude…', pct: 40 });
       const { prompt, system } = followupTemplatePrompt({ profile: project.profile, senderName: project.smtp?.fromName });
       const r = await claude({ prompt, system, model: 'haiku', maxTurns: 1, tools: [], signal: ctx.signal });
       addUsage(ctx, r);
@@ -236,23 +256,27 @@ export function makeHandlers(app) {
       if (!to) throw new Error('Adresse de réception non configurée (Réglages)');
       if (!smtp) throw new Error('Aucun SMTP configuré (Réglages ou projet)');
 
-      ctx.progress({ message: 'Mise à jour du repo…' });
+      ctx.progress({ message: 'Mise à jour du repo…', pct: 3 });
       const dir = repoDir(cfg, project.id);
       await syncRepo(project.gitUrl, dir, forgejoToken(app));
 
-      ctx.progress({ message: `Recherche de ${count} évolutions (${level})…` });
+      ctx.progress({ message: `Recherche de ${count} évolutions (${level})…`, pct: 10 });
       const { prompt, system } = evolutionPrompt({ projectName: project.name, profile: project.profile, count, level });
       const { model, maxTurns } = LEVELS[level];
-      const r = await claude({ prompt, system, cwd: dir, model, maxTurns, tools: ['Read', 'Glob', 'Grep'], signal: ctx.signal });
+      const r = await claude({
+        prompt, system, cwd: dir, model, maxTurns, tools: ['Read', 'Glob', 'Grep'], signal: ctx.signal,
+        onTurn: (n) => ctx.progress({ message: `Recherche de ${count} évolutions (${level}) · étape ${n}…`, pct: turnPct(10, 90, n, maxTurns) }),
+      });
       addUsage(ctx, r);
       if (!r.text?.trim()) throw new Error(`Pas de résultat (${r.subtype})`);
 
-      ctx.progress({ message: 'Envoi par mail…' });
+      ctx.progress({ message: 'Envoi par mail…', pct: 95 });
       const transport = (app.createTransport || createTransport)(smtp);
       await transport.sendMail({
         from: smtp.fromEmail, to,
         subject: `[AiTools] ${count} évolutions pour ${project.name}`,
         text: r.text,
+        html: evolutionMail({ markdown: r.text, projectName: project.name, count, appUrl: cfg.appUrl }),
       });
       transport.close();
       return { markdown: r.text, sentTo: to };

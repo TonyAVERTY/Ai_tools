@@ -13,6 +13,7 @@ export const MODELS = { rapide: 'haiku', normal: 'sonnet', approfondi: 'opus' };
  * @param {string[]} [o.tools]      outils autorisés, tout le reste est refusé
  * @param {string} [o.system]       consignes ajoutées au prompt système
  * @param {(text:string)=>void} [o.onText]  appelé à chaque bloc texte de Claude
+ * @param {(n:number)=>void} [o.onTurn]     appelé à chaque message de Claude (sert à estimer l'avancement)
  * @param {AbortSignal} [o.signal]
  * @param {number} [o.timeoutMs]
  * @param {string} [o.bin]
@@ -38,6 +39,7 @@ export function runClaude(o) {
     let stderr = '';
     let result = null;
     let rateLimit = null;
+    let turns = 0;
     const texts = [];
 
     const timer = setTimeout(() => child.kill('SIGTERM'), o.timeoutMs || 30 * 60_000);
@@ -58,6 +60,7 @@ export function runClaude(o) {
       let ev;
       try { ev = JSON.parse(line); } catch { return; }
       if (ev.type === 'assistant') {
+        o.onTurn?.(++turns);
         for (const block of ev.message?.content || []) {
           if (block.type === 'text' && block.text) { texts.push(block.text); o.onText?.(block.text); }
         }

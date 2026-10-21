@@ -3,6 +3,7 @@ import { now, getSetting, setSetting } from '../db.js';
 import { abStats, globalSmtp } from '../projects.js';
 import { createTransport } from './mailer.js';
 import { notify } from './notify.js';
+import { weeklyMail } from './mailhtml.js';
 import { parisParts, parisTime } from './paris-time.js';
 
 const pct = (a, b) => (b ? `${Math.round((a / b) * 100)} %` : '-');
@@ -62,19 +63,28 @@ export async function sendWeeklyReport(app, { at = now() } = {}) {
   if (to && smtp) {
     const transport = (app.createTransport || createTransport)(smtp);
     try {
-      await transport.sendMail({ from: smtp.fromEmail, to, subject: `[AiTools] Rapport du ${day(st.from)} au ${day(st.to)}`, text });
+      await transport.sendMail({
+        from: smtp.fromEmail, to, subject: `[AiTools] Rapport du ${day(st.from)} au ${day(st.to)}`, text,
+        html: weeklyMail(st, { period: `Semaine du ${day(st.from)} au ${day(st.to)}`, appUrl: app.cfg.appUrl }),
+      });
       channels.push('mail');
     } finally { transport.close(); }
   }
   const t = st.totals;
+  const active = st.projects.filter((p) => p.sent || p.found || p.replies);
   const ok = await notify(app, 'weekly', {
     title: `Rapport hebdo · ${day(st.from)} → ${day(st.to)}`, level: 'info',
-    description: st.projects.filter((p) => p.sent || p.found || p.replies)
-      .map((p) => `**${p.name}** : ${p.found} trouvés · ${p.sent} envoyés · ${p.replies} réponses`).join('\n') || 'Rien cette semaine.',
+    description: active.length
+      ? `**${t.sent}** mails · **${t.replies}** réponses (${pct(t.replies, t.sent)}) · **${t.found}** prospects trouvés`
+      : 'Rien cette semaine.',
     fields: [
-      { name: 'Réponses', value: `${t.replies} (${pct(t.replies, t.sent)})` },
-      { name: 'Relances', value: String(t.followups) },
-      { name: 'Coût IA', value: usd(t.cost) },
+      { name: '💬 Réponses', value: `**${t.replies}** (${pct(t.replies, t.sent)})` },
+      { name: '🔁 Relances', value: String(t.followups) },
+      { name: '💳 Coût IA', value: usd(t.cost) },
+      ...active.slice(0, 21).map((p) => ({
+        name: `📁 ${p.name}`, inline: false,
+        value: `🔎 ${p.found} trouvés · ✉️ ${p.sent} envoyés · 💬 ${p.replies} réponses (${pct(p.replies, p.sent)})${p.bestSubject ? ` · 🏆 objet ${p.bestSubject.variant}` : ''}`,
+      })),
     ],
   });
   if (ok) channels.push('discord');
