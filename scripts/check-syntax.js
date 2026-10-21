@@ -19,5 +19,17 @@ for (const f of files) {
   try { execFileSync(process.execPath, ['--check', f], { stdio: 'pipe' }); }
   catch (e) { failed++; console.error(`✗ ${f}\n${e.stderr}`); }
 }
-console.log(`${files.length - failed}/${files.length} fichiers OK`);
+// Scripts shell : syntaxe bash, + shellcheck s'il est installé
+const shells = ['install.sh', 'deploy/aitools-backup.sh', '.githooks/pre-commit'];
+let hasShellcheck = true;
+try { execFileSync('shellcheck', ['--version'], { stdio: 'pipe' }); } catch { hasShellcheck = false; }
+for (const f of shells) {
+  try {
+    execFileSync('bash', ['-n', f], { stdio: 'pipe' });
+    if (hasShellcheck) execFileSync('shellcheck', ['-S', 'warning', '-x', f], { stdio: 'pipe' });
+  } catch (e) { failed++; console.error(`✗ ${f}\n${e.stdout || ''}${e.stderr || ''}`); }
+}
+
+const total = files.length + shells.length;
+console.log(`${total - failed}/${total} fichiers OK${hasShellcheck ? '' : ' (shellcheck absent, syntaxe bash seulement)'}`);
 process.exit(failed ? 1 : 0);
