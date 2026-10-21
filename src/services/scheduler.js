@@ -1,10 +1,12 @@
 // Tâches de fond légères (sans Claude), toutes les 15 min :
 //   1. lecture des boîtes IMAP (réponses, bounces)
 //   2. puis seulement ensuite, mise en file des relances dues
+//   3. rapport hebdo le lundi à 8h
 import { checkInbox } from './inbox.js';
 import { followupPlan } from './followup.js';
 import { enqueue } from './jobs.js';
 import { getProject } from '../projects.js';
+import { maybeSendWeekly } from './report.js';
 
 export class Scheduler {
   constructor(app, { everyMs = 15 * 60_000, log = console } = {}) {
@@ -34,6 +36,8 @@ export class Scheduler {
         catch (e) { this.log.error(`[inbox ${id}]`, e.message); }
       }
       this.queueFollowups();
+      try { await maybeSendWeekly(this.app); }
+      catch (e) { this.log.error('[rapport hebdo]', e.message); }
     } finally { this.running = false; }
   }
 

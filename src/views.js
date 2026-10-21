@@ -234,7 +234,9 @@ export function settingsPage({ email, s, saved }) {
 ${saved ? '<p class="ok">Enregistré.</p>' : ''}
 <form method="post" action="/settings" class="card cfg">
   <h4>Notifications</h4>
-  <label>Email de réception (évolutions)<input name="notify_email" type="email" value="${esc(s.notify_email)}"></label>
+  <label>Email de réception (évolutions, rapport hebdo)<input name="notify_email" type="email" value="${esc(s.notify_email)}"></label>
+  <label class="check"><input type="checkbox" name="weekly_report" ${s.weekly_report ? 'checked' : ''}> Rapport hebdo le lundi à 8h (mail + Discord)</label>
+  <button type="button" class="btn small" data-report-send>Envoyer le rapport maintenant</button>
 
   <h4>Forgejo</h4>
   <div class="grid2">

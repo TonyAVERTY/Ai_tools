@@ -232,6 +232,12 @@
 
     if (e.target.matches('[data-recap-refresh]')) loadRecap(e.target.closest('.project'), true);
 
+    if (e.target.closest('[data-report-send]')) {
+      try { const r = await api('/api/report/send', {}); toast(`Rapport envoyé (${r.channels.join(' + ')})`); }
+      catch (err) { toast(err.message, 'error'); }
+      return;
+    }
+
     if (e.target.closest('[data-notify-test]')) {
       try { await api('/api/notify/test', {}); toast('Notification envoyée sur Discord'); }
       catch (err) { toast(err.message, 'error'); }
