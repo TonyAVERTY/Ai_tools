@@ -1,0 +1,36 @@
+# Dépendances
+node_modules/
+
+# Secrets / config locale
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+
+# Données runtime (BDD, clones Git des projets, logs)
+data/
+*.sqlite
+*.sqlite-*
+*.db
+*.log
+logs/
+
+# Dumps / backups
+*.sql
+*.zip
+*.rar
+*.tar
+*.gz
+*.bundle
+
+# Build / temp
+dist/
+build/
+tmp/
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

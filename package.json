@@ -1,0 +1,23 @@
+{
+  "name": "aitools",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Panel perso de prospection et d'analyse de projets via Claude Code headless, pensé pour Raspberry Pi 4",
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "start": "node --env-file=.env --no-warnings=ExperimentalWarning src/server.js",
+    "dev": "node --env-file=.env --watch --no-warnings=ExperimentalWarning src/server.js",
+    "lint": "node scripts/check-syntax.js",
+    "test": "node --no-warnings=ExperimentalWarning --test 'test/**/*.test.js'",
+    "check": "npm run lint && npm run test",
+    "hooks": "git config core.hooksPath .githooks"
+  },
+  "dependencies": {
+    "mysql2": "^3.11.0",
+    "nodemailer": "^6.9.15",
+    "pg": "^8.13.0"
+  }
+}
