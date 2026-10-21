@@ -1,0 +1,20 @@
+#!/bin/sh
+# Bloque le commit si : branche main/master, fichier sensible indexé, lint ou tests en échec.
+branch=$(git branch --show-current)
+if [ "$branch" = "main" ] || [ "$branch" = "master" ]; then
+  echo "✗ Commit direct sur $branch interdit. Passe sur develop."
+  exit 1
+fi
+
+staged=$(git diff --cached --name-only --diff-filter=ACM)
+bad=$(echo "$staged" | grep -E '(^|/)\.env($|\.)|\.pem$|\.key$|id_rsa|id_ed25519|\.sqlite|\.sql$|\.(zip|rar|tar|gz)$|^data/' | grep -v '\.env\.example$')
+if [ -n "$bad" ]; then
+  echo "✗ Fichiers sensibles indexés :"; echo "$bad"; exit 1
+fi
+
+scan=$(echo "$staged" | grep -v '^\.githooks/')
+if [ -n "$scan" ] && git diff --cached -U0 -- $scan | grep -E '^\+' | grep -Ei '(sk-ant-|ghp_[A-Za-z0-9]{20}|-----BEGIN [A-Z ]*PRIVATE KEY|GOCSPX-)' >/dev/null; then
+  echo "✗ Un secret semble présent dans le diff. Vérifie avant de commit."; exit 1
+fi
+
+npm run --silent check || { echo "✗ Lint/tests en échec, commit bloqué."; exit 1; }
