@@ -7,6 +7,13 @@ export const repoDir = (cfg, id) => join(cfg.dataDir, 'repos', String(id));
 
 const parse = (s) => (s ? JSON.parse(s) : null);
 
+// Secret illisible (SECRET_KEY changée, donnée abîmée) : on le traite comme absent pour que le
+// panel reste utilisable, il suffira de le ressaisir.
+function readSecret(key, payload, what) {
+  try { return decryptJson(key, payload); }
+  catch { console.warn(`[secrets] ${what} illisible (SECRET_KEY changée ?), à ressaisir`); return null; }
+}
+
 export function getProject(app, id, { secrets = false } = {}) {
   const p = app.db.prepare('SELECT * FROM projects WHERE id = ?').get(Number(id));
   if (!p) throw new HttpError(404, 'Projet introuvable');
@@ -20,9 +27,9 @@ export function getProject(app, id, { secrets = false } = {}) {
     followupEnabled: !!p.followup_enabled, followupDays: p.followup_days,
   };
   if (secrets) {
-    out.smtp = decryptJson(app.cfg.secretKey, p.smtp_enc);
-    out.dbCfg = decryptJson(app.cfg.secretKey, p.db_enc);
-    out.imapCfg = decryptJson(app.cfg.secretKey, p.imap_enc);
+    out.smtp = readSecret(app.cfg.secretKey, p.smtp_enc, `SMTP du projet ${p.id}`);
+    out.dbCfg = readSecret(app.cfg.secretKey, p.db_enc, `accès BDD du projet ${p.id}`);
+    out.imapCfg = readSecret(app.cfg.secretKey, p.imap_enc, `IMAP du projet ${p.id}`);
     out.imap = imapCredentials(out.imapCfg, out.smtp);
   }
   return out;
@@ -40,7 +47,7 @@ export function createProject(app, { name, gitUrl }) {
 // Les secrets vides dans le formulaire = on garde l'ancien (le formulaire ne les réaffiche jamais)
 export function saveSecretConfig(app, id, column, incoming, secretField) {
   if (!['smtp_enc', 'db_enc', 'imap_enc'].includes(column)) throw new Error('Colonne invalide');
-  const current = decryptJson(app.cfg.secretKey, app.db.prepare(`SELECT ${column} c FROM projects WHERE id = ?`).get(id)?.c) || {};
+  const current = readSecret(app.cfg.secretKey, app.db.prepare(`SELECT ${column} c FROM projects WHERE id = ?`).get(id)?.c, column) || {};
   const next = { ...current, ...incoming };
   if (!incoming[secretField]) next[secretField] = current[secretField];
   app.db.prepare(`UPDATE projects SET ${column} = ? WHERE id = ?`).run(encryptJson(app.cfg.secretKey, next), id);
@@ -54,11 +61,12 @@ export function publicConfig(cfg, secretField) {
 }
 
 export function forgejoToken(app) {
-  return decrypt(app.cfg.secretKey, getSetting(app.db, 'forgejo_token_enc'));
+  try { return decrypt(app.cfg.secretKey, getSetting(app.db, 'forgejo_token_enc')); }
+  catch { console.warn('[secrets] token Forgejo illisible, à ressaisir'); return null; }
 }
 
 export function globalSmtp(app) {
-  return decryptJson(app.cfg.secretKey, getSetting(app.db, 'smtp_enc'));
+  return readSecret(app.cfg.secretKey, getSetting(app.db, 'smtp_enc'), 'SMTP global');
 }
 
 export function prospectStats(db, projectId) {
