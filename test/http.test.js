@@ -161,3 +161,16 @@ test('SECRET_KEY changée : le panel reste utilisable, les secrets sont à ressa
     assert.equal(r.status, 200, 'on peut ressaisir');
   } finally { console.warn = warn; }
 });
+
+test('« Cette nuit » programme le job au prochain créneau 1h-6h', async () => {
+  const id = app.db.prepare('SELECT id FROM projects LIMIT 1').get().id;
+  app.db.prepare("UPDATE jobs SET status = 'cancelled' WHERE status IN ('queued', 'running')").run();
+  const r = await post(`/api/projects/${id}/evolution`, { count: 3, level: 'rapide', when: 'night' });
+  assert.equal(r.status, 200);
+  const job = app.db.prepare("SELECT run_after FROM jobs WHERE type = 'evolution' ORDER BY id DESC LIMIT 1").get();
+  const { parisParts } = await import('../src/services/paris-time.js');
+  const p = parisParts(new Date(job.run_after * 1000));
+  assert.ok(p.hour >= 1 && p.hour < 6, `démarrage à ${p.hour}h`);
+  const sys = await (await get('/api/system')).json();
+  assert.ok(job.run_after > now() ? sys.scheduled >= 1 : true);
+});

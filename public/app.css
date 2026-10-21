@@ -100,3 +100,5 @@ form.send { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--lin
 .inbox { margin: 10px 0 4px; line-height: 1.9; }
 .inbox:empty { display: none; }
 .followup { margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--line); }
+.running.scheduled { background: transparent; border: 1px dashed var(--line); }
+.moon { width: 18px; height: 18px; border-radius: 50%; box-shadow: inset -5px -3px 0 0 var(--accent); flex: none; transform: rotate(-20deg); }

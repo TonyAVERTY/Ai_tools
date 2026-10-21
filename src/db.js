@@ -101,6 +101,10 @@ export const MIGRATIONS = [
   ALTER TABLE projects ADD COLUMN followup_enabled INTEGER NOT NULL DEFAULT 0;
   ALTER TABLE projects ADD COLUMN followup_days INTEGER NOT NULL DEFAULT 7;
   `,
+  // 6 — jobs programmés (la nuit)
+  `
+  ALTER TABLE jobs ADD COLUMN run_after INTEGER;          -- ne pas démarrer avant (epoch s)
+  `,
 ];
 
 export function openDb(dataDir) {

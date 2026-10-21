@@ -44,7 +44,8 @@
       const hot = s.temp !== null && s.temp >= s.thermalMax - 5;
       el.innerHTML = `${s.temp !== null ? `<span class="${hot ? 'warn' : ''}">${s.temp} °C</span>` : ''}
         <span title="Équivalent API, consommé sur ton quota Pro">IA 24 h : $${s.usage.day.cost.toFixed(2)} · 30 j : $${s.usage.month.cost.toFixed(2)}</span>
-        ${s.queue ? `<span class="spin-inline"></span>${s.queue} job(s)` : ''}`;
+        ${s.queue ? `<span class="spin-inline"></span>${s.queue} job(s)` : ''}
+        ${s.scheduled ? `<span>${s.scheduled} programmé(s) cette nuit</span>` : ''}`;
     } catch { /* silencieux */ }
   }
   refreshSys();
@@ -55,6 +56,13 @@
     if (!box) return;
     if (!job) { box.innerHTML = ''; return; }
     const p = job.progress || {};
+    if (job.status === 'queued' && job.runAfter && job.runAfter * 1000 > Date.now()) {
+      const at = new Date(job.runAfter * 1000).toLocaleString('fr-FR', { weekday: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
+      box.innerHTML = `<div class="running scheduled"><span class="moon" aria-hidden="true"></span>
+        <div><div>${LABELS[type]} programmé(e) : ${esc(at)}</div><div class="small muted">Le Pi est au frais et ton quota Claude est libre.</div></div>
+        <button class="btn small" data-cancel="${job.id}">Annuler</button></div>`;
+      return;
+    }
     if (ACTIVE.includes(job.status)) {
       const extra = type === 'prospect' && p.found !== undefined
         ? `<strong>${p.found}</strong> prospect(s) trouvé(s) sur ${p.target}` : '';
@@ -247,10 +255,16 @@
           break;
         }
         case 'target': await api(`/api/projects/${id}/target`, data); toast('Cible validée'); setTimeout(() => location.reload(), 500); break;
-        case 'prospect': await api(`/api/projects/${id}/prospect`, data); toast('Recherche lancée en arrière-plan'); break;
+        case 'prospect': {
+          const r = await api(`/api/projects/${id}/prospect`, data);
+          toast(r.existing ? 'Une recherche est déjà prévue ou en cours' : data.when === 'night' ? 'Recherche programmée cette nuit' : 'Recherche lancée en arrière-plan');
+          break;
+        }
         case 'evolution': {
           if (data.level === 'approfondi' && !confirm('Le niveau approfondi utilise Opus et consomme beaucoup de quota. Continuer ?')) break;
-          await api(`/api/projects/${id}/evolution`, data); toast('Recherche d\'évolutions lancée'); break;
+          const r = await api(`/api/projects/${id}/evolution`, data);
+          toast(r.existing ? 'Une recherche est déjà prévue ou en cours' : data.when === 'night' ? 'Évolutions programmées cette nuit' : 'Recherche d\'évolutions lancée');
+          break;
         }
         case 'template': {
           data.kind = form.dataset.kind;
