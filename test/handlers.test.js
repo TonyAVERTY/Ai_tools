@@ -5,7 +5,7 @@ import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
-import { openDb, setSetting, now } from '../src/db.js';
+import { openDb, setSetting, getSetting, now } from '../src/db.js';
 import { Worker, enqueue, latestJobs } from '../src/services/jobs.js';
 import { makeHandlers, parseProspectLine } from '../src/handlers.js';
 import { createProject, saveSecretConfig, getProject, prospectStats, pickVariant } from '../src/projects.js';
@@ -48,6 +48,9 @@ test('flux complet : analyse → cible → prospection → modèle → envoi →
     assert.equal(p.target.zone, 'Bretagne');
     assert.equal(p.targetValidated, false);
     assert.match(p.profileCommit, /^[0-9a-f]{40}$/);
+    const rl = JSON.parse(getSetting(s.db, 'claude_rate_limit_json'));
+    assert.equal(rl.fiveHour.utilization, 0.33, 'quota Claude (session) enregistré après l\'appel');
+    assert.equal(rl.sevenDay.utilization, 0.5, 'quota Claude (semaine) enregistré après l\'appel');
 
     const refused = await run(s, 'prospect', { count: 3 });
     assert.match(refused.error, /Valide la cible/);

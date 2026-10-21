@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
-import { runClaude, extractJson } from '../src/services/claude.js';
+import { runClaude, extractJson, rateLimitWindows } from '../src/services/claude.js';
 import { waitCool } from '../src/services/thermal.js';
 import { openDb, now } from '../src/db.js';
 import { enqueue, Worker, latestJobs, cancelJob, addUsage, usageSummary } from '../src/services/jobs.js';
@@ -20,10 +20,24 @@ test('runClaude parse le flux et la conso', async () => {
   assert.ok(j.args.includes('Read,Grep'));
   assert.ok(j.args.join(' ').includes('Bash,Edit,Write'));
   assert.equal(seen.length, 1);
+  assert.deepEqual(r.rateLimit.unifiedWindows.five_hour, { utilization: 0.33, resetsAt: 1_700_000_000 });
 });
 
 test('runClaude remonte une erreur si le process meurt', async () => {
   await assert.rejects(runClaude({ bin, prompt: 'CRASH' }), /sans résultat/);
+});
+
+test('rateLimitWindows normalise la session (5h) et la semaine, quel que soit le format reçu', () => {
+  assert.deepEqual(rateLimitWindows({ unifiedWindows: {
+    five_hour: { utilization: 0.1, resetsAt: 111 },
+    seven_day: { utilization: 0.2, resetsAt: 222 },
+  } }), { fiveHour: { utilization: 0.1, resetsAt: 111 }, sevenDay: { utilization: 0.2, resetsAt: 222 } });
+  // Une seule fenêtre présente : l'autre reste null plutôt que de tout rejeter
+  assert.deepEqual(rateLimitWindows({ unifiedWindows: { five_hour: { utilization: 0.4 } } }),
+    { fiveHour: { utilization: 0.4, resetsAt: null }, sevenDay: null });
+  assert.equal(rateLimitWindows(null), null);
+  assert.equal(rateLimitWindows({}), null);
+  assert.equal(rateLimitWindows({ unifiedWindows: { five_hour: { utilization: 'beaucoup' } } }), null, 'valeur non numérique ignorée');
 });
 
 test('extractJson gère texte, fences et accolades dans les chaînes', () => {

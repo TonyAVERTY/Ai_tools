@@ -37,6 +37,7 @@ export function runClaude(o) {
     let buf = '';
     let stderr = '';
     let result = null;
+    let rateLimit = null;
     const texts = [];
 
     const timer = setTimeout(() => child.kill('SIGTERM'), o.timeoutMs || 30 * 60_000);
@@ -62,6 +63,9 @@ export function runClaude(o) {
         }
       } else if (ev.type === 'result') {
         result = ev;
+      } else if (ev.type === 'rate_limit_event' && ev.rate_limit_info) {
+        // Dernier reçu = état le plus à jour (session 5h + semaine), remonté à chaque appel
+        rateLimit = ev.rate_limit_info;
       }
     }
 
@@ -80,9 +84,22 @@ export function runClaude(o) {
         tokensIn: (usage.input_tokens || 0) + (usage.cache_read_input_tokens || 0) + (usage.cache_creation_input_tokens || 0),
         tokensOut: usage.output_tokens || 0,
         turns: result.num_turns,
+        rateLimit,
       });
     });
   });
+}
+
+// Normalise la session (5h glissantes) et la semaine (7j glissants) quel que soit le détail
+// exact remonté par la CLI. Pour afficher où en est le quota Pro avant de lancer un job.
+export function rateLimitWindows(info) {
+  if (!info) return null;
+  const w = info.unifiedWindows || {};
+  const pick = (k) => (w[k] && typeof w[k].utilization === 'number' ? { utilization: w[k].utilization, resetsAt: w[k].resetsAt ?? null } : null);
+  const fiveHour = pick('five_hour');
+  const sevenDay = pick('seven_day');
+  if (!fiveHour && !sevenDay) return null;
+  return { fiveHour, sevenDay };
 }
 
 // Extrait le premier objet JSON d'une réponse (Claude entoure parfois de ```json)
