@@ -80,10 +80,20 @@ export function getTemplate(db, projectId, kind, { validatedOnly = false } = {})
   return row;
 }
 
-export function saveTemplate(db, projectId, kind, { subject = '', body, status = 'draft' }) {
+export function saveTemplate(db, projectId, kind, { subject = '', subjectB = null, body, status = 'draft' }) {
   if (!TEMPLATE_KINDS.includes(kind)) throw new HttpError(400, 'Type de modèle inconnu');
-  db.prepare(`INSERT INTO templates(project_id, kind, subject, body, status, updated_at) VALUES(?, ?, ?, ?, ?, ?)
-    ON CONFLICT(project_id, kind) DO UPDATE SET subject = excluded.subject,
+  db.prepare(`INSERT INTO templates(project_id, kind, subject, subject_b, body, status, updated_at) VALUES(?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(project_id, kind) DO UPDATE SET subject = excluded.subject, subject_b = excluded.subject_b,
       body = excluded.body, status = excluded.status, updated_at = excluded.updated_at`)
-    .run(projectId, kind, subject, body, status, now());
+    .run(projectId, kind, subject, kind === 'initial' ? (subjectB || null) : null, body, status, now());
+}
+
+// Objet A ou B : on équilibre les envois (B seulement si un objet B est défini)
+export function pickVariant(db, projectId, template) {
+  if (!template.subject_b) return 'A';
+  const rows = db.prepare(`SELECT variant, COUNT(*) n FROM mail_log
+    WHERE project_id = ? AND kind = 'initial' AND error IS NULL AND variant IN ('A', 'B') GROUP BY variant`).all(projectId);
+  const count = { A: 0, B: 0 };
+  for (const r of rows) count[r.variant] = r.n;
+  return count.B < count.A ? 'B' : 'A';
 }

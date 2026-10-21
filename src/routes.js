@@ -123,7 +123,7 @@ export function registerRoutes(router, app) {
     const p = getProject(app, pid(params));
     const jobs = latestJobs(db, p.id);
     const row = getTemplate(db, p.id, 'initial');
-    const tpl = row ? { subject: row.subject, body: row.body, status: row.status, updated_at: row.updated_at } : null;
+    const tpl = row ? { subject: row.subject, subjectB: row.subject_b, body: row.body, status: row.status, updated_at: row.updated_at } : null;
     const stats = prospectStats(db, p.id);
     const day = now() - 86400;
     const sendMax = allowedToSend({
@@ -183,9 +183,10 @@ export function registerRoutes(router, app) {
     const b = await readBody(req);
     const subject = String(b.subject || '').trim().slice(0, 200);
     const body = String(b.body || '').trim().slice(0, 5000);
+    const subjectB = String(b.subjectB || '').trim().slice(0, 200) || null;
     if (!subject || !body) throw new HttpError(400, 'Objet et corps requis');
     const status = b.mode === 'validate' ? 'validated' : 'draft';
-    saveTemplate(db, p.id, 'initial', { subject, body, status });
+    saveTemplate(db, p.id, 'initial', { subject, subjectB, body, status });
     json(res, { ok: true, status });
   });
 

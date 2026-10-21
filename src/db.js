@@ -78,6 +78,16 @@ export const MIGRATIONS = [
     SELECT project_id, 'initial', subject, body, status, updated_at FROM mail_templates;
   DROP TABLE mail_templates;
   `,
+  // 3 — suivi des mails envoyés + test A/B de l'objet
+  `
+  ALTER TABLE templates ADD COLUMN subject_b TEXT;        -- objet B (premier mail uniquement)
+  ALTER TABLE prospects ADD COLUMN variant TEXT;          -- A | B
+  ALTER TABLE mail_log ADD COLUMN kind TEXT NOT NULL DEFAULT 'initial';
+  ALTER TABLE mail_log ADD COLUMN variant TEXT;
+  ALTER TABLE mail_log ADD COLUMN subject TEXT;
+  ALTER TABLE mail_log ADD COLUMN message_id TEXT;
+  CREATE INDEX mail_log_msgid ON mail_log(message_id);
+  `,
 ];
 
 export function openDb(dataDir) {
