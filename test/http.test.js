@@ -144,3 +144,20 @@ test('désinscription : GET confirme, POST blackliste, token forgé refusé', as
   r = await post(`/u/${encodeURIComponent(email)}/faux`, {}, { auth: false, origin: null });
   assert.equal(r.status, 400);
 });
+
+test('SECRET_KEY changée : le panel reste utilisable, les secrets sont à ressaisir', async () => {
+  const id = app.db.prepare('SELECT id FROM projects LIMIT 1').get().id;
+  app.db.prepare('UPDATE projects SET smtp_enc = ? WHERE id = ?').run('v1:AAAA:BBBB:CCCC', id);
+  const warn = console.warn; console.warn = () => {};
+  try {
+    let r = await get('/');
+    assert.equal(r.status, 200);
+    r = await get('/settings');
+    assert.equal(r.status, 200);
+    r = await get(`/api/projects/${id}/status`);
+    assert.equal(r.status, 200);
+    assert.equal((await r.json()).hasSmtp, true, 'la colonne existe toujours');
+    r = await post(`/api/projects/${id}/smtp`, { host: 'smtp.x', user: 'u', pass: 'nouveau', fromEmail: 'a@x.fr' });
+    assert.equal(r.status, 200, 'on peut ressaisir');
+  } finally { console.warn = warn; }
+});
