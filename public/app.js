@@ -23,6 +23,12 @@
   }
 
   const formData = (form) => Object.fromEntries(new FormData(form));
+  const ago = (ts) => {
+    if (!ts) return 'jamais';
+    const m = Math.round((Date.now() / 1000 - ts) / 60);
+    return m < 1 ? "à l'instant" : m < 60 ? `il y a ${m} min` : m < 1440 ? `il y a ${Math.round(m / 60)} h` : `il y a ${Math.round(m / 1440)} j`;
+  };
+  const pct = (x) => `${Math.round(x * 100)} %`;
   const ACTIVE = ['queued', 'running'];
   const LABELS = { analyze: 'Analyse', prospect: 'Recherche', template: 'Modèle', send: 'Envoi', evolution: 'Évolutions' };
 
@@ -124,6 +130,19 @@
       : `${s.stats.new} prospect(s) en attente · max ${s.sendMax} maintenant`;
     $('[data-count]', el).textContent = `(${s.stats.total || 0})`;
 
+    // Boîte de réception + test A/B
+    const ib = $('[data-inbox]', el);
+    const ab = s.ab.length > 1
+      ? `<br>Test A/B : ${s.ab.map((v) => `<strong>${v.variant}</strong> ${v.replied}/${v.sent} réponses (${pct(v.rate)})`).join(' · ')}` : '';
+    if (!s.hasImap) {
+      ib.innerHTML = `<span class="muted">Boîte non connectée : configure l'IMAP (Configuration du projet) pour détecter les réponses.</span>${ab}`;
+    } else {
+      const i = s.inbox || {};
+      const head = i.lastError ? `<span class="error">Boîte en erreur : ${esc(i.lastError)}</span>` : `Boîte vérifiée ${ago(i.lastOk)}`;
+      ib.innerHTML = `${head} · ${i.replies || 0} réponse(s) · ${i.bounces || 0} adresse(s) invalide(s)
+        <button class="btn small" data-inbox-check="${id}">Vérifier maintenant</button>${ab}`;
+    }
+
     state.set(id, st);
     schedule(el, running.length ? 4000 : 30_000);
   }
@@ -177,6 +196,16 @@
     }
 
     if (e.target.matches('[data-recap-refresh]')) loadRecap(e.target.closest('.project'), true);
+
+    const inboxBtn = e.target.closest('[data-inbox-check]');
+    if (inboxBtn) {
+      inboxBtn.disabled = true;
+      try {
+        const r = await api(`/api/projects/${inboxBtn.dataset.inboxCheck}/inbox/check`, {});
+        toast(`Boîte lue : ${r.check.replies} nouvelle(s) réponse(s), ${r.check.bounces} rejet(s)`);
+      } catch (err) { toast(err.message, 'error'); }
+      refreshProject(inboxBtn.closest('.project'));
+    }
   });
 
   // ---------- Formulaires ----------
@@ -218,6 +247,14 @@
           break;
         }
         case 'smtp': data.pass ||= ''; await api(`/api/projects/${id}/smtp`, data); toast('SMTP enregistré'); form.pass.value = ''; break;
+        case 'imap': {
+          const r = await api(`/api/projects/${id}/imap`, data);
+          form.pass.value = '';
+          if (r.disabled) toast('Détection des réponses désactivée');
+          else if (r.ok) toast(`Boîte connectée : ${r.check.replies} réponse(s) trouvée(s)`);
+          else toast(r.error, 'error');
+          break;
+        }
         case 'db': data.ssl = form.ssl.checked; await api(`/api/projects/${id}/db`, data); toast('Accès BDD enregistré'); form.password.value = ''; break;
         case 'delete': await api(`/api/projects/${id}/delete`, {}); location.reload(); break;
       }

@@ -97,3 +97,5 @@ pre.md { white-space: pre-wrap; background: var(--locked); padding: 12px; border
 .toast.error { background: var(--err); color: #fff; }
 form.send { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
 @media (max-width: 640px) { .sys { order: 3; flex-basis: 100%; } }
+.inbox { margin: 10px 0 4px; line-height: 1.9; }
+.inbox:empty { display: none; }

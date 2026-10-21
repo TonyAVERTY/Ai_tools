@@ -15,11 +15,14 @@ export function getProject(app, id, { secrets = false } = {}) {
     profile: parse(p.profile_json), profileCommit: p.profile_commit, profileAt: p.profile_at,
     target: parse(p.target_json), targetValidated: !!p.target_validated,
     dailyMailCap: p.daily_mail_cap, createdAt: p.created_at,
-    hasSmtp: !!p.smtp_enc, hasDb: !!p.db_enc,
+    hasSmtp: !!p.smtp_enc, hasDb: !!p.db_enc, hasImap: !!p.imap_enc,
+    inbox: parse(p.inbox_json),
   };
   if (secrets) {
     out.smtp = decryptJson(app.cfg.secretKey, p.smtp_enc);
     out.dbCfg = decryptJson(app.cfg.secretKey, p.db_enc);
+    out.imapCfg = decryptJson(app.cfg.secretKey, p.imap_enc);
+    out.imap = imapCredentials(out.imapCfg, out.smtp);
   }
   return out;
 }
@@ -35,7 +38,7 @@ export function createProject(app, { name, gitUrl }) {
 
 // Les secrets vides dans le formulaire = on garde l'ancien (le formulaire ne les réaffiche jamais)
 export function saveSecretConfig(app, id, column, incoming, secretField) {
-  if (!['smtp_enc', 'db_enc'].includes(column)) throw new Error('Colonne invalide');
+  if (!['smtp_enc', 'db_enc', 'imap_enc'].includes(column)) throw new Error('Colonne invalide');
   const current = decryptJson(app.cfg.secretKey, app.db.prepare(`SELECT ${column} c FROM projects WHERE id = ?`).get(id)?.c) || {};
   const next = { ...current, ...incoming };
   if (!incoming[secretField]) next[secretField] = current[secretField];
@@ -71,6 +74,16 @@ export function sentSince(db, since, projectId = null) {
   return (projectId == null ? db.prepare(sql).get(since) : db.prepare(sql).get(since, projectId)).n;
 }
 
+// IMAP : utilisateur vide = mêmes identifiants que le SMTP du projet (cas le plus courant)
+export function imapCredentials(imap, smtp) {
+  if (!imap?.host) return null;
+  const reuse = !imap.user;
+  const user = reuse ? smtp?.user : imap.user;
+  const pass = reuse ? smtp?.pass : imap.pass;
+  if (!user || !pass) return null;
+  return { host: imap.host, port: Number(imap.port || 993), user, pass, reuseSmtp: reuse };
+}
+
 // ---------- Modèles de mail ----------
 export const TEMPLATE_KINDS = ['initial', 'followup'];
 
@@ -96,4 +109,13 @@ export function pickVariant(db, projectId, template) {
   const count = { A: 0, B: 0 };
   for (const r of rows) count[r.variant] = r.n;
   return count.B < count.A ? 'B' : 'A';
+}
+
+// Taux de réponse par objet (A/B) sur les premiers mails
+export function abStats(db, projectId) {
+  const rows = db.prepare(`SELECT m.variant v, COUNT(*) sent, SUM(p.replied_at IS NOT NULL) replied
+    FROM mail_log m JOIN prospects p ON p.id = m.prospect_id
+    WHERE m.project_id = ? AND m.kind = 'initial' AND m.error IS NULL AND m.variant IS NOT NULL
+    GROUP BY m.variant ORDER BY m.variant`).all(projectId);
+  return rows.map((r) => ({ variant: r.v, sent: r.sent, replied: r.replied, rate: r.sent ? r.replied / r.sent : 0 }));
 }
