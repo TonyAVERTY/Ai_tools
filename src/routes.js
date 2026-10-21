@@ -13,6 +13,7 @@ import { followupPlan } from './services/followup.js';
 import { nextNightSlot } from './services/paris-time.js';
 import { notify, notifyConfig, EVENTS, WEBHOOK_RE } from './services/notify.js';
 import { budgetState, AI_JOBS } from './services/budget.js';
+import { sendWeeklyReport } from './services/report.js';
 import {
   getProject, listProjects, createProject, saveSecretConfig, publicConfig, globalSmtp,
   prospectStats, sentSince, repoDir, getTemplate, saveTemplate, abStats,
@@ -71,6 +72,7 @@ export function registerRoutes(router, app) {
       send_delay_max: getSetting(db, 'send_delay_max', '60'),
       prospect_model: getSetting(db, 'prospect_model', 'haiku'),
       blacklist_count: db.prepare('SELECT COUNT(*) n FROM blacklist').get().n,
+      weekly_report: getSetting(db, 'weekly_report', '0') === '1',
       budget_day_usd: getSetting(db, 'budget_day_usd', ''),
       budget_month_usd: getSetting(db, 'budget_month_usd', ''),
       discord: { set: !!notifyConfig(app).url, events: notifyConfig(app).events, all: EVENTS },
@@ -92,6 +94,7 @@ export function registerRoutes(router, app) {
     setSetting(db, 'send_delay_max', String(dmax));
     setSetting(db, 'prospect_model', b.prospect_model === 'sonnet' ? 'sonnet' : 'haiku');
     const money = (v) => { const n = Number(String(v || '').replace(',', '.')); return Number.isFinite(n) && n > 0 ? String(Math.round(n * 100) / 100) : ''; };
+    setSetting(db, 'weekly_report', b.weekly_report === 'on' ? '1' : '0');
     setSetting(db, 'budget_day_usd', money(b.budget_day_usd));
     setSetting(db, 'budget_month_usd', money(b.budget_month_usd));
 
@@ -108,6 +111,12 @@ export function registerRoutes(router, app) {
   });
 
   // ---------- API JSON ----------
+  router.post('/api/report/send', async ({ res }) => {
+    const r = await sendWeeklyReport(app);
+    if (!r.channels.length) throw new HttpError(400, 'Configure le SMTP global + l\'email de réception, ou un webhook Discord');
+    json(res, { ok: true, channels: r.channels });
+  });
+
   router.post('/api/notify/test', async ({ res }) => {
     if (!notifyConfig(app).url) throw new HttpError(400, 'Aucun webhook Discord configuré');
     const ok = await notify(app, 'test', { title: 'Notification de test', description: 'Les notifications AiTools arrivent bien ici.', level: 'ok' }, { force: true });
