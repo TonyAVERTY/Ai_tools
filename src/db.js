@@ -117,6 +117,15 @@ export const MIGRATIONS = [
   ALTER TABLE prospects ADD COLUMN next_action TEXT;
   ALTER TABLE prospects ADD COLUMN next_action_at INTEGER;
   `,
+  // 8 — historique quotidien des KPI business (pour les courbes)
+  `
+  CREATE TABLE metrics_daily (
+    project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    day TEXT NOT NULL,                 -- AAAA-MM-JJ, heure de Paris
+    users REAL, clients REAL, revenue REAL,
+    PRIMARY KEY (project_id, day)
+  );
+  `,
 ];
 
 export function openDb(dataDir) {
