@@ -12,7 +12,10 @@ idées d'évolutions et récap business. Pensé pour un **Raspberry Pi 4 sans ve
   - outils Claude restreints à chaque job (lecture seule pour le code, WebSearch/WebFetch pour la prospection) ;
   - `--max-turns` borné ;
   - fiche projet générée une fois, puis seulement sur « Réanalyser » ;
-  - Haiku par défaut pour la prospection et les mails.
+  - Haiku par défaut partout (prospection, analyse de projet, mails, relances) ; Sonnet/Opus restent
+    disponibles en Réglages (prospection, analyse) ou au lancement (niveau de raisonnement de
+    l'Évolution), uniquement quand Haiku ne suffit pas — utile avec un abonnement Pro dont le quota
+    est limité à la semaine.
 - **Sécurité** :
   - login Google avec whitelist d'emails ;
   - PKCE + state + nonce ;
@@ -42,6 +45,10 @@ idées d'évolutions et récap business. Pensé pour un **Raspberry Pi 4 sans ve
 - **Budget IA** : plafonds glissants sur 24 h et sur 30 jours, en équivalent $ API remonté par Claude Code. L'abonnement Pro ne facture rien en plus ; c'est un garde-fou pour ton quota.
   - Plafond atteint : les jobs IA **restent en file** et repartent seuls quand la fenêtre glisse. Les envois et relances, qui ne consomment pas d'IA, continuent.
   - Un job en cours n'est jamais coupé : le plafond peut donc être dépassé d'un job.
+- **Quota du compte Claude** : la barre du haut affiche, dès qu'un job IA a tourné, le taux d'utilisation
+  remonté par la CLI elle-même — session glissante de 5 h et semaine glissante de 7 jours, avec l'heure de
+  réinitialisation au survol. Orange à partir de 80 %, rouge à 100 %. C'est la vraie limite du compte
+  Pro, à distinguer du budget IA ci-dessus (un garde-fou interne en $ équivalent).
 - **Notifications Discord** via webhook : URL chiffrée, validée, sans mention possible. Tu choisis les événements :
   - fin de job ou erreur ;
   - réponses de prospects ;
