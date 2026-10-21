@@ -17,4 +17,5 @@ if [ -n "$scan" ] && git diff --cached -U0 -- $scan | grep -E '^\+' | grep -Ei '
   echo "✗ Un secret semble présent dans le diff. Vérifie avant de commit."; exit 1
 fi
 
-npm run --silent check || { echo "✗ Lint/tests en échec, commit bloqué."; exit 1; }
+out=$(npm run --silent check 2>&1) || { echo "$out" | tail -40; echo "✗ Lint/tests en échec, commit bloqué."; exit 1; }
+echo "✓ lint + tests OK"
