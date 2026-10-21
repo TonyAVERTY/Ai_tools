@@ -2,11 +2,13 @@
 //   1. lecture des boîtes IMAP (réponses, bounces)
 //   2. puis seulement ensuite, mise en file des relances dues
 //   3. rapport hebdo le lundi à 8h
+//   4. photo quotidienne des KPI business (pour les courbes)
 import { checkInbox } from './inbox.js';
 import { followupPlan } from './followup.js';
 import { enqueue } from './jobs.js';
 import { getProject } from '../projects.js';
 import { maybeSendWeekly } from './report.js';
+import { snapshotAll } from './metrics.js';
 
 export class Scheduler {
   constructor(app, { everyMs = 15 * 60_000, log = console } = {}) {
@@ -38,6 +40,7 @@ export class Scheduler {
       this.queueFollowups();
       try { await maybeSendWeekly(this.app); }
       catch (e) { this.log.error('[rapport hebdo]', e.message); }
+      await snapshotAll(this.app, { log: this.log });
     } finally { this.running = false; }
   }
 

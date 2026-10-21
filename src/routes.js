@@ -15,6 +15,7 @@ import { notify, notifyConfig, EVENTS, WEBHOOK_RE } from './services/notify.js';
 import { budgetState, AI_JOBS } from './services/budget.js';
 import { sendWeeklyReport } from './services/report.js';
 import { exportProspects, importProspects } from './services/csv.js';
+import { history, saveSnapshot } from './services/metrics.js';
 import {
   listProspects, parseFilters, STATUSES as PROSPECT_STATUSES, prospectDetail, addNote, deleteNote, setNextAction,
 } from './services/crm.js';
@@ -301,8 +302,10 @@ export function registerRoutes(router, app) {
     const stats = prospectStats(db, p.id);
     const cost = db.prepare('SELECT COALESCE(SUM(cost_usd),0) c FROM jobs WHERE project_id = ?').get(p.id).c;
     let business = null, error = null;
-    try { business = await fetchRecap(p.id, p.dbCfg, { force: url.searchParams.has('force') }); }
-    catch (e) { error = e.message; }
+    try {
+      business = await fetchRecap(p.id, p.dbCfg, { force: url.searchParams.has('force') });
+      saveSnapshot(db, p.id, business); // la consultation alimente aussi la courbe du jour
+    } catch (e) { error = e.message; }
     json(res, { business, error, stats, aiCostUsd: cost });
   });
 
@@ -323,6 +326,11 @@ export function registerRoutes(router, app) {
     const b = await readBody(req, { max: 1024 * 1024 });
     try { json(res, importProspects(db, p.id, String(b.csv || ''))); }
     catch (e) { throw new HttpError(400, e.message); }
+  });
+
+  router.get('/api/projects/:id/history', ({ res, params, url }) => {
+    const p = getProject(app, pid(params));
+    json(res, history(db, p.id, { days: url.searchParams.get('days') === '90' ? 90 : 30 }));
   });
 
   router.get('/api/projects/:id/prospects', ({ res, params, url }) => {
