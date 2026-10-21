@@ -2,6 +2,7 @@
 // Aucun token Claude : uniquement des en-têtes de mails.
 import { now } from '../db.js';
 import { getProject } from '../projects.js';
+import { notify } from './notify.js';
 
 // Webmails grand public : une réponse d'un autre @gmail.com ne dit rien sur l'entreprise
 const GENERIC_DOMAINS = new Set([
@@ -158,6 +159,13 @@ export async function checkInbox(app, projectId) {
       uidValidity: r.uidValidity, lastUid: r.lastUid, lastCheck: at, lastOk: at, lastError: null,
       replies: (state.replies || 0) + res.replies, bounces: (state.bounces || 0) + res.bounces,
     });
+    if (res.replies) {
+      const who = db.prepare('SELECT company, email, reply_subject FROM prospects WHERE project_id = ? AND replied_at = ? LIMIT 10').all(project.id, at);
+      await notify(app, 'reply', {
+        title: `${project.name} · ${res.replies} réponse(s) de prospect`, level: 'ok',
+        description: who.map((p) => `**${p.company}** (${p.email}) : ${p.reply_subject || 'sans objet'}`).join('\n'),
+      });
+    }
     return res;
   } catch (e) {
     const msg = String(e.responseText || e.message || e).slice(0, 300);

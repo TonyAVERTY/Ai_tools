@@ -174,3 +174,21 @@ test('« Cette nuit » programme le job au prochain créneau 1h-6h', async () =>
   const sys = await (await get('/api/system')).json();
   assert.ok(job.run_after > now() ? sys.scheduled >= 1 : true);
 });
+
+test('réglages Discord : URL validée, chiffrée, événements enregistrés', async () => {
+  const base = { notify_email: 'moi@x.fr', forgejo_host: 'git.tony-averty.dev', global_daily_cap: '100', send_delay_min: '20', send_delay_max: '60' };
+  let r = await post('/settings', { ...base, discord_webhook: 'https://evil.com/api/webhooks/1/x' }, { form: true });
+  assert.equal(r.status, 400);
+  const hook = 'https://discord.com/api/webhooks/123456789012345678/abcdefghijklmnopqrstuvwxyz-ABC_123';
+  r = await post('/settings', { ...base, discord_webhook: hook, ev_reply: 'on', ev_job_error: 'on' }, { form: true });
+  assert.equal(r.status, 303);
+  const enc = app.db.prepare("SELECT value FROM settings WHERE key = 'discord_webhook_enc'").get().value;
+  assert.ok(!enc.includes('abcdefghijklmnop'), 'URL chiffrée');
+  assert.deepEqual(JSON.parse(app.db.prepare("SELECT value FROM settings WHERE key = 'discord_events'").get().value), ['job_error', 'reply']);
+  r = await get('/settings');
+  const page = await r.text();
+  assert.ok(!page.includes('abcdefghijklmnop'), 'URL jamais réaffichée');
+  assert.match(page, /data-notify-test/);
+  r = await post('/settings', { ...base, discord_remove: 'on' }, { form: true });
+  assert.equal(app.db.prepare("SELECT value FROM settings WHERE key = 'discord_webhook_enc'").get().value, null);
+});

@@ -39,8 +39,10 @@ export function latestJobs(db, projectId) {
 }
 
 export class Worker {
-  constructor(db, handlers, { thermalMax = 75, pollMs = 3000, log = console, clock = now } = {}) {
+  constructor(db, handlers, { thermalMax = 75, pollMs = 3000, log = console, clock = now, onFinish, onThermal } = {}) {
     this.clock = clock;
+    this.onFinish = onFinish;   // (job, {status, result, error}) → notifications
+    this.onThermal = onThermal; // (°C) → une fois par pause
     this.db = db;
     this.handlers = handlers;
     this.thermalMax = thermalMax;
@@ -57,6 +59,12 @@ export class Worker {
   }
 
   stop() { this.stopped = true; this.current?.abort(); }
+
+  // Les callbacks ne doivent jamais bloquer ni faire tomber le worker
+  emit(name, ...args) {
+    try { Promise.resolve(this[name]?.(...args)).catch((e) => this.log.error(`[${name}]`, e.message)); }
+    catch (e) { this.log.error(`[${name}]`, e.message); }
+  }
 
   isCancelled(jobId) {
     return this.db.prepare('SELECT status FROM jobs WHERE id = ?').get(jobId)?.status === 'cancelled';
@@ -79,7 +87,13 @@ export class Worker {
       return true;
     }
 
-    await waitCool(this.thermalMax, { onWait: (t) => setProgress(this.db, job.id, { message: `Pause thermique (${t} °C)` }) });
+    let warned = false;
+    await waitCool(this.thermalMax, {
+      onWait: (t) => {
+        setProgress(this.db, job.id, { message: `Pause thermique (${t} °C)` });
+        if (!warned) { warned = true; this.emit('onThermal', t); }
+      },
+    });
 
     this.db.prepare("UPDATE jobs SET status='running', started_at=? WHERE id=? AND status='queued'").run(now(), job.id);
     const ctrl = new AbortController();
@@ -100,12 +114,14 @@ export class Worker {
       if (!this.isCancelled(job.id)) {
         this.db.prepare("UPDATE jobs SET status='done', result_json=?, finished_at=?, cost_usd=?, tokens_in=?, tokens_out=? WHERE id=?")
           .run(JSON.stringify(result ?? null), now(), ctx.usage.costUsd, ctx.usage.tokensIn, ctx.usage.tokensOut, job.id);
+        this.emit('onFinish', job, { status: 'done', result });
       }
     } catch (e) {
       this.log.error(`[job ${job.id} ${job.type}]`, e.message);
       if (!this.isCancelled(job.id)) {
         this.db.prepare("UPDATE jobs SET status='error', error=?, finished_at=?, cost_usd=?, tokens_in=?, tokens_out=? WHERE id=?")
           .run(String(e.message).slice(0, 2000), now(), ctx.usage.costUsd, ctx.usage.tokensIn, ctx.usage.tokensOut, job.id);
+        this.emit('onFinish', job, { status: 'error', error: e.message });
       }
     } finally {
       clearInterval(watch);

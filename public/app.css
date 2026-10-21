@@ -102,3 +102,5 @@ form.send { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--lin
 .followup { margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--line); }
 .running.scheduled { background: transparent; border: 1px dashed var(--line); }
 .moon { width: 18px; height: 18px; border-radius: 50%; box-shadow: inset -5px -3px 0 0 var(--accent); flex: none; transform: rotate(-20deg); }
+.checks { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0 12px; margin: 4px 0 10px; }
+.checks label.check { margin: 4px 0; }
