@@ -56,7 +56,7 @@ function targetForm(p) {
 </form>`;
 }
 
-function configForms(p, smtp, dbCfg) {
+function configForms(p, smtp, dbCfg, imap) {
   return `<details class="config"><summary>Configuration du projet</summary>
 <form data-action="smtp" data-id="${p.id}" class="cfg">
   <h4>SMTP d'envoi</h4>
@@ -70,6 +70,17 @@ function configForms(p, smtp, dbCfg) {
   </div>
   <label>Plafond mails / 24 h (max 200)<input name="dailyCap" type="number" min="1" max="200" value="${p.dailyMailCap}"></label>
   <button class="btn">Enregistrer SMTP</button>
+</form>
+<form data-action="imap" data-id="${p.id}" class="cfg">
+  <h4>Boîte de réception (IMAP)</h4>
+  <p class="muted small">Sert à détecter les réponses et les adresses invalides. Utilisateur vide = mêmes identifiants que le SMTP. Hôte vide = désactivé.</p>
+  <div class="grid3">
+    <label>Hôte IMAP<input name="host" value="${esc(imap.host)}" placeholder="imap.mondomaine.fr"></label>
+    <label>Port<input name="port" type="number" value="${esc(imap.port || 993)}"></label>
+    <label>Utilisateur<input name="user" value="${esc(imap.user)}" placeholder="identique au SMTP" autocomplete="off"></label>
+    <label>Mot de passe<input name="pass" type="password" placeholder="${imap.passSet ? '•••••• (inchangé)' : 'identique au SMTP'}" autocomplete="new-password"></label>
+  </div>
+  <button class="btn">Enregistrer et tester</button>
 </form>
 <form data-action="db" data-id="${p.id}" class="cfg">
   <h4>Base de données (récapitulatif)</h4>
@@ -94,7 +105,7 @@ function configForms(p, smtp, dbCfg) {
 </details>`;
 }
 
-function projectItem(p, smtp, dbCfg) {
+function projectItem(p, smtp, dbCfg, imap) {
   const profile = p.profile;
   return `<details class="project card" data-id="${p.id}">
 <summary><span class="pname">${esc(p.name)}</span><span class="pstate" data-state></span></summary>
@@ -146,6 +157,7 @@ function projectItem(p, smtp, dbCfg) {
       <span class="muted small" data-send-info></span>
     </form>
     <div class="job" data-job="send"></div>
+    <p class="inbox small" data-inbox></p>
 
     <details class="prospects"><summary>Prospects <span data-count></span></summary>
       <div data-prospects></div>
@@ -169,7 +181,7 @@ function projectItem(p, smtp, dbCfg) {
     <div class="recap" data-recap><p class="muted">Chargement…</p></div>
   </section>
 
-  ${configForms(p, smtp, dbCfg)}
+  ${configForms(p, smtp, dbCfg, imap)}
 </div>
 </details>`;
 }
@@ -190,7 +202,7 @@ export function dashboardPage({ email, projects, forgejoHost }) {
   </form>
 </details>
 <div class="projects">
-${projects.length ? projects.map((x) => projectItem(x.project, x.smtp, x.dbCfg)).join('\n') : '<p class="muted">Aucun projet pour l\'instant.</p>'}
+${projects.length ? projects.map((x) => projectItem(x.project, x.smtp, x.dbCfg, x.imap)).join('\n') : '<p class="muted">Aucun projet pour l\'instant.</p>'}
 </div>`,
   });
 }

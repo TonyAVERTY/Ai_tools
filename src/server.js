@@ -9,6 +9,7 @@ import { getSession, checkOrigin, purgeExpired } from './auth.js';
 import { registerRoutes } from './routes.js';
 import { Worker } from './services/jobs.js';
 import { makeHandlers } from './handlers.js';
+import { Scheduler } from './services/scheduler.js';
 import { layout } from './views.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -67,14 +68,17 @@ export function createApp(cfg, { db = openDb(cfg.dataDir), worker = true, create
   server.requestTimeout = 30_000;
 
   let w = null;
+  let scheduler = null;
   if (worker) {
     w = new Worker(db, makeHandlers(app), { thermalMax: cfg.thermalMax });
     w.start();
+    scheduler = new Scheduler(app);
+    scheduler.start();
   }
   const purge = setInterval(() => purgeExpired(db), 3600_000);
   purge.unref();
 
-  app.close = () => new Promise((r) => { w?.stop(); clearInterval(purge); server.close(() => { db.close(); r(); }); });
+  app.close = () => new Promise((r) => { w?.stop(); scheduler?.stop(); clearInterval(purge); server.close(() => { db.close(); r(); }); });
   app.server = server;
   return app;
 }

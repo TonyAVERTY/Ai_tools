@@ -88,6 +88,13 @@ export const MIGRATIONS = [
   ALTER TABLE mail_log ADD COLUMN message_id TEXT;
   CREATE INDEX mail_log_msgid ON mail_log(message_id);
   `,
+  // 4 — détection des réponses via IMAP
+  `
+  ALTER TABLE prospects ADD COLUMN replied_at INTEGER;
+  ALTER TABLE prospects ADD COLUMN reply_subject TEXT;
+  ALTER TABLE projects ADD COLUMN imap_enc TEXT;
+  ALTER TABLE projects ADD COLUMN inbox_json TEXT;        -- état de la dernière lecture IMAP
+  `,
 ];
 
 export function openDb(dataDir) {

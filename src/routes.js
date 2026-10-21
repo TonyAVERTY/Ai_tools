@@ -8,9 +8,10 @@ import { validateGitUrl, removeRepo } from './services/git.js';
 import { fetchRecap, clearRecapCache, validateSelect } from './services/recap.js';
 import { allowedToSend, EMAIL_RE } from './services/mailer.js';
 import { cpuTemp } from './services/thermal.js';
+import { checkInbox } from './services/inbox.js';
 import {
   getProject, listProjects, createProject, saveSecretConfig, publicConfig, globalSmtp,
-  prospectStats, sentSince, repoDir, getTemplate, saveTemplate,
+  prospectStats, sentSince, repoDir, getTemplate, saveTemplate, abStats,
 } from './projects.js';
 
 const lines = (s) => String(s || '').split('\n').map((x) => x.trim()).filter(Boolean).slice(0, 20);
@@ -50,7 +51,7 @@ export function registerRoutes(router, app) {
   router.get('/', ({ res, session }) => {
     const projects = listProjects(app).map((p) => {
       const full = getProject(app, p.id, { secrets: true });
-      return { project: p, smtp: publicConfig(full.smtp, 'pass'), dbCfg: publicConfig(full.dbCfg, 'password') };
+      return { project: p, smtp: publicConfig(full.smtp, 'pass'), dbCfg: publicConfig(full.dbCfg, 'password'), imap: publicConfig(full.imapCfg, 'pass') };
     });
     html(res, dashboardPage({ email: session.email, projects, forgejoHost: getSetting(db, 'forgejo_host') }));
   });
@@ -134,6 +135,7 @@ export function registerRoutes(router, app) {
     json(res, {
       jobs, template: tpl, stats, sendMax,
       targetValidated: p.targetValidated, hasProfile: !!p.profile, hasSmtp: p.hasSmtp,
+      hasImap: p.hasImap, inbox: p.inbox, ab: abStats(db, p.id),
     });
   });
 
@@ -200,6 +202,28 @@ export function registerRoutes(router, app) {
     }, 'pass');
     db.prepare('UPDATE projects SET daily_mail_cap = ? WHERE id = ?').run(int(b.dailyCap, 1, 200, 30), p.id);
     json(res, { ok: true });
+  });
+
+  // Boîte de réception : on enregistre puis on teste tout de suite la connexion
+  router.post('/api/projects/:id/imap', async ({ req, res, params }) => {
+    const p = getProject(app, pid(params));
+    const b = await readBody(req);
+    const host = String(b.host || '').trim();
+    if (!host) {
+      db.prepare('UPDATE projects SET imap_enc = NULL, inbox_json = NULL WHERE id = ?').run(p.id);
+      return json(res, { ok: true, disabled: true });
+    }
+    saveSecretConfig(app, p.id, 'imap_enc', {
+      host, port: int(b.port, 1, 65535, 993), user: String(b.user || '').trim(), pass: b.pass || '',
+    }, 'pass');
+    try { json(res, { ok: true, check: await checkInbox(app, p.id) }); }
+    catch (e) { json(res, { ok: false, error: e.message }); }
+  });
+
+  router.post('/api/projects/:id/inbox/check', async ({ res, params }) => {
+    const p = getProject(app, pid(params));
+    try { json(res, { ok: true, check: await checkInbox(app, p.id) }); }
+    catch (e) { throw new HttpError(502, e.message); }
   });
 
   router.post('/api/projects/:id/db', async ({ req, res, params }) => {
