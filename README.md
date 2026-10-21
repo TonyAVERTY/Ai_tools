@@ -49,12 +49,17 @@ idées d'évolutions et récap business. Pensé pour un **Raspberry Pi 4 sans ve
   remonté par la CLI elle-même — session glissante de 5 h et semaine glissante de 7 jours, avec l'heure de
   réinitialisation au survol. Orange à partir de 80 %, rouge à 100 %. C'est la vraie limite du compte
   Pro, à distinguer du budget IA ci-dessus (un garde-fou interne en $ équivalent).
+  - **Report automatique** : au-delà de 85 % (session ou semaine), Analyse et Évolutions — non urgents —
+    restent en file et repartent seuls une fois le quota libéré. Prospection et envois (y compris les
+    relances) continuent normalement : c'est le cœur du métier, jamais mis en pause.
+  - **Alerte Discord** à 80 % puis 95 % (session ou semaine), une seule fois par fenêtre jusqu'au reset.
 - **Notifications Discord** via webhook : URL chiffrée, validée, sans mention possible. Tu choisis les événements :
   - fin de job ou erreur ;
   - réponses de prospects ;
   - relances envoyées ;
   - pause thermique ;
   - budget atteint ;
+  - quota Claude proche de la limite, ou job reporté ;
   - rapport hebdo.
 
   Un bouton permet d'envoyer une notification de test.
