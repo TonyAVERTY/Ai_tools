@@ -357,24 +357,46 @@
 
   // ---------- Liste des prospects (mini CRM) ----------
   const STATUS = { new: 'À contacter', sent: 'Contacté', replied: 'A répondu', client: 'Client', refused: 'Refus', bounced: 'Rejeté' };
-  $$('details.prospects').forEach((d) => d.addEventListener('toggle', async () => {
-    if (!d.open) return;
+  const fmtDay = (ts) => (ts ? new Date(ts * 1000).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', timeZone: 'Europe/Paris' }) : '');
+
+  async function loadProspects(d, page = 1) {
     const proj = d.closest('.project');
     const box = $('[data-prospects]', d);
+    const qs = new URLSearchParams({ ...formData($('[data-filters]', d)), page });
     try {
-      const rows = await api(`/api/projects/${proj.dataset.id}/prospects`);
-      box.innerHTML = rows.length ? `<div class="table-wrap"><table><thead><tr><th>Entreprise</th><th>Email</th><th>Ville</th><th>Score</th><th>Statut</th></tr></thead><tbody>
-        ${rows.map((r) => `<tr><td>${r.website ? `<a href="${esc(r.website)}" target="_blank" rel="noopener noreferrer">${esc(r.company)}</a>` : esc(r.company)}</td>
-          <td>${esc(r.email)}</td><td>${esc(r.city)}</td><td>${r.score}</td>
-          <td><select data-prospect="${r.id}">${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${k === r.status ? 'selected' : ''}>${v}</option>`).join('')}</select></td></tr>`).join('')}
-      </tbody></table></div>` : '<p class="muted small">Aucun prospect.</p>';
+      const r = await api(`/api/projects/${proj.dataset.id}/prospects?${qs}`);
+      d.dataset.page = r.page;
+      box.innerHTML = r.rows.length ? `<div class="table-wrap"><table><thead><tr><th>Entreprise</th><th>Email</th><th>Ville</th><th>Score</th><th>Contacté</th><th>Statut</th></tr></thead><tbody>
+        ${r.rows.map((x) => `<tr data-row="${x.id}"><td>${x.website ? `<a href="${esc(x.website)}" target="_blank" rel="noopener noreferrer">${esc(x.company)}</a>` : esc(x.company)}</td>
+          <td>${esc(x.email)}</td><td>${esc(x.city)}</td><td>${x.score ?? ''}</td>
+          <td>${fmtDay(x.sent_at)}${x.followup_at ? ' <span class="muted small">+ relance</span>' : ''}</td>
+          <td><select data-prospect="${x.id}" class="st-${x.status}">${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${k === x.status ? 'selected' : ''}>${v}</option>`).join('')}</select></td></tr>`).join('')}
+      </tbody></table></div>` : '<p class="muted small">Aucun prospect ne correspond.</p>';
+      $('[data-pager]', d).innerHTML = r.pages > 1
+        ? `<button type="button" class="btn small" data-page="${r.page - 1}" ${r.page <= 1 ? 'disabled' : ''}>←</button>
+           <span class="small muted">Page ${r.page} / ${r.pages} · ${r.total} prospect(s)</span>
+           <button type="button" class="btn small" data-page="${r.page + 1}" ${r.page >= r.pages ? 'disabled' : ''}>→</button>`
+        : `<span class="small muted">${r.total} prospect(s)</span>`;
     } catch (err) { box.innerHTML = `<p class="error small">${esc(err.message)}</p>`; }
-  }));
+  }
+
+  $$('details.prospects').forEach((d) => {
+    d.addEventListener('toggle', () => { if (d.open) loadProspects(d); });
+    const form = $('[data-filters]', d);
+    let t;
+    form.addEventListener('input', (e) => { if (e.target.name === 'q') { clearTimeout(t); t = setTimeout(() => loadProspects(d), 300); } });
+    form.addEventListener('change', (e) => { if (e.target.name !== 'q') loadProspects(d); });
+    form.addEventListener('submit', (e) => { e.preventDefault(); loadProspects(d); });
+    d.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-page]');
+      if (b) loadProspects(d, Number(b.dataset.page));
+    });
+  });
   document.addEventListener('change', async (e) => {
     const sel = e.target.closest('[data-prospect]');
     if (!sel) return;
     if (sel.value === 'refused' && !confirm('Marquer en refus ajoute l\'adresse à la liste d\'opposition. Continuer ?')) return;
-    try { await api(`/api/prospects/${sel.dataset.prospect}/status`, { status: sel.value }); toast('Statut mis à jour'); }
+    try { await api(`/api/prospects/${sel.dataset.prospect}/status`, { status: sel.value }); sel.className = `st-${sel.value}`; toast('Statut mis à jour'); }
     catch (err) { toast(err.message, 'error'); }
   });
 })();

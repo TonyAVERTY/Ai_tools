@@ -104,3 +104,10 @@ form.send { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--lin
 .moon { width: 18px; height: 18px; border-radius: 50%; box-shadow: inset -5px -3px 0 0 var(--accent); flex: none; transform: rotate(-20deg); }
 .checks { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0 12px; margin: 4px 0 10px; }
 .checks label.check { margin: 4px 0; }
+.pfilters { display: grid; grid-template-columns: 2fr repeat(3, 1fr); gap: 8px; margin: 10px 0; }
+.pfilters input, .pfilters select { margin: 0; }
+@media (max-width: 640px) { .pfilters { grid-template-columns: 1fr 1fr; } .pfilters input { grid-column: 1 / -1; } }
+.pager { display: flex; gap: 10px; align-items: center; justify-content: center; margin: 8px 0; }
+select.st-replied, select.st-client { color: var(--ok); font-weight: 600; }
+select.st-refused, select.st-bounced { color: var(--err); }
+select.st-new { color: var(--accent); }

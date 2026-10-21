@@ -14,6 +14,7 @@ import { nextNightSlot } from './services/paris-time.js';
 import { notify, notifyConfig, EVENTS, WEBHOOK_RE } from './services/notify.js';
 import { budgetState, AI_JOBS } from './services/budget.js';
 import { sendWeeklyReport } from './services/report.js';
+import { listProspects, parseFilters, STATUSES as PROSPECT_STATUSES } from './services/crm.js';
 import {
   getProject, listProjects, createProject, saveSecretConfig, publicConfig, globalSmtp,
   prospectStats, sentSince, repoDir, getTemplate, saveTemplate, abStats,
@@ -302,14 +303,12 @@ export function registerRoutes(router, app) {
     json(res, { business, error, stats, aiCostUsd: cost });
   });
 
-  router.get('/api/projects/:id/prospects', ({ res, params }) => {
+  router.get('/api/projects/:id/prospects', ({ res, params, url }) => {
     const p = getProject(app, pid(params));
-    const rows = db.prepare(`SELECT id, company, email, website, city, sector, score, status, sent_at FROM prospects
-      WHERE project_id = ? ORDER BY CASE status WHEN 'new' THEN 0 ELSE 1 END, score DESC, id DESC LIMIT 500`).all(p.id);
-    json(res, rows);
+    json(res, listProspects(db, p.id, parseFilters(url.searchParams)));
   });
 
-  const STATUSES = ['new', 'sent', 'replied', 'client', 'refused', 'bounced'];
+  const STATUSES = Object.keys(PROSPECT_STATUSES);
   router.post('/api/prospects/:id/status', async ({ req, res, params }) => {
     const b = await readBody(req);
     if (!STATUSES.includes(b.status)) throw new HttpError(400, 'Statut invalide');
