@@ -97,6 +97,14 @@ test('flux complet : analyse → cible → prospection → modèle → envoi →
   } finally { rmSync(s.tmp, { recursive: true, force: true }); }
 });
 
+test('parseProspectLine ne garde que des URLs http(s)', () => {
+  const p = parseProspectLine('PROSPECT {"company":"X","email":"a@b.fr","website":"javascript:alert(1)","source":"https://ok.fr/contact"}');
+  assert.equal(p.website, null);
+  assert.equal(p.source, 'https://ok.fr/contact');
+  assert.equal(parseProspectLine('PROSPECT {"company":"X","email":"a@b.fr","website":"https://a.fr\\" onclick=x"}').website, null);
+  assert.equal(parseProspectLine('PROSPECT {"company":"X","email":"a@b.fr","website":"data:text/html,x"}').website, null);
+});
+
 test('parseProspectLine filtre les lignes invalides', () => {
   assert.equal(parseProspectLine('blabla'), null);
   assert.equal(parseProspectLine('PROSPECT {cassé'), null);
