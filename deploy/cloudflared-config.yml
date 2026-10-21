@@ -1,0 +1,9 @@
+# /etc/cloudflared/config.yml
+# Créé avec : cloudflared tunnel create aitools
+tunnel: aitools
+credentials-file: /etc/cloudflared/<TUNNEL_ID>.json
+
+ingress:
+  - hostname: ai.tony-averty.dev
+    service: http://127.0.0.1:3100
+  - service: http_status:404
