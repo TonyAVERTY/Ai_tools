@@ -36,6 +36,32 @@ idées d'évolutions et récap business. Pensé pour un **Raspberry Pi 4 sans ve
 
 > Test IMAP de bout en bout (optionnel) : `IMAP_TEST=hôte:port:utilisateur:motdepasse npm test`. Voir `test/inbox.live.test.js` pour les 4 mails attendus dans la boîte de test.
 
+## Pilotage
+
+- **Jobs de nuit** : Prospecter et Évolution proposent « Maintenant » ou « Cette nuit ». Le job démarre au prochain créneau entre 1h et 6h (heure de Paris, changements d'heure gérés), quand le Pi est au frais et que ton quota Claude est libre. Il est annulable jusqu'au départ.
+- **Budget IA** : plafonds glissants sur 24 h et sur 30 jours, en équivalent $ API remonté par Claude Code. L'abonnement Pro ne facture rien en plus ; c'est un garde-fou pour ton quota.
+  - Plafond atteint : les jobs IA **restent en file** et repartent seuls quand la fenêtre glisse. Les envois et relances, qui ne consomment pas d'IA, continuent.
+  - Un job en cours n'est jamais coupé : le plafond peut donc être dépassé d'un job.
+- **Notifications Discord** via webhook : URL chiffrée, validée, sans mention possible. Tu choisis les événements :
+  - fin de job ou erreur ;
+  - réponses de prospects ;
+  - relances envoyées ;
+  - pause thermique ;
+  - budget atteint ;
+  - rapport hebdo.
+
+  Un bouton permet d'envoyer une notification de test.
+- **Rapport hebdo** : le lundi à 8h, par mail (SMTP global vers ton email de réception) et en résumé sur Discord. Pour chaque projet, sur 7 jours :
+  - prospects trouvés ;
+  - mails et relances envoyés ;
+  - réponses et taux de réponse ;
+  - clients ;
+  - adresses invalides ;
+  - objet gagnant du test A/B, dès 10 envois par objet ;
+  - coût IA.
+
+  Le bouton « Envoyer le rapport maintenant » permet de tester.
+
 ## Garde-fous d'envoi
 
 - Tu choisis le nombre de mails à chaque envoi, avec une confirmation obligatoire.
