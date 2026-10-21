@@ -39,8 +39,12 @@ export function latestJobs(db, projectId) {
 }
 
 export class Worker {
-  constructor(db, handlers, { thermalMax = 75, pollMs = 3000, log = console, clock = now, onFinish, onThermal } = {}) {
+  constructor(db, handlers, { thermalMax = 75, pollMs = 3000, log = console, clock = now, onFinish, onThermal, budget, isAiJob, onBudget } = {}) {
     this.clock = clock;
+    this.budget = budget;       // () => {blocked, reason}
+    this.isAiJob = isAiJob;     // (type) => bool : jobs à mettre en attente si budget atteint
+    this.onBudget = onBudget;   // (reason) → une notif quand le blocage commence
+    this.budgetBlocked = false;
     this.onFinish = onFinish;   // (job, {status, result, error}) → notifications
     this.onThermal = onThermal; // (°C) → une fois par pause
     this.db = db;
@@ -78,8 +82,26 @@ export class Worker {
   }
 
   async tick() {
-    const job = this.db.prepare(`SELECT * FROM jobs WHERE status = 'queued'
-      AND (run_after IS NULL OR run_after <= ?) ORDER BY id LIMIT 1`).get(this.clock());
+    const due = this.db.prepare(`SELECT * FROM jobs WHERE status = 'queued'
+      AND (run_after IS NULL OR run_after <= ?) ORDER BY id`).all(this.clock());
+    if (!due.length) return false;
+
+    // Budget atteint : les jobs IA restent en file (pas perdus), les autres passent devant
+    const budget = this.budget?.() || { blocked: false };
+    let job = null;
+    let waiting = false;
+    for (const j of due) {
+      if (budget.blocked && this.isAiJob?.(j.type)) {
+        waiting = true;
+        const msg = JSON.stringify({ message: `En attente : ${budget.reason}` });
+        if (j.progress_json !== msg) this.db.prepare('UPDATE jobs SET progress_json = ? WHERE id = ?').run(msg, j.id);
+        continue;
+      }
+      job = j;
+      break;
+    }
+    if (waiting && !this.budgetBlocked) this.emit('onBudget', budget.reason);
+    this.budgetBlocked = waiting;
     if (!job) return false;
     const handler = this.handlers[job.type];
     if (!handler) {
@@ -138,10 +160,11 @@ export function addUsage(ctx, r) {
   ctx.usage.tokensOut += r.tokensOut || 0;
 }
 
-// Conso des 30 derniers jours, pour la jauge
+// Conso des 30 derniers jours, pour la jauge (comptée à la fin du job, comme le budget)
 export function usageSummary(db) {
   const since = now() - 30 * 86400;
   const day = now() - 86400;
-  const q = (s) => db.prepare('SELECT COALESCE(SUM(cost_usd),0) cost, COALESCE(SUM(tokens_in),0) tin, COALESCE(SUM(tokens_out),0) tout, COUNT(*) n FROM jobs WHERE created_at > ?').get(s);
+  const q = (s) => db.prepare(`SELECT COALESCE(SUM(cost_usd),0) cost, COALESCE(SUM(tokens_in),0) tin, COALESCE(SUM(tokens_out),0) tout, COUNT(*) n
+    FROM jobs WHERE COALESCE(finished_at, created_at) > ?`).get(s);
   return { month: q(since), day: q(day) };
 }

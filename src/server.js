@@ -11,6 +11,7 @@ import { Worker } from './services/jobs.js';
 import { makeHandlers } from './handlers.js';
 import { Scheduler } from './services/scheduler.js';
 import { notify, notifyJob } from './services/notify.js';
+import { budgetState, AI_JOBS } from './services/budget.js';
 import { layout } from './views.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -74,6 +75,12 @@ export function createApp(cfg, { db = openDb(cfg.dataDir), worker = true, create
     w = new Worker(db, makeHandlers(app), {
       thermalMax: cfg.thermalMax,
       onFinish: (job, r) => notifyJob(app, job, r),
+      budget: () => budgetState(db),
+      isAiJob: (type) => AI_JOBS.has(type),
+      onBudget: (reason) => notify(app, 'budget', {
+        title: 'Budget IA atteint', level: 'warn',
+        description: `${reason[0].toUpperCase()}${reason.slice(1)}. Les jobs IA attendent ; les envois et relances continuent.`,
+      }),
       onThermal: (t) => notify(app, 'thermal', {
         title: 'Pause thermique', level: 'warn',
         description: `CPU à ${t} °C : les jobs IA attendent que le Pi redescende sous ${cfg.thermalMax - 5} °C.`,

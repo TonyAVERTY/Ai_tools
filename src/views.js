@@ -266,6 +266,13 @@ ${saved ? '<p class="ok">Enregistré.</p>' : ''}
     <label>Délai min entre 2 mails (s)<input name="send_delay_min" type="number" min="5" value="${esc(s.send_delay_min)}"></label>
     <label>Délai max (s)<input name="send_delay_max" type="number" min="5" value="${esc(s.send_delay_max)}"></label>
   </div>
+  <h4>Budget IA</h4>
+  <p class="muted small">En équivalent $ API remonté par Claude Code (ton abonnement Pro ne facture rien en plus : c'est un garde-fou pour ton quota).
+  Au-delà, les jobs IA attendent sans être perdus ; envois et relances continuent. Vide = pas de limite.</p>
+  <div class="grid2">
+    <label>Plafond sur 24 h glissantes ($)<input name="budget_day_usd" inputmode="decimal" value="${esc(s.budget_day_usd)}" placeholder="ex. 2"></label>
+    <label>Plafond sur 30 jours glissants ($)<input name="budget_month_usd" inputmode="decimal" value="${esc(s.budget_month_usd)}" placeholder="ex. 30"></label>
+  </div>
   <label>Modèle pour la prospection<select name="prospect_model">
     <option value="haiku" ${s.prospect_model === 'haiku' ? 'selected' : ''}>Haiku (économe)</option>
     <option value="sonnet" ${s.prospect_model === 'sonnet' ? 'selected' : ''}>Sonnet (plus précis, plus cher)</option>

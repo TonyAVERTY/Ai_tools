@@ -36,6 +36,14 @@
   };
 
   // ---------- Barre système ----------
+  // "IA 24 h : 0,42 $ / 2 $" : orange à 80 %, rouge une fois atteint
+  function gauge(label, x) {
+    const used = `${x.used.toFixed(2)} $`;
+    if (!x.limit) return `<span title="Équivalent API, consommé sur ton quota Pro">IA ${label} : ${used}</span>`;
+    const r = x.used / x.limit;
+    return `<span class="${r >= 1 ? 'error' : r >= 0.8 ? 'warn' : ''}" title="Équivalent API, consommé sur ton quota Pro">IA ${label} : ${used} / ${x.limit} $</span>`;
+  }
+
   async function refreshSys() {
     const el = $('#sys');
     if (!el) return;
@@ -43,7 +51,8 @@
       const s = await api('/api/system');
       const hot = s.temp !== null && s.temp >= s.thermalMax - 5;
       el.innerHTML = `${s.temp !== null ? `<span class="${hot ? 'warn' : ''}">${s.temp} °C</span>` : ''}
-        <span title="Équivalent API, consommé sur ton quota Pro">IA 24 h : $${s.usage.day.cost.toFixed(2)} · 30 j : $${s.usage.month.cost.toFixed(2)}</span>
+        ${gauge('24 h', s.budget.day)} ${gauge('30 j', s.budget.month)}
+        ${s.budget.blocked ? '<span class="error">Budget IA atteint : jobs IA en attente</span>' : ''}
         ${s.queue ? `<span class="spin-inline"></span>${s.queue} job(s)` : ''}
         ${s.scheduled ? `<span>${s.scheduled} programmé(s) cette nuit</span>` : ''}`;
     } catch { /* silencieux */ }
@@ -67,7 +76,7 @@
       const extra = type === 'prospect' && p.found !== undefined
         ? `<strong>${p.found}</strong> prospect(s) trouvé(s) sur ${p.target}` : '';
       box.innerHTML = `<div class="running"><span class="spinner"></span>
-        <div><div>${esc(job.status === 'queued' ? 'En file d\'attente…' : p.message || 'En cours…')}</div>${extra ? `<div class="small">${extra}</div>` : ''}</div>
+        <div><div>${esc(p.message || (job.status === 'queued' ? 'En file d\'attente…' : 'En cours…'))}</div>${extra ? `<div class="small">${extra}</div>` : ''}</div>
         <button class="btn small" data-cancel="${job.id}">Annuler</button></div>`;
     } else if (job.status === 'error') {
       box.innerHTML = `<p class="error small">${LABELS[type]} en échec : ${esc(job.error)}</p>`;
@@ -263,13 +272,13 @@
         case 'target': await api(`/api/projects/${id}/target`, data); toast('Cible validée'); setTimeout(() => location.reload(), 500); break;
         case 'prospect': {
           const r = await api(`/api/projects/${id}/prospect`, data);
-          toast(r.existing ? 'Une recherche est déjà prévue ou en cours' : data.when === 'night' ? 'Recherche programmée cette nuit' : 'Recherche lancée en arrière-plan');
+          toast(r.budgetBlocked ? `En file, mais ${r.budgetBlocked}` : r.existing ? 'Une recherche est déjà prévue ou en cours' : data.when === 'night' ? 'Recherche programmée cette nuit' : 'Recherche lancée en arrière-plan', r.budgetBlocked ? 'error' : 'ok');
           break;
         }
         case 'evolution': {
           if (data.level === 'approfondi' && !confirm('Le niveau approfondi utilise Opus et consomme beaucoup de quota. Continuer ?')) break;
           const r = await api(`/api/projects/${id}/evolution`, data);
-          toast(r.existing ? 'Une recherche est déjà prévue ou en cours' : data.when === 'night' ? 'Évolutions programmées cette nuit' : 'Recherche d\'évolutions lancée');
+          toast(r.budgetBlocked ? `En file, mais ${r.budgetBlocked}` : r.existing ? 'Une recherche est déjà prévue ou en cours' : data.when === 'night' ? 'Évolutions programmées cette nuit' : 'Recherche d\'évolutions lancée', r.budgetBlocked ? 'error' : 'ok');
           break;
         }
         case 'template': {
