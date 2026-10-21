@@ -251,6 +251,15 @@ ${saved ? '<p class="ok">Enregistré.</p>' : ''}
     <label>Expéditeur<input name="smtp_fromEmail" type="email" value="${esc(s.smtp.fromEmail)}"></label>
   </div>
 
+  <h4>Notifications Discord</h4>
+  <p class="muted small">Salon Discord › Modifier › Intégrations › Webhooks › Nouveau webhook › Copier l'URL.</p>
+  <label>URL du webhook<input name="discord_webhook" type="password" placeholder="${s.discord.set ? '•••••• (inchangé)' : 'https://discord.com/api/webhooks/…'}" autocomplete="off"></label>
+  ${s.discord.set ? '<label class="check"><input type="checkbox" name="discord_remove"> Supprimer le webhook</label>' : ''}
+  <div class="checks">
+    ${Object.entries(s.discord.all).map(([k, label]) => `<label class="check"><input type="checkbox" name="ev_${k}" ${s.discord.events.includes(k) ? 'checked' : ''}> ${esc(label)}</label>`).join('')}
+  </div>
+  ${s.discord.set ? '<button type="button" class="btn small" data-notify-test>Envoyer une notification de test</button>' : ''}
+
   <h4>Garde-fous</h4>
   <div class="grid3">
     <label>Plafond global mails / 24 h (max 300)<input name="global_daily_cap" type="number" min="1" max="300" value="${esc(s.global_daily_cap)}"></label>

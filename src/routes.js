@@ -11,6 +11,7 @@ import { cpuTemp } from './services/thermal.js';
 import { checkInbox } from './services/inbox.js';
 import { followupPlan } from './services/followup.js';
 import { nextNightSlot } from './services/paris-time.js';
+import { notify, notifyConfig, EVENTS, WEBHOOK_RE } from './services/notify.js';
 import {
   getProject, listProjects, createProject, saveSecretConfig, publicConfig, globalSmtp,
   prospectStats, sentSince, repoDir, getTemplate, saveTemplate, abStats,
@@ -69,6 +70,7 @@ export function registerRoutes(router, app) {
       send_delay_max: getSetting(db, 'send_delay_max', '60'),
       prospect_model: getSetting(db, 'prospect_model', 'haiku'),
       blacklist_count: db.prepare('SELECT COUNT(*) n FROM blacklist').get().n,
+      discord: { set: !!notifyConfig(app).url, events: notifyConfig(app).events, all: EVENTS },
     };
     html(res, settingsPage({ email: session.email, s, saved: url.searchParams.has('ok') }));
   });
@@ -87,6 +89,12 @@ export function registerRoutes(router, app) {
     setSetting(db, 'send_delay_max', String(dmax));
     setSetting(db, 'prospect_model', b.prospect_model === 'sonnet' ? 'sonnet' : 'haiku');
 
+    const hook = String(b.discord_webhook || '').trim();
+    if (hook && !WEBHOOK_RE.test(hook)) throw new HttpError(400, 'URL de webhook Discord invalide (https://discord.com/api/webhooks/…)');
+    if (hook) setSetting(db, 'discord_webhook_enc', encrypt(cfg.secretKey, hook));
+    if (b.discord_remove === 'on') setSetting(db, 'discord_webhook_enc', null);
+    setSetting(db, 'discord_events', JSON.stringify(Object.keys(EVENTS).filter((k) => b[`ev_${k}`] === 'on')));
+
     const prev = globalSmtp(app) || {};
     const smtp = { host: b.smtp_host, port: b.smtp_port, user: b.smtp_user, pass: b.smtp_pass || prev.pass, fromEmail: b.smtp_fromEmail };
     setSetting(db, 'smtp_enc', smtp.host ? encryptJson(cfg.secretKey, smtp) : null);
@@ -94,6 +102,13 @@ export function registerRoutes(router, app) {
   });
 
   // ---------- API JSON ----------
+  router.post('/api/notify/test', async ({ res }) => {
+    if (!notifyConfig(app).url) throw new HttpError(400, 'Aucun webhook Discord configuré');
+    const ok = await notify(app, 'test', { title: 'Notification de test', description: 'Les notifications AiTools arrivent bien ici.', level: 'ok' }, { force: true });
+    if (!ok) throw new HttpError(502, 'Discord a refusé la notification (webhook supprimé ?)');
+    json(res, { ok: true });
+  });
+
   router.get('/api/system', ({ res }) => {
     const queue = db.prepare(`SELECT COUNT(*) n FROM jobs WHERE status = 'running'
       OR (status = 'queued' AND (run_after IS NULL OR run_after <= ?))`).get(now()).n;

@@ -10,6 +10,7 @@ import { registerRoutes } from './routes.js';
 import { Worker } from './services/jobs.js';
 import { makeHandlers } from './handlers.js';
 import { Scheduler } from './services/scheduler.js';
+import { notify, notifyJob } from './services/notify.js';
 import { layout } from './views.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -70,7 +71,14 @@ export function createApp(cfg, { db = openDb(cfg.dataDir), worker = true, create
   let w = null;
   let scheduler = null;
   if (worker) {
-    w = new Worker(db, makeHandlers(app), { thermalMax: cfg.thermalMax });
+    w = new Worker(db, makeHandlers(app), {
+      thermalMax: cfg.thermalMax,
+      onFinish: (job, r) => notifyJob(app, job, r),
+      onThermal: (t) => notify(app, 'thermal', {
+        title: 'Pause thermique', level: 'warn',
+        description: `CPU à ${t} °C : les jobs IA attendent que le Pi redescende sous ${cfg.thermalMax - 5} °C.`,
+      }),
+    });
     w.start();
     scheduler = new Scheduler(app);
     scheduler.start();
