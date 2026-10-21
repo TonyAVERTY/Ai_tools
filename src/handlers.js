@@ -130,7 +130,8 @@ export function makeHandlers(app) {
 
       ctx.progress({ message: 'Analyse du code par Claude…' });
       const { prompt, system } = analyzePrompt(project.name);
-      const r = await claude({ prompt, system, cwd: dir, model: 'sonnet', maxTurns: 20, tools: ['Read', 'Glob', 'Grep'], signal: ctx.signal });
+      const model = getSetting(db, 'analyze_model', 'haiku');
+      const r = await claude({ prompt, system, cwd: dir, model, maxTurns: 20, tools: ['Read', 'Glob', 'Grep'], signal: ctx.signal });
       addUsage(ctx, r);
       if (!r.ok) throw new Error(`Analyse incomplète (${r.subtype})`);
       const profile = extractJson(r.text);

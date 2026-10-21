@@ -295,6 +295,11 @@ ${saved ? '<p class="ok">Enregistré.</p>' : ''}
     <option value="haiku" ${s.prospect_model === 'haiku' ? 'selected' : ''}>Haiku (économe)</option>
     <option value="sonnet" ${s.prospect_model === 'sonnet' ? 'selected' : ''}>Sonnet (plus précis, plus cher)</option>
   </select></label>
+  <label>Modèle pour l'analyse de projet<select name="analyze_model">
+    <option value="haiku" ${s.analyze_model === 'haiku' ? 'selected' : ''}>Haiku (économe)</option>
+    <option value="sonnet" ${s.analyze_model === 'sonnet' ? 'selected' : ''}>Sonnet (plus précis, plus cher)</option>
+  </select></label>
+  <p class="muted small">Haiku suffit pour la plupart des projets. Repasse en Sonnet uniquement si la fiche générée manque de précision.</p>
   <button class="btn primary">Enregistrer</button>
 </form>
 
