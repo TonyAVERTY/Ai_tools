@@ -62,6 +62,35 @@ idées d'évolutions et récap business. Pensé pour un **Raspberry Pi 4 sans ve
 
   Le bouton « Envoyer le rapport maintenant » permet de tester.
 
+## CRM
+
+- **Recherche et filtres** sur les prospects :
+  - recherche par entreprise, email, ville ou secteur ;
+  - filtres par statut, score minimum et « Actions à faire » ;
+  - tri ;
+  - pagination par 100.
+
+  Tout est côté serveur, donc ça reste léger sur le Pi même avec des milliers de prospects.
+- **Fiche prospect** : un clic sur l'entreprise ouvre la fiche, avec :
+  - l'accroche et l'origine de l'email ;
+  - l'historique : premier mail (avec la variante A/B), relance, réponse et échecs d'envoi ;
+  - une **prochaine action** datée (rappel à 9h, heure de Paris), qui alimente le filtre « Actions à faire » ;
+  - des **notes** libres.
+- **Export CSV** : format Excel FR (`;` et BOM UTF-8). L'export reprend les filtres affichés.
+  - Les cellules qui commencent par `= + - @` sont neutralisées pour qu'Excel ne les exécute pas comme des formules.
+- **Import CSV** (2000 lignes max) :
+  - colonnes reconnues en français ou en anglais (entreprise, email, site, ville, secteur, score, source, accroche) ;
+  - encodage UTF-8 ou Windows-1252 détecté, donc les fichiers enregistrés par Excel passent tels quels ;
+  - doublons et adresses en liste d'opposition ignorés ;
+  - rapport ligne par ligne ;
+  - l'origine de chaque contact est toujours renseignée (« Import CSV du JJ/MM/AAAA » par défaut), pour le RGPD.
+- **Courbes** (onglet Récapitulatif, sur 30 ou 90 jours) :
+  - utilisateurs, clients payants et revenu : une photo quotidienne est prise automatiquement, plus une à chaque ouverture du récap ;
+  - mails envoyés et réponses par semaine, recalculés depuis l'historique.
+
+  Les graphiques ont des infobulles au survol et une vue tableau (« Voir les données »).
+  - Les données business démarrent le jour où tu configures l'accès BDD du projet : l'historique ne peut pas être reconstitué avant.
+
 ## Garde-fous d'envoi
 
 - Tu choisis le nombre de mails à chaque envoi, avec une confirmation obligatoire.
