@@ -32,61 +32,67 @@ idées d'évolutions et récap business. Pensé pour un **Raspberry Pi 4 sans ve
 
 ## Installation sur le Pi
 
-```bash
-# Node 22 LTS (arm64)
-curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
-sudo apt install -y nodejs git
-
-# Utilisateur dédié + code
-sudo useradd -m -s /bin/bash aitools
-sudo git clone https://git.tony-averty.dev/Tony/AiTools.git /opt/aitools
-sudo chown -R aitools: /opt/aitools
-cd /opt/aitools && sudo -u aitools npm ci --omit=dev && sudo -u aitools mkdir -p data
-
-# Claude Code, connecté à TON compte Pro (une seule fois, en interactif)
-sudo npm i -g @anthropic-ai/claude-code
-sudo -u aitools -i claude      # puis /login, ouvre le lien sur ton PC
-```
-
-Configuration :
+Pré-requis : **Raspberry Pi OS Lite 64 bits** fraîchement installé, accès SSH, et ton HDD branché.
 
 ```bash
-sudo -u aitools cp .env.example .env && sudo -u aitools nano .env
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"   # → SECRET_KEY
+sudo apt install -y git
+git clone -b develop https://git.tony-averty.dev/Tony/AiTools.git
+cd AiTools
+sudo ./install.sh
 ```
 
-> Conseil : mets `DATA_DIR` sur un SSD USB. La carte SD n'aime pas les écritures SQLite.
+Pour voir ce qui serait fait sans rien toucher : `./install.sh --dry-run`.
 
-Service :
+### Ce que fait `install.sh`
 
-```bash
-sudo cp deploy/aitools.service /etc/systemd/system/
-sudo systemctl daemon-reload && sudo systemctl enable --now aitools
-journalctl -u aitools -f
-```
+1. **Questions d'abord** :
+   - quel disque pour les données (le disque système est exclu d'office) ;
+   - partition existante, ou formatage ext4 ;
+   - interface réseau, Wi-Fi et Bluetooth ;
+   - nettoyage du système ;
+   - config de l'app ;
+   - token Cloudflare ;
+   - connexion Claude.
 
-### Cloudflare Tunnel
+   Puis un **récapitulatif à valider**. Rien n'est modifié avant.
+2. **Installation sans interruption** :
+   - mise à jour du système et du firmware ;
+   - nettoyage : services inutiles coupés, swap SD remplacé par zram, journaux en RAM ;
+   - montage du HDD par UUID dans `/etc/fstab` (`nofail`, `noatime`) ;
+   - Node 22, Claude Code et cloudflared ;
+   - déploiement dans `/opt/aitools` avec l'utilisateur système `aitools` et les dépendances de prod uniquement (sans les tests) ;
+   - `.env` généré avec `SECRET_KEY` aléatoire, en droits 600 ;
+   - services systemd + sauvegarde quotidienne de la base (04:30, 14 jours) ;
+   - tunnel Cloudflare.
+3. **Connexion Claude** via `claude setup-token`, puis un test réel, et démarrage avec vérification HTTP.
 
-```bash
-cloudflared tunnel login
-cloudflared tunnel create aitools
-cloudflared tunnel route dns aitools ai.tony-averty.dev
-sudo cp deploy/cloudflared-config.yml /etc/cloudflared/config.yml   # remplacer <TUNNEL_ID>
-sudo cloudflared service install
-```
+Garde-fous :
+- formater un disque exige de **taper son nom** ;
+- les partitions exFAT/NTFS sont refusées, car SQLite et les droits Linux ne les supportent pas ;
+- `/etc/fstab` et `config.txt` sont sauvegardés (`*.aitools.bak`) avant modification ;
+- les tokens ne passent jamais en ligne de commande ni dans le log.
 
-Aucun port à ouvrir sur la box. L'app écoute uniquement sur `127.0.0.1`.
+**Mise à jour de l'app** : `git pull` dans ton clone, puis relance `sudo ./install.sh` et garde la config existante. Le script est relançable sans risque.
+
+> Le service ne démarre pas si le HDD n'est pas monté (`RequiresMountsFor`). Ça évite d'écrire une base vide sur la carte SD par erreur.
 
 ### Google OAuth
 
-Dans la console Google Cloud, va dans Identifiants, puis crée un ID client OAuth de type « Application Web ».
+Dans la console Google Cloud, crée un ID client OAuth de type « Application Web » (menu Identifiants).
 
 - URI de redirection : `https://ai.tony-averty.dev/auth/google/callback`
 - Écran de consentement : mode « Test » avec ton email en testeur, ça suffit.
 
+### Cloudflare Tunnel
+
+Dans Zero Trust, va dans Networks → Tunnels → Create a tunnel (Cloudflared).
+
+- Public hostname : `ai.tony-averty.dev` → `http://localhost:3100`
+- Copie le token, `install.sh` te le demandera.
+
 ### Forgejo
 
-Le token se crée dans Paramètres → Applications. Donne-lui la portée `read:repository` seulement. Colle-le ensuite dans **Réglages** avec l'hôte `git.tony-averty.dev`.
+Le token se crée dans Paramètres → Applications. Donne-lui la portée `read:repository` seulement, puis colle-le dans **Réglages** du panel avec l'hôte `git.tony-averty.dev`.
 
 ## À faire côté mails (sinon spam garanti)
 
@@ -109,3 +115,5 @@ npm run check     # lint + tests
 ```
 
 Les tests utilisent un faux binaire Claude (`test/fixtures/fake-claude.js`) : aucun token consommé.
+
+`test/install.test.sh` teste les fonctions d'`install.sh` qui écrivent des fichiers : `.env`, unit systemd, migration, sauvegarde. Il tourne en root et écrit dans `/opt/aitools` et `/etc/systemd`, donc **uniquement dans une VM ou un conteneur jetable**, jamais sur le Pi en service.
