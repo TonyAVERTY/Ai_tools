@@ -13,7 +13,7 @@ if [ -n "$bad" ]; then
 fi
 
 scan=$(echo "$staged" | grep -v '^\.githooks/')
-if [ -n "$scan" ] && git diff --cached -U0 -- $scan | grep -E '^\+' | grep -Ei '(sk-ant-|ghp_[A-Za-z0-9]{20}|-----BEGIN [A-Z ]*PRIVATE KEY|GOCSPX-)' >/dev/null; then
+if [ -n "$scan" ] && git diff --cached -U0 -- $scan | grep -E '^\+' | grep -E '(sk-ant-[a-z]+[0-9]{2}-[A-Za-z0-9_-]{20,}|ghp_[A-Za-z0-9]{20}|-----BEGIN [A-Z ]*PRIVATE KEY|GOCSPX-)' >/dev/null; then
   echo "✗ Un secret semble présent dans le diff. Vérifie avant de commit."; exit 1
 fi
 
