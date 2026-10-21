@@ -1,4 +1,6 @@
-// Prospects : filtres, tri, pagination. Partagé par la liste et l'export CSV.
+// Prospects : filtres, tri, pagination, fiche détaillée. Partagé par la liste et l'export CSV.
+import { now } from '../db.js';
+import { parisTime, parisParts } from './paris-time.js';
 
 export const STATUSES = {
   new: 'À contacter', sent: 'Contacté', replied: 'A répondu', client: 'Client', refused: 'Refus', bounced: 'Rejeté',
@@ -23,6 +25,7 @@ export function parseFilters(sp) {
     status: Object.hasOwn(STATUSES, sp.get('status')) ? sp.get('status') : '',
     minScore: int(sp.get('minScore'), 0, 10, 0),
     sort: Object.hasOwn(SORTS, sp.get('sort')) ? sp.get('sort') : 'score',
+    todo: sp.get('todo') === '1',
     page: int(sp.get('page'), 1, 100_000, 1),
   };
 }
@@ -37,6 +40,7 @@ export function filterWhere(projectId, f) {
   }
   if (f.status) { where.push('status = ?'); args.push(f.status); }
   if (f.minScore) { where.push('score >= ?'); args.push(f.minScore); }
+  if (f.todo) { where.push('next_action_at IS NOT NULL AND next_action_at <= ?'); args.push(f.at ?? now()); }
   return { sql: where.join(' AND '), args, order: SORTS[f.sort] || SORTS.score };
 }
 
@@ -45,7 +49,48 @@ export function listProspects(db, projectId, f, { limit = 100 } = {}) {
   const total = db.prepare(`SELECT COUNT(*) n FROM prospects WHERE ${sql}`).get(...args).n;
   const pages = Math.max(1, Math.ceil(total / limit));
   const page = Math.min(f.page, pages);
-  const rows = db.prepare(`SELECT id, company, email, website, city, sector, score, status, sent_at, followup_at, replied_at
+  const rows = db.prepare(`SELECT id, company, email, website, city, sector, score, status, sent_at, followup_at, replied_at,
+    next_action, next_action_at
     FROM prospects WHERE ${sql} ORDER BY ${order} LIMIT ? OFFSET ?`).all(...args, limit, (page - 1) * limit);
   return { total, page, pages, rows };
+}
+
+// ---------- Fiche prospect ----------
+
+/** Tout ce qu'on sait d'un prospect : infos, mails envoyés, réponse, notes. */
+export function prospectDetail(db, id) {
+  const p = db.prepare('SELECT * FROM prospects WHERE id = ?').get(id);
+  if (!p) return null;
+  const mails = db.prepare(`SELECT kind, subject, variant, sent_at, error FROM mail_log
+    WHERE prospect_id = ? ORDER BY sent_at, id`).all(id);
+  const notes = db.prepare('SELECT id, body, created_at FROM prospect_notes WHERE prospect_id = ? ORDER BY created_at DESC, id DESC').all(id);
+  const optOut = db.prepare('SELECT reason, created_at FROM blacklist WHERE email = ?').get(p.email) || null;
+  return { prospect: p, mails, notes, optOut };
+}
+
+export function addNote(db, prospectId, body) {
+  const text = String(body || '').trim().slice(0, 2000);
+  if (!text) return null;
+  return Number(db.prepare('INSERT INTO prospect_notes(prospect_id, body, created_at) VALUES(?, ?, ?)').run(prospectId, text, now()).lastInsertRowid);
+}
+
+export function deleteNote(db, prospectId, noteId) {
+  return db.prepare('DELETE FROM prospect_notes WHERE id = ? AND prospect_id = ?').run(noteId, prospectId).changes > 0;
+}
+
+/** Prochaine action : texte + jour (AAAA-MM-JJ, rappel à 9h heure de Paris). Vide = effacer. */
+export function setNextAction(db, prospectId, action, day) {
+  const text = String(action || '').trim().slice(0, 200);
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(day || ''));
+  if (!text) {
+    db.prepare('UPDATE prospects SET next_action = NULL, next_action_at = NULL WHERE id = ?').run(prospectId);
+    return null;
+  }
+  if (!m) throw new Error('Date attendue au format AAAA-MM-JJ');
+  const date = parisTime(+m[1], +m[2], +m[3], 9);
+  // 2026-02-31 deviendrait le 3 mars sans prévenir : on refuse
+  if (parisParts(date).day !== +m[3]) throw new Error('Date invalide');
+  const at = Math.floor(date.getTime() / 1000);
+  db.prepare('UPDATE prospects SET next_action = ?, next_action_at = ? WHERE id = ?').run(text, at, prospectId);
+  return at;
 }

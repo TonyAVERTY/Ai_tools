@@ -104,10 +104,24 @@ form.send { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--lin
 .moon { width: 18px; height: 18px; border-radius: 50%; box-shadow: inset -5px -3px 0 0 var(--accent); flex: none; transform: rotate(-20deg); }
 .checks { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0 12px; margin: 4px 0 10px; }
 .checks label.check { margin: 4px 0; }
-.pfilters { display: grid; grid-template-columns: 2fr repeat(3, 1fr); gap: 8px; margin: 10px 0; }
+.pfilters { display: grid; grid-template-columns: 2fr repeat(4, auto); gap: 8px; margin: 10px 0; }
 .pfilters input, .pfilters select { margin: 0; }
 @media (max-width: 640px) { .pfilters { grid-template-columns: 1fr 1fr; } .pfilters input { grid-column: 1 / -1; } }
 .pager { display: flex; gap: 10px; align-items: center; justify-content: center; margin: 8px 0; }
 select.st-replied, select.st-client { color: var(--ok); font-weight: 600; }
 select.st-refused, select.st-bounced { color: var(--err); }
 select.st-new { color: var(--accent); }
+.prospect-dialog { width: min(720px, calc(100vw - 32px)); max-height: calc(100vh - 48px); border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); color: var(--text); padding: 18px; }
+.prospect-dialog::backdrop { background: rgba(0, 0, 0, .45); }
+.dlg-head { align-items: flex-start; }
+.dlg-head h3 { margin: 0 0 4px; }
+.hook { font-style: italic; border-left: 3px solid var(--accent); padding-left: 10px; margin: 10px 0; }
+.timeline { list-style: none; padding: 0; margin: 0; border-left: 2px solid var(--line); }
+.timeline li { position: relative; padding: 0 0 10px 14px; }
+.timeline li::before { content: ""; position: absolute; left: -6px; top: 6px; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); }
+.timeline time { display: block; font-size: .8rem; color: var(--muted); }
+.notes { list-style: none; padding: 0; }
+.notes li { border-top: 1px solid var(--line); padding: 8px 0; }
+.note-body { white-space: pre-wrap; }
+.pfilters .todo { margin: 0; align-self: center; }
+@media (max-width: 640px) { .pfilters .todo { grid-column: 1 / -1; } }

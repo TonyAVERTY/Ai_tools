@@ -209,3 +209,25 @@ test('budget : réglages, jauge et avertissement au lancement', async () => {
   assert.match((await r.json()).budgetBlocked, /budget IA des dernières 24 h atteint/);
   await post('/settings', { ...base, budget_day_usd: '' }, { form: true });
 });
+
+test('fiche prospect : routes notes et prochaine action', async () => {
+  const pid = app.db.prepare('SELECT id FROM projects LIMIT 1').get().id;
+  const id = Number(app.db.prepare("INSERT INTO prospects(project_id, company, email, website, created_at) VALUES(?, 'Atelier', 'a@atelier.fr', 'javascript:alert(1)', ?)").run(pid, now()).lastInsertRowid);
+  let r = await post(`/api/prospects/${id}/notes`, { body: '<script>x</script>' });
+  assert.equal(r.status, 200);
+  r = await post(`/api/prospects/${id}/notes`, { body: '' });
+  assert.equal(r.status, 400);
+  r = await post(`/api/prospects/${id}/next`, { action: 'Rappeler', day: '2026-02-31' });
+  assert.equal(r.status, 400);
+  r = await post(`/api/prospects/${id}/next`, { action: 'Rappeler', day: '2026-11-03' });
+  assert.equal(r.status, 200);
+  const d = await (await get(`/api/prospects/${id}`)).json();
+  assert.equal(d.notes[0].body, '<script>x</script>', 'stocké brut, échappé à l\'affichage');
+  assert.equal(d.prospect.next_action, 'Rappeler');
+  r = await get('/api/prospects/999999');
+  assert.equal(r.status, 404);
+  r = await post(`/api/prospects/${id}/notes/${d.notes[0].id}/delete`, {}, { origin: 'https://evil.com' });
+  assert.equal(r.status, 403, 'CSRF bloqué');
+  const list = await (await get(`/api/projects/${pid}/prospects?q=atelier`)).json();
+  assert.equal(list.rows[0].next_action, 'Rappeler');
+});

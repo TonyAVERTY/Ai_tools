@@ -359,6 +359,92 @@
   const STATUS = { new: 'À contacter', sent: 'Contacté', replied: 'A répondu', client: 'Client', refused: 'Refus', bounced: 'Rejeté' };
   // Seuls les liens http(s) sont cliquables : un "javascript:" venu d'une page web scrapée ne doit jamais s'exécuter ici
   const safeUrl = (u) => (/^https?:\/\//i.test(String(u || '')) ? String(u) : '');
+  const fmtDate = (ts) => new Date(ts * 1000).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' });
+  const isoDay = (ts) => (ts ? new Date(ts * 1000).toLocaleDateString('sv-SE', { timeZone: 'Europe/Paris' }) : '');
+
+  // ---------- Fiche prospect ----------
+  const dlg = $('#prospect-dialog');
+
+  async function openProspect(id) {
+    let d;
+    try { d = await api(`/api/prospects/${id}`); } catch (err) { toast(err.message, 'error'); return; }
+    const p = d.prospect;
+    const site = safeUrl(p.website);
+    const source = safeUrl(p.source);
+    const events = [
+      ...d.mails.map((m) => ({
+        at: m.sent_at,
+        html: `<strong>${m.kind === 'followup' ? 'Relance' : 'Premier mail'}</strong>${m.variant ? ` <span class="muted">(objet ${esc(m.variant)})</span>` : ''} : ${esc(m.subject || '')}
+          ${m.error ? `<span class="error"> · échec : ${esc(m.error)}</span>` : ''}`,
+      })),
+      ...(p.replied_at ? [{ at: p.replied_at, html: `<strong class="ok">Réponse reçue</strong> : ${esc(p.reply_subject || 'sans objet')}` }] : []),
+    ].sort((a, b) => a.at - b.at);
+
+    $('[data-dialog-body]', dlg).innerHTML = `
+      <div class="row dlg-head">
+        <div>
+          <h3>${site ? `<a href="${esc(site)}" target="_blank" rel="noopener noreferrer">${esc(p.company)}</a>` : esc(p.company)}</h3>
+          <div class="small muted"><a href="mailto:${esc(p.email)}">${esc(p.email)}</a>${p.city ? ` · ${esc(p.city)}` : ''}${p.sector ? ` · ${esc(p.sector)}` : ''}${p.score ? ` · score ${p.score}/10` : ''} · ${esc(STATUS[p.status] || p.status)}</div>
+        </div>
+        <button type="button" class="btn small" data-close>Fermer</button>
+      </div>
+      ${d.optOut ? `<p class="error small">Sur la liste d'opposition (${d.optOut.reason === 'bounce' ? 'adresse invalide' : d.optOut.reason === 'refused' ? 'refus' : 'désinscription'}) : ne plus contacter.</p>` : ''}
+      ${p.hook ? `<p class="hook">« ${esc(p.hook)} »</p>` : ''}
+      ${source ? `<p class="small muted">Email trouvé sur : <a href="${esc(source)}" target="_blank" rel="noopener noreferrer">${esc(source)}</a></p>` : ''}
+
+      <h4>Historique</h4>
+      ${events.length ? `<ol class="timeline">${events.map((e) => `<li><time>${fmtDate(e.at)}</time><div>${e.html}</div></li>`).join('')}</ol>` : '<p class="muted small">Pas encore contacté.</p>'}
+
+      <h4>Prochaine action</h4>
+      <form data-dlg="next" class="inline">
+        <label>Quoi<input name="action" value="${esc(p.next_action || '')}" placeholder="ex. Rappeler après les vacances" maxlength="200"></label>
+        <label>Quand<input type="date" name="day" value="${isoDay(p.next_action_at)}"></label>
+        <button class="btn">Enregistrer</button>
+        ${p.next_action ? '<button type="button" class="btn small" data-clear-next>Effacer</button>' : ''}
+      </form>
+
+      <h4>Notes</h4>
+      <form data-dlg="note">
+        <textarea name="body" rows="3" maxlength="2000" placeholder="Ce qu'il a dit, le contexte, ce qu'il faut retenir…"></textarea>
+        <button class="btn">Ajouter la note</button>
+      </form>
+      <ul class="notes">${d.notes.map((n) => `<li><div class="small muted">${fmtDate(n.created_at)} · <button type="button" class="link small" data-del-note="${n.id}">supprimer</button></div><div class="note-body">${esc(n.body)}</div></li>`).join('')}</ul>`;
+    dlg.dataset.id = id;
+    if (!dlg.open) dlg.showModal();
+  }
+
+  function refreshOpenLists() { $$('details.prospects[open]').forEach((d) => loadProspects(d, Number(d.dataset.page) || 1)); }
+
+  if (dlg) {
+    dlg.addEventListener('click', async (e) => {
+      if (e.target === dlg || e.target.closest('[data-close]')) { dlg.close(); return; }
+      const id = dlg.dataset.id;
+      const del = e.target.closest('[data-del-note]');
+      if (del && confirm('Supprimer cette note ?')) {
+        await api(`/api/prospects/${id}/notes/${del.dataset.delNote}/delete`, {}).catch((err) => toast(err.message, 'error'));
+        openProspect(id);
+      }
+      if (e.target.closest('[data-clear-next]')) {
+        await api(`/api/prospects/${id}/next`, { action: '' }).catch((err) => toast(err.message, 'error'));
+        openProspect(id); refreshOpenLists();
+      }
+    });
+    dlg.addEventListener('submit', async (e) => {
+      const form = e.target.closest('form[data-dlg]');
+      if (!form) return;
+      e.preventDefault();
+      const id = dlg.dataset.id;
+      try {
+        if (form.dataset.dlg === 'note') { await api(`/api/prospects/${id}/notes`, formData(form)); toast('Note ajoutée'); }
+        else { await api(`/api/prospects/${id}/next`, formData(form)); toast('Prochaine action enregistrée'); refreshOpenLists(); }
+        openProspect(id);
+      } catch (err) { toast(err.message, 'error'); }
+    });
+  }
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-open-prospect]');
+    if (b) openProspect(b.dataset.openProspect);
+  });
 
   const fmtDay = (ts) => (ts ? new Date(ts * 1000).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', timeZone: 'Europe/Paris' }) : '');
 
@@ -370,7 +456,8 @@
       const r = await api(`/api/projects/${proj.dataset.id}/prospects?${qs}`);
       d.dataset.page = r.page;
       box.innerHTML = r.rows.length ? `<div class="table-wrap"><table><thead><tr><th>Entreprise</th><th>Email</th><th>Ville</th><th>Score</th><th>Contacté</th><th>Statut</th></tr></thead><tbody>
-        ${r.rows.map((x) => `<tr data-row="${x.id}"><td>${safeUrl(x.website) ? `<a href="${esc(safeUrl(x.website))}" target="_blank" rel="noopener noreferrer">${esc(x.company)}</a>` : esc(x.company)}</td>
+        ${r.rows.map((x) => `<tr data-row="${x.id}"><td><button type="button" class="link" data-open-prospect="${x.id}">${esc(x.company)}</button>
+            ${x.next_action ? `<div class="small ${x.next_action_at * 1000 <= Date.now() ? 'warn' : 'muted'}">→ ${esc(x.next_action)} (${fmtDay(x.next_action_at)})</div>` : ''}</td>
           <td>${esc(x.email)}</td><td>${esc(x.city)}</td><td>${x.score ?? ''}</td>
           <td>${fmtDay(x.sent_at)}${x.followup_at ? ' <span class="muted small">+ relance</span>' : ''}</td>
           <td><select data-prospect="${x.id}" class="st-${x.status}">${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${k === x.status ? 'selected' : ''}>${v}</option>`).join('')}</select></td></tr>`).join('')}

@@ -184,6 +184,7 @@ function projectItem(p, smtp, dbCfg, imap) {
         <input type="search" name="q" placeholder="Rechercher : entreprise, email, ville, secteur" aria-label="Rechercher">
         <select name="status" aria-label="Statut"><option value="">Tous les statuts</option>${Object.entries(STATUSES).map(([k, l]) => `<option value="${k}">${l}</option>`).join('')}</select>
         <select name="minScore" aria-label="Score minimum"><option value="0">Tous les scores</option><option value="5">Score ≥ 5</option><option value="7">Score ≥ 7</option><option value="9">Score ≥ 9</option></select>
+        <label class="check todo"><input type="checkbox" name="todo" value="1"> Actions à faire</label>
         <select name="sort" aria-label="Tri"><option value="score">Tri : score</option><option value="recent">Plus récents</option><option value="contacted">Dernier contact</option><option value="company">Entreprise A → Z</option></select>
       </form>
       <div data-prospects></div>
@@ -229,6 +230,7 @@ export function dashboardPage({ email, projects, forgejoHost }) {
     <button class="btn primary">Créer et analyser</button>
   </form>
 </details>
+<dialog class="prospect-dialog" id="prospect-dialog" aria-label="Fiche prospect"><div data-dialog-body></div></dialog>
 <div class="projects">
 ${projects.length ? projects.map((x) => projectItem(x.project, x.smtp, x.dbCfg, x.imap)).join('\n') : '<p class="muted">Aucun projet pour l\'instant.</p>'}
 </div>`,
