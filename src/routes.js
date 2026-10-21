@@ -135,7 +135,11 @@ export function registerRoutes(router, app) {
     const queue = db.prepare(`SELECT COUNT(*) n FROM jobs WHERE status = 'running'
       OR (status = 'queued' AND (run_after IS NULL OR run_after <= ?))`).get(now()).n;
     const scheduled = db.prepare("SELECT COUNT(*) n FROM jobs WHERE status = 'queued' AND run_after > ?").get(now()).n;
-    json(res, { temp: cpuTemp(), queue, scheduled, usage: usageSummary(db), budget: budgetState(db), thermalMax: cfg.thermalMax });
+    const rlRaw = getSetting(db, 'claude_rate_limit_json');
+    json(res, {
+      temp: cpuTemp(), queue, scheduled, usage: usageSummary(db), budget: budgetState(db), thermalMax: cfg.thermalMax,
+      claudeRateLimit: rlRaw ? JSON.parse(rlRaw) : null,
+    });
   });
 
   router.post('/api/projects', async ({ req, res }) => {

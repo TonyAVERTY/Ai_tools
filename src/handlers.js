@@ -1,6 +1,6 @@
 // Handlers des jobs en arrière-plan.
-import { now, getSetting } from './db.js';
-import { runClaude, extractJson } from './services/claude.js';
+import { now, getSetting, setSetting } from './db.js';
+import { runClaude, extractJson, rateLimitWindows } from './services/claude.js';
 import { addUsage } from './services/jobs.js';
 import { syncRepo } from './services/git.js';
 import { analyzePrompt, prospectPrompt, templatePrompt, followupTemplatePrompt, evolutionPrompt, LEVELS } from './services/prompts.js';
@@ -38,7 +38,13 @@ export function parseProspectLine(line) {
 
 export function makeHandlers(app) {
   const { db, cfg } = app;
-  const claude = (o) => runClaude({ bin: cfg.claudeBin, ...o });
+  const claude = async (o) => {
+    const r = await runClaude({ bin: cfg.claudeBin, ...o });
+    // État du quota Pro (session 5h + semaine), affiché dans la barre système
+    const w = rateLimitWindows(r.rateLimit);
+    if (w) setSetting(db, 'claude_rate_limit_json', JSON.stringify({ at: now(), ...w }));
+    return r;
+  };
 
   const inHours = () => (app.isBusinessHours || isBusinessHours)();
 

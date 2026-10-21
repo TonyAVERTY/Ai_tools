@@ -44,6 +44,23 @@
     return `<span class="${r >= 1 ? 'error' : r >= 0.8 ? 'warn' : ''}" title="Équivalent API, consommé sur ton quota Pro">IA ${label} : ${used} / ${x.limit} $</span>`;
   }
 
+  // Quota du compte Claude Pro lui-même (session glissante de 5 h + semaine glissante de 7 j),
+  // remonté par la CLI à chaque appel. Permet de décider en amont si une tâche vaut le coup.
+  function resetLabel(ts) {
+    if (!ts) return '';
+    return new Date(ts * 1000).toLocaleString('fr-FR', { weekday: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
+  }
+  function claudeBit(label, w) {
+    if (!w) return '';
+    const cls = w.utilization >= 1 ? 'error' : w.utilization >= 0.8 ? 'warn' : '';
+    const reset = resetLabel(w.resetsAt);
+    return `<span class="${cls}"${reset ? ` title="Réinitialisation ${esc(reset)}"` : ''}>Claude ${label} : ${pct(w.utilization)}</span>`;
+  }
+  function claudeQuota(rl) {
+    if (!rl) return '<span class="muted" title="Mesuré après le premier job IA">Claude : pas encore mesuré</span>';
+    return `${claudeBit('session 5h', rl.fiveHour)} ${claudeBit('semaine', rl.sevenDay)}`.trim();
+  }
+
   async function refreshSys() {
     const el = $('#sys');
     if (!el) return;
@@ -51,6 +68,7 @@
       const s = await api('/api/system');
       const hot = s.temp !== null && s.temp >= s.thermalMax - 5;
       el.innerHTML = `${s.temp !== null ? `<span class="${hot ? 'warn' : ''}">${s.temp} °C</span>` : ''}
+        ${claudeQuota(s.claudeRateLimit)}
         ${gauge('24 h', s.budget.day)} ${gauge('30 j', s.budget.month)}
         ${s.budget.blocked ? '<span class="error">Budget IA atteint : jobs IA en attente</span>' : ''}
         ${s.queue ? `<span class="spin-inline"></span>${s.queue} job(s)` : ''}

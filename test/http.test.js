@@ -4,7 +4,7 @@ import { randomBytes } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { openDb, now } from '../src/db.js';
+import { openDb, now, setSetting } from '../src/db.js';
 import { createApp } from '../src/server.js';
 import { unsubToken } from '../src/crypto.js';
 
@@ -202,8 +202,13 @@ test('budget : réglages, jauge et avertissement au lancement', async () => {
   assert.equal(s('budget_day_usd'), '0.5', 'virgule française acceptée');
   assert.equal(s('budget_month_usd'), '', 'valeur invalide = pas de limite');
   app.db.prepare("INSERT INTO jobs(type, status, cost_usd, created_at, finished_at) VALUES('evolution', 'done', 0.8, ?, ?)").run(now(), now());
-  const sys = await (await get('/api/system')).json();
+  let sys = await (await get('/api/system')).json();
   assert.equal(sys.budget.blocked, true);
+  assert.equal(sys.claudeRateLimit, null, 'pas encore mesuré sans appel Claude');
+  setSetting(app.db, 'claude_rate_limit_json', JSON.stringify({ at: now(), fiveHour: { utilization: 0.42, resetsAt: 123 }, sevenDay: { utilization: 0.1, resetsAt: 456 } }));
+  sys = await (await get('/api/system')).json();
+  assert.equal(sys.claudeRateLimit.fiveHour.utilization, 0.42);
+  assert.equal(sys.claudeRateLimit.sevenDay.utilization, 0.1);
   const id = app.db.prepare('SELECT id FROM projects LIMIT 1').get().id;
   app.db.prepare("UPDATE jobs SET status = 'cancelled' WHERE status IN ('queued', 'running')").run();
   r = await post(`/api/projects/${id}/evolution`, { count: 2, level: 'rapide' });
