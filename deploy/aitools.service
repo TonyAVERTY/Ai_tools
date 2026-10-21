@@ -1,0 +1,27 @@
+[Unit]
+Description=AiTools (panel prospection IA)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=aitools
+WorkingDirectory=/opt/aitools
+ExecStart=/usr/bin/node --env-file=/opt/aitools/.env --no-warnings=ExperimentalWarning src/server.js
+Restart=on-failure
+RestartSec=5
+Environment=NODE_ENV=production
+# Le serveur web reste léger ; Claude Code (enfant) tourne déjà en nice 10
+Nice=5
+MemoryMax=900M
+# Durcissement
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/opt/aitools/data -/home/aitools/.claude -/home/aitools/.claude.json
+ProtectKernelTunables=true
+ProtectControlGroups=true
+
+[Install]
+WantedBy=multi-user.target
