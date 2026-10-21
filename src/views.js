@@ -1,4 +1,5 @@
 import { esc } from './http.js';
+import { STATUSES } from './services/crm.js';
 
 const fmtDate = (ts) => (ts ? new Date(ts * 1000).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' }) : '—');
 
@@ -179,7 +180,14 @@ function projectItem(p, smtp, dbCfg, imap) {
     </section>
 
     <details class="prospects"><summary>Prospects <span data-count></span></summary>
+      <form class="pfilters" data-filters>
+        <input type="search" name="q" placeholder="Rechercher : entreprise, email, ville, secteur" aria-label="Rechercher">
+        <select name="status" aria-label="Statut"><option value="">Tous les statuts</option>${Object.entries(STATUSES).map(([k, l]) => `<option value="${k}">${l}</option>`).join('')}</select>
+        <select name="minScore" aria-label="Score minimum"><option value="0">Tous les scores</option><option value="5">Score ≥ 5</option><option value="7">Score ≥ 7</option><option value="9">Score ≥ 9</option></select>
+        <select name="sort" aria-label="Tri"><option value="score">Tri : score</option><option value="recent">Plus récents</option><option value="contacted">Dernier contact</option><option value="company">Entreprise A → Z</option></select>
+      </form>
       <div data-prospects></div>
+      <div class="pager" data-pager></div>
     </details>
   </section>
 
