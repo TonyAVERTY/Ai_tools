@@ -187,6 +187,12 @@ function projectItem(p, smtp, dbCfg, imap) {
         <label class="check todo"><input type="checkbox" name="todo" value="1"> Actions à faire</label>
         <select name="sort" aria-label="Tri"><option value="score">Tri : score</option><option value="recent">Plus récents</option><option value="contacted">Dernier contact</option><option value="company">Entreprise A → Z</option></select>
       </form>
+      <div class="row csv">
+        <a class="btn small" data-export href="/api/projects/${p.id}/prospects.csv" download>Exporter (CSV)</a>
+        <label class="btn small file">Importer un CSV<input type="file" accept=".csv,text/csv" data-import="${p.id}" hidden></label>
+        <span class="muted small">Colonnes reconnues : entreprise, email, site, ville, secteur, score, source, accroche.</span>
+      </div>
+      <div data-import-report></div>
       <div data-prospects></div>
       <div class="pager" data-pager></div>
     </details>

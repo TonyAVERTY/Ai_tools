@@ -14,6 +14,7 @@ import { nextNightSlot } from './services/paris-time.js';
 import { notify, notifyConfig, EVENTS, WEBHOOK_RE } from './services/notify.js';
 import { budgetState, AI_JOBS } from './services/budget.js';
 import { sendWeeklyReport } from './services/report.js';
+import { exportProspects, importProspects } from './services/csv.js';
 import {
   listProspects, parseFilters, STATUSES as PROSPECT_STATUSES, prospectDetail, addNote, deleteNote, setNextAction,
 } from './services/crm.js';
@@ -303,6 +304,25 @@ export function registerRoutes(router, app) {
     try { business = await fetchRecap(p.id, p.dbCfg, { force: url.searchParams.has('force') }); }
     catch (e) { error = e.message; }
     json(res, { business, error, stats, aiCostUsd: cost });
+  });
+
+  router.get('/api/projects/:id/prospects\\.csv', ({ res, params, url }) => {
+    const p = getProject(app, pid(params));
+    const slug = p.name.normalize('NFD').replace(/[^\w-]+/g, '-').replace(/^-|-$/g, '').toLowerCase() || 'projet';
+    const date = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Paris' });
+    res.writeHead(200, {
+      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Disposition': `attachment; filename="prospects-${slug}-${date}.csv"`,
+      'Cache-Control': 'no-store',
+    });
+    res.end(exportProspects(db, p.id, parseFilters(url.searchParams)));
+  });
+
+  router.post('/api/projects/:id/prospects/import', async ({ req, res, params }) => {
+    const p = getProject(app, pid(params));
+    const b = await readBody(req, { max: 1024 * 1024 });
+    try { json(res, importProspects(db, p.id, String(b.csv || ''))); }
+    catch (e) { throw new HttpError(400, e.message); }
   });
 
   router.get('/api/projects/:id/prospects', ({ res, params, url }) => {

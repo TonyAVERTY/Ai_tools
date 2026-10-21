@@ -125,3 +125,5 @@ select.st-new { color: var(--accent); }
 .note-body { white-space: pre-wrap; }
 .pfilters .todo { margin: 0; align-self: center; }
 @media (max-width: 640px) { .pfilters .todo { grid-column: 1 / -1; } }
+.csv { justify-content: flex-start; margin: 4px 0 8px; }
+label.btn.file { display: inline-block; margin: 0; color: var(--text); font-size: .85rem; }

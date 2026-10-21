@@ -441,6 +441,29 @@
       } catch (err) { toast(err.message, 'error'); }
     });
   }
+  // Import CSV : Excel enregistre souvent en Windows-1252, on détecte pour ne pas abîmer les accents
+  document.addEventListener('change', async (e) => {
+    const input = e.target.closest('[data-import]');
+    if (!input?.files?.length) return;
+    const file = input.files[0];
+    input.value = '';
+    const d = input.closest('details.prospects');
+    const report = $('[data-import-report]', d);
+    if (file.size > 1024 * 1024) { toast('Fichier trop gros (1 Mo max, environ 2000 lignes)', 'error'); return; }
+    const buf = await file.arrayBuffer();
+    let csv;
+    try { csv = new TextDecoder('utf-8', { fatal: true }).decode(buf); }
+    catch { csv = new TextDecoder('windows-1252').decode(buf); }
+    try {
+      const r = await api(`/api/projects/${input.dataset.import}/prospects/import`, { csv });
+      report.innerHTML = `<p class="small"><span class="ok">${r.imported} importé(s)</span> sur ${r.total} ·
+        ${r.duplicates} déjà présent(s) · ${r.blacklisted} sur liste d'opposition · ${r.invalid.length} invalide(s)</p>
+        ${r.invalid.length ? `<details class="small"><summary>Lignes ignorées</summary><ul>${r.invalid.map((x) => `<li>Ligne ${x.line} : ${esc(x.reason)}</li>`).join('')}</ul></details>` : ''}`;
+      toast(`${r.imported} prospect(s) importé(s)`);
+      loadProspects(d);
+    } catch (err) { report.innerHTML = ''; toast(err.message, 'error'); }
+  });
+
   document.addEventListener('click', (e) => {
     const b = e.target.closest('[data-open-prospect]');
     if (b) openProspect(b.dataset.openProspect);
@@ -451,7 +474,10 @@
   async function loadProspects(d, page = 1) {
     const proj = d.closest('.project');
     const box = $('[data-prospects]', d);
-    const qs = new URLSearchParams({ ...formData($('[data-filters]', d)), page });
+    const filters = formData($('[data-filters]', d));
+    const qs = new URLSearchParams({ ...filters, page });
+    // L'export suit les filtres affichés
+    $('[data-export]', d).href = `/api/projects/${proj.dataset.id}/prospects.csv?${new URLSearchParams(filters)}`;
     try {
       const r = await api(`/api/projects/${proj.dataset.id}/prospects?${qs}`);
       d.dataset.page = r.page;
