@@ -3,6 +3,28 @@ import { STATUSES } from './services/crm.js';
 
 const fmtDate = (ts) => (ts ? new Date(ts * 1000).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' }) : '—');
 
+// Icônes en SVG inline (attributs de présentation uniquement : compatible avec la CSP sans style inline)
+const svg = (d) => `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+const ICONS = {
+  target: svg('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>'),
+  search: svg('<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>'),
+  spark: svg('<path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/><circle cx="12" cy="12" r="3"/>'),
+  chart: svg('<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'),
+  mail: svg('<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>'),
+  send: svg('<path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4z"/>'),
+  repeat: svg('<path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/>'),
+  users: svg('<circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0"/><path d="M16 4a4 4 0 0 1 0 8M22 21a7 7 0 0 0-4-6.3"/>'),
+  gear: svg('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>'),
+};
+
+/** Section dépliable animée. `title` peut contenir du HTML de confiance (badges), jamais de donnée utilisateur brute. */
+function acc(key, icon, title, sub, body, { open = false, cls = '' } = {}) {
+  return `<details class="acc anim ${cls}" data-acc="${key}"${open ? ' open' : ''}>
+  <summary><span class="acc-ico">${ICONS[icon]}</span><span class="acc-txt"><span class="acc-title">${title}</span>${sub ? `<span class="acc-sub">${sub}</span>` : ''}</span><span class="chev" aria-hidden="true"></span></summary>
+  <div class="acc-body">${body}</div>
+</details>`;
+}
+
 export function layout({ title, body, email }) {
   return `<!doctype html>
 <html lang="fr">
@@ -15,9 +37,17 @@ export function layout({ title, body, email }) {
 <script src="/static/app.js" defer></script>
 </head>
 <body>
+<canvas id="bg" aria-hidden="true"></canvas>
 ${email ? `<header class="top">
-  <a class="brand" href="/">AiTools</a>
+  <a class="brand" href="/"><span class="logo" aria-hidden="true"></span>AiTools</a>
   <div class="sys" id="sys" aria-live="polite"></div>
+  <div class="jobs" id="jobs" hidden>
+    <button type="button" class="jobs-btn" aria-expanded="false" aria-controls="jobs-pop"><span class="spin-inline"></span><span data-jobs-count></span><span class="chev" aria-hidden="true"></span></button>
+    <div class="jobs-pop" id="jobs-pop" role="region" aria-label="Jobs en cours" hidden>
+      <div class="jobs-head"><strong>Activité</strong><span class="muted small" data-jobs-sub></span></div>
+      <div data-jobs-list></div>
+    </div>
+  </div>
   <nav><a href="/settings">Réglages</a>
   <form method="post" action="/logout"><button class="link">Déconnexion</button></form></nav>
 </header>` : ''}
@@ -42,7 +72,6 @@ function targetForm(p) {
   const t = p.target || {};
   const list = (a) => esc((a || []).join('\n'));
   return `<form class="target" data-action="target" data-id="${p.id}">
-  <h4>Cible ${p.targetValidated ? '<span class="badge ok">validée</span>' : '<span class="badge warn">à valider</span>'}</h4>
   <label>Description<input name="description" value="${esc(t.description)}"></label>
   <div class="grid3">
     <label>Zone<input name="zone" value="${esc(t.zone)}"></label>
@@ -58,8 +87,7 @@ function targetForm(p) {
 }
 
 function configForms(p, smtp, dbCfg, imap) {
-  return `<details class="config"><summary>Configuration du projet</summary>
-<form data-action="smtp" data-id="${p.id}" class="cfg">
+  return `<form data-action="smtp" data-id="${p.id}" class="cfg">
   <h4>SMTP d'envoi</h4>
   <div class="grid3">
     <label>Hôte<input name="host" value="${esc(smtp.host)}" required></label>
@@ -102,8 +130,7 @@ function configForms(p, smtp, dbCfg, imap) {
 </form>
 <form data-action="delete" data-id="${p.id}" data-confirm="Supprimer ${esc(p.name)} et tous ses prospects ?" class="cfg">
   <button class="btn danger">Supprimer le projet</button>
-</form>
-</details>`;
+</form>`;
 }
 
 function templateForm(p, kind) {
@@ -126,7 +153,7 @@ function templateForm(p, kind) {
 
 function projectItem(p, smtp, dbCfg, imap) {
   const profile = p.profile;
-  return `<details class="project card" data-id="${p.id}">
+  return `<details class="project card anim" data-id="${p.id}">
 <summary><span class="pname">${esc(p.name)}</span><span class="pstate" data-state></span></summary>
 <div class="pbody">
   <label>Dépôt Git<input class="locked" value="${esc(p.gitUrl)}" readonly disabled></label>
@@ -141,34 +168,33 @@ function projectItem(p, smtp, dbCfg, imap) {
       : '<p class="muted">Pas encore analysé.</p>'}
   </section>
 
-  ${profile ? targetForm(p) : ''}
+  ${profile ? acc('target', 'target',
+    `Cible ${p.targetValidated ? '<span class="badge ok">validée</span>' : '<span class="badge warn">à valider</span>'}`,
+    esc((p.target?.description || '').slice(0, 120)), targetForm(p), { open: !p.targetValidated, cls: 'target-acc' }) : ''}
 
-  <div class="actions">
-    <button class="btn primary" data-panel="prospect">Prospecter</button>
-    <button class="btn" data-panel="evolution">Évolution</button>
-    <button class="btn" data-panel="recap">Récapitulatif</button>
-  </div>
-
-  <section class="panel" data-panel-body="prospect" hidden>
+  <div class="accs">
+  ${acc('prospect', 'search', 'Prospecter', 'Recherche, modèle de mail, envoi, relances et CRM', `
+    ${acc('search', 'search', 'Recherche de prospects', 'Claude cherche des entreprises qui collent à la cible', `
     <form data-action="prospect" data-id="${p.id}" class="inline">
       <label>Prospects à chercher<input name="count" type="number" min="1" max="50" value="10"></label>
       <label>Quand<select name="when"><option value="now">Maintenant</option><option value="night">Cette nuit (1h-6h)</option></select></label>
       <button class="btn primary">Lancer la recherche</button>
     </form>
-    <div class="job" data-job="prospect"></div>
+    <div class="job" data-job="prospect"></div>`, { open: true, cls: 'sub' })}
 
-    ${templateForm(p, 'initial')}
+    ${acc('template', 'mail', 'Modèle de mail', 'Objet, test A/B et corps du premier mail', templateForm(p, 'initial'), { cls: 'sub' })}
 
+    ${acc('send', 'send', 'Envoi', 'Envoi par lots, boîte de réception et test A/B', `
     <form data-action="send" data-id="${p.id}" class="inline send">
       <label>Mails à envoyer<input name="count" type="number" min="1" value="10"></label>
       <button class="btn primary" disabled>Envoyer</button>
       <span class="muted small" data-send-info></span>
     </form>
     <div class="job" data-job="send"></div>
-    <p class="inbox small" data-inbox></p>
+    <p class="inbox small" data-inbox></p>`, { cls: 'sub' })}
 
+    ${acc('followup', 'repeat', 'Relance automatique', 'Une relance dans le même fil après quelques jours', `
     <section class="followup">
-      <h4>Relance automatique</h4>
       <form data-action="followup" data-id="${p.id}" class="inline">
         <label class="check"><input type="checkbox" name="enabled" ${p.followupEnabled ? 'checked' : ''}> Relancer une fois les prospects sans réponse</label>
         <label>Après (jours)<input name="days" type="number" min="2" max="30" value="${p.followupDays}"></label>
@@ -177,9 +203,9 @@ function projectItem(p, smtp, dbCfg, imap) {
       <p class="muted small" data-followup-info></p>
       ${templateForm(p, 'followup')}
       <div class="job" data-job="followup"></div>
-    </section>
+    </section>`, { cls: 'sub' })}
 
-    <details class="prospects"><summary>Prospects <span data-count></span></summary>
+    ${acc('prospects', 'users', 'Prospects <span data-count></span>', 'Recherche, filtres, fiches, import et export CSV', `
       <form class="pfilters" data-filters>
         <input type="search" name="q" placeholder="Rechercher : entreprise, email, ville, secteur" aria-label="Rechercher">
         <select name="status" aria-label="Statut"><option value="">Tous les statuts</option>${Object.entries(STATUSES).map(([k, l]) => `<option value="${k}">${l}</option>`).join('')}</select>
@@ -194,11 +220,10 @@ function projectItem(p, smtp, dbCfg, imap) {
       </div>
       <div data-import-report></div>
       <div data-prospects></div>
-      <div class="pager" data-pager></div>
-    </details>
-  </section>
+      <div class="pager" data-pager></div>`, { cls: 'sub prospects' })}
+  `, { cls: 'main' })}
 
-  <section class="panel" data-panel-body="evolution" hidden>
+  ${acc('evolution', 'spark', 'Évolution', 'Idées de fonctionnalités tirées du code, envoyées par mail', `
     <form data-action="evolution" data-id="${p.id}" class="inline">
       <label>Nombre d'évolutions<input name="count" type="number" min="1" max="20" value="5"></label>
       <label>Raisonnement<select name="level">
@@ -209,14 +234,13 @@ function projectItem(p, smtp, dbCfg, imap) {
       <label>Quand<select name="when"><option value="now">Maintenant</option><option value="night">Cette nuit (1h-6h)</option></select></label>
       <button class="btn primary">Chercher et envoyer par mail</button>
     </form>
-    <div class="job" data-job="evolution"></div>
-  </section>
+    <div class="job" data-job="evolution"></div>`, { cls: 'main' })}
 
-  <section class="panel" data-panel-body="recap" hidden>
-    <div class="recap" data-recap><p class="muted">Chargement…</p></div>
-  </section>
+  ${acc('recap', 'chart', 'Récapitulatif', 'Chiffres business, prospection et courbes', `
+    <div class="recap" data-recap><p class="muted">Chargement…</p></div>`, { cls: 'main' })}
+  </div>
 
-  ${configForms(p, smtp, dbCfg, imap)}
+  ${acc('config', 'gear', 'Configuration du projet', 'SMTP, boîte IMAP, base de données', configForms(p, smtp, dbCfg, imap), { cls: 'config' })}
 </div>
 </details>`;
 }
@@ -227,7 +251,7 @@ export function dashboardPage({ email, projects, forgejoHost }) {
     body: `<div class="row head">
   <h1>Projets</h1>
 </div>
-<details class="card new">
+<details class="card new anim">
   <summary class="btn primary">+ Nouveau projet</summary>
   <form data-action="create" class="cfg">
     <label>Nom<input name="name" required maxlength="80"></label>

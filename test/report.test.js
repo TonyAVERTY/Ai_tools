@@ -64,7 +64,10 @@ test('envoi automatique : lundi 8h, une seule fois par semaine, désactivé par 
   assert.deepEqual(r.channels, ['mail', 'discord']);
   assert.equal(s.mails[0].to, 'moi@x.fr');
   assert.match(s.mails[0].subject, /^\[AiTools\] Rapport du/);
-  assert.match(s.hooks[0].embeds[0].description, /\*\*MonEspacePro\*\* : 20 trouvés · 20 envoyés · 6 réponses/);
+  const field = s.hooks[0].embeds[0].fields.find((f) => f.name === '📁 MonEspacePro');
+  assert.match(field.value, /20 trouvés · ✉️ 20 envoyés · 💬 6 réponses \(30 %\)/);
+  assert.match(s.mails[0].html, /Rapport hebdo/);
+  assert.match(s.mails[0].html, /MonEspacePro/);
 
   assert.equal(await maybeSendWeekly(s.app, { date: new Date('2026-10-26T08:45:00+01:00') }), null, 'pas deux fois le même lundi');
   assert.notEqual(await maybeSendWeekly(s.app, { date: new Date('2026-11-02T08:15:00+01:00') }), null, 'lundi suivant');

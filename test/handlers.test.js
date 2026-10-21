@@ -80,6 +80,8 @@ test('flux complet : analyse → cible → prospection → modèle → envoi →
     assert.equal(mail.subject, 'Idée pour Boulangerie Le Fournil');
     assert.match(mail.text, /Bonjour Boulangerie Le Fournil à Rennes/);
     assert.match(mail.text, /fournil\.fr\/contact/);
+    assert.match(mail.html, /Bonjour Boulangerie Le Fournil à Rennes/);
+    assert.match(mail.html, /Ne plus recevoir de messages/);
     const unsub = /\/u\/([^/]+)\/(\S+)/.exec(mail.headers['List-Unsubscribe']);
     assert.ok(verifyUnsubToken(s.app.cfg.secretKey, decodeURIComponent(unsub[1]), unsub[2].replace('>', '')));
     assert.equal(prospectStats(s.db, s.id).sent, 1);
@@ -94,6 +96,9 @@ test('flux complet : analyse → cible → prospection → modèle → envoi →
     assert.equal(ev.status, 'done', ev.error);
     assert.equal(s.sentMails.at(-1).to, 'moi@x.fr');
     assert.match(s.sentMails.at(-1).text, /Export CSV/);
+    assert.match(s.sentMails.at(-1).html, /class|style/, 'version HTML mise en forme');
+    assert.match(s.sentMails.at(-1).html, /Export CSV/);
+    assert.equal(ev.progress.pct, 95, 'avancement remonté jusqu\'au mail');
 
     const usage = s.db.prepare('SELECT SUM(cost_usd) c FROM jobs').get().c;
     assert.ok(usage > 0);

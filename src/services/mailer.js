@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import { randomBytes } from 'node:crypto';
+import { prospectHtml } from './mailhtml.js';
 
 export const EMAIL_RE = /^[^\s@<>()"',;:]+@[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/i;
 
@@ -35,17 +36,14 @@ export function buildProspectMail({ template, prospect, smtp, unsubUrl, subject 
     expediteur: smtp.fromName || '',
   };
   const body = fillTemplate(template.body, vars).replace(/\n{3,}/g, '\n\n').trim();
-  const footer = [
-    '',
-    '—',
-    `Vous recevez ce message car l'adresse ${prospect.email} est publiée publiquement${prospect.source ? ` (${prospect.source})` : ''}.`,
-    `Pour ne plus être contacté : ${unsubUrl}`,
-  ].join('\n');
+  const notice = `Vous recevez ce message car l'adresse ${prospect.email} est publiée publiquement${prospect.source ? ` (${prospect.source})` : ''}.`;
+  const footer = ['', '—', notice, `Pour ne plus être contacté : ${unsubUrl}`].join('\n');
   return {
     from: smtp.fromName ? `"${smtp.fromName.replace(/"/g, '')}" <${smtp.fromEmail}>` : smtp.fromEmail,
     to: prospect.email,
     subject: fillTemplate(subject, vars).trim(),
     text: body + '\n' + footer,
+    html: prospectHtml({ body, notice, unsubUrl }),
     ...(messageId ? { messageId } : {}),
     ...(inReplyTo ? { inReplyTo, references: [inReplyTo] } : {}),
     headers: {

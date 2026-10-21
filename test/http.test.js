@@ -174,6 +174,11 @@ test('« Cette nuit » programme le job au prochain créneau 1h-6h', async () =>
   assert.ok(p.hour >= 1 && p.hour < 6, `démarrage à ${p.hour}h`);
   const sys = await (await get('/api/system')).json();
   assert.ok(job.run_after > now() ? sys.scheduled >= 1 : true);
+  // Le menu « jobs » de la barre du haut reçoit le détail, avec le nom du projet
+  const listed = sys.jobs.find((j) => j.type === 'evolution');
+  assert.equal(listed.status, 'queued');
+  assert.equal(listed.projectId, id);
+  assert.ok(listed.project);
 });
 
 test('réglages Discord : URL validée, chiffrée, événements enregistrés', async () => {

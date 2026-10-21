@@ -19,8 +19,28 @@
     t.className = `toast ${kind}`;
     t.textContent = msg;
     document.body.append(t);
-    setTimeout(() => t.remove(), 4500);
+    setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 300); }, 4200);
   }
+
+  // Barres de progression : la largeur passe par le CSSOM (la CSP interdit les attributs style="").
+  // On repart de la dernière valeur connue du job pour que la barre glisse au lieu de repartir de 0 à chaque rafraîchissement.
+  const barMem = new Map();
+  function paintBars(root) {
+    $$('.bar > span[data-pct]', root).forEach((s) => {
+      if (s.dataset.pct === '') return;
+      const pct = Number(s.dataset.pct);
+      const key = s.dataset.key;
+      s.style.width = `${barMem.get(key) ?? 0}%`;
+      void s.offsetWidth; // force le calcul pour déclencher la transition
+      s.style.width = `${pct}%`;
+      if (key) barMem.set(key, pct);
+    });
+  }
+  const pctOf = (p) => (typeof p?.pct === 'number' ? Math.max(0, Math.min(100, Math.round(p.pct))) : null);
+  const progressBar = (job) => {
+    const v = pctOf(job.progress);
+    return `<div class="bar${v === null ? ' indet' : ''}"><span data-key="${job.id}" data-pct="${v ?? ''}"></span></div>`;
+  };
 
   const formData = (form) => Object.fromEntries(new FormData(form));
   const ago = (ts) => {
@@ -61,41 +81,124 @@
     return `${claudeBit('session 5h', rl.fiveHour)} ${claudeBit('semaine', rl.sevenDay)}`.trim();
   }
 
+  // ---------- Menu « jobs » : détail de ce qui tourne, avec l'avancement ----------
+  const jobsBox = $('#jobs');
+  const jobsBtn = jobsBox && $('.jobs-btn', jobsBox);
+  const jobsPop = jobsBox && $('.jobs-pop', jobsBox);
+  const jobsOpen = () => jobsBtn?.getAttribute('aria-expanded') === 'true';
+  const fmtWhen = (ts) => new Date(ts * 1000).toLocaleString('fr-FR', { weekday: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
+  const plural = (n, w) => `${n} ${w}${n > 1 ? 's' : ''}`;
+
+  function jobItem(j) {
+    const p = j.progress || {};
+    const scheduled = j.status === 'queued' && j.runAfter && j.runAfter * 1000 > Date.now();
+    const running = j.status === 'running';
+    const v = running ? pctOf(p) : null;
+    const state = scheduled ? `Programmé ${fmtWhen(j.runAfter)}` : running ? `Démarré ${ago(j.startedAt)}` : 'En file d\'attente';
+    const msg = p.message || (running ? 'En cours…' : '');
+    return `<div class="jitem j-${scheduled ? 'scheduled' : j.status}">
+      <div class="jrow">${scheduled ? '<span class="moon" aria-hidden="true"></span>' : running ? '<span class="pulse" aria-hidden="true"></span>' : '<span class="dot-wait" aria-hidden="true"></span>'}
+        <strong>${esc(LABELS[j.type] || j.type)}</strong><span class="jproj">${j.project ? esc(j.project) : ''}</span>${v !== null ? `<span class="jpct">${v} %</span>` : ''}</div>
+      ${msg ? `<div class="jmsg small muted">${esc(msg)}</div>` : ''}
+      ${running ? progressBar(j) : ''}
+      <div class="jmeta small muted"><span>${esc(state)}</span>
+        <span>${j.projectId ? `<button type="button" class="link small" data-goto="${j.projectId}">Voir</button> · ` : ''}<button type="button" class="link small" data-cancel="${j.id}">Annuler</button></span></div>
+    </div>`;
+  }
+
+  function renderJobsMenu(s) {
+    if (!jobsBox) return;
+    const list = s.jobs || [];
+    jobsBox.hidden = !list.length;
+    if (!list.length) { if (jobsOpen()) toggleJobs(false); return; }
+    $('.spin-inline', jobsBtn).hidden = !s.queue;
+    $('[data-jobs-count]', jobsBtn).textContent = s.queue
+      ? `${plural(s.queue, 'job')}${s.scheduled ? ` · ${s.scheduled} cette nuit` : ''}`
+      : `${plural(s.scheduled, 'programmé')} cette nuit`;
+    const running = list.filter((j) => j.status === 'running').length;
+    $('[data-jobs-sub]', jobsPop).textContent = `${running} en cours · ${list.length - running} en attente`;
+    // Redessine seulement si le contenu change : sinon l'animation d'apparition rejouerait à chaque poll
+    const html = list.map(jobItem).join('');
+    const box = $('[data-jobs-list]', jobsPop);
+    if (box._html === html) return;
+    box._html = html;
+    box.innerHTML = html;
+    paintBars(jobsPop);
+  }
+
+  function toggleJobs(open = !jobsOpen()) {
+    if (!jobsBtn) return;
+    jobsBtn.setAttribute('aria-expanded', String(open));
+    jobsPop.hidden = !open;
+    if (open) {
+      // Les lignes n'apparaissent en fondu qu'à l'ouverture, pas à chaque mise à jour
+      jobsPop.classList.add('fresh');
+      setTimeout(() => jobsPop.classList.remove('fresh'), 600);
+      refreshSys();
+    }
+  }
+  jobsBtn?.addEventListener('click', () => toggleJobs());
+  document.addEventListener('click', (e) => {
+    if (jobsOpen() && !e.target.closest('#jobs')) toggleJobs(false);
+    const go = e.target.closest('[data-goto]');
+    if (!go) return;
+    sessionStorageSet('openProject', go.dataset.goto);
+    const d = $(`details.project[data-id="${go.dataset.goto}"]`);
+    if (!d) { location.href = '/'; return; }
+    toggleJobs(false);
+    d.open = true;
+    d.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && jobsOpen()) { toggleJobs(false); jobsBtn.focus(); } });
+
+  let sysTimer;
   async function refreshSys() {
+    clearTimeout(sysTimer);
     const el = $('#sys');
     if (!el) return;
+    let busy = false;
     try {
       const s = await api('/api/system');
       const hot = s.temp !== null && s.temp >= s.thermalMax - 5;
       el.innerHTML = `${s.temp !== null ? `<span class="${hot ? 'warn' : ''}">${s.temp} °C</span>` : ''}
         ${claudeQuota(s.claudeRateLimit)}
         ${gauge('24 h', s.budget.day)} ${gauge('30 j', s.budget.month)}
-        ${s.budget.blocked ? '<span class="error">Budget IA atteint : jobs IA en attente</span>' : ''}
-        ${s.queue ? `<span class="spin-inline"></span>${s.queue} job(s)` : ''}
-        ${s.scheduled ? `<span>${s.scheduled} programmé(s) cette nuit</span>` : ''}`;
+        ${s.budget.blocked ? '<span class="error">Budget IA atteint : jobs IA en attente</span>' : ''}`;
+      renderJobsMenu(s);
+      busy = s.queue > 0;
     } catch { /* silencieux */ }
+    // Plus réactif quand quelque chose tourne ou que le menu est ouvert
+    sysTimer = setTimeout(refreshSys, jobsOpen() ? 3000 : busy ? 6000 : 30_000);
   }
   refreshSys();
-  setInterval(refreshSys, 30_000);
 
   // ---------- Rendu d'un job ----------
   function renderJob(box, job, type) {
     if (!box) return;
-    if (!job) { box.innerHTML = ''; return; }
+    if (!job) { box.innerHTML = ''; box._sig = ''; return; }
     const p = job.progress || {};
-    if (job.status === 'queued' && job.runAfter && job.runAfter * 1000 > Date.now()) {
+    const later = job.status === 'queued' && job.runAfter && job.runAfter * 1000 > Date.now();
+    // Rien n'a changé : on ne touche pas au DOM (sinon les animations d'apparition rejoueraient à chaque poll)
+    const sig = `${job.id}|${job.status}|${later}|${JSON.stringify(p)}`;
+    if (box._sig === sig) return;
+    box._sig = sig;
+    if (later) {
       const at = new Date(job.runAfter * 1000).toLocaleString('fr-FR', { weekday: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
       box.innerHTML = `<div class="running scheduled"><span class="moon" aria-hidden="true"></span>
-        <div><div>${LABELS[type]} programmé(e) : ${esc(at)}</div><div class="small muted">Le Pi est au frais et ton quota Claude est libre.</div></div>
+        <div><div>${LABELS[type]} programmé(e) : ${esc(at)}</div><div class="small muted">Démarrage la nuit, quand ton quota Claude est libre.</div></div>
         <button class="btn small" data-cancel="${job.id}">Annuler</button></div>`;
       return;
     }
     if (ACTIVE.includes(job.status)) {
       const extra = type === 'prospect' && p.found !== undefined
         ? `<strong>${p.found}</strong> prospect(s) trouvé(s) sur ${p.target}` : '';
+      const running = job.status === 'running';
+      const v = running ? pctOf(p) : null;
       box.innerHTML = `<div class="running"><span class="spinner"></span>
-        <div><div>${esc(p.message || (job.status === 'queued' ? 'En file d\'attente…' : 'En cours…'))}</div>${extra ? `<div class="small">${extra}</div>` : ''}</div>
+        <div><div class="run-head"><span>${esc(p.message || (running ? 'En cours…' : 'En file d\'attente…'))}</span>${v !== null ? `<strong class="jpct">${v} %</strong>` : ''}</div>
+          ${extra ? `<div class="small">${extra}</div>` : ''}${running ? progressBar(job) : ''}</div>
         <button class="btn small" data-cancel="${job.id}">Annuler</button></div>`;
+      paintBars(box);
     } else if (job.status === 'error') {
       box.innerHTML = `<p class="error small">${LABELS[type]} en échec : ${esc(job.error)}</p>`;
     } else if (job.status === 'cancelled') {
@@ -107,7 +210,12 @@
       if (type === 'send') txt = `Envoi terminé : ${r.sent} envoyé(s), ${r.failed} échec(s).`;
       if (type === 'followup') txt = r.postponed ? 'Relances reportées au prochain créneau (lun-ven 9h-18h).' : `Relances terminées : ${r.sent} envoyée(s), ${r.failed} échec(s).`;
       if (type === 'evolution') {
-        box.innerHTML = `<p class="ok small">Envoyé à ${esc(r.sentTo)}.</p><pre class="md">${esc(r.markdown)}</pre>`;
+        const when = job.finishedAt ? new Date(job.finishedAt * 1000).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' }) : '';
+        // r.html est rendu et échappé par le serveur (src/services/markdown.js)
+        box.innerHTML = `<div class="evo-done"><p class="ok small">Envoyé à ${esc(r.sentTo)}${when ? ` · ${esc(when)}` : ''}</p>
+          <button type="button" class="btn small" data-copy-md>Copier le Markdown</button></div>
+          ${r.html || `<pre class="md">${esc(r.markdown)}</pre>`}`;
+        box._markdown = r.markdown;
         return;
       }
       box.innerHTML = `<p class="ok small">${esc(txt)}</p>`;
@@ -217,15 +325,44 @@
   function sessionStorageSet(k, v) { try { sessionStorage.setItem(k, v); } catch { /* ignore */ } }
   $$('details.project').forEach((el) => el.addEventListener('toggle', () => { if (el.open) sessionStorageSet('openProject', el.dataset.id); }));
 
-  // ---------- Panneaux ----------
+  // ---------- Sections dépliables animées ----------
+  // <details class="anim"> : la hauteur du bloc qui suit le <summary> glisse à l'ouverture et à la fermeture.
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
+  document.addEventListener('click', (e) => {
+    const sum = e.target.closest('summary');
+    const d = sum?.parentElement;
+    const body = sum?.nextElementSibling;
+    if (!d?.matches('details.anim') || !body || reduceMotion.matches) return;
+    e.preventDefault();
+    d._anim?.cancel();
+    const opening = !d.open || d.classList.contains('closing');
+    const from = d.open ? body.getBoundingClientRect().height : 0;
+    d.classList.remove('closing');
+    if (opening) d.open = true;
+    else d.classList.add('closing');
+    const to = opening ? body.scrollHeight : 0;
+    body.style.overflow = 'hidden';
+    const anim = body.animate(
+      [{ height: `${from}px`, opacity: opening ? 0 : 1 }, { height: `${to}px`, opacity: opening ? 1 : 0 }],
+      { duration: Math.min(450, 200 + Math.abs(to - from) * 0.2), easing: 'cubic-bezier(.2,.8,.2,1)' },
+    );
+    d._anim = anim;
+    anim.oncancel = () => { body.style.overflow = ''; };
+    anim.onfinish = () => {
+      d._anim = null;
+      body.style.overflow = '';
+      if (!opening) { d.open = false; d.classList.remove('closing'); }
+    };
+  });
+
+  // Le récap se charge à l'ouverture de sa section
+  $$('details[data-acc="recap"]').forEach((d) => d.addEventListener('toggle', () => { if (d.open) loadRecap(d.closest('.project')); }));
+
   document.addEventListener('click', async (e) => {
-    const panelBtn = e.target.closest('[data-panel]');
-    if (panelBtn) {
-      const proj = panelBtn.closest('.project');
-      const name = panelBtn.dataset.panel;
-      $$('[data-panel]', proj).forEach((b) => b.classList.toggle('active', b === panelBtn && !b.classList.contains('active')));
-      $$('[data-panel-body]', proj).forEach((p) => { p.hidden = p.dataset.panelBody !== name || !panelBtn.classList.contains('active'); });
-      if (name === 'recap' && panelBtn.classList.contains('active')) loadRecap(proj);
+    const copy = e.target.closest('[data-copy-md]');
+    if (copy) {
+      const md = copy.closest('.job')?._markdown || '';
+      try { await navigator.clipboard.writeText(md); toast('Markdown copié'); } catch { toast('Copie impossible dans ce navigateur', 'error'); }
       return;
     }
 
@@ -244,7 +381,11 @@
     const cancel = e.target.closest('[data-cancel]');
     if (cancel) {
       await api(`/api/jobs/${cancel.dataset.cancel}/cancel`, {}).catch((err) => toast(err.message, 'error'));
-      refreshProject(cancel.closest('.project'));
+      // Depuis le menu du haut, le bouton n'est dans aucun projet : on rafraîchit tout ce qui est ouvert
+      const proj = cancel.closest('.project');
+      if (proj) refreshProject(proj);
+      else $$('details.project[open]').forEach((el) => refreshProject(el));
+      refreshSys();
       return;
     }
 
@@ -679,4 +820,88 @@
     try { await api(`/api/prospects/${sel.dataset.prospect}/status`, { status: sel.value }); sel.className = `st-${sel.value}`; toast('Statut mis à jour'); }
     catch (err) { toast(err.message, 'error'); }
   });
+
+  // ---------- Fond : constellation de particules qui fuient la souris ----------
+  // Canvas 2D, ~90 points max : léger. Coupé quand l'onglet est caché, figé si l'OS demande moins d'animations.
+  (function particles() {
+    const cv = $('#bg');
+    const ctx = cv?.getContext?.('2d');
+    if (!ctx) return;
+    const LINK = 120;   // distance max d'un trait entre deux points
+    const R = 170;      // rayon d'influence de la souris
+    const mouse = { x: -1e4, y: -1e4 };
+    let W = 0, H = 0, pts = [], raf = 0, rgb = '47,91,234';
+
+    const readColor = () => {
+      const m = /^#?([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec(getComputedStyle(document.documentElement).getPropertyValue('--accent').trim());
+      if (m) rgb = m.slice(1).map((h) => parseInt(h, 16)).join(',');
+    };
+    const spawn = () => {
+      const a = Math.random() * Math.PI * 2, s = 0.12 + Math.random() * 0.25;
+      const bvx = Math.cos(a) * s, bvy = Math.sin(a) * s;
+      return { x: Math.random() * W, y: Math.random() * H, vx: bvx, vy: bvy, bvx, bvy, r: 1 + Math.random() * 1.6 };
+    };
+    function resize() {
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      W = window.innerWidth; H = window.innerHeight;
+      cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const n = Math.round(Math.min(90, Math.max(24, (W * H) / 16000)));
+      while (pts.length < n) pts.push(spawn());
+      pts.length = n;
+    }
+    function step() {
+      for (const p of pts) {
+        const dx = p.x - mouse.x, dy = p.y - mouse.y, d = Math.hypot(dx, dy);
+        if (d < R && d > 0.5) { const f = (1 - d / R) * 0.45; p.vx += (dx / d) * f; p.vy += (dy / d) * f; }
+        // Revient doucement à sa dérive de base après une poussée
+        p.vx += (p.bvx - p.vx) * 0.03; p.vy += (p.bvy - p.vy) * 0.03;
+        p.x += p.vx; p.y += p.vy;
+        if (p.x < -12) p.x = W + 12; else if (p.x > W + 12) p.x = -12;
+        if (p.y < -12) p.y = H + 12; else if (p.y > H + 12) p.y = -12;
+      }
+    }
+    function draw() {
+      ctx.clearRect(0, 0, W, H);
+      ctx.lineWidth = 1;
+      for (let i = 0; i < pts.length; i++) {
+        const a = pts[i];
+        for (let j = i + 1; j < pts.length; j++) {
+          const b = pts[j], dx = a.x - b.x, dy = a.y - b.y, d2 = dx * dx + dy * dy;
+          if (d2 > LINK * LINK) continue;
+          ctx.strokeStyle = `rgba(${rgb},${((1 - Math.sqrt(d2) / LINK) * 0.2).toFixed(3)})`;
+          ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+        }
+        const md = Math.hypot(a.x - mouse.x, a.y - mouse.y);
+        if (md < R) {
+          ctx.strokeStyle = `rgba(${rgb},${((1 - md / R) * 0.45).toFixed(3)})`;
+          ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(mouse.x, mouse.y); ctx.stroke();
+        }
+      }
+      for (const p of pts) {
+        const glow = Math.max(0, 1 - Math.hypot(p.x - mouse.x, p.y - mouse.y) / R);
+        ctx.fillStyle = `rgba(${rgb},${(0.45 + glow * 0.5).toFixed(3)})`;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r + glow * 1.5, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+    const loop = () => { step(); draw(); raf = requestAnimationFrame(loop); };
+    const start = () => { cancelAnimationFrame(raf); if (reduceMotion.matches) draw(); else raf = requestAnimationFrame(loop); };
+
+    window.addEventListener('pointermove', (e) => { mouse.x = e.clientX; mouse.y = e.clientY; }, { passive: true });
+    document.addEventListener('pointerleave', () => { mouse.x = mouse.y = -1e4; });
+    window.addEventListener('blur', () => { mouse.x = mouse.y = -1e4; });
+    // Un clic souffle les particules alentour
+    window.addEventListener('pointerdown', (e) => {
+      for (const p of pts) {
+        const dx = p.x - e.clientX, dy = p.y - e.clientY, d = Math.hypot(dx, dy);
+        if (d < 240 && d > 0.5) { const f = (1 - d / 240) * 5; p.vx += (dx / d) * f; p.vy += (dy / d) * f; }
+      }
+    }, { passive: true });
+    let rt;
+    window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { resize(); start(); }, 120); });
+    document.addEventListener('visibilitychange', () => { if (document.hidden) cancelAnimationFrame(raf); else start(); });
+    matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readColor);
+    reduceMotion.addEventListener('change', start);
+    readColor(); resize(); start();
+  })();
 })();
