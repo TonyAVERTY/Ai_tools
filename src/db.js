@@ -95,6 +95,12 @@ export const MIGRATIONS = [
   ALTER TABLE projects ADD COLUMN imap_enc TEXT;
   ALTER TABLE projects ADD COLUMN inbox_json TEXT;        -- état de la dernière lecture IMAP
   `,
+  // 5 — relance automatique
+  `
+  ALTER TABLE prospects ADD COLUMN followup_at INTEGER;
+  ALTER TABLE projects ADD COLUMN followup_enabled INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE projects ADD COLUMN followup_days INTEGER NOT NULL DEFAULT 7;
+  `,
 ];
 
 export function openDb(dataDir) {

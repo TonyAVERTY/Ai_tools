@@ -1,5 +1,10 @@
-// Tâches de fond légères (sans Claude) : lecture des boîtes IMAP toutes les 15 min.
+// Tâches de fond légères (sans Claude), toutes les 15 min :
+//   1. lecture des boîtes IMAP (réponses, bounces)
+//   2. puis seulement ensuite, mise en file des relances dues
 import { checkInbox } from './inbox.js';
+import { followupPlan } from './followup.js';
+import { enqueue } from './jobs.js';
+import { getProject } from '../projects.js';
 
 export class Scheduler {
   constructor(app, { everyMs = 15 * 60_000, log = console } = {}) {
@@ -28,6 +33,17 @@ export class Scheduler {
         try { await checkInbox(this.app, id); }
         catch (e) { this.log.error(`[inbox ${id}]`, e.message); }
       }
+      this.queueFollowups();
     } finally { this.running = false; }
+  }
+
+  queueFollowups(opts) {
+    const { db } = this.app;
+    const queued = [];
+    for (const { id } of db.prepare('SELECT id FROM projects WHERE followup_enabled = 1').all()) {
+      const plan = followupPlan(db, getProject(this.app, id), opts);
+      if (plan.ready) queued.push({ id, ...enqueue(db, { projectId: id, type: 'followup', params: { count: plan.due } }) });
+    }
+    return queued;
   }
 }

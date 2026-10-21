@@ -69,6 +69,23 @@ Réponds UNIQUEMENT avec : {"subject":"...","body":"..."}`,
   };
 }
 
+export function followupTemplatePrompt({ profile, senderName }) {
+  return {
+    system: SYSTEM_FR,
+    prompt: `Rédige un mail de RELANCE B2B très court (60 mots max), envoyé dans le même fil que le premier mail resté sans réponse.
+Produit : ${profile.resume}
+Valeur : ${profile.proposition_valeur}
+Ton : ${profile.ton || 'direct et chaleureux'}
+Expéditeur : ${senderName || '{{expediteur}}'}
+
+Règles : rappelle en une phrase l'intérêt pour {{entreprise}}, pose une question simple qui appelle une réponse courte (oui/non),
+aucune culpabilisation ("je me permets de revenir vers vous" interdit), pas de proposition d'appel ni de visio.
+Variables disponibles : {{entreprise}}, {{ville}}, {{expediteur}}.
+Ne mets PAS de lien de désinscription (ajouté automatiquement).
+Réponds UNIQUEMENT avec : {"body":"..."}`,
+  };
+}
+
 export const LEVELS = {
   rapide: { model: 'haiku', maxTurns: 12, files: 8 },
   normal: { model: 'sonnet', maxTurns: 20, files: 15 },

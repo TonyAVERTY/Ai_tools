@@ -3,7 +3,8 @@ import { now, getSetting } from './db.js';
 import { runClaude, extractJson } from './services/claude.js';
 import { addUsage } from './services/jobs.js';
 import { syncRepo } from './services/git.js';
-import { analyzePrompt, prospectPrompt, templatePrompt, evolutionPrompt, LEVELS } from './services/prompts.js';
+import { analyzePrompt, prospectPrompt, templatePrompt, followupTemplatePrompt, evolutionPrompt, LEVELS } from './services/prompts.js';
+import { followupCandidates, followupSubject, isBusinessHours } from './services/followup.js';
 import { EMAIL_RE, createTransport, buildProspectMail, allowedToSend, makeMessageId } from './services/mailer.js';
 import { unsubToken } from './crypto.js';
 import { getProject, repoDir, forgejoToken, globalSmtp, sentSince, getTemplate, saveTemplate, pickVariant } from './projects.js';
@@ -31,6 +32,87 @@ export function parseProspectLine(line) {
 export function makeHandlers(app) {
   const { db, cfg } = app;
   const claude = (o) => runClaude({ bin: cfg.claudeBin, ...o });
+
+  const inHours = () => (app.isBusinessHours || isBusinessHours)();
+
+  // Premier mail ou relance : mêmes plafonds, mêmes délais, même journal
+  async function sendMails(ctx, kind) {
+    // Une relance mise en file à 17h55 ne doit pas partir à 19h si le worker était occupé
+    if (kind === 'followup' && !inHours()) return { sent: 0, failed: 0, total: 0, postponed: true };
+    const project = getProject(app, ctx.job.project_id, { secrets: true });
+    const template = getTemplate(db, project.id, kind, { validatedOnly: true });
+    if (!template) throw new Error(kind === 'followup' ? 'Modèle de relance non validé' : 'Modèle de mail non validé');
+    if (!project.smtp) throw new Error('SMTP non configuré pour ce projet');
+
+    const day = now() - 86400;
+    const candidates = kind === 'followup'
+      ? followupCandidates(db, project)
+      : db.prepare(`SELECT * FROM prospects WHERE project_id = ? AND status = 'new'
+          AND email NOT IN (SELECT email FROM blacklist) ORDER BY score DESC, id LIMIT 100`).all(project.id);
+    const n = allowedToSend({
+      requested: ctx.params.count,
+      available: candidates.length,
+      projectCap: project.dailyMailCap,
+      sentTodayProject: sentSince(db, day, project.id),
+      globalCap: Number(getSetting(db, 'global_daily_cap', '100')),
+      sentTodayGlobal: sentSince(db, day),
+    });
+    if (n === 0) throw new Error(kind === 'followup' ? 'Plafond quotidien atteint ou aucune relance due' : 'Plafond quotidien atteint ou aucun prospect à contacter');
+
+    const transport = (app.createTransport || createTransport)(project.smtp);
+    await transport.verify();
+    const minDelay = Number(getSetting(db, 'send_delay_min', '20')) * 1000;
+    const maxDelay = Number(getSetting(db, 'send_delay_max', '60')) * 1000;
+    const log = db.prepare(`INSERT INTO mail_log(project_id, prospect_id, email, sent_at, error, kind, variant, subject, message_id)
+      VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    const markInitial = db.prepare('UPDATE prospects SET status = ?, sent_at = ?, variant = ? WHERE id = ?');
+    const markFollowup = db.prepare('UPDATE prospects SET followup_at = ? WHERE id = ?');
+    const markBounced = db.prepare("UPDATE prospects SET status = 'bounced' WHERE id = ?");
+    const original = db.prepare("SELECT subject, message_id FROM mail_log WHERE prospect_id = ? AND kind = 'initial' AND error IS NULL ORDER BY id LIMIT 1");
+    const current = db.prepare('SELECT status, followup_at FROM prospects WHERE id = ?');
+    let sent = 0, failed = 0;
+
+    for (const p of candidates.slice(0, n)) {
+      if (ctx.cancelled()) break;
+      if (kind === 'followup' && !inHours()) break; // le reste repartira au prochain créneau
+      // Re-vérifie juste avant l'envoi : désinscription, réponse arrivée pendant le batch…
+      if (db.prepare('SELECT 1 FROM blacklist WHERE email = ?').get(p.email)) continue;
+      if (kind === 'followup') {
+        const c = current.get(p.id);
+        if (c.status !== 'sent' || c.followup_at) continue;
+      }
+      const unsubUrl = `${cfg.appUrl}/u/${encodeURIComponent(p.email)}/${unsubToken(cfg.secretKey, p.email)}`;
+      let variant = null, subject, inReplyTo;
+      if (kind === 'initial') {
+        variant = pickVariant(db, project.id, template);
+        subject = variant === 'B' ? template.subject_b : template.subject;
+      } else {
+        const orig = original.get(p.id);
+        subject = followupSubject(template, orig);
+        inReplyTo = orig?.message_id;
+      }
+      const mail = buildProspectMail({
+        template, prospect: p, smtp: project.smtp, unsubUrl, subject, inReplyTo,
+        messageId: makeMessageId(project.smtp.fromEmail),
+      });
+      try {
+        await transport.sendMail(mail);
+        log.run(project.id, p.id, p.email, now(), null, kind, variant, mail.subject, mail.messageId);
+        if (kind === 'initial') markInitial.run('sent', now(), variant, p.id);
+        else markFollowup.run(now(), p.id);
+        sent++;
+      } catch (e) {
+        log.run(project.id, p.id, p.email, now(), String(e.message).slice(0, 500), kind, variant, mail.subject, mail.messageId);
+        if (/^5\d\d/.test(String(e.responseCode))) markBounced.run(p.id);
+        failed++;
+      }
+      const label = kind === 'followup' ? 'relances envoyées' : 'envoyés';
+      ctx.progress({ sent, failed, total: n, message: `${sent + failed}/${n} ${label}` });
+      if (sent + failed < n) await sleep(minDelay + Math.random() * (maxDelay - minDelay), ctx.signal).catch(() => {});
+    }
+    transport.close();
+    return { sent, failed, total: n };
+  }
 
   return {
     async analyze(ctx) {
@@ -105,61 +187,20 @@ export function makeHandlers(app) {
       return { ok: true };
     },
 
-    async send(ctx) {
+    async followup_template(ctx) {
       const project = getProject(app, ctx.job.project_id, { secrets: true });
-      const template = getTemplate(db, project.id, 'initial', { validatedOnly: true });
-      if (!template) throw new Error('Modèle de mail non validé');
-      if (!project.smtp) throw new Error('SMTP non configuré pour ce projet');
-
-      const day = now() - 86400;
-      const candidates = db.prepare(`SELECT * FROM prospects WHERE project_id = ? AND status = 'new'
-        AND email NOT IN (SELECT email FROM blacklist) ORDER BY score DESC, id LIMIT 100`).all(project.id);
-      const n = allowedToSend({
-        requested: ctx.params.count,
-        available: candidates.length,
-        projectCap: project.dailyMailCap,
-        sentTodayProject: sentSince(db, day, project.id),
-        globalCap: Number(getSetting(db, 'global_daily_cap', '100')),
-        sentTodayGlobal: sentSince(db, day),
-      });
-      if (n === 0) throw new Error('Plafond quotidien atteint ou aucun prospect à contacter');
-
-      const transport = (app.createTransport || createTransport)(project.smtp);
-      await transport.verify();
-      const minDelay = Number(getSetting(db, 'send_delay_min', '20')) * 1000;
-      const maxDelay = Number(getSetting(db, 'send_delay_max', '60')) * 1000;
-      const log = db.prepare(`INSERT INTO mail_log(project_id, prospect_id, email, sent_at, error, kind, variant, subject, message_id)
-        VALUES(?, ?, ?, ?, ?, 'initial', ?, ?, ?)`);
-      const mark = db.prepare('UPDATE prospects SET status = ?, sent_at = ?, variant = ? WHERE id = ?');
-      let sent = 0, failed = 0;
-
-      for (const p of candidates.slice(0, n)) {
-        if (ctx.cancelled()) break;
-        // Re-vérifie la blacklist juste avant l'envoi (désinscription pendant le batch)
-        if (db.prepare('SELECT 1 FROM blacklist WHERE email = ?').get(p.email)) continue;
-        const unsubUrl = `${cfg.appUrl}/u/${encodeURIComponent(p.email)}/${unsubToken(cfg.secretKey, p.email)}`;
-        const variant = pickVariant(db, project.id, template);
-        const mail = buildProspectMail({
-          template, prospect: p, smtp: project.smtp, unsubUrl,
-          subject: variant === 'B' ? template.subject_b : template.subject,
-          messageId: makeMessageId(project.smtp.fromEmail),
-        });
-        try {
-          await transport.sendMail(mail);
-          log.run(project.id, p.id, p.email, now(), null, variant, mail.subject, mail.messageId);
-          mark.run('sent', now(), variant, p.id);
-          sent++;
-        } catch (e) {
-          log.run(project.id, p.id, p.email, now(), String(e.message).slice(0, 500), variant, mail.subject, mail.messageId);
-          if (/^5\d\d/.test(String(e.responseCode))) mark.run('bounced', now(), variant, p.id);
-          failed++;
-        }
-        ctx.progress({ sent, failed, total: n, message: `${sent + failed}/${n} envoyés` });
-        if (sent + failed < n) await sleep(minDelay + Math.random() * (maxDelay - minDelay), ctx.signal).catch(() => {});
-      }
-      transport.close();
-      return { sent, failed, total: n };
+      if (!project.profile) throw new Error('Analyse le projet d\'abord');
+      const { prompt, system } = followupTemplatePrompt({ profile: project.profile, senderName: project.smtp?.fromName });
+      const r = await claude({ prompt, system, model: 'haiku', maxTurns: 1, tools: [], signal: ctx.signal });
+      addUsage(ctx, r);
+      const t = extractJson(r.text);
+      if (!t.body) throw new Error('Modèle de relance invalide');
+      saveTemplate(db, project.id, 'followup', { subject: '', body: t.body });
+      return { ok: true };
     },
+
+    send: (ctx) => sendMails(ctx, 'initial'),
+    followup: (ctx) => sendMails(ctx, 'followup'),
 
     async evolution(ctx) {
       const project = getProject(app, ctx.job.project_id, { secrets: true });

@@ -99,3 +99,4 @@ form.send { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--lin
 @media (max-width: 640px) { .sys { order: 3; flex-basis: 100%; } }
 .inbox { margin: 10px 0 4px; line-height: 1.9; }
 .inbox:empty { display: none; }
+.followup { margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--line); }

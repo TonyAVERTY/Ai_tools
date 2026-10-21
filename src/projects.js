@@ -17,6 +17,7 @@ export function getProject(app, id, { secrets = false } = {}) {
     dailyMailCap: p.daily_mail_cap, createdAt: p.created_at,
     hasSmtp: !!p.smtp_enc, hasDb: !!p.db_enc, hasImap: !!p.imap_enc,
     inbox: parse(p.inbox_json),
+    followupEnabled: !!p.followup_enabled, followupDays: p.followup_days,
   };
   if (secrets) {
     out.smtp = decryptJson(app.cfg.secretKey, p.smtp_enc);

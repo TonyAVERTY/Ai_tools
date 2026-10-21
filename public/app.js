@@ -30,7 +30,10 @@
   };
   const pct = (x) => `${Math.round(x * 100)} %`;
   const ACTIVE = ['queued', 'running'];
-  const LABELS = { analyze: 'Analyse', prospect: 'Recherche', template: 'Modèle', send: 'Envoi', evolution: 'Évolutions' };
+  const LABELS = {
+    analyze: 'Analyse', prospect: 'Recherche', template: 'Modèle', send: 'Envoi', evolution: 'Évolutions',
+    followup_template: 'Modèle de relance', followup: 'Relances',
+  };
 
   // ---------- Barre système ----------
   async function refreshSys() {
@@ -67,6 +70,7 @@
       let txt = `${LABELS[type]} terminé(e).`;
       if (type === 'prospect') txt = `Recherche terminée : ${r.found} nouveau(x) prospect(s) sur ${r.requested} demandés.`;
       if (type === 'send') txt = `Envoi terminé : ${r.sent} envoyé(s), ${r.failed} échec(s).`;
+      if (type === 'followup') txt = r.postponed ? 'Relances reportées au prochain créneau (lun-ven 9h-18h).' : `Relances terminées : ${r.sent} envoyée(s), ${r.failed} échec(s).`;
       if (type === 'evolution') {
         box.innerHTML = `<p class="ok small">Envoyé à ${esc(r.sentTo)}.</p><pre class="md">${esc(r.markdown)}</pre>`;
         return;
@@ -84,7 +88,7 @@
     try { s = await api(`/api/projects/${id}/status`); } catch (e) { return schedule(el, 30_000); }
     const st = state.get(id) || {};
     const jobs = s.jobs;
-    for (const type of ['prospect', 'template', 'send', 'evolution']) renderJob($(`[data-job="${type}"]`, el), jobs[type], type);
+    for (const type of ['prospect', 'template', 'send', 'evolution', 'followup_template', 'followup']) renderJob($(`[data-job="${type}"]`, el), jobs[type], type);
 
     const running = Object.entries(jobs).filter(([, j]) => ACTIVE.includes(j.status)).map(([t]) => LABELS[t]);
     $('[data-state]', el).innerHTML = running.length
@@ -102,15 +106,29 @@
     if (an?.status === 'error' && !s.hasProfile) $('.profile p', el).outerHTML = `<p class="error small">${esc(an.error)}</p>`;
 
     // Modèle de mail : on ne remplace le formulaire que s'il a changé côté serveur
-    const tplForm = $('form[data-action="template"]', el);
-    if (s.template && st.tplStamp !== s.template.updated_at) {
-      st.tplStamp = s.template.updated_at;
-      tplForm.subject.value = s.template.subject;
-      tplForm.subjectB.value = s.template.subjectB || '';
-      tplForm.body.value = s.template.body;
+    st.tplStamp ||= {};
+    for (const kind of ['initial', 'followup']) {
+      const t = s.templates[kind];
+      const form = $(`form[data-action="template"][data-kind="${kind}"]`, el);
+      if (t && st.tplStamp[kind] !== t.updated_at) {
+        st.tplStamp[kind] = t.updated_at;
+        form.subject.value = t.subject;
+        if (form.subjectB) form.subjectB.value = t.subjectB || '';
+        form.body.value = t.body;
+      }
+      $('[data-tpl-state]', form).innerHTML = t
+        ? (t.status === 'validated' ? '<span class="badge ok">validé</span>' : '<span class="badge warn">brouillon</span>') : '';
     }
-    $('[data-tpl-state]', el).innerHTML = s.template
-      ? (s.template.status === 'validated' ? '<span class="badge ok">validé</span>' : '<span class="badge warn">brouillon</span>') : '';
+
+    // Relance automatique : ce qui est prévu, ou ce qui bloque
+    const f = s.followup;
+    $('[data-followup-info]', el).innerHTML = !f.enabled
+      ? 'Désactivée.'
+      : f.blockers.length
+        ? `<span class="warn">En attente : ${esc(f.blockers.join(', '))}.</span> ${f.due} relance(s) due(s).`
+        : f.due
+          ? `${f.due} relance(s) due(s) : ${f.inHours ? 'envoi au prochain passage (≤ 15 min)' : 'envoi aux heures ouvrées (lun-ven 9h-18h)'}.`
+          : `Active : les prospects sans réponse après ${f.days} jours seront relancés une fois.`;
 
     // Bouton Envoyer : recherche finie + modèle validé + SMTP + quota dispo
     const prospecting = jobs.prospect && ACTIVE.includes(jobs.prospect.status);
@@ -119,7 +137,7 @@
     const blockers = [];
     if (prospecting) blockers.push('recherche en cours');
     if (sending) blockers.push('envoi en cours');
-    if (s.template?.status !== 'validated') blockers.push('modèle à valider');
+    if (s.templates.initial?.status !== 'validated') blockers.push('modèle à valider');
     if (!s.hasSmtp) blockers.push('SMTP à configurer');
     if (!s.sendMax) blockers.push(s.stats.new ? 'plafond du jour atteint' : 'aucun prospect à contacter');
     $('button', sendForm).disabled = blockers.length > 0;
@@ -235,6 +253,7 @@
           await api(`/api/projects/${id}/evolution`, data); toast('Recherche d\'évolutions lancée'); break;
         }
         case 'template': {
+          data.kind = form.dataset.kind;
           const r = await api(`/api/projects/${id}/template/save`, data);
           toast(r.status === 'validated' ? 'Modèle validé' : 'Brouillon enregistré');
           break;
@@ -253,6 +272,12 @@
           if (r.disabled) toast('Détection des réponses désactivée');
           else if (r.ok) toast(`Boîte connectée : ${r.check.replies} réponse(s) trouvée(s)`);
           else toast(r.error, 'error');
+          break;
+        }
+        case 'followup': {
+          data.enabled = form.enabled.checked;
+          await api(`/api/projects/${id}/followup`, data);
+          toast(data.enabled ? 'Relance automatique activée' : 'Relance automatique désactivée');
           break;
         }
         case 'db': data.ssl = form.ssl.checked; await api(`/api/projects/${id}/db`, data); toast('Accès BDD enregistré'); form.password.value = ''; break;
