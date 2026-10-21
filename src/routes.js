@@ -227,7 +227,7 @@ export function registerRoutes(router, app) {
   }));
   router.post('/api/projects/:id/evolution', jobRoute('evolution', (b) => ({
     count: int(b.count, 1, 20, 5),
-    level: ['rapide', 'normal', 'approfondi'].includes(b.level) ? b.level : 'normal',
+    level: ['rapide', 'normal', 'approfondi'].includes(b.level) ? b.level : 'rapide',
   })));
   router.post('/api/projects/:id/send', jobRoute('send', (b) => ({ count: int(b.count, 1, 100, 10) }), (p, b) => {
     if (!b.confirm) throw new HttpError(400, 'Confirmation requise');

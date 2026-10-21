@@ -202,8 +202,8 @@ function projectItem(p, smtp, dbCfg, imap) {
     <form data-action="evolution" data-id="${p.id}" class="inline">
       <label>Nombre d'évolutions<input name="count" type="number" min="1" max="20" value="5"></label>
       <label>Raisonnement<select name="level">
-        <option value="rapide">Rapide (Haiku)</option>
-        <option value="normal" selected>Normal (Sonnet)</option>
+        <option value="rapide" selected>Rapide (Haiku, économe)</option>
+        <option value="normal">Normal (Sonnet, plus cher)</option>
         <option value="approfondi">Approfondi (Opus, coûteux)</option>
       </select></label>
       <label>Quand<select name="when"><option value="now">Maintenant</option><option value="night">Cette nuit (1h-6h)</option></select></label>
