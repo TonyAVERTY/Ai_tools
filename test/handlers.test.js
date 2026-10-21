@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
@@ -183,4 +183,19 @@ test('sans objet B : tout part en A', () => {
   const db = openDb(':memory:');
   assert.equal(pickVariant(db, 1, { subject_b: null }), 'A');
   assert.equal(pickVariant(db, 1, { subject_b: '' }), 'A');
+});
+
+test('analyse : modèle économique (Haiku) par défaut, Sonnet uniquement sur demande', async () => {
+  const s = setup();
+  const spyFile = join(s.tmp, 'models.log');
+  s.app.cfg.claudeBin = resolve('test/fixtures/spy-claude.js');
+  process.env.MODEL_SPY_FILE = spyFile;
+  try {
+    const a = await run(s, 'analyze');
+    assert.equal(a.status, 'done', a.error);
+    setSetting(s.db, 'analyze_model', 'sonnet');
+    const a2 = await run(s, 'analyze');
+    assert.equal(a2.status, 'done', a2.error);
+    assert.deepEqual(readFileSync(spyFile, 'utf8').trim().split('\n'), ['haiku', 'sonnet']);
+  } finally { delete process.env.MODEL_SPY_FILE; rmSync(s.tmp, { recursive: true, force: true }); }
 });

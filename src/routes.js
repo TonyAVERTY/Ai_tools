@@ -76,6 +76,7 @@ export function registerRoutes(router, app) {
       send_delay_min: getSetting(db, 'send_delay_min', '20'),
       send_delay_max: getSetting(db, 'send_delay_max', '60'),
       prospect_model: getSetting(db, 'prospect_model', 'haiku'),
+      analyze_model: getSetting(db, 'analyze_model', 'haiku'),
       blacklist_count: db.prepare('SELECT COUNT(*) n FROM blacklist').get().n,
       weekly_report: getSetting(db, 'weekly_report', '0') === '1',
       budget_day_usd: getSetting(db, 'budget_day_usd', ''),
@@ -98,6 +99,7 @@ export function registerRoutes(router, app) {
     setSetting(db, 'send_delay_min', String(dmin));
     setSetting(db, 'send_delay_max', String(dmax));
     setSetting(db, 'prospect_model', b.prospect_model === 'sonnet' ? 'sonnet' : 'haiku');
+    setSetting(db, 'analyze_model', b.analyze_model === 'sonnet' ? 'sonnet' : 'haiku');
     const money = (v) => { const n = Number(String(v || '').replace(',', '.')); return Number.isFinite(n) && n > 0 ? String(Math.round(n * 100) / 100) : ''; };
     setSetting(db, 'weekly_report', b.weekly_report === 'on' ? '1' : '0');
     setSetting(db, 'budget_day_usd', money(b.budget_day_usd));

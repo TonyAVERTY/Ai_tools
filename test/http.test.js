@@ -77,13 +77,14 @@ test('dashboard, réglages, création de projet et statut', async () => {
   assert.equal(r.status, 400);
   assert.match((await r.json()).error, /Forgejo/);
 
-  r = await post('/settings', { notify_email: 'moi@x.fr', forgejo_host: 'https://git.tony-averty.dev/', forgejo_token: 'tok123', global_daily_cap: '9999', send_delay_min: '1', send_delay_max: '2', prospect_model: 'opus' }, { form: true });
+  r = await post('/settings', { notify_email: 'moi@x.fr', forgejo_host: 'https://git.tony-averty.dev/', forgejo_token: 'tok123', global_daily_cap: '9999', send_delay_min: '1', send_delay_max: '2', prospect_model: 'opus', analyze_model: 'opus' }, { form: true });
   assert.equal(r.status, 303);
   const s = (k) => app.db.prepare('SELECT value FROM settings WHERE key = ?').get(k)?.value;
   assert.equal(s('forgejo_host'), 'git.tony-averty.dev');
   assert.equal(s('global_daily_cap'), '300', 'plafond borné');
   assert.equal(s('send_delay_min'), '5');
   assert.equal(s('prospect_model'), 'haiku', 'opus refusé pour la prospection');
+  assert.equal(s('analyze_model'), 'haiku', 'opus refusé pour l\'analyse');
   assert.ok(!s('forgejo_token_enc').includes('tok123'), 'token chiffré');
 
   r = await post('/api/projects', { name: 'MEP', gitUrl: 'https://github.com/Tony/MEP.git' });
