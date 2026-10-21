@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import { randomBytes } from 'node:crypto';
 
 export const EMAIL_RE = /^[^\s@<>()"',;:]+@[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/i;
 
@@ -20,7 +21,13 @@ export function fillTemplate(text, vars) {
   return String(text).replace(/\{\{\s*(\w+)\s*\}\}/g, (_, k) => vars[k] ?? '');
 }
 
-export function buildProspectMail({ template, prospect, smtp, unsubUrl }) {
+// Message-ID maîtrisé : c'est lui qui permet de rattacher une réponse au bon prospect
+export function makeMessageId(fromEmail) {
+  const domain = String(fromEmail || '').split('@')[1] || 'aitools.local';
+  return `<${Date.now().toString(36)}.${randomBytes(9).toString('base64url')}@${domain}>`;
+}
+
+export function buildProspectMail({ template, prospect, smtp, unsubUrl, subject = template.subject, messageId, inReplyTo }) {
   const vars = {
     entreprise: prospect.company,
     ville: prospect.city || '',
@@ -37,8 +44,10 @@ export function buildProspectMail({ template, prospect, smtp, unsubUrl }) {
   return {
     from: smtp.fromName ? `"${smtp.fromName.replace(/"/g, '')}" <${smtp.fromEmail}>` : smtp.fromEmail,
     to: prospect.email,
-    subject: fillTemplate(template.subject, vars).trim(),
+    subject: fillTemplate(subject, vars).trim(),
     text: body + '\n' + footer,
+    ...(messageId ? { messageId } : {}),
+    ...(inReplyTo ? { inReplyTo, references: [inReplyTo] } : {}),
     headers: {
       'List-Unsubscribe': `<${unsubUrl}>`,
       'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',

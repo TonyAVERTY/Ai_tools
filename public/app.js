@@ -100,6 +100,7 @@
     if (s.template && st.tplStamp !== s.template.updated_at) {
       st.tplStamp = s.template.updated_at;
       tplForm.subject.value = s.template.subject;
+      tplForm.subjectB.value = s.template.subjectB || '';
       tplForm.body.value = s.template.body;
     }
     $('[data-tpl-state]', el).innerHTML = s.template

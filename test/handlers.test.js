@@ -8,7 +8,7 @@ import { randomBytes } from 'node:crypto';
 import { openDb, setSetting, now } from '../src/db.js';
 import { Worker, enqueue, latestJobs } from '../src/services/jobs.js';
 import { makeHandlers, parseProspectLine } from '../src/handlers.js';
-import { createProject, saveSecretConfig, getProject, prospectStats } from '../src/projects.js';
+import { createProject, saveSecretConfig, getProject, prospectStats, pickVariant } from '../src/projects.js';
 import { allowedToSend, buildProspectMail, fillTemplate } from '../src/services/mailer.js';
 import { validateSelect, firstValue } from '../src/services/recap.js';
 import { validateGitUrl } from '../src/services/git.js';
@@ -145,4 +145,34 @@ test('URL Git Forgejo', () => {
   assert.throws(() => validateGitUrl('https://user:pw@git.tony-averty.dev/Tony/A.git'), /identifiants/);
   assert.throws(() => validateGitUrl('https://github.com/Tony/A.git', 'git.tony-averty.dev'), /doit être/);
   assert.throws(() => validateGitUrl('https://git.tony-averty.dev/a/b/c/d'), /Format/);
+});
+
+test('envoi : Message-ID journalisé et objets A/B alternés équitablement', async () => {
+  const s = setup();
+  try {
+    saveSecretConfig(s.app, s.id, 'smtp_enc', { host: 'smtp.x', port: 587, user: 'u', pass: 'p', fromEmail: 'tony@codebzh.fr' }, 'pass');
+    s.db.prepare(`INSERT INTO templates(project_id, kind, subject, subject_b, body, status, updated_at)
+      VALUES(?, 'initial', 'Objet A {{entreprise}}', 'Objet B {{entreprise}}', 'Bonjour', 'validated', ?)`).run(s.id, now());
+    for (const n of [1, 2, 3, 4]) {
+      s.db.prepare("INSERT INTO prospects(project_id, company, email, score, created_at) VALUES(?, ?, ?, ?, ?)").run(s.id, `Ent${n}`, `c${n}@ent${n}.fr`, 10 - n, now());
+    }
+    const job = await run(s, 'send', { count: 4 });
+    assert.equal(job.status, 'done', job.error);
+    assert.deepEqual(s.sentMails.map((m) => m.subject), ['Objet A Ent1', 'Objet B Ent2', 'Objet A Ent3', 'Objet B Ent4']);
+    const logs = s.db.prepare("SELECT * FROM mail_log WHERE kind = 'initial' ORDER BY id").all();
+    assert.equal(logs.length, 4);
+    for (const [i, l] of logs.entries()) {
+      assert.equal(l.message_id, s.sentMails[i].messageId);
+      assert.match(l.message_id, /^<[^@\s]+@codebzh\.fr>$/);
+      assert.equal(l.subject, s.sentMails[i].subject);
+    }
+    assert.equal(new Set(logs.map((l) => l.message_id)).size, 4, 'Message-ID uniques');
+    assert.deepEqual(s.db.prepare('SELECT variant FROM prospects ORDER BY id').all().map((r) => r.variant), ['A', 'B', 'A', 'B']);
+  } finally { rmSync(s.tmp, { recursive: true, force: true }); }
+});
+
+test('sans objet B : tout part en A', () => {
+  const db = openDb(':memory:');
+  assert.equal(pickVariant(db, 1, { subject_b: null }), 'A');
+  assert.equal(pickVariant(db, 1, { subject_b: '' }), 'A');
 });

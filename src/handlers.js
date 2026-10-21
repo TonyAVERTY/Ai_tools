@@ -4,9 +4,9 @@ import { runClaude, extractJson } from './services/claude.js';
 import { addUsage } from './services/jobs.js';
 import { syncRepo } from './services/git.js';
 import { analyzePrompt, prospectPrompt, templatePrompt, evolutionPrompt, LEVELS } from './services/prompts.js';
-import { EMAIL_RE, createTransport, buildProspectMail, allowedToSend } from './services/mailer.js';
+import { EMAIL_RE, createTransport, buildProspectMail, allowedToSend, makeMessageId } from './services/mailer.js';
 import { unsubToken } from './crypto.js';
-import { getProject, repoDir, forgejoToken, globalSmtp, sentSince, getTemplate, saveTemplate } from './projects.js';
+import { getProject, repoDir, forgejoToken, globalSmtp, sentSince, getTemplate, saveTemplate, pickVariant } from './projects.js';
 
 const sleep = (ms, signal) => new Promise((resolve, reject) => {
   const t = setTimeout(resolve, ms);
@@ -128,8 +128,9 @@ export function makeHandlers(app) {
       await transport.verify();
       const minDelay = Number(getSetting(db, 'send_delay_min', '20')) * 1000;
       const maxDelay = Number(getSetting(db, 'send_delay_max', '60')) * 1000;
-      const log = db.prepare('INSERT INTO mail_log(project_id, prospect_id, email, sent_at, error) VALUES(?, ?, ?, ?, ?)');
-      const mark = db.prepare("UPDATE prospects SET status = ?, sent_at = ? WHERE id = ?");
+      const log = db.prepare(`INSERT INTO mail_log(project_id, prospect_id, email, sent_at, error, kind, variant, subject, message_id)
+        VALUES(?, ?, ?, ?, ?, 'initial', ?, ?, ?)`);
+      const mark = db.prepare('UPDATE prospects SET status = ?, sent_at = ?, variant = ? WHERE id = ?');
       let sent = 0, failed = 0;
 
       for (const p of candidates.slice(0, n)) {
@@ -137,14 +138,20 @@ export function makeHandlers(app) {
         // Re-vérifie la blacklist juste avant l'envoi (désinscription pendant le batch)
         if (db.prepare('SELECT 1 FROM blacklist WHERE email = ?').get(p.email)) continue;
         const unsubUrl = `${cfg.appUrl}/u/${encodeURIComponent(p.email)}/${unsubToken(cfg.secretKey, p.email)}`;
+        const variant = pickVariant(db, project.id, template);
+        const mail = buildProspectMail({
+          template, prospect: p, smtp: project.smtp, unsubUrl,
+          subject: variant === 'B' ? template.subject_b : template.subject,
+          messageId: makeMessageId(project.smtp.fromEmail),
+        });
         try {
-          await transport.sendMail(buildProspectMail({ template, prospect: p, smtp: project.smtp, unsubUrl }));
-          log.run(project.id, p.id, p.email, now(), null);
-          mark.run('sent', now(), p.id);
+          await transport.sendMail(mail);
+          log.run(project.id, p.id, p.email, now(), null, variant, mail.subject, mail.messageId);
+          mark.run('sent', now(), variant, p.id);
           sent++;
         } catch (e) {
-          log.run(project.id, p.id, p.email, now(), String(e.message).slice(0, 500));
-          if (/^5\d\d/.test(String(e.responseCode))) mark.run('bounced', now(), p.id);
+          log.run(project.id, p.id, p.email, now(), String(e.message).slice(0, 500), variant, mail.subject, mail.messageId);
+          if (/^5\d\d/.test(String(e.responseCode))) mark.run('bounced', now(), variant, p.id);
           failed++;
         }
         ctx.progress({ sent, failed, total: n, message: `${sent + failed}/${n} envoyés` });

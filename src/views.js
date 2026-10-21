@@ -131,6 +131,7 @@ function projectItem(p, smtp, dbCfg) {
         <button type="button" class="btn small" data-run="template" data-id="${p.id}">Générer avec l'IA</button></div>
       <p class="muted small">Variables : {{entreprise}} {{ville}} {{accroche}} {{expediteur}}. Le lien de désinscription est ajouté automatiquement.</p>
       <label>Objet<input name="subject"></label>
+      <label>Objet B <span class="muted small">(optionnel : test A/B, les envois alternent entre les deux objets)</span><input name="subjectB"></label>
       <label>Corps<textarea name="body" rows="9"></textarea></label>
       <div class="row">
         <button class="btn" name="mode" value="save">Enregistrer</button>
