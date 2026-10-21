@@ -1,0 +1,4 @@
+# Les scripts shell doivent rester en LF, même commités depuis Windows (sinon "bad interpreter" sur le Pi)
+*.sh        text eol=lf
+.githooks/* text eol=lf
+*.service   text eol=lf
