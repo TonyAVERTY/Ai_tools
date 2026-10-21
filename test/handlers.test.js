@@ -64,7 +64,7 @@ test('flux complet : analyse → cible → prospection → modèle → envoi →
     const noValid = await run(s, 'send', { count: 5 });
     assert.match(noValid.error, /non validé/);
 
-    s.db.prepare("UPDATE mail_templates SET status = 'validated' WHERE project_id = ?").run(s.id);
+    s.db.prepare("UPDATE templates SET status = 'validated' WHERE project_id = ? AND kind = 'initial'").run(s.id);
     const noSmtp = await run(s, 'send', { count: 5 });
     assert.match(noSmtp.error, /SMTP/);
 

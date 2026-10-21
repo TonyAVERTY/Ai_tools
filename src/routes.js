@@ -10,7 +10,7 @@ import { allowedToSend, EMAIL_RE } from './services/mailer.js';
 import { cpuTemp } from './services/thermal.js';
 import {
   getProject, listProjects, createProject, saveSecretConfig, publicConfig, globalSmtp,
-  prospectStats, sentSince, repoDir,
+  prospectStats, sentSince, repoDir, getTemplate, saveTemplate,
 } from './projects.js';
 
 const lines = (s) => String(s || '').split('\n').map((x) => x.trim()).filter(Boolean).slice(0, 20);
@@ -122,7 +122,8 @@ export function registerRoutes(router, app) {
   router.get('/api/projects/:id/status', ({ res, params }) => {
     const p = getProject(app, pid(params));
     const jobs = latestJobs(db, p.id);
-    const tpl = db.prepare('SELECT subject, body, status, updated_at FROM mail_templates WHERE project_id = ?').get(p.id) || null;
+    const row = getTemplate(db, p.id, 'initial');
+    const tpl = row ? { subject: row.subject, body: row.body, status: row.status, updated_at: row.updated_at } : null;
     const stats = prospectStats(db, p.id);
     const day = now() - 86400;
     const sendMax = allowedToSend({
@@ -184,9 +185,7 @@ export function registerRoutes(router, app) {
     const body = String(b.body || '').trim().slice(0, 5000);
     if (!subject || !body) throw new HttpError(400, 'Objet et corps requis');
     const status = b.mode === 'validate' ? 'validated' : 'draft';
-    db.prepare(`INSERT INTO mail_templates(project_id, subject, body, status, updated_at) VALUES(?, ?, ?, ?, ?)
-      ON CONFLICT(project_id) DO UPDATE SET subject = excluded.subject, body = excluded.body, status = excluded.status, updated_at = excluded.updated_at`)
-      .run(p.id, subject, body, status, now());
+    saveTemplate(db, p.id, 'initial', { subject, body, status });
     json(res, { ok: true, status });
   });
 

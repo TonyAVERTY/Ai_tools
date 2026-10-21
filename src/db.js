@@ -3,7 +3,7 @@ import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 // Chaque entrée = une migration. Ne jamais modifier une migration déjà livrée, en ajouter une.
-const MIGRATIONS = [
+export const MIGRATIONS = [
   `
   CREATE TABLE sessions (
     id TEXT PRIMARY KEY, email TEXT NOT NULL,
@@ -62,6 +62,21 @@ const MIGRATIONS = [
     prospect_id INTEGER, email TEXT NOT NULL, sent_at INTEGER NOT NULL, error TEXT
   );
   CREATE INDEX mail_log_day ON mail_log(project_id, sent_at);
+  `,
+  // 2 — modèles de mail par type (premier mail / relance)
+  `
+  CREATE TABLE templates (
+    project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    kind TEXT NOT NULL CHECK (kind IN ('initial', 'followup')),
+    subject TEXT NOT NULL DEFAULT '',   -- relance : vide = "Re: <objet du 1er mail>"
+    body TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'draft',
+    updated_at INTEGER NOT NULL,
+    PRIMARY KEY (project_id, kind)
+  );
+  INSERT INTO templates(project_id, kind, subject, body, status, updated_at)
+    SELECT project_id, 'initial', subject, body, status, updated_at FROM mail_templates;
+  DROP TABLE mail_templates;
   `,
 ];
 

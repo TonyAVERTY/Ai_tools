@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { encrypt, decrypt, encryptJson, decryptJson, unsubToken, verifyUnsubToken } from '../src/crypto.js';
-import { openDb, getSetting, setSetting } from '../src/db.js';
+import { openDb, getSetting, setSetting, MIGRATIONS } from '../src/db.js';
 import { Router, esc } from '../src/http.js';
 import { checkIdTokenClaims, checkOrigin } from '../src/auth.js';
 
@@ -27,10 +27,36 @@ test('token de désinscription', () => {
 
 test('migrations et settings', () => {
   const db = openDb(':memory:');
-  assert.equal(db.prepare('PRAGMA user_version').get().user_version, 1);
+  assert.equal(db.prepare('PRAGMA user_version').get().user_version, MIGRATIONS.length);
   setSetting(db, 'a', '1'); setSetting(db, 'a', '2');
   assert.equal(getSetting(db, 'a'), '2');
   assert.equal(getSetting(db, 'nope', 'x'), 'x');
+});
+
+test('migration 2 : les modèles existants deviennent des modèles "initial"', async () => {
+  const { DatabaseSync } = await import('node:sqlite');
+  const { mkdtempSync, rmSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const { tmpdir } = await import('node:os');
+  const dir = mkdtempSync(join(tmpdir(), 'mig-'));
+  // Base en version 1 avec un modèle déjà validé
+  let raw = new DatabaseSync(join(dir, 'aitools.sqlite'));
+  raw.exec(`CREATE TABLE projects (id INTEGER PRIMARY KEY);
+    CREATE TABLE mail_templates (project_id INTEGER PRIMARY KEY, subject TEXT NOT NULL, body TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'draft', updated_at INTEGER NOT NULL);
+    INSERT INTO projects VALUES (1); INSERT INTO mail_templates VALUES (1, 'Objet', 'Corps', 'validated', 123);
+    PRAGMA user_version = 1;`);
+  raw.close();
+  // On rejoue seulement la migration 2 (les autres tables v1 sont absentes de ce mini-schéma)
+  raw = new DatabaseSync(join(dir, 'aitools.sqlite'));
+  const { MIGRATIONS } = await import('../src/db.js');
+  raw.exec(MIGRATIONS[1]);
+  const t = raw.prepare('SELECT * FROM templates').get();
+  assert.equal(t.kind, 'initial');
+  assert.equal(t.subject, 'Objet');
+  assert.equal(t.status, 'validated');
+  assert.equal(raw.prepare("SELECT COUNT(*) n FROM sqlite_master WHERE name = 'mail_templates'").get().n, 0);
+  raw.close();
+  rmSync(dir, { recursive: true, force: true });
 });
 
 test('router avec paramètres', () => {
