@@ -105,6 +105,18 @@ export const MIGRATIONS = [
   `
   ALTER TABLE jobs ADD COLUMN run_after INTEGER;          -- ne pas démarrer avant (epoch s)
   `,
+  // 7 — fiche prospect : notes et prochaine action
+  `
+  CREATE TABLE prospect_notes (
+    id INTEGER PRIMARY KEY,
+    prospect_id INTEGER NOT NULL REFERENCES prospects(id) ON DELETE CASCADE,
+    body TEXT NOT NULL,
+    created_at INTEGER NOT NULL
+  );
+  CREATE INDEX prospect_notes_p ON prospect_notes(prospect_id, created_at);
+  ALTER TABLE prospects ADD COLUMN next_action TEXT;
+  ALTER TABLE prospects ADD COLUMN next_action_at INTEGER;
+  `,
 ];
 
 export function openDb(dataDir) {

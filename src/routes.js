@@ -14,7 +14,9 @@ import { nextNightSlot } from './services/paris-time.js';
 import { notify, notifyConfig, EVENTS, WEBHOOK_RE } from './services/notify.js';
 import { budgetState, AI_JOBS } from './services/budget.js';
 import { sendWeeklyReport } from './services/report.js';
-import { listProspects, parseFilters, STATUSES as PROSPECT_STATUSES } from './services/crm.js';
+import {
+  listProspects, parseFilters, STATUSES as PROSPECT_STATUSES, prospectDetail, addNote, deleteNote, setNextAction,
+} from './services/crm.js';
 import {
   getProject, listProjects, createProject, saveSecretConfig, publicConfig, globalSmtp,
   prospectStats, sentSince, repoDir, getTemplate, saveTemplate, abStats,
@@ -319,6 +321,30 @@ export function registerRoutes(router, app) {
       db.prepare("INSERT OR IGNORE INTO blacklist(email, reason, created_at) VALUES(?, 'refused', ?)").run(email, now());
     }
     json(res, { ok: true });
+  });
+
+  // ---------- Fiche prospect ----------
+  const prospectId = (params) => {
+    const id = Number(params.id);
+    if (!db.prepare('SELECT 1 FROM prospects WHERE id = ?').get(id)) throw new HttpError(404, 'Prospect introuvable');
+    return id;
+  };
+  router.get('/api/prospects/:id', ({ res, params }) => json(res, prospectDetail(db, prospectId(params))));
+  router.post('/api/prospects/:id/notes', async ({ req, res, params }) => {
+    const id = prospectId(params);
+    const noteId = addNote(db, id, (await readBody(req)).body);
+    if (!noteId) throw new HttpError(400, 'Note vide');
+    json(res, { ok: true, id: noteId });
+  });
+  router.post('/api/prospects/:id/notes/:nid/delete', ({ res, params }) => {
+    if (!deleteNote(db, prospectId(params), Number(params.nid))) throw new HttpError(404, 'Note introuvable');
+    json(res, { ok: true });
+  });
+  router.post('/api/prospects/:id/next', async ({ req, res, params }) => {
+    const id = prospectId(params);
+    const b = await readBody(req);
+    try { json(res, { ok: true, at: setNextAction(db, id, b.action, b.day) }); }
+    catch (e) { throw new HttpError(400, e.message); }
   });
 
   router.post('/api/jobs/:id/cancel', ({ res, params }) => { cancelJob(db, Number(params.id)); json(res, { ok: true }); });
