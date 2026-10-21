@@ -20,6 +20,22 @@ idées d'évolutions et récap business. Pensé pour un **Raspberry Pi 4 sans ve
   - secrets chiffrés en AES-256-GCM en base ;
   - token Forgejo jamais écrit sur disque.
 
+## Suivi des réponses, relances et test A/B
+
+- **Détection des réponses** : la boîte de réception du projet est lue en IMAP toutes les 15 minutes, et à la demande avec « Vérifier maintenant ».
+  - Une réponse fait passer le prospect en « A répondu ». Elle est rattachée par le fil de discussion (Message-ID), puis par l'adresse, puis par le domaine pro s'il est unique.
+  - Les absences, réponses automatiques et newsletters sont ignorées.
+  - Les mails rejetés (bounces) passent le prospect en « Rejeté » et l'adresse en liste d'opposition.
+  - Aucun token Claude n'est consommé : on ne lit que les en-têtes, et le début du corps pour les bounces.
+- **Relance automatique** : une seule, après N jours (7 par défaut), dans le même fil (« Re: » + In-Reply-To). Elle part à quatre conditions :
+  - le modèle de relance est validé ;
+  - la boîte IMAP a été lue avec succès il y a moins de 2 h. Sinon, on relancerait des gens qui ont déjà répondu ;
+  - on est en heures ouvrées, du lundi au vendredi de 9h à 18h (heure de Paris). L'heure est revérifiée entre chaque mail ;
+  - les plafonds quotidiens ne sont pas atteints (premiers mails et relances confondus).
+- **Test A/B de l'objet** : renseigne un « Objet B » et les envois alternent de façon équilibrée. Le taux de réponse de chaque objet s'affiche sous le bouton Envoyer.
+
+> Test IMAP de bout en bout (optionnel) : `IMAP_TEST=hôte:port:utilisateur:motdepasse npm test`. Voir `test/inbox.live.test.js` pour les 4 mails attendus dans la boîte de test.
+
 ## Garde-fous d'envoi
 
 - Tu choisis le nombre de mails à chaque envoi, avec une confirmation obligatoire.
