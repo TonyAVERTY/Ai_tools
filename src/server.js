@@ -11,7 +11,7 @@ import { Worker } from './services/jobs.js';
 import { makeHandlers } from './handlers.js';
 import { Scheduler } from './services/scheduler.js';
 import { notify, notifyJob } from './services/notify.js';
-import { budgetState, AI_JOBS } from './services/budget.js';
+import { budgetState, AI_JOBS, quotaState, isQuotaSensitive } from './services/budget.js';
 import { layout } from './views.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -80,6 +80,12 @@ export function createApp(cfg, { db = openDb(cfg.dataDir), worker = true, create
       onBudget: (reason) => notify(app, 'budget', {
         title: 'Budget IA atteint', level: 'warn',
         description: `${reason[0].toUpperCase()}${reason.slice(1)}. Les jobs IA attendent ; les envois et relances continuent.`,
+      }),
+      quota: () => quotaState(db),
+      isQuotaSensitive,
+      onQuotaHold: (reason) => notify(app, 'quota', {
+        title: 'Job IA reporté (quota serré)', level: 'warn',
+        description: `${reason[0].toUpperCase()}${reason.slice(1)}. Analyse et évolutions attendent ; prospection et envois continuent.`,
       }),
       onThermal: (t) => notify(app, 'thermal', {
         title: 'Pause thermique', level: 'warn',

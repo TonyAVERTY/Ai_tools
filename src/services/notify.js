@@ -12,6 +12,7 @@ export const EVENTS = {
   followup: 'Relances envoyées',
   thermal: 'Pause thermique du Pi',
   budget: 'Budget IA atteint',
+  quota: 'Quota Claude proche de la limite, ou job reporté',
   weekly: 'Rapport hebdo',
 };
 

@@ -7,6 +7,8 @@ import { analyzePrompt, prospectPrompt, templatePrompt, followupTemplatePrompt, 
 import { followupCandidates, followupSubject, isBusinessHours } from './services/followup.js';
 import { EMAIL_RE, createTransport, buildProspectMail, allowedToSend, makeMessageId } from './services/mailer.js';
 import { unsubToken } from './crypto.js';
+import { quotaAlerts } from './services/budget.js';
+import { notify } from './services/notify.js';
 import { getProject, repoDir, forgejoToken, globalSmtp, sentSince, getTemplate, saveTemplate, pickVariant } from './projects.js';
 
 const sleep = (ms, signal) => new Promise((resolve, reject) => {
@@ -42,7 +44,16 @@ export function makeHandlers(app) {
     const r = await runClaude({ bin: cfg.claudeBin, ...o });
     // État du quota Pro (session 5h + semaine), affiché dans la barre système
     const w = rateLimitWindows(r.rateLimit);
-    if (w) setSetting(db, 'claude_rate_limit_json', JSON.stringify({ at: now(), ...w }));
+    if (w) {
+      setSetting(db, 'claude_rate_limit_json', JSON.stringify({ at: now(), ...w }));
+      for (const a of quotaAlerts(db, w)) {
+        notify(app, 'quota', {
+          title: `Quota Claude : ${a.level}+ % (${a.label})`,
+          level: a.level >= 95 ? 'error' : 'warn',
+          description: `${Math.round(a.utilization * 100)} % utilisé sur la ${a.label}.`,
+        });
+      }
+    }
     return r;
   };
 

@@ -15,9 +15,10 @@ const lines = prompt.includes('fiche commerciale') ? ['```json\n' + JSON.stringi
      'PROSPECT {"company":"Coiffure Zen","email":"Hello@Zen.fr","website":"https://zen.fr","city":"Vern","score":6,"source":"https://zen.fr"}']
   : ['```json\n{"ok":true,"args":' + JSON.stringify(process.argv.slice(2)) + '}\n```'];
 for (const t of lines) out({ type: 'assistant', message: { content: [{ type: 'text', text: t }] } });
-// Quota du compte (session 5h + semaine), remonté par la vraie CLI à chaque appel
+// Quota du compte (session 5h + semaine), remonté par la vraie CLI à chaque appel.
+// Surchargeable par les tests qui veulent simuler un quota serré (FAKE_FIVE_HOUR / FAKE_SEVEN_DAY).
 out({ type: 'rate_limit_event', rate_limit_info: { status: 'allowed', unifiedWindows: {
-  five_hour: { utilization: 0.33, resetsAt: 1_700_000_000 },
-  seven_day: { utilization: 0.5, resetsAt: 1_700_300_000 },
+  five_hour: { utilization: Number(process.env.FAKE_FIVE_HOUR ?? 0.33), resetsAt: 1_700_000_000 },
+  seven_day: { utilization: Number(process.env.FAKE_SEVEN_DAY ?? 0.5), resetsAt: 1_700_300_000 },
 } } });
 out({ type: 'result', subtype: 'success', is_error: false, result: lines[lines.length - 1], total_cost_usd: 0.0123, num_turns: 2, usage: { input_tokens: 100, cache_read_input_tokens: 50, output_tokens: 20 } });

@@ -12,7 +12,7 @@ import { createProject, saveSecretConfig, getProject, prospectStats, pickVariant
 import { allowedToSend, buildProspectMail, fillTemplate } from '../src/services/mailer.js';
 import { validateSelect, firstValue } from '../src/services/recap.js';
 import { validateGitUrl } from '../src/services/git.js';
-import { verifyUnsubToken } from '../src/crypto.js';
+import { verifyUnsubToken, encrypt } from '../src/crypto.js';
 
 function setup() {
   const tmp = mkdtempSync(join(tmpdir(), 'aitools-'));
@@ -201,4 +201,29 @@ test('analyse : modèle économique (Haiku) par défaut, Sonnet uniquement sur d
     assert.equal(a2.status, 'done', a2.error);
     assert.deepEqual(readFileSync(spyFile, 'utf8').trim().split('\n'), ['haiku', 'sonnet']);
   } finally { delete process.env.MODEL_SPY_FILE; rmSync(s.tmp, { recursive: true, force: true }); }
+});
+
+test('quota Claude serré : alerte Discord à 80 %, pas en dessous', async () => {
+  const s = setup();
+  const sent = [];
+  s.app.fetch = async (url, opts) => { sent.push({ url, body: JSON.parse(opts.body) }); return { ok: true, status: 204 }; };
+  const hook = 'https://discord.com/api/webhooks/123456789012345678/abcdefghijklmnopqrstuvwxyz-ABC_123';
+  setSetting(s.db, 'discord_webhook_enc', encrypt(s.app.cfg.secretKey, hook));
+  try {
+    const a = await run(s, 'analyze'); // fake-claude : 33 % / 50 % par défaut
+    assert.equal(a.status, 'done', a.error);
+    assert.equal(sent.length, 0, 'sous le seuil : pas d\'alerte');
+
+    process.env.FAKE_FIVE_HOUR = '0.84';
+    const a2 = await run(s, 'analyze');
+    assert.equal(a2.status, 'done', a2.error);
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].url, hook);
+    assert.match(sent[0].body.embeds[0].title, /80\+ % \(session Claude \(5 h\)\)/);
+
+    // reste au-dessus de 80 % : pas de redite
+    const a3 = await run(s, 'analyze');
+    assert.equal(a3.status, 'done', a3.error);
+    assert.equal(sent.length, 1);
+  } finally { delete process.env.FAKE_FIVE_HOUR; rmSync(s.tmp, { recursive: true, force: true }); }
 });
