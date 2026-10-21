@@ -231,3 +231,18 @@ test('fiche prospect : routes notes et prochaine action', async () => {
   const list = await (await get(`/api/projects/${pid}/prospects?q=atelier`)).json();
   assert.equal(list.rows[0].next_action, 'Rappeler');
 });
+
+test('CSV : export en pièce jointe, import via l\'API', async () => {
+  const pid = app.db.prepare('SELECT id FROM projects LIMIT 1').get().id;
+  let r = await get(`/api/projects/${pid}/prospects.csv?q=atelier`);
+  assert.equal(r.status, 200);
+  assert.match(r.headers.get('content-type'), /text\/csv/);
+  assert.match(r.headers.get('content-disposition'), /attachment; filename="prospects-mep-\d{4}-\d{2}-\d{2}\.csv"/);
+  assert.match(await r.text(), /a@atelier\.fr/);
+  r = await post(`/api/projects/${pid}/prospects/import`, { csv: 'email;entreprise\nnouveau@client.fr;Nouveau' });
+  assert.deepEqual(await r.json(), { total: 1, imported: 1, duplicates: 0, blacklisted: 0, invalid: [] });
+  r = await post(`/api/projects/${pid}/prospects/import`, { csv: 'nom\nx' });
+  assert.equal(r.status, 400);
+  r = await fetch(`${base}/api/projects/${pid}/prospects.csv`);
+  assert.equal(r.status, 401, 'pas d\'export sans session');
+});

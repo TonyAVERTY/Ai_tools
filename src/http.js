@@ -42,12 +42,12 @@ export function setCookie(res, name, value, { maxAge, httpOnly = true } = {}) {
 
 const MAX_BODY = 256 * 1024;
 
-export async function readBody(req) {
+export async function readBody(req, { max = MAX_BODY } = {}) {
   const chunks = [];
   let size = 0;
   for await (const c of req) {
     size += c.length;
-    if (size > MAX_BODY) throw Object.assign(new Error('Requête trop volumineuse'), { status: 413 });
+    if (size > max) throw Object.assign(new Error('Requête trop volumineuse'), { status: 413 });
     chunks.push(c);
   }
   const raw = Buffer.concat(chunks).toString('utf8');
