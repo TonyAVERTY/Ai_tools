@@ -14,6 +14,13 @@ const sleep = (ms, signal) => new Promise((resolve, reject) => {
   signal?.addEventListener('abort', () => { clearTimeout(t); reject(new Error('Annulé')); }, { once: true });
 });
 
+// Une page web peut tenter de faire enregistrer "javascript:…" : seules les URLs http(s) sont gardées
+export function httpUrl(v) {
+  const s = String(v ?? '').trim();
+  if (!/^https?:\/\/[^\s<>"]+$/i.test(s)) return null;
+  try { return new URL(s).protocol.startsWith('http') ? s.slice(0, 300) : null; } catch { return null; }
+}
+
 export function parseProspectLine(line) {
   const m = /^\s*PROSPECT\s+(\{.*\})\s*$/.exec(line);
   if (!m) return null;
@@ -24,8 +31,8 @@ export function parseProspectLine(line) {
   const str = (v, max = 300) => (v == null ? null : String(v).slice(0, max));
   const score = Math.max(1, Math.min(10, Math.round(Number(p.score) || 5)));
   return {
-    company: str(p.company, 200), email, website: str(p.website), city: str(p.city, 100),
-    sector: str(p.sector, 100), hook: str(p.hook, 400), source: str(p.source), score,
+    company: str(p.company, 200), email, website: httpUrl(p.website), city: str(p.city, 100),
+    sector: str(p.sector, 100), hook: str(p.hook, 400), source: httpUrl(p.source), score,
   };
 }
 
