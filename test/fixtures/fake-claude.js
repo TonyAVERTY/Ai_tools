@@ -6,6 +6,7 @@ out({ type: 'system', subtype: 'init', args: process.argv.slice(2) });
 if (prompt.includes('CRASH')) process.exit(3);
 const profile = { resume: 'Cartes de fidélité digitales.', proposition_valeur: 'Fidélisez sans carton.', fonctionnalites: ['tampons'], stack: 'node', modele_eco: 'abonnement', cible: { description: 'commerces de proximité', secteurs: ['boulangerie'], zone: 'Bretagne', taille: 'TPE', decideur: 'gérant', requetes: ['boulangerie rennes'] }, arguments: ['simple'], ton: 'direct' };
 const lines = prompt.includes('fiche commerciale') ? ['```json\n' + JSON.stringify(profile) + '\n```']
+  : prompt.includes('mail de RELANCE') ? ['{"body":"Petite relance : toujours partant, {{entreprise}} ?"}']
   : prompt.includes('email de prospection') ? ['{"subject":"Idée pour {{entreprise}}","body":"{{accroche}}\\n\\nBonjour {{entreprise}} à {{ville}}.\\n\\n{{expediteur}}"}']
   : prompt.includes('évolutions') ? ['### 1. Export CSV\n- **Pourquoi** : pratique']
   : prompt.includes('prospects')

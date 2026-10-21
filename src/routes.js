@@ -9,6 +9,7 @@ import { fetchRecap, clearRecapCache, validateSelect } from './services/recap.js
 import { allowedToSend, EMAIL_RE } from './services/mailer.js';
 import { cpuTemp } from './services/thermal.js';
 import { checkInbox } from './services/inbox.js';
+import { followupPlan } from './services/followup.js';
 import {
   getProject, listProjects, createProject, saveSecretConfig, publicConfig, globalSmtp,
   prospectStats, sentSince, repoDir, getTemplate, saveTemplate, abStats,
@@ -123,8 +124,8 @@ export function registerRoutes(router, app) {
   router.get('/api/projects/:id/status', ({ res, params }) => {
     const p = getProject(app, pid(params));
     const jobs = latestJobs(db, p.id);
-    const row = getTemplate(db, p.id, 'initial');
-    const tpl = row ? { subject: row.subject, subjectB: row.subject_b, body: row.body, status: row.status, updated_at: row.updated_at } : null;
+    const tplOut = (row) => (row ? { subject: row.subject, subjectB: row.subject_b, body: row.body, status: row.status, updated_at: row.updated_at } : null);
+    const templates = { initial: tplOut(getTemplate(db, p.id, 'initial')), followup: tplOut(getTemplate(db, p.id, 'followup')) };
     const stats = prospectStats(db, p.id);
     const day = now() - 86400;
     const sendMax = allowedToSend({
@@ -133,7 +134,8 @@ export function registerRoutes(router, app) {
       globalCap: Number(getSetting(db, 'global_daily_cap', '100')), sentTodayGlobal: sentSince(db, day),
     });
     json(res, {
-      jobs, template: tpl, stats, sendMax,
+      jobs, templates, stats, sendMax,
+      followup: { enabled: p.followupEnabled, days: p.followupDays, ...followupPlan(db, p) },
       targetValidated: p.targetValidated, hasProfile: !!p.profile, hasSmtp: p.hasSmtp,
       hasImap: p.hasImap, inbox: p.inbox, ab: abStats(db, p.id),
     });
@@ -167,6 +169,16 @@ export function registerRoutes(router, app) {
   router.post('/api/projects/:id/template', jobRoute('template', () => ({}), (p) => {
     if (!p.profile) throw new HttpError(400, "Analyse le projet d'abord");
   }));
+  router.post('/api/projects/:id/followup_template', jobRoute('followup_template', () => ({}), (p) => {
+    if (!p.profile) throw new HttpError(400, "Analyse le projet d'abord");
+  }));
+  router.post('/api/projects/:id/followup', async ({ req, res, params }) => {
+    const p = getProject(app, pid(params));
+    const b = await readBody(req);
+    const enabled = b.enabled === true || b.enabled === 'on';
+    db.prepare('UPDATE projects SET followup_enabled = ?, followup_days = ? WHERE id = ?').run(enabled ? 1 : 0, int(b.days, 2, 30, 7), p.id);
+    json(res, { ok: true });
+  });
   router.post('/api/projects/:id/prospect', jobRoute('prospect', (b) => ({ count: int(b.count, 1, 50, 10) }), (p) => {
     if (!p.targetValidated) throw new HttpError(400, 'Valide la cible avant de prospecter');
   }));
@@ -186,9 +198,11 @@ export function registerRoutes(router, app) {
     const subject = String(b.subject || '').trim().slice(0, 200);
     const body = String(b.body || '').trim().slice(0, 5000);
     const subjectB = String(b.subjectB || '').trim().slice(0, 200) || null;
-    if (!subject || !body) throw new HttpError(400, 'Objet et corps requis');
+    const kind = b.kind === 'followup' ? 'followup' : 'initial';
+    // Relance : objet facultatif (vide = "Re: <objet du 1er mail>", même fil de discussion)
+    if (!body || (kind === 'initial' && !subject)) throw new HttpError(400, kind === 'initial' ? 'Objet et corps requis' : 'Corps requis');
     const status = b.mode === 'validate' ? 'validated' : 'draft';
-    saveTemplate(db, p.id, 'initial', { subject, subjectB, body, status });
+    saveTemplate(db, p.id, kind, { subject, subjectB, body, status });
     json(res, { ok: true, status });
   });
 

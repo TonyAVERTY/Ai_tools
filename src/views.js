@@ -105,6 +105,24 @@ function configForms(p, smtp, dbCfg, imap) {
 </details>`;
 }
 
+function templateForm(p, kind) {
+  const initial = kind === 'initial';
+  const job = initial ? 'template' : 'followup_template';
+  return `<form data-action="template" data-kind="${kind}" data-id="${p.id}" class="tpl">
+      <div class="row"><h4>${initial ? 'Modèle de mail' : 'Modèle de relance'} <span data-tpl-state></span></h4>
+        <button type="button" class="btn small" data-run="${job}" data-id="${p.id}">Générer avec l'IA</button></div>
+      <p class="muted small">Variables : {{entreprise}} {{ville}}${initial ? ' {{accroche}}' : ''} {{expediteur}}. Le lien de désinscription est ajouté automatiquement.</p>
+      <label>Objet${initial ? '' : ' <span class="muted small">(vide = « Re: » + objet du premier mail, dans le même fil)</span>'}<input name="subject"></label>
+      ${initial ? '<label>Objet B <span class="muted small">(optionnel : test A/B, les envois alternent entre les deux objets)</span><input name="subjectB"></label>' : ''}
+      <label>Corps<textarea name="body" rows="${initial ? 9 : 5}"></textarea></label>
+      <div class="row">
+        <button class="btn" name="mode" value="save">Enregistrer</button>
+        <button class="btn primary" name="mode" value="validate">Valider le modèle</button>
+      </div>
+    </form>
+    <div class="job" data-job="${job}"></div>`;
+}
+
 function projectItem(p, smtp, dbCfg, imap) {
   const profile = p.profile;
   return `<details class="project card" data-id="${p.id}">
@@ -137,19 +155,7 @@ function projectItem(p, smtp, dbCfg, imap) {
     </form>
     <div class="job" data-job="prospect"></div>
 
-    <form data-action="template" data-id="${p.id}" class="tpl">
-      <div class="row"><h4>Modèle de mail <span data-tpl-state></span></h4>
-        <button type="button" class="btn small" data-run="template" data-id="${p.id}">Générer avec l'IA</button></div>
-      <p class="muted small">Variables : {{entreprise}} {{ville}} {{accroche}} {{expediteur}}. Le lien de désinscription est ajouté automatiquement.</p>
-      <label>Objet<input name="subject"></label>
-      <label>Objet B <span class="muted small">(optionnel : test A/B, les envois alternent entre les deux objets)</span><input name="subjectB"></label>
-      <label>Corps<textarea name="body" rows="9"></textarea></label>
-      <div class="row">
-        <button class="btn" name="mode" value="save">Enregistrer</button>
-        <button class="btn primary" name="mode" value="validate">Valider le modèle</button>
-      </div>
-    </form>
-    <div class="job" data-job="template"></div>
+    ${templateForm(p, 'initial')}
 
     <form data-action="send" data-id="${p.id}" class="inline send">
       <label>Mails à envoyer<input name="count" type="number" min="1" value="10"></label>
@@ -158,6 +164,18 @@ function projectItem(p, smtp, dbCfg, imap) {
     </form>
     <div class="job" data-job="send"></div>
     <p class="inbox small" data-inbox></p>
+
+    <section class="followup">
+      <h4>Relance automatique</h4>
+      <form data-action="followup" data-id="${p.id}" class="inline">
+        <label class="check"><input type="checkbox" name="enabled" ${p.followupEnabled ? 'checked' : ''}> Relancer une fois les prospects sans réponse</label>
+        <label>Après (jours)<input name="days" type="number" min="2" max="30" value="${p.followupDays}"></label>
+        <button class="btn">Enregistrer</button>
+      </form>
+      <p class="muted small" data-followup-info></p>
+      ${templateForm(p, 'followup')}
+      <div class="job" data-job="followup"></div>
+    </section>
 
     <details class="prospects"><summary>Prospects <span data-count></span></summary>
       <div data-prospects></div>
