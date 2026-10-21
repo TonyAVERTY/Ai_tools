@@ -39,12 +39,19 @@ export function latestJobs(db, projectId) {
 }
 
 export class Worker {
-  constructor(db, handlers, { thermalMax = 75, pollMs = 3000, log = console, clock = now, onFinish, onThermal, budget, isAiJob, onBudget } = {}) {
+  constructor(db, handlers, {
+    thermalMax = 75, pollMs = 3000, log = console, clock = now, onFinish, onThermal,
+    budget, isAiJob, onBudget, quota, isQuotaSensitive, onQuotaHold,
+  } = {}) {
     this.clock = clock;
     this.budget = budget;       // () => {blocked, reason}
-    this.isAiJob = isAiJob;     // (type) => bool : jobs à mettre en attente si budget atteint
+    this.isAiJob = isAiJob;     // (type) => bool : jobs à mettre en attente si budget ($ équivalent) atteint
     this.onBudget = onBudget;   // (reason) → une notif quand le blocage commence
     this.budgetBlocked = false;
+    this.quota = quota;                     // () => {blocked, reason} : quota du compte Claude lui-même (session/semaine)
+    this.isQuotaSensitive = isQuotaSensitive; // (type) => bool : jobs à reporter si le quota est serré (pas la prospection/l'envoi)
+    this.onQuotaHold = onQuotaHold;          // (reason) → une notif quand le report commence
+    this.quotaBlocked = false;
     this.onFinish = onFinish;   // (job, {status, result, error}) → notifications
     this.onThermal = onThermal; // (°C) → une fois par pause
     this.db = db;
@@ -86,22 +93,28 @@ export class Worker {
       AND (run_after IS NULL OR run_after <= ?) ORDER BY id`).all(this.clock());
     if (!due.length) return false;
 
-    // Budget atteint : les jobs IA restent en file (pas perdus), les autres passent devant
+    // Budget $ atteint ou quota du compte Claude serré : les jobs concernés restent en file
+    // (pas perdus), les autres passent devant. Deux garde-fous indépendants, deux périmètres :
+    // le budget met en pause TOUS les jobs IA, le quota ne retarde que les jobs non urgents
+    // (analyse, évolutions) — la prospection et les envois continuent.
     const budget = this.budget?.() || { blocked: false };
+    const quota = this.quota?.() || { blocked: false };
+    const hold = (j, reason) => {
+      const msg = JSON.stringify({ message: `En attente : ${reason}` });
+      if (j.progress_json !== msg) this.db.prepare('UPDATE jobs SET progress_json = ? WHERE id = ?').run(msg, j.id);
+    };
     let job = null;
-    let waiting = false;
+    let waiting = false, quotaWaiting = false;
     for (const j of due) {
-      if (budget.blocked && this.isAiJob?.(j.type)) {
-        waiting = true;
-        const msg = JSON.stringify({ message: `En attente : ${budget.reason}` });
-        if (j.progress_json !== msg) this.db.prepare('UPDATE jobs SET progress_json = ? WHERE id = ?').run(msg, j.id);
-        continue;
-      }
+      if (budget.blocked && this.isAiJob?.(j.type)) { waiting = true; hold(j, budget.reason); continue; }
+      if (quota.blocked && this.isQuotaSensitive?.(j.type)) { quotaWaiting = true; hold(j, quota.reason); continue; }
       job = j;
       break;
     }
     if (waiting && !this.budgetBlocked) this.emit('onBudget', budget.reason);
     this.budgetBlocked = waiting;
+    if (quotaWaiting && !this.quotaBlocked) this.emit('onQuotaHold', quota.reason);
+    this.quotaBlocked = quotaWaiting;
     if (!job) return false;
     const handler = this.handlers[job.type];
     if (!handler) {
