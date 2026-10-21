@@ -70,3 +70,20 @@ export function sentSince(db, since, projectId = null) {
     : 'SELECT COUNT(*) n FROM mail_log WHERE sent_at > ? AND error IS NULL AND project_id = ?';
   return (projectId == null ? db.prepare(sql).get(since) : db.prepare(sql).get(since, projectId)).n;
 }
+
+// ---------- Modèles de mail ----------
+export const TEMPLATE_KINDS = ['initial', 'followup'];
+
+export function getTemplate(db, projectId, kind, { validatedOnly = false } = {}) {
+  const row = db.prepare('SELECT * FROM templates WHERE project_id = ? AND kind = ?').get(projectId, kind);
+  if (!row || (validatedOnly && row.status !== 'validated')) return null;
+  return row;
+}
+
+export function saveTemplate(db, projectId, kind, { subject = '', body, status = 'draft' }) {
+  if (!TEMPLATE_KINDS.includes(kind)) throw new HttpError(400, 'Type de modèle inconnu');
+  db.prepare(`INSERT INTO templates(project_id, kind, subject, body, status, updated_at) VALUES(?, ?, ?, ?, ?, ?)
+    ON CONFLICT(project_id, kind) DO UPDATE SET subject = excluded.subject,
+      body = excluded.body, status = excluded.status, updated_at = excluded.updated_at`)
+    .run(projectId, kind, subject, body, status, now());
+}

@@ -6,7 +6,7 @@ import { syncRepo } from './services/git.js';
 import { analyzePrompt, prospectPrompt, templatePrompt, evolutionPrompt, LEVELS } from './services/prompts.js';
 import { EMAIL_RE, createTransport, buildProspectMail, allowedToSend } from './services/mailer.js';
 import { unsubToken } from './crypto.js';
-import { getProject, repoDir, forgejoToken, globalSmtp, sentSince } from './projects.js';
+import { getProject, repoDir, forgejoToken, globalSmtp, sentSince, getTemplate, saveTemplate } from './projects.js';
 
 const sleep = (ms, signal) => new Promise((resolve, reject) => {
   const t = setTimeout(resolve, ms);
@@ -101,15 +101,13 @@ export function makeHandlers(app) {
       addUsage(ctx, r);
       const t = extractJson(r.text);
       if (!t.subject || !t.body) throw new Error('Modèle de mail invalide');
-      db.prepare(`INSERT INTO mail_templates(project_id, subject, body, status, updated_at) VALUES(?, ?, ?, 'draft', ?)
-        ON CONFLICT(project_id) DO UPDATE SET subject = excluded.subject, body = excluded.body, status = 'draft', updated_at = excluded.updated_at`)
-        .run(project.id, t.subject, t.body, now());
+      saveTemplate(db, project.id, 'initial', { subject: t.subject, body: t.body });
       return { ok: true };
     },
 
     async send(ctx) {
       const project = getProject(app, ctx.job.project_id, { secrets: true });
-      const template = db.prepare("SELECT * FROM mail_templates WHERE project_id = ? AND status = 'validated'").get(project.id);
+      const template = getTemplate(db, project.id, 'initial', { validatedOnly: true });
       if (!template) throw new Error('Modèle de mail non validé');
       if (!project.smtp) throw new Error('SMTP non configuré pour ce projet');
 
