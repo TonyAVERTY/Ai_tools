@@ -357,6 +357,9 @@
 
   // ---------- Liste des prospects (mini CRM) ----------
   const STATUS = { new: 'À contacter', sent: 'Contacté', replied: 'A répondu', client: 'Client', refused: 'Refus', bounced: 'Rejeté' };
+  // Seuls les liens http(s) sont cliquables : un "javascript:" venu d'une page web scrapée ne doit jamais s'exécuter ici
+  const safeUrl = (u) => (/^https?:\/\//i.test(String(u || '')) ? String(u) : '');
+
   const fmtDay = (ts) => (ts ? new Date(ts * 1000).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', timeZone: 'Europe/Paris' }) : '');
 
   async function loadProspects(d, page = 1) {
@@ -367,7 +370,7 @@
       const r = await api(`/api/projects/${proj.dataset.id}/prospects?${qs}`);
       d.dataset.page = r.page;
       box.innerHTML = r.rows.length ? `<div class="table-wrap"><table><thead><tr><th>Entreprise</th><th>Email</th><th>Ville</th><th>Score</th><th>Contacté</th><th>Statut</th></tr></thead><tbody>
-        ${r.rows.map((x) => `<tr data-row="${x.id}"><td>${x.website ? `<a href="${esc(x.website)}" target="_blank" rel="noopener noreferrer">${esc(x.company)}</a>` : esc(x.company)}</td>
+        ${r.rows.map((x) => `<tr data-row="${x.id}"><td>${safeUrl(x.website) ? `<a href="${esc(safeUrl(x.website))}" target="_blank" rel="noopener noreferrer">${esc(x.company)}</a>` : esc(x.company)}</td>
           <td>${esc(x.email)}</td><td>${esc(x.city)}</td><td>${x.score ?? ''}</td>
           <td>${fmtDay(x.sent_at)}${x.followup_at ? ' <span class="muted small">+ relance</span>' : ''}</td>
           <td><select data-prospect="${x.id}" class="st-${x.status}">${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${k === x.status ? 'selected' : ''}>${v}</option>`).join('')}</select></td></tr>`).join('')}
