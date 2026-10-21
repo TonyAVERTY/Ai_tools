@@ -12,6 +12,7 @@ import { checkInbox } from './services/inbox.js';
 import { followupPlan } from './services/followup.js';
 import { nextNightSlot } from './services/paris-time.js';
 import { notify, notifyConfig, EVENTS, WEBHOOK_RE } from './services/notify.js';
+import { budgetState, AI_JOBS } from './services/budget.js';
 import {
   getProject, listProjects, createProject, saveSecretConfig, publicConfig, globalSmtp,
   prospectStats, sentSince, repoDir, getTemplate, saveTemplate, abStats,
@@ -70,6 +71,8 @@ export function registerRoutes(router, app) {
       send_delay_max: getSetting(db, 'send_delay_max', '60'),
       prospect_model: getSetting(db, 'prospect_model', 'haiku'),
       blacklist_count: db.prepare('SELECT COUNT(*) n FROM blacklist').get().n,
+      budget_day_usd: getSetting(db, 'budget_day_usd', ''),
+      budget_month_usd: getSetting(db, 'budget_month_usd', ''),
       discord: { set: !!notifyConfig(app).url, events: notifyConfig(app).events, all: EVENTS },
     };
     html(res, settingsPage({ email: session.email, s, saved: url.searchParams.has('ok') }));
@@ -88,6 +91,9 @@ export function registerRoutes(router, app) {
     setSetting(db, 'send_delay_min', String(dmin));
     setSetting(db, 'send_delay_max', String(dmax));
     setSetting(db, 'prospect_model', b.prospect_model === 'sonnet' ? 'sonnet' : 'haiku');
+    const money = (v) => { const n = Number(String(v || '').replace(',', '.')); return Number.isFinite(n) && n > 0 ? String(Math.round(n * 100) / 100) : ''; };
+    setSetting(db, 'budget_day_usd', money(b.budget_day_usd));
+    setSetting(db, 'budget_month_usd', money(b.budget_month_usd));
 
     const hook = String(b.discord_webhook || '').trim();
     if (hook && !WEBHOOK_RE.test(hook)) throw new HttpError(400, 'URL de webhook Discord invalide (https://discord.com/api/webhooks/…)');
@@ -113,7 +119,7 @@ export function registerRoutes(router, app) {
     const queue = db.prepare(`SELECT COUNT(*) n FROM jobs WHERE status = 'running'
       OR (status = 'queued' AND (run_after IS NULL OR run_after <= ?))`).get(now()).n;
     const scheduled = db.prepare("SELECT COUNT(*) n FROM jobs WHERE status = 'queued' AND run_after > ?").get(now()).n;
-    json(res, { temp: cpuTemp(), queue, scheduled, usage: usageSummary(db), thermalMax: cfg.thermalMax });
+    json(res, { temp: cpuTemp(), queue, scheduled, usage: usageSummary(db), budget: budgetState(db), thermalMax: cfg.thermalMax });
   });
 
   router.post('/api/projects', async ({ req, res }) => {
@@ -182,7 +188,8 @@ export function registerRoutes(router, app) {
     // "Cette nuit" : démarrage au prochain créneau 1h-6h (Pi au frais, quota Claude libre)
     const runAfter = b.when === 'night' ? Math.floor(nextNightSlot().getTime() / 1000) : null;
     const r = enqueue(db, { projectId: p.id, type, params: paramsOf(b), runAfter });
-    json(res, r);
+    const budget = AI_JOBS.has(type) ? budgetState(db) : null;
+    json(res, { ...r, budgetBlocked: budget?.blocked ? budget.reason : null });
   };
 
   router.post('/api/projects/:id/analyze', jobRoute('analyze'));

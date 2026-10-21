@@ -192,3 +192,20 @@ test('réglages Discord : URL validée, chiffrée, événements enregistrés', a
   r = await post('/settings', { ...base, discord_remove: 'on' }, { form: true });
   assert.equal(app.db.prepare("SELECT value FROM settings WHERE key = 'discord_webhook_enc'").get().value, null);
 });
+
+test('budget : réglages, jauge et avertissement au lancement', async () => {
+  const base = { notify_email: 'moi@x.fr', forgejo_host: 'git.tony-averty.dev', global_daily_cap: '100', send_delay_min: '20', send_delay_max: '60' };
+  let r = await post('/settings', { ...base, budget_day_usd: '0,5', budget_month_usd: 'abc' }, { form: true });
+  assert.equal(r.status, 303);
+  const s = (k) => app.db.prepare('SELECT value FROM settings WHERE key = ?').get(k)?.value;
+  assert.equal(s('budget_day_usd'), '0.5', 'virgule française acceptée');
+  assert.equal(s('budget_month_usd'), '', 'valeur invalide = pas de limite');
+  app.db.prepare("INSERT INTO jobs(type, status, cost_usd, created_at, finished_at) VALUES('evolution', 'done', 0.8, ?, ?)").run(now(), now());
+  const sys = await (await get('/api/system')).json();
+  assert.equal(sys.budget.blocked, true);
+  const id = app.db.prepare('SELECT id FROM projects LIMIT 1').get().id;
+  app.db.prepare("UPDATE jobs SET status = 'cancelled' WHERE status IN ('queued', 'running')").run();
+  r = await post(`/api/projects/${id}/evolution`, { count: 2, level: 'rapide' });
+  assert.match((await r.json()).budgetBlocked, /budget IA des dernières 24 h atteint/);
+  await post('/settings', { ...base, budget_day_usd: '' }, { form: true });
+});
