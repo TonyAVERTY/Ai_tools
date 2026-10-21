@@ -151,6 +151,7 @@ function projectItem(p, smtp, dbCfg, imap) {
   <section class="panel" data-panel-body="prospect" hidden>
     <form data-action="prospect" data-id="${p.id}" class="inline">
       <label>Prospects à chercher<input name="count" type="number" min="1" max="50" value="10"></label>
+      <label>Quand<select name="when"><option value="now">Maintenant</option><option value="night">Cette nuit (1h-6h)</option></select></label>
       <button class="btn primary">Lancer la recherche</button>
     </form>
     <div class="job" data-job="prospect"></div>
@@ -190,6 +191,7 @@ function projectItem(p, smtp, dbCfg, imap) {
         <option value="normal" selected>Normal (Sonnet)</option>
         <option value="approfondi">Approfondi (Opus, coûteux)</option>
       </select></label>
+      <label>Quand<select name="when"><option value="now">Maintenant</option><option value="night">Cette nuit (1h-6h)</option></select></label>
       <button class="btn primary">Chercher et envoyer par mail</button>
     </form>
     <div class="job" data-job="evolution"></div>

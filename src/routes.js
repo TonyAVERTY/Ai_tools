@@ -10,6 +10,7 @@ import { allowedToSend, EMAIL_RE } from './services/mailer.js';
 import { cpuTemp } from './services/thermal.js';
 import { checkInbox } from './services/inbox.js';
 import { followupPlan } from './services/followup.js';
+import { nextNightSlot } from './services/paris-time.js';
 import {
   getProject, listProjects, createProject, saveSecretConfig, publicConfig, globalSmtp,
   prospectStats, sentSince, repoDir, getTemplate, saveTemplate, abStats,
@@ -94,8 +95,10 @@ export function registerRoutes(router, app) {
 
   // ---------- API JSON ----------
   router.get('/api/system', ({ res }) => {
-    const queue = db.prepare("SELECT COUNT(*) n FROM jobs WHERE status IN ('queued','running')").get().n;
-    json(res, { temp: cpuTemp(), queue, usage: usageSummary(db), thermalMax: cfg.thermalMax });
+    const queue = db.prepare(`SELECT COUNT(*) n FROM jobs WHERE status = 'running'
+      OR (status = 'queued' AND (run_after IS NULL OR run_after <= ?))`).get(now()).n;
+    const scheduled = db.prepare("SELECT COUNT(*) n FROM jobs WHERE status = 'queued' AND run_after > ?").get(now()).n;
+    json(res, { temp: cpuTemp(), queue, scheduled, usage: usageSummary(db), thermalMax: cfg.thermalMax });
   });
 
   router.post('/api/projects', async ({ req, res }) => {
@@ -161,7 +164,9 @@ export function registerRoutes(router, app) {
     const p = getProject(app, pid(params));
     const b = req.headers['content-type']?.includes('json') ? await readBody(req) : {};
     guard(p, b);
-    const r = enqueue(db, { projectId: p.id, type, params: paramsOf(b) });
+    // "Cette nuit" : démarrage au prochain créneau 1h-6h (Pi au frais, quota Claude libre)
+    const runAfter = b.when === 'night' ? Math.floor(nextNightSlot().getTime() / 1000) : null;
+    const r = enqueue(db, { projectId: p.id, type, params: paramsOf(b), runAfter });
     json(res, r);
   };
 

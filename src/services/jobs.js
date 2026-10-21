@@ -2,13 +2,13 @@
 import { now } from '../db.js';
 import { waitCool } from './thermal.js';
 
-export function enqueue(db, { projectId, type, params = {} }) {
+export function enqueue(db, { projectId, type, params = {}, runAfter = null }) {
   const running = db.prepare(
     "SELECT id FROM jobs WHERE project_id IS ? AND type = ? AND status IN ('queued','running')"
   ).get(projectId ?? null, type);
   if (running) return { id: running.id, existing: true };
-  const r = db.prepare('INSERT INTO jobs(project_id, type, params_json, created_at) VALUES(?, ?, ?, ?)')
-    .run(projectId ?? null, type, JSON.stringify(params), now());
+  const r = db.prepare('INSERT INTO jobs(project_id, type, params_json, created_at, run_after) VALUES(?, ?, ?, ?, ?)')
+    .run(projectId ?? null, type, JSON.stringify(params), now(), runAfter);
   return { id: Number(r.lastInsertRowid), existing: false };
 }
 
@@ -32,14 +32,15 @@ export function latestJobs(db, projectId) {
       id: r.id, status: r.status, error: r.error,
       progress: r.progress_json ? JSON.parse(r.progress_json) : null,
       result: r.result_json ? JSON.parse(r.result_json) : null,
-      createdAt: r.created_at, finishedAt: r.finished_at,
+      createdAt: r.created_at, finishedAt: r.finished_at, runAfter: r.run_after,
     };
   }
   return out;
 }
 
 export class Worker {
-  constructor(db, handlers, { thermalMax = 75, pollMs = 3000, log = console } = {}) {
+  constructor(db, handlers, { thermalMax = 75, pollMs = 3000, log = console, clock = now } = {}) {
+    this.clock = clock;
     this.db = db;
     this.handlers = handlers;
     this.thermalMax = thermalMax;
@@ -69,7 +70,8 @@ export class Worker {
   }
 
   async tick() {
-    const job = this.db.prepare("SELECT * FROM jobs WHERE status = 'queued' ORDER BY id LIMIT 1").get();
+    const job = this.db.prepare(`SELECT * FROM jobs WHERE status = 'queued'
+      AND (run_after IS NULL OR run_after <= ?) ORDER BY id LIMIT 1`).get(this.clock());
     if (!job) return false;
     const handler = this.handlers[job.type];
     if (!handler) {
