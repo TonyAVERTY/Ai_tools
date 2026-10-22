@@ -8,19 +8,19 @@ export const AI_JOBS = new Set(['analyze', 'prospect', 'template', 'followup_tem
 const usd = (n) => `${n.toFixed(2)} $`;
 
 // La dépense compte au moment où le job s'est terminé (un job de nuit compte la nuit)
-function spentSince(db, since) {
-  return db.prepare('SELECT COALESCE(SUM(cost_usd), 0) c FROM jobs WHERE COALESCE(finished_at, created_at) > ?').get(since).c;
+async function spentSince(db, since) {
+  return (await db.prepare('SELECT COALESCE(SUM(cost_usd), 0) c FROM jobs WHERE COALESCE(finished_at, created_at) > ?').get(since)).c;
 }
 
-function limit(db, key) {
-  const v = Number(getSetting(db, key, ''));
+async function limit(db, key) {
+  const v = Number(await getSetting(db, key, ''));
   return Number.isFinite(v) && v > 0 ? v : null;
 }
 
 /** @returns {{day: {used:number, limit:number|null}, month: {used:number, limit:number|null}, blocked: boolean, reason: string|null}} */
-export function budgetState(db, { at = now() } = {}) {
-  const day = { used: spentSince(db, at - 86400), limit: limit(db, 'budget_day_usd') };
-  const month = { used: spentSince(db, at - 30 * 86400), limit: limit(db, 'budget_month_usd') };
+export async function budgetState(db, { at = now() } = {}) {
+  const day = { used: await spentSince(db, at - 86400), limit: await limit(db, 'budget_day_usd') };
+  const month = { used: await spentSince(db, at - 30 * 86400), limit: await limit(db, 'budget_month_usd') };
   const over = (x) => x.limit != null && x.used >= x.limit;
   const reason = over(day) ? `budget IA des dernières 24 h atteint (${usd(day.used)} / ${usd(day.limit)})`
     : over(month) ? `budget IA des 30 derniers jours atteint (${usd(month.used)} / ${usd(month.limit)})`
@@ -40,8 +40,8 @@ export const QUOTA_PAUSE_THRESHOLD = 0.85;
 const WINDOW_LABELS = { fiveHour: 'session Claude (5 h)', sevenDay: 'semaine Claude' };
 
 /** @returns {{blocked: boolean, reason: string|null}} */
-export function quotaState(db) {
-  const raw = getSetting(db, 'claude_rate_limit_json');
+export async function quotaState(db) {
+  const raw = await getSetting(db, 'claude_rate_limit_json');
   if (!raw) return { blocked: false, reason: null };
   let rl;
   try { rl = JSON.parse(raw); } catch { return { blocked: false, reason: null }; }
@@ -58,10 +58,10 @@ export function quotaState(db) {
 const ALERT_LEVELS = [0.95, 0.80];
 
 /** Renvoie les paliers nouvellement franchis et enregistre l'état pour ne pas re-notifier. */
-export function quotaAlerts(db, windows) {
+export async function quotaAlerts(db, windows) {
   if (!windows) return [];
   let prev = {};
-  try { prev = JSON.parse(getSetting(db, 'claude_quota_notified_json', '{}') || '{}'); } catch { prev = {}; }
+  try { prev = JSON.parse((await getSetting(db, 'claude_quota_notified_json', '{}')) || '{}'); } catch { prev = {}; }
   const next = { ...prev };
   const alerts = [];
   for (const [key, label] of Object.entries(WINDOW_LABELS)) {
@@ -73,6 +73,6 @@ export function quotaAlerts(db, windows) {
     if (crossed) alerts.push({ label, level: Math.round(crossed * 100), utilization: w.utilization });
     next[key] = { resetsAt: w.resetsAt, level: crossed ? Math.round(crossed * 100) : state.level };
   }
-  setSetting(db, 'claude_quota_notified_json', JSON.stringify(next));
+  await setSetting(db, 'claude_quota_notified_json', JSON.stringify(next));
   return alerts;
 }

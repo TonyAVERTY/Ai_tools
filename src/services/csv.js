@@ -21,9 +21,9 @@ export function toCsv(header, rows) {
 
 const day = (ts) => (ts ? new Date(ts * 1000).toLocaleString('sv-SE', { timeZone: 'Europe/Paris' }).slice(0, 16) : '');
 
-export function exportProspects(db, projectId, filters) {
+export async function exportProspects(db, projectId, filters) {
   const { sql, args, order } = filterWhere(projectId, filters);
-  const rows = db.prepare(`SELECT * FROM prospects WHERE ${sql} ORDER BY ${order} LIMIT 10000`).all(...args);
+  const rows = await db.prepare(`SELECT * FROM prospects WHERE ${sql} ORDER BY ${order} LIMIT 10000`).all(...args);
   const header = ['Entreprise', 'Email', 'Site', 'Ville', 'Secteur', 'Score', 'Statut', 'Ajouté le', 'Contacté le', 'Objet',
     'Relancé le', 'Répondu le', 'Prochaine action', 'Échéance', 'Source', 'Accroche'];
   return toCsv(header, rows.map((p) => [
@@ -75,7 +75,7 @@ const MAX_ROWS = 2000;
 // Notre propre export préfixe les formules par ' : on l'enlève à la relecture
 const unformula = (s) => (/^'[=+\-@]/.test(s) ? s.slice(1) : s);
 
-export function importProspects(db, projectId, text, { at = now() } = {}) {
+export async function importProspects(db, projectId, text, { at = now() } = {}) {
   const rows = parseCsv(text);
   if (rows.length < 2) throw new Error('Fichier vide ou sans en-tête');
   const header = rows[0].map(norm);
@@ -89,36 +89,32 @@ export function importProspects(db, projectId, text, { at = now() } = {}) {
   if (data.length > MAX_ROWS) throw new Error(`Maximum ${MAX_ROWS} lignes par import (${data.length} dans le fichier)`);
 
   const dateLabel = new Date(at * 1000).toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris' });
-  const exists = db.prepare('SELECT 1 FROM prospects WHERE project_id = ? AND email = ?');
-  const optOut = db.prepare('SELECT 1 FROM blacklist WHERE email = ?');
-  const insert = db.prepare(`INSERT INTO prospects(project_id, company, email, website, city, sector, score, source, hook, created_at)
-    VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
   const res = { total: data.length, imported: 0, duplicates: 0, blacklisted: 0, invalid: [] };
   const seen = new Set();
   const get = (r, k, max = 200) => (col[k] === undefined ? '' : unformula(String(r[col[k]] ?? '').trim()).slice(0, max));
 
-  db.exec('BEGIN');
-  try {
-    data.forEach((r, i) => {
+  // Tout ou rien : une ligne qui plante annule l'import entier
+  await db.transaction(async (tx) => {
+    const exists = tx.prepare('SELECT 1 FROM prospects WHERE project_id = ? AND email = ?');
+    const optOut = tx.prepare('SELECT 1 FROM blacklist WHERE email = ?');
+    const insert = tx.prepare(`INSERT INTO prospects(project_id, company, email, website, city, sector, score, source, hook, created_at)
+      VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    for (const [i, r] of data.entries()) {
       const line = i + 2;
       const email = get(r, 'email').toLowerCase();
-      if (!EMAIL_RE.test(email)) { if (res.invalid.length < 50) res.invalid.push({ line, reason: `email invalide : "${email || 'vide'}"` }); return; }
-      if (seen.has(email) || exists.get(projectId, email)) { res.duplicates++; return; }
+      if (!EMAIL_RE.test(email)) { if (res.invalid.length < 50) res.invalid.push({ line, reason: `email invalide : "${email || 'vide'}"` }); continue; }
+      if (seen.has(email) || await exists.get(projectId, email)) { res.duplicates++; continue; }
       seen.add(email);
-      if (optOut.get(email)) { res.blacklisted++; return; }
+      if (await optOut.get(email)) { res.blacklisted++; continue; }
       const s = Number(get(r, 'score'));
-      insert.run(
+      await insert.run(
         projectId, get(r, 'company') || email.split('@')[1], email, httpUrl(get(r, 'website', 300)), get(r, 'city', 100) || null,
         get(r, 'sector', 100) || null, Number.isFinite(s) && s > 0 ? Math.max(1, Math.min(10, Math.round(s))) : null,
         // RGPD : on garde toujours l'origine de la donnée
         httpUrl(get(r, 'source', 300)) || get(r, 'source', 300) || `Import CSV du ${dateLabel}`, get(r, 'hook', 400) || null, at,
       );
       res.imported++;
-    });
-    db.exec('COMMIT');
-  } catch (e) {
-    db.exec('ROLLBACK');
-    throw e;
-  }
+    }
+  });
   return res;
 }

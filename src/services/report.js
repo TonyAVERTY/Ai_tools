@@ -10,26 +10,27 @@ const pct = (a, b) => (b ? `${Math.round((a / b) * 100)} %` : '-');
 const usd = (n) => `${n.toFixed(2)} $`;
 const day = (ts) => new Date(ts * 1000).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', timeZone: 'Europe/Paris' });
 
-export function weeklyStats(db, { at = now() } = {}) {
+export async function weeklyStats(db, { at = now() } = {}) {
   const from = at - 7 * 86400;
-  const one = (sql, ...a) => db.prepare(sql).get(...a).n;
-  const projects = db.prepare('SELECT id, name FROM projects ORDER BY name COLLATE NOCASE').all().map((p) => {
-    const sent = one("SELECT COUNT(*) n FROM mail_log WHERE project_id = ? AND kind = 'initial' AND error IS NULL AND sent_at > ?", p.id, from);
-    const ab = abStats(db, p.id);
-    return {
+  const one = async (sql, ...a) => (await db.prepare(sql).get(...a)).n;
+  const projects = [];
+  for (const p of await db.prepare('SELECT id, name FROM projects ORDER BY LOWER(name)').all()) {
+    const sent = await one("SELECT COUNT(*) n FROM mail_log WHERE project_id = ? AND kind = 'initial' AND error IS NULL AND sent_at > ?", p.id, from);
+    const ab = await abStats(db, p.id);
+    projects.push({
       name: p.name,
-      found: one('SELECT COUNT(*) n FROM prospects WHERE project_id = ? AND created_at > ?', p.id, from),
+      found: await one('SELECT COUNT(*) n FROM prospects WHERE project_id = ? AND created_at > ?', p.id, from),
       sent,
-      followups: one("SELECT COUNT(*) n FROM mail_log WHERE project_id = ? AND kind = 'followup' AND error IS NULL AND sent_at > ?", p.id, from),
-      replies: one('SELECT COUNT(*) n FROM prospects WHERE project_id = ? AND replied_at > ?', p.id, from),
-      clients: one("SELECT COUNT(*) n FROM prospects WHERE project_id = ? AND status = 'client'", p.id),
-      bounces: one(`SELECT COUNT(*) n FROM blacklist b JOIN prospects x ON x.email = b.email
+      followups: await one("SELECT COUNT(*) n FROM mail_log WHERE project_id = ? AND kind = 'followup' AND error IS NULL AND sent_at > ?", p.id, from),
+      replies: await one('SELECT COUNT(*) n FROM prospects WHERE project_id = ? AND replied_at > ?', p.id, from),
+      clients: await one("SELECT COUNT(*) n FROM prospects WHERE project_id = ? AND status = 'client'", p.id),
+      bounces: await one(`SELECT COUNT(*) n FROM blacklist b JOIN prospects x ON x.email = b.email
         WHERE x.project_id = ? AND b.reason = 'bounce' AND b.created_at > ?`, p.id, from),
-      cost: db.prepare('SELECT COALESCE(SUM(cost_usd), 0) c FROM jobs WHERE project_id = ? AND COALESCE(finished_at, created_at) > ?').get(p.id, from).c,
+      cost: (await db.prepare('SELECT COALESCE(SUM(cost_usd), 0) c FROM jobs WHERE project_id = ? AND COALESCE(finished_at, created_at) > ?').get(p.id, from)).c,
       bestSubject: ab.length > 1 && ab.every((v) => v.sent >= 10) ? [...ab].sort((a, b) => b.rate - a.rate)[0] : null,
-    };
-  });
-  const cost = db.prepare('SELECT COALESCE(SUM(cost_usd), 0) c FROM jobs WHERE COALESCE(finished_at, created_at) > ?').get(from).c;
+    });
+  }
+  const cost = (await db.prepare('SELECT COALESCE(SUM(cost_usd), 0) c FROM jobs WHERE COALESCE(finished_at, created_at) > ?').get(from)).c;
   const sum = (k) => projects.reduce((t, p) => t + p[k], 0);
   return { from, to: at, projects, totals: { found: sum('found'), sent: sum('sent'), followups: sum('followups'), replies: sum('replies'), cost } };
 }
@@ -55,11 +56,11 @@ export function weeklyText(st) {
 
 /** Envoie le rapport (mail si SMTP global + adresse, Discord si webhook). Retourne les canaux utilisés. */
 export async function sendWeeklyReport(app, { at = now() } = {}) {
-  const st = weeklyStats(app.db, { at });
+  const st = await weeklyStats(app.db, { at });
   const text = weeklyText(st);
   const channels = [];
-  const to = getSetting(app.db, 'notify_email');
-  const smtp = globalSmtp(app);
+  const to = await getSetting(app.db, 'notify_email');
+  const smtp = await globalSmtp(app);
   if (to && smtp) {
     const transport = (app.createTransport || createTransport)(smtp);
     try {
@@ -93,14 +94,14 @@ export async function sendWeeklyReport(app, { at = now() } = {}) {
 
 /** Appelé toutes les 15 min : envoie une fois par semaine, le lundi à partir de 8h (Paris). */
 export async function maybeSendWeekly(app, { date = new Date() } = {}) {
-  if (getSetting(app.db, 'weekly_report', '0') !== '1') return null;
+  if ((await getSetting(app.db, 'weekly_report', '0')) !== '1') return null;
   const p = parisParts(date);
   if (p.weekday !== 'Mon' || p.hour < 8) return null;
   const mondayAt8 = Math.floor(parisTime(p.year, p.month, p.day, 8).getTime() / 1000);
-  if (Number(getSetting(app.db, 'weekly_report_last', '0')) >= mondayAt8) return null;
+  if (Number(await getSetting(app.db, 'weekly_report_last', '0')) >= mondayAt8) return null;
   const at = Math.floor(date.getTime() / 1000);
   const r = await sendWeeklyReport(app, { at });
   // Rien de configuré : on ne marque pas, il partira dès qu'un canal existera
-  if (r.channels.length) setSetting(app.db, 'weekly_report_last', String(at));
+  if (r.channels.length) await setSetting(app.db, 'weekly_report_last', String(at));
   return r;
 }

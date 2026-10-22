@@ -9,8 +9,8 @@ const pad = (n) => String(n).padStart(2, '0');
 export const parisDay = (date = new Date()) => { const p = parisParts(date); return `${p.year}-${pad(p.month)}-${pad(p.day)}`; };
 const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 
-export function saveSnapshot(db, projectId, business, { date = new Date() } = {}) {
-  db.prepare(`INSERT INTO metrics_daily(project_id, day, users, clients, revenue) VALUES(?, ?, ?, ?, ?)
+export async function saveSnapshot(db, projectId, business, { date = new Date() } = {}) {
+  await db.prepare(`INSERT INTO metrics_daily(project_id, day, users, clients, revenue) VALUES(?, ?, ?, ?, ?)
     ON CONFLICT(project_id, day) DO UPDATE SET users = excluded.users, clients = excluded.clients, revenue = excluded.revenue`)
     .run(projectId, parisDay(date), num(business.users), num(business.clients), num(business.revenue));
 }
@@ -18,13 +18,13 @@ export function saveSnapshot(db, projectId, business, { date = new Date() } = {}
 /** Une photo par projet et par jour, appelée par le planificateur (toutes les 15 min, ne fait rien si déjà prise). */
 export async function snapshotAll(app, { date = new Date(), log = console } = {}) {
   const day = parisDay(date);
-  const todo = app.db.prepare(`SELECT id FROM projects WHERE db_enc IS NOT NULL
+  const todo = await app.db.prepare(`SELECT id FROM projects WHERE db_enc IS NOT NULL
     AND id NOT IN (SELECT project_id FROM metrics_daily WHERE day = ?)`).all(day);
   let n = 0;
   for (const { id } of todo) {
     try {
-      const p = getProject(app, id, { secrets: true });
-      saveSnapshot(app.db, id, await (app.fetchRecap || fetchRecap)(id, p.dbCfg, { force: true }), { date });
+      const p = await getProject(app, id, { secrets: true });
+      await saveSnapshot(app.db, id, await (app.fetchRecap || fetchRecap)(id, p.dbCfg, { force: true }), { date });
       n++;
     } catch (e) { log.error(`[métriques ${id}]`, e.message); }
   }
@@ -40,9 +40,9 @@ function weekStart(date) {
 }
 
 /** Séries pour les graphiques : jours (KPI business) et semaines (envois / réponses). */
-export function history(db, projectId, { days = 30, at = now() } = {}) {
+export async function history(db, projectId, { days = 30, at = now() } = {}) {
   const fromDay = parisDay(new Date((at - (days - 1) * 86400) * 1000));
-  const daily = db.prepare('SELECT day, users, clients, revenue FROM metrics_daily WHERE project_id = ? AND day >= ? ORDER BY day')
+  const daily = await db.prepare('SELECT day, users, clients, revenue FROM metrics_daily WHERE project_id = ? AND day >= ? ORDER BY day')
     .all(projectId, fromDay);
 
   const nWeeks = Math.ceil(days / 7);
@@ -55,10 +55,10 @@ export function history(db, projectId, { days = 30, at = now() } = {}) {
   const first = weeks[0].start.split('-').map(Number);
   const since = Math.floor(parisTime(first[0], first[1], first[2], 0).getTime() / 1000);
   const bucket = (ts) => weeks.find((w) => w.start === weekStart(new Date(ts * 1000)));
-  for (const r of db.prepare("SELECT sent_at FROM mail_log WHERE project_id = ? AND kind = 'initial' AND error IS NULL AND sent_at >= ?").all(projectId, since)) {
+  for (const r of await db.prepare("SELECT sent_at FROM mail_log WHERE project_id = ? AND kind = 'initial' AND error IS NULL AND sent_at >= ?").all(projectId, since)) {
     const w = bucket(r.sent_at); if (w) w.sent++;
   }
-  for (const r of db.prepare('SELECT replied_at FROM prospects WHERE project_id = ? AND replied_at >= ?').all(projectId, since)) {
+  for (const r of await db.prepare('SELECT replied_at FROM prospects WHERE project_id = ? AND replied_at >= ?').all(projectId, since)) {
     const w = bucket(r.replied_at); if (w) w.replies++;
   }
   return { daily, weeks };

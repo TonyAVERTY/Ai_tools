@@ -1,4 +1,5 @@
 import { resolve } from 'node:path';
+import { dbConfigFromEnv } from './db.js';
 
 const env = process.env;
 
@@ -23,6 +24,7 @@ export function loadConfig() {
     },
     allowedEmails: required('ALLOWED_EMAILS').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean),
     secretKey: Buffer.from(secretKey, 'hex'),
+    db: dbConfigFromEnv(env),
     dataDir: resolve(env.DATA_DIR || './data'),
     claudeBin: env.CLAUDE_BIN || 'claude',
     thermalMax: Number(env.THERMAL_MAX || 75),
