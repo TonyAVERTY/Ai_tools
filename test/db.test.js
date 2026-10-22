@@ -2,6 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { openDb, translate, dbConfigFromEnv, getSetting, setSetting, now } from '../src/db.js';
 import { testDb } from './helpers/db.js';
+import { addUser } from './helpers/users.js';
+import { MIGRATIONS } from '../src/migrations.js';
 
 test('translate : MySQL reçoit INSERT IGNORE, ON DUPLICATE KEY, VALUES() et pas de NOCASE', () => {
   const up = 'INSERT INTO t(a, b) VALUES(?, ?) ON CONFLICT(a, b) DO UPDATE SET x = excluded.x, y = excluded.y';
@@ -25,10 +27,11 @@ test('dbConfigFromEnv : variables DB_*, port par défaut, erreur claire', () => 
 
 test('shim : get / all / run asynchrones, run → changes + lastInsertRowid', async () => {
   const db = await testDb();
-  const pending = db.prepare('INSERT INTO projects(name, git_url, created_at) VALUES(?, ?, ?)').run('A', 'u1', now());
+  const u = await addUser(db);
+  const pending = db.prepare('INSERT INTO projects(user_id, name, git_url, created_at) VALUES(?, ?, ?, ?)').run(u, 'A', 'u1', now());
   assert.ok(pending instanceof Promise);
   await pending;
-  const r1 = await db.prepare('INSERT INTO projects(name, git_url, created_at) VALUES(?, ?, ?)').run('B', 'u2', now());
+  const r1 = await db.prepare('INSERT INTO projects(user_id, name, git_url, created_at) VALUES(?, ?, ?, ?)').run(u, 'B', 'u2', now());
   assert.equal(r1.changes, 1);
   assert.ok(r1.lastInsertRowid > 0);
   assert.equal((await db.prepare('SELECT name FROM projects WHERE id = ?').get(r1.lastInsertRowid)).name, 'B');
@@ -40,7 +43,8 @@ test('shim : get / all / run asynchrones, run → changes + lastInsertRowid', as
 
 test('shim : undefined et NaN deviennent NULL', async () => {
   const db = await testDb();
-  await db.prepare('INSERT INTO projects(name, git_url, created_at, profile_at) VALUES(?, ?, ?, ?)').run('A', 'u', now(), Number('abc'));
+  const u = await addUser(db);
+  await db.prepare('INSERT INTO projects(user_id, name, git_url, created_at, profile_at) VALUES(?, ?, ?, ?, ?)').run(u, 'A', 'u', now(), Number('abc'));
   await db.prepare('UPDATE projects SET profile_commit = ? WHERE git_url = ?').run(undefined, 'u');
   const p = await db.prepare('SELECT profile_at, profile_commit FROM projects').get();
   assert.equal(p.profile_at, null);
@@ -49,11 +53,14 @@ test('shim : undefined et NaN deviennent NULL', async () => {
 
 test('upsert (ON CONFLICT) et INSERT OR IGNORE dans le sous-ensemble commun', async () => {
   const db = await testDb();
-  await setSetting(db, 'a', '1'); await setSetting(db, 'a', '2');
-  assert.equal(await getSetting(db, 'a'), '2');
-  assert.equal(await getSetting(db, 'nope', 'x'), 'x');
-  await setSetting(db, 'a', null);
-  assert.equal(await getSetting(db, 'a', 'fallback'), null);
+  const u = await addUser(db), v = await addUser(db);
+  await setSetting(db, u, 'a', '1'); await setSetting(db, u, 'a', '2');
+  assert.equal(await getSetting(db, u, 'a'), '2');
+  assert.equal(await getSetting(db, u, 'nope', 'x'), 'x');
+  assert.equal(await getSetting(db, v, 'a', 'autre'), 'autre', 'les réglages sont propres à chaque utilisateur');
+  await setSetting(db, u, 'a', null);
+  assert.equal(await getSetting(db, u, 'a', 'fallback'), null);
+  await assert.rejects(setSetting(db, undefined, 'a', '1'), /utilisateur requis/);
 
   const ins = db.prepare("INSERT OR IGNORE INTO blacklist(email, reason, created_at) VALUES(?, 'x', ?)");
   assert.equal((await ins.run('a@b.fr', now())).changes, 1);
@@ -62,10 +69,11 @@ test('upsert (ON CONFLICT) et INSERT OR IGNORE dans le sous-ensemble commun', as
 
 test('clés étrangères : supprimer un projet supprime ses dépendances (CASCADE)', async () => {
   const db = await testDb();
-  const { lastInsertRowid: pid } = await db.prepare('INSERT INTO projects(name, git_url, created_at) VALUES(?, ?, ?)').run('A', 'u', now());
+  const u = await addUser(db);
+  const { lastInsertRowid: pid } = await db.prepare('INSERT INTO projects(user_id, name, git_url, created_at) VALUES(?, ?, ?, ?)').run(u, 'A', 'u', now());
   const { lastInsertRowid: prid } = await db.prepare('INSERT INTO prospects(project_id, company, email, created_at) VALUES(?, ?, ?, ?)').run(pid, 'C', 'c@d.fr', now());
   await db.prepare('INSERT INTO prospect_notes(prospect_id, body, created_at) VALUES(?, ?, ?)').run(prid, 'n', now());
-  await db.prepare('INSERT INTO jobs(project_id, type, created_at) VALUES(?, ?, ?)').run(pid, 'analyze', now());
+  await db.prepare('INSERT INTO jobs(user_id, project_id, type, created_at) VALUES(?, ?, ?, ?)').run(u, pid, 'analyze', now());
   await db.prepare('DELETE FROM projects WHERE id = ?').run(pid);
   for (const t of ['prospects', 'prospect_notes', 'jobs']) assert.equal((await db.prepare(`SELECT COUNT(*) n FROM ${t}`).get()).n, 0, t);
 });
@@ -109,11 +117,12 @@ test('migrations idempotentes : rouvrir une base déjà migrée ne casse rien (S
   try {
     const file = join(dir, 't.sqlite');
     const a = await openDb({ driver: 'sqlite', file });
-    await setSetting(a, 'k', 'v');
+    const u = await addUser(a);
+    await setSetting(a, u, 'k', 'v');
     await a.close();
     const b = await openDb({ driver: 'sqlite', file });
-    assert.equal(await getSetting(b, 'k'), 'v');
-    assert.equal((await b.prepare('SELECT COUNT(*) n FROM schema_migrations').get()).n, 1);
+    assert.equal(await getSetting(b, u, 'k'), 'v');
+    assert.equal((await b.prepare('SELECT COUNT(*) n FROM schema_migrations').get()).n, MIGRATIONS.length);
     await b.close();
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });

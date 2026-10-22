@@ -16,11 +16,26 @@ function splitTop(s) {
   return out;
 }
 
-// Tables, colonnes et clés étrangères déclarées par une liste d'instructions CREATE TABLE
+// Tables, colonnes et clés étrangères déclarées par la suite d'instructions des migrations : CREATE TABLE,
+// puis DROP TABLE, RENAME TO, ADD COLUMN et ADD CONSTRAINT ... FOREIGN KEY rejoués dans l'ordre (état final).
 function parseDdl(statements) {
   const tables = new Map();
-  for (const raw of statements) {
-    const sql = raw.replace(/--[^\n]*/g, '');
+  const cascade = (item) => [...item.matchAll(/REFERENCES\s+`?(\w+)`?\s*\([^)]*\)\s*ON DELETE CASCADE/gi)].map((r) => r[1]);
+  for (const st of statements) {
+    const sql = (typeof st === 'string' ? st : st.sql).replace(/--[^\n]*/g, '').trim();
+    let a;
+    if ((a = /^DROP TABLE (?:IF EXISTS )?`?(\w+)`?/i.exec(sql))) { tables.delete(a[1]); continue; }
+    if ((a = /^ALTER TABLE `?(\w+)`? RENAME TO `?(\w+)`?/i.exec(sql))) { tables.set(a[2], tables.get(a[1])); tables.delete(a[1]); continue; }
+    if ((a = /^ALTER TABLE `?(\w+)`? ADD COLUMN `?(\w+)`?/i.exec(sql))) {
+      const t = tables.get(a[1]);
+      t.columns.add(a[2]); t.refs = [...t.refs, ...cascade(sql)].sort();
+      continue;
+    }
+    if ((a = /^ALTER TABLE `?(\w+)`? ADD CONSTRAINT/i.exec(sql))) {
+      const t = tables.get(a[1]);
+      t.refs = [...t.refs, ...cascade(sql)].sort();
+      continue;
+    }
     const m = /CREATE TABLE (?:IF NOT EXISTS )?`?(\w+)`?\s*\(/i.exec(sql);
     if (!m) continue;
     let depth = 1, i = m.index + m[0].length;
@@ -28,7 +43,7 @@ function parseDdl(statements) {
     for (; i < sql.length && depth > 0; i++) { if (sql[i] === '(') depth++; else if (sql[i] === ')') depth--; }
     const columns = new Set(), refs = [];
     for (const item of splitTop(sql.slice(start, i - 1)).map((x) => x.trim())) {
-      for (const r of item.matchAll(/REFERENCES\s+`?(\w+)`?\s*\([^)]*\)\s*ON DELETE CASCADE/gi)) refs.push(r[1]);
+      refs.push(...cascade(item));
       if (/^(?:PRIMARY\s+KEY|UNIQUE|KEY\s+\w+\s*\(|INDEX|CONSTRAINT|FOREIGN\s+KEY|CHECK)/i.test(item)) continue;
       columns.add(item.match(/^`?(\w+)`?/)[1]);
     }
@@ -38,6 +53,9 @@ function parseDdl(statements) {
 }
 
 const ddl = (dialect) => parseDdl(MIGRATIONS.flatMap((m) => m[dialect]));
+
+// Tables volontairement hors du périmètre d'un utilisateur : liste d'opposition (RGPD) et états OAuth éphémères
+const NOT_OWNED = new Set(['blacklist', 'oauth_states', 'users']);
 const shape = (tables) => Object.fromEntries([...tables].map(([t, v]) => [t, { columns: [...v.columns].sort(), refs: v.refs }]));
 
 test('schémas SQLite et MySQL : mêmes tables et mêmes colonnes', () => {
@@ -53,6 +71,25 @@ test('schémas : mêmes clés étrangères ON DELETE CASCADE des deux côtés', 
   for (const t of Object.keys(s)) assert.deepEqual(m[t].refs, s[t].refs, `FK de ${t}`);
   assert.deepEqual(m.prospects.refs, ['projects']);
   assert.deepEqual(m.prospect_notes.refs, ['prospects']);
+  assert.deepEqual(m.projects.refs, ['users']);
+  assert.deepEqual(m.jobs.refs, ['projects', 'users']);
+});
+
+test('multi-tenant : toute table métier descend d\'un utilisateur par cascade (donc la suppression de compte efface tout)', () => {
+  for (const dialect of ['sqlite', 'mysql']) {
+    const tables = ddl(dialect);
+    const owned = (t, seen = new Set()) => {
+      if (seen.has(t)) return false;
+      seen.add(t);
+      return tables.get(t).refs.some((p) => p === 'users' || owned(p, seen));
+    };
+    for (const t of tables.keys()) {
+      if (NOT_OWNED.has(t)) continue;
+      assert.ok(owned(t), `${dialect} : ${t} n'est rattachée à aucun utilisateur`);
+    }
+    assert.ok(!tables.has('settings'), 'plus de réglages globaux');
+    assert.ok(tables.get('user_settings').columns.has('user_id'));
+  }
 });
 
 test('MySQL : InnoDB, utf8mb4, migrations rejouables', () => {

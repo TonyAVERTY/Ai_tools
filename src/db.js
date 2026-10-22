@@ -72,6 +72,9 @@ class MysqlExecutor extends Executor {
 class MysqlDb extends MysqlExecutor {
   constructor(pool) { super(pool); this.pool = pool; this.dialect = 'mysql'; }
 
+  /** Applique les migrations en attente (jusqu'à `upTo`), avec le contexte { adminEmails }. */
+  migrate(opts = {}) { return migrateMysql(this, opts); }
+
   /** fn(tx) reçoit un exécuteur lié à UNE connexion ; commit si tout va bien, rollback sinon. */
   async transaction(fn) {
     const conn = await this.pool.getConnection();
@@ -91,7 +94,7 @@ class MysqlDb extends MysqlExecutor {
   close() { return this.pool.end(); }
 }
 
-async function openMysql(cfg) {
+async function openMysql(cfg, opts) {
   const { default: mysql } = await import('mysql2/promise');
   const pool = mysql.createPool({
     host: cfg.host, port: cfg.port || 3306, user: cfg.user, password: cfg.password, database: cfg.database,
@@ -103,15 +106,17 @@ async function openMysql(cfg) {
     timezone: 'Z',
   });
   const db = new MysqlDb(pool);
-  try { await migrateMysql(db); }
+  try { await db.migrate(opts); }
   catch (e) { await pool.end().catch(() => {}); throw e; }
   return db;
 }
 
 // Verrou applicatif (GET_LOCK) : deux instances qui démarrent en même temps ne migrent pas en parallèle.
 // Le verrou est lié à la connexion : on garde la même du début à la fin.
-async function migrateMysql(db) {
+async function migrateMysql(db, opts = {}) {
   const conn = await db.pool.getConnection();
+  const ctx = migrationContext(opts);
+  const q = async (sql, params = []) => (await conn.query(sql, params))[0];
   const LOCK = 'aitools_migrate';
   try {
     const [[lock]] = await conn.query('SELECT GET_LOCK(?, 60) ok', [LOCK]);
@@ -122,10 +127,11 @@ async function migrateMysql(db) {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
       const [rows] = await conn.query('SELECT version FROM schema_migrations');
       const done = new Set(rows.map((r) => r.version));
-      for (let i = 0; i < MIGRATIONS.length; i++) {
+      for (let i = 0; i < Math.min(MIGRATIONS.length, opts.upTo ?? Infinity); i++) {
         const version = i + 1;
         if (done.has(version)) continue;
-        for (const sql of MIGRATIONS[i].mysql) await conn.query(sql);
+        await MIGRATIONS[i].check?.(q, ctx);
+        for (const st of MIGRATIONS[i].mysql) await runStatement(st, q, ctx);
         await conn.query('INSERT INTO schema_migrations(version, name, applied_at) VALUES(?, ?, ?)',
           [version, MIGRATIONS[i].name, now()]);
       }
@@ -162,6 +168,9 @@ class SqliteExecutor extends Executor {
 class SqliteDb extends SqliteExecutor {
   constructor(raw) { super(raw); this.dialect = 'sqlite'; this.txLock = null; }
 
+  /** Applique les migrations en attente (jusqu'à `upTo`), avec le contexte { adminEmails }. */
+  migrate(opts = {}) { return migrateSqlite(this.raw, opts); }
+
   // Une seule connexion : pendant une transaction, les autres requêtes attendent sa fin
   // (sinon elles s'exécuteraient DANS la transaction). Ne pas appeler db.* depuis le callback : utiliser tx.*.
   async _exec(sql, params, mode) {
@@ -190,51 +199,91 @@ class SqliteDb extends SqliteExecutor {
   async close() { this.raw.close(); }
 }
 
-function openSqlite(file = ':memory:') {
+async function openSqlite(file = ':memory:', opts = {}) {
   if (file !== ':memory:') mkdirSync(dirname(file), { recursive: true });
   const raw = new DatabaseSync(file);
   raw.exec('PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
   const db = new SqliteDb(raw);
+  try { await db.migrate(opts); }
+  catch (e) { raw.close(); throw e; }
+  return db;
+}
+
+async function migrateSqlite(raw, opts = {}) {
   raw.exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
     version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at INTEGER NOT NULL
   )`);
+  const ctx = migrationContext(opts);
+  const q = async (sql, params = []) => raw.prepare(sql).all(...params);
   const done = new Set(raw.prepare('SELECT version FROM schema_migrations').all().map((r) => r.version));
-  for (let i = 0; i < MIGRATIONS.length; i++) {
+  for (let i = 0; i < Math.min(MIGRATIONS.length, opts.upTo ?? Infinity); i++) {
     const version = i + 1;
     if (done.has(version)) continue;
-    raw.exec('BEGIN');
+    const m = MIGRATIONS[i];
+    // PRAGMA foreign_keys est sans effet dans une transaction : on le règle avant BEGIN
+    if (m.sqliteForeignKeysOff) raw.exec('PRAGMA foreign_keys = OFF');
     try {
-      for (const sql of MIGRATIONS[i].sqlite) raw.exec(sql);
-      raw.prepare('INSERT INTO schema_migrations(version, name, applied_at) VALUES(?, ?, ?)').run(version, MIGRATIONS[i].name, now());
-      raw.exec('COMMIT');
-    } catch (e) {
-      raw.exec('ROLLBACK');
-      raw.close();
-      throw e;
+      raw.exec('BEGIN');
+      try {
+        await m.check?.(q, ctx);
+        for (const st of m.sqlite) await runStatement(st, q, ctx, (sql, params) => raw.prepare(sql).run(...params));
+        if (m.sqliteForeignKeysOff) {
+          const bad = raw.prepare('PRAGMA foreign_key_check').all();
+          if (bad.length) throw new Error(`Migration ${version} : clés étrangères violées (${bad[0].table} → ${bad[0].parent})`);
+        }
+        raw.prepare('INSERT INTO schema_migrations(version, name, applied_at) VALUES(?, ?, ?)').run(version, m.name, now());
+        raw.exec('COMMIT');
+      } catch (e) {
+        raw.exec('ROLLBACK');
+        throw e;
+      }
+    } finally {
+      if (m.sqliteForeignKeysOff) raw.exec('PRAGMA foreign_keys = ON');
     }
   }
-  return db;
 }
 
 /**
  * Ouvre la base et applique les migrations en attente.
  * cfg = { driver: 'mysql', host, port, user, password, database } ou { driver: 'sqlite', file } ;
  * sans argument (ou ':memory:') : SQLite en mémoire.
+ * opts = { adminEmails } (propriétaire des données existantes, voir migration 2) ; { upTo } limite la version
+ * migrée (tests de migration), db.migrate() applique ensuite le reste.
  */
-export async function openDb(cfg = ':memory:') {
-  if (typeof cfg === 'string') return openSqlite(cfg);
-  if (cfg.driver === 'sqlite') return openSqlite(cfg.file);
-  return openMysql(cfg);
+export async function openDb(cfg = ':memory:', opts = {}) {
+  if (typeof cfg === 'string') return openSqlite(cfg, opts);
+  if (cfg.driver === 'sqlite') return openSqlite(cfg.file, opts);
+  return openMysql(cfg, opts);
+}
+
+// Contexte des migrations : le propriétaire des données existantes est la première adresse de ADMIN_EMAILS
+function migrationContext({ adminEmails } = {}) {
+  const list = (Array.isArray(adminEmails) ? adminEmails : String(adminEmails || '').split(','))
+    .map((e) => String(e).trim().toLowerCase()).filter(Boolean);
+  return { ownerEmail: list[0] || null, now: now() };
+}
+
+// Instruction de migration : chaîne SQL ou { sql, params(ctx), when(q, ctx) }
+async function runStatement(st, q, ctx, exec = q) {
+  if (typeof st === 'string') return exec(st, []);
+  if (st.when && !(await st.when(q, ctx))) return undefined;
+  return exec(st.sql, st.params ? st.params(ctx) : []);
 }
 
 export const now = () => Math.floor(Date.now() / 1000);
 
-export async function getSetting(db, key, fallback = null) {
-  const row = await db.prepare('SELECT value FROM settings WHERE `key` = ?').get(key);
+// Réglages par utilisateur (aucun réglage global : chaque compte a les siens)
+function uid(userId) {
+  if (!Number.isInteger(Number(userId)) || Number(userId) <= 0) throw new Error('Réglage : utilisateur requis');
+  return Number(userId);
+}
+
+export async function getSetting(db, userId, key, fallback = null) {
+  const row = await db.prepare('SELECT value FROM user_settings WHERE user_id = ? AND `key` = ?').get(uid(userId), key);
   return row ? row.value : fallback;
 }
 
-export async function setSetting(db, key, value) {
-  await db.prepare('INSERT INTO settings(`key`, value) VALUES(?, ?) ON CONFLICT(`key`) DO UPDATE SET value = excluded.value')
-    .run(key, value);
+export async function setSetting(db, userId, key, value) {
+  await db.prepare('INSERT INTO user_settings(user_id, `key`, value) VALUES(?, ?, ?) ON CONFLICT(user_id, `key`) DO UPDATE SET value = excluded.value')
+    .run(uid(userId), key, value);
 }

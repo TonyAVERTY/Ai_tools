@@ -24,14 +24,14 @@ export function testDbConfig() {
   return dbConfigFromEnv(process.env, 'TEST_DB_');
 }
 
-/** Base vide, schéma migré. */
-export async function testDb() {
-  if (!USING_MYSQL) return openDb(':memory:');
+/** Base vide, schéma migré. `opts` : { upTo, adminEmails } (voir openDb), pour tester les migrations. */
+export async function testDb(opts = {}) {
+  if (!USING_MYSQL) return openDb(':memory:', opts);
   const cfg = { ...testDbConfig(), connectionLimit: 4 };
-  const raw = await openDb(cfg);
+  const raw = await openDb(cfg, { upTo: 0 });
   await wipe(raw);
   await raw.close();
-  const db = await openDb(cfg);
+  const db = await openDb(cfg, opts);
   opened.push(db);
   return db;
 }
