@@ -6,6 +6,7 @@ import { getSetting, setSetting, MIGRATIONS } from '../src/db.js';
 import { testDb } from './helpers/db.js';
 import { Router, esc } from '../src/http.js';
 import { checkIdTokenClaims, checkOrigin } from '../src/auth.js';
+import { addUser } from './helpers/users.js';
 
 const key = randomBytes(32);
 
@@ -30,9 +31,10 @@ test('migrations et settings', async () => {
   const db = await testDb();
   const v = await db.prepare('SELECT COUNT(*) n, MAX(version) v FROM schema_migrations').get();
   assert.deepEqual({ n: v.n, v: v.v }, { n: MIGRATIONS.length, v: MIGRATIONS.length });
-  await setSetting(db, 'a', '1'); await setSetting(db, 'a', '2');
-  assert.equal(await getSetting(db, 'a'), '2');
-  assert.equal(await getSetting(db, 'nope', 'x'), 'x');
+  const u = await addUser(db);
+  await setSetting(db, u, 'a', '1'); await setSetting(db, u, 'a', '2');
+  assert.equal(await getSetting(db, u, 'a'), '2');
+  assert.equal(await getSetting(db, u, 'nope', 'x'), 'x');
 });
 
 test('router avec paramètres', () => {
@@ -47,15 +49,20 @@ test('échappement HTML', () => {
   assert.equal(esc('<a href="x">\'&'), '&lt;a href=&quot;x&quot;&gt;&#39;&amp;');
 });
 
-test('claims id_token Google', () => {
-  const base = { iss: 'https://accounts.google.com', aud: 'cid', exp: 2e9, nonce: 'n', email_verified: true, email: 'Me@Gmail.com' };
-  const opts = { clientId: 'cid', nonce: 'n', allowedEmails: ['me@gmail.com'], at: 1e9 };
-  assert.equal(checkIdTokenClaims(base, opts), 'me@gmail.com');
-  assert.throws(() => checkIdTokenClaims({ ...base, email: 'pirate@gmail.com' }, opts), /non autorisé/);
+test('claims id_token : émetteur, audience, expiration, nonce, email vérifié', () => {
+  const base = { iss: 'https://accounts.google.com', aud: 'cid', exp: 2e9, nonce: 'n', sub: '123', email_verified: true, email: 'Me@Gmail.com' };
+  const opts = { issuers: ['https://accounts.google.com', 'accounts.google.com'], clientId: 'cid', nonce: 'n', at: 1e9 };
+  assert.deepEqual(checkIdTokenClaims(base, opts), { sub: '123', email: 'me@gmail.com', name: null });
+  assert.equal(checkIdTokenClaims({ ...base, aud: ['x', 'cid'] }, opts).sub, '123', 'audience en liste');
+  assert.equal(checkIdTokenClaims({ ...base, email_verified: 'true' }, opts).sub, '123', 'Apple envoie "true" en chaîne');
+  assert.throws(() => checkIdTokenClaims({ ...base, iss: 'https://evil.com' }, opts), /Émetteur/);
   assert.throws(() => checkIdTokenClaims({ ...base, aud: 'x' }, opts), /Audience/);
   assert.throws(() => checkIdTokenClaims({ ...base, nonce: 'z' }, opts), /Nonce/);
+  assert.throws(() => checkIdTokenClaims({ ...base, nonce: undefined }, { ...opts, nonce: undefined }), /Nonce/);
   assert.throws(() => checkIdTokenClaims({ ...base, email_verified: false }, opts), /vérifié/);
   assert.throws(() => checkIdTokenClaims({ ...base, exp: 1 }, opts), /expiré/);
+  assert.throws(() => checkIdTokenClaims({ ...base, sub: '' }, opts), /Identifiant/);
+  assert.throws(() => checkIdTokenClaims({ ...base, email: '' }, opts), /Email manquant/);
 });
 
 test('contrôle d\'origine', () => {
