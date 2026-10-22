@@ -38,6 +38,15 @@ export function extractLoginUrl(out) {
     return u.protocol === 'https:' && ALLOWED_HOST.test(u.hostname) ? u.href : null;
   } catch { return null; }
 }
+/** Sortie du CLI lisible : sans séquences de terminal, et sans rien qui ressemble à un code ou un jeton. */
+export function readableTail(out, max = 300) {
+  return out
+    .replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, '')
+    .replace(/\x1b\[[0-9;?<>=]*[A-Za-z]/g, ' ')
+    .replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ')
+    .replace(/[A-Za-z0-9_#.~-]{24,}/g, '…')
+    .trim().slice(-max);
+}
 export const extractToken = (out) => TOKEN.exec(out)?.[0] ?? null;
 
 export class ClaudeLogins {
@@ -120,8 +129,15 @@ export class ClaudeLogins {
     await new Promise((r) => setTimeout(r, ENTER_DELAY_MS));
     s.proc.stdin.write('\r');
     const res = await this.#waitFor(s, (out) => extractToken(out) || (REFUSED.test(out.slice(s.outAtSubmit ?? 0)) ? 'refused' : null), TOKEN_WAIT_MS);
+    const tail = readableTail(s.out.slice(s.outAtSubmit ?? 0));
+    const exited = s.done;
     this.#drop(String(id));
-    if (!res || res === 'refused') throw new HttpError(400, 'Claude a refusé ce code (expiré ou incorrect). Recommence la connexion.');
+    if (!res || res === 'refused') {
+      // Ce que le CLI a vraiment répondu : indispensable pour distinguer un code périmé d'une panne (réseau, CLI)
+      console.warn(`Connexion Claude refusée (compte ${userId}, CLI ${exited ? 'terminé' : 'actif'}) : ${tail}`);
+      const detail = res === 'refused' ? (/status code (\d+)/i.exec(tail)?.[0] ?? 'erreur OAuth') : exited ? 'le CLI s\'est arrêté' : 'pas de réponse du CLI';
+      throw new HttpError(400, `Claude n'a pas validé ce code (${detail}). Recommence depuis le début, avec une seule fenêtre de connexion, et colle le code dans la minute.`);
+    }
     return res;
   }
 }

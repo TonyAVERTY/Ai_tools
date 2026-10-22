@@ -127,9 +127,14 @@
         closePopup();
         location.href = '/';
       } catch (err) {
-        fail('[data-claude-error2]', err);
+        // Le serveur a fermé cette connexion (code refusé, expirée) : on repart de l'étape 1 avec le message
+        loginId = null; sending = false; closePopup();
+        codeForm.reset();
         busy(codeForm, false, 'Terminer la connexion');
-        sending = false;
+        step2.hidden = true;
+        loginForm.hidden = false;
+        busy(loginForm, false, 'Se connecter avec Claude');
+        fail('[data-claude-error]', err);
       }
     }
     codeForm.addEventListener('submit', (e) => { e.preventDefault(); sendCode(); });
