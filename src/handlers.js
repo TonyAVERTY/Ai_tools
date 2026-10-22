@@ -11,6 +11,8 @@ import { resolveCredentials } from './claudelink.js';
 import { userRepoRoot } from './users.js';
 import { quotaAlerts } from './services/budget.js';
 import { notify } from './services/notify.js';
+import { quotaFor, recordUsage, planLimitMessage } from './services/plans.js';
+import { getUser } from './users.js';
 import { evolutionMail } from './services/mailhtml.js';
 import { getProject, repoDir, forgejoToken, globalSmtp, sentSince, getTemplate, saveTemplate, pickVariant } from './projects.js';
 
@@ -105,7 +107,11 @@ export function makeHandlers(app) {
       ? await followupCandidates(db, project)
       : await db.prepare(`SELECT * FROM prospects WHERE project_id = ? AND status = 'new'
           AND email NOT IN (SELECT email FROM blacklist) ORDER BY score DESC, id LIMIT 100`).all(project.id);
-    const n = allowedToSend({
+    // Plafond mensuel du plan : on n'envoie que ce qui reste (le reste attend, rien n'est perdu)
+    const user = await getUser(db, userId);
+    const mq = await quotaFor(db, user, 'mails');
+    if (!mq.unlimited && mq.remaining <= 0) throw new Error(planLimitMessage(user, mq));
+    const n0 = allowedToSend({
       requested: ctx.params.count,
       available: candidates.length,
       projectCap: project.dailyMailCap,
@@ -113,6 +119,7 @@ export function makeHandlers(app) {
       globalCap: Number(await getSetting(db, userId, 'global_daily_cap', '100')),
       sentTodayGlobal: await sentSince(db, day, userId),
     });
+    const n = mq.unlimited ? n0 : Math.min(n0, mq.remaining);
     if (n === 0) throw new Error(kind === 'followup' ? 'Plafond quotidien atteint ou aucune relance due' : 'Plafond quotidien atteint ou aucun prospect à contacter');
 
     const transport = (app.createTransport || createTransport)(project.smtp);
@@ -155,6 +162,7 @@ export function makeHandlers(app) {
       try {
         await transport.sendMail(mail);
         await log.run(project.id, p.id, p.email, now(), null, kind, variant, mail.subject, mail.messageId);
+        await recordUsage(db, userId, 'mail');
         if (kind === 'initial') await markInitial.run('sent', now(), variant, p.id);
         else await markFollowup.run(now(), p.id);
         sent++;
@@ -206,6 +214,10 @@ export function makeHandlers(app) {
 
       // Domaines déjà connus de ce projet : Claude ne les recherche pas une 2e fois. La liste d'opposition,
       // commune à tous les comptes, n'entre pas dans le prompt (elle est appliquée à l'insertion, ci-dessous).
+      const user = await getUser(db, userId);
+      const pq = await quotaFor(db, user, 'prospects');
+      let room = pq.unlimited ? Infinity : pq.remaining;
+      let capped = false;
       const exclude = (await db.prepare(`
         SELECT DISTINCT substr(email, instr(email, '@') + 1) d FROM prospects WHERE project_id = ?
         LIMIT 300`).all(project.id)).map((r) => r.d);
@@ -234,8 +246,10 @@ export function makeHandlers(app) {
         sink.push(async () => {
           for (const p of parsed) {
             if (await optedOut.get(p.email)) continue;
+            if (room <= 0) { capped = true; continue; }
             const res = await insert.run(project.id, p.company, p.email, p.website, p.city, p.sector, p.hook, p.source, p.score, now());
             if (res.changes) {
+              room--;
               found++;
               message = `${found}/${count} — ${p.company}`;
               await report();
@@ -254,7 +268,7 @@ export function makeHandlers(app) {
       onText('\n');
       await sink.flush();
       addUsage(ctx, r);
-      return { found, requested: count, stoppedBy: r.subtype };
+      return { found, requested: count, stoppedBy: r.subtype, ...(capped ? { capped: true } : {}) };
     },
 
     async template(ctx) {

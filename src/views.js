@@ -57,6 +57,18 @@ ${email ? `<header class="top">
 </html>`;
 }
 
+// Usage du mois : une barre par plafond du plan (largeurs par classes w-N, la CSP interdit le style en ligne)
+export function usagePanel(u) {
+  if (!u) return '';
+  const rows = u.items.map((i) => `<li><div class="run-head"><span>${esc(i.label)}</span><span class="jpct">${i.used}${i.limit == null ? '' : ` / ${i.limit}`}</span></div>${i.limit == null ? '' : `<div class="bar usage${i.full ? ' full' : ''}"><span class="w-${Math.round(i.pct / 5) * 5}"></span></div>`}</li>`).join('');
+  const full = u.items.filter((i) => i.full);
+  return `<section class="card usage-card">
+  <h4>Usage du mois <span class="badge">plan ${esc(u.planLabel)}</span></h4>
+  <ul class="usage-list">${rows}</ul>
+  ${full.length ? `<p class="error small">Plafond atteint : ${full.map((i) => esc(i.label.toLowerCase())).join(', ')}. Rien n'est perdu. <a href="/tarifs">Voir les tarifs</a></p>` : u.plan === 'free' ? '<p class="muted small">Les plafonds se renouvellent le 1er du mois (heure de Paris). <a href="/tarifs">Voir les tarifs</a></p>' : ''}
+</section>`;
+}
+
 const PROVIDER_NAMES = { google: 'Google', apple: 'Apple' };
 
 // Section « Liaison Claude » de Mon compte : état, test, changement de mode, déliaison. Jamais le secret, ni même un masque
@@ -88,7 +100,7 @@ function linkSection(link, consent) {
 </section>`;
 }
 
-export function accountPage({ user, error, link = null, consent = null, notice = null }) {
+export function accountPage({ user, error, link = null, consent = null, notice = null, usage = null }) {
   return layout({
     title: 'Mon compte', email: user.email,
     body: `<h1>Mon compte</h1>
@@ -99,6 +111,7 @@ export function accountPage({ user, error, link = null, consent = null, notice =
   </dl>
 </section>
 ${notice ? `<p class="${notice.ok ? 'ok' : 'error'}">${esc(notice.text)}</p>` : ''}
+${usagePanel(usage)}
 ${linkSection(link, consent)}
 <section class="card">
   <h4>Supprimer mon compte</h4>
@@ -339,12 +352,13 @@ function projectItem(p, smtp, dbCfg, imap) {
 </details>`;
 }
 
-export function dashboardPage({ email, projects, forgejoHost }) {
+export function dashboardPage({ email, projects, forgejoHost, usage = null }) {
   return layout({
     title: 'Projets', email,
     body: `<div class="row head">
   <h1>Projets</h1>
 </div>
+${usagePanel(usage)}
 <details class="card new anim">
   <summary class="btn primary">+ Nouveau projet</summary>
   <form data-action="create" class="cfg">

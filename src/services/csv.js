@@ -75,7 +75,8 @@ const MAX_ROWS = 2000;
 // Notre propre export préfixe les formules par ' : on l'enlève à la relecture
 const unformula = (s) => (/^'[=+\-@]/.test(s) ? s.slice(1) : s);
 
-export async function importProspects(db, projectId, text, { at = now() } = {}) {
+// `limit` : places restantes dans le plan (null = illimité) ; au-delà, l'import entier est annulé avec `limitError`
+export async function importProspects(db, projectId, text, { at = now(), limit = null, limitError = null } = {}) {
   const rows = parseCsv(text);
   if (rows.length < 2) throw new Error('Fichier vide ou sans en-tête');
   const header = rows[0].map(norm);
@@ -106,6 +107,7 @@ export async function importProspects(db, projectId, text, { at = now() } = {}) 
       if (seen.has(email) || await exists.get(projectId, email)) { res.duplicates++; continue; }
       seen.add(email);
       if (await optOut.get(email)) { res.blacklisted++; continue; }
+      if (limit != null && res.imported >= limit) throw limitError || new Error('Plafond de prospects atteint');
       const s = Number(get(r, 'score'));
       await insert.run(
         projectId, get(r, 'company') || email.split('@')[1], email, httpUrl(get(r, 'website', 300)), get(r, 'city', 100) || null,

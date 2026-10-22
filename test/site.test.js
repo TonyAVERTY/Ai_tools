@@ -201,7 +201,8 @@ test('textes : faits réels du statut, tarifs sans prix inventé, aucun terme in
   assert.match(tarifs, /Bientôt/);
   for (const n of ['>1<', '>50<', '>100<', '>5<']) assert.ok(tarifs.includes(`<strong>${n.slice(1, -1)}</strong>`), n);
   assert.doesNotMatch(tarifs.replace(/0 €/g, ''), /\d\s?€|€\s?\d/, 'aucun prix inventé');
-  assert.match(tarifs, /pas encore automatiquement/);
+  assert.match(tarifs, /appliqués par le serveur/);
+  assert.doesNotMatch(tarifs, /pas encore appliqu/);
   assert.match(tarifs, /suspendu ou fermé/);
 
   const cgu = await text('/cgu');
