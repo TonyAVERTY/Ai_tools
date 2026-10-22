@@ -65,7 +65,10 @@ export async function prospectDetail(db, id) {
   const mails = await db.prepare(`SELECT kind, subject, variant, sent_at, error FROM mail_log
     WHERE prospect_id = ? ORDER BY sent_at, id`).all(id);
   const notes = await db.prepare('SELECT id, body, created_at FROM prospect_notes WHERE prospect_id = ? ORDER BY created_at DESC, id DESC').all(id);
-  const optOut = (await db.prepare('SELECT reason, created_at FROM blacklist WHERE email = ?').get(p.email)) || null;
+  // La liste d'opposition est commune à tous les comptes : on n'en révèle que le strict nécessaire. Le motif d'un
+  // autre compte (refus, adresse invalide) n'est pas montré ; seule la désinscription, acte de la personne elle-même, l'est.
+  const row = await db.prepare('SELECT reason FROM blacklist WHERE email = ?').get(p.email);
+  const optOut = row ? { reason: row.reason === 'unsubscribe' ? 'unsubscribe' : p.status === 'bounced' ? 'bounce' : 'refused' } : null;
   return { prospect: p, mails, notes, optOut };
 }
 

@@ -12,6 +12,7 @@ import { Worker, latestJobs } from '../src/services/jobs.js';
 import { Scheduler } from '../src/services/scheduler.js';
 import { makeHandlers } from '../src/handlers.js';
 import { createProject, saveSecretConfig, getProject } from '../src/projects.js';
+import { addUser } from './helpers/users.js';
 
 const paris = (iso) => new Date(iso); // ISO avec décalage explicite
 
@@ -44,9 +45,10 @@ async function setup() {
     createTransport: () => ({ verify: async () => true, sendMail: async (m) => { sentMails.push(m); }, close() {} }),
     isBusinessHours: () => true, // horloge figée : le test ne dépend pas de l'heure à laquelle on le lance
   };
-  await setSetting(db, 'send_delay_min', '0');
-  await setSetting(db, 'send_delay_max', '0');
-  const id = await createProject(app, { name: 'P', gitUrl: 'https://git.x/T/P.git' });
+  const userId = await addUser(db);
+  await setSetting(db, userId, 'send_delay_min', '0');
+  await setSetting(db, userId, 'send_delay_max', '0');
+  const id = await createProject(app, { userId, name: 'P', gitUrl: 'https://git.x/T/P.git' });
   await saveSecretConfig(app, id, 'smtp_enc', { host: 'smtp.x', user: 'u', pass: 'p', fromEmail: 'tony@codebzh.fr' }, 'pass');
   await saveSecretConfig(app, id, 'imap_enc', { host: 'imap.x', port: 993 }, 'pass');
   const inboxOk = (at = now(), extra = {}) => db.prepare('UPDATE projects SET inbox_json = ? WHERE id = ?')
@@ -64,7 +66,7 @@ async function setup() {
   };
   const worker = new Worker(db, makeHandlers(app), { thermalMax: 999, log: { error() {} } });
   const scheduler = new Scheduler(app, { log: { error() {} } });
-  return { tmp, db, app, id, add, inboxOk, worker, scheduler, sentMails };
+  return { tmp, db, app, id, userId, add, inboxOk, worker, scheduler, sentMails };
 }
 
 test('relance : seulement les prospects dus, sans réponse, dans le même fil, une seule fois', async () => {
@@ -76,7 +78,7 @@ test('relance : seulement les prospects dus, sans réponse, dans le même fil, u
     const blacklisted = await s.add('stop@ferme.fr', 9);
     await s.db.prepare("INSERT INTO blacklist(email, reason, created_at) VALUES('stop@ferme.fr', 'unsubscribe', ?)").run(now());
 
-    const plan = await followupPlan(s.db, await getProject(s.app, s.id), { date: new Date(WED_10H * 1000) });
+    const plan = await followupPlan(s.db, await getProject(s.app, s.id, { userId: s.userId }), { date: new Date(WED_10H * 1000) });
     assert.deepEqual({ due: plan.due, blockers: plan.blockers }, { due: 1, blockers: [] });
 
     const queued = await s.scheduler.queueFollowups({ date: new Date(WED_10H * 1000) });
@@ -109,7 +111,7 @@ test('relance bloquée : boîte en erreur, boîte pas lue récemment, week-end, 
   const s = await setup();
   try {
     await s.add('contact@fournil.fr', 8);
-    const plan = async (o = {}) => followupPlan(s.db, await getProject(s.app, s.id), o);
+    const plan = async (o = {}) => followupPlan(s.db, await getProject(s.app, s.id, { userId: s.userId }), o);
     const sat = new Date('2026-10-24T11:00:00+02:00');
     assert.equal((await plan({ date: sat })).ready, false);
     assert.equal((await plan({ date: sat })).inHours, false);
@@ -159,7 +161,7 @@ test('génération du modèle de relance par l\'IA', async () => {
     await s.db.prepare('UPDATE projects SET profile_json = ? WHERE id = ?').run(JSON.stringify({ resume: 'x', proposition_valeur: 'y' }), s.id);
     await s.db.prepare("DELETE FROM templates WHERE kind = 'followup'").run();
     const { enqueue } = await import('../src/services/jobs.js');
-    await enqueue(s.db, { projectId: s.id, type: 'followup_template' });
+    await enqueue(s.db, { userId: s.userId, projectId: s.id, type: 'followup_template' });
     await s.worker.tick();
     const job = (await latestJobs(s.db, s.id)).followup_template;
     assert.equal(job.status, 'done', job.error);

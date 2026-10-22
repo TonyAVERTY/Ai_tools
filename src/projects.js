@@ -3,7 +3,8 @@ import { now, getSetting } from './db.js';
 import { encryptJson, decryptJson, decrypt } from './crypto.js';
 import { HttpError } from './http.js';
 
-export const repoDir = (cfg, id) => join(cfg.dataDir, 'repos', String(id));
+// Un dossier de clones par utilisateur : data/repos/<utilisateur>/<projet>
+export const repoDir = (cfg, userId, id) => join(cfg.dataDir, 'repos', String(Number(userId)), String(Number(id)));
 
 const parse = (s) => (s ? JSON.parse(s) : null);
 
@@ -14,11 +15,16 @@ function readSecret(key, payload, what) {
   catch { console.warn(`[secrets] ${what} illisible (SECRET_KEY changée ?), à ressaisir`); return null; }
 }
 
-export async function getProject(app, id, { secrets = false } = {}) {
-  const p = await app.db.prepare('SELECT * FROM projects WHERE id = ?').get(Number(id));
+/**
+ * Projet d'un utilisateur. `userId` est obligatoire : un projet d'un autre compte est introuvable (404),
+ * exactement comme un projet qui n'existe pas. Les tâches de fond passent le propriétaire lu en base.
+ */
+export async function getProject(app, id, { userId, secrets = false } = {}) {
+  if (!Number.isInteger(Number(userId)) || Number(userId) <= 0) throw new Error('getProject : userId requis');
+  const p = await app.db.prepare('SELECT * FROM projects WHERE id = ? AND user_id = ?').get(Number(id), Number(userId));
   if (!p) throw new HttpError(404, 'Projet introuvable');
   const out = {
-    id: p.id, name: p.name, gitUrl: p.git_url,
+    id: p.id, userId: Number(p.user_id), name: p.name, gitUrl: p.git_url,
     profile: parse(p.profile_json), profileCommit: p.profile_commit, profileAt: p.profile_at,
     target: parse(p.target_json), targetValidated: !!p.target_validated,
     dailyMailCap: p.daily_mail_cap, createdAt: p.created_at,
@@ -35,13 +41,13 @@ export async function getProject(app, id, { secrets = false } = {}) {
   return out;
 }
 
-export async function listProjects(app) {
-  const rows = await app.db.prepare('SELECT id FROM projects ORDER BY LOWER(name)').all();
-  return Promise.all(rows.map((r) => getProject(app, r.id)));
+export async function listProjects(app, userId) {
+  const rows = await app.db.prepare('SELECT id FROM projects WHERE user_id = ? ORDER BY LOWER(name)').all(Number(userId));
+  return Promise.all(rows.map((r) => getProject(app, r.id, { userId })));
 }
 
-export async function createProject(app, { name, gitUrl }) {
-  const r = await app.db.prepare('INSERT INTO projects(name, git_url, created_at) VALUES(?, ?, ?)').run(name, gitUrl, now());
+export async function createProject(app, { userId, name, gitUrl }) {
+  const r = await app.db.prepare('INSERT INTO projects(user_id, name, git_url, created_at) VALUES(?, ?, ?, ?)').run(Number(userId), name, gitUrl, now());
   return Number(r.lastInsertRowid);
 }
 
@@ -62,13 +68,13 @@ export function publicConfig(cfg, secretField) {
   return { ...rest, [`${secretField}Set`]: !!_omit };
 }
 
-export async function forgejoToken(app) {
-  try { return decrypt(app.cfg.secretKey, await getSetting(app.db, 'forgejo_token_enc')); }
+export async function forgejoToken(app, userId) {
+  try { return decrypt(app.cfg.secretKey, await getSetting(app.db, userId, 'forgejo_token_enc')); }
   catch { console.warn('[secrets] token Forgejo illisible, à ressaisir'); return null; }
 }
 
-export async function globalSmtp(app) {
-  return readSecret(app.cfg.secretKey, await getSetting(app.db, 'smtp_enc'), 'SMTP global');
+export async function globalSmtp(app, userId) {
+  return readSecret(app.cfg.secretKey, await getSetting(app.db, userId, 'smtp_enc'), 'SMTP global');
 }
 
 export async function prospectStats(db, projectId) {
@@ -78,11 +84,14 @@ export async function prospectStats(db, projectId) {
   return out;
 }
 
-export async function sentSince(db, since, projectId = null) {
-  const sql = projectId == null
-    ? 'SELECT COUNT(*) n FROM mail_log WHERE sent_at > ? AND error IS NULL'
-    : 'SELECT COUNT(*) n FROM mail_log WHERE sent_at > ? AND error IS NULL AND project_id = ?';
-  return (projectId == null ? await db.prepare(sql).get(since) : await db.prepare(sql).get(since, projectId)).n;
+/** Envois réussis depuis `since` : tous les projets de l'utilisateur, ou un seul projet (déjà vérifié comme étant le sien). */
+export async function sentSince(db, since, userId, projectId = null) {
+  if (projectId == null) {
+    return (await db.prepare(`SELECT COUNT(*) n FROM mail_log m JOIN projects p ON p.id = m.project_id
+      WHERE m.sent_at > ? AND m.error IS NULL AND p.user_id = ?`).get(since, Number(userId))).n;
+  }
+  return (await db.prepare(`SELECT COUNT(*) n FROM mail_log m JOIN projects p ON p.id = m.project_id
+    WHERE m.sent_at > ? AND m.error IS NULL AND p.user_id = ? AND m.project_id = ?`).get(since, Number(userId), projectId)).n;
 }
 
 // IMAP : utilisateur vide = mêmes identifiants que le SMTP du projet (cas le plus courant)

@@ -10,11 +10,11 @@ const pct = (a, b) => (b ? `${Math.round((a / b) * 100)} %` : '-');
 const usd = (n) => `${n.toFixed(2)} $`;
 const day = (ts) => new Date(ts * 1000).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', timeZone: 'Europe/Paris' });
 
-export async function weeklyStats(db, { at = now() } = {}) {
+export async function weeklyStats(db, userId, { at = now() } = {}) {
   const from = at - 7 * 86400;
   const one = async (sql, ...a) => (await db.prepare(sql).get(...a)).n;
   const projects = [];
-  for (const p of await db.prepare('SELECT id, name FROM projects ORDER BY LOWER(name)').all()) {
+  for (const p of await db.prepare('SELECT id, name FROM projects WHERE user_id = ? ORDER BY LOWER(name)').all(userId)) {
     const sent = await one("SELECT COUNT(*) n FROM mail_log WHERE project_id = ? AND kind = 'initial' AND error IS NULL AND sent_at > ?", p.id, from);
     const ab = await abStats(db, p.id);
     projects.push({
@@ -30,7 +30,7 @@ export async function weeklyStats(db, { at = now() } = {}) {
       bestSubject: ab.length > 1 && ab.every((v) => v.sent >= 10) ? [...ab].sort((a, b) => b.rate - a.rate)[0] : null,
     });
   }
-  const cost = (await db.prepare('SELECT COALESCE(SUM(cost_usd), 0) c FROM jobs WHERE COALESCE(finished_at, created_at) > ?').get(from)).c;
+  const cost = (await db.prepare('SELECT COALESCE(SUM(cost_usd), 0) c FROM jobs WHERE user_id = ? AND COALESCE(finished_at, created_at) > ?').get(userId, from)).c;
   const sum = (k) => projects.reduce((t, p) => t + p[k], 0);
   return { from, to: at, projects, totals: { found: sum('found'), sent: sum('sent'), followups: sum('followups'), replies: sum('replies'), cost } };
 }
@@ -55,12 +55,12 @@ export function weeklyText(st) {
 }
 
 /** Envoie le rapport (mail si SMTP global + adresse, Discord si webhook). Retourne les canaux utilisés. */
-export async function sendWeeklyReport(app, { at = now() } = {}) {
-  const st = await weeklyStats(app.db, { at });
+export async function sendWeeklyReport(app, userId, { at = now() } = {}) {
+  const st = await weeklyStats(app.db, userId, { at });
   const text = weeklyText(st);
   const channels = [];
-  const to = await getSetting(app.db, 'notify_email');
-  const smtp = await globalSmtp(app);
+  const to = await getSetting(app.db, userId, 'notify_email');
+  const smtp = await globalSmtp(app, userId);
   if (to && smtp) {
     const transport = (app.createTransport || createTransport)(smtp);
     try {
@@ -73,7 +73,7 @@ export async function sendWeeklyReport(app, { at = now() } = {}) {
   }
   const t = st.totals;
   const active = st.projects.filter((p) => p.sent || p.found || p.replies);
-  const ok = await notify(app, 'weekly', {
+  const ok = await notify(app, userId, 'weekly', {
     title: `Rapport hebdo · ${day(st.from)} → ${day(st.to)}`, level: 'info',
     description: active.length
       ? `**${t.sent}** mails · **${t.replies}** réponses (${pct(t.replies, t.sent)}) · **${t.found}** prospects trouvés`
@@ -93,15 +93,15 @@ export async function sendWeeklyReport(app, { at = now() } = {}) {
 }
 
 /** Appelé toutes les 15 min : envoie une fois par semaine, le lundi à partir de 8h (Paris). */
-export async function maybeSendWeekly(app, { date = new Date() } = {}) {
-  if ((await getSetting(app.db, 'weekly_report', '0')) !== '1') return null;
+export async function maybeSendWeekly(app, userId, { date = new Date() } = {}) {
+  if ((await getSetting(app.db, userId, 'weekly_report', '0')) !== '1') return null;
   const p = parisParts(date);
   if (p.weekday !== 'Mon' || p.hour < 8) return null;
   const mondayAt8 = Math.floor(parisTime(p.year, p.month, p.day, 8).getTime() / 1000);
-  if (Number(await getSetting(app.db, 'weekly_report_last', '0')) >= mondayAt8) return null;
+  if (Number(await getSetting(app.db, userId, 'weekly_report_last', '0')) >= mondayAt8) return null;
   const at = Math.floor(date.getTime() / 1000);
-  const r = await sendWeeklyReport(app, { at });
+  const r = await sendWeeklyReport(app, userId, { at });
   // Rien de configuré : on ne marque pas, il partira dès qu'un canal existera
-  if (r.channels.length) await setSetting(app.db, 'weekly_report_last', String(at));
+  if (r.channels.length) await setSetting(app.db, userId, 'weekly_report_last', String(at));
   return r;
 }

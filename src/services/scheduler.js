@@ -42,14 +42,20 @@ export class Scheduler {
     if (this.running) return;
     this.running = true;
     try {
-      const projects = await this.app.db.prepare('SELECT id FROM projects WHERE imap_enc IS NOT NULL').all();
-      for (const { id } of projects) {
-        try { await checkInbox(this.app, id); }
+      // Les tâches de fond ne travaillent que pour les comptes actifs, projet par projet avec son propriétaire
+      const projects = await this.app.db.prepare(`SELECT p.id, p.user_id FROM projects p JOIN users u ON u.id = p.user_id
+        WHERE p.imap_enc IS NOT NULL AND u.status = 'active'`).all();
+      for (const { id, user_id: userId } of projects) {
+        try { await checkInbox(this.app, userId, id); }
         catch (e) { this.log.error(`[inbox ${id}]`, e.message); }
       }
       await this.queueFollowups();
-      try { await maybeSendWeekly(this.app); }
-      catch (e) { this.log.error('[rapport hebdo]', e.message); }
+      const users = await this.app.db.prepare(`SELECT s.user_id FROM user_settings s JOIN users u ON u.id = s.user_id
+        WHERE s.\`key\` = 'weekly_report' AND s.value = '1' AND u.status = 'active'`).all();
+      for (const { user_id: userId } of users) {
+        try { await maybeSendWeekly(this.app, userId); }
+        catch (e) { this.log.error('[rapport hebdo]', e.message); }
+      }
       await snapshotAll(this.app, { log: this.log });
     } finally { this.running = false; }
   }
@@ -57,9 +63,10 @@ export class Scheduler {
   async queueFollowups(opts) {
     const { db } = this.app;
     const queued = [];
-    for (const { id } of await db.prepare('SELECT id FROM projects WHERE followup_enabled = 1').all()) {
-      const plan = await followupPlan(db, await getProject(this.app, id), opts);
-      if (plan.ready) queued.push({ id, ...await enqueue(db, { projectId: id, type: 'followup', params: { count: plan.due } }) });
+    for (const { id, user_id: userId } of await db.prepare(`SELECT p.id, p.user_id FROM projects p JOIN users u ON u.id = p.user_id
+        WHERE p.followup_enabled = 1 AND u.status = 'active'`).all()) {
+      const plan = await followupPlan(db, await getProject(this.app, id, { userId }), opts);
+      if (plan.ready) queued.push({ id, ...await enqueue(db, { userId, projectId: id, type: 'followup', params: { count: plan.due } }) });
     }
     return queued;
   }

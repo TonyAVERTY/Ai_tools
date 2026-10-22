@@ -329,7 +329,7 @@ ${saved ? '<p class="ok">Enregistré.</p>' : ''}
 
 <section class="card">
   <h4>Liste d'opposition</h4>
-  <p class="muted small">${s.blacklist_count} adresse(s) désinscrite(s). Elles ne seront plus jamais contactées, tous projets confondus.</p>
+  <p class="muted small">${s.blacklist_count} de tes prospects ont demandé à ne plus être contactés. La liste d'opposition est commune à tous les comptes : une adresse désinscrite n'est plus jamais contactée, quel que soit le projet.</p>
 </section>`,
   });
 }

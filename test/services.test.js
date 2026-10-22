@@ -5,6 +5,7 @@ import { runClaude, extractJson, rateLimitWindows } from '../src/services/claude
 import { waitCool } from '../src/services/thermal.js';
 import { now } from '../src/db.js';
 import { testDb } from './helpers/db.js';
+import { addUser } from './helpers/users.js';
 import { enqueue, Worker, latestJobs, cancelJob, addUsage, usageSummary } from '../src/services/jobs.js';
 
 const bin = resolve('test/fixtures/fake-claude.js');
@@ -57,19 +58,20 @@ test('waitCool attend la redescente avec hystérésis', async () => {
 
 test('worker : exécution, dédoublonnage, erreurs, annulation, conso', async () => {
   const db = await testDb();
-  await db.prepare("INSERT INTO projects(name, git_url, created_at) VALUES('p','u',?)").run(now());
-  const a = await enqueue(db, { projectId: 1, type: 'ok', params: { x: 2 } });
-  assert.equal((await enqueue(db, { projectId: 1, type: 'ok' })).existing, true);
+  const u = await addUser(db);
+  await db.prepare("INSERT INTO projects(user_id, name, git_url, created_at) VALUES(?, 'p','u',?)").run(u, now());
+  const a = await enqueue(db, { userId: u, projectId: 1, type: 'ok', params: { x: 2 } });
+  assert.equal((await enqueue(db, { userId: u, projectId: 1, type: 'ok' })).existing, true);
   const handlers = {
     ok: async (ctx) => { ctx.progress({ found: 1 }); addUsage(ctx, { costUsd: 0.5, tokensIn: 10, tokensOut: 5 }); return { double: ctx.params.x * 2 }; },
     boom: async () => { throw new Error('raté'); },
   };
   const w = new Worker(db, handlers, { thermalMax: 999, log: { error() {} } });
   assert.equal(await w.tick(), true);
-  await enqueue(db, { projectId: 1, type: 'boom' });
+  await enqueue(db, { userId: u, projectId: 1, type: 'boom' });
   await w.tick();
-  const c = await enqueue(db, { projectId: 1, type: 'ok' });
-  await cancelJob(db, c.id);
+  const c = await enqueue(db, { userId: u, projectId: 1, type: 'ok' });
+  await cancelJob(db, u, c.id);
   assert.equal(await w.tick(), false);
   const jobs = await latestJobs(db, 1);
   assert.equal(a.id, 1);
@@ -79,5 +81,5 @@ test('worker : exécution, dédoublonnage, erreurs, annulation, conso', async ()
   const first = await db.prepare('SELECT * FROM jobs WHERE id = 1').get();
   assert.equal(first.status, 'done');
   assert.deepEqual(JSON.parse(first.result_json), { double: 4 });
-  assert.equal((await usageSummary(db)).month.cost, 0.5);
+  assert.equal((await usageSummary(db, u)).month.cost, 0.5);
 });

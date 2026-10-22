@@ -2,11 +2,14 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { now } from '../src/db.js';
 import { testDb } from './helpers/db.js';
+import { addUser } from './helpers/users.js';
 import { Worker, enqueue, latestJobs } from '../src/services/jobs.js';
 
 async function setup() {
   const db = await testDb();
-  await db.prepare("INSERT INTO projects(name, git_url, created_at) VALUES('p', 'u', ?)").run(now());
+  const u = await addUser(db);
+  await db.prepare("INSERT INTO projects(user_id, name, git_url, created_at) VALUES(?, 'p', 'u', ?)").run(u, now());
+  db.userId = u;
   return db;
 }
 
@@ -20,7 +23,7 @@ test('start puis stop : la boucle s\'arrête, le job en cours est annulé et att
       ctx.signal.addEventListener('abort', () => reject(new Error('Annulé')), { once: true });
     }),
   }, { thermalMax: 999, pollMs: 10, log: { error() {} } });
-  await enqueue(db, { projectId: 1, type: 'prospect' });
+  await enqueue(db, { userId: db.userId, projectId: 1, type: 'prospect' });
   await w.start();
   await running;
   await w.stop();
@@ -42,8 +45,8 @@ test('stop attend les notifications en vol, et un callback qui échoue est journ
       if (job.type === 'evolution') throw new Error('notification cassée');
     },
   });
-  await enqueue(db, { projectId: 1, type: 'prospect' });
-  await enqueue(db, { projectId: 1, type: 'evolution' });
+  await enqueue(db, { userId: db.userId, projectId: 1, type: 'prospect' });
+  await enqueue(db, { userId: db.userId, projectId: 1, type: 'evolution' });
   await w.tick(); await w.tick();
   assert.deepEqual(seen, [], 'les notifications ne bloquent pas la file');
   await w.stop();
@@ -53,7 +56,7 @@ test('stop attend les notifications en vol, et un callback qui échoue est journ
 
 test('un job "running" laissé par un crash est marqué en erreur au démarrage', async () => {
   const db = await setup();
-  await db.prepare("INSERT INTO jobs(project_id, type, status, created_at) VALUES(1, 'analyze', 'running', ?)").run(now());
+  await db.prepare("INSERT INTO jobs(user_id, project_id, type, status, created_at) VALUES(?, 1, 'analyze', 'running', ?)").run(db.userId, now());
   const w = new Worker(db, {}, { thermalMax: 999, pollMs: 10, log: { error() {} } });
   await w.start();
   await w.stop();

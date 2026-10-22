@@ -6,6 +6,7 @@ import { loadConfig } from './config.js';
 import { openDb } from './db.js';
 import { Router, json, redirect, html, HttpError } from './http.js';
 import { getSession, checkOrigin, purgeExpired } from './auth.js';
+import { syncAdmins } from './users.js';
 import { registerRoutes } from './routes.js';
 import { Worker } from './services/jobs.js';
 import { makeHandlers } from './handlers.js';
@@ -31,7 +32,8 @@ const SECURITY_HEADERS = {
 };
 
 export async function createApp(cfg, { db, worker = true, createTransport } = {}) {
-  db ??= await openDb(cfg.db);
+  db ??= await openDb(cfg.db, { adminEmails: cfg.adminEmails });
+  await syncAdmins(db, cfg.adminEmails || []); // ADMIN_EMAILS fait foi pour le rôle admin
   const app = { db, cfg, createTransport };
   const router = new Router();
   registerRoutes(router, app);
@@ -76,19 +78,19 @@ export async function createApp(cfg, { db, worker = true, createTransport } = {}
     w = new Worker(db, makeHandlers(app), {
       thermalMax: cfg.thermalMax,
       onFinish: (job, r) => notifyJob(app, job, r),
-      budget: () => budgetState(db),
+      budget: (userId) => budgetState(db, userId),
       isAiJob: (type) => AI_JOBS.has(type),
-      onBudget: (reason) => notify(app, 'budget', {
+      onBudget: (reason, userId) => notify(app, userId, 'budget', {
         title: 'Budget IA atteint', level: 'warn',
         description: `${reason[0].toUpperCase()}${reason.slice(1)}. Les jobs IA attendent ; les envois et relances continuent.`,
       }),
-      quota: () => quotaState(db),
+      quota: (userId) => quotaState(db, userId),
       isQuotaSensitive,
-      onQuotaHold: (reason) => notify(app, 'quota', {
+      onQuotaHold: (reason, userId) => notify(app, userId, 'quota', {
         title: 'Job IA reporté (quota serré)', level: 'warn',
         description: `${reason[0].toUpperCase()}${reason.slice(1)}. Analyse et évolutions attendent ; prospection et envois continuent.`,
       }),
-      onThermal: (t) => notify(app, 'thermal', {
+      onThermal: (t, userId) => notify(app, userId, 'thermal', {
         title: 'Pause thermique', level: 'warn',
         description: `CPU à ${t} °C : les jobs IA attendent que le Pi redescende sous ${cfg.thermalMax - 5} °C.`,
       }),
@@ -118,6 +120,7 @@ export async function createApp(cfg, { db, worker = true, createTransport } = {}
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const cfg = loadConfig();
+  if (!cfg.adminEmails.length) console.warn('ADMIN_EMAILS est vide : aucun administrateur (personne ne pourra lancer de job IA).');
   const app = await createApp(cfg);
   app.server.listen(cfg.port, cfg.host, () => console.log(`AiTools sur http://${cfg.host}:${cfg.port} (${cfg.appUrl})`));
   const shutdown = () => app.close().then(() => process.exit(0), (e) => { console.error(e); process.exit(1); });

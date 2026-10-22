@@ -31,18 +31,18 @@ export function bar(done, total, width = 12) {
   return `${'▰'.repeat(full)}${'▱'.repeat(width - full)} ${Math.round(r * 100)} %`;
 }
 
-export async function notifyConfig(app) {
+export async function notifyConfig(app, userId) {
   let url = null;
-  try { url = decrypt(app.cfg.secretKey, await getSetting(app.db, 'discord_webhook_enc')); }
+  try { url = decrypt(app.cfg.secretKey, await getSetting(app.db, userId, 'discord_webhook_enc')); }
   catch { url = null; }
-  const raw = await getSetting(app.db, 'discord_events');
+  const raw = await getSetting(app.db, userId, 'discord_events');
   const events = raw ? JSON.parse(raw) : Object.keys(EVENTS);
   return { url, events };
 }
 
 /** Envoie une notif si le webhook est configuré et l'événement activé. Ne lève jamais d'erreur. */
-export async function notify(app, event, { title, description = '', level = 'info', fields = [], footer }, { force = false } = {}) {
-  const { url, events } = await notifyConfig(app);
+export async function notify(app, userId, event, { title, description = '', level = 'info', fields = [], footer }, { force = false } = {}) {
+  const { url, events } = await notifyConfig(app, userId);
   if (!url || (!force && !events.includes(event))) return false;
   const body = {
     username: 'AiTools',
@@ -111,7 +111,7 @@ const LABEL = { analyze: 'Analyse', prospect: 'Recherche', template: 'Modèle de
 // Durée et coût réels, relus en base une fois le job clos (absents dans les tests unitaires)
 async function jobMeta(app, job) {
   if (!job.id) return [];
-  const row = await app.db.prepare('SELECT started_at, finished_at, cost_usd FROM jobs WHERE id = ?').get(job.id);
+  const row = await app.db.prepare('SELECT started_at, finished_at, cost_usd FROM jobs WHERE id = ? AND user_id = ?').get(job.id, job.user_id);
   const out = [];
   if (row?.started_at && row?.finished_at) out.push({ name: '⏱️ Durée', value: duration(row.finished_at - row.started_at) });
   if (row?.cost_usd) out.push({ name: '💳 Coût IA', value: `${row.cost_usd.toFixed(2)} $` });
@@ -119,11 +119,11 @@ async function jobMeta(app, job) {
 }
 
 export async function notifyJob(app, job, { status, result, error }) {
-  const project = job.project_id ? (await app.db.prepare('SELECT name FROM projects WHERE id = ?').get(job.project_id))?.name : null;
+  const project = job.project_id ? (await app.db.prepare('SELECT name FROM projects WHERE id = ? AND user_id = ?').get(job.project_id, job.user_id))?.name : null;
   const prefix = project ? `${project} · ` : '';
   const footer = project ? `${project} · ${LABEL[job.type] || job.type}` : undefined;
   if (status === 'error') {
-    return notify(app, 'job_error', {
+    return notify(app, job.user_id, 'job_error', {
       title: `${prefix}${LABEL[job.type] || job.type} en échec`, level: 'error', footer,
       description: `\`\`\`\n${String(error || 'Erreur inconnue').slice(0, 900).replace(/```/g, "'''")}\n\`\`\``,
       fields: await jobMeta(app, job),
@@ -132,7 +132,7 @@ export async function notifyJob(app, job, { status, result, error }) {
   if (status !== 'done') return false;
   if (job.type === 'followup') {
     if (!result?.sent) return false;
-    return notify(app, 'followup', {
+    return notify(app, job.user_id, 'followup', {
       title: `${prefix}Relances envoyées`, level: 'info', footer,
       description: `${result.sent} relance(s), ${result.failed} échec(s).\n${bar(result.sent, result.total || result.sent)}`,
     });
@@ -140,5 +140,5 @@ export async function notifyJob(app, job, { status, result, error }) {
   const make = DONE[job.type];
   if (!make) return false;
   const n = make(result);
-  return notify(app, 'job_done', { ...n, title: `${prefix}${n.title}`, footer, fields: [...(n.fields || []), ...(await jobMeta(app, job))] });
+  return notify(app, job.user_id, 'job_done', { ...n, title: `${prefix}${n.title}`, footer, fields: [...(n.fields || []), ...(await jobMeta(app, job))] });
 }

@@ -2,11 +2,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { now } from '../src/db.js';
 import { testDb } from './helpers/db.js';
+import { addUser } from './helpers/users.js';
 import { parseFilters, listProspects } from '../src/services/crm.js';
 
 async function setup() {
   const db = await testDb();
-  await db.prepare("INSERT INTO projects(name, git_url, created_at) VALUES('A', 'a', ?), ('B', 'b', ?)").run(now(), now());
+  const u = await addUser(db);
+  await db.prepare("INSERT INTO projects(user_id, name, git_url, created_at) VALUES(?, 'A', 'a', ?), (?, 'B', 'b', ?)").run(u, now(), u, now());
   const add = (project, company, email, o = {}) => db.prepare(`INSERT INTO prospects(project_id, company, email, city, sector, score, status, sent_at, created_at)
     VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(project, company, email, o.city ?? 'Rennes', o.sector ?? 'boulangerie', o.score ?? 5, o.status ?? 'new', o.sent ?? null, o.created ?? now());
   await add(1, 'Le Fournil', 'contact@fournil.fr', { score: 9, status: 'replied', sent: now() - 100 });

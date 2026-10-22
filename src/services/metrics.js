@@ -18,12 +18,13 @@ export async function saveSnapshot(db, projectId, business, { date = new Date() 
 /** Une photo par projet et par jour, appelée par le planificateur (toutes les 15 min, ne fait rien si déjà prise). */
 export async function snapshotAll(app, { date = new Date(), log = console } = {}) {
   const day = parisDay(date);
-  const todo = await app.db.prepare(`SELECT id FROM projects WHERE db_enc IS NOT NULL
-    AND id NOT IN (SELECT project_id FROM metrics_daily WHERE day = ?)`).all(day);
+  const todo = await app.db.prepare(`SELECT p.id, p.user_id FROM projects p JOIN users u ON u.id = p.user_id
+    WHERE p.db_enc IS NOT NULL AND u.status = 'active'
+    AND p.id NOT IN (SELECT project_id FROM metrics_daily WHERE day = ?)`).all(day);
   let n = 0;
-  for (const { id } of todo) {
+  for (const { id, user_id: userId } of todo) {
     try {
-      const p = await getProject(app, id, { secrets: true });
+      const p = await getProject(app, id, { userId, secrets: true });
       await saveSnapshot(app.db, id, await (app.fetchRecap || fetchRecap)(id, p.dbCfg, { force: true }), { date });
       n++;
     } catch (e) { log.error(`[métriques ${id}]`, e.message); }

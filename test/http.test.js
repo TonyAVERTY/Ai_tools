@@ -8,20 +8,22 @@ import { now, setSetting } from '../src/db.js';
 import { testDb } from './helpers/db.js';
 import { createApp } from '../src/server.js';
 import { unsubToken } from '../src/crypto.js';
+import { addUser } from './helpers/users.js';
 
 const APP_URL = 'https://ai.tony-averty.dev';
-let app, base, cookie, tmp;
+let app, base, cookie, tmp, uid;
 
 before(async () => {
   tmp = mkdtempSync(join(tmpdir(), 'aitools-http-'));
   const cfg = {
-    appUrl: APP_URL, google: { clientId: 'cid', clientSecret: 'cs' }, allowedEmails: ['me@gmail.com'],
+    appUrl: APP_URL, google: { clientId: 'cid', clientSecret: 'cs' }, apple: null, adminEmails: ['me@gmail.com'],
     secretKey: randomBytes(32), dataDir: tmp, claudeBin: 'claude', thermalMax: 75,
   };
   app = await createApp(cfg, { db: await testDb(), worker: false });
   await new Promise((r) => app.server.listen(0, '127.0.0.1', r));
   base = `http://127.0.0.1:${app.server.address().port}`;
-  await app.db.prepare('INSERT INTO sessions(id, email, created_at, expires_at) VALUES(?, ?, ?, ?)').run('sess1', 'me@gmail.com', now(), now() + 3600);
+  uid = await addUser(app.db, { email: 'me@gmail.com' });
+  await app.db.prepare('INSERT INTO sessions(id, user_id, created_at, expires_at) VALUES(?, ?, ?, ?)').run('sess1', uid, now(), now() + 3600);
   cookie = 'sid=sess1';
 });
 after(async () => { await app.close(); rmSync(tmp, { recursive: true, force: true }); });
@@ -80,7 +82,7 @@ test('dashboard, réglages, création de projet et statut', async () => {
 
   r = await post('/settings', { notify_email: 'moi@x.fr', forgejo_host: 'https://git.tony-averty.dev/', forgejo_token: 'tok123', global_daily_cap: '9999', send_delay_min: '1', send_delay_max: '2', prospect_model: 'opus', analyze_model: 'opus' }, { form: true });
   assert.equal(r.status, 303);
-  const s = async (k) => (await app.db.prepare('SELECT value FROM settings WHERE `key` = ?').get(k))?.value;
+  const s = async (k) => (await app.db.prepare('SELECT value FROM user_settings WHERE user_id = ? AND `key` = ?').get(uid, k))?.value;
   assert.equal(await s('forgejo_host'), 'git.tony-averty.dev');
   assert.equal(await s('global_daily_cap'), '300', 'plafond borné');
   assert.equal(await s('send_delay_min'), '5');
@@ -189,29 +191,29 @@ test('réglages Discord : URL validée, chiffrée, événements enregistrés', a
   const hook = 'https://discord.com/api/webhooks/123456789012345678/abcdefghijklmnopqrstuvwxyz-ABC_123';
   r = await post('/settings', { ...base, discord_webhook: hook, ev_reply: 'on', ev_job_error: 'on' }, { form: true });
   assert.equal(r.status, 303);
-  const enc = (await app.db.prepare("SELECT value FROM settings WHERE `key` = 'discord_webhook_enc'").get()).value;
+  const enc = (await app.db.prepare("SELECT value FROM user_settings WHERE user_id = ? AND `key` = 'discord_webhook_enc'").get(uid)).value;
   assert.ok(!enc.includes('abcdefghijklmnop'), 'URL chiffrée');
-  assert.deepEqual(JSON.parse((await app.db.prepare("SELECT value FROM settings WHERE `key` = 'discord_events'").get()).value), ['job_error', 'reply']);
+  assert.deepEqual(JSON.parse((await app.db.prepare("SELECT value FROM user_settings WHERE user_id = ? AND `key` = 'discord_events'").get(uid)).value), ['job_error', 'reply']);
   r = await get('/settings');
   const page = await r.text();
   assert.ok(!page.includes('abcdefghijklmnop'), 'URL jamais réaffichée');
   assert.match(page, /data-notify-test/);
   r = await post('/settings', { ...base, discord_remove: 'on' }, { form: true });
-  assert.equal((await app.db.prepare("SELECT value FROM settings WHERE `key` = 'discord_webhook_enc'").get()).value, null);
+  assert.equal((await app.db.prepare("SELECT value FROM user_settings WHERE user_id = ? AND `key` = 'discord_webhook_enc'").get(uid)).value, null);
 });
 
 test('budget : réglages, jauge et avertissement au lancement', async () => {
   const base = { notify_email: 'moi@x.fr', forgejo_host: 'git.tony-averty.dev', global_daily_cap: '100', send_delay_min: '20', send_delay_max: '60' };
   let r = await post('/settings', { ...base, budget_day_usd: '0,5', budget_month_usd: 'abc' }, { form: true });
   assert.equal(r.status, 303);
-  const s = async (k) => (await app.db.prepare('SELECT value FROM settings WHERE `key` = ?').get(k))?.value;
+  const s = async (k) => (await app.db.prepare('SELECT value FROM user_settings WHERE user_id = ? AND `key` = ?').get(uid, k))?.value;
   assert.equal(await s('budget_day_usd'), '0.5', 'virgule française acceptée');
   assert.equal(await s('budget_month_usd'), '', 'valeur invalide = pas de limite');
-  await app.db.prepare("INSERT INTO jobs(type, status, cost_usd, created_at, finished_at) VALUES('evolution', 'done', 0.8, ?, ?)").run(now(), now());
+  await app.db.prepare("INSERT INTO jobs(user_id, type, status, cost_usd, created_at, finished_at) VALUES(?, 'evolution', 'done', 0.8, ?, ?)").run(uid, now(), now());
   let sys = await (await get('/api/system')).json();
   assert.equal(sys.budget.blocked, true);
   assert.equal(sys.claudeRateLimit, null, 'pas encore mesuré sans appel Claude');
-  await setSetting(app.db, 'claude_rate_limit_json', JSON.stringify({ at: now(), fiveHour: { utilization: 0.42, resetsAt: 123 }, sevenDay: { utilization: 0.1, resetsAt: 456 } }));
+  await setSetting(app.db, uid, 'claude_rate_limit_json', JSON.stringify({ at: now(), fiveHour: { utilization: 0.42, resetsAt: 123 }, sevenDay: { utilization: 0.1, resetsAt: 456 } }));
   sys = await (await get('/api/system')).json();
   assert.equal(sys.claudeRateLimit.fiveHour.utilization, 0.42);
   assert.equal(sys.claudeRateLimit.sevenDay.utilization, 0.1);
