@@ -5,7 +5,7 @@ export class Router {
   add(method, path, handler, opts = {}) {
     const keys = [];
     const re = new RegExp('^' + path.replace(/:(\w+)/g, (_, k) => { keys.push(k); return '([^/]+)'; }) + '/?$');
-    this.routes.push({ method, re, keys, handler, public: !!opts.public });
+    this.routes.push({ method, re, keys, handler, public: !!opts.public, limit: opts.limit || null, admin: !!opts.admin });
   }
   get(p, h, o) { this.add('GET', p, h, o); }
   post(p, h, o) { this.add('POST', p, h, o); }
@@ -65,9 +65,14 @@ export const html = (res, body, status = 200) => send(res, status, body);
 export const json = (res, data, status = 200) => send(res, status, JSON.stringify(data), 'application/json; charset=utf-8');
 export function redirect(res, location) { res.writeHead(303, { Location: location }); res.end(); }
 
-// `expose` : message sûr destiné à l'utilisateur même pour un 5xx (ex. impossible de joindre un service tiers)
+// `expose` : message sûr destiné à l'utilisateur même pour un 5xx (ex. impossible de joindre un service tiers).
+// `headers` : en-têtes ajoutés à la réponse d'erreur (Retry-After d'un 429). `code` et `data` : champs ajoutés au JSON
+// d'erreur, pour que le front distingue un plafond de plan (plan_limit) d'une erreur ordinaire.
 export class HttpError extends Error {
-  constructor(status, message, { expose = false } = {}) { super(message); this.status = status; this.expose = expose; }
+  constructor(status, message, { expose = false, headers = null, code = null, data = null } = {}) {
+    super(message);
+    this.status = status; this.expose = expose; this.headers = headers; this.code = code; this.data = data;
+  }
 }
 
 // Échappement HTML pour les templates

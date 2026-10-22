@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { loadConfig } from './config.js';
 import { openDb } from './db.js';
 import { Router, json, redirect, html, HttpError } from './http.js';
+import { RateLimiter, clientIp } from './ratelimit.js';
 import { getSession, checkOrigin, purgeExpired } from './auth.js';
 import { syncAdmins } from './users.js';
 import { registerRoutes } from './routes.js';
@@ -35,11 +36,11 @@ const STATIC = {
   '/static/favicon.svg': asset('favicon.svg', 'image/svg+xml', 86400),
 };
 
-// `fetch`, `validateApiKey`, `validateToken`, `syncRepo` : points d'injection pour les tests (aucun appel réseau réel)
-export async function createApp(cfg, { db, worker = true, createTransport, fetch, validateApiKey, validateToken, syncRepo } = {}) {
+// `fetch`, `validateApiKey`, `validateToken`, `syncRepo`, `limiter` : points d'injection pour les tests (aucun appel réseau réel)
+export async function createApp(cfg, { db, worker = true, createTransport, fetch, validateApiKey, validateToken, syncRepo, limiter } = {}) {
   db ??= await openDb(cfg.db, { adminEmails: cfg.adminEmails });
   await syncAdmins(db, cfg.adminEmails || []); // ADMIN_EMAILS fait foi pour le rôle admin
-  const app = { db, cfg, createTransport, fetch, validateApiKey, validateToken, syncRepo };
+  const app = { db, cfg, createTransport, fetch, validateApiKey, validateToken, syncRepo, limiter: limiter || new RateLimiter() };
   const secHeaders = securityHeaders(cfg.appUrl);
   const router = new Router();
   registerRoutes(router, app);
@@ -66,6 +67,8 @@ export async function createApp(cfg, { db, worker = true, createTransport, fetch
         if (wantsJson || !isRead) throw new HttpError(404, 'Page introuvable');
         return html(res, notFoundPage({ appUrl: cfg.appUrl }), 404);
       }
+      const ip = clientIp(req, cfg.trustProxy);
+      if (route.public && route.limit) app.limiter.enforce(route.limit, { ip });
       const session = route.public ? null : await getSession(db, req);
       if (!route.public) {
         if (!session) {
@@ -78,6 +81,7 @@ export async function createApp(cfg, { db, worker = true, createTransport, fetch
           return redirect(res, '/login');
         }
         checkOrigin(req, cfg);
+        if (route.limit) app.limiter.enforce(route.limit, { ip, userId: session.userId });
         // Onboarding bloquant : sans liaison Claude valide, seules la liaison, Mon compte et la déconnexion répondent
         if (!isLinkExempt(req.method, url.pathname) && !(await hasUsableLink(db, session.userId, { cliModeEnabled: cfg.cliModeEnabled !== false }))) {
           if (url.pathname.startsWith('/api/') || req.headers.accept?.includes('json')) {
@@ -92,7 +96,8 @@ export async function createApp(cfg, { db, worker = true, createTransport, fetch
       if (status >= 500 && !e.expose) console.error(`[${req.method} ${url.pathname}]`, e);
       if (res.headersSent) return res.end();
       const msg = status >= 500 && !e.expose ? 'Erreur interne' : e.message;
-      if (url.pathname.startsWith('/api/') || req.headers.accept?.includes('json')) json(res, { error: msg }, status);
+      for (const [k, v] of Object.entries(e.headers || {})) res.setHeader(k, v);
+      if (url.pathname.startsWith('/api/') || req.headers.accept?.includes('json')) json(res, { error: msg, ...(e.code ? { code: e.code } : {}), ...(e.data || {}) }, status);
       else html(res, layout({ title: 'Erreur', body: `<section class="card"><h1>${status}</h1><p>${msg.replace(/</g, '&lt;')}</p><a href="/">Retour</a></section>` }), status);
     }
   });
@@ -131,6 +136,7 @@ export async function createApp(cfg, { db, worker = true, createTransport, fetch
   }
   let purging = null;
   const purge = setInterval(() => {
+    app.limiter.sweep();
     purging = purgeExpired(db).catch((e) => console.error('[purge]', e.message));
   }, 3600_000);
   purge.unref();
@@ -145,6 +151,7 @@ export async function createApp(cfg, { db, worker = true, createTransport, fetch
     await db.close();
   };
   app.server = server;
+  app.router = router;
   return app;
 }
 
