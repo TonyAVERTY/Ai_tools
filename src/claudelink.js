@@ -2,10 +2,11 @@
 // configuration du CLI du serveur. Le secret est chiffré (AES-256-GCM) dans users.claude_link_json ; il ne sort jamais
 // de ce module que sous forme d'environnement du processus enfant, et toujours à partir du user_id du job.
 import { execFile } from 'node:child_process';
+import { createHash, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
 import { now, getSetting, setSetting } from './db.js';
-import { encrypt, decrypt } from './crypto.js';
-import { HttpError } from './http.js';
+import { encrypt, decrypt, randomId } from './crypto.js';
+import { HttpError, parseCookies, setCookie, redirect } from './http.js';
 import { getUser } from './users.js';
 import { runClaude } from './services/claude.js';
 import { buildChildEnv } from './services/sandbox.js';
@@ -104,7 +105,7 @@ export async function hasUsableLink(db, userId, opts) {
  */
 export async function resolveCredentials(app, userId) {
   await assertCanRunAi(app.db, userId, { cliModeEnabled: app.cfg.cliModeEnabled !== false });
-  const link = await readLink(app.db, userId);
+  const link = await refreshIfNeeded(app, userId, await readLink(app.db, userId));
   if (link.mode === MODES.server) return { mode: link.mode, secretEnv: {}, serverConfig: true };
   let secret;
   try { secret = decrypt(app.cfg.secretKey, link.secret_enc); }
@@ -136,7 +137,7 @@ export async function validateApiKey(key, fetchFn = fetch) {
 
 // Appel minimal du CLI avec le jeton (modèle le plus petit, 1 tour, aucun outil). Ce n'est PAS gratuit : quelques tokens
 // sont décomptés de l'abonnement. Aucune commande du CLI ne vérifie un jeton sans appel au modèle.
-async function validateSubscriptionToken(app, token) {
+export async function validateSubscriptionToken(app, token) {
   let r;
   try {
     r = await runClaude({
@@ -155,7 +156,7 @@ async function validateSubscriptionToken(app, token) {
 
 // ---------- Liaison ----------
 
-async function saveLink(app, userId, link) {
+export async function saveLink(app, userId, link) {
   const t = now();
   await writeLink(app.db, userId, { v: 1, valid: true, linked_at: t, validated_at: t, last_test_at: t, ...link });
   await resetQuotaState(app.db, userId);
@@ -186,6 +187,114 @@ export async function linkSubscriptionToken(app, userId, { token, accept }) {
   await setSetting(app.db, userId, 'claude_cli_consent_json', JSON.stringify(consent));
 }
 
+// ---------- Connexion automatique avec Claude (OAuth, PKCE) ----------
+// L'utilisateur clique, Anthropic lui demande d'autoriser AiTools, puis le navigateur revient sur /link/claude/callback
+// où le serveur échange le code contre un jeton et le range chiffré, comme le jeton collé à la main (mode abonnement).
+const OAUTH_STATE_TTL = 600;
+const OAUTH_COOKIE = 'claude_oauth_b';
+const OAUTH_COOKIE_PATH = '/link/claude';
+export const OAUTH_UNAVAILABLE_MESSAGE = "La connexion automatique avec Claude n'est pas activée sur ce service.";
+const hashBind = (v) => createHash('sha256').update(String(v)).digest('hex');
+
+/** Le bouton « Se connecter avec Claude » est-il utilisable sur ce service ? */
+export const oauthAvailable = (cfg) => !!cfg.claudeOauth && cfg.cliModeEnabled !== false;
+
+/**
+ * Démarre le flux : consentement obligatoire (rien n'est créé sans la case cochée), state + PKCE en base,
+ * cookie qui lie le retour à CE navigateur, puis redirection vers la page d'autorisation d'Anthropic.
+ */
+export async function startClaudeOauth(app, userId, { accept }, res) {
+  const { cfg, db } = app;
+  if (cfg.cliModeEnabled === false) throw new HttpError(403, CLI_DISABLED_MESSAGE);
+  if (!cfg.claudeOauth) throw new HttpError(503, OAUTH_UNAVAILABLE_MESSAGE, { expose: true });
+  if (!truthy(accept)) throw new HttpError(400, `Tu dois cocher « ${CONSENT_CHECKBOX} » pour utiliser ton abonnement`);
+  const oc = cfg.claudeOauth;
+  const state = randomId(24);
+  const verifier = randomId(48);
+  const bind = randomId(24);
+  await db.prepare('INSERT INTO oauth_states(state, provider, verifier, nonce, binding, created_at) VALUES(?, ?, ?, ?, ?, ?)')
+    .run(state, 'claude', verifier, String(userId), hashBind(bind), now());
+  setCookie(res, OAUTH_COOKIE, bind, { maxAge: OAUTH_STATE_TTL, path: OAUTH_COOKIE_PATH });
+  const q = new URLSearchParams({
+    client_id: oc.clientId, response_type: 'code', redirect_uri: oc.redirectUri, scope: oc.scope, state,
+    code_challenge: createHash('sha256').update(verifier).digest('base64url'), code_challenge_method: 'S256',
+  });
+  redirect(res, `${oc.authorizeUrl}?${q}`);
+}
+
+async function tokenRequest(app, body) {
+  let r;
+  try {
+    r = await (app.fetch || fetch)(app.cfg.claudeOauth.tokenUrl, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify(body), signal: AbortSignal.timeout(15_000),
+    });
+  } catch {
+    throw new HttpError(502, "Impossible de joindre Anthropic pour terminer la connexion. Réessaie dans un instant.", { expose: true });
+  }
+  if (r.status === 400 || r.status === 401 || r.status === 403) throw new HttpError(400, 'Anthropic a refusé la connexion (autorisation expirée ou déjà utilisée). Recommence.');
+  if (!r.ok) throw new HttpError(502, `Anthropic ne répond pas normalement (HTTP ${r.status}). Réessaie plus tard.`, { expose: true });
+  const data = await r.json().catch(() => null);
+  if (typeof data?.access_token !== 'string' || !TOKEN_RE.test(data.access_token)) throw new HttpError(502, "Réponse inattendue d'Anthropic : la connexion n'a pas pu être terminée.", { expose: true });
+  return data;
+}
+
+// Ce que le jeton donne en plus de son secret : de quoi le renouveler avant son échéance
+const oauthFields = (app, data) => ({
+  ...(data.refresh_token ? { refresh_enc: encrypt(app.cfg.secretKey, String(data.refresh_token)) } : {}),
+  ...(Number(data.expires_in) > 0 ? { expires_at: now() + Number(data.expires_in) } : {}),
+});
+
+/**
+ * Retour d'Anthropic : state connu, à usage unique, non expiré, émis pour CE compte et CE navigateur ;
+ * échange du code (PKCE) puis même vérification et même stockage que le jeton collé.
+ */
+export async function finishClaudeOauth(app, userId, params, req, res) {
+  const { cfg, db } = app;
+  const state = params.get('state');
+  const row = state ? await db.prepare('SELECT * FROM oauth_states WHERE state = ? AND created_at > ?').get(String(state), now() - OAUTH_STATE_TTL) : null;
+  if (state) await db.prepare('DELETE FROM oauth_states WHERE state = ?').run(String(state));
+  setCookie(res, OAUTH_COOKIE, '', { maxAge: 0, path: OAUTH_COOKIE_PATH });
+
+  if (params.get('error')) throw new HttpError(400, params.get('error') === 'access_denied' ? 'Connexion annulée : tu as refusé l\'accès sur Claude.' : 'Claude a refusé la connexion.');
+  const code = params.get('code');
+  if (!code || !state) throw new HttpError(400, 'Retour de Claude incomplet : recommence.');
+  if (!row || row.provider !== 'claude' || String(row.nonce) !== String(userId)) throw new HttpError(400, 'Connexion expirée ou lancée depuis un autre compte : recommence.');
+  const bind = parseCookies(req)[OAUTH_COOKIE];
+  const a = Buffer.from(hashBind(bind || ''));
+  const b = Buffer.from(String(row.binding));
+  if (!bind || a.length !== b.length || !timingSafeEqual(a, b)) throw new HttpError(400, 'Connexion lancée depuis un autre navigateur : recommence.');
+  if (cfg.cliModeEnabled === false) throw new HttpError(403, CLI_DISABLED_MESSAGE);
+  if (!cfg.claudeOauth) throw new HttpError(503, OAUTH_UNAVAILABLE_MESSAGE, { expose: true });
+
+  const oc = cfg.claudeOauth;
+  const data = await tokenRequest(app, {
+    grant_type: 'authorization_code', code: String(code), state: String(state), redirect_uri: oc.redirectUri,
+    client_id: oc.clientId, code_verifier: row.verifier, expires_in: oc.expiresIn,
+  });
+  await (app.validateToken || ((t) => validateSubscriptionToken(app, t)))(data.access_token);
+  const consent = { at: now(), version: CONSENT_VERSION };
+  await saveLink(app, userId, { mode: MODES.subscription_token, secret_enc: encrypt(cfg.secretKey, data.access_token), consent, via: 'oauth', ...oauthFields(app, data) });
+  await setSetting(db, userId, 'claude_cli_consent_json', JSON.stringify(consent));
+}
+
+/** Jeton OAuth proche de son échéance (moins de 5 minutes) : on le renouvelle avec le refresh_token, sinon la liaison est à refaire. */
+async function refreshIfNeeded(app, userId, link) {
+  if (link?.via !== 'oauth' || !link.expires_at || link.expires_at - now() > 300) return link;
+  let refresh;
+  try { refresh = link.refresh_enc ? decrypt(app.cfg.secretKey, link.refresh_enc) : null; } catch { refresh = null; }
+  if (!refresh || !app.cfg.claudeOauth) throw new HttpError(403, LINK_INVALID_MESSAGE);
+  let data;
+  try { data = await tokenRequest(app, { grant_type: 'refresh_token', refresh_token: refresh, client_id: app.cfg.claudeOauth.clientId }); }
+  catch (e) {
+    if (e instanceof HttpError && e.status === 400) { await writeLink(app.db, userId, { ...link, valid: false }); throw new HttpError(403, LINK_INVALID_MESSAGE); }
+    throw e;
+  }
+  const next = { ...link, secret_enc: encrypt(app.cfg.secretKey, data.access_token), ...oauthFields(app, data) };
+  await writeLink(app.db, userId, next);
+  return next;
+}
+
 /** Mode « Claude du serveur » : administrateurs seulement, aucun secret stocké. */
 export async function linkServer(app, userId) {
   const user = await getUser(app.db, userId);
@@ -212,8 +321,9 @@ export async function unlink(app, userId) {
  * @returns {Promise<{ok:boolean, message:string}>}
  */
 export async function testLink(app, userId) {
-  const link = await readLink(app.db, userId);
+  let link = await readLink(app.db, userId);
   if (!link?.mode) throw new HttpError(400, LINK_REQUIRED_MESSAGE);
+  try { link = await refreshIfNeeded(app, userId, link); } catch (e) { if (!(e instanceof HttpError)) throw e; return { ok: false, message: e.message }; }
   const mark = async (valid) => writeLink(app.db, userId, { ...link, valid, last_test_at: now(), ...(valid ? { validated_at: now() } : {}) });
   try {
     if (link.mode === MODES.server) {
