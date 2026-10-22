@@ -30,18 +30,30 @@ ${urls}
 // Tout vient de l'application elle-même : ni script, ni style, ni police, ni image d'un autre domaine.
 // Pas de style en ligne : les largeurs, couleurs et animations passent par des classes de public/*.css.
 // form-action liste les fournisseurs de connexion (un formulaire ne les vise pas aujourd'hui, la redirection oui).
-const CSP = [
+const directives = (extra = {}) => [
   "default-src 'self'",
-  "script-src 'self'",
+  `script-src 'self'${extra.script ? ` ${extra.script}` : ''}`,
   "style-src 'self'",
   "img-src 'self' data:",
   "font-src 'self'",
   "connect-src 'self'",
+  ...(extra.frame ? [`frame-src ${extra.frame}`] : []),
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self' https://accounts.google.com https://appleid.apple.com",
   "frame-ancestors 'none'",
 ].join('; ');
+const CSP = directives();
+
+// reCAPTCHA : uniquement les domaines que Google documente pour la version 3, et uniquement sur la page de connexion
+// (le script n'y est chargé qu'après le consentement de l'utilisateur, voir public/captcha.js).
+const RECAPTCHA_CSP = directives({
+  script: 'https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/',
+  frame: 'https://www.google.com/recaptcha/ https://recaptcha.google.com/recaptcha/',
+});
+
+/** CSP de la page : celle de la connexion autorise reCAPTCHA quand il est configuré, toutes les autres jamais. */
+export const cspFor = (pathname, recaptcha) => (recaptcha && pathname.replace(/(.)\/$/, '$1') === '/login' ? RECAPTCHA_CSP : CSP);
 
 /** En-têtes posés sur toutes les réponses. HSTS seulement si le site est servi en https. */
 export function securityHeaders(appUrl) {

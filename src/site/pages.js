@@ -1,4 +1,4 @@
-// Pages publiques du site (rendu serveur, sans script). Les textes sont écrits pour être lus tels quels :
+// Pages publiques du site (rendu serveur, sans script, sauf la vérification anti-robot de la connexion). Les textes sont écrits pour être lus tels quels :
 // rien ici ne promet un résultat, rien n'est chiffré au-delà de ce que le code fait réellement.
 import { esc } from '../http.js';
 import { siteLayout } from './layout.js';
@@ -7,9 +7,29 @@ import { siteLayout } from './layout.js';
 export const providersText = (apple) => (apple ? 'Google ou Apple' : 'Google');
 
 // ---------- Connexion ----------
-export function loginPage({ appUrl, error = null, apple = false, bye = false }) {
+// Avec reCAPTCHA (clés configurées), la page demande d'abord le consentement : rien n'est chargé depuis Google avant le
+// clic sur « Charger la vérification anti-robot » (public/captcha.js). Les boutons sont alors des formulaires POST qui
+// portent le jeton ; sans reCAPTCHA, ce sont de simples liens.
+function captchaBox(siteKey) {
+  return `<div class="captcha" data-captcha data-sitekey="${esc(siteKey)}">
+      <h3>Vérification anti-robot</h3>
+      <p>Pour protéger la connexion contre les programmes automatiques, AiTools utilise Google reCAPTCHA. Il n'est chargé qu'avec ton accord : Google dépose alors des cookies et reçoit ton adresse IP, des informations sur ton navigateur et sur ton comportement sur la page. Rien n'est envoyé à Google avant ton clic. <a href="/confidentialite#destinataires">En savoir plus</a></p>
+      <p><button type="button" class="btn" data-captcha-load>Charger la vérification anti-robot</button></p>
+      <p class="fine" role="status" data-captcha-status>Les boutons de connexion s'activent une fois la vérification chargée.</p>
+      <noscript><p class="error">JavaScript est nécessaire pour la vérification anti-robot.</p></noscript>
+    </div>`;
+}
+
+const loginButtons = ({ apple, captcha }) => (captcha
+  ? `<form method="post" action="/auth/google" data-captcha-form><input type="hidden" name="captcha" value=""><button class="btn primary" disabled>Se connecter avec Google</button></form>
+      ${apple ? '<form method="post" action="/auth/apple" data-captcha-form><input type="hidden" name="captcha" value=""><button class="btn apple" disabled>Se connecter avec Apple</button></form>' : ''}
+      <p class="fine">Ce site est protégé par reCAPTCHA : la <a href="https://policies.google.com/privacy" rel="noopener noreferrer">politique de confidentialité</a> et les <a href="https://policies.google.com/terms" rel="noopener noreferrer">conditions d'utilisation</a> de Google s'appliquent.</p>`
+  : `<a class="btn primary" href="/auth/google">Se connecter avec Google</a>
+      ${apple ? '<a class="btn apple" href="/auth/apple">Se connecter avec Apple</a>' : ''}`);
+
+export function loginPage({ appUrl, error = null, apple = false, bye = false, captcha = null }) {
   return siteLayout({
-    appUrl, path: '/login', noindex: true,
+    appUrl, path: '/login', noindex: true, scripts: captcha ? ['/static/captcha.js'] : [],
     title: 'Connexion · AiTools',
     description: `Connecte-toi à AiTools avec ton compte ${providersText(apple)}. Ton compte est créé à la première connexion, sans mot de passe.`,
     body: `<div class="wrap auth">
@@ -23,9 +43,9 @@ export function loginPage({ appUrl, error = null, apple = false, bye = false }) 
     <h2 id="connexion-titre">Continuer avec</h2>
     ${bye ? '<p class="ok" role="status">Ton compte et toutes ses données ont été supprimés.</p>' : ''}
     ${error ? `<p class="error" role="alert">${esc(error)}</p>` : ''}
+    ${captcha ? captchaBox(captcha.siteKey) : ''}
     <div class="login-btns">
-      <a class="btn primary" href="/auth/google">Se connecter avec Google</a>
-      ${apple ? '<a class="btn apple" href="/auth/apple">Se connecter avec Apple</a>' : ''}
+      ${loginButtons({ apple, captcha })}
     </div>
     <p class="fine">En te connectant, tu acceptes les <a href="/cgu">conditions d'utilisation</a> et tu reconnais avoir pris connaissance de la <a href="/confidentialite">politique de confidentialité</a>.</p>
   </section>

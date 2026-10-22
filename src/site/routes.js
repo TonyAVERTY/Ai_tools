@@ -6,7 +6,7 @@ import { robotsTxt, sitemapXml } from './seo.js';
 
 export function registerSiteRoutes(router, { cfg }) {
   const apple = !!cfg.apple;
-  const ctx = { appUrl: cfg.appUrl, apple };
+  const ctx = { appUrl: cfg.appUrl, apple, captcha: !!cfg.recaptcha };
   const open = { public: true };
 
   router.get('/fonctionnement', async ({ res }) => html(res, howPage(ctx)), open);

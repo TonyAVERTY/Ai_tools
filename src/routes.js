@@ -1,7 +1,8 @@
 import { now, getSetting, setSetting } from './db.js';
 import { encrypt, encryptJson, decryptJson, verifyUnsubToken } from './crypto.js';
 import { html, json, redirect, readBody, HttpError } from './http.js';
-import { startLogin, finishLogin, destroySession, getSession } from './auth.js';
+import { startLogin, finishLogin, destroySession, getSession, checkOrigin } from './auth.js';
+import { verifyCaptcha } from './captcha.js';
 import { deleteUser, normalizeEmail } from './users.js';
 import {
   assertCanRunAi, getLinkState, linkApiKey, linkSubscriptionToken, linkServer, unlink, testLink, lastConsent,
@@ -49,21 +50,37 @@ export function registerRoutes(router, app) {
   // Déjà connecté : la page de connexion n'a rien à offrir, on va au tableau de bord
   router.get('/login', async ({ req, res, url }) => {
     if (await getSession(db, req)) return redirect(res, '/');
-    html(res, loginPage({ appUrl: cfg.appUrl, error: url.searchParams.get('e'), apple: !!cfg.apple, bye: url.searchParams.has('bye') }));
+    html(res, loginPage({ appUrl: cfg.appUrl, error: url.searchParams.get('e'), apple: !!cfg.apple, bye: url.searchParams.has('bye'), captcha: cfg.recaptcha ? { siteKey: cfg.recaptcha.siteKey } : null }));
   }, { public: true });
   // Erreur de connexion : message du serveur s'il est destiné à l'utilisateur, sinon générique (rien de technique à l'écran)
   const loginFailed = (res, e) => {
-    if (!e.status || e.status >= 500) console.error('[connexion]', e);
-    redirect(res, `/login?e=${encodeURIComponent(e.status && e.status < 500 ? e.message : 'Connexion impossible, réessaie dans un instant')}`);
+    if (!e.status || (e.status >= 500 && !e.expose)) console.error('[connexion]', e);
+    redirect(res, `/login?e=${encodeURIComponent(e.status && (e.status < 500 || e.expose) ? e.message : 'Connexion impossible, réessaie dans un instant')}`);
   };
-  router.get('/auth/google', async ({ res }) => startLogin(app, 'google', res), { public: true, limit: 'auth_start' });
+  // Démarrage : avec reCAPTCHA, seul un POST portant un jeton valide démarre le flux (le GET renvoie vers la page de connexion)
+  const start = (name) => ({
+    get: async ({ res }) => {
+      if (cfg.recaptcha) return redirect(res, `/login?e=${encodeURIComponent('Passe par la vérification anti-robot de la page de connexion')}`);
+      return startLogin(app, name, res);
+    },
+    post: async ({ req, res }) => {
+      try {
+        checkOrigin(req, cfg);
+        await verifyCaptcha(app, (await readBody(req)).captcha);
+      } catch (e) { return loginFailed(res, e); }
+      return startLogin(app, name, res);
+    },
+  });
+  router.get('/auth/google', start('google').get, { public: true, limit: 'auth_start' });
+  router.post('/auth/google', start('google').post, { public: true, limit: 'auth_start' });
   router.get('/auth/google/callback', async ({ req, res, url }) => {
     try { await finishLogin(app, 'google', url.searchParams, req, res); }
     catch (e) { loginFailed(res, e); }
   }, { public: true, limit: 'auth_callback' });
   // Apple : le retour est un POST cross-site (response_mode=form_post), donc public et sans contrôle d'origine ;
   // la protection repose sur state + nonce + cookie de liaison (voir auth.js)
-  router.get('/auth/apple', async ({ res }) => startLogin(app, 'apple', res), { public: true, limit: 'auth_start' });
+  router.get('/auth/apple', start('apple').get, { public: true, limit: 'auth_start' });
+  router.post('/auth/apple', start('apple').post, { public: true, limit: 'auth_start' });
   router.post('/auth/apple/callback', async ({ req, res }) => {
     try { await finishLogin(app, 'apple', await readBody(req), req, res); }
     catch (e) { loginFailed(res, e); }

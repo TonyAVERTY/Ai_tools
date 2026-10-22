@@ -30,8 +30,9 @@ export function absoluteUrl(appUrl, path) {
  * @param {string} o.body        contenu de <main>, déjà échappé
  * @param {boolean} [o.noindex]  page à ne pas indexer (connexion, 404)
  * @param {object} [o.jsonLd]    données structurées (bloc de données, non exécuté : compatible avec la CSP)
+ * @param {string[]} [o.scripts] scripts de l'application (chemins /static/…) ; aucun par défaut
  */
-export function siteLayout({ appUrl, path, title, description, body, noindex = false, jsonLd = null }) {
+export function siteLayout({ appUrl, path, title, description, body, noindex = false, jsonLd = null, scripts = [] }) {
   const url = absoluteUrl(appUrl, path === '/' ? '/' : path);
   const year = new Date().getFullYear();
   const link = ([href, label]) => `<li><a href="${href}"${href === path ? ' aria-current="page"' : ''}>${esc(label)}</a></li>`;
@@ -56,7 +57,7 @@ ${noindex ? '' : `<link rel="canonical" href="${esc(url)}">\n`}<meta name="color
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 <link rel="stylesheet" href="/static/app.css">
 <link rel="stylesheet" href="/static/site.css">
-${jsonLd ? `<script type="application/ld+json">${JSON.stringify(jsonLd).replace(/</g, '\\u003c')}</script>\n` : ''}</head>
+${scripts.map((src) => `<script src="${esc(src)}" defer></script>\n`).join('')}${jsonLd ? `<script type="application/ld+json">${JSON.stringify(jsonLd).replace(/</g, '\\u003c')}</script>\n` : ''}</head>
 <body class="site">
 <a class="skip" href="#contenu">Aller au contenu</a>
 <header class="site-head">
