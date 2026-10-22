@@ -3,6 +3,7 @@
 import { now } from '../db.js';
 import { getProject } from '../projects.js';
 import { notify } from './notify.js';
+import { pinImap } from '../netguard.js';
 
 // Webmails grand public : une réponse d'un autre @gmail.com ne dit rien sur l'entreprise
 const GENERIC_DOMAINS = new Set([
@@ -92,6 +93,7 @@ export async function fetchInbox(creds, state, { since, max = 500 }) {
   const client = new ImapFlow({
     host: creds.host, port: creds.port, secure: creds.port === 993,
     auth: { user: creds.user, pass: creds.pass }, logger: false,
+    ...(creds.servername ? { servername: creds.servername } : {}),
     socketTimeout: 60_000, connectionTimeout: 15_000,
   });
   // Sans écouteur, une erreur réseau tardive (timeout après un échec d'auth) ferait planter tout le serveur
@@ -153,7 +155,9 @@ export async function checkInbox(app, userId, projectId) {
   const at = now();
   const save = (s) => db.prepare('UPDATE projects SET inbox_json = ? WHERE id = ?').run(JSON.stringify(s), project.id);
   try {
-    const r = await (app.fetchInbox || fetchInbox)(project.imap, state, { since });
+    // Hôte vérifié à CHAQUE lecture et connexion à l'adresse vérifiée (pas de rebinding DNS entre les deux)
+    const imap = await pinImap(app, userId, project.imap);
+    const r = await (app.fetchInbox || fetchInbox)(imap, state, { since });
     const res = await applyMessages(db, project.id, r.messages, { at });
     await save({
       uidValidity: r.uidValidity, lastUid: r.lastUid, lastCheck: at, lastOk: at, lastError: null,

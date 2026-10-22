@@ -48,8 +48,16 @@ export const GIT_HARDENING = [
   '-c', 'core.fsmonitor=false', '-c', 'submodule.recurse=false', '-c', 'core.symlinks=false',
 ];
 
-export const cloneArgs = (url, dir) => [...GIT_HARDENING, 'clone', '--depth', '1', '--single-branch', '--no-tags', '--no-recurse-submodules', url, dir];
-export const fetchArgs = () => [...GIT_HARDENING, 'fetch', '--depth', '1', '--no-tags', '--no-recurse-submodules', 'origin', 'HEAD'];
+// Épinglage : git se connecte à l'adresse déjà vérifiée (pas de seconde résolution DNS) et ne suit aucune redirection,
+// qui pourrait mener vers un hôte interne. Nécessite git >= 2.37 pour http.curloptResolve (ignoré sur une version plus ancienne).
+export function pinArgs(pin) {
+  if (!pin) return [];
+  const addr = pin.family === 6 ? `[${pin.address}]` : pin.address;
+  return ['-c', `http.curloptResolve=${pin.host}:${pin.port}:${addr}`, '-c', 'http.followRedirects=false'];
+}
+
+export const cloneArgs = (url, dir, pin = null) => [...GIT_HARDENING, ...pinArgs(pin), 'clone', '--depth', '1', '--single-branch', '--no-tags', '--no-recurse-submodules', url, dir];
+export const fetchArgs = (pin = null) => [...GIT_HARDENING, ...pinArgs(pin), 'fetch', '--depth', '1', '--no-tags', '--no-recurse-submodules', 'origin', 'HEAD'];
 
 /** Taille d'un dossier en octets (sans suivre les liens symboliques). Coupe court dès que `limit` est dépassé. */
 export function dirSize(dir, limit = Infinity) {
@@ -94,12 +102,12 @@ export async function syncRepo(url, dir, token, opts = {}) {
     // L'URL est relue en base : on revalide ici (pas de file://, ext::, ssh) quel que soit l'appelant
     url = validateGitUrl(url);
     if (existsSync(`${dir}/.git`)) {
-      await runGit(fetchArgs(), { token, cwd: dir, watchDir: dir, ...opts });
+      await runGit(fetchArgs(opts.pin), { token, cwd: dir, watchDir: dir, ...opts });
       await runGit([...GIT_HARDENING, 'reset', '--hard', 'FETCH_HEAD'], { token, cwd: dir, ...opts });
     } else {
       rmSync(dir, { recursive: true, force: true });
       mkdirSync(dirname(dir), { recursive: true });
-      try { await runGit(cloneArgs(url, dir), { token, watchDir: dir, ...opts }); }
+      try { await runGit(cloneArgs(url, dir, opts.pin), { token, watchDir: dir, ...opts }); }
       catch (e) { rmSync(dir, { recursive: true, force: true }); throw e; }
     }
     const { stdout } = await runGit([...GIT_HARDENING, 'rev-parse', 'HEAD'], { cwd: dir, ...opts });

@@ -85,6 +85,9 @@ export function loadConfig() {
     },
     apple: appleConfig(),
     recaptcha: recaptchaConfig(),
+    production: env.NODE_ENV === 'production',
+    // Développement : autorise les hôtes privés (SMTP local, etc.). En production, seulement pour les administrateurs.
+    allowPrivateHosts: flag(env.ALLOW_PRIVATE_HOSTS, false),
     // Administrateurs : ces adresses seulement (la première est aussi propriétaire des données migrées)
     adminEmails: (env.ADMIN_EMAILS || '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean),
     secretKey: Buffer.from(secretKey, 'hex'),

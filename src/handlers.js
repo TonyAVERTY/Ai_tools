@@ -13,6 +13,7 @@ import { quotaAlerts } from './services/budget.js';
 import { notify } from './services/notify.js';
 import { quotaFor, recordUsage, planLimitMessage } from './services/plans.js';
 import { getUser } from './users.js';
+import { pinSmtp, pinGit } from './netguard.js';
 import { evolutionMail } from './services/mailhtml.js';
 import { getProject, repoDir, forgejoToken, globalSmtp, sentSince, getTemplate, saveTemplate, pickVariant } from './projects.js';
 
@@ -89,7 +90,8 @@ export function makeClaude(app) {
 export function makeHandlers(app) {
   const { db, cfg } = app;
   const claude = makeClaude(app);
-  const sync = (...a) => (app.syncRepo || syncRepo)(...a);
+  // Forgejo : l'hôte est revérifié à chaque synchronisation, git se connecte à l'adresse vérifiée
+  const sync = async (userId, url, dir, token) => (app.syncRepo || syncRepo)(url, dir, token, { pin: await pinGit(app, userId, url) });
   const inHours = () => (app.isBusinessHours || isBusinessHours)();
 
   // Premier mail ou relance : mêmes plafonds, mêmes délais, même journal
@@ -122,7 +124,7 @@ export function makeHandlers(app) {
     const n = mq.unlimited ? n0 : Math.min(n0, mq.remaining);
     if (n === 0) throw new Error(kind === 'followup' ? 'Plafond quotidien atteint ou aucune relance due' : 'Plafond quotidien atteint ou aucun prospect à contacter');
 
-    const transport = (app.createTransport || createTransport)(project.smtp);
+    const transport = (app.createTransport || createTransport)(await pinSmtp(app, userId, project.smtp));
     await transport.verify();
     const minDelay = Number(await getSetting(db, userId, 'send_delay_min', '20')) * 1000;
     const maxDelay = Number(await getSetting(db, userId, 'send_delay_max', '60')) * 1000;
@@ -185,7 +187,7 @@ export function makeHandlers(app) {
       const project = await getProject(app, ctx.job.project_id, { userId });
       await ctx.progress({ message: 'Récupération du repo…', pct: 3 });
       const dir = repoDir(cfg, userId, project.id);
-      const commit = await sync(project.gitUrl, dir, await forgejoToken(app, userId));
+      const commit = await sync(userId, project.gitUrl, dir, await forgejoToken(app, userId));
 
       await ctx.progress({ message: 'Analyse du code par Claude…', pct: 10 });
       const { prompt, system } = analyzePrompt(project.name);
@@ -314,7 +316,7 @@ export function makeHandlers(app) {
 
       await ctx.progress({ message: 'Mise à jour du repo…', pct: 3 });
       const dir = repoDir(cfg, userId, project.id);
-      await sync(project.gitUrl, dir, await forgejoToken(app, userId));
+      await sync(userId, project.gitUrl, dir, await forgejoToken(app, userId));
 
       await ctx.progress({ message: `Recherche de ${count} évolutions (${level})…`, pct: 10 });
       const { prompt, system } = evolutionPrompt({ projectName: project.name, profile: project.profile, count, level });
@@ -329,7 +331,7 @@ export function makeHandlers(app) {
       if (!r.text?.trim()) throw new Error(`Pas de résultat (${r.subtype})`);
 
       await ctx.progress({ message: 'Envoi par mail…', pct: 95 });
-      const transport = (app.createTransport || createTransport)(smtp);
+      const transport = (app.createTransport || createTransport)(await pinSmtp(app, userId, smtp));
       await transport.sendMail({
         from: smtp.fromEmail, to,
         subject: `[AiTools] ${count} évolutions pour ${project.name}`,

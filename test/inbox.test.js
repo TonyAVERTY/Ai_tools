@@ -10,7 +10,7 @@ import { createProject, saveSecretConfig, getProject, imapCredentials } from '..
 
 async function setup() {
   const db = await testDb();
-  const app = { db, cfg: { secretKey: randomBytes(32) } };
+  const app = { resolveHost: async () => [{ address: '93.184.216.34', family: 4 }], db, cfg: { secretKey: randomBytes(32) } };
   const userId = await addUser(db);
   const id = await createProject(app, { userId, name: 'P', gitUrl: 'https://git.x/T/P.git' });
   const add = async (company, email, msgId, status = 'sent') => {

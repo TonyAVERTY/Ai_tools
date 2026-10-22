@@ -16,7 +16,7 @@ async function queryMysql(cfg, queries) {
   const mysql = await import('mysql2/promise');
   const conn = await mysql.createConnection({
     host: cfg.host, port: Number(cfg.port || 3306), user: cfg.user, password: cfg.password,
-    database: cfg.database, connectTimeout: 8000, ssl: cfg.ssl ? {} : undefined,
+    database: cfg.database, connectTimeout: 8000, ssl: cfg.ssl ? { servername: cfg.servername } : undefined,
   });
   try {
     await conn.query('START TRANSACTION READ ONLY');
@@ -35,7 +35,7 @@ async function queryPg(cfg, queries) {
   const client = new pg.Client({
     host: cfg.host, port: Number(cfg.port || 5432), user: cfg.user, password: cfg.password,
     database: cfg.database, connectionTimeoutMillis: 8000, statement_timeout: 10_000,
-    ssl: cfg.ssl ? { rejectUnauthorized: false } : undefined,
+    ssl: cfg.ssl ? { rejectUnauthorized: false, servername: cfg.servername } : undefined,
   });
   await client.connect();
   try {

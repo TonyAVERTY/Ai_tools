@@ -3,6 +3,7 @@
 import { now } from '../db.js';
 import { getProject } from '../projects.js';
 import { fetchRecap } from './recap.js';
+import { pinDb } from '../netguard.js';
 import { parisParts, parisTime, addParisDays } from './paris-time.js';
 
 const pad = (n) => String(n).padStart(2, '0');
@@ -25,7 +26,7 @@ export async function snapshotAll(app, { date = new Date(), log = console } = {}
   for (const { id, user_id: userId } of todo) {
     try {
       const p = await getProject(app, id, { userId, secrets: true });
-      await saveSnapshot(app.db, id, await (app.fetchRecap || fetchRecap)(id, p.dbCfg, { force: true }), { date });
+      await saveSnapshot(app.db, id, await (app.fetchRecap || fetchRecap)(id, await pinDb(app, userId, p.dbCfg), { force: true }), { date });
       n++;
     } catch (e) { log.error(`[métriques ${id}]`, e.message); }
   }
