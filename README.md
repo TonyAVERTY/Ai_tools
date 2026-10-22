@@ -9,7 +9,7 @@ la version publique cible un serveur CloudPanel avec une base MySQL/MariaDB (voi
 - **Node 22, zéro framework** : `node:http`. Dépendances : `nodemailer`, `imapflow`, `mysql2`, `pg`.
 - **Base MySQL / MariaDB** (`mysql2`, pool, utf8mb4, InnoDB), accès entièrement asynchrone via `src/db.js`. SQLite (`node:sqlite`, en mémoire) ne sert plus que pour les tests locaux et comme source du script de migration.
 - **Rendu serveur + JS vanilla**, pas de build.
-- **Un seul job IA à la fois** (file en base). Le process Claude tourne en `nice 10`. Pause automatique si le CPU dépasse `THERMAL_MAX`.
+- **File de jobs équitable** (en base) : `MAX_AI_JOBS` jobs en parallèle, un seul par utilisateur, tourniquet entre utilisateurs. Le process Claude tourne en `nice 10`. Les nouveaux jobs attendent si la charge du serveur dépasse `LOAD_MAX` (voir « Anti-abus, plafonds et administration »).
 - **Économie de tokens** :
   - outils Claude restreints à chaque job (lecture seule pour le code, WebSearch/WebFetch pour la prospection) ;
   - `--max-turns` borné ;
@@ -57,7 +57,7 @@ Le site (`ai.tony-averty.dev`) est servi par la même application, dans `src/sit
 
 ## Pilotage
 
-- **Jobs de nuit** : Prospecter et Évolution proposent « Maintenant » ou « Cette nuit ». Le job démarre au prochain créneau entre 1h et 6h (heure de Paris, changements d'heure gérés), quand le Pi est au frais et que ton quota Claude est libre. Il est annulable jusqu'au départ.
+- **Jobs de nuit** : Prospecter et Évolution proposent « Maintenant » ou « Cette nuit ». Le job démarre au prochain créneau entre 1h et 6h (heure de Paris, changements d'heure gérés), quand le serveur est peu chargé et que ton quota Claude est libre. Il est annulable jusqu'au départ.
 - **Budget IA** : plafonds glissants sur 24 h et sur 30 jours, en équivalent $ API remonté par Claude Code. L'abonnement Pro ne facture rien en plus ; c'est un garde-fou pour ton quota.
   - Plafond atteint : les jobs IA **restent en file** et repartent seuls quand la fenêtre glisse. Les envois et relances, qui ne consomment pas d'IA, continuent.
   - Un job en cours n'est jamais coupé : le plafond peut donc être dépassé d'un job.
@@ -152,6 +152,44 @@ Chaque utilisateur relie SON accès ; ses jobs IA tournent avec cet accès uniqu
 
 - **Google** : voir « Google OAuth » plus bas. URI de redirection : `https://<domaine>/auth/google/callback`.
 - **Apple** (facultatif) : dans developer.apple.com, crée un *Services ID* (c'est `APPLE_CLIENT_ID`), active « Sign in with Apple » avec ton domaine et l'URL de retour `https://<domaine>/auth/apple/callback`, puis une clé *Sign in with Apple* : son identifiant est `APPLE_KEY_ID`, le fichier `.p8` va dans `APPLE_PRIVATE_KEY` sur une seule ligne (retours à la ligne écrits `\n`). `APPLE_TEAM_ID` est l'identifiant d'équipe. Le secret client (JWT ES256) est généré à chaque connexion, rien n'est stocké. Apple répond par un POST cross-site : le flux est protégé par state, nonce et un cookie de liaison `SameSite=None` limité à `/auth`.
+
+## Anti-abus, plafonds et administration
+
+Les seuils, fenêtres et plafonds vivent dans **un seul module : `src/limits.js`**. Les pages Tarifs lisent les mêmes chiffres.
+
+### Limitation de débit
+
+En mémoire (fenêtre glissante, sans dépendance), par adresse IP et par compte. Au-delà du seuil : `429` avec `Retry-After`. Règles : démarrage et retours de connexion, routes `/link/*`, export et import CSV, envois (lot, rapport, notification de test), création de projet, suppression de compte, tests de connexion (IMAP, base du récap), back-office. Les compteurs sont perdus à un redémarrage et non partagés entre instances (une seule instance en production).
+
+**`TRUST_PROXY`** (désactivé par défaut) : derrière Nginx de CloudPanel, toutes les requêtes arrivent de `127.0.0.1` ; sans réglage, tous les visiteurs partagent donc le même compteur.
+- `TRUST_PROXY=true` : `X-Forwarded-For` est lu **seulement** si la connexion vient d'un proxy local (127.0.0.0/8, `::1`).
+- `TRUST_PROXY=127.0.0.1,10.0.0.0/8` : liste d'adresses ou de plages CIDR de proxys de confiance.
+- L'en-tête est lu de droite à gauche et on garde la première adresse qui n'est pas un proxy de confiance : les valeurs inventées par le client à gauche sont ignorées. Nginx doit AJOUTER l'adresse (`proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;`). Sans `TRUST_PROXY`, un en-tête forgé n'a aucun effet. Derrière Cloudflare Tunnel seul, l'adresse réelle est dans `CF-Connecting-IP`, qui n'est pas lue : garde Nginx devant.
+
+### reCAPTCHA v3 (connexion)
+
+`RECAPTCHA_SITE_KEY` + `RECAPTCHA_SECRET` (les deux ou aucune), `RECAPTCHA_MIN_SCORE` (0,5 par défaut). Le démarrage de la connexion Google et Apple devient un POST qui porte un jeton, vérifié côté serveur (score, action `login`, site). **Rien n'est chargé depuis Google avant le clic sur « Charger la vérification anti-robot »** de la page de connexion ; la CSP n'ouvre les domaines reCAPTCHA que sur `/login`. Sans clés, reCAPTCHA est désactivé (développement, avertissement au démarrage) ; avec les clés, aucun réglage ne permet de le contourner. Le choix n'est pas mémorisé. La politique de confidentialité décrit reCAPTCHA seulement quand il est configuré.
+
+### Plafonds des plans
+
+Plan gratuit : 1 projet, 50 prospects, 100 mails et 5 jobs IA par mois (mois calendaire, heure de Paris). Un administrateur (`ADMIN_EMAILS`) n'a pas de limite ; le plan `pro` est illimité en attendant qu'il soit défini. Projets et prospects se comptent dans leurs tables ; mails et jobs IA dans `usage_events`, qui survit à la suppression d'un projet. Rien ne se stocke en compteur : l'usage est toujours une somme. Un dépassement refuse l'action (`403`, code `plan_limit`, lien `/tarifs`) sans rien supprimer : un import CSV trop gros est refusé en entier, un lot de mails est tronqué à ce qui reste, une recherche de prospects n'enregistre pas au-delà du plafond. L'usage du mois s'affiche (barres) dans Mon compte et sur le tableau de bord.
+
+### File de jobs
+
+`MAX_AI_JOBS` jobs en parallèle (4 par défaut, un serveur de 6 cœurs), **au plus un par utilisateur**, prochain job choisi en tourniquet entre utilisateurs. Réservation atomique en base. L'arrêt attend tous les jobs en cours. Les nouveaux jobs attendent quand la charge du serveur dépasse `LOAD_MAX` (charge moyenne sur 1 minute divisée par le nombre de cœurs, 0,9 par défaut, reprise 0,1 plus bas) ; les jobs en cours continuent. `nice 10` est conservé. Budget IA et quota Claude restent par utilisateur.
+
+### Hôtes saisis par l'utilisateur (SSRF)
+
+SMTP, IMAP, base du récap et hôte Forgejo : le nom est résolu, toute adresse privée, loopback, link-local (dont `169.254.169.254`), CGNAT, `fc00::/7`, `fe80::/10` ou IPv4 mappée est refusée, et la connexion se fait **à l'adresse vérifiée** (nom conservé pour SNI et certificat), revérifiée à chaque connexion (pas de rebinding DNS). Git est épinglé par `http.curloptResolve` (git 2.37 ou plus) et ne suit aucune redirection. Ports par type dans `ALLOWED_PORTS` (`src/limits.js`) : SMTP 25/465/587/2525, IMAP 143/993, MySQL 3306/3307/25060, PostgreSQL 5432/5433/25061, Git 443/8443. `ALLOW_PRIVATE_HOSTS=true` autorise les hôtes privés et tous les ports : pour le développement, et en production pour les administrateurs seulement.
+
+### Back-office `/admin`
+
+Réservé aux administrateurs (`404` pour tous les autres). Liste paginée des comptes (email, fournisseur, plan, statut, dates, mode de liaison sans secret, usage du mois), recherche par email, suspendre / réactiver, plan gratuit ou pro, supprimer (saisie de l'email), rétablir les envois. Un administrateur ne peut ni se suspendre ni se supprimer, ni agir sur un autre administrateur. Aucune donnée métier (prospects, mails, notes) n'est consultable. Journal d'audit en lecture seule, adresses masquées, conservé 12 mois.
+
+### Comptes inactifs et abus d'envoi
+
+- **Inactifs** : après `INACTIVE_ACCOUNT_MONTHS` mois (24, `0` pour désactiver) sans connexion ni job, un mail d'avertissement part via le SMTP du serveur (`SYSTEM_SMTP_HOST`, `_PORT`, `_USER`, `_PASSWORD`, `_FROM`, toutes ensemble), puis le compte est supprimé 30 jours plus tard s'il est resté inactif. **Sans SMTP du serveur, rien n'est supprimé automatiquement** : l'avertissement est journalisé. Jamais un administrateur ni un compte suspendu.
+- **Rejets** : au-delà de 10 % de rejets sur au moins 50 prospects contactés (30 jours), les envois du compte sont mis en pause, avec message clair, audit, journal du serveur et Discord de l'administrateur. L'administrateur rétablit depuis `/admin`. Désinscription et liste d'opposition inchangées.
 
 ## Installation sur un serveur (CloudPanel ou autre, sans Raspberry)
 

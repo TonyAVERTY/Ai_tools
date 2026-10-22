@@ -1,6 +1,48 @@
 # Journal de projet — AiTools
 
-Branches de travail : `feat/saas-mysql` (J1), `feat/saas-accounts` (J2, depuis la précédente) `feat/saas-claude-link` (J3, depuis J2) puis `feat/saas-site` (J4, depuis J3) — version publique, voir `docs/CADRAGE.md`.
+Branches de travail : `feat/saas-mysql` (J1), `feat/saas-accounts` (J2, depuis la précédente) `feat/saas-claude-link` (J3, depuis J2) puis `feat/saas-site` (J4, depuis J3) et `feat/saas-guardrails` (J5, depuis J4) — version publique, voir `docs/CADRAGE.md`.
+
+## 2026-10-22 — J5 « Anti-abus, quotas et administration »
+
+### Fait
+- **Limitation de débit** (`src/ratelimit.js`, seuils dans `src/limits.js`) : fenêtre glissante en mémoire, par IP et par compte, sans dépendance. Connexion (démarrage, retours Google et Apple), `/link/*`, export et import CSV, envois (lot, rapport, notification de test), création de projet, suppression de compte, tests IMAP et récap, back-office. `429` + `Retry-After` ; une requête refusée n'est pas comptée. `TRUST_PROXY` (défaut : désactivé) : `X-Forwarded-For` lu de droite à gauche, seulement depuis un proxy de confiance (loopback, ou liste/CIDR), les valeurs de gauche forgées par le client sont ignorées.
+- **reCAPTCHA v3** (`src/captcha.js`, `public/captcha.js`) : le démarrage de la connexion devient un POST avec jeton, vérifié côté serveur (score ≥ `RECAPTCHA_MIN_SCORE`, action, site). Le script de Google n'est chargé qu'après le clic sur « Charger la vérification anti-robot » ; la CSP ouvre les domaines reCAPTCHA sur `/login` seulement. Sans clés : désactivé. Politique de confidentialité mise à jour (destinataires, cookies, adresse IP en mémoire) seulement quand reCAPTCHA est configuré.
+- **Plafonds du plan gratuit** (`src/services/plans.js`) : 1 projet, 50 prospects, 100 mails, 5 jobs IA par mois (mois calendaire Paris). Migration 3 `usage_events` (journal d'usage qui survit à la suppression d'un projet). Refus `403 plan_limit` avec lien `/tarifs`, sans perte (import CSV refusé en entier, lot de mails tronqué, recherche de prospects arrêtée au plafond, projet créé même si l'analyse est refusée). Barres d'usage dans Mon compte et sur le tableau de bord. Page Tarifs corrigée.
+- **File de jobs** : `MAX_AI_JOBS` (4) en parallèle, un seul par utilisateur, tourniquet, réservation atomique (`UPDATE … WHERE status = 'queued'` + contrôle des lignes affectées et d'un job `running` du même utilisateur), arrêt qui attend tous les jobs. Pause thermique remplacée par une pause selon `charge / cœurs` (`LOAD_MAX`, hystérésis de 0,1). `nice 10` conservé. Testée avec le CLI simulé (`FAKE_DELAY_MS`, `FAKE_LOG` dans la fixture).
+- **SSRF** (`src/netguard.js`, `src/ip.js`) : SMTP, IMAP, base du récap, Forgejo. Résolution puis refus des adresses privées ; connexion à l'adresse vérifiée (SMTP/IMAP/BDD : `host` = IP + `servername`), git épinglé (`http.curloptResolve`, sans redirection). Ports par type. `ALLOW_PRIVATE_HOSTS` : dev, et admins seulement en production. Contrôle aussi à l'enregistrement (réponse 400 immédiate ; hôte non résolu accepté, revérifié à l'usage).
+- **Back-office `/admin`** (`src/admin.js`, `adminroutes.js`, `adminviews.js`) : 404 pour les non-admins et les visiteurs, liste paginée avec recherche, suspendre / réactiver / plan gratuit-pro / supprimer (saisie de l'email) / rétablir les envois. Migration 4 `admin_audit` (sans clé étrangère, adresses masquées, conservé 12 mois, lecture seule).
+- **Comptes inactifs** (`src/services/inactive.js`) : planificateur, `INACTIVE_ACCOUNT_MONTHS` (24, 0 = désactivé), avertissement 30 jours avant via `SYSTEM_SMTP_*`, suppression 30 jours après l'avertissement si pas de reconnexion. Page confidentialité corrigée (en place, durée configurée).
+- **Abus d'envoi** (`src/services/abuse.js`) : > 10 % de rejets sur ≥ 50 prospects contactés (30 jours) → pause d'envoi, message clair, audit, journal serveur, Discord des admins (forcé) et du compte. Rétablissement par l'admin.
+- **Tests** : `ratelimit`, `captcha`, `plans`, `queue`, `netguard`, `admin`, `abuse`, `inactive`.
+
+### Décisions
+- **Journal d'usage plutôt que `mail_log`/`jobs`** pour les plafonds mensuels : supprimer un projet efface ses jobs et ses logs de mail (cascade) et remettrait sinon le mois à zéro. Un job IA annulé ou refusé sans jamais démarrer n'est pas compté ; un job dont le projet a disparu l'est (prudence).
+- **Pas de suppression automatique sans avertissement reçu** : sans SMTP du serveur, les comptes inactifs sont journalisés et à traiter à la main (le brief disait « sinon journalisé » ; supprimer sans prévenir semblait pire).
+- **Le plan `pro` est illimité** tant qu'il n'est pas défini (`PLAN_LIMITS.pro` dans `src/limits.js`).
+- **Un admin ne touche pas aux autres admins** (suspension, plan, suppression) : leur rôle vient de `ADMIN_EMAILS`.
+- **Sans consentement reCAPTCHA, pas de connexion** (aucun contournement demandé) : la politique le dit. Le consentement n'est pas mémorisé.
+- **Git épinglé sans suivre de redirection** (`http.followRedirects=false`) : un dépôt hébergé derrière une redirection ne se clone plus.
+- Événement Discord `thermal` renommé `load` (les anciens réglages sont convertis à la lecture).
+
+### Non vérifié (à faire par Tony ou au prochain passage)
+- **MySQL/MariaDB réel** : toujours aucune base de test. Nouveau à valider avec `npm run test:mysql` : migrations 3 et 4, et surtout `UPDATE jobs … AND (SELECT COUNT(*) FROM (SELECT id FROM jobs WHERE … LIMIT 1) busy) = 0` (table dérivée avec `LIMIT` pour éviter l'erreur 1093 ; à confirmer sur MySQL 8 et MariaDB), `COUNT(DISTINCT CASE …)`, `LIKE … ESCAPE '!'`.
+- **reCAPTCHA réel** : clés, score, rendu du badge masqué, et surtout la **CSP** (`style-src 'self'` sans `unsafe-inline` : si reCAPTCHA injecte des styles en ligne, la console affichera des violations ; à vérifier dans un navigateur sur le domaine, ajuster seulement la CSP de `/login`). Durée du cookie `_GRECAPTCHA` non vérifiée (la page dit « durée fixée par Google »).
+- **Connexions réelles bloquées par le filtre** : SMTP/IMAP/MySQL réels avec `servername`, `tls.servername` pour STARTTLS (nodemailer), `http.curloptResolve` (git ≥ 2.37), non exécutables ici. Vérifier un envoi réel, une lecture IMAP et un clone sur le serveur.
+- **Charge** : `os.loadavg()` vaut toujours 0 sous Windows ; la pause de charge n'est testée qu'avec une charge injectée. Valeurs `MAX_AI_JOBS`/`LOAD_MAX` à régler sur le vrai serveur (bwrap, 4 jobs réels, mémoire non mesurés).
+- **TRUST_PROXY** derrière le Nginx de CloudPanel : à tester avec l'en-tête réellement posé.
+- **Mail d'avertissement d'inactivité** : jamais envoyé pour de vrai (transport simulé).
+
+### Risques
+- Compteurs de débit en mémoire : un redémarrage les remet à zéro ; plusieurs instances ne les partagent pas.
+- Quotas : `withUserLock` est un verrou de processus ; deux instances pourraient dépasser un plafond d'une unité.
+- Ports autorisés : un fournisseur de base managée sur un port inhabituel est refusé (liste dans `ALLOWED_PORTS`).
+- Une pause d'envoi se déclenche aussi sur des rejets dont l'utilisateur n'est pas responsable (liste achetée, panne chez un destinataire) : l'admin rétablit.
+- Aucune relecture juridique du paragraphe reCAPTCHA (consentement obligatoire pour se connecter : un consentement « libre » peut être contesté).
+
+### À faire
+- Fixer le plan `pro` (limites, prix) avec le jalon paiement.
+- Poser les clés reCAPTCHA, `SYSTEM_SMTP_*`, `TRUST_PROXY=true` (ou la liste) dans le `.env` du serveur ; `MAX_AI_JOBS` selon la charge réelle.
+- J6 : `install.sh` (Pi) propose encore `THERMAL_MAX` ; il n'est plus lu.
 
 ## 2026-10-22 — J4 « Site public »
 
@@ -29,7 +71,7 @@ Visibles en jaune sur les pages légales tant que l'information manque. Un test 
 - `[À COMPLÉTER : adresse du siège]` : mentions légales et confidentialité (adresse de l'EI).
 - `[À COMPLÉTER : hébergeur]` : mentions légales et confidentialité (nom, adresse, contact de l'hébergeur du serveur).
 - `[À COMPLÉTER : téléphone]` : mentions légales. La loi sur la confiance dans l'économie numérique demande un moyen de contact rapide pour l'éditeur ; à confirmer avec un juriste (un numéro, ou autre solution), sinon retirer la ligne.
-- `[À VALIDER : durées de conservation]` : confidentialité. Propositions : compte inactif supprimé après 24 mois (**non implémenté**, à coder ou à retirer), sessions 30 jours, sauvegardes environ 14 jours, journaux d'accès du serveur 12 mois (à vérifier avec la configuration réelle de Nginx/CloudPanel), prospects : recommandation de 3 ans après le dernier contact.
+- `[À VALIDER : durées de conservation]` : confidentialité. Propositions : compte inactif supprimé après 24 mois (implémenté au J5, avec avertissement 30 jours avant), journal d'administration 12 mois, sessions 30 jours, sauvegardes environ 14 jours, journaux d'accès du serveur 12 mois (à vérifier avec la configuration réelle de Nginx/CloudPanel), prospects : recommandation de 3 ans après le dernier contact.
 - `[À VALIDER : transferts hors UE]` : confidentialité (Google, Apple, Anthropic aux États-Unis ; mécanismes cités de façon générale).
 - `[À VALIDER : cadre de sous-traitance]` : confidentialité et CGU. Les CGU et la politique tiennent lieu de cadre de l'article 28 RGPD ; un accord de sous-traitance dédié est peut-être préférable.
 - `[À VALIDER : limitation de responsabilité]` : CGU.
@@ -50,7 +92,7 @@ Visibles en jaune sur les pages légales tant que l'information manque. Un test 
 ### À faire
 - Renseigner les marqueurs, relire les pages légales, vérifier les liens sortants, et retirer chaque marqueur de cette liste et de `MARKERS` (`src/site/legal.js`) une fois traité.
 - Une image Open Graph et de vraies captures du produit quand il y aura des données réelles (aucun témoignage ni chiffre n'a été inventé : il n'y en a pas).
-- J5 : appliquer les plafonds du plan gratuit, reCAPTCHA (paragraphe prêt), suppression des comptes inactifs si la durée est confirmée.
+- ~~J5 : plafonds, reCAPTCHA, comptes inactifs~~ : faits (voir J5).
 - Les pages d'erreur HTML autres que 404 (403, 500) utilisent encore l'ancien gabarit.
 
 ## 2026-10-22 — J3 « Liaison Claude »
