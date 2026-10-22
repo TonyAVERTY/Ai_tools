@@ -26,6 +26,19 @@ la version publique cible un serveur CloudPanel avec une base MySQL/MariaDB (voi
   - secrets chiffrés en AES-256-GCM en base ;
   - token Forgejo jamais écrit sur disque.
 
+## Site public
+
+Le site (`ai.tony-averty.dev`) est servi par la même application, dans `src/site/`, en rendu serveur sans JavaScript ni dépendance.
+
+- **Pages** : `/` (accueil pour un visiteur, tableau de bord pour un compte connecté), `/fonctionnement`, `/tarifs`, `/login`, `/mentions-legales`, `/confidentialite`, `/cgu`, et une 404 propre. Toutes répondent sans session.
+- **Identité** : `public/site.css` s'ajoute à `public/app.css` et n'utilise que ses jetons (`--bg`, `--card`, `--text`, `--muted`, `--line`, `--accent`, thème sombre compris). Pas de seconde palette : pour changer une couleur, on modifie `app.css`.
+- **Textes** : `src/site/pages.js` (accueil, fonctionnement, tarifs, connexion, 404) et `src/site/legal.js` (pages légales). Les limites annoncées viennent du code ; si elles changent, relire ces textes.
+- **Marqueurs** : les informations légales manquantes (adresse du siège, hébergeur, téléphone) et les points à valider s'affichent en `[À COMPLÉTER : …]` / `[À VALIDER : …]`. La liste vit dans `docs/JOURNAL.md` (« Marqueurs à compléter ») et dans `MARKERS` de `legal.js` ; un test vérifie qu'elles concordent. Pour en finir avec un marqueur, remplace-le dans `legal.js` puis retire-le des deux listes.
+- **SEO** : title, description, canonical et Open Graph par page, `/robots.txt`, `/sitemap.xml`. Tout ce qui n'est pas une page publique répond `noindex` (balise et `X-Robots-Tag`).
+- **En-têtes** : CSP stricte (aucun style ni script en ligne, aucune ressource externe), `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, `frame-ancestors 'none'`. HSTS seulement si `APP_URL` commence par `https://`. Les fichiers statiques ont un ETag (réponse 304).
+- **Ajouter une page** : une fonction dans `pages.js` qui appelle `siteLayout`, une route dans `src/site/routes.js`, et son chemin dans `INDEXABLE_PATHS` (`src/site/seo.js`) si elle doit être référencée.
+- **Essayer en local** : `APP_URL=http://localhost:3199 PORT=3199 SECRET_KEY=<64 hexa> GOOGLE_CLIENT_ID=x GOOGLE_CLIENT_SECRET=y DB_DRIVER=sqlite SANDBOX=off node src/server.js` (base SQLite en mémoire, perdue à l'arrêt).
+
 ## Suivi des réponses, relances et test A/B
 
 - **Détection des réponses** : la boîte de réception du projet est lue en IMAP toutes les 15 minutes, et à la demande avec « Vérifier maintenant ».
