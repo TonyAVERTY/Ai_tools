@@ -19,8 +19,9 @@ la version publique cible un serveur CloudPanel avec une base MySQL/MariaDB (voi
     l'Évolution), uniquement quand Haiku ne suffit pas — utile avec un abonnement Pro dont le quota
     est limité à la semaine.
 - **Sécurité** :
-  - login Google avec whitelist d'emails ;
-  - PKCE + state + nonce ;
+  - connexion Google ou Apple (OIDC), inscription automatique, sans mot de passe ;
+  - state + nonce (+ PKCE pour Google), id_token vérifié (signature RS256 via les JWKS du fournisseur, émetteur, audience, expiration) ;
+  - données cloisonnées par compte (voir « Comptes et multi-utilisateur ») ;
   - anti-CSRF par contrôle d'`Origin` ;
   - secrets chiffrés en AES-256-GCM en base ;
   - token Forgejo jamais écrit sur disque.
@@ -115,6 +116,19 @@ la version publique cible un serveur CloudPanel avec une base MySQL/MariaDB (voi
 - La liste d'opposition vaut pour tous les projets. Un statut « Refus » y ajoute aussi l'adresse.
 - La source publique de l'email est stockée et rappelée dans le pied de mail (RGPD).
 
+## Comptes et multi-utilisateur
+
+- **Connexion** : Google ou Apple, sans mot de passe. Le compte est créé à la première connexion réussie (plan gratuit). Un même email ne se lie qu'à un seul fournisseur ; un compte suspendu ne peut plus se connecter et ses sessions tombent aussitôt.
+- **Cloisonnement** : projets, prospects, notes, modèles, journaux d'envoi, jobs, métriques et **réglages** (SMTP, Discord, budget IA, plafonds, hôte Forgejo…) sont propres à chaque compte. Toute requête est filtrée par l'utilisateur courant ; la ressource d'un autre compte répond « introuvable » (404). Un même dépôt Git peut être un projet pour deux comptes (unicité par utilisateur).
+- **Liste d'opposition** : volontairement commune à tous les comptes (une personne désinscrite ne doit plus être contactée par personne). Un compte n'y voit que le nombre de ses propres prospects concernés, jamais l'origine ni le motif d'un autre compte.
+- **Jobs IA réservés aux admins, pour l'instant** : tant que la liaison Claude n'existe pas (jalon suivant), seuls les emails de `ADMIN_EMAILS` peuvent lancer analyse, recherche de prospects, modèles générés ou évolutions. Les autres reçoivent « Liaison Claude requise (bientôt disponible) », refusé côté serveur (routes, file, worker et handlers). Ils peuvent créer des projets, utiliser le CRM et l'import CSV, et envoyer des mails dans les plafonds existants.
+- **Mon compte** (`/account`) : email, fournisseur, et suppression du compte (confirmation par saisie de l'email). Elle efface tout : projets, prospects, notes, modèles, journaux, jobs, réglages, sessions et clones Git. Seule la liste d'opposition est conservée.
+
+### Connexion Google et Apple
+
+- **Google** : voir « Google OAuth » plus bas. URI de redirection : `https://<domaine>/auth/google/callback`.
+- **Apple** (facultatif) : dans developer.apple.com, crée un *Services ID* (c'est `APPLE_CLIENT_ID`), active « Sign in with Apple » avec ton domaine et l'URL de retour `https://<domaine>/auth/apple/callback`, puis une clé *Sign in with Apple* : son identifiant est `APPLE_KEY_ID`, le fichier `.p8` va dans `APPLE_PRIVATE_KEY` sur une seule ligne (retours à la ligne écrits `\n`). `APPLE_TEAM_ID` est l'identifiant d'équipe. Le secret client (JWT ES256) est généré à chaque connexion, rien n'est stocké. Apple répond par un POST cross-site : le flux est protégé par state, nonce et un cookie de liaison `SameSite=None` limité à `/auth`.
+
 ## Installation sur un serveur (CloudPanel ou autre, sans Raspberry)
 
 Pré-requis : Node 22.13 ou plus, git, la CLI `claude` si les jobs IA doivent tourner sur ce serveur, et une base MySQL 8.0.16 ou plus / MariaDB 10.4 ou plus (contraintes `CHECK`).
@@ -137,8 +151,10 @@ Pré-requis : Node 22.13 ou plus, git, la CLI `claude` si les jobs IA doivent to
    | `DB_HOST`, `DB_PORT` (3306 par défaut), `DB_USER`, `DB_PASSWORD`, `DB_NAME` | connexion MySQL / MariaDB |
    | `SECRET_KEY` | clé AES-256-GCM (64 caractères hexa) des secrets stockés en base |
    | `APP_URL`, `PORT`, `HOST` | URL publique et écoute locale (reverse proxy Nginx devant) |
-   | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `ALLOWED_EMAILS` | connexion Google (voir plus bas) |
-   | `DATA_DIR` | clones Git des projets analysés |
+   | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | connexion Google (voir « Connexion Google et Apple ») |
+   | `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_CLIENT_ID`, `APPLE_PRIVATE_KEY` | connexion Apple, facultative : les quatre ou aucune (sans elles, le bouton Apple est masqué) |
+   | `ADMIN_EMAILS` | emails des administrateurs, séparés par des virgules. Le premier est aussi propriétaire des données migrées. Remplace `ALLOWED_EMAILS`, supprimée : n'importe qui peut créer un compte |
+   | `DATA_DIR` | clones Git des projets analysés, rangés par utilisateur (`repos/<utilisateur>/<projet>`) |
 
 4. **Démarrage** : `npm start`. Au lancement, les migrations en attente sont appliquées (table `schema_migrations`, verrou pour éviter deux migrations simultanées). Lance le service sous un gestionnaire de processus (systemd ou celui de CloudPanel) et mets un reverse proxy TLS devant `HOST:PORT`.
 5. **Sauvegardes** : sauvegarde quotidienne de la base avec `mysqldump --single-transaction` (ou la sauvegarde CloudPanel) ; teste une restauration.
@@ -152,7 +168,9 @@ npm run migrate:sqlite -- data/aitools.sqlite          # refuse si la base cible
 npm run migrate:sqlite -- data/aitools.sqlite --force   # vide les tables cibles avant la copie
 ```
 
-Toutes les tables sont copiées dans une seule transaction, ids conservés, avec un rapport de lignes par table. En cas d'écart ou d'erreur, rien n'est écrit. Les clones Git (`DATA_DIR/repos`) sont à copier à part si tu veux éviter un nouveau clone.
+Toutes les tables sont copiées dans une seule transaction, ids conservés, avec un rapport de lignes par table. En cas d'écart ou d'erreur, rien n'est écrit. L'ancienne base est mono-utilisateur : tout est rattaché au compte propriétaire (première adresse de `ADMIN_EMAILS`, créé s'il n'existe pas) et les anciens réglages deviennent les siens. Les sessions de l'ancienne base ne sont pas copiées : reconnecte-toi. Les clones Git sont à recloner : le dossier est maintenant `DATA_DIR/repos/<utilisateur>/<projet>`.
+
+Une base MySQL/MariaDB déjà utilisée **avant les comptes** (migration 1) se met à niveau toute seule au démarrage : la migration « comptes_multi_tenant » rattache ses données au propriétaire (`ADMIN_EMAILS` doit alors être défini, sinon le démarrage s'arrête avec un message clair). Au premier login Google ou Apple avec cet email, tu retrouves tes données.
 
 ## Installation sur le Pi (instance perso, héritage)
 
@@ -249,6 +267,8 @@ TEST_DB_HOST=127.0.0.1 TEST_DB_USER=root TEST_DB_PASSWORD=... TEST_DB_NAME=aitoo
 ```
 
 Utilise une base **dédiée aux tests** : toutes ses tables sont supprimées à chaque test. `test:mysql` force l'exécution des fichiers un par un, car ils partagent la même base.
+
+Les tests d'isolation (`test/isolation.test.js`), de connexion (`test/auth.test.js`, fournisseurs simulés), de suppression de compte, de blocage des jobs IA et de migration des données existantes tournent avec le reste de la suite.
 
 Le SQL est écrit dans un sous-ensemble commun aux deux moteurs (`INSERT OR IGNORE`, `ON CONFLICT ... excluded.x`, colonnes réservées entre accents graves) et `src/db.js` le traduit pour MySQL. Le schéma est déclaré deux fois dans `src/migrations.js` (SQLite et MySQL) ; `test/schema.test.js` vérifie qu'ils décrivent les mêmes tables et colonnes. Pour changer le schéma, ajoute une entrée aux deux dialectes sans modifier les précédentes.
 
