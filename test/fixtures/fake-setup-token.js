@@ -13,9 +13,12 @@ if (mode !== 'NOLINK') {
 process.stdin.setRawMode?.(false);
 createInterface({ input: process.stdin }).on('line', (line) => {
   if (line.trim().startsWith('GOOD')) {
-    // Comme le vrai CLI : le jeton est coupé par un retour à la ligne et un déplacement de curseur, et les mots voisins sont collés
-    const tok = `oat01-${'L'.repeat(60)}`;
-    process.stdout.write(`\n✓ Long-lived authentication token created successfully!\nYour OAuth token (valid for 1 year): sk-ant-${esc}[1G\r\n${tok.slice(0, 30)}${esc}[3G${tok.slice(30)}\r\n\r\nStore${esc}[7Gthis token securely.\n`);
+    // Comme le vrai CLI : l'écran est mis à jour par morceaux. Le jeton est d'abord dessiné avec un caractère faux (X), puis le
+    // curseur revient et ne réécrit que ce caractère : le flux brut seul est faux, seul l'écran rendu est juste.
+    const prefix = 'Your OAuth token (valid for 1 year): ';
+    const tok = `sk-ant-oat01-${'L'.repeat(60)}`;
+    const wrong = `${tok.slice(0, 20)}X${tok.slice(21)}`;
+    process.stdout.write(`\n✓ Long-lived authentication token created successfully!\n${prefix}${wrong}\r${esc}[${prefix.length + 20}CL\r\n\r\nStore${esc}[7Gthis token securely.\n`);
     process.exit(0);
   }
   // Code refusé : même message que le vrai CLI, qui reste en attente d'une nouvelle saisie
