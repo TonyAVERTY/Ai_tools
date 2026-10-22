@@ -251,5 +251,6 @@ export async function lastConsent(db, userId) {
 export function isLinkExempt(method, pathname) {
   if (pathname === '/link' || pathname.startsWith('/link/')) return true;
   if (pathname === '/account' || pathname === '/account/delete') return true;
+  if (pathname === '/admin' || pathname.startsWith('/admin/')) return true; // les administrateurs gèrent les comptes même sans liaison
   return method === 'POST' && pathname === '/logout';
 }
