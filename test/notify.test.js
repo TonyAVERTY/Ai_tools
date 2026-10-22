@@ -82,7 +82,7 @@ test('le worker notifie en fin de job, et un callback qui plante ne le bloque pa
   const s = await setup();
   const seen = [];
   const w = new Worker(s.db, { prospect: async () => ({ found: 2, requested: 5 }), evolution: async () => { throw new Error('boom'); } }, {
-    thermalMax: 999, log: { error() {} },
+    log: { error() {} },
     onFinish: (job, r) => { seen.push(`${job.type}:${r.status}`); if (job.type === 'evolution') throw new Error('callback cassé'); },
   });
   await enqueue(s.db, { userId: s.userId, projectId: s.id, type: 'prospect' });

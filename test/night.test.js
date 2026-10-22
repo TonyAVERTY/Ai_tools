@@ -31,7 +31,7 @@ test('le worker ne démarre pas un job programmé avant son heure', async () => 
   let clock = now();
   const ran = [];
   const w = new Worker(db, { prospect: async () => { ran.push('prospect'); }, evolution: async () => { ran.push('evolution'); } },
-    { thermalMax: 999, log: { error() {} }, clock: () => clock });
+    { log: { error() {} }, clock: () => clock });
   const u = await addUser(db);
   await db.prepare("INSERT INTO projects(user_id, name, git_url, created_at) VALUES(?, 'p', 'u', ?)").run(u, now());
   await enqueue(db, { userId: u, projectId: 1, type: 'prospect', runAfter: clock + 3600 });

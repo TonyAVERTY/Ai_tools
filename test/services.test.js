@@ -2,7 +2,6 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { runClaude, extractJson, rateLimitWindows } from '../src/services/claude.js';
-import { waitCool } from '../src/services/thermal.js';
 import { now } from '../src/db.js';
 import { testDb } from './helpers/db.js';
 import { addUser } from './helpers/users.js';
@@ -49,14 +48,6 @@ test('extractJson gère texte, fences et accolades dans les chaînes', () => {
   assert.throws(() => extractJson('rien'), /Aucun JSON/);
 });
 
-test('waitCool attend la redescente avec hystérésis', async () => {
-  const temps = [80, 78, 72, 69];
-  let waits = 0;
-  await waitCool(75, { read: () => temps.shift(), sleep: async () => {}, onWait: () => waits++ });
-  assert.equal(waits, 3);
-  await waitCool(75, { read: () => null });
-});
-
 test('worker : exécution, dédoublonnage, erreurs, annulation, conso', async () => {
   const db = await testDb();
   const u = await addUser(db);
@@ -67,7 +58,7 @@ test('worker : exécution, dédoublonnage, erreurs, annulation, conso', async ()
     ok: async (ctx) => { ctx.progress({ found: 1 }); addUsage(ctx, { costUsd: 0.5, tokensIn: 10, tokensOut: 5 }); return { double: ctx.params.x * 2 }; },
     boom: async () => { throw new Error('raté'); },
   };
-  const w = new Worker(db, handlers, { thermalMax: 999, log: { error() {} } });
+  const w = new Worker(db, handlers, { log: { error() {} } });
   assert.equal(await w.tick(), true);
   await enqueue(db, { userId: u, projectId: 1, type: 'boom' });
   await w.tick();

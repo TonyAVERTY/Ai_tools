@@ -268,7 +268,7 @@ export function registerRoutes(router, app) {
       runAfter: r.run_after, startedAt: r.started_at, createdAt: r.created_at,
     }));
     json(res, {
-      temp: session.user.isAdmin ? cpuTemp() : null, queue, scheduled, jobs, usage: await usageSummary(db, userId), budget: await budgetState(db, userId), thermalMax: cfg.thermalMax,
+      temp: session.user.isAdmin ? cpuTemp() : null, queue, scheduled, jobs, usage: await usageSummary(db, userId), budget: await budgetState(db, userId),
       claudeRateLimit: rlRaw ? JSON.parse(rlRaw) : null, linkMode: link?.mode ?? null,
     });
   });

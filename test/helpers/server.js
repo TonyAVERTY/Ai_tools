@@ -22,7 +22,7 @@ export async function startApp({ cfg = {}, worker = false, rateLimit = false, cr
   const tmp = mkdtempSync(join(tmpdir(), 'aitools-srv-'));
   const config = {
     appUrl: APP_URL, google: { clientId: 'gid', clientSecret: 'gsecret' }, apple: null, adminEmails: [],
-    secretKey: randomBytes(32), dataDir: tmp, claudeBin: 'claude', thermalMax: 75, cliModeEnabled: true,
+    secretKey: randomBytes(32), dataDir: tmp, claudeBin: 'claude', cliModeEnabled: true,
     sandbox: { enabled: false, production: false, roBinds: [], serverHome: tmp }, ...cfg,
   };
   const limiter = rateLimit ? new RateLimiter(rateLimit === true ? {} : rateLimit) : unlimited();

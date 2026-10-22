@@ -112,7 +112,7 @@ export async function createApp(cfg, { db, worker = true, createTransport, fetch
   let scheduler = null;
   if (worker) {
     w = new Worker(db, makeHandlers(app), {
-      thermalMax: cfg.thermalMax, cliModeEnabled: cfg.cliModeEnabled !== false,
+      maxJobs: cfg.maxAiJobs ?? 4, loadMax: cfg.loadMax, cliModeEnabled: cfg.cliModeEnabled !== false,
       onFinish: (job, r) => notifyJob(app, job, r),
       budget: (userId) => budgetState(db, userId),
       isAiJob: (type) => AI_JOBS.has(type),
@@ -126,9 +126,9 @@ export async function createApp(cfg, { db, worker = true, createTransport, fetch
         title: 'Job IA reporté (quota serré)', level: 'warn',
         description: `${reason[0].toUpperCase()}${reason.slice(1)}. Analyse et évolutions attendent ; prospection et envois continuent.`,
       }),
-      onThermal: (t, userId) => notify(app, userId, 'thermal', {
-        title: 'Pause thermique', level: 'warn',
-        description: `CPU à ${t} °C : les jobs IA attendent que le Pi redescende sous ${cfg.thermalMax - 5} °C.`,
+      onLoad: (ratio, userId) => notify(app, userId, 'load', {
+        title: 'Serveur très chargé', level: 'warn',
+        description: `Charge du serveur à ${Math.round(ratio * 100)} % : tes jobs attendent un instant, ils repartent tout seuls.`,
       }),
     });
     await w.start();

@@ -3,6 +3,11 @@
 const prompt = process.argv[process.argv.indexOf('-p') + 1] || '';
 const out = (o) => process.stdout.write(JSON.stringify(o) + '\n');
 out({ type: 'system', subtype: 'init', args: process.argv.slice(2) });
+// Concurrence : FAKE_LOG = fichier où noter début et fin (clé de l'utilisateur), FAKE_DELAY_MS = durée simulée du travail
+const who = (process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_CODE_OAUTH_TOKEN || '').slice(-4);
+const trace = async (what) => { if (process.env.FAKE_LOG) (await import('node:fs')).appendFileSync(process.env.FAKE_LOG, what + ' ' + who + ' ' + Date.now() + String.fromCharCode(10)); };
+await trace('start');
+if (process.env.FAKE_DELAY_MS) await new Promise((r) => setTimeout(r, Number(process.env.FAKE_DELAY_MS)));
 if (prompt.includes('CRASH')) process.exit(3);
 // Le secret de l'utilisateur fuit dans stderr : l'application ne doit jamais le répercuter
 if (prompt.includes('LEAK')) { process.stderr.write('echec avec ' + (process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_CODE_OAUTH_TOKEN || '') + ' fin'); process.exit(3); }
@@ -29,4 +34,5 @@ out({ type: 'rate_limit_event', rate_limit_info: { status: 'allowed', unifiedWin
   five_hour: { utilization: Number(process.env.FAKE_FIVE_HOUR ?? ((process.env.CLAUDE_CODE_OAUTH_TOKEN || '').includes('HOT') ? 0.9 : 0.33)), resetsAt: 1_700_000_000 },
   seven_day: { utilization: Number(process.env.FAKE_SEVEN_DAY ?? 0.5), resetsAt: 1_700_300_000 },
 } } });
+await trace('end');
 out({ type: 'result', subtype: 'success', is_error: false, result: lines[lines.length - 1], total_cost_usd: 0.0123, num_turns: 2, usage: { input_tokens: 100, cache_read_input_tokens: 50, output_tokens: 20 } });

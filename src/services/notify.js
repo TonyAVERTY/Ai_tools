@@ -11,7 +11,7 @@ export const EVENTS = {
   job_error: 'Job en erreur',
   reply: 'Réponse d\'un prospect',
   followup: 'Relances envoyées',
-  thermal: 'Pause thermique du Pi',
+  load: 'Serveur très chargé : tes jobs attendent',
   budget: 'Budget IA atteint',
   quota: 'Quota Claude proche de la limite, ou job reporté',
   weekly: 'Rapport hebdo',
@@ -21,7 +21,7 @@ const COLORS = { ok: 0x15803d, info: 0x2f5bea, warn: 0xb45309, error: 0xb91c1c }
 const ICONS = { ok: '✅', info: '🔷', warn: '⚠️', error: '⛔' };
 const FOOTERS = {
   job_done: 'Job terminé', job_error: 'Job en échec', reply: 'Réponse prospect', followup: 'Relances',
-  thermal: 'Température', budget: 'Budget IA', quota: 'Quota Claude', weekly: 'Rapport hebdo', test: 'Test',
+  load: 'Charge serveur', budget: 'Budget IA', quota: 'Quota Claude', weekly: 'Rapport hebdo', test: 'Test',
 };
 
 /** Barre de progression en caractères (Discord n'affiche pas d'images inline dans un embed sans hébergement). */
@@ -36,7 +36,8 @@ export async function notifyConfig(app, userId) {
   try { url = decrypt(app.cfg.secretKey, await getSetting(app.db, userId, 'discord_webhook_enc')); }
   catch { url = null; }
   const raw = await getSetting(app.db, userId, 'discord_events');
-  const events = raw ? JSON.parse(raw) : Object.keys(EVENTS);
+  // « thermal » (ancienne pause du Raspberry) est devenu « load »
+  const events = raw ? JSON.parse(raw).map((e) => (e === 'thermal' ? 'load' : e)) : Object.keys(EVENTS);
   return { url, events };
 }
 
