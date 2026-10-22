@@ -18,6 +18,10 @@ const MAX_OUTPUT = 64 * 1024;
 
 const OSC_LINK = /\x1b\]8;[^;\x07\x1b]*;(https:\/\/[^\x07\x1b]+)(?:\x07|\x1b\\)/;
 const TOKEN = /sk-ant-oat\d+-[A-Za-z0-9_-]{20,}/;
+// Le CLI refuse un code expiré ou incorrect en affichant cette erreur, puis attend une nouvelle saisie
+const REFUSED = /OAuth error|Press Enter to retry/i;
+// Le CLI traite « code + Entrée » reçus d'un seul bloc comme du texte collé : l'Entrée part séparément, un instant après
+const ENTER_DELAY_MS = 400;
 const CODE_RE = /^[A-Za-z0-9_#.~-]{8,400}$/;
 // Le lien affiché à l'utilisateur ne peut mener que chez Anthropic, même si la sortie du CLI était altérée
 const ALLOWED_HOST = /(^|\.)(claude\.com|claude\.ai|anthropic\.com)$/;
@@ -111,11 +115,14 @@ export class ClaudeLogins {
     if (!CODE_RE.test(c)) throw new HttpError(400, 'Ce code ne ressemble pas à celui de Claude : recopie-le en entier.');
     if (s.submitted) throw new HttpError(409, 'Code déjà envoyé : patiente un instant.');
     s.submitted = true;
-    s.proc.stdin.write(`${c}\r`);
-    const token = await this.#waitFor(s, extractToken, TOKEN_WAIT_MS);
+    s.outAtSubmit = s.out.length;
+    s.proc.stdin.write(c);
+    await new Promise((r) => setTimeout(r, ENTER_DELAY_MS));
+    s.proc.stdin.write('\r');
+    const res = await this.#waitFor(s, (out) => extractToken(out) || (REFUSED.test(out.slice(s.outAtSubmit ?? 0)) ? 'refused' : null), TOKEN_WAIT_MS);
     this.#drop(String(id));
-    if (!token) throw new HttpError(400, 'Claude a refusé ce code (expiré ou incorrect). Recommence la connexion.');
-    return token;
+    if (!res || res === 'refused') throw new HttpError(400, 'Claude a refusé ce code (expiré ou incorrect). Recommence la connexion.');
+    return res;
   }
 }
 
