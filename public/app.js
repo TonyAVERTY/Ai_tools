@@ -55,6 +55,12 @@
     followup_template: 'Modèle de relance', followup: 'Relances',
   };
 
+  // ---------- Barre du haut : page courante en surbrillance ----------
+  $$('.topnav a.navlink').forEach((a) => {
+    const here = a.pathname === '/' ? location.pathname === '/' : location.pathname === a.pathname || location.pathname.startsWith(`${a.pathname}/`);
+    if (here) a.setAttribute('aria-current', 'page');
+  });
+
   // ---------- Liaison Claude : fenêtre d'avertissement du mode abonnement ----------
   // Le serveur refuse de toute façon (400) une requête sans la case cochée ; ici on évite seulement l'envoi inutile.
   $$('[data-open-dialog]').forEach((b) => b.addEventListener('click', () => $('#' + b.dataset.openDialog)?.showModal()));
