@@ -96,6 +96,7 @@ export async function createApp(cfg, { db, worker = true, createTransport } = {}
       }),
     });
     await w.start();
+    app.worker = w;
     scheduler = new Scheduler(app);
     scheduler.start();
   }

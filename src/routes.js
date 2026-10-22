@@ -2,8 +2,8 @@ import { now, getSetting, setSetting } from './db.js';
 import { encrypt, encryptJson, decryptJson, verifyUnsubToken } from './crypto.js';
 import { html, json, redirect, readBody, HttpError } from './http.js';
 import { startLogin, finishLogin, destroySession } from './auth.js';
-import { canRunAi, assertCanRunAi, AI_BLOCKED_MESSAGE } from './users.js';
-import { loginPage, dashboardPage, settingsPage, unsubPage } from './views.js';
+import { canRunAi, assertCanRunAi, AI_BLOCKED_MESSAGE, deleteUser, normalizeEmail } from './users.js';
+import { loginPage, dashboardPage, settingsPage, unsubPage, accountPage } from './views.js';
 import { enqueue, latestJobs, cancelJob, usageSummary } from './services/jobs.js';
 import { validateGitUrl, removeRepo } from './services/git.js';
 import { fetchRecap, clearRecapCache, validateSelect } from './services/recap.js';
@@ -143,6 +143,23 @@ export function registerRoutes(router, app) {
     const smtp = { host: b.smtp_host, port: b.smtp_port, user: b.smtp_user, pass: b.smtp_pass || prev.pass, fromEmail: b.smtp_fromEmail };
     await set('smtp_enc', smtp.host ? encryptJson(cfg.secretKey, smtp) : null);
     redirect(res, '/settings?ok');
+  });
+
+  // ---------- Mon compte ----------
+  router.get('/account', async ({ res, session, url }) => {
+    html(res, accountPage({ user: session.user, error: url.searchParams.get('e') }));
+  });
+
+  // Suppression du compte : confirmée en saisissant son email ; efface TOUTES les données de l'utilisateur
+  router.post('/account/delete', async ({ req, res, session }) => {
+    const b = await readBody(req);
+    if (normalizeEmail(b.confirm) !== normalizeEmail(session.user.email)) {
+      return redirect(res, `/account?e=${encodeURIComponent("L'email saisi ne correspond pas à celui du compte")}`);
+    }
+    app.worker?.abortUser(session.userId); // un job en cours pour ce compte s'arrête avant l'effacement
+    await deleteUser(app, session.userId);
+    await destroySession(db, req, res);
+    redirect(res, '/login?bye=1');
   });
 
   // ---------- API JSON ----------

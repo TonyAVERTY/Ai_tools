@@ -48,7 +48,7 @@ ${email ? `<header class="top">
       <div data-jobs-list></div>
     </div>
   </div>
-  <nav><a href="/settings">Réglages</a>
+  <nav><a href="/account">Mon compte</a><a href="/settings">Réglages</a>
   <form method="post" action="/logout"><button class="link">Déconnexion</button></form></nav>
 </header>` : ''}
 <main>${body}</main>
@@ -56,14 +56,42 @@ ${email ? `<header class="top">
 </html>`;
 }
 
-export function loginPage(error) {
+export function loginPage(error, { apple = false, bye = false } = {}) {
   return layout({
     title: 'Connexion',
     body: `<section class="login card">
   <h1>AiTools</h1>
-  <p class="muted">Accès réservé.</p>
+  <p class="muted">Connecte-toi pour continuer. Ton compte est créé à la première connexion, sans mot de passe.</p>
+  ${bye ? '<p class="ok">Ton compte et toutes ses données ont été supprimés.</p>' : ''}
   ${error ? `<p class="error">${esc(error)}</p>` : ''}
-  <a class="btn primary" href="/auth/google">Se connecter avec Google</a>
+  <div class="login-btns">
+    <a class="btn primary" href="/auth/google">Se connecter avec Google</a>
+    ${apple ? '<a class="btn apple" href="/auth/apple">Se connecter avec Apple</a>' : ''}
+  </div>
+</section>`,
+  });
+}
+
+const PROVIDER_NAMES = { google: 'Google', apple: 'Apple' };
+
+export function accountPage({ user, error }) {
+  return layout({
+    title: 'Mon compte', email: user.email,
+    body: `<h1>Mon compte</h1>
+<section class="card">
+  <dl class="account">
+    <dt>Email</dt><dd>${esc(user.email)}</dd>
+    <dt>Connexion</dt><dd>${esc(PROVIDER_NAMES[user.provider] || '—')}</dd>
+  </dl>
+</section>
+<section class="card">
+  <h4>Supprimer mon compte</h4>
+  <p class="muted small">Efface définitivement ton compte et toutes tes données : projets, prospects, notes, modèles de mail, journaux d'envoi, jobs, réglages et clones du code. Les adresses qui ont demandé à ne plus être contactées restent dans la liste d'opposition commune. Cette action est irréversible.</p>
+  ${error ? `<p class="error">${esc(error)}</p>` : ''}
+  <form method="post" action="/account/delete" class="cfg">
+    <label>Pour confirmer, saisis ton email (${esc(user.email)})<input name="confirm" type="email" required autocomplete="off"></label>
+    <button class="btn danger">Supprimer mon compte et mes données</button>
+  </form>
 </section>`,
   });
 }
