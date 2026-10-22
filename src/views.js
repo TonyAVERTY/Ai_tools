@@ -50,8 +50,13 @@ ${email ? `<header class="top">
       <div data-jobs-list></div>
     </div>
   </div>
-  <nav><a href="/account">Mon compte</a><a href="/settings">Réglages</a>
-  <form method="post" action="/logout"><button class="link">Déconnexion</button></form></nav>
+  <nav class="topnav" aria-label="Navigation">
+    <a class="navlink" href="/"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/></svg><span>Projets</span></a>
+    <a class="navlink" href="/account"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8.5" r="3.6"/><path d="M4.8 20c.9-3.6 3.8-5.4 7.2-5.4s6.3 1.8 7.2 5.4"/></svg><span>Mon compte</span></a>
+    <a class="navlink" href="/settings"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2.2"/><circle cx="9" cy="17" r="2.2"/></svg><span>Réglages</span></a>
+    <form method="post" action="/logout"><button class="navlink logout" title="Se déconnecter"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 4.5H5.5v15H10"/><path d="M15 8l4 4-4 4M19 12H9.5"/></svg><span>Déconnexion</span></button></form>
+    <span class="avatar" title="${esc(email)}" aria-hidden="true">${esc(String(email).trim().charAt(0).toUpperCase())}</span>
+  </nav>
 </header>` : ''}
 <main>${body}</main>
 </body>
