@@ -1,13 +1,15 @@
 # AiTools
 
-Panel perso pour piloter Claude Code (headless) sur mes projets : prospection client par email,
-idées d'évolutions et récap business. Pensé pour un **Raspberry Pi 4 sans ventilateur**.
+Panel pour piloter Claude Code (headless) sur des projets : prospection client par email,
+idées d'évolutions et récap business. L'instance perso tourne sur un Raspberry Pi 4 sans ventilateur ;
+la version publique cible un serveur CloudPanel avec une base MySQL/MariaDB (voir `docs/CADRAGE.md`).
 
 ## Choix techniques
 
-- **Node 22, zéro framework** : `node:http`, `node:sqlite` intégré (rien à compiler sur ARM). 3 dépendances : `nodemailer`, `mysql2`, `pg`.
+- **Node 22, zéro framework** : `node:http`. Dépendances : `nodemailer`, `imapflow`, `mysql2`, `pg`.
+- **Base MySQL / MariaDB** (`mysql2`, pool, utf8mb4, InnoDB), accès entièrement asynchrone via `src/db.js`. SQLite (`node:sqlite`, en mémoire) ne sert plus que pour les tests locaux et comme source du script de migration.
 - **Rendu serveur + JS vanilla**, pas de build.
-- **Un seul job IA à la fois** (file SQLite). Le process Claude tourne en `nice 10`. Pause automatique si le CPU dépasse `THERMAL_MAX`.
+- **Un seul job IA à la fois** (file en base). Le process Claude tourne en `nice 10`. Pause automatique si le CPU dépasse `THERMAL_MAX`.
 - **Économie de tokens** :
   - outils Claude restreints à chaque job (lecture seule pour le code, WebSearch/WebFetch pour la prospection) ;
   - `--max-turns` borné ;
@@ -113,7 +115,48 @@ idées d'évolutions et récap business. Pensé pour un **Raspberry Pi 4 sans ve
 - La liste d'opposition vaut pour tous les projets. Un statut « Refus » y ajoute aussi l'adresse.
 - La source publique de l'email est stockée et rappelée dans le pied de mail (RGPD).
 
-## Installation sur le Pi
+## Installation sur un serveur (CloudPanel ou autre, sans Raspberry)
+
+Pré-requis : Node 22.13 ou plus, git, la CLI `claude` si les jobs IA doivent tourner sur ce serveur, et une base MySQL 8.0.16 ou plus / MariaDB 10.4 ou plus (contraintes `CHECK`).
+
+1. **Base de données** : dans CloudPanel, Databases > Add Database. Note le nom, l'utilisateur et le mot de passe. Les tables sont créées par l'application au premier démarrage, rien à importer à la main.
+2. **Code** :
+
+   ```bash
+   git clone -b develop https://git.tony-averty.dev/Tony/AiTools.git
+   cd AiTools
+   npm ci --omit=dev
+   cp .env.example .env     # puis renseigne le fichier, voir ci-dessous
+   chmod 600 .env
+   ```
+
+3. **Variables d'environnement** (`.env`, jamais commité) :
+
+   | Variable | Rôle |
+   |---|---|
+   | `DB_HOST`, `DB_PORT` (3306 par défaut), `DB_USER`, `DB_PASSWORD`, `DB_NAME` | connexion MySQL / MariaDB |
+   | `SECRET_KEY` | clé AES-256-GCM (64 caractères hexa) des secrets stockés en base |
+   | `APP_URL`, `PORT`, `HOST` | URL publique et écoute locale (reverse proxy Nginx devant) |
+   | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `ALLOWED_EMAILS` | connexion Google (voir plus bas) |
+   | `DATA_DIR` | clones Git des projets analysés |
+
+4. **Démarrage** : `npm start`. Au lancement, les migrations en attente sont appliquées (table `schema_migrations`, verrou pour éviter deux migrations simultanées). Lance le service sous un gestionnaire de processus (systemd ou celui de CloudPanel) et mets un reverse proxy TLS devant `HOST:PORT`.
+5. **Sauvegardes** : sauvegarde quotidienne de la base avec `mysqldump --single-transaction` (ou la sauvegarde CloudPanel) ; teste une restauration.
+
+### Reprendre les données de l'ancienne instance SQLite
+
+Arrête l'ancien service, puis, avec le `.env` pointant sur la nouvelle base :
+
+```bash
+npm run migrate:sqlite -- data/aitools.sqlite          # refuse si la base cible contient déjà des données
+npm run migrate:sqlite -- data/aitools.sqlite --force   # vide les tables cibles avant la copie
+```
+
+Toutes les tables sont copiées dans une seule transaction, ids conservés, avec un rapport de lignes par table. En cas d'écart ou d'erreur, rien n'est écrit. Les clones Git (`DATA_DIR/repos`) sont à copier à part si tu veux éviter un nouveau clone.
+
+## Installation sur le Pi (instance perso, héritage)
+
+> `install.sh` date de la version SQLite : il ne renseigne pas encore les variables `DB_*` ni ne sauvegarde MySQL. À reprendre avec le déploiement (jalon J6) ; en attendant, suis la section ci-dessus.
 
 Pré-requis : **Raspberry Pi OS Lite 64 bits** fraîchement installé, accès SSH, et ton HDD branché.
 
@@ -198,5 +241,15 @@ npm run check     # lint + tests
 ```
 
 Les tests utilisent un faux binaire Claude (`test/fixtures/fake-claude.js`) : aucun token consommé.
+
+Par défaut ils tournent sur SQLite en mémoire, sans rien à installer. Pour les rejouer contre un vrai MySQL/MariaDB :
+
+```bash
+TEST_DB_HOST=127.0.0.1 TEST_DB_USER=root TEST_DB_PASSWORD=... TEST_DB_NAME=aitools_test npm run test:mysql
+```
+
+Utilise une base **dédiée aux tests** : toutes ses tables sont supprimées à chaque test. `test:mysql` force l'exécution des fichiers un par un, car ils partagent la même base.
+
+Le SQL est écrit dans un sous-ensemble commun aux deux moteurs (`INSERT OR IGNORE`, `ON CONFLICT ... excluded.x`, colonnes réservées entre accents graves) et `src/db.js` le traduit pour MySQL. Le schéma est déclaré deux fois dans `src/migrations.js` (SQLite et MySQL) ; `test/schema.test.js` vérifie qu'ils décrivent les mêmes tables et colonnes. Pour changer le schéma, ajoute une entrée aux deux dialectes sans modifier les précédentes.
 
 `test/install.test.sh` teste les fonctions d'`install.sh` qui écrivent des fichiers : `.env`, unit systemd, migration, sauvegarde. Il tourne en root et écrit dans `/opt/aitools` et `/etc/systemd`, donc **uniquement dans une VM ou un conteneur jetable**, jamais sur le Pi en service.
