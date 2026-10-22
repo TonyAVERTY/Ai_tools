@@ -143,14 +143,19 @@ export async function validateSubscriptionToken(app, token) {
       bin: app.cfg.claudeBin, prompt: 'Réponds uniquement : ok', model: 'haiku', maxTurns: 1, tools: [], timeoutMs: 90_000,
       sandbox: app.cfg.sandbox, secretEnv: { CLAUDE_CODE_OAUTH_TOKEN: token },
     });
-  } catch {
+  } catch (e) {
+    console.warn(`Vérification du jeton d'abonnement : le CLI n'a pas pu s'exécuter : ${String(e.message).slice(0, 300)}`);
     throw new HttpError(502, "Le CLI Claude n'a pas pu être lancé sur le serveur (bac à sable ou installation). Préviens l'administrateur.", { expose: true });
   }
   if (r.ok) return;
-  if (/auth|login|token|credential|401|403|invalid|expired|unauthor/i.test(`${r.text} ${r.subtype}`)) {
-    throw new HttpError(400, 'Jeton refusé par Claude (invalide ou expiré)');
+  // Ce que Claude a vraiment répondu : affiché à l'utilisateur et journalisé (le secret est déjà masqué par runClaude)
+  const said = String(r.text ?? '').replace(/\s+/g, ' ').trim().slice(0, 240) || `(sans texte, ${r.subtype ?? 'erreur'})`;
+  console.warn(`Vérification du jeton d'abonnement refusée (${r.subtype ?? 'erreur'}) : ${said}`);
+  // Refus d'authentification, au sens strict : on n'invalide la liaison que pour ces réponses-là
+  if (/invalid (bearer )?token|authentication_error|please run \/login|oauth token (has )?(expired|been revoked)|token (has )?(expired|been revoked)|invalid.{0,20}credential|unauthori[sz]ed|\b401\b/i.test(`${r.text} ${r.subtype}`)) {
+    throw new HttpError(400, `Jeton refusé par Claude (invalide ou expiré). Réponse de Claude : ${said}`);
   }
-  throw new HttpError(502, "Le jeton n'a pas pu être vérifié (réponse inattendue du CLI). Réessaie plus tard.", { expose: true });
+  throw new HttpError(502, `Le jeton n'a pas pu être vérifié : Claude a répondu « ${said} ». Réessaie plus tard.`, { expose: true });
 }
 
 // ---------- Liaison ----------
