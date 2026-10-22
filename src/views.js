@@ -57,22 +57,6 @@ ${email ? `<header class="top">
 </html>`;
 }
 
-export function loginPage(error, { apple = false, bye = false } = {}) {
-  return layout({
-    title: 'Connexion',
-    body: `<section class="login card">
-  <h1>AiTools</h1>
-  <p class="muted">Connecte-toi pour continuer. Ton compte est créé à la première connexion, sans mot de passe.</p>
-  ${bye ? '<p class="ok">Ton compte et toutes ses données ont été supprimés.</p>' : ''}
-  ${error ? `<p class="error">${esc(error)}</p>` : ''}
-  <div class="login-btns">
-    <a class="btn primary" href="/auth/google">Se connecter avec Google</a>
-    ${apple ? '<a class="btn apple" href="/auth/apple">Se connecter avec Apple</a>' : ''}
-  </div>
-</section>`,
-  });
-}
-
 const PROVIDER_NAMES = { google: 'Google', apple: 'Apple' };
 
 // Section « Liaison Claude » de Mon compte : état, test, changement de mode, déliaison. Jamais le secret, ni même un masque

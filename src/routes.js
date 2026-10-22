@@ -1,13 +1,15 @@
 import { now, getSetting, setSetting } from './db.js';
 import { encrypt, encryptJson, decryptJson, verifyUnsubToken } from './crypto.js';
 import { html, json, redirect, readBody, HttpError } from './http.js';
-import { startLogin, finishLogin, destroySession } from './auth.js';
+import { startLogin, finishLogin, destroySession, getSession } from './auth.js';
 import { deleteUser, normalizeEmail } from './users.js';
 import {
   assertCanRunAi, getLinkState, linkApiKey, linkSubscriptionToken, linkServer, unlink, testLink, lastConsent,
   MODES,
 } from './claudelink.js';
-import { loginPage, dashboardPage, settingsPage, unsubPage, accountPage, linkPage } from './views.js';
+import { loginPage } from './site/pages.js';
+import { registerSiteRoutes } from './site/routes.js';
+import { dashboardPage, settingsPage, unsubPage, accountPage, linkPage } from './views.js';
 import { enqueue, latestJobs, cancelJob, usageSummary } from './services/jobs.js';
 import { validateGitUrl, removeRepo } from './services/git.js';
 import { fetchRecap, clearRecapCache, validateSelect } from './services/recap.js';
@@ -43,7 +45,12 @@ export function registerRoutes(router, app) {
   const project = (ctx, opts) => getProject(app, pid(ctx.params), { userId: ctx.session.userId, ...opts });
 
   // ---------- Public ----------
-  router.get('/login', async ({ res, url }) => html(res, loginPage(url.searchParams.get('e'), { apple: !!cfg.apple, bye: url.searchParams.has('bye') })), { public: true });
+  registerSiteRoutes(router, app);
+  // Déjà connecté : la page de connexion n'a rien à offrir, on va au tableau de bord
+  router.get('/login', async ({ req, res, url }) => {
+    if (await getSession(db, req)) return redirect(res, '/');
+    html(res, loginPage({ appUrl: cfg.appUrl, error: url.searchParams.get('e'), apple: !!cfg.apple, bye: url.searchParams.has('bye') }));
+  }, { public: true });
   // Erreur de connexion : message du serveur s'il est destiné à l'utilisateur, sinon générique (rien de technique à l'écran)
   const loginFailed = (res, e) => {
     if (!e.status || e.status >= 500) console.error('[connexion]', e);

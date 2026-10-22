@@ -331,7 +331,7 @@ test('compte suspendu : connexion refusée, session existante inutilisable et su
 
   let r = await u.get('/api/system');
   assert.equal(r.status, 401, 'la session existante ne marche plus');
-  r = await u.get('/');
+  r = await u.get('/account');
   assert.equal(r.status, 303);
   assert.equal(r.headers.get('location'), '/login');
   assert.equal((await s.db.prepare('SELECT COUNT(*) n FROM sessions WHERE user_id = ?').get(u.id)).n, 0, 'sessions supprimées');
