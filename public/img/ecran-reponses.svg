@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 560" role="img" aria-label="Écran : le suivi des mails envoyés et des réponses">
+<style>
+.p{fill:#fff}.bg{fill:#f4f5f7}.ln{stroke:#e2e4e8;fill:none}.tx{fill:#17191c}.mu{fill:#6b7078}.ac{fill:#2f5bea}.on{fill:#fff}.soft{fill:#e6ecfd}.ok{fill:#15803d}.okb{fill:#dcf3e4}.fr{fill:#17191c}.wr{fill:#b45309}.wrb{fill:#fdeed9}
+text{font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+@media (prefers-color-scheme:dark){.p{fill:#1a1d22}.bg{fill:#111317}.ln{stroke:#2b2f36}.tx{fill:#e8eaed}.mu{fill:#9097a1}.ac{fill:#5b82ff}.on{fill:#111317}.soft{fill:#232b45}.ok{fill:#4ade80}.okb{fill:#1c3326}.fr{fill:#3a3f48}.wr{fill:#fbbf24}.wrb{fill:#3a2e14}}
+</style>
+<rect x="14" y="8" width="272" height="544" rx="38" class="fr"/>
+<rect x="20" y="14" width="260" height="532" rx="33" class="p"/>
+<rect x="112" y="22" width="76" height="20" rx="10" class="fr"/>
+<text x="38" y="78" class="tx" font-size="19" font-weight="700">Les réponses</text>
+<text x="38" y="98" class="mu" font-size="12">Tout au même endroit</text>
+
+<rect x="34" y="116" width="108" height="64" rx="14" class="bg"/><text x="48" y="148" font-size="24" font-weight="700" class="tx">24</text><text x="48" y="168" font-size="10.5" class="mu">mails envoyés</text>
+<rect x="158" y="116" width="108" height="64" rx="14" class="okb"/><text x="172" y="148" font-size="24" font-weight="700" class="ok">5</text><text x="172" y="168" font-size="10.5" class="ok">réponses</text>
+<rect x="34" y="196" width="232" height="46" rx="12" class="bg"/>
+<circle cx="56" cy="219" r="12" class="soft"/><text x="56" y="223" text-anchor="middle" font-size="11" font-weight="700" class="ac">G</text>
+<text x="76" y="216" font-size="12" font-weight="600" class="tx">Garage Exemple</text><text x="76" y="231" font-size="10.5" class="mu">« Oui, appelez-moi jeudi »</text><rect x="192.2" y="208" width="69.80000000000001" height="20" rx="10" class="okb"/><text x="227.1" y="222" text-anchor="middle" font-size="10.5" font-weight="600" class="ok">A répondu</text>
+<rect x="34" y="250" width="232" height="46" rx="12" class="bg"/>
+<circle cx="56" cy="273" r="12" class="soft"/><text x="56" y="277" text-anchor="middle" font-size="11" font-weight="700" class="ac">C</text>
+<text x="76" y="270" font-size="12" font-weight="600" class="tx">Cabinet Exemple</text><text x="76" y="285" font-size="10.5" class="mu">Mail envoyé hier</text><rect x="210.8" y="262" width="51.2" height="20" rx="10" class="soft"/><text x="236.4" y="276" text-anchor="middle" font-size="10.5" font-weight="600" class="ac">Envoyé</text>
+<rect x="34" y="304" width="232" height="46" rx="12" class="bg"/>
+<circle cx="56" cy="327" r="12" class="soft"/><text x="56" y="331" text-anchor="middle" font-size="11" font-weight="700" class="ac">S</text>
+<text x="76" y="324" font-size="12" font-weight="600" class="tx">Studio Exemple</text><text x="76" y="339" font-size="10.5" class="mu">Relance dans 3 jours</text><rect x="204.6" y="316" width="57.4" height="20" rx="10" class="soft"/><text x="233.3" y="330" text-anchor="middle" font-size="10.5" font-weight="600" class="ac">Relance</text>
+<rect x="34" y="364" width="232" height="44" rx="12" class="soft"/><text x="48" y="384" font-size="11" font-weight="600" class="ac">Prochaine action</text><text x="48" y="399" font-size="10.5" class="mu">Rappeler le garage jeudi à 10 h</text>
+<rect x="34" y="470" width="232" height="40" rx="12" class="ac"/><text x="150" y="495" text-anchor="middle" font-size="13" font-weight="600" class="on">Ouvrir mon suivi</text>
+</svg>

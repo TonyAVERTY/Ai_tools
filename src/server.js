@@ -1,5 +1,5 @@
 import { createServer } from 'node:http';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -35,6 +35,10 @@ const STATIC = {
   '/static/app.js': asset('app.js', 'text/javascript; charset=utf-8', 3600),
   '/static/captcha.js': asset('captcha.js', 'text/javascript; charset=utf-8', 3600),
   '/static/favicon.svg': asset('favicon.svg', 'image/svg+xml', 86400),
+  // Les navigateurs réclament /favicon.ico d'office : on leur sert le même SVG plutôt qu'un 404
+  '/favicon.ico': asset('favicon.svg', 'image/svg+xml', 86400),
+  '/static/site.js': asset('site.js', 'text/javascript; charset=utf-8', 3600),
+  ...Object.fromEntries(readdirSync(join(ROOT, 'public', 'img')).map((f) => [`/static/img/${f}`, asset(`img/${f}`, 'image/svg+xml', 86400)])),
 };
 
 // `fetch`, `validateApiKey`, `validateToken`, `syncRepo`, `limiter` : points d'injection pour les tests (aucun appel réseau réel)

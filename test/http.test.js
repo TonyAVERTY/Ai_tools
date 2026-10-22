@@ -42,7 +42,7 @@ test('non connecté : redirection / 401 et pages publiques', async () => {
   // La racine est le site public pour un visiteur ; une page d'application renvoie vers la connexion
   let r = await get('/', false);
   assert.equal(r.status, 200);
-  assert.match(await r.text(), /<h1[^>]*>Un panel pour prospecter/);
+  assert.match(await r.text(), /<h1[^>]*>Trouve de nouveaux clients/);
   r = await get('/account', false);
   assert.equal(r.status, 303);
   assert.equal(r.headers.get('location'), '/login');
