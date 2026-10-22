@@ -53,6 +53,7 @@ ${email ? `<header class="top">
   <nav class="topnav" aria-label="Navigation">
     <a class="navlink" href="/"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/></svg><span>Projets</span></a>
     <a class="navlink" href="/account"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8.5" r="3.6"/><path d="M4.8 20c.9-3.6 3.8-5.4 7.2-5.4s6.3 1.8 7.2 5.4"/></svg><span>Mon compte</span></a>
+    <a class="navlink" href="/team"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8.5" r="3.2"/><path d="M3.5 19.5c.7-3.1 3-4.7 5.5-4.7s4.8 1.6 5.5 4.7"/><path d="M15.5 5.6a3.1 3.1 0 0 1 0 5.8M17.5 14.9c1.7.6 2.7 2 3 4.6"/></svg><span>Équipe</span></a>
     <a class="navlink" href="/settings"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2.2"/><circle cx="9" cy="17" r="2.2"/></svg><span>Réglages</span></a>
     <form method="post" action="/logout"><button class="navlink logout" title="Se déconnecter"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 4.5H5.5v15H10"/><path d="M15 8l4 4-4 4M19 12H9.5"/></svg><span>Déconnexion</span></button></form>
     <span class="avatar" title="${esc(email)}" aria-hidden="true">${esc(String(email).trim().charAt(0).toUpperCase())}</span>
@@ -225,10 +226,12 @@ function targetForm(p) {
 }
 
 function configForms(p, smtp, dbCfg, imap) {
+  const source = { project: 'Ce projet envoie avec son propre SMTP.', settings: 'Ce projet utilise le SMTP des Réglages (aucun SMTP propre).', null: "Aucun SMTP : renseigne-en un ici ou dans les Réglages, sinon rien ne peut partir." }[p.smtpSource ?? 'null'];
   return `<form data-action="smtp" data-id="${p.id}" class="cfg">
-  <h4>SMTP d'envoi</h4>
+  <h4>SMTP d'envoi de ce projet</h4>
+  <p class="muted small" data-smtp-source>${source} <strong>Laisse l'hôte vide pour utiliser le SMTP des Réglages.</strong> Un SMTP propre au projet permet d'envoyer depuis une autre adresse (une boîte par projet).</p>
   <div class="grid3">
-    <label>Hôte<input name="host" value="${esc(smtp.host)}" required></label>
+    <label>Hôte<input name="host" value="${esc(smtp.host)}" placeholder="vide = SMTP des Réglages"></label>
     <label>Port<input name="port" type="number" value="${esc(smtp.port || 587)}"></label>
     <label>Utilisateur<input name="user" value="${esc(smtp.user)}" autocomplete="off"></label>
     <label>Mot de passe<input name="pass" type="password" placeholder="${smtp.passSet ? '•••••• (inchangé)' : ''}" autocomplete="new-password"></label>
@@ -266,9 +269,9 @@ function configForms(p, smtp, dbCfg, imap) {
   <label>Revenu total (€)<input name="sql_revenue" value="${esc(dbCfg.sql_revenue)}" placeholder="SELECT SUM(amount)/100 FROM payments"></label>
   <button class="btn">Enregistrer BDD</button>
 </form>
-<form data-action="delete" data-id="${p.id}" data-confirm="Supprimer ${esc(p.name)} et tous ses prospects ?" class="cfg">
+${p.access === 'owner' ? `<form data-action="delete" data-id="${p.id}" data-confirm="Supprimer ${esc(p.name)} et tous ses prospects ?" class="cfg">
   <button class="btn danger">Supprimer le projet</button>
-</form>`;
+</form>` : ''}`;
 }
 
 function templateForm(p, kind) {
@@ -292,7 +295,7 @@ function templateForm(p, kind) {
 function projectItem(p, smtp, dbCfg, imap) {
   const profile = p.profile;
   return `<details class="project card anim" data-id="${p.id}">
-<summary><span class="pname">${esc(p.name)}</span><span class="pstate" data-state></span></summary>
+<summary><span class="pname">${esc(p.name)}</span>${p.access !== 'owner' ? `<span class="badge" title="Projet partagé par ${esc(p.ownerEmail || '')}">équipe de ${esc(p.ownerEmail || '')}</span>` : p.teamId ? '<span class="badge ok">partagé</span>' : ''}<span class="pstate" data-state></span></summary>
 <div class="pbody">
   <label>Dépôt Git<input class="locked" value="${esc(p.gitUrl)}" readonly disabled></label>
 
@@ -374,11 +377,11 @@ function projectItem(p, smtp, dbCfg, imap) {
     </form>
     <div class="job" data-job="evolution"></div>`, { cls: 'main' })}
 
-  ${acc('recap', 'chart', 'Récapitulatif', 'Chiffres business, prospection et courbes', `
-    <div class="recap" data-recap><p class="muted">Chargement…</p></div>`, { cls: 'main' })}
+  ${p.access !== 'member' ? acc('recap', 'chart', 'Récapitulatif', 'Chiffres business, prospection et courbes', `
+    <div class="recap" data-recap><p class="muted">Chargement…</p></div>`, { cls: 'main' }) : ''}
   </div>
 
-  ${acc('config', 'gear', 'Configuration du projet', 'SMTP, boîte IMAP, base de données', configForms(p, smtp, dbCfg, imap), { cls: 'config' })}
+  ${p.access !== 'member' ? acc('config', 'gear', 'Configuration du projet', 'SMTP, boîte IMAP, base de données', configForms(p, smtp, dbCfg, imap), { cls: 'config' }) : ''}
 </div>
 </details>`;
 }

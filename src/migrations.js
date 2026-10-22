@@ -420,6 +420,121 @@ export const MIGRATIONS = [
       ) ${T}`,
     ],
   },
+  {
+    // Équipes (partage de projets entre comptes) et LinkedIn (compte relié à un projet, brouillons de posts).
+    //  - teams : une équipe par propriétaire ; ses projets y sont partagés avec projects.team_id (pas de clé étrangère : la
+    //    suppression d'une équipe remet team_id à NULL dans le code, les projets restent à leur propriétaire) ;
+    //  - team_members : rôle admin | member (le propriétaire est implicite) ;
+    //  - team_invites : invitation par email, le jeton n'est jamais stocké en clair (seule son empreinte) ;
+    //  - linkedin_accounts : un compte LinkedIn par projet, jeton chiffré ; linkedin_posts : brouillons et posts publiés.
+    name: 'equipes_linkedin',
+    sqlite: [
+      `CREATE TABLE teams (
+        id INTEGER PRIMARY KEY,
+        owner_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+      )`,
+      `CREATE TABLE team_members (
+        team_id INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        role TEXT NOT NULL,         -- admin | member
+        created_at INTEGER NOT NULL,
+        PRIMARY KEY (team_id, user_id)
+      )`,
+      'CREATE INDEX team_members_user ON team_members(user_id)',
+      `CREATE TABLE team_invites (
+        id INTEGER PRIMARY KEY,
+        team_id INTEGER NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+        email TEXT NOT NULL,
+        role TEXT NOT NULL,
+        token_hash TEXT NOT NULL UNIQUE,
+        created_by INTEGER,
+        created_at INTEGER NOT NULL,
+        expires_at INTEGER NOT NULL
+      )`,
+      'CREATE INDEX team_invites_team ON team_invites(team_id)',
+      'ALTER TABLE projects ADD COLUMN team_id INTEGER',
+      'CREATE INDEX projects_team ON projects(team_id)',
+      `CREATE TABLE linkedin_accounts (
+        project_id INTEGER PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,
+        member_urn TEXT NOT NULL,
+        name TEXT,
+        token_enc TEXT NOT NULL,
+        expires_at INTEGER,
+        connected_by INTEGER,
+        created_at INTEGER NOT NULL
+      )`,
+      `CREATE TABLE linkedin_posts (
+        id INTEGER PRIMARY KEY,
+        project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        direction TEXT,
+        body TEXT NOT NULL,
+        status TEXT NOT NULL,       -- draft | published
+        remote_id TEXT,
+        created_at INTEGER NOT NULL,
+        published_at INTEGER
+      )`,
+      'CREATE INDEX linkedin_posts_project ON linkedin_posts(project_id, id)',
+    ],
+    mysql: [
+      `CREATE TABLE IF NOT EXISTS teams (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        owner_id BIGINT NOT NULL,
+        name VARCHAR(80) NOT NULL,
+        created_at BIGINT NOT NULL,
+        UNIQUE KEY teams_owner (owner_id),
+        CONSTRAINT teams_owner_fk FOREIGN KEY (owner_id) REFERENCES users(id) ON DELETE CASCADE
+      ) ${T}`,
+      `CREATE TABLE IF NOT EXISTS team_members (
+        team_id BIGINT NOT NULL,
+        user_id BIGINT NOT NULL,
+        role VARCHAR(10) NOT NULL,         -- admin | member
+        created_at BIGINT NOT NULL,
+        PRIMARY KEY (team_id, user_id),
+        KEY team_members_user (user_id),
+        CONSTRAINT team_members_team_fk FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE,
+        CONSTRAINT team_members_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      ) ${T}`,
+      `CREATE TABLE IF NOT EXISTS team_invites (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        team_id BIGINT NOT NULL,
+        email VARCHAR(255) NOT NULL,
+        role VARCHAR(10) NOT NULL,
+        token_hash VARCHAR(64) NOT NULL,
+        created_by BIGINT NULL,
+        created_at BIGINT NOT NULL,
+        expires_at BIGINT NOT NULL,
+        UNIQUE KEY team_invites_token (token_hash),
+        KEY team_invites_team (team_id),
+        CONSTRAINT team_invites_team_fk FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE
+      ) ${T}`,
+      { sql: 'ALTER TABLE projects ADD COLUMN team_id BIGINT NULL', when: colMissing('projects', 'team_id') },
+      { sql: 'CREATE INDEX projects_team ON projects(team_id)', when: idxMissing('projects', 'projects_team') },
+      `CREATE TABLE IF NOT EXISTS linkedin_accounts (
+        project_id BIGINT NOT NULL PRIMARY KEY,
+        member_urn VARCHAR(100) NOT NULL,
+        name VARCHAR(255),
+        token_enc TEXT NOT NULL,
+        expires_at BIGINT NULL,
+        connected_by BIGINT NULL,
+        created_at BIGINT NOT NULL,
+        CONSTRAINT linkedin_accounts_project_fk FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+      ) ${T}`,
+      `CREATE TABLE IF NOT EXISTS linkedin_posts (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        project_id BIGINT NOT NULL,
+        direction TEXT,
+        body TEXT NOT NULL,
+        status VARCHAR(12) NOT NULL,       -- draft | published
+        remote_id VARCHAR(200) NULL,
+        created_at BIGINT NOT NULL,
+        published_at BIGINT NULL,
+        KEY linkedin_posts_project (project_id, id),
+        CONSTRAINT linkedin_posts_project_fk FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+      ) ${T}`,
+    ],
+  },
 ];
 
 // ---------- Aides de la migration 2 ----------

@@ -175,15 +175,20 @@ En mémoire (fenêtre glissante, sans dépendance), par adresse IP et par compte
 
 Offres (définies dans `src/limits.js`, une seule source : serveur, page Tarifs, CGU et tests en dépendent). Plafonds ; projets et prospects = totaux du compte, mails et jobs IA = par mois calendaire (heure de Paris) :
 
-| Offre | Prix TTC / mois | TTC / an (2 mois offerts) | Projets | Prospects | Mails / mois | Jobs IA / mois |
-|---|---|---|---|---|---|---|
-| Gratuit | 0 € | | 1 | 50 | 100 | 6 |
-| Démarrage (`starter`) | 10 € | 100 € | 2 | 300 | 500 | 20 |
-| Croissance (`growth`) | 25 € | 250 € | 5 | 1 000 | 1 500 | 60 |
-| Business (`business`) | 50 € | 500 € | 10 | 3 000 | 4 000 | 150 |
-| Intensif (`intensive`) | 100 € | 1 000 € | 25 | 10 000 | 8 000 | 400 |
+| Offre | Prix TTC / mois | TTC / an (2 mois offerts) | Projets | Prospects | Mails / mois | Jobs IA / mois | Places d'équipe |
+|---|---|---|---|---|---|---|---|
+| Gratuit | 0 € | | 1 | 50 | 100 | 6 | 1 |
+| Démarrage (`starter`) | 10 € | 100 € | 2 | 300 | 500 | 20 | 2 |
+| Croissance (`growth`) | 25 € | 250 € | 5 | 1 000 | 1 500 | 60 | 3 |
+| Business (`business`) | 50 € | 500 € | 10 | 3 000 | 4 000 | 150 | 10 |
+| Intensif (`intensive`) | 100 € | 1 000 € | 25 | 10 000 | 8 000 | 400 | 25 |
 
 Prix TTC : l'éditeur est en franchise de TVA (art. 293 B du CGI). Les offres payantes sont affichées « Bientôt » : **le paiement n'existe pas encore** (jalon Stripe). Un administrateur peut attribuer un plan à la main dans le back-office. Contraintes tenues par un test : `mails` ≤ 300 × 30 (plafond d'envoi de 300 mails par 24 h) et assez de jobs IA pour trouver tous les prospects (une recherche = 50 au plus). Un administrateur (`ADMIN_EMAILS`) n'a pas de limite ; l'ancien plan `pro` reste illimité (attribué à la main, non vendu). Projets et prospects se comptent dans leurs tables ; mails et jobs IA dans `usage_events`, qui survit à la suppression d'un projet. Rien ne se stocke en compteur : l'usage est toujours une somme. Un dépassement refuse l'action (`403`, code `plan_limit`, lien `/tarifs`) sans rien supprimer : un import CSV trop gros est refusé en entier, un lot de mails est tronqué à ce qui reste, une recherche de prospects n'enregistre pas au-delà du plafond. L'usage du mois s'affiche (barres) dans Mon compte et sur le tableau de bord.
+
+### SMTP par projet et équipes
+
+- **SMTP par projet** : chaque projet peut avoir son propre SMTP (une boîte d'envoi par projet). **Hôte vide = SMTP des Réglages** (`getProject` renvoie `smtpSource` : `project`, `settings` ou `null`). L'IMAP réutilise les identifiants du SMTP effectif.
+- **Équipes** (`src/teams.js`, `src/teamroutes.js`, page `/team`) : un propriétaire (offre avec `seats` ≥ 2) invite des membres par email (lien à usage unique, valable 7 jours, **lié à l'adresse invitée**, seule son empreinte est stockée) et partage des projets (`projects.team_id`). Sur un projet partagé **un membre agit comme le propriétaire** : ses données, son SMTP, son plan, ses plafonds et son accès Claude (le membre n'a pas besoin du sien). Rôles : `member` (travaille sur les projets), `admin` (règle en plus SMTP, IMAP, base du récap), propriétaire (gère l'équipe, partage, supprime). Un seul point d'accès (`getProject` / `accessOn`) : un projet hors équipe est introuvable (404), le retrait d'un membre coupe l'accès à la requête suivante. Un mail d'invitation part si `SYSTEM_SMTP_*` est configuré, sinon le lien est affiché au propriétaire.
 
 ### File de jobs
 

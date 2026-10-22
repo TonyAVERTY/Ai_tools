@@ -12,6 +12,8 @@ import { loginPage } from './site/pages.js';
 import { registerSiteRoutes } from './site/routes.js';
 import { registerAdminRoutes } from './adminroutes.js';
 import { loginsOf } from './claudelogin.js';
+import { accessOn, memberTeamIds } from './teams.js';
+import { registerTeamRoutes } from './teamroutes.js';
 import { dashboardPage, settingsPage, unsubPage, accountPage, linkPage } from './views.js';
 import { enqueue, latestJobs, cancelJob, usageSummary } from './services/jobs.js';
 import { validateGitUrl, removeRepo } from './services/git.js';
@@ -53,6 +55,7 @@ export function registerRoutes(router, app) {
   // ---------- Public ----------
   registerSiteRoutes(router, app);
   registerAdminRoutes(router, app);
+  registerTeamRoutes(router, app);
   // Déjà connecté : la page de connexion n'a rien à offrir, on va au tableau de bord
   router.get('/login', async ({ req, res, url }) => {
     if (await getSession(db, req)) return redirect(res, '/');
@@ -281,17 +284,21 @@ export function registerRoutes(router, app) {
   // Barre du haut : uniquement les jobs, l'usage et les quotas de l'utilisateur courant (la température du serveur, réservée aux admins)
   router.get('/api/system', async ({ res, session }) => {
     const userId = session.userId;
-    const queue = (await db.prepare(`SELECT COUNT(*) n FROM jobs WHERE user_id = ? AND (status = 'running'
-      OR (status = 'queued' AND (run_after IS NULL OR run_after <= ?)))`).get(userId, now())).n;
-    const scheduled = (await db.prepare("SELECT COUNT(*) n FROM jobs WHERE user_id = ? AND status = 'queued' AND run_after > ?").get(userId, now())).n;
+    // Les jobs de l'utilisateur, plus ceux des projets que ses équipes partagent avec lui
+    const teamIds = await memberTeamIds(db, userId);
+    const mine = teamIds.length ? `(j.user_id = ? OR p.team_id IN (${teamIds.map(() => '?').join(',')}))` : 'j.user_id = ?';
+    const mineArgs = [userId, ...teamIds];
+    const queue = (await db.prepare(`SELECT COUNT(*) n FROM jobs j LEFT JOIN projects p ON p.id = j.project_id WHERE ${mine} AND (j.status = 'running'
+      OR (j.status = 'queued' AND (j.run_after IS NULL OR j.run_after <= ?)))`).get(...mineArgs, now())).n;
+    const scheduled = (await db.prepare(`SELECT COUNT(*) n FROM jobs j LEFT JOIN projects p ON p.id = j.project_id WHERE ${mine} AND j.status = 'queued' AND j.run_after > ?`).get(...mineArgs, now())).n;
     const link = await getLinkState(db, userId);
     // Le quota d'abonnement n'existe qu'en mode abonnement ou serveur : jamais de barre en mode clé API
     const rlRaw = link?.mode === MODES.api_key ? null : await getSetting(db, userId, 'claude_rate_limit_json');
     // Détail pour le menu « jobs » de la barre du haut : en cours d'abord, puis la file, puis les programmés
     const jobs = (await db.prepare(`SELECT j.id, j.type, j.status, j.progress_json, j.run_after, j.started_at, j.created_at, p.id pid, p.name project
       FROM jobs j LEFT JOIN projects p ON p.id = j.project_id
-      WHERE j.user_id = ? AND j.status IN ('queued','running')
-      ORDER BY j.status = 'running' DESC, COALESCE(j.run_after, 0), j.id LIMIT 20`).all(userId)).map((r) => ({
+      WHERE ${mine} AND j.status IN ('queued','running')
+      ORDER BY j.status = 'running' DESC, COALESCE(j.run_after, 0), j.id LIMIT 20`).all(...mineArgs)).map((r) => ({
       id: r.id, type: r.type, status: r.status, projectId: r.pid, project: r.project,
       progress: r.progress_json ? JSON.parse(r.progress_json) : null,
       runAfter: r.run_after, startedAt: r.started_at, createdAt: r.created_at,
@@ -327,17 +334,17 @@ export function registerRoutes(router, app) {
   }, { limit: 'project_create' });
 
   router.post('/api/projects/:id/delete', async (ctx) => {
-    const p = await project(ctx);
-    await db.prepare('DELETE FROM projects WHERE id = ? AND user_id = ?').run(p.id, ctx.session.userId);
-    removeRepo(repoDir(cfg, ctx.session.userId, p.id));
+    const p = await project(ctx, { need: 'owner' });
+    await db.prepare('DELETE FROM projects WHERE id = ? AND user_id = ?').run(p.id, p.userId);
+    removeRepo(repoDir(cfg, p.userId, p.id));
     clearRecapCache(p.id);
     json(ctx.res, { ok: true });
   });
 
   router.get('/api/projects/:id/status', async (ctx) => {
-    const { res, session } = ctx;
-    const userId = session.userId;
+    const { res } = ctx;
     const p = await project(ctx);
+    const userId = p.userId; // un membre agit comme le propriétaire : ses plafonds, ses réglages
     const jobs = await latestJobs(db, p.id);
     // Rendu côté serveur (échappé) : le front n'injecte jamais le Markdown brut de Claude
     if (jobs.evolution?.result?.markdown) jobs.evolution.result.html = evolutionHtml(jobs.evolution.result.markdown);
@@ -353,7 +360,7 @@ export function registerRoutes(router, app) {
     json(res, {
       jobs, templates, stats, sendMax,
       followup: { enabled: p.followupEnabled, days: p.followupDays, ...(await followupPlan(db, p)) },
-      targetValidated: p.targetValidated, hasProfile: !!p.profile, hasSmtp: p.hasSmtp,
+      targetValidated: p.targetValidated, hasProfile: !!p.profile, hasSmtp: p.hasSmtp, smtpSource: p.smtpSource, access: p.access,
       hasImap: p.hasImap, inbox: p.inbox, ab: await abStats(db, p.id),
     });
   });
@@ -376,16 +383,17 @@ export function registerRoutes(router, app) {
   });
 
   const jobRoute = (type, paramsOf = () => ({}), guard = () => {}) => async (ctx) => {
-    const { req, res, session } = ctx;
-    // Refus côté serveur AVANT toute autre vérification : pas de job IA sans liaison Claude valide (enqueue le revérifie)
-    if (AI_JOBS.has(type)) await assertCanRunAi(db, session.userId, aiOpts);
+    const { req, res } = ctx;
     const p = await project(ctx);
+    // Pas de job IA sans liaison Claude valide : celle du PROPRIÉTAIRE du projet (un membre n'a pas besoin de la sienne ;
+    // enqueue le revérifie)
+    if (AI_JOBS.has(type)) await assertCanRunAi(db, p.userId, aiOpts);
     const b = req.headers['content-type']?.includes('json') ? await readBody(req) : {};
     await guard(p, b);
     // "Cette nuit" : démarrage au prochain créneau 1h-6h (Pi au frais, quota Claude libre)
     const runAfter = b.when === 'night' ? Math.floor(nextNightSlot().getTime() / 1000) : null;
-    const r = await enqueue(db, { userId: session.userId, projectId: p.id, type, params: paramsOf(b), runAfter }, aiOpts);
-    const budget = AI_JOBS.has(type) ? await budgetState(db, session.userId) : null;
+    const r = await enqueue(db, { userId: p.userId, projectId: p.id, type, params: paramsOf(b), runAfter }, aiOpts);
+    const budget = AI_JOBS.has(type) ? await budgetState(db, p.userId) : null;
     json(res, { ...r, budgetBlocked: budget?.blocked ? budget.reason : null });
   };
 
@@ -435,10 +443,16 @@ export function registerRoutes(router, app) {
 
   router.post('/api/projects/:id/smtp', async (ctx) => {
     const { req, res } = ctx;
-    const p = await project(ctx);
+    const p = await project(ctx, { need: 'admin' });
     const b = await readBody(req);
+    // Hôte vide = « utiliser le SMTP des Réglages » : on efface celui du projet (le plafond quotidien reste réglable)
+    if (!String(b.host || '').trim() || b.reset === true || b.reset === 'on') {
+      await db.prepare('UPDATE projects SET smtp_enc = NULL WHERE id = ?').run(p.id);
+      if (b.dailyCap !== undefined) await db.prepare('UPDATE projects SET daily_mail_cap = ? WHERE id = ?').run(int(b.dailyCap, 1, 200, 30), p.id);
+      return json(res, { ok: true, reset: true });
+    }
     if (b.fromEmail && !EMAIL_RE.test(b.fromEmail)) throw new HttpError(400, 'Email expéditeur invalide');
-    if (String(b.host || '').trim()) await guardTarget(app, ctx.session.userId, 'smtp', String(b.host).trim(), int(b.port, 1, 65535, 587), { lenient: true });
+    if (String(b.host || '').trim()) await guardTarget(app, p.userId, 'smtp', String(b.host).trim(), int(b.port, 1, 65535, 587), { lenient: true });
     await saveSecretConfig(app, p.id, 'smtp_enc', {
       host: String(b.host || '').trim(), port: int(b.port, 1, 65535, 587), user: String(b.user || '').trim(),
       pass: b.pass || '', fromEmail: String(b.fromEmail || '').trim(), fromName: String(b.fromName || '').trim().slice(0, 80),
@@ -449,37 +463,37 @@ export function registerRoutes(router, app) {
 
   // Boîte de réception : on enregistre puis on teste tout de suite la connexion
   router.post('/api/projects/:id/imap', async (ctx) => {
-    const { req, res, session } = ctx;
-    const p = await project(ctx);
+    const { req, res } = ctx;
+    const p = await project(ctx, { need: 'admin' });
     const b = await readBody(req);
     const host = String(b.host || '').trim();
     if (!host) {
       await db.prepare('UPDATE projects SET imap_enc = NULL, inbox_json = NULL WHERE id = ?').run(p.id);
       return json(res, { ok: true, disabled: true });
     }
-    await guardTarget(app, session.userId, 'imap', host, int(b.port, 1, 65535, 993), { lenient: true });
+    await guardTarget(app, p.userId, 'imap', host, int(b.port, 1, 65535, 993), { lenient: true });
     await saveSecretConfig(app, p.id, 'imap_enc', {
       host, port: int(b.port, 1, 65535, 993), user: String(b.user || '').trim(), pass: b.pass || '',
     }, 'pass');
-    try { json(res, { ok: true, check: await checkInbox(app, session.userId, p.id) }); }
+    try { json(res, { ok: true, check: await checkInbox(app, p.userId, p.id) }); }
     catch (e) { json(res, { ok: false, error: e.message }); }
   }, { limit: 'conn_test' });
 
   router.post('/api/projects/:id/inbox/check', async (ctx) => {
-    const { res, session } = ctx;
+    const { res } = ctx;
     const p = await project(ctx);
-    try { json(res, { ok: true, check: await checkInbox(app, session.userId, p.id) }); }
+    try { json(res, { ok: true, check: await checkInbox(app, p.userId, p.id) }); }
     catch (e) { throw new HttpError(502, e.message); }
   }, { limit: 'conn_test' });
 
   router.post('/api/projects/:id/db', async (ctx) => {
     const { req, res } = ctx;
-    const p = await project(ctx);
+    const p = await project(ctx, { need: 'admin' });
     const b = await readBody(req);
     for (const k of ['sql_users', 'sql_clients', 'sql_revenue']) {
       try { validateSelect(b[k]); } catch (e) { throw new HttpError(400, `${k} : ${e.message}`); }
     }
-    if (String(b.host || '').trim()) await guardTarget(app, ctx.session.userId, b.type === 'pg' ? 'pg' : 'mysql', String(b.host).trim(), b.port ? int(b.port, 1, 65535, 3306) : (b.type === 'pg' ? 5432 : 3306), { lenient: true });
+    if (String(b.host || '').trim()) await guardTarget(app, p.userId, b.type === 'pg' ? 'pg' : 'mysql', String(b.host).trim(), b.port ? int(b.port, 1, 65535, 3306) : (b.type === 'pg' ? 5432 : 3306), { lenient: true });
     await saveSecretConfig(app, p.id, 'db_enc', {
       type: b.type === 'pg' ? 'pg' : 'mysql', host: String(b.host || '').trim(), port: b.port ? int(b.port, 1, 65535, null) : null,
       database: String(b.database || '').trim(), user: String(b.user || '').trim(), password: b.password || '',
@@ -492,12 +506,12 @@ export function registerRoutes(router, app) {
 
   router.get('/api/projects/:id/recap', async (ctx) => {
     const { res, url } = ctx;
-    const p = await project(ctx, { secrets: true });
+    const p = await project(ctx, { secrets: true, need: 'admin' });
     const stats = await prospectStats(db, p.id);
-    const cost = (await db.prepare('SELECT COALESCE(SUM(cost_usd),0) c FROM jobs WHERE project_id = ? AND user_id = ?').get(p.id, ctx.session.userId)).c;
+    const cost = (await db.prepare('SELECT COALESCE(SUM(cost_usd),0) c FROM jobs WHERE project_id = ? AND user_id = ?').get(p.id, p.userId)).c;
     let business = null, error = null;
     try {
-      business = await fetchRecap(p.id, await pinDb(app, ctx.session.userId, p.dbCfg), { force: url.searchParams.has('force') });
+      business = await fetchRecap(p.id, await pinDb(app, p.userId, p.dbCfg), { force: url.searchParams.has('force') });
       await saveSnapshot(db, p.id, business); // la consultation alimente aussi la courbe du jour
     } catch (e) { error = e.message; }
     json(res, { business, error, stats, aiCostUsd: cost });
@@ -521,8 +535,8 @@ export function registerRoutes(router, app) {
     const p = await project(ctx);
     const b = await readBody(req, { max: 1024 * 1024 });
     try {
-      json(res, await withUserLock(ctx.session.userId, async () => {
-        const u = await getUser(db, ctx.session.userId);
+      json(res, await withUserLock(p.userId, async () => {
+        const u = await getUser(db, p.userId);
         const q = await quotaFor(db, u, 'prospects');
         return importProspects(db, p.id, String(b.csv || ''), { limit: q.remaining, limitError: q.unlimited ? null : planLimitError(u, q, { wanted: q.remaining + 1, note: "Rien n'a été importé." }) });
       }));
@@ -545,10 +559,11 @@ export function registerRoutes(router, app) {
   // ---------- Fiche prospect ----------
   // Un prospect n'est accessible que par le propriétaire de son projet ; sinon 404, comme s'il n'existait pas
   const ownedProspect = async ({ params, session }) => {
-    const row = await db.prepare(`SELECT x.id, x.email FROM prospects x JOIN projects p ON p.id = x.project_id
-      WHERE x.id = ? AND p.user_id = ?`).get(Number(params.id), session.userId);
-    if (!row) throw new HttpError(404, 'Prospect introuvable');
-    return row;
+    const row = await db.prepare(`SELECT x.id, x.email, p.id pid, p.user_id, p.team_id FROM prospects x JOIN projects p ON p.id = x.project_id
+      WHERE x.id = ?`).get(Number(params.id));
+    // Le propriétaire du projet ou un membre de l'équipe qui le partage ; sinon 404, comme s'il n'existait pas
+    if (!row || !(await accessOn(db, { user_id: row.user_id, team_id: row.team_id }, session.userId))) throw new HttpError(404, 'Prospect introuvable');
+    return { id: row.id, email: row.email };
   };
   router.post('/api/prospects/:id/status', async (ctx) => {
     const { req, res } = ctx;
@@ -581,7 +596,12 @@ export function registerRoutes(router, app) {
   });
 
   router.post('/api/jobs/:id/cancel', async ({ res, params, session }) => {
-    await cancelJob(db, session.userId, Number(params.id));
+    const id = Number(params.id);
+    const job = await db.prepare('SELECT j.user_id, p.team_id FROM jobs j LEFT JOIN projects p ON p.id = j.project_id WHERE j.id = ?').get(id);
+    // Un job est à son propriétaire ; un membre peut annuler ceux des projets que son équipe partage
+    const allowed = job && (Number(job.user_id) === Number(session.userId) || (await accessOn(db, { user_id: job.user_id, team_id: job.team_id }, session.userId)));
+    if (!allowed) throw new HttpError(404, 'Job introuvable');
+    await cancelJob(db, job.user_id, id);
     json(res, { ok: true });
   });
 }

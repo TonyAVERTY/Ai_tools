@@ -18,7 +18,8 @@ const PLAN_BLURBS = {
 const limitRows = (l) => `<li><span>Projets</span><strong>${l.projects}</strong></li>
         <li><span>Contacts</span><strong>${l.prospects.toLocaleString('fr-FR')}</strong></li>
         <li><span>Mails par mois</span><strong>${l.mails.toLocaleString('fr-FR')}</strong></li>
-        <li><span>Tâches IA par mois</span><strong>${l.aiJobs}</strong></li>`;
+        <li><span>Tâches IA par mois</span><strong>${l.aiJobs}</strong></li>
+        <li><span>Places d'équipe</span><strong>${l.seats}</strong></li>`;
 
 /** « Google » ou « Google ou Apple » selon la configuration réelle de la connexion. */
 export const providersText = (apple) => (apple ? 'Google ou Apple' : 'Google');
@@ -475,6 +476,8 @@ export function pricingPage({ appUrl }) {
     <p>Parce que l'intelligence artificielle n'est pas dans notre facture : tu utilises ton propre accès à Claude. Tu ne paies donc à AiTools que l'outil (les projets, les contacts, les envois et le suivi), pas la machine qui réfléchit.</p>
     <h3>Que veut dire « ${ANNUAL_FREE_MONTHS} mois offerts » ?</h3>
     <p>En payant à l'année, tu règles ${12 - ANNUAL_FREE_MONTHS} mois et tu profites de 12. Par exemple ${PLAN_LABELS.growth} : ${euros(annualPrice('growth'))} par an au lieu de ${euros(PLAN_PRICES.growth * 12)}.</p>
+    <h3>Comment fonctionne l'équipe ?</h3>
+    <p>Tu invites des collègues par email, tu choisis ce que chacun peut faire (membre ou administrateur) et tu partages les projets que tu veux. Ils travaillent avec <em>ton</em> offre, ton SMTP et ton accès Claude : pas besoin d'abonnement pour eux. Le nombre de places dépend de l'offre.</p>
     <h3>Les prix incluent-ils la TVA ?</h3>
     <p>Oui, ce sont des prix TTC. L'éditeur est en franchise de TVA (art. 293 B du CGI), donc aucun supplément ne s'ajoute.</p>
     <h3>Puis-je supprimer mon compte ?</h3>
