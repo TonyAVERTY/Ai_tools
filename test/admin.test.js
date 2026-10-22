@@ -245,7 +245,7 @@ test('journal d\'audit : en lecture seule, aucune route ni requête ne le modifi
     const src = files.map((f) => [f, readFileSync(f, 'utf8')]);
     for (const [f, text] of src) {
       assert.doesNotMatch(text, /UPDATE\s+admin_audit/i, f);
-      if (!f.endsWith('admin.js')) assert.doesNotMatch(text, /DELETE\s+FROM\s+admin_audit/i, f);
+      if (!f.endsWith('audit.js')) assert.doesNotMatch(text, /DELETE\s+FROM\s+admin_audit/i, f);
     }
     await purgeAudit(s.db, 12);
     assert.deepEqual((await recentAudit(s.db)).map((l) => l.action), ['abuse_pause'], 'la ligne de plus de 12 mois est retirée');

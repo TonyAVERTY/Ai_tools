@@ -12,6 +12,7 @@ export const EVENTS = {
   reply: 'Réponse d\'un prospect',
   followup: 'Relances envoyées',
   load: 'Serveur très chargé : tes jobs attendent',
+  abuse: 'Envois mis en pause (trop de mails rejetés)',
   budget: 'Budget IA atteint',
   quota: 'Quota Claude proche de la limite, ou job reporté',
   weekly: 'Rapport hebdo',
@@ -21,7 +22,7 @@ const COLORS = { ok: 0x15803d, info: 0x2f5bea, warn: 0xb45309, error: 0xb91c1c }
 const ICONS = { ok: '✅', info: '🔷', warn: '⚠️', error: '⛔' };
 const FOOTERS = {
   job_done: 'Job terminé', job_error: 'Job en échec', reply: 'Réponse prospect', followup: 'Relances',
-  load: 'Charge serveur', budget: 'Budget IA', quota: 'Quota Claude', weekly: 'Rapport hebdo', test: 'Test',
+  load: 'Charge serveur', abuse: 'Envois en pause', budget: 'Budget IA', quota: 'Quota Claude', weekly: 'Rapport hebdo', test: 'Test',
 };
 
 /** Barre de progression en caractères (Discord n'affiche pas d'images inline dans un embed sans hébergement). */

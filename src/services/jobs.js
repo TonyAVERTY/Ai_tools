@@ -7,6 +7,7 @@ import { aiRefusal, assertCanRunAi } from '../claudelink.js';
 import { loadRatio } from './load.js';
 import { LOAD } from '../limits.js';
 import { assertRoom, recordUsage, withUserLock, MAIL_JOBS } from './plans.js';
+import { sendPause, pauseMessage } from './abuse.js';
 
 /**
  * Met un job en file pour un utilisateur. Point de passage obligé de toutes les routes et tâches de fond :
@@ -25,6 +26,11 @@ export async function enqueue(db, { userId, projectId, type, params = {}, runAft
   if (!user) throw new Error('enqueue : utilisateur requis');
   if (user.status !== 'active') throw new HttpError(403, 'Compte suspendu');
   if (AI_JOBS.has(type)) await assertCanRunAi(db, user.id, opts);
+  // Pause d'envoi (trop de rejets) : refus explicite et immédiat, jamais silencieux
+  if (MAIL_JOBS.has(type)) {
+    const pause = await sendPause(db, user.id);
+    if (pause) throw new HttpError(403, pauseMessage(pause), { expose: true, code: 'send_paused' });
+  }
   // Deux écritures de la même condition : "= ?" ne marche pas avec NULL, et "IS ?" n'existe pas en MySQL
   const running = projectId == null
     ? await db.prepare("SELECT id FROM jobs WHERE user_id = ? AND project_id IS NULL AND type = ? AND status IN ('queued','running')").get(user.id, type)
@@ -33,7 +39,9 @@ export async function enqueue(db, { userId, projectId, type, params = {}, runAft
   // Plafonds du plan : compter puis écrire dans la même section critique (deux requêtes simultanées ne passent pas toutes deux)
   return withUserLock(user.id, async () => {
     if (AI_JOBS.has(type)) await assertRoom(db, user, 'aiJobs');
-    if (MAIL_JOBS.has(type)) await assertRoom(db, user, 'mails');
+    if (MAIL_JOBS.has(type)) {
+      await assertRoom(db, user, 'mails');
+    }
     const r = await db.prepare('INSERT INTO jobs(user_id, project_id, type, params_json, created_at, run_after) VALUES(?, ?, ?, ?, ?, ?)')
       .run(user.id, projectId ?? null, type, JSON.stringify(params), now(), runAfter);
     const id = Number(r.lastInsertRowid);

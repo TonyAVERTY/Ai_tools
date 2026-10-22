@@ -4,6 +4,7 @@ import { now } from '../db.js';
 import { getProject } from '../projects.js';
 import { notify } from './notify.js';
 import { pinImap } from '../netguard.js';
+import { evaluateSending } from './abuse.js';
 
 // Webmails grand public : une réponse d'un autre @gmail.com ne dit rien sur l'entreprise
 const GENERIC_DOMAINS = new Set([
@@ -163,6 +164,7 @@ export async function checkInbox(app, userId, projectId) {
       uidValidity: r.uidValidity, lastUid: r.lastUid, lastCheck: at, lastOk: at, lastError: null,
       replies: (state.replies || 0) + res.replies, bounces: (state.bounces || 0) + res.bounces,
     });
+    if (res.bounces) await evaluateSending(app, userId); // les rejets arrivent ici : vérifie le taux du compte
     if (res.replies) {
       const who = await db.prepare('SELECT company, email, reply_subject FROM prospects WHERE project_id = ? AND replied_at = ? LIMIT 10').all(project.id, at);
       await notify(app, userId, 'reply', {
