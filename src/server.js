@@ -166,6 +166,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const cfg = loadConfig();
   if (!cfg.adminEmails.length) console.warn('ADMIN_EMAILS est vide : aucun administrateur (personne ne pourra utiliser le mode « Claude du serveur »).');
   for (const m of sandboxStartupMessages(cfg.sandbox)) console.warn(m);
+  if (cfg.production && cfg.allowPrivateHosts) console.warn('ALLOW_PRIVATE_HOSTS est actif en production : seuls les administrateurs peuvent viser des hôtes privés.');
+  if (cfg.production && !cfg.trustProxy) console.warn("TRUST_PROXY est désactivé : derrière Nginx, tous les visiteurs partagent la même adresse pour la limitation de débit. Pose TRUST_PROXY=true.");
   if (!cfg.recaptcha) console.warn(`reCAPTCHA désactivé (RECAPTCHA_SITE_KEY / RECAPTCHA_SECRET absentes)${cfg.sandbox.production ? " : à configurer avant l'ouverture au public" : ''}.`);
   const app = await createApp(cfg);
   app.server.listen(cfg.port, cfg.host, () => console.log(`AiTools sur http://${cfg.host}:${cfg.port} (${cfg.appUrl})`));
