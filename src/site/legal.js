@@ -3,6 +3,7 @@
 // individuel Tony AVERTY. Ce sont des modèles sérieux, pas un avis juridique : voir docs/JOURNAL.md pour ce qui reste
 // à compléter (marqueurs visibles) et à faire relire.
 import { siteLayout, nextBlock, journey, CONTACT_EMAIL } from './layout.js';
+import { PLAN_LIMITS, PLAN_PRICES, PLAN_LABELS, ANNUAL_FREE_MONTHS, annualPrice } from '../limits.js';
 
 /**
  * Marqueurs visibles tant que l'information n'est pas fournie ou validée. Leur liste est aussi dans docs/JOURNAL.md
@@ -254,7 +255,8 @@ export function termsPage({ appUrl, apple = false }) {
       },
       {
         id: 'plans', title: 'Plan gratuit et plans payants',
-        html: `<p>Le plan gratuit comprend 1 projet, 50 prospects, 100 mails et 5 jobs IA par mois. Ces limites peuvent évoluer, avec information préalable. Un plan payant est prévu mais n'est pas ouvert : aucun paiement n'est demandé aujourd'hui. Ses conditions et son prix seront publiés avant toute facturation, et ne s'appliqueront qu'avec ton accord.</p>`,
+        html: `<p>Le plan gratuit comprend ${PLAN_LIMITS.free.projects} projet, ${PLAN_LIMITS.free.prospects} prospects, ${PLAN_LIMITS.free.mails} mails et ${PLAN_LIMITS.free.aiJobs} jobs IA par mois. Ces limites peuvent évoluer, avec information préalable.</p>
+<p>Des plans payants sont prévus : ${Object.keys(PLAN_PRICES).map((k) => `${PLAN_LABELS[k]} (${PLAN_PRICES[k]} € TTC par mois, ou ${annualPrice(k)} € TTC par an, ${ANNUAL_FREE_MONTHS} mois offerts)`).join(', ')}. Les prix sont TTC ; l'éditeur est en franchise de TVA (art. 293 B du CGI). Ces plans ne sont pas encore ouverts à la vente : aucun paiement n'est demandé aujourd'hui, et rien ne sera facturé sans ton accord exprès.</p>`,
       },
       {
         id: 'envois', title: 'Tes envois',

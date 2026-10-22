@@ -31,7 +31,7 @@ async function world() {
 const proj = async (w, userId, n = 1) => Number((await w.db.prepare('INSERT INTO projects(user_id, name, git_url, created_at) VALUES(?, ?, ?, ?)').run(userId, `p${n}`, `https://git.test/u${userId}/r${n}.git`, now())).lastInsertRowid);
 
 test('les limites viennent d\'un seul module et reprennent le cadrage', () => {
-  assert.deepEqual(PLAN_LIMITS.free, { projects: 1, prospects: 50, mails: 100, aiJobs: 5 });
+  assert.deepEqual(PLAN_LIMITS.free, { projects: 1, prospects: 50, mails: 100, aiJobs: 6 });
 });
 
 test('mois calendaire à l\'heure de Paris, changement d\'heure compris', () => {
@@ -81,7 +81,7 @@ test('projets : le 2e est refusé (403 plan_limit, lien /tarifs), un admin crée
   assert.equal(res.filter((r) => r.status === 'fulfilled').length, 1, 'une seule création passe malgré la simultanéité');
 });
 
-test('jobs IA : 5 par mois, le 6e est refusé ; annulé sans démarrer = rendu ; projet supprimé = toujours compté', async () => {
+test('jobs IA : 6 par mois, le 7e est refusé ; annulé sans démarrer = rendu ; projet supprimé = toujours compté', async () => {
   const w = await world();
   const u = await free(w.db);
   const p = await proj(w, u);
@@ -89,12 +89,14 @@ test('jobs IA : 5 par mois, le 6e est refusé ; annulé sans démarrer = rendu ;
   const ids = [];
   for (const type of types) ids.push((await enqueue(w.db, { userId: u, projectId: p, type })).id);
   assert.equal((await usageOf(w.db, u)).aiJobs, 5);
+  await recordUsage(w.db, u, 'ai_job'); // un sixième job (ailleurs) : le plafond est atteint
+  assert.equal((await usageOf(w.db, u)).aiJobs, PLAN_LIMITS.free.aiJobs);
   await assert.rejects(enqueue(w.db, { userId: u, projectId: p, type: 'analyze' }).then(() => enqueue(w.db, { userId: u, projectId: null, type: 'analyze' })), { status: 403, code: 'plan_limit' });
   // Le même job déjà en file n'est pas recompté (dédoublonnage)
   assert.equal((await enqueue(w.db, { userId: u, projectId: p, type: 'template' })).existing, true);
   // Annulé avant de démarrer : rendu
   await cancelJob(w.db, u, ids[0]);
-  assert.equal((await usageOf(w.db, u)).aiJobs, 4);
+  assert.equal((await usageOf(w.db, u)).aiJobs, 5);
   await enqueue(w.db, { userId: u, projectId: p, type: 'analyze' });
   await assert.rejects(enqueue(w.db, { userId: u, projectId: null, type: 'template' }), { code: 'plan_limit' }, 'à la limite exacte');
   // Supprimer le projet efface ses jobs, pas la consommation du mois
@@ -195,7 +197,7 @@ test('HTTP : refus explicite avec code plan_limit et lien /tarifs ; le projet es
   try {
     const u = await s.newUser({ admin: false, link: LINK });
     await s.db.prepare("INSERT INTO user_settings(user_id, `key`, value) VALUES(?, 'forgejo_host', 'git.test')").run(u.id);
-    for (let i = 0; i < 5; i++) await recordUsage(s.db, u.id, 'ai_job');
+    for (let i = 0; i < PLAN_LIMITS.free.aiJobs; i++) await recordUsage(s.db, u.id, 'ai_job');
     const ok = await u.post('/api/projects', { name: 'Un', gitUrl: 'https://git.test/a/un.git' });
     assert.equal(ok.status, 200);
     const body = await ok.json();
@@ -236,7 +238,7 @@ test('Mon compte et tableau de bord : barres d\'usage du mois, plafond atteint s
     assert.match(h, /plan administrateur/);
     assert.doesNotMatch(h, /class="bar usage/);
     const view = await usageView(s.db, await getUser(s.db, u.id));
-    assert.deepEqual(view.items.map((i) => i.limit), [1, 50, 100, 5]);
+    assert.deepEqual(view.items.map((i) => i.limit), [1, 50, 100, 6]);
   } finally { await s.close(); }
 });
 

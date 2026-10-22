@@ -2,7 +2,23 @@
 // de la connexion). Les textes sont écrits en mots de tous les jours, pour être lus tels quels par n'importe qui :
 // rien ici ne promet un résultat, rien n'est chiffré au-delà de ce que le code fait réellement.
 import { esc } from '../http.js';
-import { siteLayout, nextBlock, journey } from './layout.js';
+import { siteLayout, nextBlock, journey, CONTACT_EMAIL } from './layout.js';
+import { PLAN_LIMITS, PLAN_PRICES, PLAN_LABELS, ANNUAL_FREE_MONTHS, annualPrice } from '../limits.js';
+
+const FREE = PLAN_LIMITS.free;
+/** Montant en euros à la française (« 8,33 € ») ; entier sans décimales. */
+const euros = (n) => `${Number.isInteger(n) ? n : n.toFixed(2).replace('.', ',')}\u00a0€`;
+const PAID = Object.keys(PLAN_PRICES);
+const PLAN_BLURBS = {
+  starter: 'Pour lancer un premier vrai projet.',
+  growth: 'Pour prospecter chaque semaine, sur plusieurs projets.',
+  business: 'Pour une activité qui repose sur la prospection.',
+  intensive: 'Pour le plus gros volume que le service permet.',
+};
+const limitRows = (l) => `<li><span>Projets</span><strong>${l.projects}</strong></li>
+        <li><span>Contacts</span><strong>${l.prospects.toLocaleString('fr-FR')}</strong></li>
+        <li><span>Mails par mois</span><strong>${l.mails.toLocaleString('fr-FR')}</strong></li>
+        <li><span>Tâches IA par mois</span><strong>${l.aiJobs}</strong></li>`;
 
 /** « Google » ou « Google ou Apple » selon la configuration réelle de la connexion. */
 export const providersText = (apple) => (apple ? 'Google ou Apple' : 'Google');
@@ -82,7 +98,10 @@ const HOME_JSON_LD = (appUrl) => ({
   operatingSystem: 'Web',
   inLanguage: 'fr',
   description: 'Panel qui pilote Claude Code pour analyser un projet, trouver des prospects, rédiger et envoyer des mails de prospection, relancer et suivre les réponses.',
-  offers: { '@type': 'Offer', price: '0', priceCurrency: 'EUR', description: 'Plan gratuit : 1 projet, 50 prospects, 100 mails et 5 jobs IA par mois' },
+  offers: [
+    { '@type': 'Offer', name: 'Gratuit', price: '0', priceCurrency: 'EUR', description: `Plan gratuit : ${FREE.projects} projet, ${FREE.prospects} prospects, ${FREE.mails} mails et ${FREE.aiJobs} jobs IA par mois` },
+    ...PAID.map((k) => ({ '@type': 'Offer', name: PLAN_LABELS[k], price: String(PLAN_PRICES[k]), priceCurrency: 'EUR', description: `${PLAN_LABELS[k]} : ${PLAN_PRICES[k]} € TTC par mois, ou ${annualPrice(k)} € TTC par an (${ANNUAL_FREE_MONTHS} mois offerts)` })),
+  ],
   publisher: { '@type': 'Person', name: 'Tony AVERTY' },
 });
 
@@ -176,10 +195,10 @@ export function homePage({ appUrl, apple = false }) {
 
 <section class="wrap block counters" aria-label="Le plan gratuit en chiffres">
   <ul class="count-row">
-    <li data-reveal><strong data-count="1">1</strong><span>projet</span></li>
-    <li data-reveal><strong data-count="50">50</strong><span>contacts</span></li>
-    <li data-reveal><strong data-count="100">100</strong><span>mails par mois</span></li>
-    <li data-reveal><strong data-count="5">5</strong><span>tâches IA par mois</span></li>
+    <li data-reveal><strong data-count="${FREE.projects}">${FREE.projects}</strong><span>projet</span></li>
+    <li data-reveal><strong data-count="${FREE.prospects}">${FREE.prospects}</strong><span>contacts</span></li>
+    <li data-reveal><strong data-count="${FREE.mails}">${FREE.mails}</strong><span>mails par mois</span></li>
+    <li data-reveal><strong data-count="${FREE.aiJobs}">${FREE.aiJobs}</strong><span>tâches IA par mois</span></li>
   </ul>
   <p class="fine center" data-reveal>Ce que tu as sans payer, tous les mois. <a href="/tarifs">Tous les détails sur la page Tarifs.</a></p>
 </section>
@@ -243,7 +262,7 @@ ${gallery()}
   <div class="closing" data-reveal>
     <div>
       <h2 id="titre-fin">Commence avec le plan gratuit</h2>
-      <p>1 projet, 50 contacts, 100 mails et 5 tâches IA par mois. Le plan payant n'est pas encore ouvert : <a href="/tarifs">tout est expliqué sur la page Tarifs</a>.</p>
+      <p>${FREE.projects} projet, ${FREE.prospects} contacts, ${FREE.mails} mails et ${FREE.aiJobs} tâches IA par mois. Des offres de ${euros(PLAN_PRICES.starter)} à ${euros(PLAN_PRICES.intensive)} TTC par mois arrivent, avec ${ANNUAL_FREE_MONTHS} mois offerts en annuel : <a href="/tarifs">tout est expliqué sur la page Tarifs</a>.</p>
     </div>
     <a class="btn primary" href="/login">Créer mon compte</a>
   </div>
@@ -359,34 +378,47 @@ ${nextBlock(journey('home', 'pricing', 'login'))}`,
 export function pricingPage({ appUrl }) {
   return siteLayout({
     appUrl, path: '/tarifs',
-    title: 'Tarifs : plan gratuit et accès Claude à ta charge · AiTools',
-    description: "Le plan gratuit d'AiTools : 1 projet, 50 contacts, 100 mails et 5 tâches IA par mois. Le plan payant n'est pas ouvert. Ton accès Claude est facturé à part, par Anthropic.",
+    title: 'Tarifs : gratuit, puis 10 à 100 € par mois · AiTools',
+    description: `Plan gratuit, puis des offres de ${PLAN_PRICES.starter} € à ${PLAN_PRICES.intensive} € TTC par mois, avec ${ANNUAL_FREE_MONTHS} mois offerts en annuel. Ton accès Claude est facturé à part, par Anthropic.`,
     body: `<div class="wrap page-head">
   <p class="eyebrow"><span class="mark" aria-hidden="true"></span>Tarifs</p>
-  <h1>Gratuit pour commencer, payant plus tard</h1>
-  <p class="lead">Aujourd'hui, il n'y a qu'un seul plan, et il est gratuit. Ton accès à Claude est un coût à part, qui ne passe pas par AiTools.</p>
+  <h1>Gratuit pour commencer, de ${euros(PLAN_PRICES.starter)} à ${euros(PLAN_PRICES.intensive)} par mois ensuite</h1>
+  <p class="lead">Le plan gratuit existe déjà. Les offres payantes arrivent : voici leurs prix, pour que tu saches où tu vas. Ton accès à Claude reste un coût à part, qui ne passe pas par AiTools, et c'est pour ça que nos prix sont bas.</p>
 </div>
 
 <section class="wrap" aria-label="Plans">
-  <div class="plans">
+  <div class="billing">
+    <input type="radio" name="billing" id="bill-month" checked>
+    <label for="bill-month">Au mois</label>
+    <input type="radio" name="billing" id="bill-year">
+    <label for="bill-year">À l'année <span class="badge ok">${ANNUAL_FREE_MONTHS} mois offerts</span></label>
+    <div class="plans plan-grid">
     <article class="card plan" aria-labelledby="plan-gratuit" data-reveal>
       <h2 id="plan-gratuit">Gratuit</h2>
-      <p class="price">0 € <small>sans carte bancaire</small></p>
+      <p class="plan-blurb">Pour tout tester, sans carte bancaire.</p>
+      <p class="price">0 €</p>
+      <p class="price-sub">sans limite de durée</p>
       <ul class="limits">
-        <li><span>Projets</span><strong>1</strong></li>
-        <li><span>Contacts</span><strong>50</strong></li>
-        <li><span>Mails par mois</span><strong>100</strong></li>
-        <li><span>Tâches IA par mois</span><strong>5</strong></li>
+        ${limitRows(FREE)}
       </ul>
-      <p class="fine">Ces plafonds sont appliqués par le serveur. Les mails et les tâches IA se comptent par mois (heure de Paris) et repartent de zéro le 1er. Quand un plafond est atteint, la nouvelle action est refusée, mais rien n'est supprimé.</p>
       <a class="btn primary" href="/login">Créer mon compte</a>
     </article>
-    <article class="card plan soon" aria-labelledby="plan-payant" data-reveal>
-      <h2 id="plan-payant">Plan payant <span class="badge warn">Bientôt</span></h2>
-      <p>Plus de projets, plus de contacts, plus de mails. Le contenu exact et le prix ne sont pas encore décidés.</p>
-      <p>Ils seront affichés sur cette page avant que les paiements n'ouvrent. Rien n'est facturé aujourd'hui.</p>
-    </article>
+    ${PAID.map((k) => `<article class="card plan soon" aria-labelledby="plan-${k}" data-reveal>
+      <h2 id="plan-${k}">${PLAN_LABELS[k]} <span class="badge warn">Bientôt</span></h2>
+      <p class="plan-blurb">${PLAN_BLURBS[k]}</p>
+      <p class="price when-month">${euros(PLAN_PRICES[k])} <small>par mois, TTC</small></p>
+      <p class="price when-year">${euros(annualPrice(k))} <small>par an, TTC</small></p>
+      <p class="price-sub when-month">payé chaque mois</p>
+      <p class="price-sub when-year">soit ${euros(annualPrice(k) / 12)} par mois, ${ANNUAL_FREE_MONTHS} mois offerts</p>
+      <ul class="limits">
+        ${limitRows(PLAN_LIMITS[k])}
+      </ul>
+      <a class="btn" href="mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(`Me prévenir : offre ${PLAN_LABELS[k]}`)}">Me prévenir à l'ouverture</a>
+    </article>`).join('\n    ')}
+    </div>
   </div>
+  <p class="fine plan-note">Prix TTC. L'éditeur est en franchise de TVA (art. 293 B du CGI) : le prix affiché est le prix payé. En annuel, tu paies ${12 - ANNUAL_FREE_MONTHS} mois et tu en profites 12. Les offres payantes ne sont pas encore ouvertes : rien n'est facturé aujourd'hui, et tu seras prévenu avant toute ouverture.</p>
+  <p class="fine plan-note">Ces plafonds sont appliqués par le serveur. Les mails et les tâches IA se comptent par mois (heure de Paris) et repartent de zéro le 1er. Quand un plafond est atteint, la nouvelle action est refusée, mais rien n'est supprimé. Un compte ne peut pas envoyer plus de 300 mails par 24 heures, quelle que soit l'offre : c'est une protection pour la réputation de ton adresse.</p>
 </section>
 
 <section class="wrap block" id="acces-claude" aria-labelledby="titre-claude">
@@ -439,6 +471,12 @@ export function pricingPage({ appUrl }) {
   <div class="statement" data-reveal>
     <h3>Faut-il une carte bancaire ?</h3>
     <p>Non. Le plan gratuit n'en demande pas, et le paiement n'existe pas encore dans l'outil.</p>
+    <h3>Pourquoi des prix aussi bas ?</h3>
+    <p>Parce que l'intelligence artificielle n'est pas dans notre facture : tu utilises ton propre accès à Claude. Tu ne paies donc à AiTools que l'outil (les projets, les contacts, les envois et le suivi), pas la machine qui réfléchit.</p>
+    <h3>Que veut dire « ${ANNUAL_FREE_MONTHS} mois offerts » ?</h3>
+    <p>En payant à l'année, tu règles ${12 - ANNUAL_FREE_MONTHS} mois et tu profites de 12. Par exemple ${PLAN_LABELS.growth} : ${euros(annualPrice('growth'))} par an au lieu de ${euros(PLAN_PRICES.growth * 12)}.</p>
+    <h3>Les prix incluent-ils la TVA ?</h3>
+    <p>Oui, ce sont des prix TTC. L'éditeur est en franchise de TVA (art. 293 B du CGI), donc aucun supplément ne s'ajoute.</p>
     <h3>Puis-je supprimer mon compte ?</h3>
     <p>Oui, quand tu veux, depuis Mon compte. Ça efface tes projets, tes contacts, tes modèles, tes réglages et la copie de ton code. Seule la liste d'opposition, qui protège les personnes désinscrites, est gardée.</p>
     <h3>Combien me coûtera Claude ?</h3>
