@@ -67,6 +67,59 @@
   });
   $('dialog[data-autoopen]')?.showModal();
 
+  // Connexion guidée à Claude : 1) le serveur prépare le lien (petit chargement), 2) l'utilisateur se connecte sur Claude
+  // et recopie le code affiché, 3) le serveur récupère le jeton. Fermer la fenêtre annule la connexion en cours.
+  const loginForm = $('form[data-claude-login]');
+  if (loginForm) {
+    const dlg = loginForm.closest('dialog');
+    const step2 = $('[data-claude-step2]', dlg);
+    const codeForm = $('form[data-claude-code]', dlg);
+    let loginId = null;
+    const busy = (form, on, label) => {
+      const btn = $('button:not([type=button])', form);
+      $('.spin-inline', btn).hidden = !on;
+      $('[data-label]', btn).textContent = label;
+      btn.disabled = on || (form === loginForm && !$('[data-consent]', form).checked);
+    };
+    const fail = (sel, e) => { const p = $(sel, dlg); p.textContent = e.message; p.hidden = false; };
+    loginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      $('[data-claude-error]', dlg).hidden = true;
+      busy(loginForm, true, 'Je prépare ton lien…');
+      $('[data-claude-status]', loginForm).textContent = 'Ça prend quelques secondes.';
+      try {
+        const r = await api('/link/claude/login', { accept: 'on' });
+        loginId = r.id;
+        $('[data-claude-link]', dlg).href = r.url;
+        loginForm.hidden = true;
+        step2.hidden = false;
+        $('input', codeForm).focus();
+      } catch (err) {
+        fail('[data-claude-error]', err);
+        busy(loginForm, false, 'Se connecter avec Claude');
+      }
+      $('[data-claude-status]', loginForm).textContent = '';
+    });
+    codeForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      $('[data-claude-error2]', dlg).hidden = true;
+      busy(codeForm, true, 'Je récupère ton jeton…');
+      try {
+        await api('/link/claude/login/code', { id: loginId, code: new FormData(codeForm).get('code') });
+        loginId = null;
+        location.href = '/';
+      } catch (err) {
+        fail('[data-claude-error2]', err);
+        busy(codeForm, false, 'Terminer la connexion');
+      }
+    });
+    dlg.addEventListener('close', () => {
+      if (loginId) api('/link/claude/login/cancel', { id: loginId }).catch(() => {});
+      loginId = null; loginForm.hidden = false; step2.hidden = true; codeForm.reset();
+      busy(loginForm, false, 'Se connecter avec Claude');
+    });
+  }
+
   // ---------- Barre système ----------
   // "IA 24 h : 0,42 $ / 2 $" : orange à 80 %, rouge une fois atteint
   function gauge(label, x) {

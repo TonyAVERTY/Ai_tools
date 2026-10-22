@@ -130,20 +130,14 @@ ${linkSection(link, consent)}
  * Page « Relier Claude » : onboarding bloquant. Les trois modes sont des formulaires HTML classiques (POST) ;
  * la fenêtre d'avertissement du mode abonnement est un <dialog> ouvert par public/app.js.
  */
-export function linkPage({ user, link, cliModeEnabled, error, oauth = false, start = false }) {
+export function linkPage({ user, link, cliModeEnabled, error, start = false }) {
   const intro = link
     ? `<p class="muted">Accès actuel : <strong>${esc(link.label)}</strong>${link.valid ? '' : ' (à revalider)'}. Relier un autre accès remplace le précédent, dont le secret est effacé.</p>`
     : '<p class="muted">Pour utiliser AiTools, relie ton propre accès Claude. Les analyses, recherches et rédactions s\'exécutent avec TON accès, jamais celui d\'un autre utilisateur.</p>';
-  const consent = `<div class="notice card">${CONSENT_TEXT.map((t) => `<p>${esc(t)}</p>`).join('')}</div>
-    <label class="check"><input type="checkbox" name="accept" data-consent required> ${esc(CONSENT_CHECKBOX)}</label>`;
-  const manual = `<form method="post" action="/link/subscription" class="cfg" data-consent-form>
-      ${oauth ? '' : consent}
-      ${oauth ? '<label class="check"><input type="checkbox" name="accept" data-consent required> ' + esc(CONSENT_CHECKBOX) + '</label>' : ''}
-      <p class="muted small">Sur ta propre machine, lance la commande <code>claude setup-token</code>, connecte-toi à ton compte Claude quand le navigateur s'ouvre, puis copie le jeton affiché et colle-le ci-dessous. Le jeton est chiffré, utilisé uniquement pour tes jobs, et n'est jamais réaffiché.</p>
-      <label>Jeton d'abonnement<input name="token" type="password" autocomplete="new-password" spellcheck="false" required></label>
-      <p class="muted small">La vérification lance un appel minimal du CLI : quelques tokens sont décomptés de ton abonnement. Texte d'avertissement version ${esc(CONSENT_VERSION)}.</p>
-      <button class="btn primary" data-consent-submit disabled>Relier avec mon jeton</button>
-    </form>`;
+  const box = `<label class="check"><input type="checkbox" name="accept" data-consent required> ${esc(CONSENT_CHECKBOX)}</label>`;
+  const notice = `<div class="notice card">${CONSENT_TEXT.map((t) => `<p>${esc(t)}</p>`).join('')}</div>`;
+  // Connexion guidée (public/app.js) : le bouton demande le lien au serveur, avec un petit chargement, puis l'étape 2
+  // attend le code que Claude affiche ; le serveur récupère le jeton tout seul.
   const subscription = cliModeEnabled ? `
 <section class="card">
   <h4>Se connecter avec Claude (abonnement)</h4>
@@ -153,12 +147,33 @@ export function linkPage({ user, link, cliModeEnabled, error, oauth = false, sta
 <dialog class="prospect-dialog" id="consent-dialog" aria-labelledby="consent-title"${start ? ' data-autoopen' : ''}>
   <div class="cfg">
     <h2 id="consent-title">Avant de continuer</h2>
-    ${oauth ? `<form method="post" action="/link/claude/start" class="cfg" data-consent-form>
-      ${consent}
-      <p class="muted small">Tu vas être envoyé sur le site de Claude pour autoriser AiTools, puis tu reviens ici automatiquement : rien à copier. Texte d'avertissement version ${esc(CONSENT_VERSION)}.</p>
-      <button class="btn primary" data-consent-submit disabled>Continuer sur Claude</button>
+    <form class="cfg" data-claude-login data-consent-form>
+      ${notice}
+      ${box}
+      <p class="muted small">Un lien de connexion va s'afficher. Tu te connectes à Claude, puis tu recopies ici le petit code qu'il te montre : AiTools récupère le jeton tout seul. Texte d'avertissement version ${esc(CONSENT_VERSION)}.</p>
+      <button class="btn primary" data-consent-submit disabled><span class="spin-inline" hidden></span><span data-label>Se connecter avec Claude</span></button>
+      <p class="muted small" role="status" data-claude-status></p>
+      <p class="error" role="alert" data-claude-error hidden></p>
     </form>
-    <details class="manual"><summary>Je préfère coller un jeton à la main</summary>${manual}</details>` : manual}
+    <div class="cfg" data-claude-step2 hidden>
+      <p><strong>1.</strong> Ouvre Claude et connecte-toi :</p>
+      <p><a class="btn primary" data-claude-link href="#" target="_blank" rel="noopener noreferrer">Ouvrir Claude</a></p>
+      <p><strong>2.</strong> Claude t'affiche un code. Recopie-le ici :</p>
+      <form class="cfg" data-claude-code>
+        <label>Code affiché par Claude<input name="code" autocomplete="off" spellcheck="false" required></label>
+        <button class="btn primary"><span class="spin-inline" hidden></span><span data-label>Terminer la connexion</span></button>
+      </form>
+      <p class="error" role="alert" data-claude-error2 hidden></p>
+    </div>
+    <details class="manual"><summary>Je préfère coller un jeton à la main</summary>
+      <form method="post" action="/link/subscription" class="cfg" data-consent-form>
+        ${box}
+        <p class="muted small">Sur ta propre machine, lance la commande <code>claude setup-token</code>, connecte-toi à ton compte Claude quand le navigateur s'ouvre, puis copie le jeton affiché et colle-le ci-dessous. Le jeton est chiffré, utilisé uniquement pour tes jobs, et n'est jamais réaffiché.</p>
+        <label>Jeton d'abonnement<input name="token" type="password" autocomplete="new-password" spellcheck="false" required></label>
+        <p class="muted small">La vérification lance un appel minimal du CLI : quelques tokens sont décomptés de ton abonnement.</p>
+        <button class="btn primary" data-consent-submit disabled>Relier avec mon jeton</button>
+      </form>
+    </details>
     <div class="row-actions"><button type="button" class="btn" data-close-dialog>Annuler</button></div>
   </div>
 </dialog>` : '';
