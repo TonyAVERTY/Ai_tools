@@ -192,8 +192,7 @@ export async function linkSubscriptionToken(app, userId, { token, accept }) {
 }
 
 /**
- * Jeton obtenu par la connexion guidée (src/claudelogin.js) : il sort tout juste du CLI officiel, il n'est donc pas
- * re-vérifié ici (un test consommerait des tokens ; le bouton « Tester » de Mon compte le fait à la demande).
+ * Jeton obtenu par la connexion guidée (src/claudelogin.js), déjà vérifié par l'appelant avant d'arriver ici.
  * Le consentement est exigé au démarrage de la connexion, et enregistré ici avec sa date.
  */
 export async function linkLoginToken(app, userId, token) {
