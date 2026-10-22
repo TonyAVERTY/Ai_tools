@@ -57,11 +57,15 @@
 
   // ---------- Liaison Claude : fenêtre d'avertissement du mode abonnement ----------
   // Le serveur refuse de toute façon (400) une requête sans la case cochée ; ici on évite seulement l'envoi inutile.
-  $('[data-open-dialog]').forEach((b) => b.addEventListener('click', () => $('#' + b.dataset.openDialog)?.showModal()));
-  $('[data-close-dialog]').forEach((b) => b.addEventListener('click', () => b.closest('dialog')?.close()));
-  const consentBox = $('#consent-accept');
-  const consentBtn = $('#consent-submit');
-  if (consentBox && consentBtn) consentBox.addEventListener('change', () => { consentBtn.disabled = !consentBox.checked; });
+  $$('[data-open-dialog]').forEach((b) => b.addEventListener('click', () => $('#' + b.dataset.openDialog)?.showModal()));
+  $$('[data-close-dialog]').forEach((b) => b.addEventListener('click', () => b.closest('dialog')?.close()));
+  // Un formulaire de liaison par abonnement ne se valide qu'une fois la case du risque cochée
+  $$('form[data-consent-form]').forEach((f) => {
+    const box = $('[data-consent]', f);
+    const btn = $('[data-consent-submit]', f);
+    if (box && btn) box.addEventListener('change', () => { btn.disabled = !box.checked; });
+  });
+  $('dialog[data-autoopen]')?.showModal();
 
   // ---------- Barre système ----------
   // "IA 24 h : 0,42 $ / 2 $" : orange à 80 %, rouge une fois atteint
