@@ -1,6 +1,57 @@
 # Journal de projet — AiTools
 
-Branches de travail : `feat/saas-mysql` (J1), `feat/saas-accounts` (J2, depuis la précédente) puis `feat/saas-claude-link` (J3, depuis J2) — version publique, voir `docs/CADRAGE.md`.
+Branches de travail : `feat/saas-mysql` (J1), `feat/saas-accounts` (J2, depuis la précédente) `feat/saas-claude-link` (J3, depuis J2) puis `feat/saas-site` (J4, depuis J3) — version publique, voir `docs/CADRAGE.md`.
+
+## 2026-10-22 — J4 « Site public »
+
+### Fait
+- **Site servi par la même application** (`src/site/`), rendu serveur, zéro JavaScript sur les pages publiques, zéro dépendance. Un visiteur sans session voit le site à la racine ; connecté, `/` mène au tableau de bord (et à l'onboarding de liaison si besoin) comme avant. `/login` renvoie vers `/` si on est déjà connecté.
+- **Pages** : accueil (avec une maquette du tableau de bord construite avec les vrais composants, données d'exemple signalées), fonctionnement (7 étapes, limites annoncées), tarifs (Gratuit : 1 projet, 50 prospects, 100 mails, 5 jobs IA par mois ; payant « Bientôt », sans prix ; accès Claude à la charge de l'utilisateur, clé API ou abonnement avec le risque expliqué ; responsabilité des envois), connexion (la page existante, intégrée au site), mentions légales, confidentialité, CGU, 404.
+- **Identité** : `public/site.css` chargé après `app.css`, uniquement les jetons du tableau de bord (`--bg`, `--card`, `--text`, `--muted`, `--line`, `--accent`, thème sombre inclus), composants `.btn`, `.card`, `.badge`, `.bar`. Signature visuelle : un carré à coin rabattu (logo, numéros d'étapes, repères) et une règle graduée comme séparateur. Les effets du tableau de bord (fond dégradé, verre dépoli, dégradé violet des boutons) sont neutralisés sous `body.site`. Typographie système, une seule animation d'entrée, désactivée par `prefers-reduced-motion`.
+- **SEO** : title, description, canonical, Open Graph par page, une h1, `lang="fr"`, liens d'évitement, `robots.txt` (pages d'application en `Disallow`), `sitemap.xml` (6 pages), JSON-LD `SoftwareApplication` sur l'accueil, favicon SVG (clair/sombre), `noindex` (balise et en-tête `X-Robots-Tag`) sur tout ce qui n'est pas une page publique, y compris connexion et 404.
+- **Sécurité** : CSP stricte (`default-src 'self'`, pas d'inline, `object-src 'none'`, `base-uri 'self'`, `frame-ancestors 'none'`, `form-action` limité à l'application, Google et Apple), `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, `Cross-Origin-Opener-Policy`, HSTS **seulement si `APP_URL` est en https**. Statiques avec ETag (304) et `Cache-Control` (1 h, 1 jour pour le favicon). HEAD répond comme GET.
+- **Tests** : `test/site.test.js`. Deux tests existants adaptés : la racine anonyme n'est plus une redirection (elle sert le site), et le contrôle de redirection vers la connexion passe par `/account`.
+
+### Décisions
+- **« Tu »** partout, y compris dans les pages légales, comme dans le tableau de bord. À valider avec le juriste (usage plus courant : « vous »).
+- **Ce qui est dit sur le site vient du code** : limites d'envoi (100 mails par lot, plafonds 200/300 par 24 h, délai 20–60 s), lecture IMAP toutes les 15 minutes, une seule relance en heures ouvrées, etc. Si le code change, les pages Fonctionnement et Tarifs sont à relire.
+- **Plafonds du plan gratuit annoncés mais non appliqués** : la page Tarifs le dit en clair (application technique au J5).
+- **Pas de bandeau cookies** : seuls `sid` (30 jours) et `oauth_b` (10 minutes, `/auth`) sont posés, tous deux strictement nécessaires ; pas d'analytics, pas de police externe. Dit dans la page confidentialité. Le `sessionStorage` du tableau de bord (projet ouvert) y est mentionné.
+- **Acceptation des CGU par la connexion** (phrase sous les boutons, pas de case à cocher) : à valider ; une case serait plus solide juridiquement mais casse le flux « un clic ».
+- **« Apple » n'apparaît que si Apple est configuré** (accueil, connexion, confidentialité, CGU), sinon le site mentionnerait un bouton absent.
+- **Pas d'image Open Graph** : aucune illustration réelle pour l'instant (`twitter:card=summary`).
+- **reCAPTCHA (J5)** : le paragraphe de confidentialité prêt à l'emploi est en commentaire dans `src/site/legal.js` (au-dessus de `privacyPage`), avec la liste des autres endroits à mettre à jour (CSP, cookies, transferts, consentement).
+- **`/login` n'est pas en `Disallow` mais en `noindex`**, pour que le robot puisse lire le noindex.
+
+### Marqueurs à compléter
+Visibles en jaune sur les pages légales tant que l'information manque. Un test compare cette liste aux pages et au code : ajouter ou retirer un marqueur impose de mettre cette liste à jour.
+
+- `[À COMPLÉTER : adresse du siège]` : mentions légales et confidentialité (adresse de l'EI).
+- `[À COMPLÉTER : hébergeur]` : mentions légales et confidentialité (nom, adresse, contact de l'hébergeur du serveur).
+- `[À COMPLÉTER : téléphone]` : mentions légales. La loi sur la confiance dans l'économie numérique demande un moyen de contact rapide pour l'éditeur ; à confirmer avec un juriste (un numéro, ou autre solution), sinon retirer la ligne.
+- `[À VALIDER : durées de conservation]` : confidentialité. Propositions : compte inactif supprimé après 24 mois (**non implémenté**, à coder ou à retirer), sessions 30 jours, sauvegardes environ 14 jours, journaux d'accès du serveur 12 mois (à vérifier avec la configuration réelle de Nginx/CloudPanel), prospects : recommandation de 3 ans après le dernier contact.
+- `[À VALIDER : transferts hors UE]` : confidentialité (Google, Apple, Anthropic aux États-Unis ; mécanismes cités de façon générale).
+- `[À VALIDER : cadre de sous-traitance]` : confidentialité et CGU. Les CGU et la politique tiennent lieu de cadre de l'article 28 RGPD ; un accord de sous-traitance dédié est peut-être préférable.
+- `[À VALIDER : limitation de responsabilité]` : CGU.
+
+### À faire relire par un juriste
+- Clause d'abonnement (risque de suspension du compte Claude, exclusion de responsabilité « dans la mesure permise par la loi ») et sa case d'acceptation (décision 10 du cadrage).
+- Rôles RGPD (utilisateur responsable de traitement, AiTools sous-traitant), contenu de l'article 28 réellement couvert.
+- Affirmation de la page Tarifs sur la prospection B2B sans accord préalable (règle CNIL résumée, formulation prudente « en règle générale »).
+- Mentions du siège et du téléphone, médiation de la consommation (service réservé aux professionnels, donc non traitée), juridiction compétente.
+- Liens sortants, saisis de mémoire et à vérifier à la main : `anthropic.com/legal/consumer-terms`, `anthropic.com/legal/privacy`, `policies.google.com/privacy`, `apple.com/legal/privacy/fr-fr/`, `cnil.fr/fr/plaintes`.
+
+### Non vérifié
+- **Rendu réel** : vu dans le navigateur intégré (accueil sur ordinateur et mobile 375 px, fonctionnement en sombre sur tablette, confidentialité), mais la fenêtre du volet est petite et les captures sont partielles. Pas de Lighthouse, pas de Safari ni Firefox, pas de lecteur d'écran, pas de vrai téléphone.
+- **Contrastes** : calculés par un test à partir des jetons (AA 4,5:1) ; pas de mesure sur la page rendue.
+- **Sur le serveur** : en-têtes derrière le reverse proxy (Nginx/CloudPanel peut en ajouter ou en dupliquer, notamment HSTS), cache d'un éventuel CDN (`Vary: Cookie` est posé sur `/`).
+- **Connexion Apple** : le POST cross-site reste testé avec un fournisseur simulé uniquement (déjà le cas au J2).
+
+### À faire
+- Renseigner les marqueurs, relire les pages légales, vérifier les liens sortants, et retirer chaque marqueur de cette liste et de `MARKERS` (`src/site/legal.js`) une fois traité.
+- Une image Open Graph et de vraies captures du produit quand il y aura des données réelles (aucun témoignage ni chiffre n'a été inventé : il n'y en a pas).
+- J5 : appliquer les plafonds du plan gratuit, reCAPTCHA (paragraphe prêt), suppression des comptes inactifs si la durée est confirmée.
+- Les pages d'erreur HTML autres que 404 (403, 500) utilisent encore l'ancien gabarit.
 
 ## 2026-10-22 — J3 « Liaison Claude »
 
