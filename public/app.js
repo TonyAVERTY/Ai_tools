@@ -429,8 +429,8 @@
     try {
       switch (action) {
         case 'create': {
-          await api('/api/projects', data);
-          toast('Projet créé, analyse lancée');
+          const r = await api('/api/projects', data);
+          toast(r.aiBlocked ? `Projet créé. ${r.aiBlocked}` : 'Projet créé, analyse lancée');
           setTimeout(() => location.reload(), 600);
           break;
         }

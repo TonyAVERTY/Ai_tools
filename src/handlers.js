@@ -7,6 +7,7 @@ import { analyzePrompt, prospectPrompt, templatePrompt, followupTemplatePrompt, 
 import { followupCandidates, followupSubject, isBusinessHours } from './services/followup.js';
 import { EMAIL_RE, createTransport, buildProspectMail, allowedToSend, makeMessageId } from './services/mailer.js';
 import { unsubToken } from './crypto.js';
+import { getUser, assertCanRunAi } from './users.js';
 import { quotaAlerts } from './services/budget.js';
 import { notify } from './services/notify.js';
 import { evolutionMail } from './services/mailhtml.js';
@@ -54,7 +55,10 @@ export function parseProspectLine(line) {
 
 export function makeHandlers(app) {
   const { db, cfg } = app;
+  // Tout appel à Claude passe par ici. Dernier garde-fou (après enqueue et le worker) : tant que la liaison
+  // Claude (J3) n'existe pas, seul un admin actif peut utiliser la configuration du serveur.
   const claude = async (userId, o) => {
+    assertCanRunAi(await getUser(db, userId));
     const r = await runClaude({ bin: cfg.claudeBin, ...o });
     // État du quota Pro (session 5h + semaine), affiché dans la barre système
     const w = rateLimitWindows(r.rateLimit);

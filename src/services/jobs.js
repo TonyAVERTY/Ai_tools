@@ -1,13 +1,15 @@
 // File de jobs en base, UN seul worker : un seul `claude` à la fois.
 import { now } from '../db.js';
 import { HttpError } from '../http.js';
-import { getUser } from '../users.js';
+import { AI_JOBS } from './budget.js';
+import { getUser, assertCanRunAi, AI_BLOCKED_MESSAGE } from '../users.js';
 import { waitCool } from './thermal.js';
 
 /**
  * Met un job en file pour un utilisateur. Point de passage obligé de toutes les routes et tâches de fond :
  *  - le projet doit appartenir à l'utilisateur (sinon 404) ;
  *  - un compte suspendu ne met rien en file ;
+ *  - tant que la liaison Claude (J3) n'existe pas, seul un admin peut mettre en file un job IA.
  * Sans projet, `userId` est obligatoire.
  */
 export async function enqueue(db, { userId, projectId, type, params = {}, runAfter = null }) {
@@ -19,6 +21,7 @@ export async function enqueue(db, { userId, projectId, type, params = {}, runAft
   const user = userId == null ? null : await getUser(db, userId);
   if (!user) throw new Error('enqueue : utilisateur requis');
   if (user.status !== 'active') throw new HttpError(403, 'Compte suspendu');
+  if (AI_JOBS.has(type)) assertCanRunAi(user);
   // Deux écritures de la même condition : "= ?" ne marche pas avec NULL, et "IS ?" n'existe pas en MySQL
   const running = projectId == null
     ? await db.prepare("SELECT id FROM jobs WHERE user_id = ? AND project_id IS NULL AND type = ? AND status IN ('queued','running')").get(user.id, type)
@@ -27,6 +30,22 @@ export async function enqueue(db, { userId, projectId, type, params = {}, runAft
   const r = await db.prepare('INSERT INTO jobs(user_id, project_id, type, params_json, created_at, run_after) VALUES(?, ?, ?, ?, ?, ?)')
     .run(user.id, projectId ?? null, type, JSON.stringify(params), now(), runAfter);
   return { id: Number(r.lastInsertRowid), existing: false };
+}
+
+/**
+ * Un job peut-il s'exécuter ? Renvoie la raison du refus, ou null. Revérifié par le worker à chaque
+ * exécution (la file peut contenir un job mis en attente avant une suspension ou un changement de rôle).
+ */
+export async function jobRefusal(db, job) {
+  const user = await getUser(db, job.user_id);
+  if (!user) return 'Compte supprimé';
+  if (user.status !== 'active') return 'Compte suspendu';
+  if (AI_JOBS.has(job.type) && !user.isAdmin) return AI_BLOCKED_MESSAGE;
+  return null;
+}
+
+export async function setProgress(db, jobId, progress) {
+  await db.prepare('UPDATE jobs SET progress_json = ? WHERE id = ?').run(JSON.stringify(progress), jobId);
 }
 
 /** Annule un job de l'utilisateur ; un job d'un autre compte est introuvable. */
@@ -149,6 +168,12 @@ export class Worker {
     let job = null;
     const waiting = new Map(), quotaWaiting = new Map();
     for (const j of due) {
+      // Compte suspendu ou supprimé, job IA d'un non-admin (avant la liaison Claude) : refusé sans exécution
+      const refusal = await jobRefusal(this.db, j);
+      if (refusal) {
+        await this.db.prepare("UPDATE jobs SET status = 'error', error = ?, finished_at = ? WHERE id = ? AND status = 'queued'").run(refusal, now(), j.id);
+        continue;
+      }
       const budget = await perUser(budgets, this.budget, j.user_id);
       if (budget.blocked && this.isAiJob?.(j.type)) { waiting.set(j.user_id, budget.reason); await hold(j, budget.reason); continue; }
       const quota = await perUser(quotas, this.quota, j.user_id);
