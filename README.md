@@ -121,8 +121,19 @@ la version publique cible un serveur CloudPanel avec une base MySQL/MariaDB (voi
 - **Connexion** : Google ou Apple, sans mot de passe. Le compte est créé à la première connexion réussie (plan gratuit). Un même email ne se lie qu'à un seul fournisseur ; un compte suspendu ne peut plus se connecter et ses sessions tombent aussitôt.
 - **Cloisonnement** : projets, prospects, notes, modèles, journaux d'envoi, jobs, métriques et **réglages** (SMTP, Discord, budget IA, plafonds, hôte Forgejo…) sont propres à chaque compte. Toute requête est filtrée par l'utilisateur courant ; la ressource d'un autre compte répond « introuvable » (404). Un même dépôt Git peut être un projet pour deux comptes (unicité par utilisateur).
 - **Liste d'opposition** : volontairement commune à tous les comptes (une personne désinscrite ne doit plus être contactée par personne). Un compte n'y voit que le nombre de ses propres prospects concernés, jamais l'origine ni le motif d'un autre compte.
-- **Jobs IA réservés aux admins, pour l'instant** : tant que la liaison Claude n'existe pas (jalon suivant), seuls les emails de `ADMIN_EMAILS` peuvent lancer analyse, recherche de prospects, modèles générés ou évolutions. Les autres reçoivent « Liaison Claude requise (bientôt disponible) », refusé côté serveur (routes, file, worker et handlers). Ils peuvent créer des projets, utiliser le CRM et l'import CSV, et envoyer des mails dans les plafonds existants.
-- **Mon compte** (`/account`) : email, fournisseur, et suppression du compte (confirmation par saisie de l'email). Elle efface tout : projets, prospects, notes, modèles, journaux, jobs, réglages, sessions et clones Git. Seule la liste d'opposition est conservée.
+- **Liaison Claude obligatoire** : après la connexion, un compte sans liaison valide est renvoyé vers `/link` et ne peut rien utiliser d'autre que cette page, Mon compte, la déconnexion et la suppression du compte (garde côté serveur sur toutes les routes, dans la file, le worker et le wrapper d'exécution). Voir « Liaison Claude et exécution isolée ».
+- **Mon compte** (`/account`) : email, fournisseur, état de la liaison Claude (mode, dates, valide ou non, 4 derniers caractères de la clé API) avec Tester, Changer de mode et Délier, et suppression du compte (confirmation par saisie de l'email). Elle efface tout : projets, prospects, notes, modèles, journaux, jobs, réglages, sessions et clones Git. Seule la liste d'opposition est conservée.
+
+### Liaison Claude et exécution isolée
+
+Chaque utilisateur relie SON accès ; ses jobs IA tournent avec cet accès uniquement.
+
+- **Clé API Anthropic** (recommandé) : vérifiée par `GET /v1/models` (aucun token consommé), chiffrée AES-256-GCM dans `users.claude_link_json`, jamais réaffichée. Passée par `ANTHROPIC_API_KEY` au seul processus enfant, jamais écrite sur disque. Pas de barre de quota d'abonnement dans ce mode.
+- **Connexion avec Claude (abonnement)** : une fenêtre d'avertissement (risque pour le compte Claude au regard des conditions d'Anthropic) impose de cocher « J'ai compris et j'accepte ce risque » ; l'acceptation est horodatée avec la version du texte. L'utilisateur génère un jeton sur sa machine avec `claude setup-token` et le colle ; il est vérifié par un appel minimal du CLI (quelques tokens décomptés de l'abonnement), chiffré, et passé par `CLAUDE_CODE_OAUTH_TOKEN` au seul processus enfant. `CLAUDE_CLI_MODE_ENABLED=false` masque ce mode et le refuse côté serveur.
+- **Claude du serveur** (admins de `ADMIN_EMAILS`) : la configuration du CLI de la machine, comme avant.
+- **Bac à sable** : chaque job passe par bubblewrap (racine reconstruite en lecture seule, `/tmp` et `HOME` vides, seul le clone du projet de l'utilisateur monté en lecture seule, PID/IPC/UTS isolés, réseau conservé) avec un environnement en liste blanche (`PATH`, `LANG`, `HOME` jetable, le secret de l'utilisateur). En production le job est refusé si `bwrap` manque ; `SANDBOX=off` ne vaut qu'en développement. Installation : `apt install bubblewrap`. Si Node ou le CLI sont installés hors de `/usr`, liste leurs dossiers dans `SANDBOX_RO_BINDS`.
+- **Clones git** d'URL fournies par les utilisateurs : https uniquement (`GIT_ALLOW_PROTOCOL=https`), pas de hooks ni de sous-modules, 2 minutes et 300 Mo au plus.
+- **Quota, budget IA, pauses et notifications** sont propres à chaque compte.
 
 ### Connexion Google et Apple
 
@@ -154,6 +165,8 @@ Pré-requis : Node 22.13 ou plus, git, la CLI `claude` si les jobs IA doivent to
    | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | connexion Google (voir « Connexion Google et Apple ») |
    | `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_CLIENT_ID`, `APPLE_PRIVATE_KEY` | connexion Apple, facultative : les quatre ou aucune (sans elles, le bouton Apple est masqué) |
    | `ADMIN_EMAILS` | emails des administrateurs, séparés par des virgules. Le premier est aussi propriétaire des données migrées. Remplace `ALLOWED_EMAILS`, supprimée : n'importe qui peut créer un compte |
+   | `CLAUDE_CLI_MODE_ENABLED` | `true` (défaut) ou `false` : active le mode abonnement |
+   | `NODE_ENV`, `SANDBOX`, `SANDBOX_RO_BINDS`, `BWRAP_BIN` | bac à sable : obligatoire en production, `SANDBOX=off` en développement seulement |
    | `DATA_DIR` | clones Git des projets analysés, rangés par utilisateur (`repos/<utilisateur>/<projet>`) |
 
 4. **Démarrage** : `npm start`. Au lancement, les migrations en attente sont appliquées (table `schema_migrations`, verrou pour éviter deux migrations simultanées). Lance le service sous un gestionnaire de processus (systemd ou celui de CloudPanel) et mets un reverse proxy TLS devant `HOST:PORT`.
