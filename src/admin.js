@@ -1,6 +1,8 @@
 // Back-office : liste des comptes, suspension, plan, suppression, journal d'audit. RIEN des données métier d'un compte
 // (prospects, mails, notes, projets) n'est lu ici : uniquement l'identité du compte, sa liaison (mode, sans secret) et des compteurs.
 import { now } from './db.js';
+import { logAudit } from './audit.js';
+import { sendPause, resumeSending } from './services/abuse.js';
 import { HttpError } from './http.js';
 import { destroyUserSessions } from './auth.js';
 import { getUser, deleteUser, normalizeEmail } from './users.js';
@@ -8,40 +10,9 @@ import { ADMIN_PAGE_SIZE, PAID_PLANS } from './limits.js';
 import { usageOf, limitsFor } from './services/plans.js';
 import { MODE_LABELS } from './claudelink.js';
 
-/** « jean.dupont@exemple.fr » → « j***@exemple.fr » : l'identification suffit, l'adresse complète n'est pas gardée dans le journal. */
-export function maskEmail(email) {
-  const [local = '', domain = ''] = String(email || '').split('@');
-  return `${local.slice(0, 1)}***${domain ? `@${domain}` : ''}`;
-}
-
-const ACTIONS = {
-  suspend: 'Compte suspendu', reactivate: 'Compte réactivé', plan_free: 'Plan gratuit attribué', plan_pro: 'Plan pro attribué',
-  delete: 'Compte supprimé', resume_send: 'Envois rétablis', abuse_pause: 'Envois mis en pause (rejets)',
-  inactive_warning: 'Avertissement d\'inactivité', inactive_delete: 'Compte inactif supprimé',
-};
-export const ACTION_LABELS = ACTIONS;
-
-/** Ajoute une ligne au journal. `admin` = { id, email } de l'administrateur, ou null pour une décision du système. */
-export async function logAudit(db, { admin = null, action, target = null, detail = null, at = now() }) {
-  if (!ACTIONS[action]) throw new Error(`Action d'audit inconnue : ${action}`);
-  await db.prepare('INSERT INTO admin_audit(admin_id, admin_label, action, target_id, target_label, detail, created_at) VALUES(?, ?, ?, ?, ?, ?, ?)')
-    .run(admin?.id ?? null, admin ? admin.email : 'système', action, target?.id ?? null, target ? maskEmail(target.email) : null, detail ? String(detail).slice(0, 500) : null, at);
-}
-
-export async function recentAudit(db, limit = 50) {
-  return (await db.prepare('SELECT * FROM admin_audit ORDER BY id DESC LIMIT ?').all(limit)).map((r) => ({
-    id: r.id, at: r.created_at, admin: r.admin_label, action: r.action, label: ACTIONS[r.action] || r.action,
-    target: r.target_label, targetId: r.target_id, detail: r.detail,
-  }));
-}
-
-/** Nettoyage du journal ancien (planificateur). */
-export async function purgeAudit(db, months, at = now()) {
-  const d = new Date(at * 1000); d.setUTCMonth(d.getUTCMonth() - months);
-  await db.prepare('DELETE FROM admin_audit WHERE created_at < ?').run(Math.floor(d.getTime() / 1000));
-}
-
 const like = (q) => `%${String(q).replace(/[!%_]/g, '!$&')}%`;
+
+export { maskEmail, ACTION_LABELS, logAudit, recentAudit, purgeAudit } from './audit.js';
 
 /** Page de comptes : identité, liaison (mode seulement), usage du mois. Aucune donnée métier. */
 export async function listAccounts(db, { page = 1, q = '', at = now() } = {}) {
@@ -61,7 +32,7 @@ export async function listAccounts(db, { page = 1, q = '', at = now() } = {}) {
     accounts.push({
       id: Number(r.id), email: r.email, provider: r.provider, status: r.status, isAdmin: !!r.is_admin, plan: r.plan,
       createdAt: r.created_at, lastLoginAt: r.last_login_at, link,
-      usage: { ...usage, limits: limitsFor(user) },
+      usage: { ...usage, limits: limitsFor(user) }, sendPause: await sendPause(db, r.id),
     });
   }
   return { accounts, total, page: p, pages };
@@ -78,7 +49,7 @@ function assertManageable(actor, target, verb) {
  * Exécute une action d'administration, la journalise et renvoie un message pour l'écran.
  * @param {{db, worker?}} app
  * @param {{id: number, email: string}} actor administrateur connecté
- * @param {'suspend'|'reactivate'|'plan'|'delete'} action
+ * @param {'suspend'|'reactivate'|'plan'|'delete'|'resume_send'} action
  */
 export async function adminAction(app, actor, action, targetId, { plan, confirm } = {}) {
   const { db } = app;
@@ -111,6 +82,12 @@ export async function adminAction(app, actor, action, targetId, { plan, confirm 
     app.worker?.abortUser(target.id);
     await deleteUser(app, target.id);
     return 'Compte supprimé avec toutes ses données.';
+  }
+  if (action === 'resume_send') {
+    if (!target) throw new HttpError(404, 'Compte introuvable');
+    await resumeSending(db, target.id);
+    await logAudit(db, { admin: actor, action: 'resume_send', target });
+    return `Envois rétablis pour ${target.email}`;
   }
   throw new HttpError(400, 'Action inconnue');
 }

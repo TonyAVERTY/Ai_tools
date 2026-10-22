@@ -14,6 +14,7 @@ import { notify } from './services/notify.js';
 import { quotaFor, recordUsage, planLimitMessage } from './services/plans.js';
 import { getUser } from './users.js';
 import { pinSmtp, pinGit } from './netguard.js';
+import { sendPause, pauseMessage, evaluateSending } from './services/abuse.js';
 import { evolutionMail } from './services/mailhtml.js';
 import { getProject, repoDir, forgejoToken, globalSmtp, sentSince, getTemplate, saveTemplate, pickVariant } from './projects.js';
 
@@ -99,6 +100,8 @@ export function makeHandlers(app) {
     // Une relance mise en file à 17h55 ne doit pas partir à 19h si le worker était occupé
     if (kind === 'followup' && !inHours()) return { sent: 0, failed: 0, total: 0, postponed: true };
     const userId = ctx.job.user_id;
+    const pause = await sendPause(db, userId);
+    if (pause) throw new Error(pauseMessage(pause)); // la désinscription et la liste d'opposition restent appliquées ci-dessous
     const project = await getProject(app, ctx.job.project_id, { userId, secrets: true });
     const template = await getTemplate(db, project.id, kind, { validatedOnly: true });
     if (!template) throw new Error(kind === 'followup' ? 'Modèle de relance non validé' : 'Modèle de mail non validé');
@@ -178,6 +181,7 @@ export function makeHandlers(app) {
       if (sent + failed < n) await sleep(minDelay + Math.random() * (maxDelay - minDelay), ctx.signal).catch(() => {});
     }
     transport.close();
+    await evaluateSending(app, userId); // trop de rejets : le compte passe en pause d'envoi
     return { sent, failed, total: n };
   }
 

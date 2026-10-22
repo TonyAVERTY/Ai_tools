@@ -15,6 +15,7 @@ import { dashboardPage, settingsPage, unsubPage, accountPage, linkPage } from '.
 import { enqueue, latestJobs, cancelJob, usageSummary } from './services/jobs.js';
 import { validateGitUrl, removeRepo } from './services/git.js';
 import { fetchRecap, clearRecapCache, validateSelect } from './services/recap.js';
+import { sendPause, pauseMessage as pauseMessageOf } from './services/abuse.js';
 import { guardTarget, pinDb, pinGit, checkForgejoHost } from './netguard.js';
 import { allowedToSend, EMAIL_RE } from './services/mailer.js';
 import { cpuTemp } from './services/thermal.js';
@@ -118,6 +119,7 @@ export function registerRoutes(router, app) {
     }
     html(res, dashboardPage({
       email: session.email, projects, forgejoHost: await getSetting(db, userId, 'forgejo_host'), usage: await usageView(db, await getUser(db, userId)),
+      pauseMessage: await sendPause(db, userId).then((p) => (p ? pauseMessageOf(p) : null)),
     }));
   });
 

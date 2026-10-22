@@ -66,7 +66,10 @@ export class Scheduler {
     for (const { id, user_id: userId } of await db.prepare(`SELECT p.id, p.user_id FROM projects p JOIN users u ON u.id = p.user_id
         WHERE p.followup_enabled = 1 AND u.status = 'active'`).all()) {
       const plan = await followupPlan(db, await getProject(this.app, id, { userId }), opts);
-      if (plan.ready) queued.push({ id, ...await enqueue(db, { userId, projectId: id, type: 'followup', params: { count: plan.due } }) });
+      if (!plan.ready) continue;
+      // Plafond mensuel atteint ou envois en pause : la relance attend, les autres comptes ne sont pas touchés
+      try { queued.push({ id, ...await enqueue(db, { userId, projectId: id, type: 'followup', params: { count: plan.due } }) }); }
+      catch (e) { if (!(e.status === 403 && ['plan_limit', 'send_paused'].includes(e.code))) throw e; }
     }
     return queued;
   }

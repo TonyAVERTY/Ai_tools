@@ -353,12 +353,13 @@ function projectItem(p, smtp, dbCfg, imap) {
 </details>`;
 }
 
-export function dashboardPage({ email, projects, forgejoHost, usage = null }) {
+export function dashboardPage({ email, projects, forgejoHost, usage = null, pauseMessage = null }) {
   return layout({
     title: 'Projets', email,
     body: `<div class="row head">
   <h1>Projets</h1>
 </div>
+${pauseMessage ? `<p class="error" role="alert">${esc(pauseMessage)}</p>` : ''}
 ${usagePanel(usage)}
 <details class="card new anim">
   <summary class="btn primary">+ Nouveau projet</summary>
