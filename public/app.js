@@ -55,6 +55,14 @@
     followup_template: 'Modèle de relance', followup: 'Relances',
   };
 
+  // ---------- Liaison Claude : fenêtre d'avertissement du mode abonnement ----------
+  // Le serveur refuse de toute façon (400) une requête sans la case cochée ; ici on évite seulement l'envoi inutile.
+  $('[data-open-dialog]').forEach((b) => b.addEventListener('click', () => $('#' + b.dataset.openDialog)?.showModal()));
+  $('[data-close-dialog]').forEach((b) => b.addEventListener('click', () => b.closest('dialog')?.close()));
+  const consentBox = $('#consent-accept');
+  const consentBtn = $('#consent-submit');
+  if (consentBox && consentBtn) consentBox.addEventListener('change', () => { consentBtn.disabled = !consentBox.checked; });
+
   // ---------- Barre système ----------
   // "IA 24 h : 0,42 $ / 2 $" : orange à 80 %, rouge une fois atteint
   function gauge(label, x) {
@@ -76,7 +84,9 @@
     const reset = resetLabel(w.resetsAt);
     return `<span class="${cls}"${reset ? ` title="Réinitialisation ${esc(reset)}"` : ''}>Claude ${label} : ${pct(w.utilization)}</span>`;
   }
-  function claudeQuota(rl) {
+  function claudeQuota(rl, mode) {
+    // Clé API : pas de quota d'abonnement à afficher
+    if (mode === 'api_key') return '';
     if (!rl) return '<span class="muted" title="Mesuré après le premier job IA">Claude : pas encore mesuré</span>';
     return `${claudeBit('session 5h', rl.fiveHour)} ${claudeBit('semaine', rl.sevenDay)}`.trim();
   }
@@ -161,7 +171,7 @@
       const s = await api('/api/system');
       const hot = s.temp !== null && s.temp >= s.thermalMax - 5;
       el.innerHTML = `${s.temp !== null ? `<span class="${hot ? 'warn' : ''}">${s.temp} °C</span>` : ''}
-        ${claudeQuota(s.claudeRateLimit)}
+        ${claudeQuota(s.claudeRateLimit, s.linkMode)}
         ${gauge('24 h', s.budget.day)} ${gauge('30 j', s.budget.month)}
         ${s.budget.blocked ? '<span class="error">Budget IA atteint : jobs IA en attente</span>' : ''}`;
       renderJobsMenu(s);
@@ -430,7 +440,7 @@
       switch (action) {
         case 'create': {
           const r = await api('/api/projects', data);
-          toast(r.aiBlocked ? `Projet créé. ${r.aiBlocked}` : 'Projet créé, analyse lancée');
+          toast('Projet créé, analyse lancée');
           setTimeout(() => location.reload(), 600);
           break;
         }

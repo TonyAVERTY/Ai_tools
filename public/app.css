@@ -31,6 +31,10 @@ a { color: var(--accent); }
 .login-btns { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
 .btn.apple { background: var(--text); border-color: var(--text); color: var(--bg); }
 .notice { border-color: var(--warn); color: var(--text); }
+.check { display: flex; align-items: flex-start; gap: 8px; }
+.check input { margin-top: 4px; }
+.row-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
+.row-actions form { margin: 0; }
 dl.account { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0; }
 dl.account dt { color: var(--muted); }
 dl.account dd { margin: 0; overflow-wrap: anywhere; }
