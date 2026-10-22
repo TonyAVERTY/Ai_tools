@@ -146,7 +146,7 @@ test('en-têtes de sécurité, HSTS seulement en https, noindex sur l\'applicati
 });
 
 test('fichiers statiques : cache, ETag, 304, HEAD', async () => {
-  for (const [p, type] of [['/static/site.css', /text\/css/], ['/static/app.css', /text\/css/], ['/static/favicon.svg', /image\/svg\+xml/]]) {
+  for (const [p, type] of [['/static/site.css', /text\/css/], ['/static/app.css', /text\/css/], ['/static/favicon.svg', /image\/svg\+xml/], ['/favicon.ico', /image\/svg\+xml/], ['/static/site.js', /text\/javascript/], ['/static/img/ecran-projet.svg', /image\/svg\+xml/]]) {
     const r = await s.anon.get(p);
     assert.equal(r.status, 200, p);
     assert.match(r.headers.get('content-type'), type);
@@ -172,8 +172,9 @@ test('aucune ressource externe : tout est servi par l\'application, rien en lign
     for (const client of [s.anon, apple.anon]) {
       for (const p of [...PUBLIC_PAGES, '/login', '/inexistant']) {
         const h = await (await client.get(p, { headers: { accept: 'text/html' } })).text();
-        assert.doesNotMatch(h, /<script[^>]*\ssrc=/i, `${p} : aucun script`);
-        assert.doesNotMatch(h, /<script(?![^>]*ld\+json)/i, `${p} : aucun script exécutable`);
+        // Seuls scripts permis : ceux de l'application (mouvement du site, vérification de la connexion), jamais en ligne
+        for (const m of h.matchAll(/<script[^>]*\ssrc="([^"]+)"/gi)) assert.ok(['/static/site.js', '/static/captcha.js'].includes(m[1]), `${p} : script ${m[1]}`);
+        assert.doesNotMatch(h, /<script(?![^>]*(ld\+json|\ssrc=))/i, `${p} : aucun script en ligne`);
         assert.doesNotMatch(h, /<style[\s>]/i, `${p} : pas de <style>`);
         assert.doesNotMatch(h, /\sstyle="/i, `${p} : pas de style en ligne (CSP)`);
         assert.doesNotMatch(h, /<(img|iframe|video|audio|source|embed|object)[^>]*\s(src|data)="https?:/i, p);
@@ -287,4 +288,38 @@ test('contrastes AA (4,5:1) des couples texte/fond du site, thèmes clair et som
     for (const [label, fg, bg] of pairs) assert.ok(ratio(fg, bg) >= 4.5, `${name} : ${label} = ${ratio(fg, bg).toFixed(2)}`);
   }
   assert.match(read('public/site.css'), /prefers-color-scheme: dark\)\s*\{\s*body\.site \.btn\.primary \{ color: var\(--bg\); \}/);
+});
+
+test('liens entre pages : chaque lien et chaque image du site mène quelque part, les ancres existent, le parcours est complet', async () => {
+  const pages = [...PUBLIC_PAGES, '/login', '/inexistant'];
+  const html = {};
+  for (const p of pages) html[p.split('#')[0]] = await text(p);
+  const checked = new Set();
+  for (const [p, h] of Object.entries(html)) {
+    for (const m of h.matchAll(/(?:href|src)="(\/[^"]*)"/g)) {
+      const [path, hash] = m[1].split('#');
+      if (path.startsWith('/link') || path.startsWith('/auth/')) continue; // application et connexion : redirigent
+      const target = path.split('?')[0] || p;
+      if (!checked.has(target)) {
+        const r = await s.anon.get(target, { headers: { accept: 'text/html' } });
+        assert.ok(r.status === 200 || (target === '/inexistant' && r.status === 404), `${p} : ${m[1]} répond ${r.status}`);
+        checked.add(target);
+      }
+      if (hash && html[target]) assert.ok(html[target].includes(`id="${hash}"`), `${p} : ancre #${hash} introuvable sur ${target}`);
+    }
+  }
+  // Chaque page du site renvoie vers les autres : accueil, fonctionnement, tarifs, connexion
+  for (const p of ['/', '/fonctionnement', '/tarifs', '/login', '/cgu', '/mentions-legales', '/confidentialite']) {
+    const links = new Set([...html[p].matchAll(/href="(\/[^"#?]*)/g)].map((m) => m[1]));
+    for (const dest of ['/', '/fonctionnement', '/tarifs', '/login']) assert.ok(links.has(dest), `${p} ne renvoie pas vers ${dest}`);
+  }
+  // Le bouton « Se connecter avec Claude » de Tarifs ne parle plus de ligne de commande
+  const tarifs = html['/tarifs'];
+  assert.match(tarifs, /href="\/link\?start=claude"/);
+  assert.doesNotMatch(tarifs, /setup-token/);
+  // L'accueil est vivant : images, compteurs, galerie
+  assert.match(html['/'], /data-gallery/);
+  assert.match(html['/'], /data-count="50"/);
+  assert.ok((html['/'].match(/<img src="\/static\/img\//g) || []).length >= 5);
+  assert.doesNotMatch(html['/'], /<img(?![^>]*\salt="[^"]+")/, 'toutes les images ont un texte alternatif');
 });
