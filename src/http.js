@@ -32,8 +32,8 @@ export function parseCookies(req) {
   return out;
 }
 
-export function setCookie(res, name, value, { maxAge, httpOnly = true } = {}) {
-  const parts = [`${name}=${encodeURIComponent(value)}`, 'Path=/', 'SameSite=Lax', 'Secure'];
+export function setCookie(res, name, value, { maxAge, httpOnly = true, sameSite = 'Lax', path = '/' } = {}) {
+  const parts = [`${name}=${encodeURIComponent(value)}`, `Path=${path}`, `SameSite=${sameSite}`, 'Secure'];
   if (httpOnly) parts.push('HttpOnly');
   if (maxAge !== undefined) parts.push(`Max-Age=${maxAge}`);
   const prev = res.getHeader('Set-Cookie');
