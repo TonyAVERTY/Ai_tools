@@ -55,7 +55,7 @@ function parseDdl(statements) {
 const ddl = (dialect) => parseDdl(MIGRATIONS.flatMap((m) => m[dialect]));
 
 // Tables volontairement hors du périmètre d'un utilisateur : liste d'opposition (RGPD) et états OAuth éphémères
-const NOT_OWNED = new Set(['blacklist', 'oauth_states', 'users']);
+const NOT_OWNED = new Set(['blacklist', 'oauth_states', 'users', 'admin_audit']);
 const shape = (tables) => Object.fromEntries([...tables].map(([t, v]) => [t, { columns: [...v.columns].sort(), refs: v.refs }]));
 
 test('schémas SQLite et MySQL : mêmes tables et mêmes colonnes', () => {

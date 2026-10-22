@@ -366,3 +366,10 @@ form.send { margin-top: 6px; padding-top: 0; border-top: 0; }
 .bar > span.w-90 { width: 90%; }
 .bar > span.w-95 { width: 95%; }
 .bar > span.w-100 { width: 100%; }
+
+/* ---------- Administration ---------- */
+.admin-table td { vertical-align: top; }
+.admin-actions { display: grid; gap: 6px; min-width: 200px; }
+form.inline { display: inline-flex; gap: 6px; align-items: end; flex-wrap: wrap; margin: 0; }
+.admin-actions .del summary { list-style: none; cursor: pointer; display: inline-block; }
+.admin-pager { display: flex; gap: 8px; }

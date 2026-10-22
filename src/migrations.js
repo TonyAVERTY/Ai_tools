@@ -388,6 +388,38 @@ export const MIGRATIONS = [
       ) ${T}`,
     ],
   },
+  {
+    // J5 : journal d'audit des actions d'administration et des décisions automatiques (pause d'envoi, comptes inactifs).
+    // Pas de clé étrangère : le journal survit à la suppression des comptes, qui n'y figurent que par un identifiant et une
+    // adresse masquée (minimisation). Aucune route ne le modifie ni ne l'efface ; un nettoyage périodique retire l'ancien.
+    name: 'journal_audit',
+    sqlite: [
+      `CREATE TABLE admin_audit (
+        id INTEGER PRIMARY KEY,
+        admin_id INTEGER,           -- NULL = décision du système (planificateur, détection d'abus)
+        admin_label TEXT,
+        action TEXT NOT NULL,
+        target_id INTEGER,
+        target_label TEXT,          -- adresse masquée
+        detail TEXT,
+        created_at INTEGER NOT NULL
+      )`,
+      'CREATE INDEX admin_audit_at ON admin_audit(created_at)',
+    ],
+    mysql: [
+      `CREATE TABLE IF NOT EXISTS admin_audit (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        admin_id BIGINT NULL,
+        admin_label VARCHAR(255),
+        action VARCHAR(40) NOT NULL,
+        target_id BIGINT NULL,
+        target_label VARCHAR(255),
+        detail VARCHAR(500),
+        created_at BIGINT NOT NULL,
+        KEY admin_audit_at (created_at)
+      ) ${T}`,
+    ],
+  },
 ];
 
 // ---------- Aides de la migration 2 ----------

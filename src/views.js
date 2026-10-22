@@ -109,6 +109,7 @@ export function accountPage({ user, error, link = null, consent = null, notice =
     <dt>Email</dt><dd>${esc(user.email)}</dd>
     <dt>Connexion</dt><dd>${esc(PROVIDER_NAMES[user.provider] || '—')}</dd>
   </dl>
+  ${user.isAdmin ? '<p><a class="btn small" href="/admin">Administration</a></p>' : ''}
 </section>
 ${notice ? `<p class="${notice.ok ? 'ok' : 'error'}">${esc(notice.text)}</p>` : ''}
 ${usagePanel(usage)}

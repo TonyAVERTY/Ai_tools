@@ -72,6 +72,11 @@ export async function createApp(cfg, { db, worker = true, createTransport, fetch
       const ip = clientIp(req, cfg.trustProxy);
       if (route.public && route.limit) app.limiter.enforce(route.limit, { ip });
       const session = route.public ? null : await getSession(db, req);
+      // Back-office : 404 pour tout autre que les administrateurs (visiteurs compris), sans rien révéler
+      if (route.admin && !session?.user.isAdmin) {
+        if (url.pathname.startsWith('/api/') || !isRead || req.headers.accept?.includes('json')) throw new HttpError(404, 'Page introuvable');
+        return html(res, notFoundPage({ appUrl: cfg.appUrl }), 404);
+      }
       if (!route.public) {
         if (!session) {
           // Visiteur sur la racine : le site public. Connecté, la même adresse mène au tableau de bord.

@@ -10,6 +10,7 @@ import {
 } from './claudelink.js';
 import { loginPage } from './site/pages.js';
 import { registerSiteRoutes } from './site/routes.js';
+import { registerAdminRoutes } from './adminroutes.js';
 import { dashboardPage, settingsPage, unsubPage, accountPage, linkPage } from './views.js';
 import { enqueue, latestJobs, cancelJob, usageSummary } from './services/jobs.js';
 import { validateGitUrl, removeRepo } from './services/git.js';
@@ -49,6 +50,7 @@ export function registerRoutes(router, app) {
 
   // ---------- Public ----------
   registerSiteRoutes(router, app);
+  registerAdminRoutes(router, app);
   // Déjà connecté : la page de connexion n'a rien à offrir, on va au tableau de bord
   router.get('/login', async ({ req, res, url }) => {
     if (await getSession(db, req)) return redirect(res, '/');
