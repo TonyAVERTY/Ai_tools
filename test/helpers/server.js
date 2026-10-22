@@ -14,7 +14,8 @@ export async function startApp({ cfg = {}, worker = false } = {}) {
   const tmp = mkdtempSync(join(tmpdir(), 'aitools-srv-'));
   const config = {
     appUrl: APP_URL, google: { clientId: 'gid', clientSecret: 'gsecret' }, apple: null, adminEmails: [],
-    secretKey: randomBytes(32), dataDir: tmp, claudeBin: 'claude', thermalMax: 75, ...cfg,
+    secretKey: randomBytes(32), dataDir: tmp, claudeBin: 'claude', thermalMax: 75, cliModeEnabled: true,
+    sandbox: { enabled: false, production: false, roBinds: [], serverHome: tmp }, ...cfg,
   };
   const app = await createApp(config, { db: await testDb(), worker });
   await new Promise((r) => app.server.listen(0, '127.0.0.1', r));

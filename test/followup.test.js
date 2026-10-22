@@ -41,7 +41,7 @@ async function setup() {
   const db = await testDb();
   const sentMails = [];
   const app = {
-    db, cfg: { dataDir: tmp, claudeBin: resolve('test/fixtures/fake-claude.js'), secretKey: randomBytes(32), appUrl: 'https://ai.test' },
+    db, cfg: { dataDir: tmp, claudeBin: resolve('test/fixtures/fake-claude.js'), sandbox: { enabled: false, production: false }, secretKey: randomBytes(32), appUrl: 'https://ai.test' },
     createTransport: () => ({ verify: async () => true, sendMail: async (m) => { sentMails.push(m); }, close() {} }),
     isBusinessHours: () => true, // horloge figée : le test ne dépend pas de l'heure à laquelle on le lance
   };

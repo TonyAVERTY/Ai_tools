@@ -9,10 +9,11 @@ import { addUser } from './helpers/users.js';
 import { enqueue, Worker, latestJobs, cancelJob, addUsage, usageSummary } from '../src/services/jobs.js';
 
 const bin = resolve('test/fixtures/fake-claude.js');
+const sandbox = { enabled: false, production: false };
 
 test('runClaude parse le flux et la conso', async () => {
   const seen = [];
-  const r = await runClaude({ bin, prompt: 'hello', model: 'haiku', maxTurns: 3, tools: ['Read', 'Grep'], onText: (t) => seen.push(t) });
+  const r = await runClaude({ bin, sandbox, prompt: 'hello', model: 'haiku', maxTurns: 3, tools: ['Read', 'Grep'], onText: (t) => seen.push(t) });
   assert.equal(r.ok, true);
   assert.equal(r.costUsd, 0.0123);
   assert.equal(r.tokensIn, 150);
@@ -26,7 +27,7 @@ test('runClaude parse le flux et la conso', async () => {
 });
 
 test('runClaude remonte une erreur si le process meurt', async () => {
-  await assert.rejects(runClaude({ bin, prompt: 'CRASH' }), /sans résultat/);
+  await assert.rejects(runClaude({ bin, sandbox, prompt: 'CRASH' }), /sans résultat/);
 });
 
 test('rateLimitWindows normalise la session (5h) et la semaine, quel que soit le format reçu', () => {
