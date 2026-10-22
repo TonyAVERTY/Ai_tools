@@ -47,7 +47,24 @@ export function readableTail(out, max = 300) {
     .replace(/[A-Za-z0-9_#.~-]{24,}/g, '…')
     .trim().slice(-max);
 }
-export const extractToken = (out) => TOKEN.exec(out)?.[0] ?? null;
+// Le CLI affiche le jeton dans un terminal : selon la largeur, il peut être coupé par des retours à la ligne ou des
+// séquences de déplacement du curseur, et les mots voisins ne sont pas toujours séparés par un espace. On prend donc tout
+// ce qui se trouve entre « sk-ant- » et la phrase qui suit le jeton (« Store this token… »), puis on retire les blancs.
+const TOKEN_END = /Store|You\s*won|Use\s*this/;
+/**
+ * Jeton d'abonnement contenu dans la sortie du CLI, ou null. Tant que la phrase de fin n'est pas arrivée le jeton peut
+ * être incomplet : on attend, sauf si le CLI est terminé (`final`), auquel cas on prend jusqu'à la fin de la sortie.
+ */
+export function extractToken(out, final = false) {
+  const text = out.replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, '').replace(/\x1b\[[0-9;?<>=]*[A-Za-z]/g, ' ');
+  const start = text.indexOf('sk-ant-oat') >= 0 ? text.indexOf('sk-ant-oat') : text.search(/sk-ant-\s*oat/);
+  if (start < 0) return null;
+  const rest = text.slice(start);
+  const end = rest.search(TOKEN_END);
+  if (end < 0 && !final) return null;
+  const token = (end < 0 ? rest : rest.slice(0, end)).replace(/\s+/g, '');
+  return TOKEN.test(token) ? TOKEN.exec(token)[0] : null;
+}
 
 export class ClaudeLogins {
   constructor(app) { this.app = app; this.sessions = new Map(); }
@@ -128,7 +145,7 @@ export class ClaudeLogins {
     s.proc.stdin.write(c);
     await new Promise((r) => setTimeout(r, ENTER_DELAY_MS));
     s.proc.stdin.write('\r');
-    const res = await this.#waitFor(s, (out) => extractToken(out) || (REFUSED.test(out.slice(s.outAtSubmit ?? 0)) ? 'refused' : null), TOKEN_WAIT_MS);
+    const res = await this.#waitFor(s, (out) => extractToken(out, s.done) || (REFUSED.test(out.slice(s.outAtSubmit ?? 0)) ? 'refused' : null), TOKEN_WAIT_MS);
     const tail = readableTail(s.out.slice(s.outAtSubmit ?? 0));
     const exited = s.done;
     this.#drop(String(id));

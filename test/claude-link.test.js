@@ -538,3 +538,16 @@ test('connexion guidée : mode abonnement désactivé = refus, sans CLI', lt, as
     assert.equal((await u.post('/link/claude/login', { accept: true })).status, 403);
   } finally { await off.close(); }
 });
+
+test('extraction du jeton : coupé par des retours à la ligne ou des curseurs, jamais incomplet, jamais le texte voisin', async () => {
+  const { extractToken } = await import('../src/claudelogin.js');
+  const tok = `sk-ant-oat01-${'a1B2-_'.repeat(15)}`;
+  const e = String.fromCharCode(27);
+  assert.equal(extractToken(`token: ${tok}\r\n\r\nStore this token securely.`), tok);
+  assert.equal(extractToken(`token: sk-ant-\r\n${tok.slice(7, 40)}${e}[5G${tok.slice(40)}\r\n${e}[2mStore${e}[7Gthis`), tok);
+  assert.equal(extractToken(`token: ${tok.slice(0, 30)}`), null, 'jeton encore en cours d\'affichage : on attend');
+  assert.equal(extractToken(`token: ${tok}`), null, 'sans phrase de fin on attend aussi…');
+  assert.equal(extractToken(`token: ${tok}`, true), tok, '…sauf si le CLI est terminé');
+  assert.equal(extractToken('rien ici'), null);
+  assert.equal(extractToken('sk-ant-oat01-court Store'), null, 'trop court pour être un jeton');
+});
