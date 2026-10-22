@@ -9,12 +9,14 @@ import { join } from 'node:path';
 import { randomId } from './crypto.js';
 import { HttpError } from './http.js';
 import { buildChildEnv } from './services/sandbox.js';
+import { screenText } from './termscreen.js';
 
 const MAX_SESSIONS = 5;
 const TTL_MS = 5 * 60_000;
 const URL_WAIT_MS = 25_000;
 const TOKEN_WAIT_MS = 45_000;
-const MAX_OUTPUT = 64 * 1024;
+// Pas de troncature au début : le rendu d'écran a besoin de tout le flux (il ne fait que quelques Ko en pratique)
+const MAX_OUTPUT = 512 * 1024;
 
 const OSC_LINK = /\x1b\]8;[^;\x07\x1b]*;(https:\/\/[^\x07\x1b]+)(?:\x07|\x1b\\)/;
 const TOKEN = /sk-ant-oat\d+-[A-Za-z0-9_-]{20,}/;
@@ -38,33 +40,32 @@ export function extractLoginUrl(out) {
     return u.protocol === 'https:' && ALLOWED_HOST.test(u.hostname) ? u.href : null;
   } catch { return null; }
 }
-/** Sortie du CLI lisible : sans séquences de terminal, et sans rien qui ressemble à un code ou un jeton. */
+/** Ce qui est affiché à l'écran, sur une ligne, sans rien qui ressemble à un code ou un jeton (pour les journaux). */
 export function readableTail(out, max = 300) {
-  return out
-    .replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, '')
-    .replace(/\x1b\[[0-9;?<>=]*[A-Za-z]/g, ' ')
-    .replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ')
-    .replace(/[A-Za-z0-9_#.~-]{24,}/g, '…')
-    .trim().slice(-max);
+  return screenText(out).filter(Boolean).join(' ').replace(/\s+/g, ' ').replace(/[A-Za-z0-9_#.~-]{24,}/g, '…').trim().slice(-max);
 }
-// Le CLI affiche le jeton dans un terminal : selon la largeur, il peut être coupé par des retours à la ligne ou des
-// séquences de déplacement du curseur, et les mots voisins ne sont pas toujours séparés par un espace. On prend donc tout
-// ce qui se trouve entre « sk-ant- » et la phrase qui suit le jeton (« Store this token… »), puis on retire les blancs.
+
+// Le CLI dessine un écran (il ne réécrit que les cases qui changent) : on lit l'écran rendu par screenText, pas le flux brut.
+// Le jeton est dans « Your OAuth token (…): sk-ant-… », suivi de « Store this token securely » ; s'il est plus long que la
+// ligne il peut passer sur plusieurs lignes d'écran, d'où le retrait des blancs entre « sk-ant- » et la phrase de fin.
 const TOKEN_END = /Store|You\s*won|Use\s*this/;
 /**
- * Jeton d'abonnement contenu dans la sortie du CLI, ou null. Tant que la phrase de fin n'est pas arrivée le jeton peut
- * être incomplet : on attend, sauf si le CLI est terminé (`final`), auquel cas on prend jusqu'à la fin de la sortie.
+ * Jeton d'abonnement affiché à l'écran, ou null. Tant que la phrase de fin n'est pas affichée le jeton peut être incomplet :
+ * on attend, sauf si le CLI est terminé (`final`), auquel cas on prend jusqu'à la fin de l'écran.
  */
 export function extractToken(out, final = false) {
-  const text = out.replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, '').replace(/\x1b\[[0-9;?<>=]*[A-Za-z]/g, ' ');
-  const start = text.indexOf('sk-ant-oat') >= 0 ? text.indexOf('sk-ant-oat') : text.search(/sk-ant-\s*oat/);
+  const text = screenText(out).join('\n');
+  const start = text.search(/sk-ant-\s*oat/);
   if (start < 0) return null;
   const rest = text.slice(start);
   const end = rest.search(TOKEN_END);
   if (end < 0 && !final) return null;
   const token = (end < 0 ? rest : rest.slice(0, end)).replace(/\s+/g, '');
-  return TOKEN.test(token) ? TOKEN.exec(token)[0] : null;
+  return TOKEN.exec(token)?.[0] ?? null;
 }
+
+/** L'écran affiche-t-il le refus du code ? (« OAuth error… Press Enter to retry ») */
+export const isRefused = (out) => REFUSED.test(screenText(out).join('\n'));
 
 export class ClaudeLogins {
   constructor(app) { this.app = app; this.sessions = new Map(); }
@@ -141,12 +142,11 @@ export class ClaudeLogins {
     if (!CODE_RE.test(c)) throw new HttpError(400, 'Ce code ne ressemble pas à celui de Claude : recopie-le en entier.');
     if (s.submitted) throw new HttpError(409, 'Code déjà envoyé : patiente un instant.');
     s.submitted = true;
-    s.outAtSubmit = s.out.length;
     s.proc.stdin.write(c);
     await new Promise((r) => setTimeout(r, ENTER_DELAY_MS));
     s.proc.stdin.write('\r');
-    const res = await this.#waitFor(s, (out) => extractToken(out, s.done) || (REFUSED.test(out.slice(s.outAtSubmit ?? 0)) ? 'refused' : null), TOKEN_WAIT_MS);
-    const tail = readableTail(s.out.slice(s.outAtSubmit ?? 0));
+    const res = await this.#waitFor(s, (out) => extractToken(out, s.done) || (isRefused(out) ? 'refused' : null), TOKEN_WAIT_MS);
+    const tail = readableTail(s.out);
     const exited = s.done;
     this.#drop(String(id));
     if (!res || res === 'refused') {

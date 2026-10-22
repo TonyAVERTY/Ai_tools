@@ -539,15 +539,24 @@ test('connexion guidée : mode abonnement désactivé = refus, sans CLI', lt, as
   } finally { await off.close(); }
 });
 
-test('extraction du jeton : coupé par des retours à la ligne ou des curseurs, jamais incomplet, jamais le texte voisin', async () => {
-  const { extractToken } = await import('../src/claudelogin.js');
+test('extraction du jeton : lu sur l\'écran rendu (cases sautées, retours à la ligne), jamais incomplet, jamais le texte voisin', async () => {
+  const { extractToken, isRefused } = await import('../src/claudelogin.js');
+  const { screenText } = await import('../src/termscreen.js');
   const tok = `sk-ant-oat01-${'a1B2-_'.repeat(15)}`;
   const e = String.fromCharCode(27);
   assert.equal(extractToken(`token: ${tok}\r\n\r\nStore this token securely.`), tok);
-  assert.equal(extractToken(`token: sk-ant-\r\n${tok.slice(7, 40)}${e}[5G${tok.slice(40)}\r\n${e}[2mStore${e}[7Gthis`), tok);
+  // Écran mis à jour par morceaux : un caractère faux est corrigé après coup, le flux brut seul serait faux
+  const wrong = `${tok.slice(0, 20)}X${tok.slice(21)}`;
+  assert.equal(extractToken(`Your token: ${wrong}\r${e}[${'Your token: '.length + 20}C${tok[20]}\r\n\r\nStore${e}[7Gthis token`), tok, 'lu sur l\'écran final');
+  // Case déjà affichée, sautée par le curseur : « Requ[curseur]st » reste « Request »
+  assert.equal(screenText(`Request\rRequ${e}[1Cst`)[0], 'Request');
+  assert.equal(extractToken(`t: sk-ant-\r\n${tok.slice(7, 40)}\r\n${tok.slice(40)}\r\n\r\nStore this`), tok, 'jeton sur plusieurs lignes d\'écran');
   assert.equal(extractToken(`token: ${tok.slice(0, 30)}`), null, 'jeton encore en cours d\'affichage : on attend');
   assert.equal(extractToken(`token: ${tok}`), null, 'sans phrase de fin on attend aussi…');
   assert.equal(extractToken(`token: ${tok}`, true), tok, '…sauf si le CLI est terminé');
   assert.equal(extractToken('rien ici'), null);
   assert.equal(extractToken('sk-ant-oat01-court Store'), null, 'trop court pour être un jeton');
+  // Le refus se lit lui aussi sur l'écran
+  assert.equal(isRefused(`OAuth error: Request failed with status code 400\r\nPress Enter to retry.`), true);
+  assert.equal(isRefused('Paste code here if prompted >'), false);
 });
