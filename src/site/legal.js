@@ -2,7 +2,7 @@
 // Textes rédigés d'après le code (données réellement collectées, cookies réellement posés) pour l'entrepreneur
 // individuel Tony AVERTY. Ce sont des modèles sérieux, pas un avis juridique : voir docs/JOURNAL.md pour ce qui reste
 // à compléter (marqueurs visibles) et à faire relire.
-import { siteLayout, CONTACT_EMAIL } from './layout.js';
+import { siteLayout, nextBlock, journey, CONTACT_EMAIL } from './layout.js';
 
 /**
  * Marqueurs visibles tant que l'information n'est pas fournie ou validée. Leur liste est aussi dans docs/JOURNAL.md
@@ -39,7 +39,8 @@ function legalPage({ appUrl, path, title, description, h1, lead, sections }) {
   <div class="prose">
 ${body}
   </div>
-</div>`,
+</div>
+${nextBlock(journey('home', 'how', 'pricing'), 'Retour au site')}`,
   });
 }
 
@@ -155,7 +156,7 @@ export function privacyPage({ appUrl, apple = false, captcha = false, inactiveMo
   <li><strong>Google</strong> pour la connexion : il nous transmet ton email, ton nom et un identifiant. <a href="https://policies.google.com/privacy" rel="noopener noreferrer">Politique de Google</a>.</li>
   ${apple ? '<li><strong>Apple</strong> pour la connexion avec Apple : même principe, avec la possibilité de masquer ton email. <a href="https://www.apple.com/legal/privacy/fr-fr/" rel="noopener noreferrer">Politique d\'Apple</a>.</li>' : ''}
   <li><strong>Anthropic</strong>, par l'intermédiaire de <em>ton</em> accès Claude : le code de ton projet lu par Claude, la fiche et la cible, les domaines des prospects déjà connus pour éviter les doublons, et ce que Claude trouve sur le web transitent par ton compte Anthropic, selon les conditions que tu as acceptées avec lui. <a href="https://www.anthropic.com/legal/privacy" rel="noopener noreferrer">Politique d'Anthropic</a>.</li>
-  ${captcha ? `<li><strong>Google reCAPTCHA</strong> (Google Ireland Limited, Google LLC) : protège la connexion contre les envois automatisés. Son script n'est chargé qu'après ton clic sur « Charger la vérification anti-robot », sur la page de connexion. Il dépose des cookies et transmet à Google ton adresse IP, des informations sur ton navigateur et sur ton comportement sur la page. Base légale : ton consentement. AiTools ne conserve pas le résultat de la vérification. Sans elle, la connexion n'est pas possible : c'est une mesure de sécurité contre les abus. Si cela te pose problème, écris-nous. <a href="https://policies.google.com/privacy" rel="noopener noreferrer">Politique de Google</a>.</li>` : ''}
+  ${captcha ? `<li><strong>Google reCAPTCHA</strong> (Google Ireland Limited, Google LLC) : protège la connexion contre les envois automatisés. Son script est chargé automatiquement à l'ouverture de la page de connexion, sans action de ta part. Il dépose des cookies et transmet à Google ton adresse IP, des informations sur ton navigateur et sur ton comportement sur la page. Base légale : l'intérêt légitime d'AiTools à protéger la connexion contre les abus. AiTools ne conserve pas le résultat de la vérification. Sans elle, la connexion n'est pas possible. Si cela te pose problème, écris-nous. <a href="https://policies.google.com/privacy" rel="noopener noreferrer">Politique de Google</a>.</li>` : ''}
   <li><strong>L'hébergeur</strong> du serveur : ${todo('host')}</li>
   <li><strong>Tes propres services</strong>, quand tu les configures : serveur SMTP et IMAP de ta messagerie, Forgejo, base de données de ton projet, Discord. AiTools s'y connecte avec tes identifiants.</li>
 </ul>
@@ -168,19 +169,19 @@ export function privacyPage({ appUrl, apple = false, captcha = false, inactiveMo
       },
       {
         id: 'cookies', title: 'Cookies et traceurs',
-        html: `<p>AiTools ne pose que des cookies <strong>strictement nécessaires</strong> au service. Ils sont exemptés de consentement : c'est pourquoi aucun bandeau ne s'affiche. Pas d'analyse d'audience, pas de publicité, pas de police ni de script chargés depuis un autre site${captcha ? ', sauf la vérification anti-robot de Google sur la page de connexion, et seulement après ton accord (voir plus bas)' : ''}.</p>
+        html: `<p>AiTools ne pose que des cookies <strong>strictement nécessaires</strong> au service. Ceux d'AiTools sont exemptés de consentement : c'est pourquoi aucun bandeau ne s'affiche${captcha ? ' (ceux de Google, sur la page de connexion, sont décrits plus bas)' : ''}. Pas d'analyse d'audience, pas de publicité, pas de police ni de script chargés depuis un autre site${captcha ? ', sauf la vérification anti-robot de Google, uniquement sur la page de connexion (voir plus bas)' : ''}.</p>
 <div class="table-wrap"><table>
   <caption>Cookies posés par AiTools</caption>
   <thead><tr><th scope="col">Nom</th><th scope="col">Rôle</th><th scope="col">Durée</th></tr></thead>
   <tbody>
     <tr><th scope="row"><code>sid</code></th><td>Te garder connecté (identifiant de session aléatoire). Sécurisé : HttpOnly, Secure, SameSite=Lax.</td><td>30 jours au plus</td></tr>
     <tr><th scope="row"><code>oauth_b</code></th><td>Relier une tentative de connexion à ton navigateur, pour empêcher qu'un tiers la détourne. Limité aux adresses de connexion.</td><td>10 minutes</td></tr>
-    ${captcha ? `<tr><th scope="row">Cookies de Google reCAPTCHA</th><td>Déposés par Google, uniquement si tu charges la vérification anti-robot (non essentiels : consentement). Ils servent à distinguer un humain d'un programme.</td><td>Durée fixée par Google</td></tr>` : ''}
+    ${captcha ? `<tr><th scope="row">Cookies de Google reCAPTCHA</th><td>Déposés par Google sur la page de connexion, pendant la vérification anti-robot automatique. Ils servent à distinguer un humain d'un programme.</td><td>Durée fixée par Google</td></tr>` : ''}
   </tbody>
 </table></div>
 <p>Le tableau de bord retient aussi, dans la mémoire de session de ton navigateur, le projet que tu as ouvert en dernier ; cette mémoire est effacée à la fermeture de l'onglet et rien n'est envoyé au serveur.</p>
 ${captcha
-  ? `<p>Sur la page de connexion, rien n'est chargé depuis Google tant que tu n'as pas cliqué sur « Charger la vérification anti-robot ». Ce choix n'est pas mémorisé : il t'est redemandé à chaque visite de la page.</p>`
+  ? `<p>Sur la page de connexion, la vérification anti-robot de Google se charge toute seule. Aucune autre page du site ne charge quoi que ce soit depuis Google.</p>`
   : `<p>Si un traceur non essentiel devait un jour être ajouté, un choix « Accepter » ou « Refuser » apparaîtrait avant tout dépôt, et cette page serait mise à jour.</p>`}`,
       },
       {

@@ -1,30 +1,33 @@
-// Vérification anti-robot de la page de connexion (Google reCAPTCHA v3), chargée seulement APRÈS le clic de l'utilisateur.
-// Tant qu'il n'a pas cliqué sur « Charger la vérification anti-robot », aucune requête ne part vers Google.
+// Vérification anti-robot de la page de connexion (Google reCAPTCHA v3), entièrement automatique :
+// le script est chargé dès l'ouverture de la page, les boutons s'activent quand il est prêt, et le jeton est produit
+// au moment du clic. Il n'y a rien à cocher ni à résoudre.
 (() => {
   const box = document.querySelector('[data-captcha]');
   if (!box) return;
   const key = box.dataset.sitekey;
   const status = box.querySelector('[data-captcha-status]');
-  const load = box.querySelector('[data-captcha-load]');
+  const retry = box.querySelector('[data-captcha-load]');
   const forms = [...document.querySelectorAll('form[data-captcha-form]')];
   let ready = false;
   const say = (text) => { status.textContent = text; };
 
-  load.addEventListener('click', () => {
-    load.disabled = true;
-    say('Chargement de la vérification…');
+  function load() {
+    retry.hidden = true;
+    say('Vérification anti-robot en cours, ça prend une seconde…');
     const s = document.createElement('script');
     s.src = `https://www.google.com/recaptcha/api.js?render=${encodeURIComponent(key)}`;
     s.async = true;
     s.onload = () => window.grecaptcha.ready(() => {
       ready = true;
       for (const f of forms) f.querySelector('button').disabled = false;
-      load.hidden = true;
-      say('Vérification chargée : tu peux te connecter.');
+      say('Vérification faite : tu peux te connecter.');
     });
-    s.onerror = () => { load.disabled = false; say('La vérification n\'a pas pu être chargée (réseau ou bloqueur de contenu). Réessaie.'); };
+    s.onerror = () => { s.remove(); retry.hidden = false; say("La vérification n'a pas pu se charger (réseau ou bloqueur de pubs ?). Réessaie."); };
     document.head.append(s);
-  });
+  }
+
+  retry.addEventListener('click', load);
+  load();
 
   for (const f of forms) {
     f.addEventListener('submit', (e) => {

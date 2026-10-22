@@ -6,7 +6,7 @@ import { verifyCaptcha } from '../src/captcha.js';
 import { loadConfig } from '../src/config.js';
 import { startApp, APP_URL } from './helpers/server.js';
 
-// reCAPTCHA v3 : vérification serveur (jeton absent, invalide, score bas…), consentement avant tout chargement de Google,
+// reCAPTCHA v3 : vérification serveur (jeton absent, invalide, score bas…), chargement automatique sur la page de connexion,
 // CSP limitée à la page de connexion. Aucun appel réel à Google : tout passe par app.fetch.
 
 const SITE = 'site-key-test';
@@ -102,17 +102,18 @@ test('configuration : les deux clés ensemble, seuil par défaut 0,5, aucun cont
 
 // ---------- Page de connexion et démarrage du flux ----------
 
-test('page de connexion : consentement d\'abord, rien de Google dans la page, boutons inactifs', async () => {
+test('page de connexion : vérification automatique, rien de Google dans la page, boutons inactifs jusqu\'au chargement', async () => {
   const s = await startApp({ cfg: { recaptcha: RC, apple: { teamId: 't', keyId: 'k', clientId: 'c', privateKey: 'p' } } });
   try {
     const r = await s.anon.get('/login', { headers: { accept: 'text/html' } });
     const h = await r.text();
     assert.match(h, /data-captcha/);
     assert.match(h, new RegExp(`data-sitekey="${SITE}"`));
-    assert.match(h, /Charger la vérification anti-robot/);
-    assert.match(h, /Rien n'est envoyé à Google avant ton clic/);
-    // Un seul script, celui de l'application ; aucune URL de script, de cadre ou d'image vers Google
-    assert.deepEqual([...h.matchAll(/<script[^>]*\ssrc="([^"]+)"/g)].map((m) => m[1]), ['/static/captcha.js']);
+    assert.match(h, /Vérification anti-robot en cours/);
+    assert.doesNotMatch(h, /Charger la vérification anti-robot/, 'plus de clic à faire');
+    assert.match(h, /data-captcha-load hidden/, 'le bouton « Réessayer » n\'apparaît qu\'en cas d\'échec');
+    // Deux scripts, ceux de l'application ; aucune URL de script, de cadre ou d'image vers Google
+    assert.deepEqual([...h.matchAll(/<script[^>]*\ssrc="([^"]+)"/g)].map((m) => m[1]), ['/static/site.js', '/static/captcha.js']);
     assert.doesNotMatch(h, /<(script|iframe|img|link)[^>]*(gstatic|google\.com\/recaptcha)/i);
     assert.doesNotMatch(h, /recaptcha\/api\.js/);
     assert.doesNotMatch(h, /<script(?![^>]*src=)/i, 'aucun script en ligne (CSP)');
@@ -127,7 +128,7 @@ test('page de connexion : consentement d\'abord, rien de Google dans la page, bo
     const plain = await startApp();
     try {
       const p = await (await plain.anon.get('/login', { headers: { accept: 'text/html' } })).text();
-      assert.doesNotMatch(p, /<script|data-captcha/);
+      assert.doesNotMatch(p, /captcha\.js|data-captcha/);
       assert.match(p, /href="\/auth\/google"/);
     } finally { await plain.close(); }
   } finally { await s.close(); }
@@ -228,20 +229,18 @@ test('POST /auth/apple : mêmes règles ; sans reCAPTCHA, le démarrage reste di
 
 // ---------- Script de la page : rien avant le clic ----------
 
-test('captcha.js : aucun chargement de Google avant le clic ; après, le script officiel puis le jeton dans le formulaire', async () => {
+test('captcha.js : chargé tout seul à l\'ouverture, boutons actifs ensuite, puis le jeton dans le formulaire au clic', async () => {
   const s = await startApp({ cfg: { recaptcha: RC } });
   try {
     const src = await (await s.anon.get('/static/captcha.js')).text();
     assert.match(src, /api\.js\?render=/);
-    assert.ok(src.indexOf("addEventListener('click'") < src.indexOf('recaptcha/api.js'), 'l\'adresse de Google n\'apparaît que dans le gestionnaire de clic');
 
     // Faux DOM minimal
-    const handlers = { load: {}, forms: [] };
     const el = (extra = {}) => ({ dataset: {}, hidden: false, disabled: false, textContent: '', listeners: {}, addEventListener(n, f) { this.listeners[n] = f; }, ...extra });
-    const status = el(), load = el();
-    const box = el({ dataset: { sitekey: SITE }, querySelector: (q) => (q === '[data-captcha-status]' ? status : load) });
+    const status = el(), retry = el();
+    const box = el({ dataset: { sitekey: SITE }, querySelector: (q) => (q === '[data-captcha-status]' ? status : retry) });
     const mkForm = () => {
-      const button = el(), input = el({ value: '' });
+      const button = el({ disabled: true }), input = el({ value: '' });
       const f = el({ submitted: 0, submit() { this.submitted++; }, querySelector: (q) => (q === 'button' ? button : input) });
       f.button = button; f.input = input; return f;
     };
@@ -251,15 +250,13 @@ test('captcha.js : aucun chargement de Google avant le clic ; après, le script 
     const window = { grecaptcha };
     const document = {
       querySelector: (q) => (q === '[data-captcha]' ? box : null), querySelectorAll: () => forms,
-      createElement: () => ({}), head: { append: (n) => appended.push(n) },
+      createElement: () => ({ remove() {} }), head: { append: (n) => appended.push(n) },
     };
     vm.runInNewContext(src, { document, window, encodeURIComponent });
 
-    assert.equal(appended.length, 0, 'rien n\'est chargé au chargement de la page');
-    assert.ok(forms.every((f) => f.listeners.submit));
-    load.listeners.click();
-    assert.equal(appended.length, 1);
+    assert.equal(appended.length, 1, 'le script de Google se charge tout seul, sans clic');
     assert.equal(appended[0].src, `https://www.google.com/recaptcha/api.js?render=${SITE}`);
+    assert.ok(forms.every((f) => f.button.disabled), 'boutons inactifs tant que la vérification n\'est pas prête');
     appended[0].onload();
     assert.ok(forms.every((f) => f.button.disabled === false), 'boutons actifs une fois chargé');
     let prevented = 0;
@@ -269,6 +266,12 @@ test('captcha.js : aucun chargement de Google avant le clic ; après, le script 
     assert.deepEqual(JSON.parse(JSON.stringify(grecaptcha.last)), [SITE, { action: 'login' }]);
     assert.equal(forms[0].input.value, 'jeton-xyz');
     assert.equal(forms[0].submitted, 1);
+
+    // Échec du chargement (bloqueur de pub, réseau) : message et bouton « Réessayer », qui relance le chargement
+    appended[0].onerror();
+    assert.equal(retry.hidden, false);
+    retry.listeners.click();
+    assert.equal(appended.length, 2);
   } finally { await s.close(); }
 });
 
@@ -280,9 +283,10 @@ test('confidentialité : le paragraphe reCAPTCHA, ses cookies et le consentement
   try {
     const page = async (s) => (await s.anon.get('/confidentialite', { headers: { accept: 'text/html' } })).text();
     const a = await page(on);
-    for (const f of ['Google reCAPTCHA', 'Charger la vérification anti-robot', 'Base légale : ton consentement', 'Cookies de Google reCAPTCHA', 'redemandé à chaque visite']) {
+    for (const f of ['Google reCAPTCHA', 'chargé automatiquement', 'Base légale : l\'intérêt légitime', 'Cookies de Google reCAPTCHA', 'se charge toute seule']) {
       assert.ok(a.includes(f), f);
     }
+    assert.doesNotMatch(a, /Charger la vérification anti-robot|Base légale : ton consentement/);
     assert.doesNotMatch(a, /<!--/);
     assert.match(a, /Adresse IP/);
     const b = await page(off);
