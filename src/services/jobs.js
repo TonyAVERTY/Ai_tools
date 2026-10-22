@@ -95,6 +95,7 @@ export class Worker {
     this.pollMs = pollMs;
     this.log = log;
     this.current = null;
+    this.currentJob = null;
     this.stopped = false;
     this.pending = new Set();   // callbacks de notification en vol (attendus à l'arrêt)
     this.loopDone = null;
@@ -114,6 +115,11 @@ export class Worker {
     this.wake?.();
     await this.loopDone;
     await this.idle();
+  }
+
+  /** Interrompt le job en cours s'il appartient à cet utilisateur (suppression du compte). */
+  abortUser(userId) {
+    if (this.currentJob && Number(this.currentJob.user_id) === Number(userId)) this.current?.abort();
   }
 
   /** Attend les callbacks (notifications) lancés par emit(). */
@@ -203,6 +209,7 @@ export class Worker {
     await this.db.prepare("UPDATE jobs SET status='running', started_at=? WHERE id=? AND status='queued'").run(now(), job.id);
     const ctrl = new AbortController();
     this.current = ctrl;
+    this.currentJob = job;
     const ctx = {
       job,
       params: JSON.parse(job.params_json || '{}'),
@@ -233,6 +240,7 @@ export class Worker {
     } finally {
       clearInterval(watch);
       this.current = null;
+      this.currentJob = null;
     }
     return true;
   }

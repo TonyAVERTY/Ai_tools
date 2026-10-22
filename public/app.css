@@ -28,6 +28,12 @@ a { color: var(--accent); }
 
 .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; margin: 12px 0; }
 .login { max-width: 380px; margin: 12vh auto; text-align: center; }
+.login-btns { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+.btn.apple { background: var(--text); border-color: var(--text); color: var(--bg); }
+.notice { border-color: var(--warn); color: var(--text); }
+dl.account { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0; }
+dl.account dt { color: var(--muted); }
+dl.account dd { margin: 0; overflow-wrap: anywhere; }
 .muted { color: var(--muted); }
 .small { font-size: .85rem; }
 .ok { color: var(--ok); }
