@@ -343,7 +343,7 @@ test('offres : prix de 10 à 100 € TTC, annuel = 2 mois offerts, plafonds tena
   for (const k of keys) {
     assert.equal(annualPrice(k), PLAN_PRICES[k] * 10, `${k} : 12 mois pour le prix de 10`);
     const l = PLAN_LIMITS[k];
-    for (const kind of ['projects', 'prospects', 'mails', 'aiJobs']) assert.ok(l[kind] > prev[kind], `${k} : ${kind} plus large que l'offre précédente`);
+    for (const kind of ['projects', 'prospects', 'mails', 'aiJobs', 'seats']) assert.ok(l[kind] > prev[kind], `${k} : ${kind} plus large que l'offre précédente`);
     assert.ok(l.mails <= 300 * 30, `${k} : ${l.mails} mails par mois dépasserait le plafond de 300 par 24 h`);
     assert.ok(l.aiJobs >= Math.ceil(l.prospects / 50), `${k} : assez de tâches IA pour trouver ${l.prospects} contacts`);
     prev = l;

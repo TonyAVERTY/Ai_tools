@@ -105,7 +105,7 @@ export function makeHandlers(app) {
     const project = await getProject(app, ctx.job.project_id, { userId, secrets: true });
     const template = await getTemplate(db, project.id, kind, { validatedOnly: true });
     if (!template) throw new Error(kind === 'followup' ? 'Modèle de relance non validé' : 'Modèle de mail non validé');
-    if (!project.smtp) throw new Error('SMTP non configuré pour ce projet');
+    if (!project.smtp) throw new Error("Aucun SMTP : configure-en un pour ce projet, ou dans les Réglages");
 
     const day = now() - 86400;
     const candidates = kind === 'followup'

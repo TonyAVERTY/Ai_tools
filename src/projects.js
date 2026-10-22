@@ -4,6 +4,7 @@ import { encryptJson, decryptJson, decrypt } from './crypto.js';
 import { HttpError } from './http.js';
 import { getUser } from './users.js';
 import { assertRoom, withUserLock } from './services/plans.js';
+import { accessOn, needAccess, memberTeamIds } from './teams.js';
 
 // Un dossier de clones par utilisateur : data/repos/<utilisateur>/<projet>
 export const repoDir = (cfg, userId, id) => join(cfg.dataDir, 'repos', String(Number(userId)), String(Number(id)));
@@ -18,24 +19,36 @@ function readSecret(key, payload, what) {
 }
 
 /**
- * Projet d'un utilisateur. `userId` est obligatoire : un projet d'un autre compte est introuvable (404),
- * exactement comme un projet qui n'existe pas. Les tâches de fond passent le propriétaire lu en base.
+ * Projet auquel `userId` a accès : le sien, ou un projet que son propriétaire a partagé avec une équipe dont il est membre.
+ * Tout autre projet est introuvable (404), exactement comme un projet qui n'existe pas. Le résultat porte `userId` = le
+ * PROPRIÉTAIRE (un membre agit comme lui : mêmes données, mêmes plafonds, même SMTP), et `access` = 'owner' | 'admin' | 'member'.
+ * `need` exige un niveau minimal (403 en dessous). Les secrets (SMTP, IMAP, base) ne sont lus que pour owner et admin.
+ * Les tâches de fond passent le propriétaire lu en base : leur accès est donc toujours « owner ».
  */
-export async function getProject(app, id, { userId, secrets = false } = {}) {
+export async function getProject(app, id, { userId, secrets = false, need = null } = {}) {
   if (!Number.isInteger(Number(userId)) || Number(userId) <= 0) throw new Error('getProject : userId requis');
-  const p = await app.db.prepare('SELECT * FROM projects WHERE id = ? AND user_id = ?').get(Number(id), Number(userId));
-  if (!p) throw new HttpError(404, 'Projet introuvable');
+  const p = await app.db.prepare('SELECT * FROM projects WHERE id = ?').get(Number(id));
+  const access = await accessOn(app.db, p, userId);
+  if (!access) throw new HttpError(404, 'Projet introuvable');
+  if (need) needAccess(access, need);
+  // SMTP du projet, sinon celui des Réglages du propriétaire : le projet peut donc envoyer dans les deux cas
+  const settingsSmtp = !p.smtp_enc && !!(await getSetting(app.db, p.user_id, 'smtp_enc'));
   const out = {
     id: p.id, userId: Number(p.user_id), name: p.name, gitUrl: p.git_url,
+    access, teamId: p.team_id == null ? null : Number(p.team_id),
     profile: parse(p.profile_json), profileCommit: p.profile_commit, profileAt: p.profile_at,
     target: parse(p.target_json), targetValidated: !!p.target_validated,
     dailyMailCap: p.daily_mail_cap, createdAt: p.created_at,
-    hasSmtp: !!p.smtp_enc, hasDb: !!p.db_enc, hasImap: !!p.imap_enc,
+    hasSmtp: !!p.smtp_enc || settingsSmtp, hasOwnSmtp: !!p.smtp_enc,
+    smtpSource: p.smtp_enc ? 'project' : settingsSmtp ? 'settings' : null,
+    hasDb: !!p.db_enc, hasImap: !!p.imap_enc,
     inbox: parse(p.inbox_json),
     followupEnabled: !!p.followup_enabled, followupDays: p.followup_days,
   };
-  if (secrets) {
-    out.smtp = readSecret(app.cfg.secretKey, p.smtp_enc, `SMTP du projet ${p.id}`);
+  if (access !== 'owner') out.ownerEmail = (await app.db.prepare('SELECT email FROM users WHERE id = ?').get(p.user_id))?.email ?? null;
+  if (secrets && access !== 'member') {
+    out.ownSmtp = readSecret(app.cfg.secretKey, p.smtp_enc, `SMTP du projet ${p.id}`);
+    out.smtp = out.ownSmtp || (settingsSmtp ? await globalSmtp(app, p.user_id) : null);
     out.dbCfg = readSecret(app.cfg.secretKey, p.db_enc, `accès BDD du projet ${p.id}`);
     out.imapCfg = readSecret(app.cfg.secretKey, p.imap_enc, `IMAP du projet ${p.id}`);
     out.imap = imapCredentials(out.imapCfg, out.smtp);
@@ -43,8 +56,12 @@ export async function getProject(app, id, { userId, secrets = false } = {}) {
   return out;
 }
 
+/** Les projets de l'utilisateur, puis ceux que des équipes ont partagés avec lui. */
 export async function listProjects(app, userId) {
-  const rows = await app.db.prepare('SELECT id FROM projects WHERE user_id = ? ORDER BY LOWER(name)').all(Number(userId));
+  const teamIds = await memberTeamIds(app.db, userId);
+  const rows = teamIds.length
+    ? await app.db.prepare(`SELECT id FROM projects WHERE user_id = ? OR team_id IN (${teamIds.map(() => '?').join(',')}) ORDER BY LOWER(name)`).all(Number(userId), ...teamIds)
+    : await app.db.prepare('SELECT id FROM projects WHERE user_id = ? ORDER BY LOWER(name)').all(Number(userId));
   return Promise.all(rows.map((r) => getProject(app, r.id, { userId })));
 }
 

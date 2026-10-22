@@ -403,3 +403,9 @@ form.inline { display: inline-flex; gap: 6px; align-items: end; flex-wrap: wrap;
   .topnav .avatar { display: none; }
 }
 @media (max-width: 480px) { .topnav .navlink:not([aria-current="page"]) span { display: none; } }
+
+/* Équipe : petits formulaires en ligne dans les tableaux */
+.inline-form { display: flex; align-items: center; gap: 8px; margin: 0; flex-wrap: wrap; }
+.inline-form select { width: auto; min-width: 9em; }
+input.copy { width: 100%; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .82rem; }
+@media (max-width: 1020px) { .sys { order: 3; flex-basis: 100%; } }

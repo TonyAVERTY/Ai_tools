@@ -19,6 +19,7 @@ import { layout } from './views.js';
 import { homePage, notFoundPage } from './site/pages.js';
 import { securityHeaders, robotsHeaderFor, cspFor } from './site/seo.js';
 import { hasUsableLink, isLinkExempt, LINK_REQUIRED_MESSAGE } from './claudelink.js';
+import { memberTeamIds, purgeInvites } from './teams.js';
 import { sandboxStartupMessages } from './services/sandbox.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -94,7 +95,9 @@ export async function createApp(cfg, { db, worker = true, createTransport, fetch
         checkOrigin(req, cfg);
         if (route.limit) app.limiter.enforce(route.limit, { ip, userId: session.userId });
         // Onboarding bloquant : sans liaison Claude valide, seules la liaison, Mon compte et la déconnexion répondent
-        if (!isLinkExempt(req.method, url.pathname) && !(await hasUsableLink(db, session.userId, { cliModeEnabled: cfg.cliModeEnabled !== false }))) {
+        // Un membre d'une équipe travaille avec l'accès Claude du propriétaire des projets partagés : il n'en a pas besoin du sien
+        if (!isLinkExempt(req.method, url.pathname) && !(await hasUsableLink(db, session.userId, { cliModeEnabled: cfg.cliModeEnabled !== false }))
+          && !(await memberTeamIds(db, session.userId)).length) {
           if (url.pathname.startsWith('/api/') || req.headers.accept?.includes('json')) {
             return json(res, { error: LINK_REQUIRED_MESSAGE, code: 'link_required' }, 403);
           }
@@ -148,7 +151,7 @@ export async function createApp(cfg, { db, worker = true, createTransport, fetch
   let purging = null;
   const purge = setInterval(() => {
     app.limiter.sweep();
-    purging = purgeExpired(db).catch((e) => console.error('[purge]', e.message));
+    purging = Promise.all([purgeExpired(db), purgeInvites(db)]).catch((e) => console.error('[purge]', e.message));
   }, 3600_000);
   purge.unref();
 

@@ -13,7 +13,7 @@ import { createProject, saveSecretConfig, getProject, prospectStats, pickVariant
 import { allowedToSend, buildProspectMail, fillTemplate } from '../src/services/mailer.js';
 import { validateSelect, firstValue } from '../src/services/recap.js';
 import { validateGitUrl } from '../src/services/git.js';
-import { verifyUnsubToken, encrypt } from '../src/crypto.js';
+import { verifyUnsubToken, encrypt, encryptJson } from '../src/crypto.js';
 import { addUser } from './helpers/users.js';
 import { makeClaudeBin } from './helpers/claude-bin.js';
 
@@ -194,6 +194,57 @@ test('envoi : Message-ID journalisé et objets A/B alternés équitablement', as
     }
     assert.equal(new Set(logs.map((l) => l.message_id)).size, 4, 'Message-ID uniques');
     assert.deepEqual((await s.db.prepare('SELECT variant FROM prospects ORDER BY id').all()).map((r) => r.variant), ['A', 'B', 'A', 'B']);
+  } finally { rmSync(s.tmp, { recursive: true, force: true }); }
+});
+
+// SMTP : celui du projet, sinon celui des Réglages du propriétaire, sinon un refus clair
+test('SMTP par projet avec repli sur les Réglages', async () => {
+  const s = await setup();
+  try {
+    await s.db.prepare(`INSERT INTO templates(project_id, kind, subject, body, status, updated_at) VALUES(?, 'initial', 'Salut {{entreprise}}', 'Bonjour', 'validated', ?)`).run(s.id, now());
+    const addProspect = (n) => s.db.prepare('INSERT INTO prospects(project_id, company, email, score, created_at) VALUES(?, ?, ?, 5, ?)').run(s.id, `E${n}`, `c${n}@e${n}.fr`, now());
+    const settingsSmtp = { host: 'smtp.reglages', port: 587, user: 'r', pass: 'p', fromEmail: 'reglages@codebzh.fr' };
+    const asSource = async () => (await getProject(s.app, s.id, { userId: s.userId })).smtpSource;
+
+    // Aucun SMTP nulle part : refus clair, rien ne part
+    assert.equal(await asSource(), null);
+    assert.equal((await getProject(s.app, s.id, { userId: s.userId })).hasSmtp, false);
+    await addProspect(1);
+    let job = await run(s, 'send', { count: 1 });
+    assert.equal(job.status, 'error');
+    assert.match(job.error, /Aucun SMTP.*Réglages/);
+    assert.equal(s.sentMails.length, 0);
+
+    // SMTP des Réglages seulement : le projet l'utilise
+    await setSetting(s.db, s.userId, 'smtp_enc', encryptJson(s.app.cfg.secretKey, settingsSmtp));
+    assert.equal(await asSource(), 'settings');
+    const p = await getProject(s.app, s.id, { userId: s.userId, secrets: true });
+    assert.equal(p.hasSmtp, true);
+    assert.equal(p.hasOwnSmtp, false);
+    assert.equal(p.smtp.fromEmail, 'reglages@codebzh.fr');
+    job = await run(s, 'send', { count: 1 });
+    assert.equal(job.status, 'done', job.error);
+    assert.equal(s.sentMails.at(-1).from, 'reglages@codebzh.fr');
+
+    // SMTP propre au projet : il prend le dessus
+    await saveSecretConfig(s.app, s.id, 'smtp_enc', { host: 'smtp.projet', port: 587, user: 'u', pass: 'p', fromEmail: 'projet@codebzh.fr' }, 'pass');
+    assert.equal(await asSource(), 'project');
+    await addProspect(2);
+    job = await run(s, 'send', { count: 1 });
+    assert.equal(job.status, 'done', job.error);
+    assert.equal(s.sentMails.at(-1).from, 'projet@codebzh.fr');
+
+    // Le SMTP d'un autre compte n'est jamais utilisé
+    const other = await addUser(s.db);
+    await setSetting(s.db, other, 'smtp_enc', encryptJson(s.app.cfg.secretKey, { ...settingsSmtp, fromEmail: 'autre@codebzh.fr' }));
+    await s.db.prepare('UPDATE projects SET smtp_enc = NULL WHERE id = ?').run(s.id);
+    await addProspect(3);
+    await run(s, 'send', { count: 1 });
+    assert.equal(s.sentMails.at(-1).from, 'reglages@codebzh.fr');
+    // L'IMAP réutilise les identifiants du SMTP effectif (repli compris)
+    await saveSecretConfig(s.app, s.id, 'imap_enc', { host: 'imap.x', port: 993, user: '', pass: '' }, 'pass');
+    const q = await getProject(s.app, s.id, { userId: s.userId, secrets: true });
+    assert.equal(q.imap.user, 'r');
   } finally { rmSync(s.tmp, { recursive: true, force: true }); }
 });
 

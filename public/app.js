@@ -55,6 +55,9 @@
     followup_template: 'Modèle de relance', followup: 'Relances',
   };
 
+  // Champs en lecture seule à copier (lien d'invitation) : un clic sélectionne tout
+  $$('input.copy').forEach((i) => i.addEventListener('focus', () => i.select()));
+
   // ---------- Barre du haut : page courante en surbrillance ----------
   $$('.topnav a.navlink').forEach((a) => {
     const here = a.pathname === '/' ? location.pathname === '/' : location.pathname === a.pathname || location.pathname.startsWith(`${a.pathname}/`);
