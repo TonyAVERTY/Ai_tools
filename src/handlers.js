@@ -7,7 +7,8 @@ import { analyzePrompt, prospectPrompt, templatePrompt, followupTemplatePrompt, 
 import { followupCandidates, followupSubject, isBusinessHours } from './services/followup.js';
 import { EMAIL_RE, createTransport, buildProspectMail, allowedToSend, makeMessageId } from './services/mailer.js';
 import { unsubToken } from './crypto.js';
-import { getUser, assertCanRunAi } from './users.js';
+import { resolveCredentials } from './claudelink.js';
+import { userRepoRoot } from './users.js';
 import { quotaAlerts } from './services/budget.js';
 import { notify } from './services/notify.js';
 import { evolutionMail } from './services/mailhtml.js';
@@ -53,15 +54,21 @@ export function parseProspectLine(line) {
   };
 }
 
-export function makeHandlers(app) {
+/**
+ * Tout appel à Claude passe par ici. Le secret est relu pour le user_id du job (jamais un autre), l'exécution se fait
+ * dans le bac à sable avec un environnement assaini, et le quota remonté par le CLI est enregistré pour CET utilisateur.
+ */
+export function makeClaude(app) {
   const { db, cfg } = app;
-  // Tout appel à Claude passe par ici. Dernier garde-fou (après enqueue et le worker) : tant que la liaison
-  // Claude (J3) n'existe pas, seul un admin actif peut utiliser la configuration du serveur.
-  const claude = async (userId, o) => {
-    assertCanRunAi(await getUser(db, userId));
-    const r = await runClaude({ bin: cfg.claudeBin, ...o });
-    // État du quota Pro (session 5h + semaine), affiché dans la barre système
-    const w = rateLimitWindows(r.rateLimit);
+  return async (userId, o) => {
+    const cred = await resolveCredentials(app, userId); // refuse sans liaison valide (dernier garde-fou)
+    const r = await runClaude({
+      bin: cfg.claudeBin, ...o,
+      sandbox: cfg.sandbox, secretEnv: cred.secretEnv, serverConfig: cred.serverConfig,
+      allowedRoot: userRepoRoot(cfg, userId),
+    });
+    // État du quota d'abonnement (session 5h + semaine), affiché dans la barre système. Une clé API n'en a pas.
+    const w = cred.mode === 'api_key' ? null : rateLimitWindows(r.rateLimit);
     if (w) {
       await setSetting(db, userId, 'claude_rate_limit_json', JSON.stringify({ at: now(), ...w }));
       for (const a of await quotaAlerts(db, userId, w)) {
@@ -75,7 +82,12 @@ export function makeHandlers(app) {
     }
     return r;
   };
+}
 
+export function makeHandlers(app) {
+  const { db, cfg } = app;
+  const claude = makeClaude(app);
+  const sync = (...a) => (app.syncRepo || syncRepo)(...a);
   const inHours = () => (app.isBusinessHours || isBusinessHours)();
 
   // Premier mail ou relance : mêmes plafonds, mêmes délais, même journal
@@ -165,7 +177,7 @@ export function makeHandlers(app) {
       const project = await getProject(app, ctx.job.project_id, { userId });
       await ctx.progress({ message: 'Récupération du repo…', pct: 3 });
       const dir = repoDir(cfg, userId, project.id);
-      const commit = await syncRepo(project.gitUrl, dir, await forgejoToken(app, userId));
+      const commit = await sync(project.gitUrl, dir, await forgejoToken(app, userId));
 
       await ctx.progress({ message: 'Analyse du code par Claude…', pct: 10 });
       const { prompt, system } = analyzePrompt(project.name);
@@ -288,7 +300,7 @@ export function makeHandlers(app) {
 
       await ctx.progress({ message: 'Mise à jour du repo…', pct: 3 });
       const dir = repoDir(cfg, userId, project.id);
-      await syncRepo(project.gitUrl, dir, await forgejoToken(app, userId));
+      await sync(project.gitUrl, dir, await forgejoToken(app, userId));
 
       await ctx.progress({ message: `Recherche de ${count} évolutions (${level})…`, pct: 10 });
       const { prompt, system } = evolutionPrompt({ projectName: project.name, profile: project.profile, count, level });

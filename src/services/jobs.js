@@ -2,17 +2,18 @@
 import { now } from '../db.js';
 import { HttpError } from '../http.js';
 import { AI_JOBS } from './budget.js';
-import { getUser, assertCanRunAi, AI_BLOCKED_MESSAGE } from '../users.js';
+import { getUser } from '../users.js';
+import { aiRefusal, assertCanRunAi } from '../claudelink.js';
 import { waitCool } from './thermal.js';
 
 /**
  * Met un job en file pour un utilisateur. Point de passage obligé de toutes les routes et tâches de fond :
  *  - le projet doit appartenir à l'utilisateur (sinon 404) ;
  *  - un compte suspendu ne met rien en file ;
- *  - tant que la liaison Claude (J3) n'existe pas, seul un admin peut mettre en file un job IA.
- * Sans projet, `userId` est obligatoire.
+ *  - un job IA exige une liaison Claude valide de CET utilisateur.
+ * Sans projet, `userId` est obligatoire. `opts.cliModeEnabled` : drapeau CLAUDE_CLI_MODE_ENABLED (vrai par défaut).
  */
-export async function enqueue(db, { userId, projectId, type, params = {}, runAfter = null }) {
+export async function enqueue(db, { userId, projectId, type, params = {}, runAfter = null }, opts = {}) {
   if (projectId != null) {
     const owner = await db.prepare('SELECT user_id FROM projects WHERE id = ?').get(projectId);
     if (!owner || (userId != null && Number(owner.user_id) !== Number(userId))) throw new HttpError(404, 'Projet introuvable');
@@ -21,7 +22,7 @@ export async function enqueue(db, { userId, projectId, type, params = {}, runAft
   const user = userId == null ? null : await getUser(db, userId);
   if (!user) throw new Error('enqueue : utilisateur requis');
   if (user.status !== 'active') throw new HttpError(403, 'Compte suspendu');
-  if (AI_JOBS.has(type)) assertCanRunAi(user);
+  if (AI_JOBS.has(type)) await assertCanRunAi(db, user.id, opts);
   // Deux écritures de la même condition : "= ?" ne marche pas avec NULL, et "IS ?" n'existe pas en MySQL
   const running = projectId == null
     ? await db.prepare("SELECT id FROM jobs WHERE user_id = ? AND project_id IS NULL AND type = ? AND status IN ('queued','running')").get(user.id, type)
@@ -34,13 +35,13 @@ export async function enqueue(db, { userId, projectId, type, params = {}, runAft
 
 /**
  * Un job peut-il s'exécuter ? Renvoie la raison du refus, ou null. Revérifié par le worker à chaque
- * exécution (la file peut contenir un job mis en attente avant une suspension ou un changement de rôle).
+ * exécution (la file peut contenir un job mis en attente avant une suspension, un changement de rôle ou une déliaison).
  */
-export async function jobRefusal(db, job) {
+export async function jobRefusal(db, job, opts = {}) {
   const user = await getUser(db, job.user_id);
   if (!user) return 'Compte supprimé';
   if (user.status !== 'active') return 'Compte suspendu';
-  if (AI_JOBS.has(job.type) && !user.isAdmin) return AI_BLOCKED_MESSAGE;
+  if (AI_JOBS.has(job.type)) return aiRefusal(db, job.user_id, opts);
   return null;
 }
 
@@ -76,8 +77,9 @@ export async function latestJobs(db, projectId) {
 export class Worker {
   constructor(db, handlers, {
     thermalMax = 75, pollMs = 3000, log = console, clock = now, onFinish, onThermal,
-    budget, isAiJob, onBudget, quota, isQuotaSensitive, onQuotaHold,
+    budget, isAiJob, onBudget, quota, isQuotaSensitive, onQuotaHold, cliModeEnabled = true,
   } = {}) {
+    this.cliModeEnabled = cliModeEnabled;
     this.clock = clock;
     this.budget = budget;       // async (userId) => {blocked, reason} : budget de CET utilisateur
     this.isAiJob = isAiJob;     // (type) => bool : jobs à mettre en attente si budget ($ équivalent) atteint
@@ -120,6 +122,11 @@ export class Worker {
   /** Interrompt le job en cours s'il appartient à cet utilisateur (suppression du compte). */
   abortUser(userId) {
     if (this.currentJob && Number(this.currentJob.user_id) === Number(userId)) this.current?.abort();
+  }
+
+  /** Interrompt le job en cours s'il est un job IA de cet utilisateur (déliaison de son accès Claude). */
+  abortUserAi(userId) {
+    if (this.currentJob && Number(this.currentJob.user_id) === Number(userId) && this.isAiJob?.(this.currentJob.type)) this.current?.abort();
   }
 
   /** Attend les callbacks (notifications) lancés par emit(). */
@@ -174,8 +181,8 @@ export class Worker {
     let job = null;
     const waiting = new Map(), quotaWaiting = new Map();
     for (const j of due) {
-      // Compte suspendu ou supprimé, job IA d'un non-admin (avant la liaison Claude) : refusé sans exécution
-      const refusal = await jobRefusal(this.db, j);
+      // Compte suspendu ou supprimé, job IA sans liaison Claude valide : refusé sans exécution
+      const refusal = await jobRefusal(this.db, j, { cliModeEnabled: this.cliModeEnabled });
       if (refusal) {
         await this.db.prepare("UPDATE jobs SET status = 'error', error = ?, finished_at = ? WHERE id = ? AND status = 'queued'").run(refusal, now(), j.id);
         continue;

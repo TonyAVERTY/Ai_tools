@@ -6,7 +6,6 @@ import { HttpError } from './http.js';
 import { clearRecapCache } from './services/recap.js';
 
 export const PROVIDER_LABELS = { google: 'Google', apple: 'Apple' };
-export const AI_BLOCKED_MESSAGE = 'Liaison Claude requise (bientôt disponible)';
 
 export const normalizeEmail = (e) => String(e ?? '').trim().toLowerCase();
 const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -24,13 +23,6 @@ function publicUser(r) {
 
 export async function getUser(db, id) {
   return publicUser(await db.prepare(`SELECT ${COLUMNS} FROM users WHERE id = ?`).get(Number(id)));
-}
-
-/** Un compte actif et administrateur peut lancer un job IA avec la configuration du serveur ; personne d'autre (avant le J3). */
-export const canRunAi = (user) => !!user && user.status === 'active' && user.isAdmin;
-
-export function assertCanRunAi(user) {
-  if (!canRunAi(user)) throw new HttpError(403, AI_BLOCKED_MESSAGE);
 }
 
 /** ADMIN_EMAILS fait foi : les admins sont exactement ces adresses (au démarrage et à chaque connexion). */
