@@ -17,16 +17,16 @@ export function isBusinessHours(date = new Date(), timeZone = 'Europe/Paris') {
 const CANDIDATES_SQL = `FROM prospects WHERE project_id = ? AND status = 'sent' AND followup_at IS NULL
   AND sent_at <= ? AND email NOT IN (SELECT email FROM blacklist)`;
 
-export function followupCandidates(db, project, { at = now(), limit = 100 } = {}) {
+export async function followupCandidates(db, project, { at = now(), limit = 100 } = {}) {
   const cutoff = at - project.followupDays * 86400;
   return db.prepare(`SELECT * ${CANDIDATES_SQL} ORDER BY sent_at, id LIMIT ?`).all(project.id, cutoff, limit);
 }
 
 /** @returns {{due: number, blockers: string[], inHours: boolean, ready: boolean}} */
-export function followupPlan(db, project, { at = now(), date = new Date(at * 1000) } = {}) {
+export async function followupPlan(db, project, { at = now(), date = new Date(at * 1000) } = {}) {
   const blockers = [];
   if (!project.followupEnabled) blockers.push('relance désactivée');
-  if (!getTemplate(db, project.id, 'followup', { validatedOnly: true })) blockers.push('modèle de relance à valider');
+  if (!(await getTemplate(db, project.id, 'followup', { validatedOnly: true }))) blockers.push('modèle de relance à valider');
   if (!project.hasSmtp) blockers.push('SMTP à configurer');
   // Sans lecture de la boîte, on relancerait des gens qui ont déjà répondu
   const inbox = project.inbox || {};
@@ -34,7 +34,7 @@ export function followupPlan(db, project, { at = now(), date = new Date(at * 100
   else if (inbox.lastError || !inbox.lastOk || at - inbox.lastOk > INBOX_MAX_AGE) blockers.push('boîte non vérifiée récemment');
 
   const cutoff = at - project.followupDays * 86400;
-  const due = db.prepare(`SELECT COUNT(*) n ${CANDIDATES_SQL}`).get(project.id, cutoff).n;
+  const due = (await db.prepare(`SELECT COUNT(*) n ${CANDIDATES_SQL}`).get(project.id, cutoff)).n;
   const inHours = isBusinessHours(date);
   return { due, blockers, inHours, ready: !blockers.length && inHours && due > 0 };
 }

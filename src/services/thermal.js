@@ -11,7 +11,7 @@ export async function waitCool(max, { read = cpuTemp, sleep = (ms) => new Promis
   let t = read();
   if (t === null || t < max) return;
   while (t !== null && t >= max - 5) {
-    onWait?.(t);
+    await onWait?.(t);
     await sleep(30_000);
     t = read();
   }

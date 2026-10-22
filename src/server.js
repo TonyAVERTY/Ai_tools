@@ -30,7 +30,8 @@ const SECURITY_HEADERS = {
   'Strict-Transport-Security': 'max-age=31536000',
 };
 
-export function createApp(cfg, { db = openDb(cfg.dataDir), worker = true, createTransport } = {}) {
+export async function createApp(cfg, { db, worker = true, createTransport } = {}) {
+  db ??= await openDb(cfg.db);
   const app = { db, cfg, createTransport };
   const router = new Router();
   registerRoutes(router, app);
@@ -46,7 +47,7 @@ export function createApp(cfg, { db = openDb(cfg.dataDir), worker = true, create
       }
       const route = router.match(req.method, url.pathname);
       if (!route) throw new HttpError(404, 'Page introuvable');
-      const session = route.public ? null : getSession(db, req);
+      const session = route.public ? null : await getSession(db, req);
       if (!route.public) {
         if (!session) {
           if (url.pathname.startsWith('/api/')) throw new HttpError(401, 'Non connecté');
@@ -92,23 +93,34 @@ export function createApp(cfg, { db = openDb(cfg.dataDir), worker = true, create
         description: `CPU à ${t} °C : les jobs IA attendent que le Pi redescende sous ${cfg.thermalMax - 5} °C.`,
       }),
     });
-    w.start();
+    await w.start();
     scheduler = new Scheduler(app);
     scheduler.start();
   }
-  const purge = setInterval(() => purgeExpired(db), 3600_000);
+  let purging = null;
+  const purge = setInterval(() => {
+    purging = purgeExpired(db).catch((e) => console.error('[purge]', e.message));
+  }, 3600_000);
   purge.unref();
 
-  app.close = () => new Promise((r) => { w?.stop(); scheduler?.stop(); clearInterval(purge); server.close(() => { db.close(); r(); }); });
+  // Arrêt propre : plus de requêtes, puis fin du job en cours et des tâches de fond, enfin fermeture de la base
+  app.close = async () => {
+    clearInterval(purge);
+    await new Promise((r) => { server.close(r); server.closeIdleConnections?.(); });
+    await w?.stop();
+    await scheduler?.stop();
+    await purging;
+    await db.close();
+  };
   app.server = server;
   return app;
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const cfg = loadConfig();
-  const app = createApp(cfg);
+  const app = await createApp(cfg);
   app.server.listen(cfg.port, cfg.host, () => console.log(`AiTools sur http://${cfg.host}:${cfg.port} (${cfg.appUrl})`));
-  const shutdown = () => app.close().then(() => process.exit(0));
+  const shutdown = () => app.close().then(() => process.exit(0), (e) => { console.error(e); process.exit(1); });
   process.on('SIGTERM', shutdown);
   process.on('SIGINT', shutdown);
 }

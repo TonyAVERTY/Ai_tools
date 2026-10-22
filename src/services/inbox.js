@@ -48,7 +48,7 @@ export function classify(msg) {
 }
 
 /** Applique une liste de messages aux prospects du projet. Idempotent. */
-export function applyMessages(db, projectId, messages, { at = now() } = {}) {
+export async function applyMessages(db, projectId, messages, { at = now() } = {}) {
   const res = { replies: 0, bounces: 0, ignored: 0 };
   const byMsgId = db.prepare('SELECT prospect_id FROM mail_log WHERE project_id = ? AND message_id = ? AND prospect_id IS NOT NULL LIMIT 1');
   const byEmail = db.prepare('SELECT id FROM prospects WHERE project_id = ? AND email = ? LIMIT 1');
@@ -57,30 +57,30 @@ export function applyMessages(db, projectId, messages, { at = now() } = {}) {
   const markBounce = db.prepare("UPDATE prospects SET status = 'bounced' WHERE id = ? AND status = 'sent'");
   const blacklist = db.prepare("INSERT OR IGNORE INTO blacklist(email, reason, created_at) SELECT email, 'bounce', ? FROM prospects WHERE id = ?");
 
-  const fromIds = (list) => {
-    for (const id of list) { const r = byMsgId.get(projectId, id); if (r) return r.prospect_id; }
+  const fromIds = async (list) => {
+    for (const id of list) { const r = await byMsgId.get(projectId, id); if (r) return r.prospect_id; }
     return null;
   };
 
   for (const msg of messages) {
     const c = classify(msg);
     if (c.type === 'bounce') {
-      const pid = fromIds(c.ids);
-      if (pid && markBounce.run(pid).changes) { blacklist.run(at, pid); res.bounces++; } else res.ignored++;
+      const pid = await fromIds(c.ids);
+      if (pid && (await markBounce.run(pid)).changes) { await blacklist.run(at, pid); res.bounces++; } else res.ignored++;
       continue;
     }
     if (c.type === 'auto') { res.ignored++; continue; }
 
     // Réponse : 1) fil de discussion, 2) même adresse, 3) même domaine pro (un seul prospect en attente dessus)
-    let pid = fromIds(c.ids) ?? byEmail.get(projectId, c.from)?.id ?? null;
+    let pid = (await fromIds(c.ids)) ?? (await byEmail.get(projectId, c.from))?.id ?? null;
     if (!pid) {
       const domain = c.from.split('@')[1];
       if (domain && !GENERIC_DOMAINS.has(domain)) {
-        const rows = byDomain.all(projectId, domain);
+        const rows = await byDomain.all(projectId, domain);
         if (rows.length === 1) pid = rows[0].id;
       }
     }
-    if (pid && markReply.run(at, String(msg.subject || '').slice(0, 300), pid).changes) res.replies++;
+    if (pid && (await markReply.run(at, String(msg.subject || '').slice(0, 300), pid)).changes) res.replies++;
     else res.ignored++;
   }
   return res;
@@ -145,22 +145,22 @@ export async function fetchInbox(creds, state, { since, max = 500 }) {
 /** Vérifie la boîte d'un projet et mémorise l'état (dernier UID, erreurs, compteurs). */
 export async function checkInbox(app, projectId) {
   const { db } = app;
-  const project = getProject(app, projectId, { secrets: true });
+  const project = await getProject(app, projectId, { secrets: true });
   if (!project.imap) throw new Error('Boîte IMAP non configurée');
   const state = project.inbox || {};
-  const firstSent = db.prepare('SELECT MIN(sent_at) t FROM mail_log WHERE project_id = ?').get(project.id).t;
+  const firstSent = (await db.prepare('SELECT MIN(sent_at) t FROM mail_log WHERE project_id = ?').get(project.id)).t;
   const since = new Date(((firstSent || now()) - 86400) * 1000);
   const at = now();
   const save = (s) => db.prepare('UPDATE projects SET inbox_json = ? WHERE id = ?').run(JSON.stringify(s), project.id);
   try {
     const r = await (app.fetchInbox || fetchInbox)(project.imap, state, { since });
-    const res = applyMessages(db, project.id, r.messages, { at });
-    save({
+    const res = await applyMessages(db, project.id, r.messages, { at });
+    await save({
       uidValidity: r.uidValidity, lastUid: r.lastUid, lastCheck: at, lastOk: at, lastError: null,
       replies: (state.replies || 0) + res.replies, bounces: (state.bounces || 0) + res.bounces,
     });
     if (res.replies) {
-      const who = db.prepare('SELECT company, email, reply_subject FROM prospects WHERE project_id = ? AND replied_at = ? LIMIT 10').all(project.id, at);
+      const who = await db.prepare('SELECT company, email, reply_subject FROM prospects WHERE project_id = ? AND replied_at = ? LIMIT 10').all(project.id, at);
       await notify(app, 'reply', {
         title: `${project.name} · ${res.replies} réponse(s) de prospect`, level: 'ok',
         description: who.map((p) => `**${p.company}** (${p.email}) : ${p.reply_subject || 'sans objet'}`).join('\n'),
@@ -169,7 +169,7 @@ export async function checkInbox(app, projectId) {
     return res;
   } catch (e) {
     const msg = String(e.responseText || e.message || e).slice(0, 300);
-    save({ ...state, lastCheck: at, lastError: msg });
+    await save({ ...state, lastCheck: at, lastError: msg });
     throw new Error(`IMAP : ${msg}`);
   }
 }

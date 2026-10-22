@@ -10,7 +10,7 @@ const SORTS = {
   score: 'score DESC, id DESC',
   recent: 'created_at DESC, id DESC',
   contacted: 'COALESCE(sent_at, 0) DESC, id DESC',
-  company: 'company COLLATE NOCASE, id',
+  company: 'LOWER(company), id',
 };
 
 const int = (v, min, max, def) => {
@@ -34,8 +34,9 @@ export function filterWhere(projectId, f) {
   const where = ['project_id = ?'];
   const args = [projectId];
   if (f.q) {
-    const like = `%${f.q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
-    where.push("(company LIKE ? ESCAPE '\\' OR email LIKE ? ESCAPE '\\' OR city LIKE ? ESCAPE '\\' OR sector LIKE ? ESCAPE '\\')");
+    // '!' comme échappement : le backslash n'a pas le même sens dans un littéral SQLite et MySQL
+    const like = `%${f.q.replace(/[!%_]/g, (c) => `!${c}`)}%`;
+    where.push("(company LIKE ? ESCAPE '!' OR email LIKE ? ESCAPE '!' OR city LIKE ? ESCAPE '!' OR sector LIKE ? ESCAPE '!')");
     args.push(like, like, like, like);
   }
   if (f.status) { where.push('status = ?'); args.push(f.status); }
@@ -44,12 +45,12 @@ export function filterWhere(projectId, f) {
   return { sql: where.join(' AND '), args, order: SORTS[f.sort] || SORTS.score };
 }
 
-export function listProspects(db, projectId, f, { limit = 100 } = {}) {
+export async function listProspects(db, projectId, f, { limit = 100 } = {}) {
   const { sql, args, order } = filterWhere(projectId, f);
-  const total = db.prepare(`SELECT COUNT(*) n FROM prospects WHERE ${sql}`).get(...args).n;
+  const total = (await db.prepare(`SELECT COUNT(*) n FROM prospects WHERE ${sql}`).get(...args)).n;
   const pages = Math.max(1, Math.ceil(total / limit));
   const page = Math.min(f.page, pages);
-  const rows = db.prepare(`SELECT id, company, email, website, city, sector, score, status, sent_at, followup_at, replied_at,
+  const rows = await db.prepare(`SELECT id, company, email, website, city, sector, score, status, sent_at, followup_at, replied_at,
     next_action, next_action_at
     FROM prospects WHERE ${sql} ORDER BY ${order} LIMIT ? OFFSET ?`).all(...args, limit, (page - 1) * limit);
   return { total, page, pages, rows };
@@ -58,32 +59,32 @@ export function listProspects(db, projectId, f, { limit = 100 } = {}) {
 // ---------- Fiche prospect ----------
 
 /** Tout ce qu'on sait d'un prospect : infos, mails envoyés, réponse, notes. */
-export function prospectDetail(db, id) {
-  const p = db.prepare('SELECT * FROM prospects WHERE id = ?').get(id);
+export async function prospectDetail(db, id) {
+  const p = await db.prepare('SELECT * FROM prospects WHERE id = ?').get(id);
   if (!p) return null;
-  const mails = db.prepare(`SELECT kind, subject, variant, sent_at, error FROM mail_log
+  const mails = await db.prepare(`SELECT kind, subject, variant, sent_at, error FROM mail_log
     WHERE prospect_id = ? ORDER BY sent_at, id`).all(id);
-  const notes = db.prepare('SELECT id, body, created_at FROM prospect_notes WHERE prospect_id = ? ORDER BY created_at DESC, id DESC').all(id);
-  const optOut = db.prepare('SELECT reason, created_at FROM blacklist WHERE email = ?').get(p.email) || null;
+  const notes = await db.prepare('SELECT id, body, created_at FROM prospect_notes WHERE prospect_id = ? ORDER BY created_at DESC, id DESC').all(id);
+  const optOut = (await db.prepare('SELECT reason, created_at FROM blacklist WHERE email = ?').get(p.email)) || null;
   return { prospect: p, mails, notes, optOut };
 }
 
-export function addNote(db, prospectId, body) {
+export async function addNote(db, prospectId, body) {
   const text = String(body || '').trim().slice(0, 2000);
   if (!text) return null;
-  return Number(db.prepare('INSERT INTO prospect_notes(prospect_id, body, created_at) VALUES(?, ?, ?)').run(prospectId, text, now()).lastInsertRowid);
+  return Number((await db.prepare('INSERT INTO prospect_notes(prospect_id, body, created_at) VALUES(?, ?, ?)').run(prospectId, text, now())).lastInsertRowid);
 }
 
-export function deleteNote(db, prospectId, noteId) {
-  return db.prepare('DELETE FROM prospect_notes WHERE id = ? AND prospect_id = ?').run(noteId, prospectId).changes > 0;
+export async function deleteNote(db, prospectId, noteId) {
+  return (await db.prepare('DELETE FROM prospect_notes WHERE id = ? AND prospect_id = ?').run(noteId, prospectId)).changes > 0;
 }
 
 /** Prochaine action : texte + jour (AAAA-MM-JJ, rappel à 9h heure de Paris). Vide = effacer. */
-export function setNextAction(db, prospectId, action, day) {
+export async function setNextAction(db, prospectId, action, day) {
   const text = String(action || '').trim().slice(0, 200);
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(day || ''));
   if (!text) {
-    db.prepare('UPDATE prospects SET next_action = NULL, next_action_at = NULL WHERE id = ?').run(prospectId);
+    await db.prepare('UPDATE prospects SET next_action = NULL, next_action_at = NULL WHERE id = ?').run(prospectId);
     return null;
   }
   if (!m) throw new Error('Date attendue au format AAAA-MM-JJ');
@@ -91,6 +92,6 @@ export function setNextAction(db, prospectId, action, day) {
   // 2026-02-31 deviendrait le 3 mars sans prévenir : on refuse
   if (parisParts(date).day !== +m[3]) throw new Error('Date invalide');
   const at = Math.floor(date.getTime() / 1000);
-  db.prepare('UPDATE prospects SET next_action = ?, next_action_at = ? WHERE id = ?').run(text, at, prospectId);
+  await db.prepare('UPDATE prospects SET next_action = ?, next_action_at = ? WHERE id = ?').run(text, at, prospectId);
   return at;
 }

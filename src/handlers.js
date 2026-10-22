@@ -17,6 +17,16 @@ const sleep = (ms, signal) => new Promise((resolve, reject) => {
   signal?.addEventListener('abort', () => { clearTimeout(t); reject(new Error('Annulé')); }, { once: true });
 });
 
+// Les callbacks du flux Claude (onText, onTurn) sont synchrones : leurs écritures en base passent par une file
+// ordonnée, attendue à la fin de la phase (flush). Une erreur d'écriture fait échouer le job au lieu de se perdre.
+function makeSink() {
+  let chain = Promise.resolve();
+  return {
+    push(fn) { chain = chain.then(fn); chain.catch(() => {}); },
+    flush: () => chain,
+  };
+}
+
 // Avancement d'une phase Claude : de `from` à `to` % au fil des messages, sur `maxTurns` au plus (estimation)
 const turnPct = (from, to, n, maxTurns) => Math.round(from + (to - from) * Math.min(1, n / Math.max(1, maxTurns)));
 
@@ -49,9 +59,10 @@ export function makeHandlers(app) {
     // État du quota Pro (session 5h + semaine), affiché dans la barre système
     const w = rateLimitWindows(r.rateLimit);
     if (w) {
-      setSetting(db, 'claude_rate_limit_json', JSON.stringify({ at: now(), ...w }));
-      for (const a of quotaAlerts(db, w)) {
-        notify(app, 'quota', {
+      await setSetting(db, 'claude_rate_limit_json', JSON.stringify({ at: now(), ...w }));
+      for (const a of await quotaAlerts(db, w)) {
+        // notify ne lève jamais : un Discord indisponible ne fait pas échouer le job
+        await notify(app, 'quota', {
           title: `Quota Claude : ${a.level}+ % (${a.label})`,
           level: a.level >= 95 ? 'error' : 'warn',
           description: `${Math.round(a.utilization * 100)} % utilisé sur la ${a.label}.`,
@@ -67,30 +78,30 @@ export function makeHandlers(app) {
   async function sendMails(ctx, kind) {
     // Une relance mise en file à 17h55 ne doit pas partir à 19h si le worker était occupé
     if (kind === 'followup' && !inHours()) return { sent: 0, failed: 0, total: 0, postponed: true };
-    const project = getProject(app, ctx.job.project_id, { secrets: true });
-    const template = getTemplate(db, project.id, kind, { validatedOnly: true });
+    const project = await getProject(app, ctx.job.project_id, { secrets: true });
+    const template = await getTemplate(db, project.id, kind, { validatedOnly: true });
     if (!template) throw new Error(kind === 'followup' ? 'Modèle de relance non validé' : 'Modèle de mail non validé');
     if (!project.smtp) throw new Error('SMTP non configuré pour ce projet');
 
     const day = now() - 86400;
     const candidates = kind === 'followup'
-      ? followupCandidates(db, project)
-      : db.prepare(`SELECT * FROM prospects WHERE project_id = ? AND status = 'new'
+      ? await followupCandidates(db, project)
+      : await db.prepare(`SELECT * FROM prospects WHERE project_id = ? AND status = 'new'
           AND email NOT IN (SELECT email FROM blacklist) ORDER BY score DESC, id LIMIT 100`).all(project.id);
     const n = allowedToSend({
       requested: ctx.params.count,
       available: candidates.length,
       projectCap: project.dailyMailCap,
-      sentTodayProject: sentSince(db, day, project.id),
-      globalCap: Number(getSetting(db, 'global_daily_cap', '100')),
-      sentTodayGlobal: sentSince(db, day),
+      sentTodayProject: await sentSince(db, day, project.id),
+      globalCap: Number(await getSetting(db, 'global_daily_cap', '100')),
+      sentTodayGlobal: await sentSince(db, day),
     });
     if (n === 0) throw new Error(kind === 'followup' ? 'Plafond quotidien atteint ou aucune relance due' : 'Plafond quotidien atteint ou aucun prospect à contacter');
 
     const transport = (app.createTransport || createTransport)(project.smtp);
     await transport.verify();
-    const minDelay = Number(getSetting(db, 'send_delay_min', '20')) * 1000;
-    const maxDelay = Number(getSetting(db, 'send_delay_max', '60')) * 1000;
+    const minDelay = Number(await getSetting(db, 'send_delay_min', '20')) * 1000;
+    const maxDelay = Number(await getSetting(db, 'send_delay_max', '60')) * 1000;
     const log = db.prepare(`INSERT INTO mail_log(project_id, prospect_id, email, sent_at, error, kind, variant, subject, message_id)
       VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)`);
     const markInitial = db.prepare('UPDATE prospects SET status = ?, sent_at = ?, variant = ? WHERE id = ?');
@@ -99,24 +110,24 @@ export function makeHandlers(app) {
     const original = db.prepare("SELECT subject, message_id FROM mail_log WHERE prospect_id = ? AND kind = 'initial' AND error IS NULL ORDER BY id LIMIT 1");
     const current = db.prepare('SELECT status, followup_at FROM prospects WHERE id = ?');
     let sent = 0, failed = 0;
-    ctx.progress({ sent, failed, total: n, message: `0/${n} ${kind === 'followup' ? 'relances envoyées' : 'envoyés'}`, pct: 0 });
+    await ctx.progress({ sent, failed, total: n, message: `0/${n} ${kind === 'followup' ? 'relances envoyées' : 'envoyés'}`, pct: 0 });
 
     for (const p of candidates.slice(0, n)) {
-      if (ctx.cancelled()) break;
+      if (await ctx.cancelled()) break;
       if (kind === 'followup' && !inHours()) break; // le reste repartira au prochain créneau
       // Re-vérifie juste avant l'envoi : désinscription, réponse arrivée pendant le batch…
-      if (db.prepare('SELECT 1 FROM blacklist WHERE email = ?').get(p.email)) continue;
+      if (await db.prepare('SELECT 1 FROM blacklist WHERE email = ?').get(p.email)) continue;
       if (kind === 'followup') {
-        const c = current.get(p.id);
+        const c = await current.get(p.id);
         if (c.status !== 'sent' || c.followup_at) continue;
       }
       const unsubUrl = `${cfg.appUrl}/u/${encodeURIComponent(p.email)}/${unsubToken(cfg.secretKey, p.email)}`;
       let variant = null, subject, inReplyTo;
       if (kind === 'initial') {
-        variant = pickVariant(db, project.id, template);
+        variant = await pickVariant(db, project.id, template);
         subject = variant === 'B' ? template.subject_b : template.subject;
       } else {
-        const orig = original.get(p.id);
+        const orig = await original.get(p.id);
         subject = followupSubject(template, orig);
         inReplyTo = orig?.message_id;
       }
@@ -126,17 +137,17 @@ export function makeHandlers(app) {
       });
       try {
         await transport.sendMail(mail);
-        log.run(project.id, p.id, p.email, now(), null, kind, variant, mail.subject, mail.messageId);
-        if (kind === 'initial') markInitial.run('sent', now(), variant, p.id);
-        else markFollowup.run(now(), p.id);
+        await log.run(project.id, p.id, p.email, now(), null, kind, variant, mail.subject, mail.messageId);
+        if (kind === 'initial') await markInitial.run('sent', now(), variant, p.id);
+        else await markFollowup.run(now(), p.id);
         sent++;
       } catch (e) {
-        log.run(project.id, p.id, p.email, now(), String(e.message).slice(0, 500), kind, variant, mail.subject, mail.messageId);
-        if (/^5\d\d/.test(String(e.responseCode))) markBounced.run(p.id);
+        await log.run(project.id, p.id, p.email, now(), String(e.message).slice(0, 500), kind, variant, mail.subject, mail.messageId);
+        if (/^5\d\d/.test(String(e.responseCode))) await markBounced.run(p.id);
         failed++;
       }
       const label = kind === 'followup' ? 'relances envoyées' : 'envoyés';
-      ctx.progress({ sent, failed, total: n, message: `${sent + failed}/${n} ${label}`, pct: Math.round(((sent + failed) / n) * 100) });
+      await ctx.progress({ sent, failed, total: n, message: `${sent + failed}/${n} ${label}`, pct: Math.round(((sent + failed) / n) * 100) });
       if (sent + failed < n) await sleep(minDelay + Math.random() * (maxDelay - minDelay), ctx.signal).catch(() => {});
     }
     transport.close();
@@ -145,41 +156,46 @@ export function makeHandlers(app) {
 
   return {
     async analyze(ctx) {
-      const project = getProject(app, ctx.job.project_id);
-      ctx.progress({ message: 'Récupération du repo…', pct: 3 });
+      const project = await getProject(app, ctx.job.project_id);
+      await ctx.progress({ message: 'Récupération du repo…', pct: 3 });
       const dir = repoDir(cfg, project.id);
-      const commit = await syncRepo(project.gitUrl, dir, forgejoToken(app));
+      const commit = await syncRepo(project.gitUrl, dir, await forgejoToken(app));
 
-      ctx.progress({ message: 'Analyse du code par Claude…', pct: 10 });
+      await ctx.progress({ message: 'Analyse du code par Claude…', pct: 10 });
       const { prompt, system } = analyzePrompt(project.name);
-      const model = getSetting(db, 'analyze_model', 'haiku');
+      const model = await getSetting(db, 'analyze_model', 'haiku');
+      const sink = makeSink();
       const r = await claude({
         prompt, system, cwd: dir, model, maxTurns: 20, tools: ['Read', 'Glob', 'Grep'], signal: ctx.signal,
-        onTurn: (n) => ctx.progress({ message: `Lecture du code par Claude (étape ${n})…`, pct: turnPct(10, 95, n, 20) }),
+        onTurn: (n) => sink.push(() => ctx.progress({ message: `Lecture du code par Claude (étape ${n})…`, pct: turnPct(10, 95, n, 20) })),
       });
+      await sink.flush();
       addUsage(ctx, r);
       if (!r.ok) throw new Error(`Analyse incomplète (${r.subtype})`);
       const profile = extractJson(r.text);
       if (!profile.resume || !profile.cible) throw new Error('Fiche projet incomplète');
       const { cible, ...rest } = profile;
-      db.prepare('UPDATE projects SET profile_json = ?, profile_commit = ?, profile_at = ?, target_json = ?, target_validated = 0 WHERE id = ?')
+      await db.prepare('UPDATE projects SET profile_json = ?, profile_commit = ?, profile_at = ?, target_json = ?, target_validated = 0 WHERE id = ?')
         .run(JSON.stringify(rest), commit, now(), JSON.stringify(cible), project.id);
       return { commit };
     },
 
     async prospect(ctx) {
-      const project = getProject(app, ctx.job.project_id);
+      const project = await getProject(app, ctx.job.project_id);
       if (!project.profile || !project.targetValidated) throw new Error('Valide la cible du projet avant de prospecter');
       const count = Math.max(1, Math.min(50, Math.floor(Number(ctx.params.count) || 10)));
 
       // Domaines déjà connus (tous projets) : Claude ne les recherche pas une 2e fois
-      const exclude = db.prepare(`
+      const exclude = (await db.prepare(`
         SELECT DISTINCT substr(email, instr(email, '@') + 1) d FROM prospects WHERE project_id = ?
         UNION SELECT substr(email, instr(email, '@') + 1) FROM blacklist
-        LIMIT 300`).all(project.id).map((r) => r.d);
+        LIMIT 300`).all(project.id)).map((r) => r.d);
 
+      // Deux requêtes plutôt qu'un INSERT ... SELECT sans FROM (non portable) ; l'unicité (projet, email) reste garantie par la base
+      const optedOut = db.prepare('SELECT 1 FROM blacklist WHERE email = ?');
       const insert = db.prepare(`INSERT OR IGNORE INTO prospects(project_id, company, email, website, city, sector, hook, source, score, created_at)
-        SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE NOT EXISTS (SELECT 1 FROM blacklist WHERE email = ?)`);
+        VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      const sink = makeSink();
       let found = 0;
       let pending = '';
       let turns = 0;
@@ -194,53 +210,57 @@ export function makeHandlers(app) {
         pending += text + '\n';
         const lines = pending.split('\n');
         pending = lines.pop();
-        for (const line of lines) {
-          const p = parseProspectLine(line);
-          if (!p) continue;
-          const res = insert.run(project.id, p.company, p.email, p.website, p.city, p.sector, p.hook, p.source, p.score, now(), p.email);
-          if (res.changes) {
-            found++;
-            message = `${found}/${count} — ${p.company}`;
-            report();
+        const parsed = lines.map(parseProspectLine).filter(Boolean);
+        if (!parsed.length) return;
+        sink.push(async () => {
+          for (const p of parsed) {
+            if (await optedOut.get(p.email)) continue;
+            const res = await insert.run(project.id, p.company, p.email, p.website, p.city, p.sector, p.hook, p.source, p.score, now());
+            if (res.changes) {
+              found++;
+              message = `${found}/${count} — ${p.company}`;
+              await report();
+            }
           }
-        }
+        });
       };
-      report();
+      await report();
       const { prompt, system } = prospectPrompt({ profile: project.profile, target: project.target, count, exclude });
-      const model = getSetting(db, 'prospect_model', 'haiku');
+      const model = await getSetting(db, 'prospect_model', 'haiku');
       const r = await claude({
         prompt, system, model, tools: ['WebSearch', 'WebFetch'],
         maxTurns, onText, signal: ctx.signal,
-        onTurn: (n) => { turns = n; report(); },
+        onTurn: (n) => { turns = n; sink.push(report); },
       });
       onText('\n');
+      await sink.flush();
       addUsage(ctx, r);
       return { found, requested: count, stoppedBy: r.subtype };
     },
 
     async template(ctx) {
-      const project = getProject(app, ctx.job.project_id, { secrets: true });
+      const project = await getProject(app, ctx.job.project_id, { secrets: true });
       if (!project.profile) throw new Error('Analyse le projet d\'abord');
-      ctx.progress({ message: 'Rédaction du modèle par Claude…', pct: 40 });
+      await ctx.progress({ message: 'Rédaction du modèle par Claude…', pct: 40 });
       const { prompt, system } = templatePrompt({ profile: project.profile, target: project.target || {}, senderName: project.smtp?.fromName });
       const r = await claude({ prompt, system, model: 'haiku', maxTurns: 1, tools: [], signal: ctx.signal });
       addUsage(ctx, r);
       const t = extractJson(r.text);
       if (!t.subject || !t.body) throw new Error('Modèle de mail invalide');
-      saveTemplate(db, project.id, 'initial', { subject: t.subject, body: t.body });
+      await saveTemplate(db, project.id, 'initial', { subject: t.subject, body: t.body });
       return { ok: true };
     },
 
     async followup_template(ctx) {
-      const project = getProject(app, ctx.job.project_id, { secrets: true });
+      const project = await getProject(app, ctx.job.project_id, { secrets: true });
       if (!project.profile) throw new Error('Analyse le projet d\'abord');
-      ctx.progress({ message: 'Rédaction de la relance par Claude…', pct: 40 });
+      await ctx.progress({ message: 'Rédaction de la relance par Claude…', pct: 40 });
       const { prompt, system } = followupTemplatePrompt({ profile: project.profile, senderName: project.smtp?.fromName });
       const r = await claude({ prompt, system, model: 'haiku', maxTurns: 1, tools: [], signal: ctx.signal });
       addUsage(ctx, r);
       const t = extractJson(r.text);
       if (!t.body) throw new Error('Modèle de relance invalide');
-      saveTemplate(db, project.id, 'followup', { subject: '', body: t.body });
+      await saveTemplate(db, project.id, 'followup', { subject: '', body: t.body });
       return { ok: true };
     },
 
@@ -248,29 +268,31 @@ export function makeHandlers(app) {
     followup: (ctx) => sendMails(ctx, 'followup'),
 
     async evolution(ctx) {
-      const project = getProject(app, ctx.job.project_id, { secrets: true });
+      const project = await getProject(app, ctx.job.project_id, { secrets: true });
       const count = Math.max(1, Math.min(20, Math.floor(Number(ctx.params.count) || 5)));
       const level = LEVELS[ctx.params.level] ? ctx.params.level : 'normal';
-      const to = getSetting(db, 'notify_email');
-      const smtp = globalSmtp(app) || project.smtp;
+      const to = await getSetting(db, 'notify_email');
+      const smtp = (await globalSmtp(app)) || project.smtp;
       if (!to) throw new Error('Adresse de réception non configurée (Réglages)');
       if (!smtp) throw new Error('Aucun SMTP configuré (Réglages ou projet)');
 
-      ctx.progress({ message: 'Mise à jour du repo…', pct: 3 });
+      await ctx.progress({ message: 'Mise à jour du repo…', pct: 3 });
       const dir = repoDir(cfg, project.id);
-      await syncRepo(project.gitUrl, dir, forgejoToken(app));
+      await syncRepo(project.gitUrl, dir, await forgejoToken(app));
 
-      ctx.progress({ message: `Recherche de ${count} évolutions (${level})…`, pct: 10 });
+      await ctx.progress({ message: `Recherche de ${count} évolutions (${level})…`, pct: 10 });
       const { prompt, system } = evolutionPrompt({ projectName: project.name, profile: project.profile, count, level });
       const { model, maxTurns } = LEVELS[level];
+      const sink = makeSink();
       const r = await claude({
         prompt, system, cwd: dir, model, maxTurns, tools: ['Read', 'Glob', 'Grep'], signal: ctx.signal,
-        onTurn: (n) => ctx.progress({ message: `Recherche de ${count} évolutions (${level}) · étape ${n}…`, pct: turnPct(10, 90, n, maxTurns) }),
+        onTurn: (n) => sink.push(() => ctx.progress({ message: `Recherche de ${count} évolutions (${level}) · étape ${n}…`, pct: turnPct(10, 90, n, maxTurns) })),
       });
+      await sink.flush();
       addUsage(ctx, r);
       if (!r.text?.trim()) throw new Error(`Pas de résultat (${r.subtype})`);
 
-      ctx.progress({ message: 'Envoi par mail…', pct: 95 });
+      await ctx.progress({ message: 'Envoi par mail…', pct: 95 });
       const transport = (app.createTransport || createTransport)(smtp);
       await transport.sendMail({
         from: smtp.fromEmail, to,
