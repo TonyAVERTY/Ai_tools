@@ -68,7 +68,7 @@ body.site h1, body.site h2, body.site h3 { color: var(--text); background: none;
 .textlink:hover { color: var(--accent); }
 
 /* ---------- Accueil : en-tête de page ---------- */
-.hero { display: grid; gap: 38px; padding-top: 44px; padding-bottom: 56px; overflow-x: clip; }
+.hero { display: grid; gap: 38px; padding-top: 44px; padding-bottom: 56px; }
 .hero-text { align-self: center; }
 @media (min-width: 900px) {
   .hero { grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 48px; padding-top: 72px; padding-bottom: 80px; }
@@ -230,7 +230,8 @@ mark.todo { background: color-mix(in srgb, var(--warn) 16%, transparent); color:
 .site-foot .brand { display: inline-flex; align-items: center; gap: 9px; margin-bottom: .6em; font-size: 1.05rem; }
 
 /* ---------- Accueil vivant : formes, compteurs, galerie, cartes de parcours ---------- */
-.hero { position: relative; isolation: isolate; }
+.hero-bg { position: relative; overflow: hidden; isolation: isolate; }
+.hero { position: relative; }
 .blob { position: absolute; z-index: -1; border-radius: 50%; pointer-events: none; filter: blur(8px);
   background: radial-gradient(circle at 35% 35%, color-mix(in srgb, var(--accent) 24%, transparent), transparent 70%); }
 .blob.b1 { width: 340px; height: 340px; top: -90px; left: -120px; }

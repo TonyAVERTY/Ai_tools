@@ -38,6 +38,8 @@ test('pages publiques : 200 sans session, complètes (une h1, title, description
     assert.match(h, /<header class="site-head">/);
     assert.match(h, /<footer class="site-foot">/);
     assert.match(h, /<link rel="icon" type="image\/svg\+xml" href="\/static\/favicon\.svg">/);
+    assert.match(h, /href="\/static\/app\.css\?v=[0-9a-f]{10}"/, `${p} : feuilles de style versionnées`);
+    assert.match(h, /href="\/static\/app\.css\?v=[0-9a-f]{10}"/, `${p} : feuilles de style versionnées`);
   }
 });
 
@@ -173,7 +175,7 @@ test('aucune ressource externe : tout est servi par l\'application, rien en lign
       for (const p of [...PUBLIC_PAGES, '/login', '/inexistant']) {
         const h = await (await client.get(p, { headers: { accept: 'text/html' } })).text();
         // Seuls scripts permis : ceux de l'application (mouvement du site, vérification de la connexion), jamais en ligne
-        for (const m of h.matchAll(/<script[^>]*\ssrc="([^"]+)"/gi)) assert.ok(['/static/site.js', '/static/captcha.js'].includes(m[1]), `${p} : script ${m[1]}`);
+        for (const m of h.matchAll(/<script[^>]*\ssrc="([^"]+)"/gi)) assert.ok(['/static/site.js', '/static/captcha.js'].includes(m[1].split('?')[0]), `${p} : script ${m[1]}`);
         assert.doesNotMatch(h, /<script(?![^>]*(ld\+json|\ssrc=))/i, `${p} : aucun script en ligne`);
         assert.doesNotMatch(h, /<style[\s>]/i, `${p} : pas de <style>`);
         assert.doesNotMatch(h, /\sstyle="/i, `${p} : pas de style en ligne (CSP)`);

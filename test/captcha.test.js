@@ -113,7 +113,7 @@ test('page de connexion : vérification automatique, rien de Google dans la page
     assert.doesNotMatch(h, /Charger la vérification anti-robot/, 'plus de clic à faire');
     assert.match(h, /data-captcha-load hidden/, 'le bouton « Réessayer » n\'apparaît qu\'en cas d\'échec');
     // Deux scripts, ceux de l'application ; aucune URL de script, de cadre ou d'image vers Google
-    assert.deepEqual([...h.matchAll(/<script[^>]*\ssrc="([^"]+)"/g)].map((m) => m[1]), ['/static/site.js', '/static/captcha.js']);
+    assert.deepEqual([...h.matchAll(/<script[^>]*\ssrc="([^"?]+)(?:\?v=[0-9a-f]{10})?"/g)].map((m) => m[1]), ['/static/site.js', '/static/captcha.js']);
     assert.doesNotMatch(h, /<(script|iframe|img|link)[^>]*(gstatic|google\.com\/recaptcha)/i);
     assert.doesNotMatch(h, /recaptcha\/api\.js/);
     assert.doesNotMatch(h, /<script(?![^>]*src=)/i, 'aucun script en ligne (CSP)');

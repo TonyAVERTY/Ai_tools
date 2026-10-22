@@ -1,5 +1,6 @@
 import { esc } from './http.js';
 import { STATUSES } from './services/crm.js';
+import { assetUrl } from './assets.js';
 import { MODE_LABELS, CONSENT_TEXT, CONSENT_CHECKBOX, CONSENT_VERSION } from './claudelink.js';
 
 const fmtDate = (ts) => (ts ? new Date(ts * 1000).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' }) : '—');
@@ -34,8 +35,8 @@ export function layout({ title, body, email }) {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <title>${esc(title)} · AiTools</title>
-<link rel="stylesheet" href="/static/app.css">
-<script src="/static/app.js" defer></script>
+<link rel="stylesheet" href="${assetUrl('/static/app.css')}">
+<script src="${assetUrl('/static/app.js')}" defer></script>
 </head>
 <body>
 <canvas id="bg" aria-hidden="true"></canvas>
