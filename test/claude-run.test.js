@@ -49,7 +49,7 @@ test('un utilisateur ne lance jamais un job avec le secret d\'un autre (secret r
   const a = await s.newUser({ admin: false, link: apiKeyLink(KEY_A) });
   const b = await s.newUser({ admin: false, link: apiKeyLink(KEY_B) });
   const pa = await project(a), pb = await project(b);
-  const w = new Worker(s.db, makeHandlers(s.app), { thermalMax: 999, log: { error() {} } });
+  const w = new Worker(s.db, makeHandlers(s.app), { log: { error() {} } });
   await enqueue(s.db, { userId: a.id, projectId: pa, type: 'template' });
   await enqueue(s.db, { userId: b.id, projectId: pb, type: 'template' });
   while (await w.tick()) { /* vide la file */ }
@@ -69,7 +69,7 @@ test('id de projet ou de job manipulé : le job d\'A ne touche jamais au projet 
   }
   // Même chose via la file : un job inséré à la main avec le projet de B échoue sans exécution
   await s.db.prepare("INSERT INTO jobs(user_id, project_id, type, status, created_at) VALUES(?, ?, 'template', 'queued', ?)").run(a.id, pb, now());
-  const w = new Worker(s.db, makeHandlers(s.app), { thermalMax: 999, log: { error() {} } });
+  const w = new Worker(s.db, makeHandlers(s.app), { log: { error() {} } });
   while (await w.tick()) { /* vide la file */ }
   const row = await s.db.prepare("SELECT status, error FROM jobs WHERE user_id = ? AND project_id = ?").get(a.id, pb);
   assert.equal(row.status, 'error');
@@ -141,7 +141,7 @@ test('le secret n\'apparaît ni dans les erreurs du CLI, ni dans le job en erreu
   assert.match(err.message, /\*\*\*/);
   assert.ok(!err.message.includes(KEY_A));
   const p = await project(a);
-  const w = new Worker(s.db, { template: async () => { await makeClaude(s.app)(a.id, { prompt: 'LEAK' }); } }, { thermalMax: 999, log: { error() {} } });
+  const w = new Worker(s.db, { template: async () => { await makeClaude(s.app)(a.id, { prompt: 'LEAK' }); } }, { log: { error() {} } });
   await enqueue(s.db, { userId: a.id, projectId: p, type: 'template' });
   while (await w.tick()) { /* vide la file */ }
   const row = await s.db.prepare('SELECT status, error FROM jobs WHERE project_id = ?').get(p);
@@ -312,7 +312,7 @@ test('quota : chaque utilisateur voit le sien, celui du CLI de A n\'apparaît ja
   const b = await s.newUser({ admin: false, link: tokenLink(TOK_B) }); // 33 %
   const pa = await project(a), pb = await project(b);
   const w = new Worker(s.db, makeHandlers(s.app), {
-    thermalMax: 999, log: { error() {} }, quota: (uid) => quotaState(s.db, uid), isQuotaSensitive, isAiJob: (t) => AI_JOBS.has(t), budget: (uid) => budgetState(s.db, uid),
+    log: { error() {} }, quota: (uid) => quotaState(s.db, uid), isQuotaSensitive, isAiJob: (t) => AI_JOBS.has(t), budget: (uid) => budgetState(s.db, uid),
   });
   await enqueue(s.db, { userId: a.id, projectId: pa, type: 'template' });
   await enqueue(s.db, { userId: b.id, projectId: pb, type: 'template' });
@@ -328,7 +328,7 @@ test('quota : chaque utilisateur voit le sien, celui du CLI de A n\'apparaît ja
   await s.db.prepare("UPDATE jobs SET status = 'cancelled' WHERE status = 'queued'").run();
   const done = [];
   const w2 = new Worker(s.db, { analyze: async (ctx) => { done.push(ctx.job.user_id); return {}; } }, {
-    thermalMax: 999, log: { error() {} }, quota: (uid) => quotaState(s.db, uid), isQuotaSensitive, isAiJob: (t) => AI_JOBS.has(t),
+    log: { error() {} }, quota: (uid) => quotaState(s.db, uid), isQuotaSensitive, isAiJob: (t) => AI_JOBS.has(t),
   });
   await enqueue(s.db, { userId: a.id, projectId: pa, type: 'analyze' });
   await enqueue(s.db, { userId: b.id, projectId: pb, type: 'analyze' });

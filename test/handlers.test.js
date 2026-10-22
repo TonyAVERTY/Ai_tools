@@ -42,7 +42,7 @@ async function setup() {
   await setSetting(db, userId, 'send_delay_min', '0');
   await setSetting(db, userId, 'send_delay_max', '0');
   const id = await createProject(app, { userId, name: 'MonEspacePro', gitUrl: `file://${src}` });
-  const worker = new Worker(db, makeHandlers(app), { thermalMax: 999, log: { error: (...a) => console.error(...a) } });
+  const worker = new Worker(db, makeHandlers(app), { log: { error: (...a) => console.error(...a) } });
   return { tmp, db, app, id, userId, worker, sentMails };
 }
 

@@ -22,12 +22,12 @@ test('start puis stop : la boucle s\'arrête, le job en cours est annulé et att
       started();
       ctx.signal.addEventListener('abort', () => reject(new Error('Annulé')), { once: true });
     }),
-  }, { thermalMax: 999, pollMs: 10, log: { error() {} } });
+  }, { pollMs: 10, log: { error() {} } });
   await enqueue(db, { userId: db.userId, projectId: 1, type: 'prospect' });
   await w.start();
   await running;
   await w.stop();
-  assert.equal(w.current, null);
+  assert.equal(w.running.size, 0);
   const job = (await latestJobs(db, 1)).prospect;
   assert.equal(job.status, 'error');
   assert.match(job.error, /Annulé/);
@@ -38,7 +38,7 @@ test('stop attend les notifications en vol, et un callback qui échoue est journ
   const seen = [];
   const errors = [];
   const w = new Worker(db, { prospect: async () => ({ ok: true }), evolution: async () => { throw new Error('boum'); } }, {
-    thermalMax: 999, pollMs: 10, log: { error: (...a) => errors.push(a.join(' ')) },
+    pollMs: 10, log: { error: (...a) => errors.push(a.join(' ')) },
     onFinish: async (job, r) => {
       await new Promise((res) => setTimeout(res, 30));
       seen.push(`${job.type}:${r.status}`);
@@ -57,7 +57,7 @@ test('stop attend les notifications en vol, et un callback qui échoue est journ
 test('un job "running" laissé par un crash est marqué en erreur au démarrage', async () => {
   const db = await setup();
   await db.prepare("INSERT INTO jobs(user_id, project_id, type, status, created_at) VALUES(?, 1, 'analyze', 'running', ?)").run(db.userId, now());
-  const w = new Worker(db, {}, { thermalMax: 999, pollMs: 10, log: { error() {} } });
+  const w = new Worker(db, {}, { pollMs: 10, log: { error() {} } });
   await w.start();
   await w.stop();
   const job = (await latestJobs(db, 1)).analyze;

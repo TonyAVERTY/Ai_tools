@@ -169,7 +169,7 @@
     let busy = false;
     try {
       const s = await api('/api/system');
-      const hot = s.temp !== null && s.temp >= s.thermalMax - 5;
+      const hot = s.temp !== null && s.temp >= 70;
       el.innerHTML = `${s.temp !== null ? `<span class="${hot ? 'warn' : ''}">${s.temp} °C</span>` : ''}
         ${claudeQuota(s.claudeRateLimit, s.linkMode)}
         ${gauge('24 h', s.budget.day)} ${gauge('30 j', s.budget.month)}

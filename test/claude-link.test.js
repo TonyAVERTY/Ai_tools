@@ -283,7 +283,7 @@ test('garde « compte relié » à chaque couche : route, enqueue, worker, wrapp
 
   // worker : un job IA déjà en base d'un compte non relié ne s'exécute pas
   const ran = [];
-  const w = new Worker(s.db, Object.fromEntries([...AI_JOBS, 'send'].map((t) => [t, async () => { ran.push(t); return {}; }])), { thermalMax: 999, log: { error() {} } });
+  const w = new Worker(s.db, Object.fromEntries([...AI_JOBS, 'send'].map((t) => [t, async () => { ran.push(t); return {}; }])), { log: { error() {} } });
   for (const type of [...AI_JOBS, 'send']) await s.db.prepare("INSERT INTO jobs(user_id, project_id, type, status, created_at) VALUES(?, ?, ?, 'queued', ?)").run(bare.id, pBare, type, now());
   while (await w.tick()) { /* vide la file */ }
   assert.deepEqual(ran, ['send']);
@@ -391,12 +391,12 @@ test('délier un job IA en cours : il est interrompu', async () => {
   await s.db.prepare("UPDATE jobs SET status = 'cancelled' WHERE status = 'queued'").run(); // jobs des tests précédents
   const w = new Worker(s.db, {
     analyze: (ctx) => new Promise((resolve) => { ctx.signal.addEventListener('abort', () => { aborted = true; resolve({}); }); }),
-  }, { thermalMax: 999, log: { error() {} }, isAiJob: (t) => AI_JOBS.has(t) });
+  }, { log: { error() {} }, isAiJob: (t) => AI_JOBS.has(t) });
   s.app.worker = w;
   try {
     await enqueue(s.db, { userId: u.id, projectId: p, type: 'analyze' });
     const tick = w.tick();
-    for (let i = 0; i < 50 && !w.currentJob; i++) await new Promise((r) => setTimeout(r, 20));
+    for (let i = 0; i < 50 && !w.running.size; i++) await new Promise((r) => setTimeout(r, 20));
     assert.equal((await u.post('/link/unlink', {})).status, 200);
     await tick;
     assert.equal(aborted, true);
@@ -437,7 +437,7 @@ test('serveur complet (worker démarré par createApp) : job d\'un compte relié
     const jl = (await enqueue(full.db, { userId: linked.id, projectId: pl, type: 'template' })).id;
     const jb = Number((await full.db.prepare("INSERT INTO jobs(user_id, project_id, type, status, created_at) VALUES(?, ?, 'template', 'queued', ?)").run(bare.id, pb, now())).lastInsertRowid);
     const status = async (id) => full.db.prepare('SELECT status, error FROM jobs WHERE id = ?').get(id);
-    for (let i = 0; i < 100 && ((await status(jl)).status === 'queued' || (await status(jb)).status === 'queued'); i++) await new Promise((r) => setTimeout(r, 100));
+    for (let i = 0; i < 100 && (['queued', 'running'].includes((await status(jl)).status) || ['queued', 'running'].includes((await status(jb)).status)); i++) await new Promise((r) => setTimeout(r, 100));
     assert.equal((await status(jl)).status, 'done', (await status(jl)).error);
     assert.deepEqual({ ...(await status(jb)) }, { status: 'error', error: LINK_REQUIRED_MESSAGE });
     assert.equal((await full.db.prepare('SELECT COUNT(*) n FROM templates WHERE project_id = ?').get(pb)).n, 0);

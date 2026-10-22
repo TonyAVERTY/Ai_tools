@@ -64,7 +64,7 @@ async function setup() {
       .run(id, pid, email, t, `Une idée pour ${email}`, `<orig-${pid}@codebzh.fr>`);
     return pid;
   };
-  const worker = new Worker(db, makeHandlers(app), { thermalMax: 999, log: { error() {} } });
+  const worker = new Worker(db, makeHandlers(app), { log: { error() {} } });
   const scheduler = new Scheduler(app, { log: { error() {} } });
   return { tmp, db, app, id, userId, add, inboxOk, worker, scheduler, sentMails };
 }

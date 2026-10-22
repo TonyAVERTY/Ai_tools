@@ -38,6 +38,19 @@ function recaptchaConfig() {
   return { siteKey, secret, minScore };
 }
 
+function positive(v, def, name) {
+  if (v == null || String(v).trim() === '') return def;
+  const n = Number(v);
+  if (!Number.isInteger(n) || n < 1 || n > 64) throw new Error(`${name} doit être un entier entre 1 et 64`);
+  return n;
+}
+function ratio(v, def, name) {
+  if (v == null || String(v).trim() === '') return def;
+  const n = Number(v);
+  if (!(n > 0.1 && n <= 4)) throw new Error(`${name} doit être un nombre entre 0,1 et 4 (charge divisée par le nombre de cœurs)`);
+  return n;
+}
+
 const flag = (v, def) => (v == null || v === '' ? def : !/^(0|false|off|no|non)$/i.test(String(v).trim()));
 
 // Bac à sable des exécutions Claude. En production il est obligatoire : SANDBOX=off n'y est pas pris en compte.
@@ -81,7 +94,9 @@ export function loadConfig() {
     // Mode « abonnement » (jeton claude setup-token) : désactivable globalement
     cliModeEnabled: flag(env.CLAUDE_CLI_MODE_ENABLED, true),
     sandbox: sandboxConfig(),
-    thermalMax: Number(env.THERMAL_MAX || 75),
+    // Jobs IA simultanés sur le serveur (un seul par utilisateur) et charge (charge/cœurs) au-delà de laquelle les nouveaux jobs attendent
+    maxAiJobs: positive(env.MAX_AI_JOBS, 4, 'MAX_AI_JOBS'),
+    loadMax: ratio(env.LOAD_MAX, 0.9, 'LOAD_MAX'),
     // Derrière Nginx/CloudPanel : lire X-Forwarded-For, mais seulement depuis un proxy de confiance (voir ratelimit.js)
     trustProxy: parseTrustProxy(env.TRUST_PROXY),
   };

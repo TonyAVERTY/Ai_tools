@@ -51,7 +51,7 @@ test('budget atteint : les jobs IA attendent (pas perdus), les envois passent, u
   const alerts = [];
   const h = (name) => async () => { ran.push(name); };
   const w = new Worker(s.db, { prospect: h('prospect'), evolution: h('evolution'), send: h('send') }, {
-    thermalMax: 999, log: { error() {} },
+    log: { error() {} },
     budget: (u) => budgetState(s.db, u), isAiJob: (t) => AI_JOBS.has(t), onBudget: (r) => alerts.push(r),
   });
   await enqueue(s.db, { userId: s.u, projectId: 1, type: 'prospect' });
@@ -105,7 +105,7 @@ test('quota serré : analyse/évolution attendent, la prospection et l\'envoi co
   const alerts = [];
   const h = (name) => async () => { ran.push(name); };
   const w = new Worker(s.db, { prospect: h('prospect'), evolution: h('evolution'), analyze: h('analyze') }, {
-    thermalMax: 999, log: { error() {} },
+    log: { error() {} },
     quota: (u) => quotaState(s.db, u), isQuotaSensitive, onQuotaHold: (r) => alerts.push(r),
   });
   await enqueue(s.db, { userId: s.u, projectId: 1, type: 'evolution' });
