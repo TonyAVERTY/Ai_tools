@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parisParts, parisTime, nextNightSlot, addParisDays } from '../src/services/paris-time.js';
-import { openDb, now } from '../src/db.js';
+import { now } from '../src/db.js';
+import { testDb } from './helpers/db.js';
 import { enqueue, Worker, latestJobs } from '../src/services/jobs.js';
 
 const iso = (d) => d.toISOString();
@@ -25,18 +26,18 @@ test('prochain créneau de nuit (1h-6h Paris)', () => {
 });
 
 test('le worker ne démarre pas un job programmé avant son heure', async () => {
-  const db = openDb(':memory:');
+  const db = await testDb();
   let clock = now();
   const ran = [];
   const w = new Worker(db, { prospect: async () => { ran.push('prospect'); }, evolution: async () => { ran.push('evolution'); } },
     { thermalMax: 999, log: { error() {} }, clock: () => clock });
-  db.prepare("INSERT INTO projects(name, git_url, created_at) VALUES('p', 'u', ?)").run(now());
-  enqueue(db, { projectId: 1, type: 'prospect', runAfter: clock + 3600 });
-  enqueue(db, { projectId: 1, type: 'evolution' });
+  await db.prepare("INSERT INTO projects(name, git_url, created_at) VALUES('p', 'u', ?)").run(now());
+  await enqueue(db, { projectId: 1, type: 'prospect', runAfter: clock + 3600 });
+  await enqueue(db, { projectId: 1, type: 'evolution' });
   assert.equal(await w.tick(), true);
   assert.deepEqual(ran, ['evolution'], 'le job immédiat passe devant le job programmé');
   assert.equal(await w.tick(), false, 'rien à faire avant l\'heure');
-  assert.equal(latestJobs(db, 1).prospect.runAfter, clock + 3600);
+  assert.equal((await latestJobs(db, 1)).prospect.runAfter, clock + 3600);
   clock += 3601;
   assert.equal(await w.tick(), true);
   assert.deepEqual(ran, ['evolution', 'prospect']);

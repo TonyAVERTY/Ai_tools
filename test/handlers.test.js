@@ -5,7 +5,8 @@ import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
-import { openDb, setSetting, getSetting, now } from '../src/db.js';
+import { setSetting, getSetting, now } from '../src/db.js';
+import { testDb } from './helpers/db.js';
 import { Worker, enqueue, latestJobs } from '../src/services/jobs.js';
 import { makeHandlers, parseProspectLine } from '../src/handlers.js';
 import { createProject, saveSecretConfig, getProject, prospectStats, pickVariant } from '../src/projects.js';
@@ -14,7 +15,7 @@ import { validateSelect, firstValue } from '../src/services/recap.js';
 import { validateGitUrl } from '../src/services/git.js';
 import { verifyUnsubToken, encrypt } from '../src/crypto.js';
 
-function setup() {
+async function setup() {
   const tmp = mkdtempSync(join(tmpdir(), 'aitools-'));
   const src = join(tmp, 'src-repo');
   execFileSync('git', ['init', '-q', '-b', 'main', src]);
@@ -22,56 +23,56 @@ function setup() {
   execFileSync('git', ['-C', src, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qam', 'init', '--allow-empty']);
   execFileSync('git', ['-C', src, 'add', '.']);
   execFileSync('git', ['-C', src, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'readme']);
-  const db = openDb(':memory:');
+  const db = await testDb();
   const sentMails = [];
   const app = {
     db,
     cfg: { dataDir: tmp, claudeBin: resolve('test/fixtures/fake-claude.js'), secretKey: randomBytes(32), appUrl: 'https://ai.test' },
     createTransport: () => ({ verify: async () => true, sendMail: async (m) => { sentMails.push(m); }, close() {} }),
   };
-  setSetting(db, 'send_delay_min', '0');
-  setSetting(db, 'send_delay_max', '0');
-  const id = createProject(app, { name: 'MonEspacePro', gitUrl: `file://${src}` });
+  await setSetting(db, 'send_delay_min', '0');
+  await setSetting(db, 'send_delay_max', '0');
+  const id = await createProject(app, { name: 'MonEspacePro', gitUrl: `file://${src}` });
   const worker = new Worker(db, makeHandlers(app), { thermalMax: 999, log: { error: (...a) => console.error(...a) } });
   return { tmp, db, app, id, worker, sentMails };
 }
 
-const run = async (s, type, params) => { enqueue(s.db, { projectId: s.id, type, params }); await s.worker.tick(); return latestJobs(s.db, s.id)[type]; };
+const run = async (s, type, params) => { await enqueue(s.db, { projectId: s.id, type, params }); await s.worker.tick(); return (await latestJobs(s.db, s.id))[type]; };
 
 test('flux complet : analyse → cible → prospection → modèle → envoi → évolution', async () => {
-  const s = setup();
+  const s = await setup();
   try {
     const a = await run(s, 'analyze');
     assert.equal(a.status, 'done', a.error);
-    let p = getProject(s.app, s.id);
+    let p = await getProject(s.app, s.id);
     assert.equal(p.profile.resume, 'Cartes de fidélité digitales.');
     assert.equal(p.target.zone, 'Bretagne');
     assert.equal(p.targetValidated, false);
     assert.match(p.profileCommit, /^[0-9a-f]{40}$/);
-    const rl = JSON.parse(getSetting(s.db, 'claude_rate_limit_json'));
+    const rl = JSON.parse(await getSetting(s.db, 'claude_rate_limit_json'));
     assert.equal(rl.fiveHour.utilization, 0.33, 'quota Claude (session) enregistré après l\'appel');
     assert.equal(rl.sevenDay.utilization, 0.5, 'quota Claude (semaine) enregistré après l\'appel');
 
     const refused = await run(s, 'prospect', { count: 3 });
     assert.match(refused.error, /Valide la cible/);
 
-    s.db.prepare('UPDATE projects SET target_validated = 1 WHERE id = ?').run(s.id);
-    s.db.prepare("INSERT INTO blacklist(email, created_at) VALUES('hello@zen.fr', ?)").run(now());
+    await s.db.prepare('UPDATE projects SET target_validated = 1 WHERE id = ?').run(s.id);
+    await s.db.prepare("INSERT INTO blacklist(email, created_at) VALUES('hello@zen.fr', ?)").run(now());
     const pr = await run(s, 'prospect', { count: 3 });
     assert.equal(pr.status, 'done', pr.error);
     assert.equal(pr.result.found, 1, 'email invalide rejeté + blacklisté ignoré');
-    assert.equal(prospectStats(s.db, s.id).new, 1);
+    assert.equal((await prospectStats(s.db, s.id)).new, 1);
 
     const t = await run(s, 'template');
     assert.equal(t.status, 'done', t.error);
     const noValid = await run(s, 'send', { count: 5 });
     assert.match(noValid.error, /non validé/);
 
-    s.db.prepare("UPDATE templates SET status = 'validated' WHERE project_id = ? AND kind = 'initial'").run(s.id);
+    await s.db.prepare("UPDATE templates SET status = 'validated' WHERE project_id = ? AND kind = 'initial'").run(s.id);
     const noSmtp = await run(s, 'send', { count: 5 });
     assert.match(noSmtp.error, /SMTP/);
 
-    saveSecretConfig(s.app, s.id, 'smtp_enc', { host: 'smtp.x', port: 587, user: 'u', pass: 'secret', fromEmail: 'tony@x.fr', fromName: 'Tony' }, 'pass');
+    await saveSecretConfig(s.app, s.id, 'smtp_enc', { host: 'smtp.x', port: 587, user: 'u', pass: 'secret', fromEmail: 'tony@x.fr', fromName: 'Tony' }, 'pass');
     const sent = await run(s, 'send', { count: 5 });
     assert.equal(sent.status, 'done', sent.error);
     assert.deepEqual(sent.result, { sent: 1, failed: 0, total: 1 });
@@ -84,14 +85,14 @@ test('flux complet : analyse → cible → prospection → modèle → envoi →
     assert.match(mail.html, /Ne plus recevoir de messages/);
     const unsub = /\/u\/([^/]+)\/(\S+)/.exec(mail.headers['List-Unsubscribe']);
     assert.ok(verifyUnsubToken(s.app.cfg.secretKey, decodeURIComponent(unsub[1]), unsub[2].replace('>', '')));
-    assert.equal(prospectStats(s.db, s.id).sent, 1);
+    assert.equal((await prospectStats(s.db, s.id)).sent, 1);
 
     const again = await run(s, 'send', { count: 5 });
     assert.match(again.error, /aucun prospect/, 'jamais 2 fois le même prospect');
 
     const ev1 = await run(s, 'evolution', { count: 3, level: 'rapide' });
     assert.match(ev1.error, /Adresse de réception/);
-    setSetting(s.db, 'notify_email', 'moi@x.fr');
+    await setSetting(s.db, 'notify_email', 'moi@x.fr');
     const ev = await run(s, 'evolution', { count: 3, level: 'rapide' });
     assert.equal(ev.status, 'done', ev.error);
     assert.equal(s.sentMails.at(-1).to, 'moi@x.fr');
@@ -100,7 +101,7 @@ test('flux complet : analyse → cible → prospection → modèle → envoi →
     assert.match(s.sentMails.at(-1).html, /Export CSV/);
     assert.equal(ev.progress.pct, 95, 'avancement remonté jusqu\'au mail');
 
-    const usage = s.db.prepare('SELECT SUM(cost_usd) c FROM jobs').get().c;
+    const usage = (await s.db.prepare('SELECT SUM(cost_usd) c FROM jobs').get()).c;
     assert.ok(usage > 0);
   } finally { rmSync(s.tmp, { recursive: true, force: true }); }
 });
@@ -164,18 +165,18 @@ test('URL Git Forgejo', () => {
 });
 
 test('envoi : Message-ID journalisé et objets A/B alternés équitablement', async () => {
-  const s = setup();
+  const s = await setup();
   try {
-    saveSecretConfig(s.app, s.id, 'smtp_enc', { host: 'smtp.x', port: 587, user: 'u', pass: 'p', fromEmail: 'tony@codebzh.fr' }, 'pass');
-    s.db.prepare(`INSERT INTO templates(project_id, kind, subject, subject_b, body, status, updated_at)
+    await saveSecretConfig(s.app, s.id, 'smtp_enc', { host: 'smtp.x', port: 587, user: 'u', pass: 'p', fromEmail: 'tony@codebzh.fr' }, 'pass');
+    await s.db.prepare(`INSERT INTO templates(project_id, kind, subject, subject_b, body, status, updated_at)
       VALUES(?, 'initial', 'Objet A {{entreprise}}', 'Objet B {{entreprise}}', 'Bonjour', 'validated', ?)`).run(s.id, now());
     for (const n of [1, 2, 3, 4]) {
-      s.db.prepare("INSERT INTO prospects(project_id, company, email, score, created_at) VALUES(?, ?, ?, ?, ?)").run(s.id, `Ent${n}`, `c${n}@ent${n}.fr`, 10 - n, now());
+      await s.db.prepare("INSERT INTO prospects(project_id, company, email, score, created_at) VALUES(?, ?, ?, ?, ?)").run(s.id, `Ent${n}`, `c${n}@ent${n}.fr`, 10 - n, now());
     }
     const job = await run(s, 'send', { count: 4 });
     assert.equal(job.status, 'done', job.error);
     assert.deepEqual(s.sentMails.map((m) => m.subject), ['Objet A Ent1', 'Objet B Ent2', 'Objet A Ent3', 'Objet B Ent4']);
-    const logs = s.db.prepare("SELECT * FROM mail_log WHERE kind = 'initial' ORDER BY id").all();
+    const logs = await s.db.prepare("SELECT * FROM mail_log WHERE kind = 'initial' ORDER BY id").all();
     assert.equal(logs.length, 4);
     for (const [i, l] of logs.entries()) {
       assert.equal(l.message_id, s.sentMails[i].messageId);
@@ -183,25 +184,25 @@ test('envoi : Message-ID journalisé et objets A/B alternés équitablement', as
       assert.equal(l.subject, s.sentMails[i].subject);
     }
     assert.equal(new Set(logs.map((l) => l.message_id)).size, 4, 'Message-ID uniques');
-    assert.deepEqual(s.db.prepare('SELECT variant FROM prospects ORDER BY id').all().map((r) => r.variant), ['A', 'B', 'A', 'B']);
+    assert.deepEqual((await s.db.prepare('SELECT variant FROM prospects ORDER BY id').all()).map((r) => r.variant), ['A', 'B', 'A', 'B']);
   } finally { rmSync(s.tmp, { recursive: true, force: true }); }
 });
 
-test('sans objet B : tout part en A', () => {
-  const db = openDb(':memory:');
-  assert.equal(pickVariant(db, 1, { subject_b: null }), 'A');
-  assert.equal(pickVariant(db, 1, { subject_b: '' }), 'A');
+test('sans objet B : tout part en A', async () => {
+  const db = await testDb();
+  assert.equal(await pickVariant(db, 1, { subject_b: null }), 'A');
+  assert.equal(await pickVariant(db, 1, { subject_b: '' }), 'A');
 });
 
 test('analyse : modèle économique (Haiku) par défaut, Sonnet uniquement sur demande', async () => {
-  const s = setup();
+  const s = await setup();
   const spyFile = join(s.tmp, 'models.log');
   s.app.cfg.claudeBin = resolve('test/fixtures/spy-claude.js');
   process.env.MODEL_SPY_FILE = spyFile;
   try {
     const a = await run(s, 'analyze');
     assert.equal(a.status, 'done', a.error);
-    setSetting(s.db, 'analyze_model', 'sonnet');
+    await setSetting(s.db, 'analyze_model', 'sonnet');
     const a2 = await run(s, 'analyze');
     assert.equal(a2.status, 'done', a2.error);
     assert.deepEqual(readFileSync(spyFile, 'utf8').trim().split('\n'), ['haiku', 'sonnet']);
@@ -209,11 +210,11 @@ test('analyse : modèle économique (Haiku) par défaut, Sonnet uniquement sur d
 });
 
 test('quota Claude serré : alerte Discord à 80 %, pas en dessous', async () => {
-  const s = setup();
+  const s = await setup();
   const sent = [];
   s.app.fetch = async (url, opts) => { sent.push({ url, body: JSON.parse(opts.body) }); return { ok: true, status: 204 }; };
   const hook = 'https://discord.com/api/webhooks/123456789012345678/abcdefghijklmnopqrstuvwxyz-ABC_123';
-  setSetting(s.db, 'discord_webhook_enc', encrypt(s.app.cfg.secretKey, hook));
+  await setSetting(s.db, 'discord_webhook_enc', encrypt(s.app.cfg.secretKey, hook));
   try {
     const a = await run(s, 'analyze'); // fake-claude : 33 % / 50 % par défaut
     assert.equal(a.status, 'done', a.error);
