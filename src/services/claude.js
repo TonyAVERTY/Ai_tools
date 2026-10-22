@@ -1,6 +1,7 @@
 // Lance Claude Code en headless (`claude -p`) avec un périmètre d'outils restreint,
 // et parse le flux stream-json pour remonter la progression en direct.
 import { spawn } from 'node:child_process';
+import { prepareLaunch } from './sandbox.js';
 
 export const MODELS = { rapide: 'haiku', normal: 'sonnet', approfondi: 'opus' };
 
@@ -17,6 +18,10 @@ export const MODELS = { rapide: 'haiku', normal: 'sonnet', approfondi: 'opus' };
  * @param {AbortSignal} [o.signal]
  * @param {number} [o.timeoutMs]
  * @param {string} [o.bin]
+ * @param {object} o.sandbox        cfg.sandbox (obligatoire : voir services/sandbox.js)
+ * @param {Record<string,string>} [o.secretEnv]  secret de l'utilisateur du job (ANTHROPIC_API_KEY ou CLAUDE_CODE_OAUTH_TOKEN), transmis au seul processus enfant
+ * @param {boolean} [o.serverConfig]  mode « Claude du serveur » (admins) : configuration CLI du serveur
+ * @param {string} [o.allowedRoot]  dossier des clones de l'utilisateur : `cwd` doit s'y trouver
  */
 export function runClaude(o) {
   const args = [
@@ -29,10 +34,14 @@ export function runClaude(o) {
   ];
   if (o.system) args.push('--append-system-prompt', o.system);
 
-  // nice : le serveur web reste réactif pendant qu'un job tourne
-  const child = spawn('nice', ['-n', '10', o.bin || 'claude', ...args], {
-    cwd: o.cwd, env: process.env, stdio: ['ignore', 'pipe', 'pipe'],
+  const launch = prepareLaunch({
+    bin: o.bin || 'claude', args, cwd: o.cwd, allowedRoot: o.allowedRoot,
+    secretEnv: o.secretEnv, serverConfig: o.serverConfig, sandbox: o.sandbox,
   });
+  const secrets = Object.values(o.secretEnv || {}).filter((v) => v && v.length >= 8);
+  // Aucune trace du secret dans les erreurs, stderr ou textes remontés (journaux, base, réponses HTTP)
+  const redact = (t) => secrets.reduce((acc, s) => acc.split(s).join('***'), String(t ?? ''));
+  const child = spawn(launch.command, launch.args, { cwd: launch.cwd, env: launch.env, stdio: ['ignore', 'pipe', 'pipe'] });
 
   return new Promise((resolve, reject) => {
     let buf = '';
@@ -55,6 +64,7 @@ export function runClaude(o) {
       }
     });
     child.stderr.on('data', (c) => { stderr = (stderr + c).slice(-4000); });
+    const done = () => { clearTimeout(timer); launch.cleanup(); };
 
     function handle(line) {
       let ev;
@@ -62,7 +72,7 @@ export function runClaude(o) {
       if (ev.type === 'assistant') {
         o.onTurn?.(++turns);
         for (const block of ev.message?.content || []) {
-          if (block.type === 'text' && block.text) { texts.push(block.text); o.onText?.(block.text); }
+          if (block.type === 'text' && block.text) { texts.push(block.text); o.onText?.(redact(block.text)); }
         }
       } else if (ev.type === 'result') {
         result = ev;
@@ -72,17 +82,17 @@ export function runClaude(o) {
       }
     }
 
-    child.on('error', (e) => { clearTimeout(timer); reject(new Error(`Impossible de lancer Claude : ${e.message}`)); });
+    child.on('error', (e) => { done(); reject(new Error(redact(`Impossible de lancer Claude : ${e.message}`))); });
     child.on('close', (code) => {
-      clearTimeout(timer);
+      done();
       if (buf.trim()) handle(buf.trim());
-      if (!result) return reject(new Error(`Claude s'est arrêté sans résultat (code ${code}). ${stderr.trim()}`));
+      if (!result) return reject(new Error(redact(`Claude s'est arrêté sans résultat (code ${code}). ${stderr.trim()}`)));
       const usage = result.usage || {};
       resolve({
         ok: !result.is_error,
         subtype: result.subtype,           // success | error_max_turns | ...
-        text: result.result ?? texts.join('\n'),
-        allText: texts.join('\n'),
+        text: redact(result.result ?? texts.join('\n')),
+        allText: redact(texts.join('\n')),
         costUsd: result.total_cost_usd ?? null,
         tokensIn: (usage.input_tokens || 0) + (usage.cache_read_input_tokens || 0) + (usage.cache_creation_input_tokens || 0),
         tokensOut: usage.output_tokens || 0,
