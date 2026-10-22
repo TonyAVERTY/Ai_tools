@@ -9,10 +9,15 @@ import { enqueue } from './jobs.js';
 import { getProject } from '../projects.js';
 import { maybeSendWeekly } from './report.js';
 import { snapshotAll } from './metrics.js';
+import { runInactiveCleanup } from './inactive.js';
+import { purgeAudit } from '../audit.js';
+import { INACTIVITY } from '../limits.js';
+import { now } from '../db.js';
 
 export class Scheduler {
-  constructor(app, { everyMs = 15 * 60_000, log = console } = {}) {
+  constructor(app, { everyMs = 15 * 60_000, log = console, clock = now } = {}) {
     this.app = app;
+    this.clock = clock; // secondes ; injectable pour les tests
     this.everyMs = everyMs;
     this.log = log;
     this.running = false;
@@ -57,6 +62,11 @@ export class Scheduler {
         catch (e) { this.log.error('[rapport hebdo]', e.message); }
       }
       await snapshotAll(this.app, { log: this.log });
+      // Entretien : comptes inactifs (avertissement puis suppression) et ancien journal d'audit
+      try {
+        await runInactiveCleanup(this.app, { at: this.clock(), log: this.log });
+        await purgeAudit(this.app.db, INACTIVITY.auditRetentionMonths, this.clock());
+      } catch (e) { this.log.error('[inactifs]', e.message); }
     } finally { this.running = false; }
   }
 

@@ -51,6 +51,23 @@ function ratio(v, def, name) {
   return n;
 }
 
+// SMTP du serveur (mails système : avertissement avant suppression d'un compte inactif). Facultatif ; toutes les variables ensemble.
+function systemSmtpConfig() {
+  const keys = ['SYSTEM_SMTP_HOST', 'SYSTEM_SMTP_USER', 'SYSTEM_SMTP_PASSWORD', 'SYSTEM_SMTP_FROM'];
+  const set = keys.filter((k) => env[k]);
+  if (!set.length) return null;
+  if (set.length < keys.length) throw new Error(`SMTP du serveur : variables incomplètes (manque ${keys.filter((k) => !env[k]).join(', ')})`);
+  return { host: env.SYSTEM_SMTP_HOST, port: Number(env.SYSTEM_SMTP_PORT || 587), user: env.SYSTEM_SMTP_USER, pass: env.SYSTEM_SMTP_PASSWORD, fromEmail: env.SYSTEM_SMTP_FROM };
+}
+
+function inactiveMonths() {
+  const raw = (env.INACTIVE_ACCOUNT_MONTHS || '').trim();
+  if (raw === '') return 24;
+  const n = Number(raw);
+  if (!Number.isInteger(n) || n < 0 || n > 120) throw new Error('INACTIVE_ACCOUNT_MONTHS doit être un nombre entier de mois entre 0 (désactivé) et 120');
+  return n;
+}
+
 const flag = (v, def) => (v == null || v === '' ? def : !/^(0|false|off|no|non)$/i.test(String(v).trim()));
 
 // Bac à sable des exécutions Claude. En production il est obligatoire : SANDBOX=off n'y est pas pris en compte.
@@ -85,6 +102,8 @@ export function loadConfig() {
     },
     apple: appleConfig(),
     recaptcha: recaptchaConfig(),
+    systemSmtp: systemSmtpConfig(),
+    inactiveMonths: inactiveMonths(),
     production: env.NODE_ENV === 'production',
     // Développement : autorise les hôtes privés (SMTP local, etc.). En production, seulement pour les administrateurs.
     allowPrivateHosts: flag(env.ALLOW_PRIVATE_HOSTS, false),

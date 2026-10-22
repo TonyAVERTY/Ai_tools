@@ -94,7 +94,7 @@ export function mentionsPage({ appUrl }) {
 
 // ---------- Politique de confidentialité ----------
 // `captcha` : reCAPTCHA configuré. Les paragraphes qui le concernent n'apparaissent que dans ce cas, comme Apple.
-export function privacyPage({ appUrl, apple = false, captcha = false }) {
+export function privacyPage({ appUrl, apple = false, captcha = false, inactiveMonths = 24 }) {
   return legalPage({
     appUrl, path: '/confidentialite',
     title: 'Politique de confidentialité · AiTools',
@@ -124,6 +124,7 @@ export function privacyPage({ appUrl, apple = false, captcha = false }) {
     <tr><th scope="row">Prospects</th><td>Entreprise, adresse professionnelle, site, ville, secteur, phrase d'accroche, page source, score, statut, notes, prochaine action, historique d'envoi, objet et date d'une réponse.</td><td>Fournir le service pour ton compte (voir « rôles »). La base légale du démarchage est la tienne, en B2B en règle générale l'intérêt légitime.</td></tr>
     <tr><th scope="row">Activité</th><td>Type, état, durée, coût et nombre de tokens de chaque job IA, résultat du job. Chaque jour, trois nombres lus dans la base de ton projet si tu l'as reliée (utilisateurs, clients, revenu).</td><td>Fournir le service, appliquer tes budgets et plafonds. Exécution du contrat.</td></tr>
     <tr><th scope="row">Adresse IP</th><td>Ton adresse IP sert à limiter le nombre de requêtes (protection contre les abus). Elle reste en mémoire du serveur, quelques minutes à quelques heures, et n'est pas enregistrée en base de données.</td><td>Sécurité du service. Intérêt légitime.</td></tr>
+    <tr><th scope="row">Modération</th><td>Actions d'administration sur un compte (suspension, plan, suppression) et pauses d'envoi décidées quand trop de mails sont rejetés : date, action, identifiant du compte et adresse masquée.</td><td>Sécurité du service et lutte contre les abus. Intérêt légitime.</td></tr>
     <tr><th scope="row">Liste d'opposition</th><td>Adresse email, motif (désinscription, refus, mail rejeté) et date.</td><td>Ne plus jamais contacter une personne qui s'y est opposée, pour tous les comptes. Obligation légale, intérêt légitime.</td></tr>
   </tbody>
 </table></div>
@@ -136,7 +137,8 @@ export function privacyPage({ appUrl, apple = false, captcha = false }) {
   <thead><tr><th scope="col">Donnée</th><th scope="col">Durée</th></tr></thead>
   <tbody>
     <tr><th scope="row">Compte et toutes ses données</th><td>Tant que le compte existe. Effacés quand tu supprimes ton compte depuis Mon compte, copie du code comprise.</td></tr>
-    <tr><th scope="row">Compte inactif</th><td>Suppression prévue après 24 mois sans connexion. Cette suppression automatique n'est pas encore en place.</td></tr>
+    <tr><th scope="row">Compte inactif</th><td>${inactiveMonths ? `Suppression automatique après ${inactiveMonths} mois sans connexion ni job, avec un mail d'avertissement 30 jours avant. Un compte suspendu ou administrateur n'est pas concerné.` : 'Aucune suppression automatique pour inactivité.'}</td></tr>
+    <tr><th scope="row">Journal d'administration</th><td>12 mois. Il note les actions des administrateurs (suspension, changement de plan, suppression) et les pauses d'envoi, avec un identifiant et une adresse masquée.</td></tr>
     <tr><th scope="row">Session</th><td>30 jours au plus, effacée à la déconnexion. Les états de connexion durent 10 minutes.</td></tr>
     <tr><th scope="row">Clé API ou jeton Claude</th><td>Jusqu'à ce que tu le délies ou supprimes ton compte.</td></tr>
     <tr><th scope="row">Prospects, notes et journaux d'envoi</th><td>Jusqu'à la suppression du projet ou du compte. En tant que responsable de traitement, ne garde pas une fiche plus de 3 ans après le dernier contact.</td></tr>
