@@ -2,6 +2,7 @@ import { now, getSetting, setSetting } from './db.js';
 import { encrypt, encryptJson, decryptJson, verifyUnsubToken } from './crypto.js';
 import { html, json, redirect, readBody, HttpError } from './http.js';
 import { startLogin, finishLogin, destroySession } from './auth.js';
+import { canRunAi, assertCanRunAi, AI_BLOCKED_MESSAGE } from './users.js';
 import { loginPage, dashboardPage, settingsPage, unsubPage } from './views.js';
 import { enqueue, latestJobs, cancelJob, usageSummary } from './services/jobs.js';
 import { validateGitUrl, removeRepo } from './services/git.js';
@@ -83,6 +84,7 @@ export function registerRoutes(router, app) {
     }
     html(res, dashboardPage({
       email: session.email, projects, forgejoHost: await getSetting(db, userId, 'forgejo_host'),
+      aiBlocked: canRunAi(session.user) ? null : AI_BLOCKED_MESSAGE,
     }));
   });
 
@@ -195,6 +197,8 @@ export function registerRoutes(router, app) {
     let id;
     try { id = await createProject(app, { userId, name, gitUrl }); }
     catch (e) { if (await exists()) throw new HttpError(409, 'Ce dépôt est déjà un projet'); throw e; }
+    // L'analyse initiale utilise Claude : réservée aux admins tant que la liaison Claude n'existe pas
+    if (!canRunAi(session.user)) return json(res, { id, aiBlocked: AI_BLOCKED_MESSAGE });
     await enqueue(db, { userId, projectId: id, type: 'analyze' });
     json(res, { id });
   });
@@ -250,6 +254,8 @@ export function registerRoutes(router, app) {
 
   const jobRoute = (type, paramsOf = () => ({}), guard = () => {}) => async (ctx) => {
     const { req, res, session } = ctx;
+    // Refus côté serveur AVANT toute autre vérification : pas de job IA sans liaison Claude (enqueue le revérifie)
+    if (AI_JOBS.has(type)) assertCanRunAi(session.user);
     const p = await project(ctx);
     const b = req.headers['content-type']?.includes('json') ? await readBody(req) : {};
     await guard(p, b);

@@ -245,12 +245,13 @@ function projectItem(p, smtp, dbCfg, imap) {
 </details>`;
 }
 
-export function dashboardPage({ email, projects, forgejoHost }) {
+export function dashboardPage({ email, projects, forgejoHost, aiBlocked = null }) {
   return layout({
     title: 'Projets', email,
     body: `<div class="row head">
   <h1>Projets</h1>
 </div>
+${aiBlocked ? `<p class="card notice">${esc(aiBlocked)}. En attendant, tu peux créer des projets, gérer tes prospects (CRM, import CSV) et envoyer tes mails ; l'analyse, la recherche de prospects et les évolutions sont indisponibles.</p>` : ''}
 <details class="card new anim">
   <summary class="btn primary">+ Nouveau projet</summary>
   <form data-action="create" class="cfg">
