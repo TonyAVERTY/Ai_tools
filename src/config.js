@@ -1,6 +1,7 @@
 import { resolve } from 'node:path';
 import { homedir } from 'node:os';
 import { dbConfigFromEnv } from './db.js';
+import { parseTrustProxy } from './ratelimit.js';
 
 const env = process.env;
 
@@ -68,5 +69,7 @@ export function loadConfig() {
     cliModeEnabled: flag(env.CLAUDE_CLI_MODE_ENABLED, true),
     sandbox: sandboxConfig(),
     thermalMax: Number(env.THERMAL_MAX || 75),
+    // Derrière Nginx/CloudPanel : lire X-Forwarded-For, mais seulement depuis un proxy de confiance (voir ratelimit.js)
+    trustProxy: parseTrustProxy(env.TRUST_PROXY),
   };
 }

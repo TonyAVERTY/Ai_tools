@@ -56,18 +56,18 @@ export function registerRoutes(router, app) {
     if (!e.status || e.status >= 500) console.error('[connexion]', e);
     redirect(res, `/login?e=${encodeURIComponent(e.status && e.status < 500 ? e.message : 'Connexion impossible, réessaie dans un instant')}`);
   };
-  router.get('/auth/google', async ({ res }) => startLogin(app, 'google', res), { public: true });
+  router.get('/auth/google', async ({ res }) => startLogin(app, 'google', res), { public: true, limit: 'auth_start' });
   router.get('/auth/google/callback', async ({ req, res, url }) => {
     try { await finishLogin(app, 'google', url.searchParams, req, res); }
     catch (e) { loginFailed(res, e); }
-  }, { public: true });
+  }, { public: true, limit: 'auth_callback' });
   // Apple : le retour est un POST cross-site (response_mode=form_post), donc public et sans contrôle d'origine ;
   // la protection repose sur state + nonce + cookie de liaison (voir auth.js)
-  router.get('/auth/apple', async ({ res }) => startLogin(app, 'apple', res), { public: true });
+  router.get('/auth/apple', async ({ res }) => startLogin(app, 'apple', res), { public: true, limit: 'auth_start' });
   router.post('/auth/apple/callback', async ({ req, res }) => {
     try { await finishLogin(app, 'apple', await readBody(req), req, res); }
     catch (e) { loginFailed(res, e); }
-  }, { public: true });
+  }, { public: true, limit: 'auth_callback' });
 
   // Désinscription (RGPD). GET = page de confirmation (évite les désinscriptions par les scanners de liens),
   // POST = désinscription effective, compatible "one-click" (RFC 8058).
@@ -166,6 +166,7 @@ export function registerRoutes(router, app) {
     }));
   });
 
+  const LINK_LIMIT = { limit: 'link' };
   const wantsJson = (req) => !!req.headers.accept?.includes('json');
   // Formulaire HTML : l'erreur revient sur la page de liaison ; appel JSON : code HTTP + { error }
   const linkAction = (fn, okTo = '/') => async ({ req, res, session }) => {
@@ -179,19 +180,19 @@ export function registerRoutes(router, app) {
       redirect(res, `/link?e=${encodeURIComponent(e.message)}`);
     }
   };
-  router.post('/link/api-key', linkAction((b, s) => linkApiKey(app, s.userId, b.apiKey)));
-  router.post('/link/subscription', linkAction((b, s) => linkSubscriptionToken(app, s.userId, { token: b.token, accept: b.accept })));
-  router.post('/link/server', linkAction((b, s) => linkServer(app, s.userId)));
+  router.post('/link/api-key', linkAction((b, s) => linkApiKey(app, s.userId, b.apiKey)), LINK_LIMIT);
+  router.post('/link/subscription', linkAction((b, s) => linkSubscriptionToken(app, s.userId, { token: b.token, accept: b.accept })), LINK_LIMIT);
+  router.post('/link/server', linkAction((b, s) => linkServer(app, s.userId)), LINK_LIMIT);
   router.post('/link/test', async ({ req, res, session }) => {
     const r = await testLink(app, session.userId);
     if (wantsJson(req)) return json(res, r);
     redirect(res, `/account?t=${r.ok ? 'ok' : 'ko'}&m=${encodeURIComponent(r.message)}`);
-  });
+  }, LINK_LIMIT);
   router.post('/link/unlink', async ({ req, res, session }) => {
     const cancelled = await unlink(app, session.userId);
     if (wantsJson(req)) return json(res, { ok: true, cancelled });
     redirect(res, '/account?t=unlinked');
-  });
+  }, LINK_LIMIT);
 
   // ---------- Mon compte ----------
   router.get('/account', async ({ res, session, url }) => {
@@ -214,21 +215,21 @@ export function registerRoutes(router, app) {
     await deleteUser(app, session.userId);
     await destroySession(db, req, res);
     redirect(res, '/login?bye=1');
-  });
+  }, { limit: 'account_delete' });
 
   // ---------- API JSON ----------
   router.post('/api/report/send', async ({ res, session }) => {
     const r = await sendWeeklyReport(app, session.userId);
     if (!r.channels.length) throw new HttpError(400, 'Configure le SMTP global + l\'email de réception, ou un webhook Discord');
     json(res, { ok: true, channels: r.channels });
-  });
+  }, { limit: 'mail_send' });
 
   router.post('/api/notify/test', async ({ res, session }) => {
     if (!(await notifyConfig(app, session.userId)).url) throw new HttpError(400, 'Aucun webhook Discord configuré');
     const ok = await notify(app, session.userId, 'test', { title: 'Notification de test', description: 'Les notifications AiTools arrivent bien ici.', level: 'ok' }, { force: true });
     if (!ok) throw new HttpError(502, 'Discord a refusé la notification (webhook supprimé ?)');
     json(res, { ok: true });
-  });
+  }, { limit: 'mail_send' });
 
   // Barre du haut : uniquement les jobs, l'usage et les quotas de l'utilisateur courant (la température du serveur, réservée aux admins)
   router.get('/api/system', async ({ res, session }) => {
@@ -272,7 +273,7 @@ export function registerRoutes(router, app) {
     catch (e) { if (await exists()) throw new HttpError(409, 'Ce dépôt est déjà un projet'); throw e; }
     await enqueue(db, { userId, projectId: id, type: 'analyze' }, aiOpts);
     json(res, { id });
-  });
+  }, { limit: 'project_create' });
 
   router.post('/api/projects/:id/delete', async (ctx) => {
     const p = await project(ctx);
@@ -363,7 +364,7 @@ export function registerRoutes(router, app) {
     if (!b.confirm) throw new HttpError(400, 'Confirmation requise');
     const running = await db.prepare("SELECT 1 FROM jobs WHERE project_id = ? AND type = 'prospect' AND status IN ('queued','running')").get(p.id);
     if (running) throw new HttpError(409, 'La recherche de prospects est encore en cours');
-  }));
+  }), { limit: 'mail_send' });
 
   router.post('/api/projects/:id/template/save', async (ctx) => {
     const { req, res } = ctx;
@@ -408,14 +409,14 @@ export function registerRoutes(router, app) {
     }, 'pass');
     try { json(res, { ok: true, check: await checkInbox(app, session.userId, p.id) }); }
     catch (e) { json(res, { ok: false, error: e.message }); }
-  });
+  }, { limit: 'conn_test' });
 
   router.post('/api/projects/:id/inbox/check', async (ctx) => {
     const { res, session } = ctx;
     const p = await project(ctx);
     try { json(res, { ok: true, check: await checkInbox(app, session.userId, p.id) }); }
     catch (e) { throw new HttpError(502, e.message); }
-  });
+  }, { limit: 'conn_test' });
 
   router.post('/api/projects/:id/db', async (ctx) => {
     const { req, res } = ctx;
@@ -445,7 +446,7 @@ export function registerRoutes(router, app) {
       await saveSnapshot(db, p.id, business); // la consultation alimente aussi la courbe du jour
     } catch (e) { error = e.message; }
     json(res, { business, error, stats, aiCostUsd: cost });
-  });
+  }, { limit: 'conn_test' });
 
   router.get('/api/projects/:id/prospects\\.csv', async (ctx) => {
     const { res, url } = ctx;
@@ -458,7 +459,7 @@ export function registerRoutes(router, app) {
       'Cache-Control': 'no-store',
     });
     res.end(await exportProspects(db, p.id, parseFilters(url.searchParams)));
-  });
+  }, { limit: 'csv' });
 
   router.post('/api/projects/:id/prospects/import', async (ctx) => {
     const { req, res } = ctx;
@@ -466,7 +467,7 @@ export function registerRoutes(router, app) {
     const b = await readBody(req, { max: 1024 * 1024 });
     try { json(res, await importProspects(db, p.id, String(b.csv || ''))); }
     catch (e) { throw new HttpError(400, e.message); }
-  });
+  }, { limit: 'csv' });
 
   router.get('/api/projects/:id/history', async (ctx) => {
     const { res, url } = ctx;
