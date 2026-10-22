@@ -2,7 +2,7 @@
 // affiché à l'écran. Nécessaire parce que ce CLI ne réécrit que les cases qui changent et saute les autres par des
 // déplacements de curseur : le flux brut n'est pas du texte lisible (« Request » devient « Requ<déplacement>st »).
 // Gère : caractères, \r \n \b, déplacements (A B C D E F G H f d), effacements (K J X), sauvegarde du curseur (ESC 7/8, s/u),
-// séquences de couleur et modes (ignorés), OSC (liens, titres : ignorés). Pas de défilement : l'écran est petit et on ne
+// séquences de couleur, modes et jeux de caractères (ignorés), OSC (liens, titres : ignorés). Pas de défilement : l'écran est petit et on ne
 // lit que son état final.
 const MAX_ROWS = 400;
 
@@ -63,6 +63,7 @@ export function screenText(out) {
       } else if (nx === '7') { saved = [r, c]; i++; }
       else if (nx === '8') { [r, c] = saved; i++; }
       else if (nx === 'M') { r = clamp(r - 1); i++; }
+      else if (nx && '()*+-./#%'.includes(nx)) i += 2; // choix de jeu de caractères (ESC ( B) : 3 octets, sans rien à afficher
       else i++; // autre séquence à un caractère
     } else if (ch === '\r') c = 0;
     else if (ch === '\n') { r = clamp(r + 1); line(r); }

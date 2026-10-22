@@ -12,6 +12,7 @@ import { makeClaude } from '../src/handlers.js';
 import {
   LINK_REQUIRED_MESSAGE, CONSENT_VERSION, CONSENT_CHECKBOX, aiRefusal, validateApiKey, getLinkState,
 } from '../src/claudelink.js';
+import { HttpError } from '../src/http.js';
 import { startApp } from './helpers/server.js';
 import { makeClaudeBin } from './helpers/claude-bin.js';
 
@@ -453,6 +454,7 @@ const hasScript = spawnSync('script', ['--version']).status === 0;
 const loginApp = async (mode = '') => {
   const dir = mkdtempSync(join(tmpdir(), 'aitools-login-bin-'));
   const o = await startApp({ cfg: { claudeBin: makeClaudeBin(dir, { fixture: 'fake-setup-token.js', env: mode ? { FAKE_MODE: mode } : {} }) } });
+  o.app.validateToken = async (t) => { o.validated = [...(o.validated || []), t]; if (o.rejectToken) throw new HttpError(400, 'Jeton refusé par Claude (test)'); };
   return { o, dir };
 };
 const lt = { skip: !hasScript && 'la commande script (util-linux) est absente' };
@@ -497,6 +499,7 @@ test('connexion guidée : lien renvoyé, puis le code donne le jeton, rangé chi
     assert.equal(link.consent.version, CONSENT_VERSION);
     assert.ok(!JSON.stringify(await getLinkState(o.db, u.id)).includes('sk-ant-oat'), 'le jeton ne sort jamais');
     assert.equal(o.app.claudeLogins.sessions.size, 0, 'session et dossier jetable nettoyés');
+    assert.deepEqual(o.validated, [`sk-ant-oat01-${'L'.repeat(60)}`], 'le jeton est vérifié avant d\'être rangé');
   } finally { await o.close(); rmSync(dir, { recursive: true, force: true }); }
 });
 
@@ -556,7 +559,24 @@ test('extraction du jeton : lu sur l\'écran rendu (cases sautées, retours à l
   assert.equal(extractToken(`token: ${tok}`, true), tok, '…sauf si le CLI est terminé');
   assert.equal(extractToken('rien ici'), null);
   assert.equal(extractToken('sk-ant-oat01-court Store'), null, 'trop court pour être un jeton');
+  // Fin de redessin du vrai CLI : « ESC ( B » (jeu de caractères) arrive curseur au bout de la dernière ligne écrite.
+  // Il ne doit rien afficher, sinon un « B » s'ajoute au jeton et le rend invalide.
+  assert.equal(extractToken(`t:\r\n${tok}${e}(B\x0f\r\n\r\nStore this`), tok, 'pas de B parasite après le jeton');
+  assert.equal(screenText(`abc${e}(Bdef${e})0${e}*Bxyz`)[0], 'abcdefxyz');
   // Le refus se lit lui aussi sur l'écran
   assert.equal(isRefused(`OAuth error: Request failed with status code 400\r\nPress Enter to retry.`), true);
   assert.equal(isRefused('Paste code here if prompted >'), false);
+});
+
+test('connexion guidée : un jeton refusé à la vérification n\'est jamais rangé', lt, async () => {
+  const { o, dir } = await loginApp();
+  try {
+    o.rejectToken = true;
+    const u = await o.newUser({ admin: false, link: null });
+    const { id } = await (await u.post('/link/claude/login', { accept: true })).json();
+    const r = await u.post('/link/claude/login/code', { id, code: 'GOOD-code-1234' });
+    assert.equal(r.status, 400);
+    assert.match((await r.json()).error, /Jeton refusé/);
+    assert.equal((await orow(o, u.id)).claude_link_json, null);
+  } finally { await o.close(); rmSync(dir, { recursive: true, force: true }); }
 });

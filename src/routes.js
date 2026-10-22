@@ -5,7 +5,7 @@ import { startLogin, finishLogin, destroySession, getSession, checkOrigin } from
 import { verifyCaptcha } from './captcha.js';
 import { deleteUser, normalizeEmail, getUser } from './users.js';
 import {
-  assertCanRunAi, getLinkState, assertLoginConsent, linkLoginToken, linkApiKey, linkSubscriptionToken, linkServer, unlink, testLink, lastConsent,
+  assertCanRunAi, getLinkState, assertLoginConsent, linkLoginToken, validateSubscriptionToken, linkApiKey, linkSubscriptionToken, linkServer, unlink, testLink, lastConsent,
   MODES,
 } from './claudelink.js';
 import { loginPage } from './site/pages.js';
@@ -220,6 +220,8 @@ export function registerRoutes(router, app) {
   router.post('/link/claude/login/code', async ({ req, res, session }) => {
     const b = await readBody(req);
     const token = await loginsOf(app).finish(session.userId, b.id, b.code);
+    // Vérifié avant d'être rangé : un jeton mal relu sur l'écran du CLI est refusé tout de suite, pas découvert plus tard
+    await (app.validateToken || ((t) => validateSubscriptionToken(app, t)))(token);
     await linkLoginToken(app, session.userId, token);
     json(res, { ok: true });
   }, LINK_LIMIT);
