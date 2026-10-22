@@ -5,7 +5,7 @@ import { startLogin, finishLogin, destroySession, getSession, checkOrigin } from
 import { verifyCaptcha } from './captcha.js';
 import { deleteUser, normalizeEmail, getUser } from './users.js';
 import {
-  assertCanRunAi, getLinkState, linkApiKey, linkSubscriptionToken, linkServer, unlink, testLink, lastConsent,
+  assertCanRunAi, getLinkState, startClaudeOauth, finishClaudeOauth, oauthAvailable, linkApiKey, linkSubscriptionToken, linkServer, unlink, testLink, lastConsent,
   MODES,
 } from './claudelink.js';
 import { loginPage } from './site/pages.js';
@@ -189,6 +189,7 @@ export function registerRoutes(router, app) {
   router.get('/link', async ({ res, session, url }) => {
     html(res, linkPage({
       user: session.user, link: await getLinkState(db, session.userId), cliModeEnabled, error: url.searchParams.get('e'),
+      oauth: oauthAvailable(cfg), start: url.searchParams.get('start') === 'claude',
     }));
   });
 
@@ -208,6 +209,16 @@ export function registerRoutes(router, app) {
   };
   router.post('/link/api-key', linkAction((b, s) => linkApiKey(app, s.userId, b.apiKey)), LINK_LIMIT);
   router.post('/link/subscription', linkAction((b, s) => linkSubscriptionToken(app, s.userId, { token: b.token, accept: b.accept })), LINK_LIMIT);
+  // Connexion automatique avec Claude : le POST (case cochée) renvoie vers Anthropic, le GET est le retour d'Anthropic
+  router.post('/link/claude/start', async ({ req, res, session }) => {
+    const b = await readBody(req);
+    try { await startClaudeOauth(app, session.userId, { accept: b.accept }, res); }
+    catch (e) { if (!(e instanceof HttpError)) throw e; redirect(res, `/link?e=${encodeURIComponent(e.message)}`); }
+  }, LINK_LIMIT);
+  router.get('/link/claude/callback', async ({ req, res, session, url }) => {
+    try { await finishClaudeOauth(app, session.userId, url.searchParams, req, res); redirect(res, '/'); }
+    catch (e) { if (!(e instanceof HttpError)) throw e; redirect(res, `/link?e=${encodeURIComponent(e.message)}`); }
+  }, LINK_LIMIT);
   router.post('/link/server', linkAction((b, s) => linkServer(app, s.userId)), LINK_LIMIT);
   router.post('/link/test', async ({ req, res, session }) => {
     const r = await testLink(app, session.userId);

@@ -373,3 +373,8 @@ form.send { margin-top: 6px; padding-top: 0; border-top: 0; }
 form.inline { display: inline-flex; gap: 6px; align-items: end; flex-wrap: wrap; margin: 0; }
 .admin-actions .del summary { list-style: none; cursor: pointer; display: inline-block; }
 .admin-pager { display: flex; gap: 8px; }
+
+/* Page « Relier Claude » : saisie manuelle du jeton, repliée sous le bouton automatique */
+.manual { margin-top: 14px; }
+.manual summary { cursor: pointer; color: var(--muted); }
+.manual form { margin-top: 10px; }

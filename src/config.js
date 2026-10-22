@@ -27,6 +27,28 @@ function appleConfig() {
 }
 
 // Google reCAPTCHA v3 sur le démarrage de la connexion : les deux clés ensemble, ou aucune (reCAPTCHA désactivé, développement)
+/**
+ * Connexion Claude par OAuth (bouton « Se connecter avec Claude »). Désactivée tant qu'aucun client_id n'est fourni :
+ * Anthropic doit avoir enregistré cette application et son adresse de retour (CLAUDE_OAUTH_REDIRECT_URI).
+ */
+function claudeOauthConfig(appUrl) {
+  const clientId = (env.CLAUDE_OAUTH_CLIENT_ID || '').trim();
+  if (!clientId) return null;
+  const url = (name, dflt) => {
+    const v = (env[name] || dflt).trim();
+    if (!/^https:\/\//.test(v)) throw new Error(`${name} doit être une adresse https`);
+    return v;
+  };
+  return {
+    clientId,
+    authorizeUrl: url('CLAUDE_OAUTH_AUTHORIZE_URL', 'https://claude.ai/oauth/authorize'),
+    tokenUrl: url('CLAUDE_OAUTH_TOKEN_URL', 'https://console.anthropic.com/v1/oauth/token'),
+    redirectUri: (env.CLAUDE_OAUTH_REDIRECT_URI || `${appUrl}/link/claude/callback`).trim(),
+    scope: (env.CLAUDE_OAUTH_SCOPE || 'user:inference').trim(),
+    expiresIn: Number(env.CLAUDE_OAUTH_EXPIRES_IN) > 0 ? Math.floor(Number(env.CLAUDE_OAUTH_EXPIRES_IN)) : 31_536_000,
+  };
+}
+
 function recaptchaConfig() {
   const siteKey = (env.RECAPTCHA_SITE_KEY || '').trim();
   const secret = (env.RECAPTCHA_SECRET || '').trim();
@@ -102,6 +124,7 @@ export function loadConfig() {
     },
     apple: appleConfig(),
     recaptcha: recaptchaConfig(),
+    claudeOauth: claudeOauthConfig(required('APP_URL').replace(/\/$/, '')),
     systemSmtp: systemSmtpConfig(),
     inactiveMonths: inactiveMonths(),
     production: env.NODE_ENV === 'production',
