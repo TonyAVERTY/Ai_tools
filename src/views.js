@@ -1,5 +1,6 @@
 import { esc } from './http.js';
 import { STATUSES } from './services/crm.js';
+import { MODE_LABELS, CONSENT_TEXT, CONSENT_CHECKBOX, CONSENT_VERSION } from './claudelink.js';
 
 const fmtDate = (ts) => (ts ? new Date(ts * 1000).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' }) : '—');
 
@@ -74,7 +75,36 @@ export function loginPage(error, { apple = false, bye = false } = {}) {
 
 const PROVIDER_NAMES = { google: 'Google', apple: 'Apple' };
 
-export function accountPage({ user, error }) {
+// Section « Liaison Claude » de Mon compte : état, test, changement de mode, déliaison. Jamais le secret, ni même un masque
+// plus long que les 4 derniers caractères de la clé API.
+function linkSection(link, consent) {
+  if (!link) {
+    return `<section class="card">
+  <h4>Liaison Claude</h4>
+  <p class="muted">Aucun accès Claude n'est relié : l'application reste bloquée sur la page de liaison.</p>
+  <a class="btn primary" href="/link">Relier Claude</a>
+</section>`;
+  }
+  return `<section class="card">
+  <h4>Liaison Claude</h4>
+  <dl class="account">
+    <dt>Mode</dt><dd>${esc(link.label)}</dd>
+    <dt>État</dt><dd>${link.valid ? '<span class="ok">Valide</span>' : '<span class="error">À revalider (teste ou relie de nouveau)</span>'}</dd>
+    ${link.last4 ? `<dt>Clé API</dt><dd>sk-ant-…${esc(link.last4)}</dd>` : ''}
+    <dt>Reliée le</dt><dd>${fmtDate(link.linkedAt)}</dd>
+    <dt>Dernier test</dt><dd>${fmtDate(link.lastTestAt)}</dd>
+    ${link.consentAt ? `<dt>Risque accepté</dt><dd>${fmtDate(link.consentAt)} (texte ${esc(link.consentVersion)})</dd>` : ''}
+  </dl>
+  <div class="row-actions">
+    <form method="post" action="/link/test"><button class="btn">Tester</button></form>
+    <a class="btn" href="/link?change=1">Changer de mode</a>
+    <form method="post" action="/link/unlink"><button class="btn danger">Délier</button></form>
+  </div>
+  <p class="muted small">Délier efface le secret chiffré et annule tes jobs IA en attente ou en cours.${consent && !link.consentAt ? ` Dernier consentement au mode abonnement : ${fmtDate(consent.at)}.` : ''}</p>
+</section>`;
+}
+
+export function accountPage({ user, error, link = null, consent = null, notice = null }) {
   return layout({
     title: 'Mon compte', email: user.email,
     body: `<h1>Mon compte</h1>
@@ -84,6 +114,8 @@ export function accountPage({ user, error }) {
     <dt>Connexion</dt><dd>${esc(PROVIDER_NAMES[user.provider] || '—')}</dd>
   </dl>
 </section>
+${notice ? `<p class="${notice.ok ? 'ok' : 'error'}">${esc(notice.text)}</p>` : ''}
+${linkSection(link, consent)}
 <section class="card">
   <h4>Supprimer mon compte</h4>
   <p class="muted small">Efface définitivement ton compte et toutes tes données : projets, prospects, notes, modèles de mail, journaux d'envoi, jobs, réglages et clones du code. Les adresses qui ont demandé à ne plus être contactées restent dans la liste d'opposition commune. Cette action est irréversible.</p>
@@ -93,6 +125,56 @@ export function accountPage({ user, error }) {
     <button class="btn danger">Supprimer mon compte et mes données</button>
   </form>
 </section>`,
+  });
+}
+
+/**
+ * Page « Relier Claude » : onboarding bloquant. Les trois modes sont des formulaires HTML classiques (POST) ;
+ * la fenêtre d'avertissement du mode abonnement est un <dialog> ouvert par public/app.js.
+ */
+export function linkPage({ user, link, cliModeEnabled, error }) {
+  const intro = link
+    ? `<p class="muted">Accès actuel : <strong>${esc(link.label)}</strong>${link.valid ? '' : ' (à revalider)'}. Relier un autre accès remplace le précédent, dont le secret est effacé.</p>`
+    : '<p class="muted">Pour utiliser AiTools, relie ton propre accès Claude. Les analyses, recherches et rédactions s\'exécutent avec TON accès, jamais celui d\'un autre utilisateur.</p>';
+  const subscription = cliModeEnabled ? `
+<section class="card">
+  <h4>Connexion avec Claude (abonnement)</h4>
+  <p class="muted small">Utilise ton abonnement Claude (Pro, Max) au lieu d'une clé API. Cette option comporte un risque pour ton compte Claude : une fenêtre d'avertissement s'affiche avant de continuer.</p>
+  <button type="button" class="btn" data-open-dialog="consent-dialog">Connexion avec Claude (abonnement)</button>
+</section>
+<dialog class="prospect-dialog" id="consent-dialog" aria-labelledby="consent-title">
+  <form method="post" action="/link/subscription" class="cfg">
+    <h2 id="consent-title">Avant de continuer</h2>
+    <div class="notice card">${CONSENT_TEXT.map((t) => `<p>${esc(t)}</p>`).join('')}</div>
+    <label class="check"><input type="checkbox" name="accept" id="consent-accept" required> ${esc(CONSENT_CHECKBOX)}</label>
+    <p class="muted small">Sur ta propre machine, lance la commande <code>claude setup-token</code>, connecte-toi à ton compte Claude quand le navigateur s'ouvre, puis copie le jeton affiché et colle-le ci-dessous. Le jeton est chiffré, utilisé uniquement pour tes jobs, et n'est jamais réaffiché.</p>
+    <label>Jeton d'abonnement<input name="token" type="password" autocomplete="new-password" spellcheck="false" required></label>
+    <p class="muted small">La vérification lance un appel minimal du CLI : quelques tokens sont décomptés de ton abonnement. Texte d'avertissement version ${esc(CONSENT_VERSION)}.</p>
+    <div class="row-actions">
+      <button type="button" class="btn" data-close-dialog>Annuler</button>
+      <button class="btn primary" id="consent-submit" disabled>Relier avec mon abonnement</button>
+    </div>
+  </form>
+</dialog>` : '';
+  const server = user.isAdmin ? `
+<section class="card">
+  <h4>Claude du serveur (administrateurs)</h4>
+  <p class="muted small">Utilise la configuration du CLI Claude déjà connectée sur la machine qui héberge AiTools.</p>
+  <form method="post" action="/link/server"><button class="btn">Utiliser Claude du serveur</button></form>
+</section>` : '';
+  return layout({
+    title: 'Relier Claude', email: user.email,
+    body: `<h1>Relier Claude</h1>
+${intro}
+${error ? `<p class="error">${esc(error)}</p>` : ''}
+<section class="card">
+  <h4>Clé API Anthropic (recommandé)</h4>
+  <p class="muted small">Crée une clé sur console.anthropic.com puis colle-la ici. Elle est vérifiée sans consommer de tokens, chiffrée, et ne sera plus jamais affichée (seuls ses 4 derniers caractères le seront).</p>
+  <form method="post" action="/link/api-key" class="cfg">
+    <label>Clé API<input name="apiKey" type="password" autocomplete="new-password" spellcheck="false" required placeholder="sk-ant-…"></label>
+    <button class="btn primary">Vérifier et relier</button>
+  </form>
+</section>${subscription}${server}`,
   });
 }
 
@@ -273,13 +355,12 @@ function projectItem(p, smtp, dbCfg, imap) {
 </details>`;
 }
 
-export function dashboardPage({ email, projects, forgejoHost, aiBlocked = null }) {
+export function dashboardPage({ email, projects, forgejoHost }) {
   return layout({
     title: 'Projets', email,
     body: `<div class="row head">
   <h1>Projets</h1>
 </div>
-${aiBlocked ? `<p class="card notice">${esc(aiBlocked)}. En attendant, tu peux créer des projets, gérer tes prospects (CRM, import CSV) et envoyer tes mails ; l'analyse, la recherche de prospects et les évolutions sont indisponibles.</p>` : ''}
 <details class="card new anim">
   <summary class="btn primary">+ Nouveau projet</summary>
   <form data-action="create" class="cfg">

@@ -14,6 +14,8 @@ import { Scheduler } from './services/scheduler.js';
 import { notify, notifyJob } from './services/notify.js';
 import { budgetState, AI_JOBS, quotaState, isQuotaSensitive } from './services/budget.js';
 import { layout } from './views.js';
+import { hasUsableLink, isLinkExempt, LINK_REQUIRED_MESSAGE } from './claudelink.js';
+import { sandboxStartupMessages } from './services/sandbox.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -31,10 +33,11 @@ const SECURITY_HEADERS = {
   'Strict-Transport-Security': 'max-age=31536000',
 };
 
-export async function createApp(cfg, { db, worker = true, createTransport } = {}) {
+// `fetch`, `validateApiKey`, `validateToken`, `syncRepo` : points d'injection pour les tests (aucun appel réseau réel)
+export async function createApp(cfg, { db, worker = true, createTransport, fetch, validateApiKey, validateToken, syncRepo } = {}) {
   db ??= await openDb(cfg.db, { adminEmails: cfg.adminEmails });
   await syncAdmins(db, cfg.adminEmails || []); // ADMIN_EMAILS fait foi pour le rôle admin
-  const app = { db, cfg, createTransport };
+  const app = { db, cfg, createTransport, fetch, validateApiKey, validateToken, syncRepo };
   const router = new Router();
   registerRoutes(router, app);
 
@@ -56,6 +59,13 @@ export async function createApp(cfg, { db, worker = true, createTransport } = {}
           return redirect(res, '/login');
         }
         checkOrigin(req, cfg);
+        // Onboarding bloquant : sans liaison Claude valide, seules la liaison, Mon compte et la déconnexion répondent
+        if (!isLinkExempt(req.method, url.pathname) && !(await hasUsableLink(db, session.userId, { cliModeEnabled: cfg.cliModeEnabled !== false }))) {
+          if (url.pathname.startsWith('/api/') || req.headers.accept?.includes('json')) {
+            return json(res, { error: LINK_REQUIRED_MESSAGE, code: 'link_required' }, 403);
+          }
+          return redirect(res, '/link');
+        }
       }
       await route.handler({ req, res, url, params: route.params, session, app });
     } catch (e) {
@@ -76,7 +86,7 @@ export async function createApp(cfg, { db, worker = true, createTransport } = {}
   let scheduler = null;
   if (worker) {
     w = new Worker(db, makeHandlers(app), {
-      thermalMax: cfg.thermalMax,
+      thermalMax: cfg.thermalMax, cliModeEnabled: cfg.cliModeEnabled !== false,
       onFinish: (job, r) => notifyJob(app, job, r),
       budget: (userId) => budgetState(db, userId),
       isAiJob: (type) => AI_JOBS.has(type),
@@ -121,7 +131,8 @@ export async function createApp(cfg, { db, worker = true, createTransport } = {}
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const cfg = loadConfig();
-  if (!cfg.adminEmails.length) console.warn('ADMIN_EMAILS est vide : aucun administrateur (personne ne pourra lancer de job IA).');
+  if (!cfg.adminEmails.length) console.warn('ADMIN_EMAILS est vide : aucun administrateur (personne ne pourra utiliser le mode « Claude du serveur »).');
+  for (const m of sandboxStartupMessages(cfg.sandbox)) console.warn(m);
   const app = await createApp(cfg);
   app.server.listen(cfg.port, cfg.host, () => console.log(`AiTools sur http://${cfg.host}:${cfg.port} (${cfg.appUrl})`));
   const shutdown = () => app.close().then(() => process.exit(0), (e) => { console.error(e); process.exit(1); });

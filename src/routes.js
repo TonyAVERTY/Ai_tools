@@ -2,8 +2,12 @@ import { now, getSetting, setSetting } from './db.js';
 import { encrypt, encryptJson, decryptJson, verifyUnsubToken } from './crypto.js';
 import { html, json, redirect, readBody, HttpError } from './http.js';
 import { startLogin, finishLogin, destroySession } from './auth.js';
-import { canRunAi, assertCanRunAi, AI_BLOCKED_MESSAGE, deleteUser, normalizeEmail } from './users.js';
-import { loginPage, dashboardPage, settingsPage, unsubPage, accountPage } from './views.js';
+import { deleteUser, normalizeEmail } from './users.js';
+import {
+  assertCanRunAi, getLinkState, linkApiKey, linkSubscriptionToken, linkServer, unlink, testLink, lastConsent,
+  MODES,
+} from './claudelink.js';
+import { loginPage, dashboardPage, settingsPage, unsubPage, accountPage, linkPage } from './views.js';
 import { enqueue, latestJobs, cancelJob, usageSummary } from './services/jobs.js';
 import { validateGitUrl, removeRepo } from './services/git.js';
 import { fetchRecap, clearRecapCache, validateSelect } from './services/recap.js';
@@ -32,6 +36,8 @@ const pid = (params) => Number(params.id);
 
 export function registerRoutes(router, app) {
   const { db, cfg } = app;
+  const cliModeEnabled = cfg.cliModeEnabled !== false;
+  const aiOpts = { cliModeEnabled };
 
   // Toute ressource métier est lue AVEC l'utilisateur courant : celle d'un autre compte est « introuvable » (404)
   const project = (ctx, opts) => getProject(app, pid(ctx.params), { userId: ctx.session.userId, ...opts });
@@ -84,7 +90,6 @@ export function registerRoutes(router, app) {
     }
     html(res, dashboardPage({
       email: session.email, projects, forgejoHost: await getSetting(db, userId, 'forgejo_host'),
-      aiBlocked: canRunAi(session.user) ? null : AI_BLOCKED_MESSAGE,
     }));
   });
 
@@ -145,9 +150,51 @@ export function registerRoutes(router, app) {
     redirect(res, '/settings?ok');
   });
 
+  // ---------- Liaison Claude ----------
+  // Page d'onboarding (bloquante tant qu'aucune liaison valide n'existe). Les secrets arrivent par POST, ne sont jamais
+  // relus ni réaffichés ; les erreurs ne contiennent que des messages fixes.
+  router.get('/link', async ({ res, session, url }) => {
+    html(res, linkPage({
+      user: session.user, link: await getLinkState(db, session.userId), cliModeEnabled, error: url.searchParams.get('e'),
+    }));
+  });
+
+  const wantsJson = (req) => !!req.headers.accept?.includes('json');
+  // Formulaire HTML : l'erreur revient sur la page de liaison ; appel JSON : code HTTP + { error }
+  const linkAction = (fn, okTo = '/') => async ({ req, res, session }) => {
+    const b = await readBody(req);
+    try {
+      const out = (await fn(b, session)) || {};
+      if (wantsJson(req)) return json(res, { ok: true, ...out });
+      redirect(res, okTo);
+    } catch (e) {
+      if (!(e instanceof HttpError) || wantsJson(req)) throw e;
+      redirect(res, `/link?e=${encodeURIComponent(e.message)}`);
+    }
+  };
+  router.post('/link/api-key', linkAction((b, s) => linkApiKey(app, s.userId, b.apiKey)));
+  router.post('/link/subscription', linkAction((b, s) => linkSubscriptionToken(app, s.userId, { token: b.token, accept: b.accept })));
+  router.post('/link/server', linkAction((b, s) => linkServer(app, s.userId)));
+  router.post('/link/test', async ({ req, res, session }) => {
+    const r = await testLink(app, session.userId);
+    if (wantsJson(req)) return json(res, r);
+    redirect(res, `/account?t=${r.ok ? 'ok' : 'ko'}&m=${encodeURIComponent(r.message)}`);
+  });
+  router.post('/link/unlink', async ({ req, res, session }) => {
+    const cancelled = await unlink(app, session.userId);
+    if (wantsJson(req)) return json(res, { ok: true, cancelled });
+    redirect(res, '/account?t=unlinked');
+  });
+
   // ---------- Mon compte ----------
   router.get('/account', async ({ res, session, url }) => {
-    html(res, accountPage({ user: session.user, error: url.searchParams.get('e') }));
+    const t = url.searchParams.get('t');
+    html(res, accountPage({
+      user: session.user, error: url.searchParams.get('e'), link: await getLinkState(db, session.userId),
+      consent: await lastConsent(db, session.userId), cliModeEnabled,
+      notice: t === 'unlinked' ? { ok: true, text: 'Liaison supprimée : le secret a été effacé et tes jobs IA en attente ont été annulés.' }
+        : t === 'ok' || t === 'ko' ? { ok: t === 'ok', text: String(url.searchParams.get('m') || '').slice(0, 300) } : null,
+    }));
   });
 
   // Suppression du compte : confirmée en saisissant son email ; efface TOUTES les données de l'utilisateur
@@ -182,7 +229,9 @@ export function registerRoutes(router, app) {
     const queue = (await db.prepare(`SELECT COUNT(*) n FROM jobs WHERE user_id = ? AND (status = 'running'
       OR (status = 'queued' AND (run_after IS NULL OR run_after <= ?)))`).get(userId, now())).n;
     const scheduled = (await db.prepare("SELECT COUNT(*) n FROM jobs WHERE user_id = ? AND status = 'queued' AND run_after > ?").get(userId, now())).n;
-    const rlRaw = await getSetting(db, userId, 'claude_rate_limit_json');
+    const link = await getLinkState(db, userId);
+    // Le quota d'abonnement n'existe qu'en mode abonnement ou serveur : jamais de barre en mode clé API
+    const rlRaw = link?.mode === MODES.api_key ? null : await getSetting(db, userId, 'claude_rate_limit_json');
     // Détail pour le menu « jobs » de la barre du haut : en cours d'abord, puis la file, puis les programmés
     const jobs = (await db.prepare(`SELECT j.id, j.type, j.status, j.progress_json, j.run_after, j.started_at, j.created_at, p.id pid, p.name project
       FROM jobs j LEFT JOIN projects p ON p.id = j.project_id
@@ -194,7 +243,7 @@ export function registerRoutes(router, app) {
     }));
     json(res, {
       temp: session.user.isAdmin ? cpuTemp() : null, queue, scheduled, jobs, usage: await usageSummary(db, userId), budget: await budgetState(db, userId), thermalMax: cfg.thermalMax,
-      claudeRateLimit: rlRaw ? JSON.parse(rlRaw) : null,
+      claudeRateLimit: rlRaw ? JSON.parse(rlRaw) : null, linkMode: link?.mode ?? null,
     });
   });
 
@@ -214,9 +263,7 @@ export function registerRoutes(router, app) {
     let id;
     try { id = await createProject(app, { userId, name, gitUrl }); }
     catch (e) { if (await exists()) throw new HttpError(409, 'Ce dépôt est déjà un projet'); throw e; }
-    // L'analyse initiale utilise Claude : réservée aux admins tant que la liaison Claude n'existe pas
-    if (!canRunAi(session.user)) return json(res, { id, aiBlocked: AI_BLOCKED_MESSAGE });
-    await enqueue(db, { userId, projectId: id, type: 'analyze' });
+    await enqueue(db, { userId, projectId: id, type: 'analyze' }, aiOpts);
     json(res, { id });
   });
 
@@ -271,14 +318,14 @@ export function registerRoutes(router, app) {
 
   const jobRoute = (type, paramsOf = () => ({}), guard = () => {}) => async (ctx) => {
     const { req, res, session } = ctx;
-    // Refus côté serveur AVANT toute autre vérification : pas de job IA sans liaison Claude (enqueue le revérifie)
-    if (AI_JOBS.has(type)) assertCanRunAi(session.user);
+    // Refus côté serveur AVANT toute autre vérification : pas de job IA sans liaison Claude valide (enqueue le revérifie)
+    if (AI_JOBS.has(type)) await assertCanRunAi(db, session.userId, aiOpts);
     const p = await project(ctx);
     const b = req.headers['content-type']?.includes('json') ? await readBody(req) : {};
     await guard(p, b);
     // "Cette nuit" : démarrage au prochain créneau 1h-6h (Pi au frais, quota Claude libre)
     const runAfter = b.when === 'night' ? Math.floor(nextNightSlot().getTime() / 1000) : null;
-    const r = await enqueue(db, { userId: session.userId, projectId: p.id, type, params: paramsOf(b), runAfter });
+    const r = await enqueue(db, { userId: session.userId, projectId: p.id, type, params: paramsOf(b), runAfter }, aiOpts);
     const budget = AI_JOBS.has(type) ? await budgetState(db, session.userId) : null;
     json(res, { ...r, budgetBlocked: budget?.blocked ? budget.reason : null });
   };
