@@ -107,8 +107,8 @@ export async function getTemplate(db, projectId, kind, { validatedOnly = false }
 export async function saveTemplate(db, projectId, kind, { subject = '', subjectB = null, body, status = 'draft' }) {
   if (!TEMPLATE_KINDS.includes(kind)) throw new HttpError(400, 'Type de modèle inconnu');
   await db.prepare(`INSERT INTO templates(project_id, kind, subject, subject_b, body, status, updated_at) VALUES(?, ?, ?, ?, ?, ?, ?)
-    ON DUPLICATE KEY UPDATE subject = VALUES(subject), subject_b = VALUES(subject_b),
-      body = VALUES(body), status = VALUES(status), updated_at = VALUES(updated_at)`)
+    ON CONFLICT(project_id, kind) DO UPDATE SET subject = excluded.subject, subject_b = excluded.subject_b,
+      body = excluded.body, status = excluded.status, updated_at = excluded.updated_at`)
     .run(projectId, kind, subject, kind === 'initial' ? (subjectB || null) : null, body, status, now());
 }
 
