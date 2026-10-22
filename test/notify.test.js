@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
-import { openDb, now, setSetting } from '../src/db.js';
+import { now, setSetting } from '../src/db.js';
+import { testDb } from './helpers/db.js';
 import { encrypt } from '../src/crypto.js';
 import { notify, notifyJob, WEBHOOK_RE } from '../src/services/notify.js';
 import { Worker, enqueue } from '../src/services/jobs.js';
@@ -10,16 +11,16 @@ import { createProject, saveSecretConfig } from '../src/projects.js';
 
 const HOOK = 'https://discord.com/api/webhooks/123456789012345678/abcdefghijklmnopqrstuvwxyz-ABC_123';
 
-function setup({ events } = {}) {
-  const db = openDb(':memory:');
+async function setup({ events } = {}) {
+  const db = await testDb();
   const sent = [];
   const app = {
     db, cfg: { secretKey: randomBytes(32), appUrl: 'https://ai.test' },
     fetch: async (url, opts) => { sent.push({ url, body: JSON.parse(opts.body) }); return { ok: true, status: 204 }; },
   };
-  setSetting(db, 'discord_webhook_enc', encrypt(app.cfg.secretKey, HOOK));
-  if (events) setSetting(db, 'discord_events', JSON.stringify(events));
-  const id = createProject(app, { name: 'MonEspacePro', gitUrl: 'https://g/T/M.git' });
+  await setSetting(db, 'discord_webhook_enc', encrypt(app.cfg.secretKey, HOOK));
+  if (events) await setSetting(db, 'discord_events', JSON.stringify(events));
+  const id = await createProject(app, { name: 'MonEspacePro', gitUrl: 'https://g/T/M.git' });
   return { db, app, sent, id };
 }
 
@@ -33,7 +34,7 @@ test('validation stricte de l\'URL de webhook', () => {
 });
 
 test('notif : forme du message, aucune mention possible', async () => {
-  const s = setup();
+  const s = await setup();
   assert.equal(await notify(s.app, 'reply', { title: '@everyone Boulangerie', description: 'x', level: 'ok', fields: [{ name: 'a', value: '' }] }), true);
   const b = s.sent[0].body;
   assert.equal(s.sent[0].url, HOOK);
@@ -44,7 +45,7 @@ test('notif : forme du message, aucune mention possible', async () => {
 });
 
 test('événement désactivé, webhook absent ou Discord en panne : rien ne casse', async () => {
-  const s = setup({ events: ['job_error'] });
+  const s = await setup({ events: ['job_error'] });
   assert.equal(await notify(s.app, 'reply', { title: 'x' }), false);
   assert.equal(s.sent.length, 0);
   assert.equal(await notify(s.app, 'reply', { title: 'x' }, { force: true }), true, 'le bouton de test force l\'envoi');
@@ -55,12 +56,12 @@ test('événement désactivé, webhook absent ou Discord en panne : rien ne cass
     s.app.fetch = async () => { throw new Error('réseau'); };
     assert.equal(await notify(s.app, 'job_error', { title: 'x' }), false);
   } finally { console.warn = warn; }
-  setSetting(s.db, 'discord_webhook_enc', null);
+  await setSetting(s.db, 'discord_webhook_enc', null);
   assert.equal(await notify(s.app, 'job_error', { title: 'x' }), false);
 });
 
 test('fin de job : succès, erreur, relances, et silence pour les jobs courts', async () => {
-  const s = setup();
+  const s = await setup();
   const job = (type) => ({ type, project_id: s.id });
   await notifyJob(s.app, job('prospect'), { status: 'done', result: { found: 7, requested: 10 } });
   await notifyJob(s.app, job('send'), { status: 'error', error: 'SMTP refusé' });
@@ -76,24 +77,24 @@ test('fin de job : succès, erreur, relances, et silence pour les jobs courts', 
 });
 
 test('le worker notifie en fin de job, et un callback qui plante ne le bloque pas', async () => {
-  const s = setup();
+  const s = await setup();
   const seen = [];
   const w = new Worker(s.db, { prospect: async () => ({ found: 2, requested: 5 }), evolution: async () => { throw new Error('boom'); } }, {
     thermalMax: 999, log: { error() {} },
     onFinish: (job, r) => { seen.push(`${job.type}:${r.status}`); if (job.type === 'evolution') throw new Error('callback cassé'); },
   });
-  enqueue(s.db, { projectId: s.id, type: 'prospect' });
-  enqueue(s.db, { projectId: s.id, type: 'evolution' });
+  await enqueue(s.db, { projectId: s.id, type: 'prospect' });
+  await enqueue(s.db, { projectId: s.id, type: 'evolution' });
   await w.tick(); await w.tick();
   assert.deepEqual(seen, ['prospect:done', 'evolution:error']);
-  assert.equal(s.db.prepare("SELECT COUNT(*) n FROM jobs WHERE status IN ('done','error')").get().n, 2);
+  assert.equal((await s.db.prepare("SELECT COUNT(*) n FROM jobs WHERE status IN ('done','error')").get()).n, 2);
 });
 
 test('nouvelles réponses détectées → une notif avec les entreprises', async () => {
-  const s = setup();
-  saveSecretConfig(s.app, s.id, 'smtp_enc', { host: 'h', user: 'u', pass: 'p', fromEmail: 'a@x.fr' }, 'pass');
-  saveSecretConfig(s.app, s.id, 'imap_enc', { host: 'imap.x' }, 'pass');
-  s.db.prepare("INSERT INTO prospects(project_id, company, email, status, sent_at, created_at) VALUES(?, 'Le Fournil', 'contact@fournil.fr', 'sent', ?, ?)").run(s.id, now(), now());
+  const s = await setup();
+  await saveSecretConfig(s.app, s.id, 'smtp_enc', { host: 'h', user: 'u', pass: 'p', fromEmail: 'a@x.fr' }, 'pass');
+  await saveSecretConfig(s.app, s.id, 'imap_enc', { host: 'imap.x' }, 'pass');
+  await s.db.prepare("INSERT INTO prospects(project_id, company, email, status, sent_at, created_at) VALUES(?, 'Le Fournil', 'contact@fournil.fr', 'sent', ?, ?)").run(s.id, now(), now());
   s.app.fetchInbox = async () => ({ uidValidity: '1', lastUid: 1, messages: [{ uid: 1, from: 'contact@fournil.fr', subject: 'Re: idée' }] });
   await checkInbox(s.app, s.id);
   assert.equal(s.sent.length, 1);
