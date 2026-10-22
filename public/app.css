@@ -409,3 +409,13 @@ form.inline { display: inline-flex; gap: 6px; align-items: end; flex-wrap: wrap;
 .inline-form select { width: auto; min-width: 9em; }
 input.copy { width: 100%; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .82rem; }
 @media (max-width: 1020px) { .sys { order: 3; flex-basis: 100%; } }
+
+/* LinkedIn */
+.li-head { align-items: center; flex-wrap: wrap; gap: 8px 16px; }
+.li-head p { margin: 0; }
+.li-gen, .li-draft { margin: 14px 0; }
+.li-gen textarea, .li-draft textarea { width: 100%; resize: vertical; }
+.li-draft textarea { min-height: 220px; line-height: 1.5; }
+.li-history { margin-top: 14px; }
+.li-history .card { margin: 10px 0; padding: 12px 14px; }
+.li-text { white-space: pre-wrap; margin: 0; }

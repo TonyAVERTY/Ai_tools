@@ -17,7 +17,11 @@ if ((process.env.CLAUDE_CODE_OAUTH_TOKEN || '').includes('REVOKED')) {
   process.exit(1);
 }
 const profile = { resume: 'Cartes de fidélité digitales.', proposition_valeur: 'Fidélisez sans carton.', fonctionnalites: ['tampons'], stack: 'node', modele_eco: 'abonnement', cible: { description: 'commerces de proximité', secteurs: ['boulangerie'], zone: 'Bretagne', taille: 'TPE', decideur: 'gérant', requetes: ['boulangerie rennes'] }, arguments: ['simple'], ton: 'direct' };
-const lines = prompt.includes('ENVDUMP') ? ['```json\n' + JSON.stringify({ env: process.env, cwd: process.cwd() }) + '\n```']
+// Post LinkedIn : reprend la direction donnée (si elle existe) ; un 2e passage (brouillons déjà produits) donne un autre texte
+const liDirection = /Direction donnée par l'auteur \(le sujet du post\) : « (.*?) »/s.exec(prompt)?.[1];
+const liPost = () => JSON.stringify({ post: `${prompt.includes('Brouillons déjà produits') ? 'Autre angle' : 'Premier angle'} : ${liDirection ? `sur ${liDirection}` : 'sujet choisi par Claude'}. ${'Un texte de post assez long pour passer le contrôle de taille. '.repeat(2)}` });
+const lines = prompt.includes('UN post LinkedIn') ? [liPost()]
+  : prompt.includes('ENVDUMP') ? ['```json\n' + JSON.stringify({ env: process.env, cwd: process.cwd() }) + '\n```']
   : prompt.includes('fiche commerciale') ? ['```json\n' + JSON.stringify(profile) + '\n```']
   : prompt.includes('mail de RELANCE') ? ['{"body":"Petite relance : toujours partant, {{entreprise}} ?"}']
   : prompt.includes('email de prospection') ? ['{"subject":"Idée pour {{entreprise}}","body":"{{accroche}}\\n\\nBonjour {{entreprise}} à {{ville}}.\\n\\n{{expediteur}}"}']

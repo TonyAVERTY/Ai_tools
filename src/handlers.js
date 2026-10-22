@@ -3,7 +3,8 @@ import { now, getSetting, setSetting } from './db.js';
 import { runClaude, extractJson, rateLimitWindows } from './services/claude.js';
 import { addUsage } from './services/jobs.js';
 import { syncRepo } from './services/git.js';
-import { analyzePrompt, prospectPrompt, templatePrompt, followupTemplatePrompt, evolutionPrompt, LEVELS } from './services/prompts.js';
+import { analyzePrompt, prospectPrompt, templatePrompt, followupTemplatePrompt, evolutionPrompt, linkedinPostPrompt, LEVELS } from './services/prompts.js';
+import { linkedinAccount, saveDraft, recentDrafts } from './linkedin.js';
 import { followupCandidates, followupSubject, isBusinessHours } from './services/followup.js';
 import { EMAIL_RE, createTransport, buildProspectMail, allowedToSend, makeMessageId } from './services/mailer.js';
 import { unsubToken } from './crypto.js';
@@ -303,6 +304,28 @@ export function makeHandlers(app) {
       if (!t.body) throw new Error('Modèle de relance invalide');
       await saveTemplate(db, project.id, 'followup', { subject: '', body: t.body });
       return { ok: true };
+    },
+
+    // Brouillon de post LinkedIn : direction facultative ; sans elle Claude choisit l'angle. Rien n'est publié ici.
+    async linkedin_post(ctx) {
+      const userId = ctx.job.user_id;
+      const project = await getProject(app, ctx.job.project_id, { userId });
+      if (!project.profile) throw new Error("Analyse le projet d'abord");
+      const account = await linkedinAccount(db, project.id);
+      if (!account) throw new Error("Connecte LinkedIn à ce projet d'abord");
+      const direction = String(ctx.params.direction ?? '').trim().slice(0, 500);
+      await ctx.progress({ message: direction ? 'Rédaction du post selon ta direction…' : 'Claude choisit un angle et rédige le post…', pct: 40 });
+      const { prompt, system } = linkedinPostPrompt({
+        profile: project.profile, target: project.target || {}, direction, previous: await recentDrafts(db, project.id), author: account.name,
+      });
+      const model = await getSetting(db, userId, 'analyze_model', 'haiku');
+      const r = await claude(userId, { prompt, system, model: ['haiku', 'sonnet'].includes(model) ? model : 'haiku', maxTurns: 1, tools: [], signal: ctx.signal });
+      addUsage(ctx, r);
+      let body = '';
+      try { body = String(extractJson(r.text).post ?? ''); } catch { body = ''; }
+      body = body.replace(/\r\n/g, '\n').trim().slice(0, 3000);
+      if (body.length < 50) throw new Error('Claude n\'a pas produit de post exploitable : réessaie');
+      return { ok: true, postId: await saveDraft(db, project.id, { body, direction }) };
     },
 
     send: (ctx) => sendMails(ctx, 'initial'),

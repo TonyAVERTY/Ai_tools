@@ -27,6 +27,18 @@ function appleConfig() {
 }
 
 // Google reCAPTCHA v3 sur le démarrage de la connexion : les deux clés ensemble, ou aucune (reCAPTCHA désactivé, développement)
+/**
+ * LinkedIn (connexion d'un compte à un projet, publication de posts). Désactivé sans clés : il faut une application sur
+ * developer.linkedin.com avec les produits « Sign In with LinkedIn using OpenID Connect » et « Share on LinkedIn ».
+ */
+function linkedinConfig(appUrl) {
+  const clientId = (env.LINKEDIN_CLIENT_ID || '').trim();
+  const clientSecret = (env.LINKEDIN_CLIENT_SECRET || '').trim();
+  if (!clientId && !clientSecret) return null;
+  if (!clientId || !clientSecret) throw new Error('LinkedIn : LINKEDIN_CLIENT_ID et LINKEDIN_CLIENT_SECRET vont ensemble');
+  return { clientId, clientSecret, redirectUri: (env.LINKEDIN_REDIRECT_URI || `${appUrl}/linkedin/callback`).trim() };
+}
+
 function recaptchaConfig() {
   const siteKey = (env.RECAPTCHA_SITE_KEY || '').trim();
   const secret = (env.RECAPTCHA_SECRET || '').trim();
@@ -102,6 +114,7 @@ export function loadConfig() {
     },
     apple: appleConfig(),
     recaptcha: recaptchaConfig(),
+    linkedin: linkedinConfig(required('APP_URL').replace(/\/$/, '')),
     systemSmtp: systemSmtpConfig(),
     inactiveMonths: inactiveMonths(),
     production: env.NODE_ENV === 'production',
