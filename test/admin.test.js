@@ -79,7 +79,7 @@ test('liste des comptes : identité, plan, statut, dates, mode de liaison et usa
     await s.db.prepare("INSERT INTO user_settings(user_id, `key`, value) VALUES(?, 'smtp_enc', 'SMTPCHIFFRE')").run(bob.id);
 
     const page = await (await admin.get('/admin', html)).text();
-    for (const f of ['bob@exemple.fr', 'tony@x.fr', 'Google', 'gratuit', 'actif', 'Clé API Anthropic', 'P 1/1', 'Pr 1/50', 'M 0/100', 'IA 0/5', '15/01/2027']) assert.ok(page.includes(f), f);
+    for (const f of ['bob@exemple.fr', 'tony@x.fr', 'Google', 'gratuit', 'actif', 'Clé API Anthropic', 'P 1/1', 'Pr 1/50', 'M 0/100', 'IA 0/6', '15/01/2027']) assert.ok(page.includes(f), f);
     for (const secret of [SECRET, 'SECRETSECRET', '1234</', 'secret_enc', link.secret_enc, 'SMTPCHIFFRE', 'ProjetConfidentiel', 'secret.git', 'RESUMEPRIVE', 'EntreprisePrivee', 'client@prive.fr', 'ACCROCHEPRIVEE', 'NOTEPRIVEE', 'OBJETPRIVE']) {
       assert.ok(!page.includes(secret), `la page d'administration ne doit pas contenir « ${secret} »`);
     }

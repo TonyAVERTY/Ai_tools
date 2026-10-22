@@ -35,15 +35,35 @@ export const RATE_LIMITS = {
  * Plafonds par plan. `null` = illimité.
  *  - `projects` et `prospects` : totaux du compte ;
  *  - `mails` et `aiJobs` : par mois calendaire, heure de Paris.
- * Le plan « pro » n'est pas encore défini commercialement : illimité en attendant (voir docs/JOURNAL.md).
+ * Le plan « pro » est un ancien plan illimité attribué à la main : il reste tel quel pour ne retirer l'accès à personne,
+ * mais il n'est pas proposé sur la page Tarifs.
+ *
+ * Les offres payantes respectent deux contraintes du serveur :
+ *  - `mails` ne dépasse jamais 300 × 30 : un compte ne peut pas envoyer plus de 300 mails par 24 h (voir README) ;
+ *  - `aiJobs` couvre au moins `prospects / 50` recherches (une recherche ramène 50 contacts au plus), plus l'analyse et les modèles.
  */
 export const PLAN_LIMITS = {
-  free: { projects: 1, prospects: 50, mails: 100, aiJobs: 5 },
+  free: { projects: 1, prospects: 50, mails: 100, aiJobs: 6 },
+  starter: { projects: 2, prospects: 300, mails: 500, aiJobs: 20 },
+  growth: { projects: 5, prospects: 1000, mails: 1500, aiJobs: 60 },
+  business: { projects: 10, prospects: 3000, mails: 4000, aiJobs: 150 },
+  intensive: { projects: 25, prospects: 10000, mails: 8000, aiJobs: 400 },
   pro: { projects: null, prospects: null, mails: null, aiJobs: null },
   admin: { projects: null, prospects: null, mails: null, aiJobs: null },
 };
-export const PLAN_LABELS = { free: 'gratuit', pro: 'pro', admin: 'administrateur' };
-export const PAID_PLANS = ['free', 'pro']; // plans qu'un administrateur peut attribuer depuis le back-office
+export const PLAN_LABELS = {
+  free: 'gratuit', starter: 'Démarrage', growth: 'Croissance', business: 'Business', intensive: 'Intensif',
+  pro: 'pro (illimité)', admin: 'administrateur',
+};
+
+/**
+ * Offres payantes : prix mensuel TTC en euros. L'éditeur est en franchise de TVA (art. 293 B du CGI) : le prix TTC est le prix payé.
+ * En annuel, 2 mois sont offerts : on paie 10 mois et on en profite 12.
+ */
+export const PLAN_PRICES = { starter: 10, growth: 25, business: 50, intensive: 100 };
+export const ANNUAL_FREE_MONTHS = 2;
+export const annualPrice = (plan) => PLAN_PRICES[plan] * (12 - ANNUAL_FREE_MONTHS);
+export const PAID_PLANS = ['free', ...Object.keys(PLAN_PRICES), 'pro']; // plans qu'un administrateur peut attribuer depuis le back-office
 
 /** Détection d'abus à l'envoi : pause du compte quand trop de mails sont rejetés. */
 export const ABUSE = {

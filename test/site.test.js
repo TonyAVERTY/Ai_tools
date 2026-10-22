@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { startApp, APP_URL } from './helpers/server.js';
 import { LEGAL_MARKERS } from '../src/site/legal.js';
+import { PLAN_LIMITS, PLAN_PRICES, PLAN_LABELS, ANNUAL_FREE_MONTHS, annualPrice } from '../src/limits.js';
 import { CONSENT_CHECKBOX } from '../src/claudelink.js';
 
 let s;
@@ -202,9 +203,13 @@ test('textes : faits réels du statut, tarifs sans prix inventé, aucun terme in
   }
   const tarifs = await text('/tarifs');
   assert.match(tarifs, /Bientôt/);
-  for (const n of ['>1<', '>50<', '>100<', '>5<']) assert.ok(tarifs.includes(`<strong>${n.slice(1, -1)}</strong>`), n);
-  assert.doesNotMatch(tarifs.replace(/0 €/g, ''), /\d\s?€|€\s?\d/, 'aucun prix inventé');
+  for (const n of Object.values(PLAN_LIMITS.free)) assert.ok(tarifs.includes(`<strong>${n}</strong>`), `plan gratuit : ${n}`);
+  // Les seuls montants permis sont ceux de la configuration (prix mensuels, annuels, équivalent mensuel, prix de 12 mois)
+  const allowed = new Set(['0']);
+  for (const [k, m] of Object.entries(PLAN_PRICES)) for (const v of [m, annualPrice(k), m * 12, (annualPrice(k) / 12).toFixed(2).replace('.', ',')]) allowed.add(String(v).replace(/,00$/, ''));
+  for (const m of tarifs.matchAll(/(\d+(?:,\d+)?)\u00a0?\s?€/g)) assert.ok(allowed.has(m[1]), `montant non prévu : ${m[0]}`);
   assert.match(tarifs, /appliqués par le serveur/);
+  assert.match(tarifs, /franchise de TVA \(art\. 293 B du CGI\)/);
   assert.doesNotMatch(tarifs, /pas encore appliqu/);
   assert.match(tarifs, /suspendu ou fermé/);
 
@@ -324,4 +329,33 @@ test('liens entre pages : chaque lien et chaque image du site mène quelque part
   assert.match(html['/'], /data-count="50"/);
   assert.ok((html['/'].match(/<img src="\/static\/img\//g) || []).length >= 5);
   assert.doesNotMatch(html['/'], /<img(?![^>]*\salt="[^"]+")/, 'toutes les images ont un texte alternatif');
+});
+
+test('offres : prix de 10 à 100 € TTC, annuel = 2 mois offerts, plafonds tenables par le serveur et croissants', async () => {
+  const keys = Object.keys(PLAN_PRICES);
+  const prices = keys.map((k) => PLAN_PRICES[k]);
+  assert.equal(Math.min(...prices), 10);
+  assert.equal(Math.max(...prices), 100);
+  assert.deepEqual(prices, [...prices].sort((a, b) => a - b), 'prix croissants');
+  assert.equal(ANNUAL_FREE_MONTHS, 2);
+  const h = await text('/tarifs');
+  let prev = PLAN_LIMITS.free;
+  for (const k of keys) {
+    assert.equal(annualPrice(k), PLAN_PRICES[k] * 10, `${k} : 12 mois pour le prix de 10`);
+    const l = PLAN_LIMITS[k];
+    for (const kind of ['projects', 'prospects', 'mails', 'aiJobs']) assert.ok(l[kind] > prev[kind], `${k} : ${kind} plus large que l'offre précédente`);
+    assert.ok(l.mails <= 300 * 30, `${k} : ${l.mails} mails par mois dépasserait le plafond de 300 par 24 h`);
+    assert.ok(l.aiJobs >= Math.ceil(l.prospects / 50), `${k} : assez de tâches IA pour trouver ${l.prospects} contacts`);
+    prev = l;
+    // la page montre le nom, les deux prix, l'équivalent mensuel et les plafonds
+    assert.ok(h.includes(`>${PLAN_LABELS[k]} <span class="badge warn">Bientôt`), `${k} : carte`);
+    assert.ok(h.includes(`${PLAN_PRICES[k]}\u00a0€ <small>par mois, TTC`), `${k} : prix mensuel`);
+    assert.ok(h.includes(`${annualPrice(k)}\u00a0€ <small>par an, TTC`), `${k} : prix annuel`);
+    assert.ok(h.includes(`<strong>${l.mails.toLocaleString('fr-FR')}</strong>`), `${k} : mails`);
+  }
+  assert.match(h, /id="bill-year"/);
+  assert.match(h, /2 mois offerts/);
+  // L'ancien plan illimité n'est pas vendu ; un plan inconnu retombe sur « gratuit »
+  assert.ok(!h.includes('illimité)'));
+  assert.deepEqual(Object.keys(PLAN_PRICES).filter((k) => PLAN_LIMITS[k].projects == null), [], 'aucune offre payante illimitée');
 });
