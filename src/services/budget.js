@@ -3,7 +3,7 @@
 import { getSetting, setSetting, now } from '../db.js';
 
 // Jobs qui appellent Claude (les envois et relances n'en consomment pas)
-export const AI_JOBS = new Set(['analyze', 'prospect', 'template', 'followup_template', 'evolution']);
+export const AI_JOBS = new Set(['analyze', 'prospect', 'template', 'followup_template', 'evolution', 'linkedin_post']);
 
 const usd = (n) => `${n.toFixed(2)} $`;
 

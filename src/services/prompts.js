@@ -86,6 +86,33 @@ Réponds UNIQUEMENT avec : {"body":"..."}`,
   };
 }
 
+/**
+ * Post LinkedIn pour un projet. `direction` (facultative) donne le sujet ; sans elle Claude choisit l'angle. `previous` =
+ * brouillons déjà produits, pour que « Régénérer » donne un autre post et pas une variante du même.
+ */
+export function linkedinPostPrompt({ profile, target, direction = '', previous = [], author = '' }) {
+  return {
+    system: SYSTEM_FR,
+    prompt: `Rédige UN post LinkedIn, en français, publié par ${author || 'le fondateur'} à propos de ce projet :
+Produit : ${profile.resume}
+Valeur : ${profile.proposition_valeur}
+Arguments : ${(profile.arguments || []).join(' ; ')}
+Public visé : ${target?.description || 'professionnels susceptibles d\'en avoir besoin'}
+Ton : ${profile.ton || 'direct et chaleureux'}
+
+${direction
+    ? `Direction donnée par l'auteur (le sujet du post) : « ${direction} »`
+    : "Aucune direction donnée : choisis toi-même un angle utile et crédible pour le public visé (un problème fréquent et comment l'aborder, un retour d'expérience plausible, les coulisses du produit, un conseil concret)."}
+${previous.length ? `\nBrouillons déjà produits, à ne PAS reprendre (change l'angle, l'accroche et la structure) :\n${previous.map((p) => `---\n${String(p).slice(0, 400)}`).join('\n')}\n---\n` : ''}
+Règles :
+- 600 à 1 200 caractères, en courts paragraphes aérés. La première ligne est une accroche qui donne envie de lire la suite (pas de « Je suis ravi d'annoncer »).
+- N'invente RIEN : aucun chiffre, client, témoignage, résultat, citation ni lien qui ne figure pas dans les informations ci-dessus. Aucune promesse de résultat.
+- Première personne, ton naturel, sans jargon ni formules creuses. 3 emojis au plus, 3 hashtags au plus, à la fin.
+- Termine par une question ou une invitation simple à en discuter en commentaire.
+Réponds UNIQUEMENT avec : {"post":"..."}`,
+  };
+}
+
 export const LEVELS = {
   rapide: { model: 'haiku', maxTurns: 12, files: 8 },
   normal: { model: 'sonnet', maxTurns: 20, files: 15 },

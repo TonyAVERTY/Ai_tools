@@ -52,7 +52,7 @@
   const ACTIVE = ['queued', 'running'];
   const LABELS = {
     analyze: 'Analyse', prospect: 'Recherche', template: 'Modèle', send: 'Envoi', evolution: 'Évolutions',
-    followup_template: 'Modèle de relance', followup: 'Relances',
+    followup_template: 'Modèle de relance', followup: 'Relances', linkedin_post: 'Post LinkedIn',
   };
 
   // Champs en lecture seule à copier (lien d'invitation) : un clic sélectionne tout
@@ -346,12 +346,17 @@
     try { s = await api(`/api/projects/${id}/status`); } catch (e) { return schedule(el, 30_000); }
     const st = state.get(id) || {};
     const jobs = s.jobs;
-    for (const type of ['prospect', 'template', 'send', 'evolution', 'followup_template', 'followup']) renderJob($(`[data-job="${type}"]`, el), jobs[type], type);
+    for (const type of ['prospect', 'template', 'send', 'evolution', 'followup_template', 'followup', 'linkedin_post']) renderJob($(`[data-job="${type}"]`, el), jobs[type], type);
 
     const running = Object.entries(jobs).filter(([, j]) => ACTIVE.includes(j.status)).map(([t]) => LABELS[t]);
     $('[data-state]', el).innerHTML = running.length
       ? `<span class="spin-inline"></span>${esc(running.join(', '))}`
       : `<span class="muted small">${s.stats.total || 0} prospect(s)</span>`;
+
+    // Fin d'un post LinkedIn → on recharge la zone pour afficher le brouillon
+    const li = jobs.linkedin_post;
+    if (li && ACTIVE.includes(li.status)) st.liRunning = true;
+    else if (st.liRunning && li) { st.liRunning = false; loadLinkedin(el); }
 
     // Fin d'analyse → recharge la page pour afficher fiche + cible
     const an = jobs.analyze;
@@ -439,6 +444,100 @@
   function sessionStorageGet(k) { try { return sessionStorage.getItem(k); } catch { return null; } }
   function sessionStorageSet(k, v) { try { sessionStorage.setItem(k, v); } catch { /* ignore */ } }
   $$('details.project').forEach((el) => el.addEventListener('toggle', () => { if (el.open) sessionStorageSet('openProject', el.dataset.id); }));
+
+  // ---------- LinkedIn ----------
+  // Section d'un projet : relier un compte, donner une direction (facultative), générer / régénérer un post, le relire et le publier.
+  const liDay = (ts) => new Date(ts * 1000).toLocaleDateString('fr-FR', { dateStyle: 'medium', timeZone: 'Europe/Paris' });
+
+  async function loadLinkedin(proj) {
+    const box = $('[data-linkedin]', proj);
+    if (!box) return;
+    try { renderLinkedin(box, await api(`/api/projects/${proj.dataset.id}/linkedin`), proj.dataset.id); }
+    catch (e) { box.innerHTML = `<p class="error small">${esc(e.message)}</p>`; }
+  }
+
+  function renderLinkedin(box, s, id) {
+    // Ne pas écraser ce que l'utilisateur est en train d'écrire
+    if (box.contains(document.activeElement) && document.activeElement.matches('textarea')) return;
+    if (!s.configured) {
+      box.innerHTML = '<p class="muted">LinkedIn n\'est pas activé sur ce service : l\'administrateur doit renseigner les clés de l\'application LinkedIn.</p>';
+      return;
+    }
+    const acc = s.account;
+    if (!acc) {
+      box.innerHTML = `<p>Relie un compte LinkedIn à ce projet : Claude pourra écrire des posts pour ce compte. AiTools demande seulement le droit de <strong>publier un post sur ton profil</strong>, et ne publie jamais sans ton clic.</p>
+        ${s.canManage ? `<p><a class="btn primary" href="/linkedin/connect?project=${id}">Connecter LinkedIn</a></p>` : '<p class="muted small">Demande à un administrateur du projet de relier le compte.</p>'}`;
+      return;
+    }
+    const head = `<div class="row li-head"><p><span class="badge ${acc.expired ? 'warn' : 'ok'}">${acc.expired ? 'connexion expirée' : 'connecté'}</span> <strong>${esc(acc.name)}</strong>
+        ${acc.expiresAt ? `<span class="muted small">· ${acc.expired ? 'a expiré' : 'valable'} jusqu'au ${esc(liDay(acc.expiresAt))}</span>` : ''}</p>
+      ${s.canManage ? `<span>${acc.expired ? `<a class="btn small primary" href="/linkedin/connect?project=${id}">Reconnecter</a> ` : ''}<button type="button" class="btn small danger" data-li-disconnect="${id}">Déconnecter</button></span>` : ''}</div>`;
+    const posts = s.posts || [];
+    const latest = posts[0];
+    const draft = latest && latest.status !== 'published' ? latest : null;
+    const direction = latest?.direction || '';
+    const gen = !s.hasProfile ? '<p class="muted small">Analyse le projet d\'abord : Claude s\'appuie sur la fiche projet.</p>' : acc.expired ? '' : `<div class="li-gen">
+        <label>De quoi doit parler le post ? <span class="muted small">(facultatif)</span>
+          <textarea name="direction" rows="3" maxlength="500" data-li-direction placeholder="Ex. : le lancement de la nouvelle offre, un retour d'expérience, un conseil pour mes clients… Laisse vide : Claude choisit le sujet.">${esc(direction)}</textarea></label>
+        <button type="button" class="btn primary" data-li-generate="${id}">${draft ? 'Régénérer un autre post' : 'Générer un post'}</button></div>`;
+    const draftHtml = draft ? `<div class="li-draft"><label>Brouillon (modifiable)
+        <textarea rows="11" maxlength="${s.maxLength}" data-li-body="${draft.id}">${esc(draft.body)}</textarea></label>
+        <p class="muted small"><span data-li-count>${draft.body.length}</span> / ${s.maxLength} caractères${draft.direction ? ` · direction : « ${esc(draft.direction)} »` : ' · sujet choisi par Claude'}</p>
+        <div class="row-actions"><button type="button" class="btn" data-li-save="${id}">Enregistrer</button>
+          <button type="button" class="btn" data-li-copy>Copier</button>
+          ${s.canManage && !acc.expired ? `<button type="button" class="btn primary" data-li-publish="${id}">Publier sur LinkedIn</button>` : '<span class="muted small">Un administrateur du projet publie.</span>'}</div></div>` : '';
+    const history = posts.filter((x) => x !== draft && x.status === 'published');
+    const hist = history.length ? `<details class="li-history"><summary>Posts publiés (${history.length})</summary>${history.map((x) => `<article class="card"><p class="muted small">Publié le ${esc(liDay(x.publishedAt))}</p><p class="li-text">${esc(x.body)}</p></article>`).join('')}</details>` : '';
+    box.innerHTML = `${head}${gen}${draftHtml}${hist}`;
+  }
+
+  document.addEventListener('click', async (e) => {
+    const t = e.target.closest('[data-li-generate],[data-li-save],[data-li-copy],[data-li-publish],[data-li-disconnect]');
+    if (!t) return;
+    const proj = t.closest('.project');
+    const id = proj?.dataset.id;
+    const body = () => $('[data-li-body]', proj);
+    try {
+      if (t.matches('[data-li-generate]')) {
+        t.disabled = true;
+        const r = await api(`/api/projects/${id}/linkedin/generate`, { direction: $('[data-li-direction]', proj)?.value || '' });
+        toast(r.budgetBlocked ? `En file, mais ${r.budgetBlocked}` : r.existing ? 'Un post est déjà en cours de rédaction' : 'Claude rédige le post…', r.budgetBlocked ? 'error' : 'ok');
+        refreshProject(proj);
+      } else if (t.matches('[data-li-save]')) {
+        await api(`/api/projects/${id}/linkedin/post`, { postId: Number(body().dataset.liBody), body: body().value });
+        toast('Brouillon enregistré');
+      } else if (t.matches('[data-li-copy]')) {
+        await navigator.clipboard.writeText(body().value);
+        toast('Post copié');
+      } else if (t.matches('[data-li-publish]')) {
+        if (!confirm('Publier ce post sur LinkedIn ? Il sera visible publiquement par tout le monde.')) return;
+        t.disabled = true;
+        await api(`/api/projects/${id}/linkedin/publish`, { postId: Number(body().dataset.liBody), body: body().value, confirm: true });
+        toast('Post publié sur LinkedIn');
+        loadLinkedin(proj);
+      } else if (t.matches('[data-li-disconnect]')) {
+        if (!confirm('Déconnecter le compte LinkedIn de ce projet ? Les brouillons sont conservés.')) return;
+        await api(`/api/projects/${id}/linkedin/disconnect`, {});
+        loadLinkedin(proj);
+      }
+    } catch (err) { toast(err.message, 'error'); t.disabled = false; }
+  });
+  document.addEventListener('input', (e) => {
+    const area = e.target.closest('[data-li-body]');
+    if (area) $('[data-li-count]', area.closest('.project')).textContent = area.value.length;
+  });
+  $$('details[data-acc="linkedin"]').forEach((d) => d.addEventListener('toggle', () => { if (d.open) loadLinkedin(d.closest('.project')); }));
+
+  // Retour de LinkedIn : message, puis on rouvre le projet concerné
+  (() => {
+    const q = new URLSearchParams(location.search);
+    if (!q.has('li')) return;
+    history.replaceState(null, '', location.pathname);
+    if (q.get('li') === 'ok') toast('Compte LinkedIn relié au projet');
+    else toast(q.get('m') || 'Connexion LinkedIn impossible', 'error');
+    const proj = $(`details.project[data-id="${q.get('p')}"]`);
+    if (proj) { proj.open = true; const acc = $('details[data-acc="linkedin"]', proj); if (acc) { acc.open = true; loadLinkedin(proj); } }
+  })();
 
   // ---------- Sections dépliables animées ----------
   // <details class="anim"> : la hauteur du bloc qui suit le <summary> glisse à l'ouverture et à la fermeture.

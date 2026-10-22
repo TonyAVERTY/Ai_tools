@@ -14,6 +14,7 @@ import { registerAdminRoutes } from './adminroutes.js';
 import { loginsOf } from './claudelogin.js';
 import { accessOn, memberTeamIds } from './teams.js';
 import { registerTeamRoutes } from './teamroutes.js';
+import { registerLinkedinRoutes } from './linkedinroutes.js';
 import { dashboardPage, settingsPage, unsubPage, accountPage, linkPage } from './views.js';
 import { enqueue, latestJobs, cancelJob, usageSummary } from './services/jobs.js';
 import { validateGitUrl, removeRepo } from './services/git.js';
@@ -56,6 +57,7 @@ export function registerRoutes(router, app) {
   registerSiteRoutes(router, app);
   registerAdminRoutes(router, app);
   registerTeamRoutes(router, app);
+  registerLinkedinRoutes(router, app, { project, aiOpts });
   // Déjà connecté : la page de connexion n'a rien à offrir, on va au tableau de bord
   router.get('/login', async ({ req, res, url }) => {
     if (await getSession(db, req)) return redirect(res, '/');
