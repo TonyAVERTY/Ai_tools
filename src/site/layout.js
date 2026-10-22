@@ -1,6 +1,7 @@
 // Gabarit du site public : balisage sémantique, métadonnées (title, description, canonical, Open Graph), liens
 // d'évitement, navigation. Aucune ressource externe (CSS, images et favicon servis par l'application ; un seul script, site.js, pour le mouvement).
 import { esc } from '../http.js';
+import { assetUrl } from '../assets.js';
 
 export const SITE_NAME = 'AiTools';
 export const CONTACT_EMAIL = 'contact@tony-averty.dev';
@@ -82,9 +83,9 @@ ${noindex ? '' : `<link rel="canonical" href="${esc(url)}">\n`}<meta name="color
 <meta name="twitter:card" content="summary">
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 <link rel="alternate icon" href="/favicon.ico">
-<link rel="stylesheet" href="/static/app.css">
-<link rel="stylesheet" href="/static/site.css">
-${['/static/site.js', ...scripts].map((src) => `<script src="${esc(src)}" defer></script>\n`).join('')}${jsonLd ? `<script type="application/ld+json">${JSON.stringify(jsonLd).replace(/</g, '\\u003c')}</script>\n` : ''}</head>
+<link rel="stylesheet" href="${assetUrl('/static/app.css')}">
+<link rel="stylesheet" href="${assetUrl('/static/site.css')}">
+${['/static/site.js', ...scripts].map((src) => `<script src="${esc(assetUrl(src))}" defer></script>\n`).join('')}${jsonLd ? `<script type="application/ld+json">${JSON.stringify(jsonLd).replace(/</g, '\\u003c')}</script>\n` : ''}</head>
 <body class="site">
 <a class="skip" href="#contenu">Aller au contenu</a>
 <header class="site-head">

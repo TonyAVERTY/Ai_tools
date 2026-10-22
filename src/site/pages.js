@@ -155,8 +155,9 @@ export function homePage({ appUrl, apple = false }) {
     title: 'AiTools : trouve des clients par mail avec ton propre Claude',
     description: 'AiTools lit ton projet, trouve des entreprises qui pourraient avoir besoin de toi, écrit et envoie tes mails, relance et suit les réponses. Gratuit pour commencer.',
     jsonLd: HOME_JSON_LD(appUrl),
-    body: `<section class="wrap hero" aria-labelledby="titre-accueil">
-  <span class="blob b1" aria-hidden="true"></span><span class="blob b2" aria-hidden="true"></span>
+    body: `<div class="hero-bg">
+<span class="blob b1" aria-hidden="true"></span><span class="blob b2" aria-hidden="true"></span>
+<section class="wrap hero" aria-labelledby="titre-accueil">
   <div class="hero-text">
     <p class="eyebrow"><span class="mark" aria-hidden="true"></span>Trouver des clients par mail</p>
     <h1 id="titre-accueil">Trouve de nouveaux clients, <span class="rot" data-rotate="sans y passer tes soirées|sans te prendre la tête|sans rien oublier|sans partir de zéro">sans y passer tes soirées</span></h1>
@@ -164,12 +165,12 @@ export function homePage({ appUrl, apple = false }) {
     <div class="cta-row">
       <a class="btn primary" href="/login">Créer mon compte</a>
       <a class="textlink" href="/fonctionnement">Voir comment ça marche</a>
-      <a class="textlink" href="/tarifs">Voir les tarifs</a>
     </div>
-    <p class="fine">Gratuit pour commencer, sans carte bancaire. Tu te connectes avec ${providersText(apple)}, sans mot de passe.</p>
+    <p class="fine">Gratuit pour commencer, sans carte bancaire (<a href="/tarifs">voir les tarifs</a>). Tu te connectes avec ${providersText(apple)}, sans mot de passe.</p>
   </div>
   ${MOCKUP}
 </section>
+</div>
 
 <div class="rule" aria-hidden="true"></div>
 
