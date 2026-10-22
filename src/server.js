@@ -70,9 +70,9 @@ export async function createApp(cfg, { db, worker = true, createTransport, fetch
       await route.handler({ req, res, url, params: route.params, session, app });
     } catch (e) {
       const status = e.status || 500;
-      if (status >= 500) console.error(`[${req.method} ${url.pathname}]`, e);
+      if (status >= 500 && !e.expose) console.error(`[${req.method} ${url.pathname}]`, e);
       if (res.headersSent) return res.end();
-      const msg = status >= 500 ? 'Erreur interne' : e.message;
+      const msg = status >= 500 && !e.expose ? 'Erreur interne' : e.message;
       if (url.pathname.startsWith('/api/') || req.headers.accept?.includes('json')) json(res, { error: msg }, status);
       else html(res, layout({ title: 'Erreur', body: `<section class="card"><h1>${status}</h1><p>${msg.replace(/</g, '&lt;')}</p><a href="/">Retour</a></section>` }), status);
     }

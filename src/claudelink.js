@@ -128,10 +128,10 @@ export async function validateApiKey(key, fetchFn = fetch) {
       signal: AbortSignal.timeout(10_000),
     });
   } catch {
-    throw new HttpError(502, "Impossible de joindre Anthropic pour vérifier la clé (réseau). Réessaie dans un instant.");
+    throw new HttpError(502, "Impossible de joindre Anthropic pour vérifier la clé (réseau). Réessaie dans un instant.", { expose: true });
   }
   if (r.status === 401 || r.status === 403) throw new HttpError(400, 'Clé API refusée par Anthropic');
-  if (!r.ok) throw new HttpError(502, `Anthropic ne répond pas normalement (HTTP ${r.status}) : la clé n'a pas pu être vérifiée. Réessaie plus tard.`);
+  if (!r.ok) throw new HttpError(502, `Anthropic ne répond pas normalement (HTTP ${r.status}) : la clé n'a pas pu être vérifiée. Réessaie plus tard.`, { expose: true });
 }
 
 // Appel minimal du CLI avec le jeton (modèle le plus petit, 1 tour, aucun outil). Ce n'est PAS gratuit : quelques tokens
@@ -143,14 +143,14 @@ async function validateSubscriptionToken(app, token) {
       bin: app.cfg.claudeBin, prompt: 'Réponds uniquement : ok', model: 'haiku', maxTurns: 1, tools: [], timeoutMs: 90_000,
       sandbox: app.cfg.sandbox, secretEnv: { CLAUDE_CODE_OAUTH_TOKEN: token },
     });
-  } catch (e) {
-    throw new HttpError(502, `Le CLI Claude n'a pas pu être lancé sur le serveur : ${String(e.message).slice(0, 160)}`);
+  } catch {
+    throw new HttpError(502, "Le CLI Claude n'a pas pu être lancé sur le serveur (bac à sable ou installation). Préviens l'administrateur.", { expose: true });
   }
   if (r.ok) return;
   if (/auth|login|token|credential|401|403|invalid|expired|unauthor/i.test(`${r.text} ${r.subtype}`)) {
     throw new HttpError(400, 'Jeton refusé par Claude (invalide ou expiré)');
   }
-  throw new HttpError(502, "Le jeton n'a pas pu être vérifié (réponse inattendue du CLI). Réessaie plus tard.");
+  throw new HttpError(502, "Le jeton n'a pas pu être vérifié (réponse inattendue du CLI). Réessaie plus tard.", { expose: true });
 }
 
 // ---------- Liaison ----------
@@ -220,7 +220,7 @@ export async function testLink(app, userId) {
       const user = await getUser(app.db, userId);
       if (!user?.isAdmin) throw new HttpError(400, SERVER_MODE_MESSAGE);
       try { await execFileP(app.cfg.claudeBin, ['--version'], { env: buildChildEnv(process.env, { home: app.cfg.sandbox?.serverHome || '/tmp' }), timeout: 15_000 }); }
-      catch { throw new HttpError(502, 'Le CLI Claude du serveur est introuvable ou ne répond pas'); }
+      catch { throw new HttpError(502, 'Le CLI Claude du serveur est introuvable ou ne répond pas', { expose: true }); }
     } else {
       let secret;
       try { secret = decrypt(app.cfg.secretKey, link.secret_enc); } catch { secret = null; }

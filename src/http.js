@@ -65,8 +65,9 @@ export const html = (res, body, status = 200) => send(res, status, body);
 export const json = (res, data, status = 200) => send(res, status, JSON.stringify(data), 'application/json; charset=utf-8');
 export function redirect(res, location) { res.writeHead(303, { Location: location }); res.end(); }
 
+// `expose` : message sûr destiné à l'utilisateur même pour un 5xx (ex. impossible de joindre un service tiers)
 export class HttpError extends Error {
-  constructor(status, message) { super(message); this.status = status; }
+  constructor(status, message, { expose = false } = {}) { super(message); this.status = status; this.expose = expose; }
 }
 
 // Échappement HTML pour les templates
