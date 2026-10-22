@@ -14,6 +14,7 @@ import { allowedToSend, buildProspectMail, fillTemplate } from '../src/services/
 import { validateSelect, firstValue } from '../src/services/recap.js';
 import { validateGitUrl } from '../src/services/git.js';
 import { verifyUnsubToken, encrypt } from '../src/crypto.js';
+import { addUser } from './helpers/users.js';
 
 async function setup() {
   const tmp = mkdtempSync(join(tmpdir(), 'aitools-'));
@@ -30,26 +31,27 @@ async function setup() {
     cfg: { dataDir: tmp, claudeBin: resolve('test/fixtures/fake-claude.js'), secretKey: randomBytes(32), appUrl: 'https://ai.test' },
     createTransport: () => ({ verify: async () => true, sendMail: async (m) => { sentMails.push(m); }, close() {} }),
   };
-  await setSetting(db, 'send_delay_min', '0');
-  await setSetting(db, 'send_delay_max', '0');
-  const id = await createProject(app, { name: 'MonEspacePro', gitUrl: `file://${src}` });
+  const userId = await addUser(db);
+  await setSetting(db, userId, 'send_delay_min', '0');
+  await setSetting(db, userId, 'send_delay_max', '0');
+  const id = await createProject(app, { userId, name: 'MonEspacePro', gitUrl: `file://${src}` });
   const worker = new Worker(db, makeHandlers(app), { thermalMax: 999, log: { error: (...a) => console.error(...a) } });
-  return { tmp, db, app, id, worker, sentMails };
+  return { tmp, db, app, id, userId, worker, sentMails };
 }
 
-const run = async (s, type, params) => { await enqueue(s.db, { projectId: s.id, type, params }); await s.worker.tick(); return (await latestJobs(s.db, s.id))[type]; };
+const run = async (s, type, params) => { await enqueue(s.db, { userId: s.userId, projectId: s.id, type, params }); await s.worker.tick(); return (await latestJobs(s.db, s.id))[type]; };
 
 test('flux complet : analyse → cible → prospection → modèle → envoi → évolution', async () => {
   const s = await setup();
   try {
     const a = await run(s, 'analyze');
     assert.equal(a.status, 'done', a.error);
-    let p = await getProject(s.app, s.id);
+    let p = await getProject(s.app, s.id, { userId: s.userId });
     assert.equal(p.profile.resume, 'Cartes de fidélité digitales.');
     assert.equal(p.target.zone, 'Bretagne');
     assert.equal(p.targetValidated, false);
     assert.match(p.profileCommit, /^[0-9a-f]{40}$/);
-    const rl = JSON.parse(await getSetting(s.db, 'claude_rate_limit_json'));
+    const rl = JSON.parse(await getSetting(s.db, s.userId, 'claude_rate_limit_json'));
     assert.equal(rl.fiveHour.utilization, 0.33, 'quota Claude (session) enregistré après l\'appel');
     assert.equal(rl.sevenDay.utilization, 0.5, 'quota Claude (semaine) enregistré après l\'appel');
 
@@ -92,7 +94,7 @@ test('flux complet : analyse → cible → prospection → modèle → envoi →
 
     const ev1 = await run(s, 'evolution', { count: 3, level: 'rapide' });
     assert.match(ev1.error, /Adresse de réception/);
-    await setSetting(s.db, 'notify_email', 'moi@x.fr');
+    await setSetting(s.db, s.userId, 'notify_email', 'moi@x.fr');
     const ev = await run(s, 'evolution', { count: 3, level: 'rapide' });
     assert.equal(ev.status, 'done', ev.error);
     assert.equal(s.sentMails.at(-1).to, 'moi@x.fr');
@@ -202,7 +204,7 @@ test('analyse : modèle économique (Haiku) par défaut, Sonnet uniquement sur d
   try {
     const a = await run(s, 'analyze');
     assert.equal(a.status, 'done', a.error);
-    await setSetting(s.db, 'analyze_model', 'sonnet');
+    await setSetting(s.db, s.userId, 'analyze_model', 'sonnet');
     const a2 = await run(s, 'analyze');
     assert.equal(a2.status, 'done', a2.error);
     assert.deepEqual(readFileSync(spyFile, 'utf8').trim().split('\n'), ['haiku', 'sonnet']);
@@ -214,7 +216,7 @@ test('quota Claude serré : alerte Discord à 80 %, pas en dessous', async () =>
   const sent = [];
   s.app.fetch = async (url, opts) => { sent.push({ url, body: JSON.parse(opts.body) }); return { ok: true, status: 204 }; };
   const hook = 'https://discord.com/api/webhooks/123456789012345678/abcdefghijklmnopqrstuvwxyz-ABC_123';
-  await setSetting(s.db, 'discord_webhook_enc', encrypt(s.app.cfg.secretKey, hook));
+  await setSetting(s.db, s.userId, 'discord_webhook_enc', encrypt(s.app.cfg.secretKey, hook));
   try {
     const a = await run(s, 'analyze'); // fake-claude : 33 % / 50 % par défaut
     assert.equal(a.status, 'done', a.error);

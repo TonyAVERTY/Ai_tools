@@ -2,13 +2,15 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { now } from '../src/db.js';
 import { testDb } from './helpers/db.js';
+import { addUser } from './helpers/users.js';
 import { csvCell, toCsv, parseCsv, exportProspects, importProspects } from '../src/services/csv.js';
 import { parseFilters } from '../src/services/crm.js';
 
 const f = (o = {}) => parseFilters(new URLSearchParams(o));
 async function setup() {
   const db = await testDb();
-  await db.prepare("INSERT INTO projects(name, git_url, created_at) VALUES('A', 'a', ?), ('B', 'b', ?)").run(now(), now());
+  const u = await addUser(db);
+  await db.prepare("INSERT INTO projects(user_id, name, git_url, created_at) VALUES(?, 'A', 'a', ?), (?, 'B', 'b', ?)").run(u, now(), u, now());
   return db;
 }
 

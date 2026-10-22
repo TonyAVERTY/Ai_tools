@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { testDb } from './helpers/db.js';
+import { addUser } from './helpers/users.js';
 import { saveSnapshot, snapshotAll, history, parisDay } from '../src/services/metrics.js';
 import { createProject, saveSecretConfig } from '../src/projects.js';
 
@@ -10,8 +11,9 @@ const ts = (iso) => Math.floor(Date.parse(iso) / 1000);
 async function setup() {
   const db = await testDb();
   const app = { db, cfg: { secretKey: randomBytes(32) } };
-  const id = await createProject(app, { name: 'MEP', gitUrl: 'https://g/T/M.git' });
-  return { db, app, id };
+  const userId = await addUser(db);
+  const id = await createProject(app, { userId, name: 'MEP', gitUrl: 'https://g/T/M.git' });
+  return { db, app, id, userId };
 }
 
 test('jour de Paris, même à 23h30 UTC', () => {
@@ -31,8 +33,8 @@ test('photo du jour : une ligne par jour, valeurs non numériques ignorées', as
 
 test('photo automatique : une seule par jour et par projet, les erreurs n\'arrêtent pas les autres', async () => {
   const s = await setup();
-  const other = await createProject(s.app, { name: 'GoSortir', gitUrl: 'https://g/T/G.git' });
-  await createProject(s.app, { name: 'Sans BDD', gitUrl: 'https://g/T/X.git' });
+  const other = await createProject(s.app, { userId: s.userId, name: 'GoSortir', gitUrl: 'https://g/T/G.git' });
+  await createProject(s.app, { userId: s.userId, name: 'Sans BDD', gitUrl: 'https://g/T/X.git' });
   for (const id of [s.id, other]) await saveSecretConfig(s.app, id, 'db_enc', { type: 'mysql', host: 'h', sql_users: 'SELECT 1' }, 'password');
   let calls = 0;
   s.app.fetchRecap = async (id) => { calls++; if (id === other) throw new Error('BDD injoignable'); return { users: 5, clients: 1, revenue: 30 }; };

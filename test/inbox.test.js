@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { now } from '../src/db.js';
 import { testDb } from './helpers/db.js';
+import { addUser } from './helpers/users.js';
 
 import { parseHeaders, classify, applyMessages, checkInbox } from '../src/services/inbox.js';
 import { createProject, saveSecretConfig, getProject, imapCredentials } from '../src/projects.js';
@@ -10,7 +11,8 @@ import { createProject, saveSecretConfig, getProject, imapCredentials } from '..
 async function setup() {
   const db = await testDb();
   const app = { db, cfg: { secretKey: randomBytes(32) } };
-  const id = await createProject(app, { name: 'P', gitUrl: 'https://git.x/T/P.git' });
+  const userId = await addUser(db);
+  const id = await createProject(app, { userId, name: 'P', gitUrl: 'https://git.x/T/P.git' });
   const add = async (company, email, msgId, status = 'sent') => {
     const r = await db.prepare('INSERT INTO prospects(project_id, company, email, status, sent_at, created_at) VALUES(?, ?, ?, ?, ?, ?)')
       .run(id, company, email, status, now(), now());
@@ -22,7 +24,7 @@ async function setup() {
     return pid;
   };
   const status = (pid) => db.prepare('SELECT status, replied_at, reply_subject FROM prospects WHERE id = ?').get(pid);
-  return { db, app, id, add, status };
+  return { db, app, id, userId, add, status };
 }
 
 test('parseHeaders déplie les en-têtes multi-lignes', () => {
@@ -116,12 +118,12 @@ test('checkInbox : reprend au dernier UID, mémorise l\'état et les erreurs', a
       ? { uidValidity: '7', lastUid: 12, messages: [{ uid: 12, from: 'contact@fournil.fr', subject: 'Re: idée' }] }
       : { uidValidity: '7', lastUid: 12, messages: [] };
   };
-  assert.deepEqual(await checkInbox(s.app, s.id), { replies: 1, bounces: 0, ignored: 0 });
+  assert.deepEqual(await checkInbox(s.app, s.userId, s.id), { replies: 1, bounces: 0, ignored: 0 });
   assert.equal(calls[0].creds.user, 'u', 'identifiants SMTP réutilisés');
-  await checkInbox(s.app, s.id);
+  await checkInbox(s.app, s.userId, s.id);
   assert.deepEqual(calls[1].state && { v: calls[1].state.uidValidity, u: calls[1].state.lastUid }, { v: '7', u: 12 });
-  await assert.rejects(checkInbox(s.app, s.id), /AUTHENTICATIONFAILED/);
-  const inbox = (await getProject(s.app, s.id)).inbox;
+  await assert.rejects(checkInbox(s.app, s.userId, s.id), /AUTHENTICATIONFAILED/);
+  const inbox = (await getProject(s.app, s.id, { userId: s.userId })).inbox;
   assert.equal(inbox.lastError, 'AUTHENTICATIONFAILED');
   assert.equal(inbox.replies, 1);
   assert.equal(inbox.lastUid, 12, 'le dernier UID est conservé après une erreur');

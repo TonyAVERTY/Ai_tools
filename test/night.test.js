@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { parisParts, parisTime, nextNightSlot, addParisDays } from '../src/services/paris-time.js';
 import { now } from '../src/db.js';
 import { testDb } from './helpers/db.js';
+import { addUser } from './helpers/users.js';
 import { enqueue, Worker, latestJobs } from '../src/services/jobs.js';
 
 const iso = (d) => d.toISOString();
@@ -31,9 +32,10 @@ test('le worker ne démarre pas un job programmé avant son heure', async () => 
   const ran = [];
   const w = new Worker(db, { prospect: async () => { ran.push('prospect'); }, evolution: async () => { ran.push('evolution'); } },
     { thermalMax: 999, log: { error() {} }, clock: () => clock });
-  await db.prepare("INSERT INTO projects(name, git_url, created_at) VALUES('p', 'u', ?)").run(now());
-  await enqueue(db, { projectId: 1, type: 'prospect', runAfter: clock + 3600 });
-  await enqueue(db, { projectId: 1, type: 'evolution' });
+  const u = await addUser(db);
+  await db.prepare("INSERT INTO projects(user_id, name, git_url, created_at) VALUES(?, 'p', 'u', ?)").run(u, now());
+  await enqueue(db, { userId: u, projectId: 1, type: 'prospect', runAfter: clock + 3600 });
+  await enqueue(db, { userId: u, projectId: 1, type: 'evolution' });
   assert.equal(await w.tick(), true);
   assert.deepEqual(ran, ['evolution'], 'le job immédiat passe devant le job programmé');
   assert.equal(await w.tick(), false, 'rien à faire avant l\'heure');

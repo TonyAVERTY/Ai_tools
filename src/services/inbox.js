@@ -143,9 +143,9 @@ export async function fetchInbox(creds, state, { since, max = 500 }) {
 }
 
 /** Vérifie la boîte d'un projet et mémorise l'état (dernier UID, erreurs, compteurs). */
-export async function checkInbox(app, projectId) {
+export async function checkInbox(app, userId, projectId) {
   const { db } = app;
-  const project = await getProject(app, projectId, { secrets: true });
+  const project = await getProject(app, projectId, { userId, secrets: true });
   if (!project.imap) throw new Error('Boîte IMAP non configurée');
   const state = project.inbox || {};
   const firstSent = (await db.prepare('SELECT MIN(sent_at) t FROM mail_log WHERE project_id = ?').get(project.id)).t;
@@ -161,7 +161,7 @@ export async function checkInbox(app, projectId) {
     });
     if (res.replies) {
       const who = await db.prepare('SELECT company, email, reply_subject FROM prospects WHERE project_id = ? AND replied_at = ? LIMIT 10').all(project.id, at);
-      await notify(app, 'reply', {
+      await notify(app, userId, 'reply', {
         title: `${project.name} · ${res.replies} réponse(s) de prospect`, level: 'ok',
         description: who.map((p) => `**${p.company}** (${p.email}) : ${p.reply_subject || 'sans objet'}`).join('\n'),
       });
