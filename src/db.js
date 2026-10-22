@@ -1,169 +1,240 @@
+// Couche d'accès aux données : une seule API asynchrone, deux drivers.
+//   - MySQL / MariaDB (mysql2/promise, pool) en production ;
+//   - SQLite en mémoire (node:sqlite) pour les tests locaux, sans serveur à installer.
+// Le SQL de l'application est écrit dans un sous-ensemble commun ; translate() ne fait que le strict
+// minimum entre dialectes (voir plus bas). Les requêtes vraiment différentes sont réécrites à la source.
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname } from 'node:path';
+import { MIGRATIONS } from './migrations.js';
 
-// Chaque entrée = une migration. Ne jamais modifier une migration déjà livrée, en ajouter une.
-export const MIGRATIONS = [
-  `
-  CREATE TABLE sessions (
-    id TEXT PRIMARY KEY, email TEXT NOT NULL,
-    created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL
-  );
-  CREATE TABLE oauth_states (
-    state TEXT PRIMARY KEY, verifier TEXT NOT NULL, nonce TEXT NOT NULL, created_at INTEGER NOT NULL
-  );
-  CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT);
-  CREATE TABLE projects (
-    id INTEGER PRIMARY KEY,
-    name TEXT NOT NULL,
-    git_url TEXT NOT NULL UNIQUE,
-    profile_json TEXT,          -- fiche projet générée par Claude
-    profile_commit TEXT,        -- commit analysé
-    profile_at INTEGER,
-    target_json TEXT,           -- cible déduite (modifiable)
-    target_validated INTEGER NOT NULL DEFAULT 0,
-    smtp_enc TEXT,              -- config SMTP chiffrée
-    db_enc TEXT,                -- accès BDD chiffré (récap)
-    daily_mail_cap INTEGER NOT NULL DEFAULT 30,
-    created_at INTEGER NOT NULL
-  );
-  CREATE TABLE mail_templates (
-    project_id INTEGER PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,
-    subject TEXT NOT NULL, body TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'draft',   -- draft | validated
-    updated_at INTEGER NOT NULL
-  );
-  CREATE TABLE prospects (
-    id INTEGER PRIMARY KEY,
-    project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-    company TEXT NOT NULL, email TEXT NOT NULL, website TEXT, city TEXT, sector TEXT,
-    hook TEXT,                  -- accroche perso (1 phrase)
-    source TEXT,                -- page où l'email a été trouvé (RGPD : origine des données)
-    score INTEGER,
-    status TEXT NOT NULL DEFAULT 'new',  -- new | sent | replied | client | refused | bounced
-    sent_at INTEGER, created_at INTEGER NOT NULL,
-    UNIQUE(project_id, email)
-  );
-  CREATE INDEX prospects_project ON prospects(project_id, status);
-  CREATE TABLE blacklist (email TEXT PRIMARY KEY, reason TEXT, created_at INTEGER NOT NULL);
-  CREATE TABLE jobs (
-    id INTEGER PRIMARY KEY,
-    project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE,
-    type TEXT NOT NULL,         -- analyze | prospect | template | send | evolution
-    status TEXT NOT NULL DEFAULT 'queued',  -- queued | running | done | error | cancelled
-    params_json TEXT, progress_json TEXT, result_json TEXT, error TEXT,
-    cost_usd REAL, tokens_in INTEGER, tokens_out INTEGER,
-    created_at INTEGER NOT NULL, started_at INTEGER, finished_at INTEGER
-  );
-  CREATE INDEX jobs_status ON jobs(status, id);
-  CREATE TABLE mail_log (
-    id INTEGER PRIMARY KEY,
-    project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-    prospect_id INTEGER, email TEXT NOT NULL, sent_at INTEGER NOT NULL, error TEXT
-  );
-  CREATE INDEX mail_log_day ON mail_log(project_id, sent_at);
-  `,
-  // 2 — modèles de mail par type (premier mail / relance)
-  `
-  CREATE TABLE templates (
-    project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-    kind TEXT NOT NULL CHECK (kind IN ('initial', 'followup')),
-    subject TEXT NOT NULL DEFAULT '',   -- relance : vide = "Re: <objet du 1er mail>"
-    body TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'draft',
-    updated_at INTEGER NOT NULL,
-    PRIMARY KEY (project_id, kind)
-  );
-  INSERT INTO templates(project_id, kind, subject, body, status, updated_at)
-    SELECT project_id, 'initial', subject, body, status, updated_at FROM mail_templates;
-  DROP TABLE mail_templates;
-  `,
-  // 3 — suivi des mails envoyés + test A/B de l'objet
-  `
-  ALTER TABLE templates ADD COLUMN subject_b TEXT;        -- objet B (premier mail uniquement)
-  ALTER TABLE prospects ADD COLUMN variant TEXT;          -- A | B
-  ALTER TABLE mail_log ADD COLUMN kind TEXT NOT NULL DEFAULT 'initial';
-  ALTER TABLE mail_log ADD COLUMN variant TEXT;
-  ALTER TABLE mail_log ADD COLUMN subject TEXT;
-  ALTER TABLE mail_log ADD COLUMN message_id TEXT;
-  CREATE INDEX mail_log_msgid ON mail_log(message_id);
-  `,
-  // 4 — détection des réponses via IMAP
-  `
-  ALTER TABLE prospects ADD COLUMN replied_at INTEGER;
-  ALTER TABLE prospects ADD COLUMN reply_subject TEXT;
-  ALTER TABLE projects ADD COLUMN imap_enc TEXT;
-  ALTER TABLE projects ADD COLUMN inbox_json TEXT;        -- état de la dernière lecture IMAP
-  `,
-  // 5 — relance automatique
-  `
-  ALTER TABLE prospects ADD COLUMN followup_at INTEGER;
-  ALTER TABLE projects ADD COLUMN followup_enabled INTEGER NOT NULL DEFAULT 0;
-  ALTER TABLE projects ADD COLUMN followup_days INTEGER NOT NULL DEFAULT 7;
-  `,
-  // 6 — jobs programmés (la nuit)
-  `
-  ALTER TABLE jobs ADD COLUMN run_after INTEGER;          -- ne pas démarrer avant (epoch s)
-  `,
-  // 7 — fiche prospect : notes et prochaine action
-  `
-  CREATE TABLE prospect_notes (
-    id INTEGER PRIMARY KEY,
-    prospect_id INTEGER NOT NULL REFERENCES prospects(id) ON DELETE CASCADE,
-    body TEXT NOT NULL,
-    created_at INTEGER NOT NULL
-  );
-  CREATE INDEX prospect_notes_p ON prospect_notes(prospect_id, created_at);
-  ALTER TABLE prospects ADD COLUMN next_action TEXT;
-  ALTER TABLE prospects ADD COLUMN next_action_at INTEGER;
-  `,
-  // 8 — historique quotidien des KPI business (pour les courbes)
-  `
-  CREATE TABLE metrics_daily (
-    project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-    day TEXT NOT NULL,                 -- AAAA-MM-JJ, heure de Paris
-    users REAL, clients REAL, revenue REAL,
-    PRIMARY KEY (project_id, day)
-  );
-  `,
-];
+export { MIGRATIONS };
 
-export function openDb(dataDir) {
-  let db;
-  if (dataDir === ':memory:') db = new DatabaseSync(':memory:');
-  else {
-    mkdirSync(dataDir, { recursive: true });
-    db = new DatabaseSync(join(dataDir, 'aitools.sqlite'));
+/** Paramètres de connexion depuis les variables d'environnement (DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME). */
+export function dbConfigFromEnv(env = process.env, prefix = 'DB_') {
+  const get = (k) => env[`${prefix}${k}`];
+  if (get('DRIVER') === 'sqlite') return { driver: 'sqlite', file: get('FILE') || ':memory:' };
+  for (const k of ['HOST', 'USER', 'NAME']) {
+    if (!get(k)) throw new Error(`Variable d'environnement manquante : ${prefix}${k}`);
   }
-  // WAL + synchronous NORMAL : moins d'écritures sur la carte SD / SSD
-  db.exec('PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
-  migrate(db);
+  return {
+    driver: 'mysql', host: get('HOST'), port: Number(get('PORT') || 3306), user: get('USER'),
+    password: get('PASSWORD') ?? '', database: get('NAME'),
+  };
+}
+
+/**
+ * Traduit le SQL "canonique" (écrit une seule fois dans le code) vers le dialecte cible.
+ * Forme canonique = celle de SQLite : INSERT OR IGNORE, ON CONFLICT(cols) DO UPDATE SET x = excluded.x.
+ * Les noms réservés (`key`) sont entre accents graves, acceptés par les deux moteurs.
+ */
+export function translate(sql, dialect) {
+  if (dialect !== 'mysql') return sql;
+  return sql
+    .replace(/\bINSERT\s+OR\s+IGNORE\b/gi, 'INSERT IGNORE')
+    .replace(/\bON\s+CONFLICT\s*\([^)]*\)\s*DO\s+UPDATE\s+SET\b/gi, 'ON DUPLICATE KEY UPDATE')
+    .replace(/\bexcluded\.(\w+)/gi, 'VALUES($1)')
+    .replace(/\s+COLLATE\s+NOCASE\b/gi, ''); // MySQL compare déjà sans casse (utf8mb4_unicode_ci)
+}
+
+// undefined et NaN (Number('abc') dans une route) deviennent NULL, comme avec SQLite
+const norm = (params) => params.map((p) => (p === undefined || (typeof p === 'number' && !Number.isFinite(p)) ? null : p));
+
+// API commune : db.prepare(sql).get / all / run(...params), toutes asynchrones.
+// Les sous-classes fournissent _exec(sql, params, mode) avec mode = 'get' | 'all' | 'run'.
+class Executor {
+  prepare(sql) {
+    return {
+      get: (...params) => this._exec(sql, norm(params), 'get'),
+      all: (...params) => this._exec(sql, norm(params), 'all'),
+      /** @returns {Promise<{changes: number, lastInsertRowid: number}>} */
+      run: (...params) => this._exec(sql, norm(params), 'run'),
+    };
+  }
+
+  /** Requête libre (renvoie les lignes). */
+  query(sql, params = []) { return this._exec(sql, norm(params), 'all'); }
+}
+
+// ---------- MySQL / MariaDB ----------
+
+class MysqlExecutor extends Executor {
+  constructor(conn) { super(); this.conn = conn; }
+
+  async _exec(sql, params, mode) {
+    const [r] = await this.conn.query(translate(sql, 'mysql'), params);
+    if (mode === 'get') return r[0];
+    if (mode === 'all') return r;
+    return { changes: r.affectedRows ?? 0, lastInsertRowid: r.insertId ?? 0 };
+  }
+}
+
+class MysqlDb extends MysqlExecutor {
+  constructor(pool) { super(pool); this.pool = pool; this.dialect = 'mysql'; }
+
+  /** fn(tx) reçoit un exécuteur lié à UNE connexion ; commit si tout va bien, rollback sinon. */
+  async transaction(fn) {
+    const conn = await this.pool.getConnection();
+    try {
+      await conn.beginTransaction();
+      const result = await fn(new MysqlExecutor(conn));
+      await conn.commit();
+      return result;
+    } catch (e) {
+      await conn.rollback().catch(() => {});
+      throw e;
+    } finally {
+      conn.release();
+    }
+  }
+
+  close() { return this.pool.end(); }
+}
+
+async function openMysql(cfg) {
+  const { default: mysql } = await import('mysql2/promise');
+  const pool = mysql.createPool({
+    host: cfg.host, port: cfg.port || 3306, user: cfg.user, password: cfg.password, database: cfg.database,
+    charset: 'UTF8MB4_UNICODE_CI',
+    waitForConnections: true, connectionLimit: cfg.connectionLimit || 10,
+    decimalNumbers: true,            // SUM()/AVG() en nombres, pas en chaînes
+    supportBigNumbers: true, bigNumberStrings: false,
+    flags: ['+FOUND_ROWS'],          // affectedRows = lignes trouvées (comme SQLite), pas seulement modifiées
+    timezone: 'Z',
+  });
+  const db = new MysqlDb(pool);
+  try { await migrateMysql(db); }
+  catch (e) { await pool.end().catch(() => {}); throw e; }
   return db;
 }
 
-function migrate(db) {
-  const { user_version: current } = db.prepare('PRAGMA user_version').get();
-  for (let i = current; i < MIGRATIONS.length; i++) {
-    db.exec('BEGIN');
+// Verrou applicatif (GET_LOCK) : deux instances qui démarrent en même temps ne migrent pas en parallèle.
+// Le verrou est lié à la connexion : on garde la même du début à la fin.
+async function migrateMysql(db) {
+  const conn = await db.pool.getConnection();
+  const LOCK = 'aitools_migrate';
+  try {
+    const [[lock]] = await conn.query('SELECT GET_LOCK(?, 60) ok', [LOCK]);
+    if (lock.ok !== 1) throw new Error('Migrations : verrou non obtenu (une autre instance migre ?)');
     try {
-      db.exec(MIGRATIONS[i]);
-      db.exec(`PRAGMA user_version = ${i + 1}`);
-      db.exec('COMMIT');
+      await conn.query(`CREATE TABLE IF NOT EXISTS schema_migrations (
+        version INT NOT NULL PRIMARY KEY, name VARCHAR(100) NOT NULL, applied_at BIGINT NOT NULL
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`);
+      const [rows] = await conn.query('SELECT version FROM schema_migrations');
+      const done = new Set(rows.map((r) => r.version));
+      for (let i = 0; i < MIGRATIONS.length; i++) {
+        const version = i + 1;
+        if (done.has(version)) continue;
+        for (const sql of MIGRATIONS[i].mysql) await conn.query(sql);
+        await conn.query('INSERT INTO schema_migrations(version, name, applied_at) VALUES(?, ?, ?)',
+          [version, MIGRATIONS[i].name, now()]);
+      }
+    } finally {
+      await conn.query('SELECT RELEASE_LOCK(?)', [LOCK]).catch(() => {});
+    }
+  } finally {
+    conn.release();
+  }
+}
+
+// ---------- SQLite (tests locaux) ----------
+
+class SqliteExecutor extends Executor {
+  constructor(raw) { super(); this.raw = raw; this.cache = new Map(); }
+
+  _stmt(sql) {
+    let s = this.cache.get(sql);
+    if (!s) { s = this.raw.prepare(translate(sql, 'sqlite')); this.cache.set(sql, s); }
+    return s;
+  }
+
+  _run(sql, params, mode) {
+    const s = this._stmt(sql);
+    if (mode === 'get') return s.get(...params);
+    if (mode === 'all') return s.all(...params);
+    const r = s.run(...params);
+    return { changes: Number(r.changes), lastInsertRowid: Number(r.lastInsertRowid) };
+  }
+
+  async _exec(sql, params, mode) { return this._run(sql, params, mode); }
+}
+
+class SqliteDb extends SqliteExecutor {
+  constructor(raw) { super(raw); this.dialect = 'sqlite'; this.txLock = null; }
+
+  // Une seule connexion : pendant une transaction, les autres requêtes attendent sa fin
+  // (sinon elles s'exécuteraient DANS la transaction). Ne pas appeler db.* depuis le callback : utiliser tx.*.
+  async _exec(sql, params, mode) {
+    while (this.txLock) await this.txLock;
+    return this._run(sql, params, mode);
+  }
+
+  async transaction(fn) {
+    while (this.txLock) await this.txLock;
+    let release;
+    this.txLock = new Promise((r) => { release = r; });
+    this.raw.exec('BEGIN');
+    try {
+      const result = await fn(new SqliteExecutor(this.raw));
+      this.raw.exec('COMMIT');
+      return result;
     } catch (e) {
-      db.exec('ROLLBACK');
+      try { this.raw.exec('ROLLBACK'); } catch { /* déjà annulée */ }
+      throw e;
+    } finally {
+      this.txLock = null;
+      release();
+    }
+  }
+
+  async close() { this.raw.close(); }
+}
+
+function openSqlite(file = ':memory:') {
+  if (file !== ':memory:') mkdirSync(dirname(file), { recursive: true });
+  const raw = new DatabaseSync(file);
+  raw.exec('PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
+  const db = new SqliteDb(raw);
+  raw.exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
+    version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at INTEGER NOT NULL
+  )`);
+  const done = new Set(raw.prepare('SELECT version FROM schema_migrations').all().map((r) => r.version));
+  for (let i = 0; i < MIGRATIONS.length; i++) {
+    const version = i + 1;
+    if (done.has(version)) continue;
+    raw.exec('BEGIN');
+    try {
+      for (const sql of MIGRATIONS[i].sqlite) raw.exec(sql);
+      raw.prepare('INSERT INTO schema_migrations(version, name, applied_at) VALUES(?, ?, ?)').run(version, MIGRATIONS[i].name, now());
+      raw.exec('COMMIT');
+    } catch (e) {
+      raw.exec('ROLLBACK');
+      raw.close();
       throw e;
     }
   }
+  return db;
+}
+
+/**
+ * Ouvre la base et applique les migrations en attente.
+ * cfg = { driver: 'mysql', host, port, user, password, database } ou { driver: 'sqlite', file } ;
+ * sans argument (ou ':memory:') : SQLite en mémoire.
+ */
+export async function openDb(cfg = ':memory:') {
+  if (typeof cfg === 'string') return openSqlite(cfg);
+  if (cfg.driver === 'sqlite') return openSqlite(cfg.file);
+  return openMysql(cfg);
 }
 
 export const now = () => Math.floor(Date.now() / 1000);
 
-export function getSetting(db, key, fallback = null) {
-  const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key);
+export async function getSetting(db, key, fallback = null) {
+  const row = await db.prepare('SELECT value FROM settings WHERE `key` = ?').get(key);
   return row ? row.value : fallback;
 }
 
-export function setSetting(db, key, value) {
-  db.prepare('INSERT INTO settings(key, value) VALUES(?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
+export async function setSetting(db, key, value) {
+  await db.prepare('INSERT INTO settings(`key`, value) VALUES(?, ?) ON CONFLICT(`key`) DO UPDATE SET value = excluded.value')
     .run(key, value);
 }
