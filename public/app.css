@@ -378,3 +378,4 @@ form.inline { display: inline-flex; gap: 6px; align-items: end; flex-wrap: wrap;
 .manual { margin-top: 14px; }
 .manual summary { cursor: pointer; color: var(--muted); }
 .manual form { margin-top: 10px; }
+.spin-inline[hidden], .cfg[hidden] { display: none; }

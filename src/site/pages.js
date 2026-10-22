@@ -273,7 +273,7 @@ export function howPage({ appUrl, apple = false }) {
       <p>Tu te connectes avec ${providersText(apple)}, puis AiTools te demande ton propre accès à Claude. Tant que ce n'est pas fait, tu peux gérer ton compte, mais rien ne se lance.</p>
       <ul>
         <li>Soit une clé Anthropic (un code secret que tu crées sur ton compte Anthropic). Elle est vérifiée sans rien consommer, rangée sous clé, et on ne réaffiche que ses 4 derniers caractères.</li>
-        <li>Soit ton abonnement Claude : tu cliques sur « Se connecter avec Claude », tu autorises AiTools sur le site d'Anthropic, et tu reviens ici tout seul. Ça comporte un risque, détaillé sur la page <a href="/tarifs#acces-claude">Tarifs</a>.</li>
+        <li>Soit ton abonnement Claude : tu cliques sur « Se connecter avec Claude », tu te connectes sur le site de Claude, tu recopies le petit code qu'il affiche, et AiTools récupère le jeton tout seul. Ça comporte un risque, détaillé sur la page <a href="/tarifs#acces-claude">Tarifs</a>.</li>
       </ul>
     </li>
     <li id="etape-2" data-reveal>
@@ -401,7 +401,7 @@ export function pricingPage({ appUrl }) {
       </li>
       <li data-reveal>
         <h3>Ton abonnement Claude (Pro, Max), avec un risque</h3>
-        <p>Tu n'as plus rien à copier : tu cliques sur le bouton ci-dessous, tu arrives sur le site d'Anthropic, tu autorises AiTools, et tu reviens ici tout seul. Pas de facture en plus, mais les règles d'Anthropic peuvent ne pas autoriser d'utiliser un abonnement à travers une application comme AiTools. Ton compte Claude pourrait être limité, suspendu ou fermé.</p>
+        <p>Tu cliques sur le bouton ci-dessous : un lien s'affiche en quelques secondes, tu te connectes à Claude, tu recopies le petit code qu'il te montre, et AiTools récupère le jeton tout seul. Pas de facture en plus, mais les règles d'Anthropic peuvent ne pas autoriser d'utiliser un abonnement à travers une application comme AiTools. Ton compte Claude pourrait être limité, suspendu ou fermé.</p>
         <p>AiTools ne peut pas l'empêcher et n'en est pas responsable. Une fenêtre d'avertissement et une case à cocher te le rappellent avant toute connexion, et ton accord est enregistré avec sa date. Lis les <a href="https://www.anthropic.com/legal/consumer-terms" rel="noopener noreferrer">conditions d'Anthropic</a> avant de choisir. Ce mode peut aussi être désactivé sur le service.</p>
         <p><a class="btn primary" href="/link?start=claude">Se connecter avec Claude</a></p>
         <p class="fine">Pas encore de compte AiTools ? Le bouton te demande d'abord de te connecter, puis te ramène ici.</p>

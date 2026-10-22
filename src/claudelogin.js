@@ -1,0 +1,123 @@
+// Connexion guidée à Claude : le serveur lance `claude setup-token` pour l'utilisateur, lui donne le lien de connexion,
+// puis, quand il recopie le petit code affiché par Claude, transmet ce code au CLI et capte le jeton produit.
+// Le CLI a besoin d'un terminal : on le lance dans `script` (util-linux), avec un HOME jetable et un environnement assaini.
+// Une seule connexion par utilisateur, 5 minutes au plus, quelques-unes en même temps sur le serveur.
+import { spawn } from 'node:child_process';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { randomId } from './crypto.js';
+import { HttpError } from './http.js';
+import { buildChildEnv } from './services/sandbox.js';
+
+const MAX_SESSIONS = 5;
+const TTL_MS = 5 * 60_000;
+const URL_WAIT_MS = 25_000;
+const TOKEN_WAIT_MS = 45_000;
+const MAX_OUTPUT = 64 * 1024;
+
+const OSC_LINK = /\x1b\]8;[^;\x07\x1b]*;(https:\/\/[^\x07\x1b]+)(?:\x07|\x1b\\)/;
+const TOKEN = /sk-ant-oat\d+-[A-Za-z0-9_-]{20,}/;
+const CODE_RE = /^[A-Za-z0-9_#.~-]{8,400}$/;
+// Le lien affiché à l'utilisateur ne peut mener que chez Anthropic, même si la sortie du CLI était altérée
+const ALLOWED_HOST = /(^|\.)(claude\.com|claude\.ai|anthropic\.com)$/;
+
+const shq = (s) => `'${String(s).split("'").join("'\\''")}'`;
+const busy = (msg) => new HttpError(503, msg, { expose: true });
+
+/** Lien de connexion contenu dans la sortie du CLI (lien cliquable OSC 8, qui porte l'adresse complète), ou null. */
+export function extractLoginUrl(out) {
+  const m = OSC_LINK.exec(out);
+  if (!m) return null;
+  try {
+    const u = new URL(m[1]);
+    return u.protocol === 'https:' && ALLOWED_HOST.test(u.hostname) ? u.href : null;
+  } catch { return null; }
+}
+export const extractToken = (out) => TOKEN.exec(out)?.[0] ?? null;
+
+export class ClaudeLogins {
+  constructor(app) { this.app = app; this.sessions = new Map(); }
+
+  #drop(id) {
+    const s = this.sessions.get(id);
+    if (!s) return;
+    this.sessions.delete(id);
+    clearTimeout(s.timer);
+    try { s.proc.kill('SIGKILL'); } catch { /* déjà terminé */ }
+    rmSync(s.home, { recursive: true, force: true });
+  }
+
+  cancel(userId, id) {
+    const s = this.sessions.get(id);
+    if (s && s.userId === Number(userId)) this.#drop(id);
+  }
+
+  closeAll() { for (const id of [...this.sessions.keys()]) this.#drop(id); }
+
+  /** Attend qu'une condition sur la sortie du CLI soit vraie, ou que le CLI se termine, ou le délai. */
+  #waitFor(s, test, ms) {
+    return new Promise((resolve) => {
+      const check = () => { const v = test(s.out); if (v || s.done) { cleanup(); resolve(v || null); } };
+      const t = setTimeout(() => { cleanup(); resolve(null); }, ms);
+      const cleanup = () => { clearTimeout(t); s.events.off('data', check); };
+      s.events.on('data', check);
+      check();
+    });
+  }
+
+  /** Lance le CLI et renvoie { id, url } dès que le lien de connexion est affiché. */
+  async start(userId) {
+    const { cfg } = this.app;
+    userId = Number(userId);
+    for (const [id, s] of this.sessions) if (s.userId === userId) this.#drop(id);
+    if (this.sessions.size >= MAX_SESSIONS) throw busy('Beaucoup de monde se connecte en ce moment : réessaie dans une minute.');
+    const home = mkdtempSync(join(tmpdir(), 'aitools-login-'));
+    const id = randomId(18);
+    const s = { userId, home, out: '', done: false, events: new (await import('node:events')).EventEmitter() };
+    // stty : un terminal très large, pour que le jeton ne soit jamais coupé sur deux lignes
+    const cmd = `stty cols 1000 rows 50; exec ${shq(cfg.claudeBin)} setup-token`;
+    try {
+      s.proc = spawn('script', ['-qefc', cmd, '/dev/null'], {
+        cwd: home, env: buildChildEnv(process.env, { home }), stdio: ['pipe', 'pipe', 'pipe'],
+      });
+    } catch {
+      rmSync(home, { recursive: true, force: true });
+      throw new HttpError(502, "Impossible de lancer la connexion à Claude sur le serveur. Préviens l'administrateur.", { expose: true });
+    }
+    const feed = (b) => { s.out = (s.out + b.toString('utf8')).slice(-MAX_OUTPUT); s.events.emit('data'); };
+    s.proc.stdout.on('data', feed);
+    s.proc.stderr.on('data', feed);
+    s.proc.stdin.on('error', () => {});
+    s.proc.on('error', () => { s.failed = true; s.done = true; s.events.emit('data'); });
+    s.proc.on('close', () => { s.done = true; s.events.emit('data'); });
+    s.timer = setTimeout(() => this.#drop(id), TTL_MS);
+    s.timer.unref?.();
+    this.sessions.set(id, s);
+
+    const url = await this.#waitFor(s, extractLoginUrl, URL_WAIT_MS);
+    if (!url) {
+      this.#drop(id);
+      throw new HttpError(502, "Claude n'a pas donné de lien de connexion (le CLI est-il installé sur le serveur ?). Réessaie, ou colle un jeton à la main.", { expose: true });
+    }
+    return { id, url };
+  }
+
+  /** Transmet le code recopié par l'utilisateur au CLI et renvoie le jeton produit. */
+  async finish(userId, id, code) {
+    const s = this.sessions.get(String(id));
+    if (!s || s.userId !== Number(userId)) throw new HttpError(404, 'Connexion expirée : recommence.');
+    const c = String(code ?? '').trim();
+    if (!CODE_RE.test(c)) throw new HttpError(400, 'Ce code ne ressemble pas à celui de Claude : recopie-le en entier.');
+    if (s.submitted) throw new HttpError(409, 'Code déjà envoyé : patiente un instant.');
+    s.submitted = true;
+    s.proc.stdin.write(`${c}\r`);
+    const token = await this.#waitFor(s, extractToken, TOKEN_WAIT_MS);
+    this.#drop(String(id));
+    if (!token) throw new HttpError(400, 'Claude a refusé ce code (expiré ou incorrect). Recommence la connexion.');
+    return token;
+  }
+}
+
+/** Gestionnaire unique par application (créé à la première utilisation, arrêté avec elle). */
+export const loginsOf = (app) => (app.claudeLogins ??= new ClaudeLogins(app));

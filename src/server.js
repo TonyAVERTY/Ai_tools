@@ -155,6 +155,7 @@ export async function createApp(cfg, { db, worker = true, createTransport, fetch
   // Arrêt propre : plus de requêtes, puis fin du job en cours et des tâches de fond, enfin fermeture de la base
   app.close = async () => {
     clearInterval(purge);
+    app.claudeLogins?.closeAll();
     await new Promise((r) => { server.close(r); server.closeIdleConnections?.(); });
     await w?.stop();
     await scheduler?.stop();

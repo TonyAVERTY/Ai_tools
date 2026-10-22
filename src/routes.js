@@ -5,12 +5,13 @@ import { startLogin, finishLogin, destroySession, getSession, checkOrigin } from
 import { verifyCaptcha } from './captcha.js';
 import { deleteUser, normalizeEmail, getUser } from './users.js';
 import {
-  assertCanRunAi, getLinkState, startClaudeOauth, finishClaudeOauth, oauthAvailable, linkApiKey, linkSubscriptionToken, linkServer, unlink, testLink, lastConsent,
+  assertCanRunAi, getLinkState, assertLoginConsent, linkLoginToken, linkApiKey, linkSubscriptionToken, linkServer, unlink, testLink, lastConsent,
   MODES,
 } from './claudelink.js';
 import { loginPage } from './site/pages.js';
 import { registerSiteRoutes } from './site/routes.js';
 import { registerAdminRoutes } from './adminroutes.js';
+import { loginsOf } from './claudelogin.js';
 import { dashboardPage, settingsPage, unsubPage, accountPage, linkPage } from './views.js';
 import { enqueue, latestJobs, cancelJob, usageSummary } from './services/jobs.js';
 import { validateGitUrl, removeRepo } from './services/git.js';
@@ -189,7 +190,7 @@ export function registerRoutes(router, app) {
   router.get('/link', async ({ res, session, url }) => {
     html(res, linkPage({
       user: session.user, link: await getLinkState(db, session.userId), cliModeEnabled, error: url.searchParams.get('e'),
-      oauth: oauthAvailable(cfg), start: url.searchParams.get('start') === 'claude',
+      start: url.searchParams.get('start') === 'claude',
     }));
   });
 
@@ -209,15 +210,22 @@ export function registerRoutes(router, app) {
   };
   router.post('/link/api-key', linkAction((b, s) => linkApiKey(app, s.userId, b.apiKey)), LINK_LIMIT);
   router.post('/link/subscription', linkAction((b, s) => linkSubscriptionToken(app, s.userId, { token: b.token, accept: b.accept })), LINK_LIMIT);
-  // Connexion automatique avec Claude : le POST (case cochée) renvoie vers Anthropic, le GET est le retour d'Anthropic
-  router.post('/link/claude/start', async ({ req, res, session }) => {
+  // Connexion guidée avec Claude (src/claudelogin.js) : le serveur lance le CLI et renvoie le lien de connexion ;
+  // l'utilisateur recopie ensuite le petit code affiché par Claude, et le serveur range le jeton qui en sort.
+  router.post('/link/claude/login', async ({ req, res, session }) => {
     const b = await readBody(req);
-    try { await startClaudeOauth(app, session.userId, { accept: b.accept }, res); }
-    catch (e) { if (!(e instanceof HttpError)) throw e; redirect(res, `/link?e=${encodeURIComponent(e.message)}`); }
+    assertLoginConsent(cfg, b.accept);
+    json(res, await loginsOf(app).start(session.userId));
   }, LINK_LIMIT);
-  router.get('/link/claude/callback', async ({ req, res, session, url }) => {
-    try { await finishClaudeOauth(app, session.userId, url.searchParams, req, res); redirect(res, '/'); }
-    catch (e) { if (!(e instanceof HttpError)) throw e; redirect(res, `/link?e=${encodeURIComponent(e.message)}`); }
+  router.post('/link/claude/login/code', async ({ req, res, session }) => {
+    const b = await readBody(req);
+    const token = await loginsOf(app).finish(session.userId, b.id, b.code);
+    await linkLoginToken(app, session.userId, token);
+    json(res, { ok: true });
+  }, LINK_LIMIT);
+  router.post('/link/claude/login/cancel', async ({ req, res, session }) => {
+    loginsOf(app).cancel(session.userId, (await readBody(req)).id);
+    json(res, { ok: true });
   }, LINK_LIMIT);
   router.post('/link/server', linkAction((b, s) => linkServer(app, s.userId)), LINK_LIMIT);
   router.post('/link/test', async ({ req, res, session }) => {

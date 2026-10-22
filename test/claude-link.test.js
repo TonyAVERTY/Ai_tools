@@ -1,6 +1,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { now, getSetting, setSetting } from '../src/db.js';
@@ -44,6 +45,7 @@ after(async () => {
   rmSync(binDir, { recursive: true, force: true });
 });
 
+const orow = (o, id) => o.db.prepare('SELECT claude_link_json FROM users WHERE id = ?').get(id);
 const row = (id) => s.db.prepare('SELECT claude_link_json FROM users WHERE id = ?').get(id);
 const dump = async () => JSON.stringify([
   await s.db.prepare('SELECT * FROM users').all(), await s.db.prepare('SELECT * FROM user_settings').all(),
@@ -184,8 +186,8 @@ test('formulaire HTML : l\'erreur revient sur /link, la page affiche la fenêtre
   assert.match(page, /ne peut en être tenu responsable/);
   assert.match(page, /<input type="checkbox" name="accept" data-consent required>/);
   assert.match(page, /data-consent-submit disabled/);
-  assert.match(page, /claude setup-token/, 'sans OAuth configuré, la saisie du jeton reste proposée');
-  assert.doesNotMatch(page, /\/link\/claude\/start/, 'sans OAuth configuré, pas de bouton automatique');
+  assert.match(page, /claude setup-token/, 'la saisie manuelle du jeton reste proposée en secours');
+  assert.match(page, /data-claude-login/, 'et la connexion guidée en premier');
 });
 
 test('drapeau CLAUDE_CLI_MODE_ENABLED=false : mode abonnement masqué et refusé côté serveur', async () => {
@@ -445,172 +447,94 @@ test('serveur complet (worker démarré par createApp) : job d\'un compte relié
   } finally { await full.close(); }
 });
 
-// ---------- Connexion automatique avec Claude (OAuth) ----------
+// ---------- Connexion guidée (le serveur lance `claude setup-token`) ----------
 
-const orow = (o, id) => o.db.prepare('SELECT claude_link_json FROM users WHERE id = ?').get(id);
-const OAUTH = {
-  clientId: 'client-test', authorizeUrl: 'https://claude.ai/oauth/authorize', tokenUrl: 'https://console.anthropic.com/v1/oauth/token',
-  redirectUri: 'https://ai.tony-averty.dev/link/claude/callback', scope: 'user:inference', expiresIn: 31_536_000,
+const hasScript = spawnSync('script', ['--version']).status === 0;
+const loginApp = async (mode = '') => {
+  const dir = mkdtempSync(join(tmpdir(), 'aitools-login-bin-'));
+  const o = await startApp({ cfg: { claudeBin: makeClaudeBin(dir, { fixture: 'fake-setup-token.js', env: mode ? { FAKE_MODE: mode } : {} }) } });
+  return { o, dir };
 };
-const ACCESS = `sk-ant-oat01-${'O'.repeat(48)}`;
-const REFRESHED = `sk-ant-oat01-${'R'.repeat(48)}`;
+const lt = { skip: !hasScript && 'la commande script (util-linux) est absente' };
 
-async function oauthApp(tokenReply = {}) {
-  const o = await startApp({ cfg: { claudeOauth: OAUTH } });
-  const calls = [];
-  o.app.validateToken = async (t) => { calls.push(['validate', t]); };
-  o.app.fetch = async (url, opts) => {
-    calls.push([url, JSON.parse(opts.body)]);
-    return { ok: tokenReply.ok ?? true, status: tokenReply.status ?? 200, json: async () => tokenReply.data ?? { access_token: ACCESS, refresh_token: 'refresh-1', expires_in: 3600 } };
-  };
-  return { o, calls };
-}
-const startOauth = (o, u, body = { accept: 'on' }) => fetch(`${o.base}/link/claude/start`, {
-  method: 'POST', redirect: 'manual',
-  headers: { cookie: u.cookie, origin: 'https://ai.tony-averty.dev', 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(body).toString(),
-});
-const bindCookie = (r) => r.headers.getSetCookie().find((c) => c.startsWith('claude_oauth_b=')).split(';')[0];
-const callback = (o, u, query, cookie) => fetch(`${o.base}/link/claude/callback?${new URLSearchParams(query)}`, { redirect: 'manual', headers: { cookie: [u.cookie, cookie].filter(Boolean).join('; ') } });
-
-test('OAuth : sans la case cochée, rien ne démarre ; sans configuration, le service le dit', async () => {
-  const { o } = await oauthApp();
-  const plain = await startApp();
-  try {
-    const u = await o.newUser({ admin: false });
-    const r = await startOauth(o, u, {});
-    assert.equal(r.status, 303);
-    assert.match(decodeURIComponent(r.headers.get('location')), /^\/link\?e=.*cocher/);
-    assert.equal((await o.db.prepare('SELECT COUNT(*) n FROM oauth_states').get()).n, 0);
-    assert.deepEqual(r.headers.getSetCookie().filter((c) => c.startsWith('claude_oauth_b=')), []);
-
-    const p = await plain.newUser({ admin: false });
-    const off = await startOauth(plain, p);
-    assert.match(decodeURIComponent(off.headers.get('location')), /^\/link\?e=.*pas activée/);
-  } finally { await o.close(); await plain.close(); }
-});
-
-test('OAuth : démarrage vers Anthropic avec PKCE, state et cookie de liaison ; la page propose le bouton automatique', async () => {
-  const { o } = await oauthApp();
+test('connexion guidée : sans la case cochée, aucun CLI n\'est lancé', lt, async () => {
+  const { o, dir } = await loginApp();
   try {
     const u = await o.newUser({ admin: false, link: null });
+    const r = await u.post('/link/claude/login', {});
+    assert.equal(r.status, 400);
+    assert.match((await r.json()).error, /cocher/);
+    assert.equal(o.app.claudeLogins?.sessions.size ?? 0, 0);
     const page = await (await u.get('/link?start=claude', { headers: { accept: 'text/html' } })).text();
-    assert.match(page, /action="\/link\/claude\/start"/);
-    assert.match(page, /<dialog[^>]*data-autoopen/, 'le bouton de la page Tarifs ouvre la fenêtre d\'avertissement');
-    assert.match(page, /Continuer sur Claude/);
-
-    const r = await startOauth(o, u);
-    assert.equal(r.status, 303);
-    const loc = new URL(r.headers.get('location'));
-    assert.equal(loc.origin + loc.pathname, OAUTH.authorizeUrl);
-    assert.equal(loc.searchParams.get('client_id'), OAUTH.clientId);
-    assert.equal(loc.searchParams.get('redirect_uri'), OAUTH.redirectUri);
-    assert.equal(loc.searchParams.get('code_challenge_method'), 'S256');
-    assert.ok(loc.searchParams.get('code_challenge'));
-    assert.ok(loc.searchParams.get('state'));
-    assert.match(r.headers.getSetCookie().find((c) => c.startsWith('claude_oauth_b=')), /HttpOnly/);
-    assert.equal(await getLinkState(o.db, u.id), null, 'rien n\'est relié avant le retour d\'Anthropic');
-  } finally { await o.close(); }
+    assert.match(page, /<dialog[^>]*data-autoopen/);
+    assert.match(page, /data-claude-login/);
+  } finally { await o.close(); rmSync(dir, { recursive: true, force: true }); }
 });
 
-test('OAuth : le retour échange le code, vérifie le jeton, le range chiffré avec le consentement et de quoi le renouveler', async () => {
-  const { o, calls } = await oauthApp();
+test('connexion guidée : lien renvoyé, puis le code donne le jeton, rangé chiffré avec le consentement', lt, async () => {
+  const { o, dir } = await loginApp();
   try {
     const u = await o.newUser({ admin: false, link: null });
-    const start = await startOauth(o, u);
-    const state = new URL(start.headers.get('location')).searchParams.get('state');
-    const r = await callback(o, u, { code: 'code-1', state }, bindCookie(start));
-    assert.equal(r.status, 303);
-    assert.equal(r.headers.get('location'), '/');
+    const start = await u.post('/link/claude/login', { accept: true });
+    assert.equal(start.status, 200);
+    const { id, url } = await start.json();
+    assert.match(url, /^https:\/\/claude\.com\/cai\/oauth\/authorize\?code=true&state=abc$/);
+    assert.equal(await getLinkState(o.db, u.id), null, 'rien n\'est relié avant le code');
 
-    const [url, body] = calls[0];
-    assert.equal(url, OAUTH.tokenUrl);
-    assert.equal(body.grant_type, 'authorization_code');
-    assert.equal(body.code, 'code-1');
-    assert.equal(body.client_id, OAUTH.clientId);
-    assert.equal(body.redirect_uri, OAUTH.redirectUri);
-    assert.equal(body.expires_in, OAUTH.expiresIn);
-    assert.ok(body.code_verifier, 'PKCE');
-    assert.deepEqual(calls[1], ['validate', ACCESS]);
+    const bad = await u.post('/link/claude/login/code', { id: 'inconnu', code: 'GOOD-code-1234' });
+    assert.equal(bad.status, 404);
+    const short = await u.post('/link/claude/login/code', { id, code: 'x' });
+    assert.equal(short.status, 400);
+    const other = await o.newUser({ admin: false, link: null });
+    assert.equal((await other.post('/link/claude/login/code', { id, code: 'GOOD-code-1234' })).status, 404, 'la connexion d\'un autre compte reste inaccessible');
 
+    const done = await u.post('/link/claude/login/code', { id, code: 'GOOD-code-1234#state' });
+    assert.equal(done.status, 200);
     const link = JSON.parse((await orow(o, u.id)).claude_link_json);
     assert.equal(link.mode, 'subscription_token');
-    assert.equal(link.via, 'oauth');
-    assert.equal(decrypt(o.app.cfg.secretKey, link.secret_enc), ACCESS);
-    assert.equal(decrypt(o.app.cfg.secretKey, link.refresh_enc), 'refresh-1');
-    assert.ok(link.consent.at && link.consent.version === CONSENT_VERSION);
-    assert.ok(!JSON.stringify(await getLinkState(o.db, u.id)).includes(ACCESS), 'le secret ne sort jamais');
-    assert.equal(await aiRefusal(o.db, u.id), null);
-
-    // Usage unique : rejouer le même retour ne fait rien
-    const again = await callback(o, u, { code: 'code-1', state }, bindCookie(start));
-    assert.match(decodeURIComponent(again.headers.get('location')), /^\/link\?e=/);
-    assert.equal(calls.length, 2);
-  } finally { await o.close(); }
+    assert.equal(link.via, 'login');
+    assert.equal(decrypt(o.app.cfg.secretKey, link.secret_enc), `sk-ant-oat01-${'L'.repeat(60)}`);
+    assert.equal(link.consent.version, CONSENT_VERSION);
+    assert.ok(!JSON.stringify(await getLinkState(o.db, u.id)).includes('sk-ant-oat'), 'le jeton ne sort jamais');
+    assert.equal(o.app.claudeLogins.sessions.size, 0, 'session et dossier jetable nettoyés');
+  } finally { await o.close(); rmSync(dir, { recursive: true, force: true }); }
 });
 
-test('OAuth : refus au retour (autre navigateur, autre compte, annulation, Anthropic en erreur) = rien de relié', async () => {
-  const { o, calls } = await oauthApp();
+test('connexion guidée : mauvais code, annulation, pas de lien, lien hors Anthropic', lt, async () => {
+  const { o, dir } = await loginApp();
+  const none = await loginApp('NOLINK');
+  const evil = await loginApp('EVIL');
   try {
     const u = await o.newUser({ admin: false, link: null });
-    const other = await o.newUser({ admin: false, link: null });
-    const fresh = async () => {
-      const r = await startOauth(o, u);
-      return { state: new URL(r.headers.get('location')).searchParams.get('state'), cookie: bindCookie(r) };
-    };
-    const fails = async (r, re) => { assert.equal(r.status, 303); assert.match(decodeURIComponent(r.headers.get('location')), re); };
-
-    let f = await fresh();
-    await fails(await callback(o, u, { code: 'c', state: f.state }, 'claude_oauth_b=autre'), /^\/link\?e=.*autre navigateur/);
-    f = await fresh();
-    await fails(await callback(o, other, { code: 'c', state: f.state }, f.cookie), /^\/link\?e=.*autre compte/);
-    f = await fresh();
-    await fails(await callback(o, u, { error: 'access_denied', state: f.state }, f.cookie), /^\/link\?e=.*annulée/);
-    await fails(await callback(o, u, { code: 'c', state: 'inconnu' }, f.cookie), /^\/link\?e=/);
-    await fails(await callback(o, u, { state: 'x' }, f.cookie), /^\/link\?e=.*incomplet/);
-    assert.equal(calls.length, 0, 'aucun appel à Anthropic pour un retour invalide');
+    let { id } = await (await u.post('/link/claude/login', { accept: true })).json();
+    const refused = await u.post('/link/claude/login/code', { id, code: 'WRONG-code-1234' });
+    assert.equal(refused.status, 400);
+    assert.match((await refused.json()).error, /refusé/);
     assert.equal((await orow(o, u.id)).claude_link_json, null);
-    assert.equal((await orow(o, other.id)).claude_link_json, null);
-  } finally { await o.close(); }
 
-  const bad = await oauthApp({ ok: false, status: 400, data: {} });
-  try {
-    const u = await bad.o.newUser({ admin: false, link: null });
-    const r = await startOauth(bad.o, u);
-    const out = await callback(bad.o, u, { code: 'c', state: new URL(r.headers.get('location')).searchParams.get('state') }, bindCookie(r));
-    assert.match(decodeURIComponent(out.headers.get('location')), /^\/link\?e=.*refusé/);
-    assert.equal((await bad.o.db.prepare('SELECT claude_link_json FROM users WHERE id = ?').get(u.id)).claude_link_json, null);
-  } finally { await bad.o.close(); }
+    // Annuler tue le CLI ; relancer remplace la connexion précédente de ce compte
+    ({ id } = await (await u.post('/link/claude/login', { accept: true })).json());
+    await u.post('/link/claude/login/cancel', { id });
+    assert.equal(o.app.claudeLogins.sessions.size, 0);
+    await u.post('/link/claude/login', { accept: true });
+    await u.post('/link/claude/login', { accept: true });
+    assert.equal(o.app.claudeLogins.sessions.size, 1, 'une seule connexion par utilisateur');
+
+    const n = await none.o.newUser({ admin: false, link: null });
+    const r1 = await n.post('/link/claude/login', { accept: true });
+    assert.equal(r1.status, 502);
+    assert.match((await r1.json()).error, /pas donné de lien/);
+    const e = await evil.o.newUser({ admin: false, link: null });
+    assert.equal((await e.post('/link/claude/login', { accept: true })).status, 502, 'un lien hors Anthropic n\'est jamais montré');
+  } finally {
+    for (const x of [{ o, dir }, none, evil]) { await x.o.close(); rmSync(x.dir, { recursive: true, force: true }); }
+  }
 });
 
-test('OAuth : un jeton proche de l\'échéance est renouvelé avant le job ; refresh refusé = liaison à refaire', async () => {
-  const { o, calls } = await oauthApp({ data: { access_token: REFRESHED, refresh_token: 'refresh-2', expires_in: 3600 } });
+test('connexion guidée : mode abonnement désactivé = refus, sans CLI', lt, async () => {
+  const off = await startApp({ cfg: { cliModeEnabled: false } });
   try {
-    const { encrypt } = await import('../src/crypto.js');
-    const link = (extra = {}) => JSON.stringify({
-      v: 1, mode: 'subscription_token', valid: true, via: 'oauth', secret_enc: encrypt(o.app.cfg.secretKey, ACCESS),
-      refresh_enc: encrypt(o.app.cfg.secretKey, 'refresh-1'), expires_at: now() - 10, ...extra,
-    });
-    const u = await o.newUser({ admin: false });
-    await o.db.prepare('UPDATE users SET claude_link_json = ? WHERE id = ?').run(link(), u.id);
-    const { resolveCredentials } = await import('../src/claudelink.js');
-    const creds = await resolveCredentials(o.app, u.id);
-    assert.equal(creds.secretEnv.CLAUDE_CODE_OAUTH_TOKEN, REFRESHED);
-    assert.equal(calls[0][1].grant_type, 'refresh_token');
-    assert.equal(calls[0][1].refresh_token, 'refresh-1');
-    const stored = JSON.parse((await orow(o, u.id)).claude_link_json);
-    assert.equal(decrypt(o.app.cfg.secretKey, stored.refresh_enc), 'refresh-2');
-    assert.ok(stored.expires_at > now() + 3000);
-
-    // Pas encore à l'échéance : aucun appel
-    await o.db.prepare('UPDATE users SET claude_link_json = ? WHERE id = ?').run(link({ expires_at: now() + 86400 }), u.id);
-    calls.length = 0;
-    await resolveCredentials(o.app, u.id);
-    assert.equal(calls.length, 0);
-
-    // Anthropic refuse le renouvellement : la liaison est marquée à refaire
-    o.app.fetch = async () => ({ ok: false, status: 400, json: async () => ({}) });
-    await o.db.prepare('UPDATE users SET claude_link_json = ? WHERE id = ?').run(link(), u.id);
-    await assert.rejects(resolveCredentials(o.app, u.id), { status: 403 });
-    assert.equal(JSON.parse((await orow(o, u.id)).claude_link_json).valid, false);
-  } finally { await o.close(); }
+    const u = await off.newUser({ admin: false, link: null });
+    assert.equal((await u.post('/link/claude/login', { accept: true })).status, 403);
+  } finally { await off.close(); }
 });
