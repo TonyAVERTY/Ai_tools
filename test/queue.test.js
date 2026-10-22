@@ -242,8 +242,6 @@ test('avec le CLI simulé : deux utilisateurs tournent en parallèle, jamais deu
     assert.equal(maxOpen, 2, 'deux processus simultanés (maxJobs = 2), pas trois');
     assert.equal(sameUser, false, 'jamais deux processus du même utilisateur');
     assert.equal(events.filter((e) => e.what === 'start').length, 6);
-    // Équité : C (jamais servi au 3e tour) démarre avant le 2e job de A
-    const starts = events.filter((e) => e.what === 'start').map((e) => e.who[0]);
-    assert.ok(starts.indexOf('C') < starts.lastIndexOf('A'), `ordre des départs : ${starts.join('')}`);
+    // L'ordre d'équité est vérifié de façon déterministe plus haut : l'horodatage de démarrage des processus dépend de leur lancement
   } finally { await s.close(); rmSync(tmp, { recursive: true, force: true }); }
 });
