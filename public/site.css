@@ -235,3 +235,13 @@ mark.todo { background: color-mix(in srgb, var(--warn) 16%, transparent); color:
   .shot { animation-delay: .08s; }
   @keyframes site-in { from { opacity: 0; transform: translateY(8px); } }
 }
+
+/* ---------- Vérification anti-robot (connexion) ---------- */
+.captcha { margin: 0 0 16px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; }
+.captcha h3 { margin: 0 0 6px; font-size: 1rem; }
+.captcha p { margin: 0 0 10px; }
+.auth .login-btns form { margin: 0; }
+.auth .login-btns form .btn { width: 100%; }
+.auth .login-btns .btn[disabled] { opacity: .55; cursor: not-allowed; }
+/* Le badge de Google est masqué : sa mention obligatoire figure dans le texte sous les boutons */
+.grecaptcha-badge { visibility: hidden; }

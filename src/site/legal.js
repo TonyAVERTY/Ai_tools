@@ -93,18 +93,8 @@ export function mentionsPage({ appUrl }) {
 }
 
 // ---------- Politique de confidentialité ----------
-// Paragraphe reCAPTCHA prêt, à insérer dans la section « destinataires » et à relier à la section « cookies » le jour où
-// le CAPTCHA est activé (jalon anti-abus). Le texte suppose le chargement du script Google APRÈS un choix de l'utilisateur.
-//
-//   <li><strong>Google reCAPTCHA</strong> (Google Ireland Limited, Google LLC) : protège les pages de connexion contre les
-//   envois automatisés. Il est chargé uniquement si tu l'acceptes, car il dépose des cookies et transmet à Google ton
-//   adresse IP, des données sur ton navigateur et ton comportement sur la page. Base légale : ton consentement. Si tu le
-//   refuses, tu peux te connecter autrement [à définir selon la solution retenue]. Voir la politique de confidentialité de Google.</li>
-//
-// En l'activant, penser aussi à : afficher un choix « Accepter » / « Refuser » aussi simple l'un que l'autre, mettre à jour
-// la CSP (script-src, frame-src), le tableau des cookies, la section « transferts » et la date de mise à jour.
-
-export function privacyPage({ appUrl, apple = false }) {
+// `captcha` : reCAPTCHA configuré. Les paragraphes qui le concernent n'apparaissent que dans ce cas, comme Apple.
+export function privacyPage({ appUrl, apple = false, captcha = false }) {
   return legalPage({
     appUrl, path: '/confidentialite',
     title: 'Politique de confidentialité · AiTools',
@@ -133,6 +123,7 @@ export function privacyPage({ appUrl, apple = false }) {
     <tr><th scope="row">Configuration</th><td>Identifiants SMTP et IMAP, accès à la base de données de ton projet (récapitulatif), jeton Forgejo, adresse du webhook Discord, plafonds et budgets. Les mots de passe, jetons et adresses de webhook sont chiffrés.</td><td>Envoyer, lire les réponses, notifier. Exécution du contrat.</td></tr>
     <tr><th scope="row">Prospects</th><td>Entreprise, adresse professionnelle, site, ville, secteur, phrase d'accroche, page source, score, statut, notes, prochaine action, historique d'envoi, objet et date d'une réponse.</td><td>Fournir le service pour ton compte (voir « rôles »). La base légale du démarchage est la tienne, en B2B en règle générale l'intérêt légitime.</td></tr>
     <tr><th scope="row">Activité</th><td>Type, état, durée, coût et nombre de tokens de chaque job IA, résultat du job. Chaque jour, trois nombres lus dans la base de ton projet si tu l'as reliée (utilisateurs, clients, revenu).</td><td>Fournir le service, appliquer tes budgets et plafonds. Exécution du contrat.</td></tr>
+    <tr><th scope="row">Adresse IP</th><td>Ton adresse IP sert à limiter le nombre de requêtes (protection contre les abus). Elle reste en mémoire du serveur, quelques minutes à quelques heures, et n'est pas enregistrée en base de données.</td><td>Sécurité du service. Intérêt légitime.</td></tr>
     <tr><th scope="row">Liste d'opposition</th><td>Adresse email, motif (désinscription, refus, mail rejeté) et date.</td><td>Ne plus jamais contacter une personne qui s'y est opposée, pour tous les comptes. Obligation légale, intérêt légitime.</td></tr>
   </tbody>
 </table></div>
@@ -162,6 +153,7 @@ export function privacyPage({ appUrl, apple = false }) {
   <li><strong>Google</strong> pour la connexion : il nous transmet ton email, ton nom et un identifiant. <a href="https://policies.google.com/privacy" rel="noopener noreferrer">Politique de Google</a>.</li>
   ${apple ? '<li><strong>Apple</strong> pour la connexion avec Apple : même principe, avec la possibilité de masquer ton email. <a href="https://www.apple.com/legal/privacy/fr-fr/" rel="noopener noreferrer">Politique d\'Apple</a>.</li>' : ''}
   <li><strong>Anthropic</strong>, par l'intermédiaire de <em>ton</em> accès Claude : le code de ton projet lu par Claude, la fiche et la cible, les domaines des prospects déjà connus pour éviter les doublons, et ce que Claude trouve sur le web transitent par ton compte Anthropic, selon les conditions que tu as acceptées avec lui. <a href="https://www.anthropic.com/legal/privacy" rel="noopener noreferrer">Politique d'Anthropic</a>.</li>
+  ${captcha ? `<li><strong>Google reCAPTCHA</strong> (Google Ireland Limited, Google LLC) : protège la connexion contre les envois automatisés. Son script n'est chargé qu'après ton clic sur « Charger la vérification anti-robot », sur la page de connexion. Il dépose des cookies et transmet à Google ton adresse IP, des informations sur ton navigateur et sur ton comportement sur la page. Base légale : ton consentement. AiTools ne conserve pas le résultat de la vérification. Sans elle, la connexion n'est pas possible : c'est une mesure de sécurité contre les abus. Si cela te pose problème, écris-nous. <a href="https://policies.google.com/privacy" rel="noopener noreferrer">Politique de Google</a>.</li>` : ''}
   <li><strong>L'hébergeur</strong> du serveur : ${todo('host')}</li>
   <li><strong>Tes propres services</strong>, quand tu les configures : serveur SMTP et IMAP de ta messagerie, Forgejo, base de données de ton projet, Discord. AiTools s'y connecte avec tes identifiants.</li>
 </ul>
@@ -174,17 +166,20 @@ export function privacyPage({ appUrl, apple = false }) {
       },
       {
         id: 'cookies', title: 'Cookies et traceurs',
-        html: `<p>AiTools ne pose que des cookies <strong>strictement nécessaires</strong> au service. Ils sont exemptés de consentement : c'est pourquoi aucun bandeau ne s'affiche. Pas d'analyse d'audience, pas de publicité, pas de police ni de script chargés depuis un autre site.</p>
+        html: `<p>AiTools ne pose que des cookies <strong>strictement nécessaires</strong> au service. Ils sont exemptés de consentement : c'est pourquoi aucun bandeau ne s'affiche. Pas d'analyse d'audience, pas de publicité, pas de police ni de script chargés depuis un autre site${captcha ? ', sauf la vérification anti-robot de Google sur la page de connexion, et seulement après ton accord (voir plus bas)' : ''}.</p>
 <div class="table-wrap"><table>
   <caption>Cookies posés par AiTools</caption>
   <thead><tr><th scope="col">Nom</th><th scope="col">Rôle</th><th scope="col">Durée</th></tr></thead>
   <tbody>
     <tr><th scope="row"><code>sid</code></th><td>Te garder connecté (identifiant de session aléatoire). Sécurisé : HttpOnly, Secure, SameSite=Lax.</td><td>30 jours au plus</td></tr>
     <tr><th scope="row"><code>oauth_b</code></th><td>Relier une tentative de connexion à ton navigateur, pour empêcher qu'un tiers la détourne. Limité aux adresses de connexion.</td><td>10 minutes</td></tr>
+    ${captcha ? `<tr><th scope="row">Cookies de Google reCAPTCHA</th><td>Déposés par Google, uniquement si tu charges la vérification anti-robot (non essentiels : consentement). Ils servent à distinguer un humain d'un programme.</td><td>Durée fixée par Google</td></tr>` : ''}
   </tbody>
 </table></div>
 <p>Le tableau de bord retient aussi, dans la mémoire de session de ton navigateur, le projet que tu as ouvert en dernier ; cette mémoire est effacée à la fermeture de l'onglet et rien n'est envoyé au serveur.</p>
-<p>Si un traceur non essentiel devait un jour être ajouté, un choix « Accepter » ou « Refuser » apparaîtrait avant tout dépôt, et cette page serait mise à jour.</p>`,
+${captcha
+  ? `<p>Sur la page de connexion, rien n'est chargé depuis Google tant que tu n'as pas cliqué sur « Charger la vérification anti-robot ». Ce choix n'est pas mémorisé : il t'est redemandé à chaque visite de la page.</p>`
+  : `<p>Si un traceur non essentiel devait un jour être ajouté, un choix « Accepter » ou « Refuser » apparaîtrait avant tout dépôt, et cette page serait mise à jour.</p>`}`,
       },
       {
         id: 'droits', title: 'Tes droits',

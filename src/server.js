@@ -17,7 +17,7 @@ import { notify, notifyJob } from './services/notify.js';
 import { budgetState, AI_JOBS, quotaState, isQuotaSensitive } from './services/budget.js';
 import { layout } from './views.js';
 import { homePage, notFoundPage } from './site/pages.js';
-import { securityHeaders, robotsHeaderFor } from './site/seo.js';
+import { securityHeaders, robotsHeaderFor, cspFor } from './site/seo.js';
 import { hasUsableLink, isLinkExempt, LINK_REQUIRED_MESSAGE } from './claudelink.js';
 import { sandboxStartupMessages } from './services/sandbox.js';
 
@@ -33,6 +33,7 @@ const STATIC = {
   '/static/app.css': asset('app.css', 'text/css; charset=utf-8', 3600),
   '/static/site.css': asset('site.css', 'text/css; charset=utf-8', 3600),
   '/static/app.js': asset('app.js', 'text/javascript; charset=utf-8', 3600),
+  '/static/captcha.js': asset('captcha.js', 'text/javascript; charset=utf-8', 3600),
   '/static/favicon.svg': asset('favicon.svg', 'image/svg+xml', 86400),
 };
 
@@ -48,6 +49,7 @@ export async function createApp(cfg, { db, worker = true, createTransport, fetch
   const server = createServer(async (req, res) => {
     for (const [k, v] of Object.entries(secHeaders)) res.setHeader(k, v);
     const url = new URL(req.url, cfg.appUrl);
+    res.setHeader('Content-Security-Policy', cspFor(url.pathname, !!cfg.recaptcha));
     // Pages d'application, API, connexion, 404 : jamais indexées (seul le site public l'est)
     const robots = robotsHeaderFor(url.pathname);
     if (robots) res.setHeader('X-Robots-Tag', robots);
@@ -159,6 +161,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const cfg = loadConfig();
   if (!cfg.adminEmails.length) console.warn('ADMIN_EMAILS est vide : aucun administrateur (personne ne pourra utiliser le mode « Claude du serveur »).');
   for (const m of sandboxStartupMessages(cfg.sandbox)) console.warn(m);
+  if (!cfg.recaptcha) console.warn(`reCAPTCHA désactivé (RECAPTCHA_SITE_KEY / RECAPTCHA_SECRET absentes)${cfg.sandbox.production ? " : à configurer avant l'ouverture au public" : ''}.`);
   const app = await createApp(cfg);
   app.server.listen(cfg.port, cfg.host, () => console.log(`AiTools sur http://${cfg.host}:${cfg.port} (${cfg.appUrl})`));
   const shutdown = () => app.close().then(() => process.exit(0), (e) => { console.error(e); process.exit(1); });

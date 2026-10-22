@@ -26,6 +26,18 @@ function appleConfig() {
   };
 }
 
+// Google reCAPTCHA v3 sur le démarrage de la connexion : les deux clés ensemble, ou aucune (reCAPTCHA désactivé, développement)
+function recaptchaConfig() {
+  const siteKey = (env.RECAPTCHA_SITE_KEY || '').trim();
+  const secret = (env.RECAPTCHA_SECRET || '').trim();
+  if (!siteKey && !secret) return null;
+  if (!siteKey || !secret) throw new Error('reCAPTCHA : RECAPTCHA_SITE_KEY et RECAPTCHA_SECRET vont ensemble');
+  const raw = (env.RECAPTCHA_MIN_SCORE || '').trim();
+  const minScore = raw === '' ? 0.5 : Number(raw);
+  if (!(minScore >= 0 && minScore <= 1)) throw new Error('RECAPTCHA_MIN_SCORE doit être un nombre entre 0 et 1');
+  return { siteKey, secret, minScore };
+}
+
 const flag = (v, def) => (v == null || v === '' ? def : !/^(0|false|off|no|non)$/i.test(String(v).trim()));
 
 // Bac à sable des exécutions Claude. En production il est obligatoire : SANDBOX=off n'y est pas pris en compte.
@@ -59,6 +71,7 @@ export function loadConfig() {
       clientSecret: required('GOOGLE_CLIENT_SECRET'),
     },
     apple: appleConfig(),
+    recaptcha: recaptchaConfig(),
     // Administrateurs : ces adresses seulement (la première est aussi propriétaire des données migrées)
     adminEmails: (env.ADMIN_EMAILS || '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean),
     secretKey: Buffer.from(secretKey, 'hex'),
