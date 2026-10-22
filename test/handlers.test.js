@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
@@ -15,6 +15,7 @@ import { validateSelect, firstValue } from '../src/services/recap.js';
 import { validateGitUrl } from '../src/services/git.js';
 import { verifyUnsubToken, encrypt } from '../src/crypto.js';
 import { addUser } from './helpers/users.js';
+import { makeClaudeBin } from './helpers/claude-bin.js';
 
 async function setup() {
   const tmp = mkdtempSync(join(tmpdir(), 'aitools-'));
@@ -28,7 +29,13 @@ async function setup() {
   const sentMails = [];
   const app = {
     db,
-    cfg: { dataDir: tmp, claudeBin: resolve('test/fixtures/fake-claude.js'), secretKey: randomBytes(32), appUrl: 'https://ai.test' },
+    cfg: { dataDir: tmp, claudeBin: resolve('test/fixtures/fake-claude.js'), sandbox: { enabled: false, production: false }, secretKey: randomBytes(32), appUrl: 'https://ai.test' },
+    // syncRepo refuse file:// (clones d'URL fournies par l'utilisateur : https seulement) : le test clone le dépôt local à la place
+    syncRepo: async (url, dir) => {
+      if (existsSync(join(dir, '.git'))) execFileSync('git', ['-C', dir, 'pull', '-q']);
+      else execFileSync('git', ['clone', '-q', '--depth', '1', url, dir]);
+      return execFileSync('git', ['-C', dir, 'rev-parse', 'HEAD']).toString().trim();
+    },
     createTransport: () => ({ verify: async () => true, sendMail: async (m) => { sentMails.push(m); }, close() {} }),
   };
   const userId = await addUser(db);
@@ -199,8 +206,7 @@ test('sans objet B : tout part en A', async () => {
 test('analyse : modèle économique (Haiku) par défaut, Sonnet uniquement sur demande', async () => {
   const s = await setup();
   const spyFile = join(s.tmp, 'models.log');
-  s.app.cfg.claudeBin = resolve('test/fixtures/spy-claude.js');
-  process.env.MODEL_SPY_FILE = spyFile;
+  s.app.cfg.claudeBin = makeClaudeBin(s.tmp, { fixture: 'spy-claude.js', env: { MODEL_SPY_FILE: spyFile } });
   try {
     const a = await run(s, 'analyze');
     assert.equal(a.status, 'done', a.error);
@@ -208,7 +214,7 @@ test('analyse : modèle économique (Haiku) par défaut, Sonnet uniquement sur d
     const a2 = await run(s, 'analyze');
     assert.equal(a2.status, 'done', a2.error);
     assert.deepEqual(readFileSync(spyFile, 'utf8').trim().split('\n'), ['haiku', 'sonnet']);
-  } finally { delete process.env.MODEL_SPY_FILE; rmSync(s.tmp, { recursive: true, force: true }); }
+  } finally { rmSync(s.tmp, { recursive: true, force: true }); }
 });
 
 test('quota Claude serré : alerte Discord à 80 %, pas en dessous', async () => {
@@ -222,7 +228,7 @@ test('quota Claude serré : alerte Discord à 80 %, pas en dessous', async () =>
     assert.equal(a.status, 'done', a.error);
     assert.equal(sent.length, 0, 'sous le seuil : pas d\'alerte');
 
-    process.env.FAKE_FIVE_HOUR = '0.84';
+    s.app.cfg.claudeBin = makeClaudeBin(s.tmp, { env: { FAKE_FIVE_HOUR: '0.84' } });
     const a2 = await run(s, 'analyze');
     assert.equal(a2.status, 'done', a2.error);
     assert.equal(sent.length, 1);
@@ -233,5 +239,5 @@ test('quota Claude serré : alerte Discord à 80 %, pas en dessous', async () =>
     const a3 = await run(s, 'analyze');
     assert.equal(a3.status, 'done', a3.error);
     assert.equal(sent.length, 1);
-  } finally { delete process.env.FAKE_FIVE_HOUR; rmSync(s.tmp, { recursive: true, force: true }); }
+  } finally { rmSync(s.tmp, { recursive: true, force: true }); }
 });

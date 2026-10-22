@@ -95,8 +95,11 @@ test('Google : inscription automatique à la première connexion, session, PKCE 
   assert.ok(u.last_login_at);
   assert.equal(u.claude_link_json, null);
 
-  const home = await s.client(sid.split(';')[0]).get('/');
-  assert.equal(home.status, 200, 'la session ouvre le tableau de bord');
+  const home = await s.client(sid.split(';')[0]).get('/', { headers: { accept: 'text/html' } });
+  // Nouveau compte sans liaison Claude : l'onboarding bloquant renvoie vers la page de liaison
+  assert.equal(home.status, 303);
+  assert.equal(home.headers.get('location'), '/link');
+  assert.equal((await s.client(sid.split(';')[0]).get('/link')).status, 200, 'la session ouvre la page de liaison');
 });
 
 test('Google : seconde connexion = même compte, pas de doublon', async () => {
