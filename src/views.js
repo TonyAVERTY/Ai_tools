@@ -156,9 +156,10 @@ export function linkPage({ user, link, cliModeEnabled, error, start = false }) {
       <p class="error" role="alert" data-claude-error hidden></p>
     </form>
     <div class="cfg" data-claude-step2 hidden>
-      <p><strong>1.</strong> Ouvre Claude et connecte-toi :</p>
-      <p><a class="btn primary" data-claude-link href="#" target="_blank" rel="noopener noreferrer">Ouvrir Claude</a></p>
-      <p><strong>2.</strong> Claude t'affiche un code. Recopie-le ici :</p>
+      <p data-claude-hint-popup hidden><strong>1.</strong> Connecte-toi à Claude dans la petite fenêtre qui vient de s'ouvrir.</p>
+      <div data-claude-hint-link><p><strong>1.</strong> Ouvre Claude et connecte-toi :</p>
+      <p><a class="btn primary" data-claude-link href="#" target="_blank" rel="noopener noreferrer">Ouvrir Claude</a></p></div>
+      <p><strong>2.</strong> Copie le code que Claude affiche, puis reviens ici : il est reconnu tout seul (sinon, colle-le dans le champ).</p>
       <form class="cfg" data-claude-code>
         <label>Code affiché par Claude<input name="code" autocomplete="off" spellcheck="false" required></label>
         <button class="btn primary"><span class="spin-inline" hidden></span><span data-label>Terminer la connexion</span></button>

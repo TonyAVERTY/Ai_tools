@@ -67,14 +67,20 @@
   });
   $('dialog[data-autoopen]')?.showModal();
 
-  // Connexion guidée à Claude : 1) le serveur prépare le lien (petit chargement), 2) l'utilisateur se connecte sur Claude
-  // et recopie le code affiché, 3) le serveur récupère le jeton. Fermer la fenêtre annule la connexion en cours.
+  // Connexion guidée à Claude : 1) le serveur prépare le lien (petit chargement) et il s'ouvre dans une petite fenêtre,
+  // 2) l'utilisateur se connecte et copie le code affiché par Claude : dès qu'il revient ici (ou colle), le code est
+  // reconnu et envoyé tout seul, 3) le serveur récupère le jeton, la petite fenêtre se ferme et la page se recharge.
+  // Fermer la fenêtre de dialogue annule la connexion en cours.
   const loginForm = $('form[data-claude-login]');
   if (loginForm) {
     const dlg = loginForm.closest('dialog');
     const step2 = $('[data-claude-step2]', dlg);
     const codeForm = $('form[data-claude-code]', dlg);
+    const codeInput = $('input', codeForm);
+    const CODE = /^[A-Za-z0-9_#.~-]{8,400}$/;
     let loginId = null;
+    let popup = null;
+    let sending = false;
     const busy = (form, on, label) => {
       const btn = $('button:not([type=button])', form);
       $('.spin-inline', btn).hidden = !on;
@@ -82,40 +88,68 @@
       btn.disabled = on || (form === loginForm && !$('[data-consent]', form).checked);
     };
     const fail = (sel, e) => { const p = $(sel, dlg); p.textContent = e.message; p.hidden = false; };
+    const closePopup = () => { try { popup?.close(); } catch { /* fenêtre déjà fermée ou inaccessible */ } popup = null; };
+
     loginForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       $('[data-claude-error]', dlg).hidden = true;
+      // La fenêtre s'ouvre tout de suite, pendant le clic (sinon le navigateur la bloque), puis reçoit le lien
+      popup = window.open('', 'aitools-claude-login', 'popup,width=520,height=760');
       busy(loginForm, true, 'Je prépare ton lien…');
       $('[data-claude-status]', loginForm).textContent = 'Ça prend quelques secondes.';
       try {
         const r = await api('/link/claude/login', { accept: 'on' });
         loginId = r.id;
         $('[data-claude-link]', dlg).href = r.url;
+        if (popup) popup.location.href = r.url;
         loginForm.hidden = true;
         step2.hidden = false;
-        $('input', codeForm).focus();
+        $('[data-claude-hint-popup]', dlg).hidden = !popup;
+        $('[data-claude-hint-link]', dlg).hidden = !!popup;
+        codeInput.focus();
       } catch (err) {
+        closePopup();
         fail('[data-claude-error]', err);
         busy(loginForm, false, 'Se connecter avec Claude');
       }
       $('[data-claude-status]', loginForm).textContent = '';
     });
-    codeForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
+
+    async function sendCode() {
+      const code = codeInput.value.trim();
+      if (sending || !loginId || !CODE.test(code)) return;
+      sending = true;
       $('[data-claude-error2]', dlg).hidden = true;
       busy(codeForm, true, 'Je récupère ton jeton…');
       try {
-        await api('/link/claude/login/code', { id: loginId, code: new FormData(codeForm).get('code') });
+        await api('/link/claude/login/code', { id: loginId, code });
         loginId = null;
+        closePopup();
         location.href = '/';
       } catch (err) {
         fail('[data-claude-error2]', err);
         busy(codeForm, false, 'Terminer la connexion');
+        sending = false;
       }
-    });
+    }
+    codeForm.addEventListener('submit', (e) => { e.preventDefault(); sendCode(); });
+    // Code collé dans le champ : envoyé sans autre clic
+    codeInput.addEventListener('paste', () => setTimeout(sendCode, 0));
+    // Retour sur cette page après avoir copié le code chez Claude : on le lit dans le presse-papiers (le navigateur peut demander l'accord)
+    async function fromClipboard() {
+      if (step2.hidden || sending || !loginId || codeInput.value) return;
+      try {
+        const t = (await navigator.clipboard.readText()).trim();
+        if (CODE.test(t)) { codeInput.value = t; sendCode(); }
+      } catch { /* accès refusé ou non géré : le code se colle à la main */ }
+    }
+    window.addEventListener('focus', fromClipboard);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) fromClipboard(); });
+
     dlg.addEventListener('close', () => {
       if (loginId) api('/link/claude/login/cancel', { id: loginId }).catch(() => {});
-      loginId = null; loginForm.hidden = false; step2.hidden = true; codeForm.reset();
+      loginId = null; sending = false; closePopup();
+      loginForm.hidden = false; step2.hidden = true; codeForm.reset();
       busy(loginForm, false, 'Se connecter avec Claude');
     });
   }
