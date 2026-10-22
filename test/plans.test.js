@@ -22,7 +22,7 @@ const free = (db, extra = {}) => addUser(db, { admin: false, link: LINK, ...extr
 async function world() {
   const db = await testDb();
   const sent = [];
-  const app = {
+  const app = { resolveHost: async () => [{ address: '93.184.216.34', family: 4 }],
     db, cfg: { dataDir: '/tmp/x', appUrl: 'https://ai.test', secretKey: randomBytes(32), sandbox: { enabled: false } },
     createTransport: () => ({ verify: async () => true, sendMail: async (m) => { sent.push(m); }, close() {} }),
   };

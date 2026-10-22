@@ -2,6 +2,7 @@
 import { now, getSetting, setSetting } from '../db.js';
 import { abStats, globalSmtp } from '../projects.js';
 import { createTransport } from './mailer.js';
+import { pinSmtp } from '../netguard.js';
 import { notify } from './notify.js';
 import { weeklyMail } from './mailhtml.js';
 import { parisParts, parisTime } from './paris-time.js';
@@ -62,7 +63,7 @@ export async function sendWeeklyReport(app, userId, { at = now() } = {}) {
   const to = await getSetting(app.db, userId, 'notify_email');
   const smtp = await globalSmtp(app, userId);
   if (to && smtp) {
-    const transport = (app.createTransport || createTransport)(smtp);
+    const transport = (app.createTransport || createTransport)(await pinSmtp(app, userId, smtp));
     try {
       await transport.sendMail({
         from: smtp.fromEmail, to, subject: `[AiTools] Rapport du ${day(st.from)} au ${day(st.to)}`, text,

@@ -15,6 +15,8 @@ export function createTransport(smtp) {
     secure: Number(smtp.port) === 465,
     auth: { user: smtp.user, pass: smtp.pass },
     pool: false,
+    // Hôte épinglé sur l'IP vérifiée (netguard.js) : le nom reste utilisé pour SNI et la vérification du certificat
+    ...(smtp.servername ? { servername: smtp.servername, tls: { servername: smtp.servername } } : {}),
   });
 }
 

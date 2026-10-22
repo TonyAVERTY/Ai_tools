@@ -11,7 +11,7 @@ import { createProject } from '../src/projects.js';
 async function setup() {
   const db = await testDb();
   const mails = [], hooks = [];
-  const app = {
+  const app = { resolveHost: async () => [{ address: '93.184.216.34', family: 4 }],
     db, cfg: { secretKey: randomBytes(32), appUrl: 'https://ai.test' },
     createTransport: () => ({ sendMail: async (m) => { mails.push(m); }, close() {} }),
     fetch: async (url, o) => { hooks.push(JSON.parse(o.body)); return { ok: true }; },

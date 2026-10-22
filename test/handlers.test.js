@@ -27,7 +27,7 @@ async function setup() {
   execFileSync('git', ['-C', src, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'readme']);
   const db = await testDb();
   const sentMails = [];
-  const app = {
+  const app = { resolveHost: async () => [{ address: '93.184.216.34', family: 4 }],
     db,
     cfg: { dataDir: tmp, claudeBin: resolve('test/fixtures/fake-claude.js'), sandbox: { enabled: false, production: false }, secretKey: randomBytes(32), appUrl: 'https://ai.test' },
     // syncRepo refuse file:// (clones d'URL fournies par l'utilisateur : https seulement) : le test clone le dépôt local à la place

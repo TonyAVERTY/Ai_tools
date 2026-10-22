@@ -14,6 +14,7 @@ import { dashboardPage, settingsPage, unsubPage, accountPage, linkPage } from '.
 import { enqueue, latestJobs, cancelJob, usageSummary } from './services/jobs.js';
 import { validateGitUrl, removeRepo } from './services/git.js';
 import { fetchRecap, clearRecapCache, validateSelect } from './services/recap.js';
+import { guardTarget, pinDb, pinGit, checkForgejoHost } from './netguard.js';
 import { allowedToSend, EMAIL_RE } from './services/mailer.js';
 import { cpuTemp } from './services/thermal.js';
 import { checkInbox } from './services/inbox.js';
@@ -148,7 +149,9 @@ export function registerRoutes(router, app) {
     const b = await readBody(req);
     if (b.notify_email && !EMAIL_RE.test(b.notify_email)) throw new HttpError(400, 'Email de réception invalide');
     await set('notify_email', (b.notify_email || '').trim());
-    await set('forgejo_host', (b.forgejo_host || '').trim().replace(/^https?:\/\//, '').replace(/\/.*$/, ''));
+    const forgejoHost = (b.forgejo_host || '').trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+    if (forgejoHost) await checkForgejoHost(app, userId, forgejoHost);
+    await set('forgejo_host', forgejoHost);
     if (b.forgejo_token) await set('forgejo_token_enc', encrypt(cfg.secretKey, b.forgejo_token.trim()));
     const cap = int(b.global_daily_cap, 1, 300, 100);
     const dmin = int(b.send_delay_min, 5, 3600, 20);
@@ -169,6 +172,7 @@ export function registerRoutes(router, app) {
     if (b.discord_remove === 'on') await set('discord_webhook_enc', null);
     await set('discord_events', JSON.stringify(Object.keys(EVENTS).filter((k) => b[`ev_${k}`] === 'on')));
 
+    if (b.smtp_host) await guardTarget(app, userId, 'smtp', String(b.smtp_host).trim(), b.smtp_port || 587, { lenient: true });
     const prev = await globalSmtp(app, userId) || {};
     const smtp = { host: b.smtp_host, port: b.smtp_port, user: b.smtp_user, pass: b.smtp_pass || prev.pass, fromEmail: b.smtp_fromEmail };
     await set('smtp_enc', smtp.host ? encryptJson(cfg.secretKey, smtp) : null);
@@ -283,6 +287,7 @@ export function registerRoutes(router, app) {
     let gitUrl;
     try { gitUrl = validateGitUrl(String(b.gitUrl || '').trim(), host); }
     catch (e) { throw new HttpError(400, e.message); }
+    await pinGit(app, userId, gitUrl); // hôte public et port autorisé, sinon refus immédiat
     // Un même dépôt peut être un projet pour deux comptes différents : l'unicité est par utilisateur
     const exists = () => db.prepare('SELECT 1 FROM projects WHERE user_id = ? AND git_url = ?').get(userId, gitUrl);
     if (await exists()) throw new HttpError(409, 'Ce dépôt est déjà un projet');
@@ -408,6 +413,7 @@ export function registerRoutes(router, app) {
     const p = await project(ctx);
     const b = await readBody(req);
     if (b.fromEmail && !EMAIL_RE.test(b.fromEmail)) throw new HttpError(400, 'Email expéditeur invalide');
+    if (String(b.host || '').trim()) await guardTarget(app, ctx.session.userId, 'smtp', String(b.host).trim(), int(b.port, 1, 65535, 587), { lenient: true });
     await saveSecretConfig(app, p.id, 'smtp_enc', {
       host: String(b.host || '').trim(), port: int(b.port, 1, 65535, 587), user: String(b.user || '').trim(),
       pass: b.pass || '', fromEmail: String(b.fromEmail || '').trim(), fromName: String(b.fromName || '').trim().slice(0, 80),
@@ -426,6 +432,7 @@ export function registerRoutes(router, app) {
       await db.prepare('UPDATE projects SET imap_enc = NULL, inbox_json = NULL WHERE id = ?').run(p.id);
       return json(res, { ok: true, disabled: true });
     }
+    await guardTarget(app, session.userId, 'imap', host, int(b.port, 1, 65535, 993), { lenient: true });
     await saveSecretConfig(app, p.id, 'imap_enc', {
       host, port: int(b.port, 1, 65535, 993), user: String(b.user || '').trim(), pass: b.pass || '',
     }, 'pass');
@@ -447,6 +454,7 @@ export function registerRoutes(router, app) {
     for (const k of ['sql_users', 'sql_clients', 'sql_revenue']) {
       try { validateSelect(b[k]); } catch (e) { throw new HttpError(400, `${k} : ${e.message}`); }
     }
+    if (String(b.host || '').trim()) await guardTarget(app, ctx.session.userId, b.type === 'pg' ? 'pg' : 'mysql', String(b.host).trim(), b.port ? int(b.port, 1, 65535, 3306) : (b.type === 'pg' ? 5432 : 3306), { lenient: true });
     await saveSecretConfig(app, p.id, 'db_enc', {
       type: b.type === 'pg' ? 'pg' : 'mysql', host: String(b.host || '').trim(), port: b.port ? int(b.port, 1, 65535, null) : null,
       database: String(b.database || '').trim(), user: String(b.user || '').trim(), password: b.password || '',
@@ -464,7 +472,7 @@ export function registerRoutes(router, app) {
     const cost = (await db.prepare('SELECT COALESCE(SUM(cost_usd),0) c FROM jobs WHERE project_id = ? AND user_id = ?').get(p.id, ctx.session.userId)).c;
     let business = null, error = null;
     try {
-      business = await fetchRecap(p.id, p.dbCfg, { force: url.searchParams.has('force') });
+      business = await fetchRecap(p.id, await pinDb(app, ctx.session.userId, p.dbCfg), { force: url.searchParams.has('force') });
       await saveSnapshot(db, p.id, business); // la consultation alimente aussi la courbe du jour
     } catch (e) { error = e.message; }
     json(res, { business, error, stats, aiCostUsd: cost });

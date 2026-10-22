@@ -15,7 +15,7 @@ const HOOK = 'https://discord.com/api/webhooks/123456789012345678/abcdefghijklmn
 async function setup({ events } = {}) {
   const db = await testDb();
   const sent = [];
-  const app = {
+  const app = { resolveHost: async () => [{ address: '93.184.216.34', family: 4 }],
     db, cfg: { secretKey: randomBytes(32), appUrl: 'https://ai.test' },
     fetch: async (url, opts) => { sent.push({ url, body: JSON.parse(opts.body) }); return { ok: true, status: 204 }; },
   };

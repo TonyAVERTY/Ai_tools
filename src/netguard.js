@@ -81,3 +81,46 @@ export async function guardTarget(app, userId, kind, host, port, { lenient = fal
   const r = await resolvePublic(host, { resolve: app.resolveHost || defaultResolve, allowPrivate, lenient });
   return r && { ...r, port: checkedPort };
 }
+
+// ---------- Cibles « épinglées » : on se connecte à l'adresse vérifiée, pas au nom ----------
+
+/** SMTP : `host` devient l'IP vérifiée, `servername` garde le nom pour SNI et la vérification du certificat. */
+export async function pinSmtp(app, userId, smtp, opts) {
+  if (!smtp?.host) return smtp;
+  const t = await guardTarget(app, userId, 'smtp', smtp.host, smtp.port || 587, opts);
+  return t ? { ...smtp, host: t.address, ...(t.servername ? { servername: t.servername } : {}) } : smtp;
+}
+
+export async function pinImap(app, userId, imap, opts) {
+  if (!imap?.host) return imap;
+  const t = await guardTarget(app, userId, 'imap', imap.host, imap.port || 993, opts);
+  return t ? { ...imap, host: t.address, ...(t.servername ? { servername: t.servername } : {}) } : imap;
+}
+
+/** Base du récap (MySQL ou PostgreSQL). */
+export async function pinDb(app, userId, cfg, opts) {
+  if (!cfg?.host) return cfg;
+  const kind = cfg.type === 'pg' ? 'pg' : 'mysql';
+  const t = await guardTarget(app, userId, kind, cfg.host, cfg.port || (kind === 'pg' ? 5432 : 3306), opts);
+  return t ? { ...cfg, host: t.address, ...(t.servername ? { servername: t.servername } : {}) } : cfg;
+}
+
+/**
+ * Forgejo : vérifie l'hôte de l'URL du dépôt et renvoie ce qu'il faut pour que git se connecte à l'adresse vérifiée
+ * (http.curloptResolve). Une URL qui n'est pas en https est laissée à syncRepo, qui la refuse.
+ * @returns {Promise<{host: string, port: number, address: string, family: 4|6} | null>}
+ */
+export async function pinGit(app, userId, url, opts) {
+  let u;
+  try { u = new URL(url); } catch { return null; }
+  if (u.protocol !== 'https:') return null;
+  const t = await guardTarget(app, userId, 'git', u.hostname, u.port || 443, opts);
+  return t ? { host: u.hostname, port: t.port, address: t.address, family: t.family } : null;
+}
+
+/** « hôte » ou « hôte:port » saisi dans Réglages (Forgejo) : contrôle à l'enregistrement. */
+export async function checkForgejoHost(app, userId, value) {
+  const m = /^([^:/]+)(?::(\d{1,5}))?$/.exec(String(value || '').trim());
+  if (!m) throw new HttpError(400, 'Hôte Forgejo invalide (attendu : hôte ou hôte:port)', { expose: true });
+  await guardTarget(app, userId, 'git', m[1], m[2] || 443, { lenient: true });
+}

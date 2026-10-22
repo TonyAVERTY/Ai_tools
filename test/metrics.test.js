@@ -10,7 +10,7 @@ const ts = (iso) => Math.floor(Date.parse(iso) / 1000);
 
 async function setup() {
   const db = await testDb();
-  const app = { db, cfg: { secretKey: randomBytes(32) } };
+  const app = { resolveHost: async () => [{ address: '93.184.216.34', family: 4 }], db, cfg: { secretKey: randomBytes(32) } };
   const userId = await addUser(db);
   const id = await createProject(app, { userId, name: 'MEP', gitUrl: 'https://g/T/M.git' });
   return { db, app, id, userId };
