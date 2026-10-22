@@ -340,9 +340,9 @@ ask_app() {
     warn "Domaine invalide (ex. ai.mondomaine.fr)."
   done
 
-  local def; def=$(sed -n 's/^ALLOWED_EMAILS=//p' "$SRC_DIR/.env.example" 2>/dev/null | head -n1)
+  local def; def=$(sed -n 's/^ADMIN_EMAILS=//p' "$SRC_DIR/.env.example" 2>/dev/null | head -n1)
   while :; do
-    ask ALLOWED "Emails Google autorisés (séparés par des virgules)" "$def"
+    ask ALLOWED "Emails administrateurs (séparés par des virgules)" "$def"
     [[ $ALLOWED =~ ^[^,[:space:]]+@[^,[:space:]]+(,[^,[:space:]]+@[^,[:space:]]+)*$ ]] && break
     warn "Format attendu : moi@gmail.com,autre@gmail.com"
   done
@@ -603,7 +603,7 @@ PORT=$PORT
 HOST=127.0.0.1
 GOOGLE_CLIENT_ID=$GOOGLE_ID
 GOOGLE_CLIENT_SECRET=$GOOGLE_SECRET
-ALLOWED_EMAILS=$ALLOWED
+ADMIN_EMAILS=$ALLOWED
 SECRET_KEY=$(openssl rand -hex 32 2>/dev/null || node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
 DATA_DIR=$DATA_DIR
 CLAUDE_BIN=$claude_bin
