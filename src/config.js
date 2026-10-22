@@ -1,4 +1,5 @@
 import { resolve } from 'node:path';
+import { homedir } from 'node:os';
 import { dbConfigFromEnv } from './db.js';
 
 const env = process.env;
@@ -24,6 +25,25 @@ function appleConfig() {
   };
 }
 
+const flag = (v, def) => (v == null || v === '' ? def : !/^(0|false|off|no|non)$/i.test(String(v).trim()));
+
+// Bac à sable des exécutions Claude. En production il est obligatoire : SANDBOX=off n'y est pas pris en compte.
+// En développement, SANDBOX=off le désactive (avertissement au démarrage).
+function sandboxConfig() {
+  const production = env.NODE_ENV === 'production';
+  const off = String(env.SANDBOX || '').trim().toLowerCase() === 'off';
+  return {
+    production,
+    enabled: production || !off,
+    offIgnored: production && off,
+    bwrapBin: env.BWRAP_BIN || 'bwrap',
+    // Dossiers supplémentaires montés en lecture seule (ex. Node installé hors de /usr), séparés par des virgules
+    roBinds: (env.SANDBOX_RO_BINDS || '').split(',').map((p) => p.trim()).filter(Boolean),
+    // Configuration du CLI du serveur, montée seulement pour le mode « Claude du serveur » (admins)
+    serverHome: env.HOME || homedir(),
+  };
+}
+
 export function loadConfig() {
   const secretKey = required('SECRET_KEY');
   if (!/^[0-9a-f]{64}$/i.test(secretKey)) {
@@ -44,6 +64,9 @@ export function loadConfig() {
     db: dbConfigFromEnv(env),
     dataDir: resolve(env.DATA_DIR || './data'),
     claudeBin: env.CLAUDE_BIN || 'claude',
+    // Mode « abonnement » (jeton claude setup-token) : désactivable globalement
+    cliModeEnabled: flag(env.CLAUDE_CLI_MODE_ENABLED, true),
+    sandbox: sandboxConfig(),
     thermalMax: Number(env.THERMAL_MAX || 75),
   };
 }
