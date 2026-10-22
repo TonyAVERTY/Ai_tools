@@ -509,7 +509,7 @@ test('connexion guidée : mauvais code, annulation, pas de lien, lien hors Anthr
     let { id } = await (await u.post('/link/claude/login', { accept: true })).json();
     const refused = await u.post('/link/claude/login/code', { id, code: 'WRONG-code-1234' });
     assert.equal(refused.status, 400);
-    assert.match((await refused.json()).error, /refusé/);
+    assert.match((await refused.json()).error, /pas validé ce code \(status code 400\)/);
     assert.equal((await orow(o, u.id)).claude_link_json, null);
 
     // Annuler tue le CLI ; relancer remplace la connexion précédente de ce compte
