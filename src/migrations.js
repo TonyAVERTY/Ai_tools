@@ -362,6 +362,32 @@ export const MIGRATIONS = [
       ) ${T}`,
     ],
   },
+  {
+    // J5 : journal d'usage. Les envois et les jobs IA du mois se comptent ici (et non dans mail_log / jobs) pour qu'un projet
+    // supprimé n'efface pas la consommation du mois. Pas de compteur : on additionne les lignes, rien ne peut dériver.
+    name: 'journal_usage',
+    sqlite: [
+      `CREATE TABLE usage_events (
+        id INTEGER PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        kind TEXT NOT NULL,         -- mail | ai_job
+        ref INTEGER,                -- ai_job : id du job (il peut disparaître avec son projet, l'événement reste)
+        at INTEGER NOT NULL
+      )`,
+      'CREATE INDEX usage_events_user ON usage_events(user_id, kind, at)',
+    ],
+    mysql: [
+      `CREATE TABLE IF NOT EXISTS usage_events (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        user_id BIGINT NOT NULL,
+        kind VARCHAR(20) NOT NULL,         -- mail | ai_job
+        ref BIGINT NULL,                   -- ai_job : id du job (il peut disparaître avec son projet, l'événement reste)
+        at BIGINT NOT NULL,
+        KEY usage_events_user (user_id, kind, at),
+        CONSTRAINT usage_events_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      ) ${T}`,
+    ],
+  },
 ];
 
 // ---------- Aides de la migration 2 ----------

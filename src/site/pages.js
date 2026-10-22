@@ -317,7 +317,7 @@ export function pricingPage({ appUrl }) {
         <li><span>Mails par mois</span><strong>100</strong></li>
         <li><span>Jobs IA par mois</span><strong>5</strong></li>
       </ul>
-      <p class="fine">Ces plafonds sont annoncés dès maintenant. L'outil ne les applique pas encore automatiquement : cette vérification technique arrive prochainement.</p>
+      <p class="fine">Ces plafonds sont appliqués par le serveur. Les mails et les jobs IA se comptent par mois calendaire (heure de Paris) et repartent à zéro le 1er. Un plafond atteint refuse la nouvelle action sans rien supprimer.</p>
       <a class="btn primary" href="/login">Créer mon compte</a>
     </article>
     <article class="card plan soon" aria-labelledby="plan-payant">

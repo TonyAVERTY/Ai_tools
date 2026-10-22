@@ -5,6 +5,7 @@ import { AI_JOBS } from './budget.js';
 import { getUser } from '../users.js';
 import { aiRefusal, assertCanRunAi } from '../claudelink.js';
 import { waitCool } from './thermal.js';
+import { assertRoom, recordUsage, withUserLock, MAIL_JOBS } from './plans.js';
 
 /**
  * Met un job en file pour un utilisateur. Point de passage obligé de toutes les routes et tâches de fond :
@@ -28,9 +29,16 @@ export async function enqueue(db, { userId, projectId, type, params = {}, runAft
     ? await db.prepare("SELECT id FROM jobs WHERE user_id = ? AND project_id IS NULL AND type = ? AND status IN ('queued','running')").get(user.id, type)
     : await db.prepare("SELECT id FROM jobs WHERE project_id = ? AND type = ? AND status IN ('queued','running')").get(projectId, type);
   if (running) return { id: running.id, existing: true };
-  const r = await db.prepare('INSERT INTO jobs(user_id, project_id, type, params_json, created_at, run_after) VALUES(?, ?, ?, ?, ?, ?)')
-    .run(user.id, projectId ?? null, type, JSON.stringify(params), now(), runAfter);
-  return { id: Number(r.lastInsertRowid), existing: false };
+  // Plafonds du plan : compter puis écrire dans la même section critique (deux requêtes simultanées ne passent pas toutes deux)
+  return withUserLock(user.id, async () => {
+    if (AI_JOBS.has(type)) await assertRoom(db, user, 'aiJobs');
+    if (MAIL_JOBS.has(type)) await assertRoom(db, user, 'mails');
+    const r = await db.prepare('INSERT INTO jobs(user_id, project_id, type, params_json, created_at, run_after) VALUES(?, ?, ?, ?, ?, ?)')
+      .run(user.id, projectId ?? null, type, JSON.stringify(params), now(), runAfter);
+    const id = Number(r.lastInsertRowid);
+    if (AI_JOBS.has(type)) await recordUsage(db, user.id, 'ai_job', { ref: id });
+    return { id, existing: false };
+  });
 }
 
 /**

@@ -3,7 +3,7 @@ import { encrypt, encryptJson, decryptJson, verifyUnsubToken } from './crypto.js
 import { html, json, redirect, readBody, HttpError } from './http.js';
 import { startLogin, finishLogin, destroySession, getSession, checkOrigin } from './auth.js';
 import { verifyCaptcha } from './captcha.js';
-import { deleteUser, normalizeEmail } from './users.js';
+import { deleteUser, normalizeEmail, getUser } from './users.js';
 import {
   assertCanRunAi, getLinkState, linkApiKey, linkSubscriptionToken, linkServer, unlink, testLink, lastConsent,
   MODES,
@@ -23,6 +23,7 @@ import { notify, notifyConfig, EVENTS, WEBHOOK_RE } from './services/notify.js';
 import { budgetState, AI_JOBS } from './services/budget.js';
 import { sendWeeklyReport } from './services/report.js';
 import { exportProspects, importProspects } from './services/csv.js';
+import { quotaFor, planLimitError, withUserLock, assertRoom, usageView } from './services/plans.js';
 import { history, saveSnapshot } from './services/metrics.js';
 import { evolutionHtml } from './services/markdown.js';
 import {
@@ -113,7 +114,7 @@ export function registerRoutes(router, app) {
       projects.push({ project: p, smtp: publicConfig(full.smtp, 'pass'), dbCfg: publicConfig(full.dbCfg, 'password'), imap: publicConfig(full.imapCfg, 'pass') });
     }
     html(res, dashboardPage({
-      email: session.email, projects, forgejoHost: await getSetting(db, userId, 'forgejo_host'),
+      email: session.email, projects, forgejoHost: await getSetting(db, userId, 'forgejo_host'), usage: await usageView(db, await getUser(db, userId)),
     }));
   });
 
@@ -216,7 +217,7 @@ export function registerRoutes(router, app) {
     const t = url.searchParams.get('t');
     html(res, accountPage({
       user: session.user, error: url.searchParams.get('e'), link: await getLinkState(db, session.userId),
-      consent: await lastConsent(db, session.userId), cliModeEnabled,
+      consent: await lastConsent(db, session.userId), cliModeEnabled, usage: await usageView(db, await getUser(db, session.userId)),
       notice: t === 'unlinked' ? { ok: true, text: 'Liaison supprimée : le secret a été effacé et tes jobs IA en attente ont été annulés.' }
         : t === 'ok' || t === 'ko' ? { ok: t === 'ok', text: String(url.searchParams.get('m') || '').slice(0, 300) } : null,
     }));
@@ -288,8 +289,11 @@ export function registerRoutes(router, app) {
     let id;
     try { id = await createProject(app, { userId, name, gitUrl }); }
     catch (e) { if (await exists()) throw new HttpError(409, 'Ce dépôt est déjà un projet'); throw e; }
-    await enqueue(db, { userId, projectId: id, type: 'analyze' }, aiOpts);
-    json(res, { id });
+    // Plafond de jobs IA atteint : le projet est créé quand même (rien n'est perdu), seule l'analyse attend
+    let notice = null;
+    try { await enqueue(db, { userId, projectId: id, type: 'analyze' }, aiOpts); }
+    catch (e) { if (e.code !== 'plan_limit') throw e; notice = e.message; }
+    json(res, { id, ...(notice ? { notice } : {}) });
   }, { limit: 'project_create' });
 
   router.post('/api/projects/:id/delete', async (ctx) => {
@@ -370,7 +374,8 @@ export function registerRoutes(router, app) {
     await db.prepare('UPDATE projects SET followup_enabled = ?, followup_days = ? WHERE id = ?').run(enabled ? 1 : 0, int(b.days, 2, 30, 7), p.id);
     json(res, { ok: true });
   });
-  router.post('/api/projects/:id/prospect', jobRoute('prospect', (b) => ({ count: int(b.count, 1, 50, 10) }), (p) => {
+  router.post('/api/projects/:id/prospect', jobRoute('prospect', (b) => ({ count: int(b.count, 1, 50, 10) }), async (p) => {
+    await assertRoom(db, await getUser(db, p.userId), 'prospects');
     if (!p.targetValidated) throw new HttpError(400, 'Valide la cible avant de prospecter');
   }));
   router.post('/api/projects/:id/evolution', jobRoute('evolution', (b) => ({
@@ -482,8 +487,13 @@ export function registerRoutes(router, app) {
     const { req, res } = ctx;
     const p = await project(ctx);
     const b = await readBody(req, { max: 1024 * 1024 });
-    try { json(res, await importProspects(db, p.id, String(b.csv || ''))); }
-    catch (e) { throw new HttpError(400, e.message); }
+    try {
+      json(res, await withUserLock(ctx.session.userId, async () => {
+        const u = await getUser(db, ctx.session.userId);
+        const q = await quotaFor(db, u, 'prospects');
+        return importProspects(db, p.id, String(b.csv || ''), { limit: q.remaining, limitError: q.unlimited ? null : planLimitError(u, q, { wanted: q.remaining + 1, note: "Rien n'a été importé." }) });
+      }));
+    } catch (e) { throw e instanceof HttpError ? e : new HttpError(400, e.message); }
   }, { limit: 'csv' });
 
   router.get('/api/projects/:id/history', async (ctx) => {

@@ -2,6 +2,8 @@ import { join } from 'node:path';
 import { now, getSetting } from './db.js';
 import { encryptJson, decryptJson, decrypt } from './crypto.js';
 import { HttpError } from './http.js';
+import { getUser } from './users.js';
+import { assertRoom, withUserLock } from './services/plans.js';
 
 // Un dossier de clones par utilisateur : data/repos/<utilisateur>/<projet>
 export const repoDir = (cfg, userId, id) => join(cfg.dataDir, 'repos', String(Number(userId)), String(Number(id)));
@@ -47,8 +49,13 @@ export async function listProjects(app, userId) {
 }
 
 export async function createProject(app, { userId, name, gitUrl }) {
-  const r = await app.db.prepare('INSERT INTO projects(user_id, name, git_url, created_at) VALUES(?, ?, ?, ?)').run(Number(userId), name, gitUrl, now());
-  return Number(r.lastInsertRowid);
+  const user = await getUser(app.db, userId);
+  if (!user) throw new HttpError(404, 'Compte introuvable');
+  return withUserLock(user.id, async () => {
+    await assertRoom(app.db, user, 'projects', 1, { note: 'Supprime un projet pour en créer un autre.' });
+    const r = await app.db.prepare('INSERT INTO projects(user_id, name, git_url, created_at) VALUES(?, ?, ?, ?)').run(user.id, name, gitUrl, now());
+    return Number(r.lastInsertRowid);
+  });
 }
 
 // Les secrets vides dans le formulaire = on garde l'ancien (le formulaire ne les réaffiche jamais)
