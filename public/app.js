@@ -650,13 +650,26 @@
     }
     const acc = s.account;
     if (!acc) {
-      box.innerHTML = `<p>Relie un compte LinkedIn à ce projet : Claude pourra écrire des posts pour ce compte. AiTools demande seulement le droit de <strong>publier un post sur ton profil</strong>, et ne publie jamais sans ton clic.</p>
+      box.innerHTML = `<p>Relie un compte LinkedIn à ce projet : Claude pourra écrire des posts pour ce compte. AiTools demande seulement le droit de <strong>publier un post ${s.pagesEnabled ? 'sur ton profil ou sur une page que tu administres' : 'sur ton profil'}</strong>, et ne publie jamais sans ton clic.</p>
         ${s.canManage ? `<p><a class="btn primary" href="/linkedin/connect?project=${id}">Connecter LinkedIn</a></p>` : '<p class="muted small">Demande à un administrateur du projet de relier le compte.</p>'}`;
       return;
     }
     const head = `<div class="row li-head"><p><span class="badge ${acc.expired ? 'warn' : 'ok'}">${acc.expired ? 'connexion expirée' : 'connecté'}</span> <strong>${esc(acc.name)}</strong>
         ${acc.expiresAt ? `<span class="muted small">· ${acc.expired ? 'a expiré' : 'valable'} jusqu'au ${esc(liDay(acc.expiresAt))}</span>` : ''}</p>
       ${s.canManage ? `<span>${acc.expired ? `<a class="btn small primary" href="/linkedin/connect?project=${id}">Reconnecter</a> ` : ''}<button type="button" class="btn small danger" data-li-disconnect="${id}">Déconnecter</button></span>` : ''}</div>`;
+    // Où partent les posts : une page choisie, sinon le profil. La liste des pages n'est demandée à LinkedIn qu'au clic sur « Changer ».
+    const where = acc.target ? acc.target.name : acc.canPersonal ? 'ton profil' : null;
+    let targetHtml = '';
+    if (s.pagesEnabled && !acc.expired) {
+      targetHtml = !acc.canPages
+        ? `<p class="muted small">Pour publier sur une page, ${s.canManage ? `<a href="/linkedin/connect?project=${id}">reconnecte LinkedIn</a> (nouvelle autorisation)` : 'un administrateur du projet doit reconnecter LinkedIn'}.</p>`
+        : `<div class="li-target" data-li-target-box><p>Publier sur : <strong>${where ? esc(where) : 'aucune page choisie'}</strong>
+            ${s.canManage ? `<button type="button" class="btn small" data-li-pages="${id}">${where ? 'Changer' : 'Choisir une page'}</button>` : ''}</p>
+            ${where ? '' : '<p class="warn small">Choisis la page où publier : ce compte ne peut pas publier sur ton profil.</p>'}
+            <div data-li-pages-list></div></div>`;
+    } else if (!s.pagesEnabled && s.canManage) {
+      targetHtml = '<p class="muted small">Les posts partent sur ton profil. Publier sur une page demande l\'accès « Community Management API » côté application LinkedIn.</p>';
+    }
     const posts = s.posts || [];
     const latest = posts[0];
     const draft = latest && latest.status !== 'published' ? latest : null;
@@ -670,14 +683,14 @@
         <p class="muted small"><span data-li-count>${draft.body.length}</span> / ${s.maxLength} caractères${draft.direction ? ` · direction : « ${esc(draft.direction)} »` : ' · sujet choisi par Claude'}</p>
         <div class="row-actions"><button type="button" class="btn" data-li-save="${id}">Enregistrer</button>
           <button type="button" class="btn" data-li-copy>Copier</button>
-          ${s.canManage && !acc.expired ? `<button type="button" class="btn primary" data-li-publish="${id}">Publier sur LinkedIn</button>` : '<span class="muted small">Un administrateur du projet publie.</span>'}</div></div>` : '';
+          ${s.canManage && !acc.expired ? `<button type="button" class="btn primary" data-li-publish="${id}" data-where="${esc(where || 'LinkedIn')}"${where ? '' : ' disabled'}>Publier sur ${esc(acc.target ? acc.target.name : 'LinkedIn')}</button>` : '<span class="muted small">Un administrateur du projet publie.</span>'}</div></div>` : '';
     const history = posts.filter((x) => x !== draft && x.status === 'published');
-    const hist = history.length ? `<details class="li-history"><summary>Posts publiés (${history.length})</summary>${history.map((x) => `<article class="card"><p class="muted small">Publié le ${esc(liDay(x.publishedAt))}</p><p class="li-text">${esc(x.body)}</p></article>`).join('')}</details>` : '';
-    box.innerHTML = `${head}${gen}${draftHtml}${hist}`;
+    const hist = history.length ? `<details class="li-history"><summary>Posts publiés (${history.length})</summary>${history.map((x) => `<article class="card"><p class="muted small">Publié le ${esc(liDay(x.publishedAt))}${x.publishedOn ? ` sur ${esc(x.publishedOn)}` : ''}</p><p class="li-text">${esc(x.body)}</p></article>`).join('')}</details>` : '';
+    box.innerHTML = `${head}${targetHtml}${gen}${draftHtml}${hist}`;
   }
 
   document.addEventListener('click', async (e) => {
-    const t = e.target.closest('[data-li-generate],[data-li-save],[data-li-copy],[data-li-publish],[data-li-disconnect]');
+    const t = e.target.closest('[data-li-generate],[data-li-save],[data-li-copy],[data-li-publish],[data-li-disconnect],[data-li-pages],[data-li-target-save],[data-li-pages-refresh]');
     if (!t) return;
     const proj = t.closest('.project');
     const id = proj?.dataset.id;
@@ -695,10 +708,31 @@
         await navigator.clipboard.writeText(body().value);
         toast('Post copié');
       } else if (t.matches('[data-li-publish]')) {
-        if (!confirm('Publier ce post sur LinkedIn ? Il sera visible publiquement par tout le monde.')) return;
+        if (!confirm(`Publier ce post sur ${t.dataset.where || 'LinkedIn'} ? Il sera visible publiquement par tout le monde.`)) return;
         t.disabled = true;
         await api(`/api/projects/${id}/linkedin/publish`, { postId: Number(body().dataset.liBody), body: body().value, confirm: true });
         toast('Post publié sur LinkedIn');
+        loadLinkedin(proj);
+      } else if (t.matches('[data-li-pages],[data-li-pages-refresh]')) {
+        // Les pages que ce compte administre, relues chez LinkedIn (en cache côté serveur ; « Actualiser » force un nouvel appel)
+        const refresh = t.matches('[data-li-pages-refresh]');
+        const list = $('[data-li-pages-list]', proj);
+        t.disabled = true;
+        const r = await api(`/api/projects/${id}/linkedin/pages${refresh ? '?refresh=1' : ''}`);
+        const options = r.pages.map((p) => `<option value="${esc(p.urn)}"${r.target?.urn === p.urn ? ' selected' : ''}>${esc(p.name)}</option>`);
+        list.innerHTML = r.pages.length
+          ? `<label>Où publier ?<select data-li-target-select>
+              <option value="me"${r.target ? '' : ' selected'}>Mon profil</option>${options.join('')}</select></label>
+            <div class="row-actions"><button type="button" class="btn small primary" data-li-target-save="${id}">Choisir</button>
+              <button type="button" class="btn small" data-li-pages-refresh="${id}">Actualiser la liste</button></div>`
+          : `<p class="warn small">LinkedIn ne montre aucune page administrée par ce compte.</p>
+            <div class="row-actions"><button type="button" class="btn small" data-li-pages-refresh="${id}">Actualiser la liste</button></div>`;
+        t.disabled = false;
+      } else if (t.matches('[data-li-target-save]')) {
+        const urn = $('[data-li-target-select]', proj).value;
+        t.disabled = true;
+        const r = await api(`/api/projects/${id}/linkedin/target`, { urn });
+        toast(r.target ? `Les posts partiront sur ${r.target.name}` : 'Les posts partiront sur ton profil');
         loadLinkedin(proj);
       } else if (t.matches('[data-li-disconnect]')) {
         if (!confirm('Déconnecter le compte LinkedIn de ce projet ? Les brouillons sont conservés.')) return;

@@ -8,7 +8,7 @@ import { addProject } from './helpers/users.js';
 import { loadConfig } from '../src/config.js';
 import { decrypt } from '../src/crypto.js';
 
-const LI = { clientId: 'li-client', clientSecret: 'li-secret', redirectUri: 'https://ai.tony-averty.dev/linkedin/callback' };
+const LI = { clientId: 'li-client', clientSecret: 'li-secret', redirectUri: 'https://ai.tony-averty.dev/linkedin/callback', scopes: ['openid', 'profile', 'w_member_social'], apiVersion: '202604', pages: false };
 const TOKEN = 'AQV-secret-token-of-linkedin-0123456789';
 const PROFILE = { resume: 'Cartes de fidélité digitales.', proposition_valeur: 'Fidélisez sans carton.', arguments: ['simple'], ton: 'direct' };
 let s, off;
@@ -59,12 +59,12 @@ test('configuration : les deux clés ensemble, sinon LinkedIn est désactivé', 
   const base = { APP_URL: 'https://x.fr', SECRET_KEY: 'a'.repeat(64), GOOGLE_CLIENT_ID: 'g', GOOGLE_CLIENT_SECRET: 's', DB_DRIVER: 'sqlite' };
   const keep = { ...process.env };
   const withEnv = (extra, fn) => {
-    for (const k of ['LINKEDIN_CLIENT_ID', 'LINKEDIN_CLIENT_SECRET', 'LINKEDIN_REDIRECT_URI']) delete process.env[k];
+    for (const k of ['LINKEDIN_CLIENT_ID', 'LINKEDIN_CLIENT_SECRET', 'LINKEDIN_REDIRECT_URI', 'LINKEDIN_SCOPES', 'LINKEDIN_API_VERSION']) delete process.env[k];
     Object.assign(process.env, base, extra);
     try { return fn(); } finally { for (const k of Object.keys(process.env)) if (!(k in keep)) delete process.env[k]; Object.assign(process.env, keep); }
   };
   assert.equal(withEnv({}, () => loadConfig().linkedin), null);
-  assert.deepEqual(withEnv({ LINKEDIN_CLIENT_ID: 'a', LINKEDIN_CLIENT_SECRET: 'b' }, () => loadConfig().linkedin), { clientId: 'a', clientSecret: 'b', redirectUri: 'https://x.fr/linkedin/callback' });
+  assert.deepEqual(withEnv({ LINKEDIN_CLIENT_ID: 'a', LINKEDIN_CLIENT_SECRET: 'b' }, () => loadConfig().linkedin), { clientId: 'a', clientSecret: 'b', redirectUri: 'https://x.fr/linkedin/callback', scopes: ['openid', 'profile', 'w_member_social'], apiVersion: '202604', pages: false });
   assert.throws(() => withEnv({ LINKEDIN_CLIENT_ID: 'a' }, loadConfig), /vont ensemble/);
   assert.throws(() => withEnv({ LINKEDIN_CLIENT_SECRET: 'b' }, loadConfig), /vont ensemble/);
 });
