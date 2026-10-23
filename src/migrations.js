@@ -4,7 +4,7 @@
 // en ajouter une. Côté MySQL, chaque instruction est idempotente (CREATE ... IF NOT EXISTS) : MySQL
 // valide implicitement chaque DDL, une migration interrompue peut donc être rejouée.
 //
-// Une instruction est soit une chaîne SQL, soit { sql, params?(ctx), when?(q, ctx) } :
+// Une instruction est soit une chaîne SQL, soit { sql, params?(ctx), when?(q, ctx) } ou { run(q, ctx, exec) } (étape JavaScript) :
 //   - params(ctx) fournit les paramètres liés (ctx = { ownerEmail, now }) ;
 //   - when(q, ctx) décide si l'instruction s'applique (q(sql, params) renvoie les lignes) : c'est ce qui rend
 //     les ALTER TABLE rejouables côté MySQL (pas de IF NOT EXISTS sur ADD COLUMN) ;
@@ -12,7 +12,55 @@
 // sqliteForeignKeysOff : la migration reconstruit des tables (SQLite ne sait pas retirer un UNIQUE) ; les clés
 // étrangères sont suspendues pendant la migration, puis PRAGMA foreign_key_check vérifie le résultat.
 
+import { hashSid } from './crypto.js';
+
 const T = 'ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci';
+
+// Les sessions existantes gardent leur validité : le cookie n'change pas, seule la valeur stockée devient son empreinte.
+const hashSessionIds = {
+  run: async (q, ctx, exec) => {
+    // Une empreinte (64 caractères hexadécimaux) n'est pas rehachée : la migration peut être rejouée côté MySQL
+    for (const r of await q('SELECT id FROM sessions')) if (!/^[0-9a-f]{64}$/.test(r.id)) await exec('UPDATE sessions SET id = ? WHERE id = ?', [hashSid(r.id), r.id]);
+  },
+};
+
+
+// ---------- Aides de la migration 2 ----------
+
+function ownerParams(ctx) { return [ctx.ownerEmail, ctx.now]; }
+function ownerParams0(ctx) { return [ctx.ownerEmail ?? null]; }
+
+// Des données existent-elles (une instance déjà utilisée) ? Alors elles ont besoin d'un propriétaire.
+async function hasLegacyData(q) {
+  for (const t of ['projects', 'settings', 'jobs']) {
+    if ((await q(`SELECT COUNT(*) n FROM ${t}`))[0].n > 0) return true;
+  }
+  return false;
+}
+
+async function checkOwner(q, ctx) {
+  if (ctx.ownerEmail) return;
+  if (await hasLegacyData(q)) {
+    throw new Error('Migration comptes : des données existent, définis ADMIN_EMAILS (le premier email devient propriétaire de ces données).');
+  }
+}
+
+const infoSchema = (what) => `SELECT 1 x FROM information_schema.${what} WHERE table_schema = DATABASE() AND table_name = ?`;
+function colMissing(t, c) {
+  return async (q) => !(await q(`${infoSchema('columns')} AND column_name = ?`, [t, c])).length;
+}
+function idxExists(t, i) {
+  return async (q) => (await q(`${infoSchema('statistics')} AND index_name = ?`, [t, i])).length > 0;
+}
+function idxMissing(t, i) {
+  return async (q) => !(await idxExists(t, i)(q));
+}
+function fkMissing(t, name) {
+  return async (q) => !(await q(`${infoSchema('table_constraints')} AND constraint_name = ? AND constraint_type = 'FOREIGN KEY'`, [t, name])).length;
+}
+function tableExists(t) {
+  return async (q) => (await q(infoSchema('tables'), [t])).length > 0;
+}
 
 export const MIGRATIONS = [
   {
@@ -573,41 +621,11 @@ export const MIGRATIONS = [
     sqlite: ["UPDATE prospects SET status = 'refused' WHERE status IN ('new', 'sent') AND email IN (SELECT email FROM blacklist)"],
     mysql: ["UPDATE prospects SET status = 'refused' WHERE status IN ('new', 'sent') AND email IN (SELECT email FROM blacklist)"],
   },
+  {
+    // Identifiants de session : la base ne garde plus que leur empreinte SHA-256. Personne n'est déconnecté (voir hashSessionIds).
+    name: 'session_id_hashing',
+    sqlite: [hashSessionIds],
+    mysql: [hashSessionIds],
+  },
 ];
 
-// ---------- Aides de la migration 2 ----------
-
-function ownerParams(ctx) { return [ctx.ownerEmail, ctx.now]; }
-function ownerParams0(ctx) { return [ctx.ownerEmail ?? null]; }
-
-// Des données existent-elles (une instance déjà utilisée) ? Alors elles ont besoin d'un propriétaire.
-async function hasLegacyData(q) {
-  for (const t of ['projects', 'settings', 'jobs']) {
-    if ((await q(`SELECT COUNT(*) n FROM ${t}`))[0].n > 0) return true;
-  }
-  return false;
-}
-
-async function checkOwner(q, ctx) {
-  if (ctx.ownerEmail) return;
-  if (await hasLegacyData(q)) {
-    throw new Error('Migration comptes : des données existent, définis ADMIN_EMAILS (le premier email devient propriétaire de ces données).');
-  }
-}
-
-const infoSchema = (what) => `SELECT 1 x FROM information_schema.${what} WHERE table_schema = DATABASE() AND table_name = ?`;
-function colMissing(t, c) {
-  return async (q) => !(await q(`${infoSchema('columns')} AND column_name = ?`, [t, c])).length;
-}
-function idxExists(t, i) {
-  return async (q) => (await q(`${infoSchema('statistics')} AND index_name = ?`, [t, i])).length > 0;
-}
-function idxMissing(t, i) {
-  return async (q) => !(await idxExists(t, i)(q));
-}
-function fkMissing(t, name) {
-  return async (q) => !(await q(`${infoSchema('table_constraints')} AND constraint_name = ? AND constraint_type = 'FOREIGN KEY'`, [t, name])).length;
-}
-function tableExists(t) {
-  return async (q) => (await q(infoSchema('tables'), [t])).length > 0;
-}
