@@ -14,7 +14,7 @@ import { allowedToSend, buildProspectMail, fillTemplate } from '../src/services/
 import { validateSelect, firstValue } from '../src/services/recap.js';
 import { validateGitUrl } from '../src/services/git.js';
 import { verifyUnsubToken, encrypt, encryptJson } from '../src/crypto.js';
-import { addUser } from './helpers/users.js';
+import { addUser, TEST_SECRET_KEY } from './helpers/users.js';
 import { makeClaudeBin } from './helpers/claude-bin.js';
 
 async function setup() {
@@ -29,7 +29,7 @@ async function setup() {
   const sentMails = [];
   const app = { resolveHost: async () => [{ address: '93.184.216.34', family: 4 }],
     db,
-    cfg: { dataDir: tmp, claudeBin: resolve('test/fixtures/fake-claude.js'), sandbox: { enabled: false, production: false }, secretKey: randomBytes(32), appUrl: 'https://ai.test' },
+    cfg: { dataDir: tmp, claudeBin: resolve('test/fixtures/fake-claude.js'), sandbox: { enabled: false, production: false }, secretKey: TEST_SECRET_KEY, appUrl: 'https://ai.test' },
     // syncRepo refuse file:// (clones d'URL fournies par l'utilisateur : https seulement) : le test clone le dépôt local à la place
     syncRepo: async (url, dir) => {
       if (existsSync(join(dir, '.git'))) execFileSync('git', ['-C', dir, 'pull', '-q']);

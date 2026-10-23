@@ -1,5 +1,4 @@
 import { resolve } from 'node:path';
-import { homedir } from 'node:os';
 import { dbConfigFromEnv } from './db.js';
 import { parseTrustProxy } from './ratelimit.js';
 
@@ -94,8 +93,6 @@ function sandboxConfig() {
     bwrapBin: env.BWRAP_BIN || 'bwrap',
     // Dossiers supplémentaires montés en lecture seule (ex. Node installé hors de /usr), séparés par des virgules
     roBinds: (env.SANDBOX_RO_BINDS || '').split(',').map((p) => p.trim()).filter(Boolean),
-    // Configuration du CLI du serveur, montée seulement pour le mode « Claude du serveur » (admins)
-    serverHome: env.HOME || homedir(),
   };
 }
 

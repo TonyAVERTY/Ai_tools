@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { now, setSetting, getSetting } from '../src/db.js';
 import { testDb } from './helpers/db.js';
-import { addUser } from './helpers/users.js';
+import { addUser, TEST_SECRET_KEY } from './helpers/users.js';
 import { encrypt, encryptJson } from '../src/crypto.js';
 import { weeklyStats, weeklyText, maybeSendWeekly } from '../src/services/report.js';
 import { createProject } from '../src/projects.js';
@@ -12,7 +12,7 @@ async function setup() {
   const db = await testDb();
   const mails = [], hooks = [];
   const app = { resolveHost: async () => [{ address: '93.184.216.34', family: 4 }],
-    db, cfg: { secretKey: randomBytes(32), appUrl: 'https://ai.test' },
+    db, cfg: { secretKey: TEST_SECRET_KEY, appUrl: 'https://ai.test' },
     createTransport: () => ({ sendMail: async (m) => { mails.push(m); }, close() {} }),
     fetch: async (url, o) => { hooks.push(JSON.parse(o.body)); return { ok: true }; },
   };

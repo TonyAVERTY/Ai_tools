@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { getSetting, now } from '../src/db.js';
 import { testDb } from './helpers/db.js';
-import { addUser } from './helpers/users.js';
+import { addUser, TEST_SECRET_KEY } from './helpers/users.js';
 import { startApp } from './helpers/server.js';
 import { addMonths, runInactiveCleanup, warningMail } from '../src/services/inactive.js';
 import { Scheduler } from '../src/services/scheduler.js';
@@ -23,7 +23,7 @@ async function world({ smtp = true, months = 24 } = {}) {
   const app = {
     db, resolveHost: async () => [{ address: '93.184.216.34', family: 4 }],
     cfg: {
-      dataDir: '/tmp/aitools-inactive', appUrl: 'https://ai.test', secretKey: randomBytes(32), inactiveMonths: months,
+      dataDir: '/tmp/aitools-inactive', appUrl: 'https://ai.test', secretKey: TEST_SECRET_KEY, inactiveMonths: months,
       systemSmtp: smtp ? { host: 'smtp.serveur.fr', port: 587, user: 'u', pass: 'p', fromEmail: 'noreply@ai.test' } : null,
     },
     createTransport: (cfg) => ({ sendMail: async (m) => { mails.push({ ...m, via: cfg.host }); }, close() {} }),

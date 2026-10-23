@@ -8,7 +8,7 @@ import { now, setSetting } from '../src/db.js';
 import { testDb } from './helpers/db.js';
 import { createApp } from '../src/server.js';
 import { unsubToken } from '../src/crypto.js';
-import { addUser } from './helpers/users.js';
+import { addUser, TEST_SECRET_KEY } from './helpers/users.js';
 
 const APP_URL = 'https://ai.tony-averty.dev';
 let app, base, cookie, tmp, uid;
@@ -17,7 +17,7 @@ before(async () => {
   tmp = mkdtempSync(join(tmpdir(), 'aitools-http-'));
   const cfg = {
     appUrl: APP_URL, google: { clientId: 'cid', clientSecret: 'cs' }, apple: null, adminEmails: ['me@gmail.com'],
-    secretKey: randomBytes(32), dataDir: tmp, claudeBin: 'claude', sandbox: { enabled: false, production: false },
+    secretKey: TEST_SECRET_KEY, dataDir: tmp, claudeBin: 'claude', sandbox: { enabled: false, production: false },
   };
   app = await createApp(cfg, { db: await testDb(), worker: false });
   await new Promise((r) => app.server.listen(0, '127.0.0.1', r));
@@ -82,7 +82,7 @@ test('dashboard, réglages, création de projet et statut', async () => {
 
   r = await post('/api/projects', { name: 'MEP', gitUrl: 'https://git.tony-averty.dev/Tony/MEP.git' });
   assert.equal(r.status, 400);
-  assert.match((await r.json()).error, /Forgejo/);
+  assert.match((await r.json()).error, /github\.com/);
 
   r = await post('/settings', { notify_email: 'moi@x.fr', forgejo_host: 'https://git.tony-averty.dev/', forgejo_token: 'tok123', global_daily_cap: '9999', send_delay_min: '1', send_delay_max: '2', prospect_model: 'opus', analyze_model: 'opus' }, { form: true });
   assert.equal(r.status, 303);
@@ -94,9 +94,10 @@ test('dashboard, réglages, création de projet et statut', async () => {
   assert.equal(await s('analyze_model'), 'haiku', 'opus refusé pour l\'analyse');
   assert.ok(!(await s('forgejo_token_enc')).includes('tok123'), 'token chiffré');
 
-  r = await post('/api/projects', { name: 'MEP', gitUrl: 'https://github.com/Tony/MEP.git' });
+  // Un autre hôte que GitHub et le serveur Git personnel : refusé (GitHub, lui, est accepté d'office : voir test/git-hosts.test.js)
+  r = await post('/api/projects', { name: 'MEP', gitUrl: 'https://gitlab.com/Tony/MEP.git' });
   assert.equal(r.status, 400);
-  assert.match((await r.json()).error, /doit être sur git\.tony-averty\.dev/);
+  assert.match((await r.json()).error, /doit être sur github\.com ou git\.tony-averty\.dev/);
   r = await post('/api/projects', { name: 'MEP', gitUrl: 'https://git.tony-averty.dev/Tony/MEP.git' });
   assert.equal(r.status, 200);
   const { id } = await r.json();

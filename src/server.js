@@ -172,7 +172,7 @@ export async function createApp(cfg, { db, worker = true, createTransport, fetch
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const cfg = loadConfig();
-  if (!cfg.adminEmails.length) console.warn('ADMIN_EMAILS est vide : aucun administrateur (personne ne pourra utiliser le mode « Claude du serveur »).');
+  if (!cfg.adminEmails.length) console.warn('ADMIN_EMAILS est vide : aucun administrateur (back-office inaccessible).');
   for (const m of sandboxStartupMessages(cfg.sandbox)) console.warn(m);
   if (cfg.production && cfg.allowPrivateHosts) console.warn('ALLOW_PRIVATE_HOSTS est actif en production : seuls les administrateurs peuvent viser des hôtes privés.');
   if (cfg.production && !cfg.trustProxy) console.warn("TRUST_PROXY est désactivé : derrière Nginx, tous les visiteurs partagent la même adresse pour la limitation de débit. Pose TRUST_PROXY=true.");

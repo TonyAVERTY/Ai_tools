@@ -424,6 +424,7 @@
         <button class="btn small" data-inbox-check="${id}">Vérifier maintenant</button>${ab}`;
     }
 
+    if (s.checklist) setChecklist(id, s.checklist);
     state.set(id, st);
     schedule(el, running.length ? 4000 : 30_000);
   }
@@ -444,6 +445,114 @@
   function sessionStorageGet(k) { try { return sessionStorage.getItem(k); } catch { return null; } }
   function sessionStorageSet(k, v) { try { sessionStorage.setItem(k, v); } catch { /* ignore */ } }
   $$('details.project').forEach((el) => el.addEventListener('toggle', () => { if (el.open) sessionStorageSet('openProject', el.dataset.id); }));
+
+  // ---------- Mise en route (liste en bas à gauche) ----------
+  // Montre ce qui est configuré et ce qui reste à faire sur un projet ; chaque ligne ouvre la bonne section. Recalculée côté
+  // serveur à chaque lecture (rien n'est mémorisé ici, sauf « réduite » et « masquée pour ce projet » dans ce navigateur).
+  const todo = $('#todo');
+  const checklists = new Map();
+  let todoFocus = null;
+  const lsGet = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
+  const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch { /* ignore */ } };
+  const TICK = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>';
+  const DOT = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="8"/></svg>';
+
+  function setChecklist(id, c) {
+    checklists.set(String(id), c);
+    const el = $(`details.project[data-id="${id}"]`);
+    if (el) markChecklist(el, c);
+    if (String(id) === String(todoFocus)) renderTodo();
+  }
+
+  // Pastille « config 5/9 » sur le projet, coche sur chaque section dont toutes les étapes sont faites
+  function markChecklist(el, c) {
+    const byAcc = {};
+    for (const s of c.steps) if (s.acc) (byAcc[s.acc] ||= []).push(s);
+    for (const [acc, list] of Object.entries(byAcc)) {
+      const sum = $(`details[data-acc="${acc}"] > summary`, el);
+      if (sum) sum.classList.toggle('acc-done', list.every((s) => s.done));
+    }
+    const badge = $('[data-cfg]', el);
+    if (!badge) return;
+    badge.hidden = false;
+    badge.textContent = c.complete ? 'config ✓' : `config ${c.done}/${c.total}`;
+    badge.classList.toggle('ok', c.complete);
+    badge.classList.toggle('warn', !c.ready);
+  }
+
+  function renderTodo() {
+    const id = String(todoFocus);
+    const c = checklists.get(id);
+    if (!todo || !c) return;
+    if (c.complete || lsGet(`todo-off-${id}`) === '1') { todo.hidden = true; return; }
+    const name = $(`details.project[data-id="${id}"] .pname`)?.textContent || '';
+    // Réduite par défaut sur un écran étroit (elle recouvrirait le contenu) ; ensuite le choix de la personne fait foi
+    const pref = lsGet('todo-min');
+    const min = pref === null ? window.innerWidth < 1700 : pref === '1';
+    todo.hidden = false;
+    todo.classList.toggle('min', min);
+    todo.dataset.project = id;
+    todo.innerHTML = `<button type="button" class="todo-head" data-todo-toggle aria-expanded="${!min}">
+      <span class="todo-ring" data-pct="${Math.round((100 * c.done) / c.total)}"><b>${c.done}/${c.total}</b></span>
+      <span class="todo-title"><strong>${c.ready ? 'Prêt à prospecter' : 'Mise en route'}</strong><span class="muted small">${esc(name)}</span></span>
+      <span class="chev" aria-hidden="true"></span></button>
+    <div class="todo-body">
+      <ul>${c.steps.map((s) => `<li class="${s.done ? 'done' : ''}">${s.done ? TICK : DOT}<div>
+        <button type="button" class="todo-go" data-todo-go="${esc(s.key)}">${esc(s.label)}</button>${s.optional ? '<span class="todo-opt">facultatif</span>' : ''}
+        ${s.done ? '' : `<span class="muted small">${esc(s.hint)}</span>`}</div></li>`).join('')}</ul>
+      <button type="button" class="todo-hide muted small" data-todo-hide>Masquer pour ce projet</button>
+    </div>`;
+    const ring = $('.todo-ring', todo);
+    ring.style.setProperty('--p', `${ring.dataset.pct}%`); // CSSOM : la CSP interdit style=""
+  }
+
+  async function loadChecklist(el) {
+    try { setChecklist(el.dataset.id, await api(`/api/projects/${el.dataset.id}/checklist`)); } catch { /* la liste est un confort : on se tait */ }
+  }
+
+  function focusTodo(el) {
+    todoFocus = el.dataset.id;
+    if (checklists.has(todoFocus)) renderTodo(); else loadChecklist(el);
+  }
+
+  // Ouvre la section de l'étape (et ses parents), y fait défiler la page et la fait clignoter un instant
+  function todoGo(el, step) {
+    el.open = true;
+    const target = (step.acc && $(`details[data-acc="${step.acc}"]`, el)) || (step.sel && $(step.sel, el));
+    if (!target) return;
+    for (let n = target; n && n !== el; n = n.parentElement) if (n.tagName === 'DETAILS') n.open = true;
+    const calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    target.scrollIntoView({ behavior: calm ? 'auto' : 'smooth', block: 'center' });
+    target.classList.add('flash');
+    setTimeout(() => target.classList.remove('flash'), 1800);
+  }
+
+  if (todo) {
+    const projects = $$('details.project');
+    const start = $(`details.project[data-id="${sessionStorageGet('openProject')}"]`) || projects[0];
+    if (start) focusTodo(start);
+    projects.forEach((el) => el.addEventListener('toggle', () => { if (el.open) focusTodo(el); }));
+    // La pastille « config » du projet rappelle la liste, même après l'avoir masquée
+    document.addEventListener('click', (e) => {
+      const badge = e.target.closest('[data-cfg]');
+      const el = badge?.closest('details.project');
+      if (!el) return;
+      e.preventDefault();
+      lsSet(`todo-off-${el.dataset.id}`, '0');
+      lsSet('todo-min', '0');
+      focusTodo(el);
+      renderTodo();
+    });
+    todo.addEventListener('click', (e) => {
+      const id = todo.dataset.project;
+      const el = $(`details.project[data-id="${id}"]`);
+      if (e.target.closest('[data-todo-toggle]')) { lsSet('todo-min', todo.classList.contains('min') ? '0' : '1'); renderTodo(); return; }
+      if (e.target.closest('[data-todo-hide]')) { lsSet(`todo-off-${id}`, '1'); todo.hidden = true; return; }
+      const go = e.target.closest('[data-todo-go]');
+      const step = go && checklists.get(id)?.steps.find((s) => s.key === go.dataset.todoGo);
+      if (step && el) todoGo(el, step);
+    });
+  }
 
   // ---------- LinkedIn ----------
   // Section d'un projet : relier un compte, donner une direction (facultative), générer / régénérer un post, le relire et le publier.

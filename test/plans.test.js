@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { setSetting, now } from '../src/db.js';
 import { testDb } from './helpers/db.js';
-import { addUser } from './helpers/users.js';
+import { addUser, TEST_SECRET_KEY } from './helpers/users.js';
 import { Worker, enqueue, cancelJob } from '../src/services/jobs.js';
 import { makeHandlers } from '../src/handlers.js';
 import { createProject, saveSecretConfig } from '../src/projects.js';
@@ -23,7 +23,7 @@ async function world() {
   const db = await testDb();
   const sent = [];
   const app = { resolveHost: async () => [{ address: '93.184.216.34', family: 4 }],
-    db, cfg: { dataDir: '/tmp/x', appUrl: 'https://ai.test', secretKey: randomBytes(32), sandbox: { enabled: false } },
+    db, cfg: { dataDir: '/tmp/x', appUrl: 'https://ai.test', secretKey: TEST_SECRET_KEY, sandbox: { enabled: false } },
     createTransport: () => ({ verify: async () => true, sendMail: async (m) => { sent.push(m); }, close() {} }),
   };
   return { db, app, sent };
