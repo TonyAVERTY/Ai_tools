@@ -105,3 +105,23 @@ test('nouvelles réponses détectées → une notif avec les entreprises', async
   await checkInbox(s.app, s.userId, s.id);
   assert.equal(s.sent.length, 1, 'pas de notif quand rien de neuf');
 });
+
+test('plusieurs webhooks : chacun ne reçoit que ses événements, le test cible un webhook', async () => {
+  const { saveDiscordHooks, listHooks } = await import('../src/services/notify.js');
+  const s = await setup();
+  const H2 = 'https://discord.com/api/webhooks/223456789012345678/zyxwvutsrqponmlkjihgfedcba-ABC_123';
+  await saveDiscordHooks(s.app, s.userId, { discord_url_0: HOOK, discord_ev_0_reply: 'on', discord_url_1: H2, discord_ev_1_job_error: 'on', discord_ev_1_weekly: 'on' });
+  const hooks = await listHooks(s.app, s.userId);
+  assert.equal(hooks.length, 2);
+  s.sent.length = 0;
+  assert.equal(await notify(s.app, s.userId, 'reply', { title: 'Réponse' }), true);
+  assert.equal(s.sent.length, 1, 'seul le premier webhook reçoit les réponses');
+  s.sent.length = 0;
+  assert.equal(await notify(s.app, s.userId, 'job_error', { title: 'Erreur' }), true);
+  assert.equal(s.sent.length, 1);
+  s.sent.length = 0;
+  assert.equal(await notify(s.app, s.userId, 'budget', { title: 'Budget' }), false, 'aucun webhook ne reçoit cet événement');
+  assert.equal(s.sent.length, 0);
+  assert.equal(await notify(s.app, s.userId, 'test', { title: 'Test' }, { force: true, hookId: hooks[1].id }), true);
+  assert.equal(s.sent.length, 1, 'le test ne vise que le webhook choisi');
+});

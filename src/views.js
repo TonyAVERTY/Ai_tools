@@ -241,12 +241,12 @@ function targetForm(p) {
 }
 
 function configForms(p, smtp, dbCfg, imap) {
-  const source = { project: 'Ce projet envoie avec son propre SMTP.', settings: 'Ce projet utilise le SMTP des Réglages (aucun SMTP propre).', null: "Aucun SMTP : renseigne-en un ici ou dans les Réglages, sinon rien ne peut partir." }[p.smtpSource ?? 'null'];
+  const source = { project: 'Ce projet envoie depuis son adresse (SMTP ci-dessous).', null: "Aucun SMTP : renseigne celui de l'adresse d'envoi de ce projet, sinon rien ne peut partir." }[p.smtpSource ?? 'null'];
   return `<form data-action="smtp" data-id="${p.id}" class="cfg">
-  <h4>SMTP d'envoi de ce projet</h4>
-  <p class="muted small" data-smtp-source>${source} <strong>Laisse l'hôte vide pour utiliser le SMTP des Réglages.</strong> Un SMTP propre au projet permet d'envoyer depuis une autre adresse (une boîte par projet).</p>
+  <h4>SMTP d'envoi de ce projet (adresse du projet)</h4>
+  <p class="muted small" data-smtp-source>${source} Les mails de prospection et les relances de ce projet partent de cette adresse (une boîte par projet). Les mails d'AiTools (rapport, évolutions, invitations) partent, eux, du serveur.</p>
   <div class="grid3">
-    <label>Hôte<input name="host" value="${esc(smtp.host)}" placeholder="vide = SMTP des Réglages"></label>
+    <label>Hôte<input name="host" value="${esc(smtp.host)}" placeholder="smtp.exemple.fr"></label>
     <label>Port<input name="port" type="number" value="${esc(smtp.port || 587)}"></label>
     <label>Utilisateur<input name="user" value="${esc(smtp.user)}" autocomplete="off"></label>
     <label>Mot de passe<input name="pass" type="password" placeholder="${smtp.passSet ? '•••••• (inchangé)' : ''}" autocomplete="new-password"></label>
@@ -456,7 +456,29 @@ function gitRow(i, srv, { fresh = false } = {}) {
 /** Case à cocher du design : le <input> natif reste là (clavier, lecteurs d'écran), la case dessinée suit son état. */
 const check = (name, checked, text, { value = '' } = {}) => `<label class="opt"><input type="checkbox" name="${name}"${value ? ` value="${value}"` : ''}${checked ? ' checked' : ''}><span class="box">${ic('check')}</span><span>${text}</span></label>`;
 
-const SETTINGS_TOC = [['notif', 'Notifications'], ['git', 'Dépôts Git'], ['smtp', 'SMTP global'], ['discord', 'Discord'], ['garde', 'Garde-fous'], ['budget', 'Budget IA'], ['opposition', "Liste d'opposition"]];
+/** Une ligne « webhook Discord » : adresse (jamais réaffichée) et événements reçus. `fresh` : ligne qui vient d'être ajoutée (gabarit). */
+function hookRow(i, h, all, { fresh = false } = {}) {
+  const n = typeof i === 'number' ? i + 1 : '';
+  return `<div class="gitrow" data-discord-row>
+      <input type="hidden" name="discord_id_${i}" value="${esc(h.id)}">
+      <div class="gitrow-head"><span class="srv-n">${ic('send')}<span class="badge" data-discord-title>Webhook${n ? ` ${n}` : ''}</span></span>
+        ${fresh ? ' <button type="button" class="linklike" data-discord-cancel>Annuler</button>' : `<button type="button" class="btn" data-notify-test data-hook="${esc(h.id)}">Envoyer un test</button>`}</div>
+      <label class="field"><span class="lbl">URL du webhook</span><input name="discord_url_${i}" type="password" placeholder="${fresh ? 'https://discord.com/api/webhooks/…' : '•••••• (inchangé)'}" autocomplete="off"><span class="hint">Stocké chiffré.</span></label>
+      <fieldset class="evs"><legend class="lbl">Ce webhook reçoit</legend>
+        <div class="checks">${Object.entries(all).map(([k, label]) => check(`discord_ev_${i}_${k}`, h.events.includes(k), esc(label))).join('')}</div>
+      </fieldset>
+      ${fresh ? '' : check(`discord_del_${i}`, false, 'Retirer ce webhook', { value: '1' })}
+    </div>`;
+}
+
+/** Événements que plus aucun webhook ne reçoit : de quoi penser à en ajouter un. */
+function uncovered(d) {
+  if (!d.hooks.length) return '';
+  const missing = Object.entries(d.all).filter(([k]) => !d.hooks.some((h) => h.events.includes(k))).map(([, l]) => esc(l));
+  return missing.length ? `<p class="hint">Aucun webhook ne reçoit pour l'instant : ${missing.join(' · ')}.</p>` : '';
+}
+
+const SETTINGS_TOC = [['notif', 'Notifications'], ['git', 'Dépôts Git'], ['discord', 'Discord'], ['garde', 'Garde-fous'], ['budget', 'Budget et modèles IA'], ['opposition', "Liste d'opposition"]];
 
 export function settingsPage({ email, s, saved }) {
   const model = (name, v) => `<span class="sel"><select name="${name}">
@@ -475,7 +497,7 @@ ${saved ? `<p class="ok-box" role="status">${ic('check')}<span><b>Réglages enre
 <form method="post" action="/settings" class="settings-form">
 
 <section class="card" id="notif" aria-labelledby="t-notif">
-  <div class="card-h"><h2 id="t-notif">Notifications</h2><p>Où et quand AiTools te prévient.</p></div>
+  <div class="card-h"><h2 id="t-notif">Notifications</h2><p>Où et quand AiTools te prévient. Ces mails partent de l'adresse d'AiTools (SMTP du serveur), jamais de celle d'un projet.</p></div>
   <label class="field"><span class="lbl">Email de réception (évolutions, rapport hebdo)</span><input name="notify_email" type="email" value="${esc(s.notify_email)}" placeholder="toi@exemple.fr"></label>
   ${check('weekly_report', s.weekly_report, 'Rapport hebdo le lundi à 8h (mail + Discord)')}
   <div class="save"><button type="button" class="btn" data-report-send>${ic('send')}Envoyer le rapport maintenant</button></div>
@@ -508,25 +530,17 @@ ${saved ? `<p class="ok-box" role="status">${ic('check')}<span><b>Réglages enre
   </div>
 </section>
 
-<section class="card" id="smtp" aria-labelledby="t-smtp">
-  <div class="card-h"><h2 id="t-smtp">SMTP global</h2><p>Mails vers toi, et envoi des projets qui n'ont pas leur propre SMTP.</p></div>
-  <div class="grid2">
-    <label class="field"><span class="lbl">Hôte</span><input name="smtp_host" value="${esc(s.smtp.host)}" placeholder="smtp.exemple.fr"></label>
-    <label class="field"><span class="lbl">Port</span><input name="smtp_port" type="number" value="${esc(s.smtp.port || 587)}"></label>
-    <label class="field"><span class="lbl">Utilisateur</span><input name="smtp_user" value="${esc(s.smtp.user)}" autocomplete="off"></label>
-    <label class="field"><span class="lbl">Mot de passe</span><input name="smtp_pass" type="password" placeholder="${s.smtp.passSet ? '•••••• (inchangé)' : ''}" autocomplete="new-password"><span class="hint">Stocké chiffré.</span></label>
-    <label class="field"><span class="lbl">Expéditeur</span><input name="smtp_fromEmail" type="email" value="${esc(s.smtp.fromEmail)}"></label>
-  </div>
-</section>
-
 <section class="card" id="discord" aria-labelledby="t-discord">
-  <div class="card-h"><h2 id="t-discord">Discord</h2><p>Reçois les réponses et les alertes dans un salon. Salon Discord › Modifier › Intégrations › Webhooks › Nouveau webhook › Copier l'URL.</p></div>
-  <label class="field"><span class="lbl">URL du webhook</span><input name="discord_webhook" type="password" placeholder="${s.discord.set ? '•••••• (inchangé)' : 'https://discord.com/api/webhooks/…'}" autocomplete="off"><span class="hint">Stocké chiffré.</span></label>
-  ${s.discord.set ? check('discord_remove', false, 'Supprimer le webhook') : ''}
-  <div class="checks">
-    ${Object.entries(s.discord.all).map(([k, label]) => check(`ev_${k}`, s.discord.events.includes(k), esc(label))).join('')}
+  <div class="card-h"><h2 id="t-discord">Discord</h2><p>Reçois les réponses et les alertes dans un salon. Salon Discord › Modifier › Intégrations › Webhooks › Nouveau webhook › Copier l'URL. Un webhook par salon : ajoute-en un autre avec « + » pour séparer ce qui est dit ou fait (réponses d'un côté, erreurs de l'autre).</p></div>
+  <div class="gitlist" data-discordlist data-next="${s.discord.hooks.length}" data-max="${s.discord.max}">
+    ${s.discord.hooks.map((h, i) => hookRow(i, h, s.discord.all)).join('\n    ')}
   </div>
-  ${s.discord.set ? `<div class="save"><button type="button" class="btn" data-notify-test>Envoyer une notification de test</button></div>` : ''}
+  <template id="discord-row-tpl">${hookRow('__I__', { id: '', events: [] }, s.discord.all, { fresh: true })}</template>
+  ${uncovered(s.discord)}
+  <div class="gitadd">
+    <button type="button" class="btn" data-discord-add>${ic('plus')}${s.discord.hooks.length ? 'Ajouter un autre webhook' : 'Ajouter un webhook'}</button>
+    <span class="hint" data-discord-max hidden>${s.discord.max} webhooks au plus.</span>
+  </div>
 </section>
 
 <section class="card" id="garde" aria-labelledby="t-garde">
@@ -539,10 +553,12 @@ ${saved ? `<p class="ok-box" role="status">${ic('check')}<span><b>Réglages enre
 </section>
 
 <section class="card" id="budget" aria-labelledby="t-budget">
-  <div class="card-h"><h2 id="t-budget">Budget IA</h2><p>En équivalent $ API remonté par Claude Code (ton abonnement Pro ne facture rien en plus : c'est un garde-fou pour ton quota). Au-delà, les jobs IA attendent sans être perdus ; envois et relances continuent. Vide = pas de limite.</p></div>
+  <div class="card-h"><h2 id="t-budget">${s.priced ? 'Budget IA' : 'Modèles IA'}</h2>${s.priced
+    ? "<p>Avec ta clé API, chaque job est facturé par Anthropic : en équivalent $ API remonté par Claude Code. Au-delà d'un plafond, les jobs IA attendent sans être perdus ; envois et relances continuent. Vide = pas de limite.</p>"
+    : "<p>Avec ton abonnement Claude rien n'est facturé en plus : le garde-fou est ton quota Claude (affiché en haut), pas un budget en $.</p>"}</div>
   <div class="grid2">
-    <label class="field"><span class="lbl">Plafond sur 24 h glissantes</span><span class="unit"><input name="budget_day_usd" inputmode="decimal" value="${esc(s.budget_day_usd)}" placeholder="ex. 2"><span>$</span></span></label>
-    <label class="field"><span class="lbl">Plafond sur 30 jours glissants</span><span class="unit"><input name="budget_month_usd" inputmode="decimal" value="${esc(s.budget_month_usd)}" placeholder="ex. 30"><span>$</span></span></label>
+    ${s.priced ? `<label class="field"><span class="lbl">Plafond sur 24 h glissantes</span><span class="unit"><input name="budget_day_usd" inputmode="decimal" value="${esc(s.budget_day_usd)}" placeholder="ex. 2"><span>$</span></span></label>
+    <label class="field"><span class="lbl">Plafond sur 30 jours glissants</span><span class="unit"><input name="budget_month_usd" inputmode="decimal" value="${esc(s.budget_month_usd)}" placeholder="ex. 30"><span>$</span></span></label>` : ''}
     <label class="field"><span class="lbl">Modèle pour la prospection</span>${model('prospect_model', s.prospect_model)}</label>
     <label class="field"><span class="lbl">Modèle pour l'analyse de projet</span>${model('analyze_model', s.analyze_model)}</label>
   </div>
@@ -554,7 +570,7 @@ ${saved ? `<p class="ok-box" role="status">${ic('check')}<span><b>Réglages enre
 
 <section class="card" id="opposition" aria-labelledby="t-opp">
   <div class="card-h"><h2 id="t-opp">Liste d'opposition</h2></div>
-  <p class="card-d">${s.blacklist_count} de tes prospects ont demandé à ne plus être contactés. La liste d'opposition est commune à tous les comptes : une adresse désinscrite n'est plus jamais contactée, quel que soit le projet.</p>
+  <p class="card-d">Une personne qui se désinscrit, refuse ou dont l'adresse est invalide n'est plus jamais contactée ni proposée, quel que soit le compte ou le projet. Cette liste est commune à tous les comptes et personne ne peut la consulter : tu ne vois que le statut de tes propres prospects.</p>
 </section>
 </div>
 </div>`,

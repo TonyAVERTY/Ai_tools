@@ -367,3 +367,32 @@ test('offres : prix de 10 à 100 € TTC, annuel = 2 mois offerts, plafonds tena
   assert.ok(!h.includes('illimité)'));
   assert.deepEqual(Object.keys(PLAN_PRICES).filter((k) => PLAN_LIMITS[k].projects == null), [], 'aucune offre payante illimitée');
 });
+
+test('connexion : la pastille flottante reCAPTCHA est masquée, la mention de protection reste visible', async () => {
+  assert.match(read('public/site.css'), /\.grecaptcha-badge \{ visibility: hidden; \}/);
+  const withCaptcha = await startApp({ cfg: { recaptcha: { siteKey: 'k', secret: 's', minScore: 0.5 } } });
+  try {
+    const h = await (await withCaptcha.anon.get('/login', { headers: { accept: 'text/html' } })).text();
+    assert.match(h, /protégé par Google reCAPTCHA/);
+    assert.match(h, /policies\.google\.com\/privacy/);
+    assert.match(h, /policies\.google\.com\/terms/);
+  } finally { await withCaptcha.close(); }
+});
+
+test('ruban de page sur toutes les pages du site (pas sur le dashboard), vrais logos Google et Apple, vérification discrète', async () => {
+  const apple = await startApp({ cfg: { apple: { teamId: 't', keyId: 'k', clientId: 'c', privateKey: 'p' } } });
+  try {
+    for (const p of [...PUBLIC_PAGES, '/login', '/inexistant']) {
+      const h = await (await apple.anon.get(p, { headers: { accept: 'text/html' } })).text();
+      assert.match(h, /<div class="page-ribbon" aria-hidden="true">/, `${p} : ruban`);
+    }
+    const login = await (await apple.anon.get('/login', { headers: { accept: 'text/html' } })).text();
+    assert.ok(login.includes('fill="#4285F4"') && login.includes('fill="#EA4335"') && login.includes('fill="#FBBC05"') && login.includes('fill="#34A853"'), 'logo Google : les quatre couleurs');
+    assert.match(login, /<svg class="prov"[^>]*><path fill="currentColor" d="M12\.152/, 'logo Apple');
+    assert.doesNotMatch(login, /class="brand"/, 'plus de lettre à la place du logo');
+    // dashboard : jamais de ruban
+    const u = await apple.newUser({ email: 'rib@x.fr' });
+    assert.doesNotMatch(await (await u.get('/', { headers: { accept: 'text/html' } })).text(), /page-ribbon/);
+  } finally { await apple.close(); }
+  assert.match(read('public/site.css'), /\[hidden\] \{ display: none !important; \}/, 'un bouton « hidden » (réessayer la vérification) ne s\'affiche jamais par erreur');
+});

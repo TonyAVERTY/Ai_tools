@@ -1,6 +1,6 @@
 // Rapport hebdo : lundi 8h (Paris), par mail + résumé Discord. Aucun token Claude.
 import { now, getSetting, setSetting } from '../db.js';
-import { abStats, globalSmtp } from '../projects.js';
+import { abStats } from '../projects.js';
 import { createTransport } from './mailer.js';
 import { pinSmtp } from '../netguard.js';
 import { notify } from './notify.js';
@@ -55,15 +55,15 @@ export function weeklyText(st) {
   return lines.join('\n').trimEnd() + '\n';
 }
 
-/** Envoie le rapport (mail si SMTP global + adresse, Discord si webhook). Retourne les canaux utilisés. */
+/** Envoie le rapport (mail si SMTP du serveur + adresse de réception, Discord si webhook). Retourne les canaux utilisés. */
 export async function sendWeeklyReport(app, userId, { at = now() } = {}) {
   const st = await weeklyStats(app.db, userId, { at });
   const text = weeklyText(st);
   const channels = [];
   const to = await getSetting(app.db, userId, 'notify_email');
-  const smtp = await globalSmtp(app, userId);
+  const smtp = app.cfg.systemSmtp; // mails d'AiTools : toujours le SMTP du serveur (SYSTEM_SMTP_*)
   if (to && smtp) {
-    const transport = (app.createTransport || createTransport)(await pinSmtp(app, userId, smtp));
+    const transport = (app.createTransport || createTransport)(await pinSmtp(app, null, smtp));
     try {
       await transport.sendMail({
         from: smtp.fromEmail, to, subject: `[AiTools] Rapport du ${day(st.from)} au ${day(st.to)}`, text,

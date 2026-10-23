@@ -75,3 +75,31 @@ test('clé API : aucun quota d\'abonnement, aucun appel à Anthropic', async () 
     assert.equal(f.calls.length, 0);
   } finally { await s.close(); }
 });
+
+test('jeton sans accès au point d\'accès « usage » : repli sur une requête minimale, dont les en-têtes donnent le quota du compte entier', async () => {
+  const calls = [];
+  const hdr = { 'anthropic-ratelimit-unified-5h-utilization': '0.07', 'anthropic-ratelimit-unified-5h-reset': '4000000000', 'anthropic-ratelimit-unified-7d-utilization': '41', 'anthropic-ratelimit-unified-7d-reset': '4000300000' };
+  const fetch = async (url, opts) => {
+    calls.push({ url, opts });
+    if (url.endsWith('/api/oauth/usage')) return { ok: false, status: 403, json: async () => ({}) };
+    return { ok: true, status: 200, headers: { get: (k) => hdr[k.toLowerCase()] ?? null }, json: async () => ({}) };
+  };
+  const s = await startApp({ fetch });
+  try {
+    const u = await s.newUser({ admin: false, link: testTokenLink() });
+    const r = (await (await u.get('/api/system', HTML)).json()).claudeRateLimit;
+    assert.equal(r.source, 'live');
+    assert.equal(r.error, null);
+    assert.equal(r.fiveHour.utilization, 0.07, 'fraction 0-1');
+    assert.equal(r.sevenDay.utilization, 0.41, 'pourcentage 0-100 converti');
+    assert.equal(r.fiveHour.resetsAt, 4_000_000_000);
+    const probe = calls.find((c) => c.url.endsWith('/v1/messages'));
+    assert.equal(probe.opts.headers.Authorization, `Bearer ${TEST_TOKEN}`);
+    const body = JSON.parse(probe.opts.body);
+    assert.equal(body.max_tokens, 1);
+    assert.match(body.system[0].text, /Claude Code/);
+    // pas de nouvel appel dans les 5 minutes, et le point d'accès refusé n'est pas réessayé aussitôt
+    await u.get('/api/system', HTML);
+    assert.equal(calls.length, 2);
+  } finally { await s.close(); }
+});
