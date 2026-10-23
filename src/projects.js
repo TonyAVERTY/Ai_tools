@@ -93,14 +93,20 @@ export function publicConfig(cfg, secretField) {
 }
 
 /**
- * Token à présenter à git pour cette URL. Il n'est destiné qu'au serveur Git personnel de l'utilisateur (Réglages) : jamais
- * envoyé à un autre hôte, GitHub compris, sinon il fuiterait vers un service tiers.
+ * Token à présenter à git pour cette URL. Chaque token n'est destiné qu'à SON hôte, jamais à un autre (il fuiterait vers un
+ * service tiers) : le token GitHub à github.com seulement, celui du serveur Git perso à cet hôte seulement.
  */
 export async function gitTokenFor(app, userId, url) {
-  const host = await getSetting(app.db, userId, 'forgejo_host');
   let target;
   try { target = new URL(url).host; } catch { return null; }
+  if (target === 'github.com') return secretSetting(app, userId, 'github_token_enc', 'GitHub');
+  const host = await getSetting(app.db, userId, 'forgejo_host');
   return host && target === host ? forgejoToken(app, userId) : null;
+}
+
+async function secretSetting(app, userId, key, label) {
+  try { return decrypt(app.cfg.secretKey, await getSetting(app.db, userId, key)); }
+  catch { console.warn(`[secrets] token ${label} illisible, à ressaisir`); return null; }
 }
 
 export async function forgejoToken(app, userId) {
