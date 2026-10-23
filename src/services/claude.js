@@ -15,6 +15,8 @@ export const MODELS = { rapide: 'haiku', normal: 'sonnet', approfondi: 'opus' };
  * @param {string} [o.system]       consignes ajoutées au prompt système
  * @param {(text:string)=>void} [o.onText]  appelé à chaque bloc texte de Claude
  * @param {(n:number)=>void} [o.onTurn]     appelé à chaque message de Claude (sert à estimer l'avancement)
+ * @param {boolean} [o.chat]        conversation : AUCUN outil (ni fichiers, ni web, ni commandes), pas de session enregistrée, pas de commandes slash
+ * @param {(text:string)=>void} [o.onDelta]  avec `chat` : appelé à chaque morceau de texte au fil de l'écriture
  * @param {AbortSignal} [o.signal]
  * @param {number} [o.timeoutMs]
  * @param {string} [o.bin]
@@ -32,6 +34,7 @@ export function runClaude(o) {
     '--disallowedTools', 'Bash,Edit,Write,MultiEdit,NotebookEdit,Task',
   ];
   if (o.system) args.push('--append-system-prompt', o.system);
+  if (o.chat) args.push('--tools', '', '--no-session-persistence', '--disable-slash-commands', '--include-partial-messages');
 
   const launch = prepareLaunch({
     bin: o.bin || 'claude', args, cwd: o.cwd, allowedRoot: o.allowedRoot,
@@ -68,7 +71,11 @@ export function runClaude(o) {
     function handle(line) {
       let ev;
       try { ev = JSON.parse(line); } catch { return; }
-      if (ev.type === 'assistant') {
+      if (ev.type === 'stream_event') {
+        // Texte en cours d'écriture (option --include-partial-messages) : transmis tel quel, le texte final vient du résultat
+        const d = ev.event?.type === 'content_block_delta' ? ev.event.delta : null;
+        if (d?.type === 'text_delta' && d.text) o.onDelta?.(redact(d.text));
+      } else if (ev.type === 'assistant') {
         o.onTurn?.(++turns);
         for (const block of ev.message?.content || []) {
           if (block.type === 'text' && block.text) { texts.push(block.text); o.onText?.(redact(block.text)); }

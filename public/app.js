@@ -64,7 +64,7 @@
   $$('input.copy').forEach((i) => i.addEventListener('focus', () => i.select()));
 
   // ---------- Barre du haut : page courante en surbrillance ----------
-  $$('.pills a.pill, .user-pop a').forEach((a) => {
+  $$('.pills a.pill, .user-pop a, .ia-link').forEach((a) => {
     const here = a.pathname === '/' ? location.pathname === '/' : location.pathname === a.pathname || location.pathname.startsWith(`${a.pathname}/`);
     if (here) a.setAttribute('aria-current', 'page');
   });
