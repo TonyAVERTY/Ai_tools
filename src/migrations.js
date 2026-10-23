@@ -764,5 +764,42 @@ export const MIGRATIONS = [
       ) ${T}`,
     ],
   },
+  {
+    // Page IA : conversations de l'utilisateur avec Claude et leurs messages. Supprimés avec le compte (cascade).
+    name: 'chat',
+    sqlite: [
+      `CREATE TABLE chat_conversations (
+        id INTEGER PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        title TEXT NOT NULL, model TEXT NOT NULL,
+        created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+      )`,
+      'CREATE INDEX chat_conversations_user ON chat_conversations(user_id, updated_at)',
+      `CREATE TABLE chat_messages (
+        id INTEGER PRIMARY KEY,
+        conversation_id INTEGER NOT NULL REFERENCES chat_conversations(id) ON DELETE CASCADE,
+        role TEXT NOT NULL, content TEXT NOT NULL, model TEXT,
+        cost_usd REAL NOT NULL DEFAULT 0, created_at INTEGER NOT NULL
+      )`,
+      'CREATE INDEX chat_messages_conv ON chat_messages(conversation_id, id)',
+    ],
+    mysql: [
+      `CREATE TABLE IF NOT EXISTS chat_conversations (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        user_id BIGINT NOT NULL,
+        title VARCHAR(200) NOT NULL, model VARCHAR(64) NOT NULL,
+        created_at BIGINT NOT NULL, updated_at BIGINT NOT NULL,
+        KEY chat_conversations_user (user_id, updated_at),
+        CONSTRAINT chat_conversations_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      ) ${T}`,
+      `CREATE TABLE IF NOT EXISTS chat_messages (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        conversation_id BIGINT NOT NULL,
+        role VARCHAR(12) NOT NULL, content MEDIUMTEXT NOT NULL, model VARCHAR(64) NULL,
+        cost_usd DOUBLE NOT NULL DEFAULT 0, created_at BIGINT NOT NULL,
+        KEY chat_messages_conv (conversation_id, id),
+        CONSTRAINT chat_messages_conv_fk FOREIGN KEY (conversation_id) REFERENCES chat_conversations(id) ON DELETE CASCADE
+      ) ${T}`,
+    ],
+  },
 ];
-

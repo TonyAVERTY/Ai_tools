@@ -410,3 +410,19 @@ body.site {
 
 /* Repère des contenus réservés aux visiteurs (remplacé pour un compte connecté) : sans effet sur la mise en page */
 x-guest { display: contents; }
+
+/* ---------- Documentation : le ruban défile plus lentement que le texte (parallaxe) et porte des bulles ---------- */
+.fx .page-ribbon svg { position: absolute; left: 0; top: 0; height: calc(100% - var(--par, 0px)); transform: translate3d(0, var(--py, 0px), 0); will-change: transform; }
+.rb-bubbles { position: absolute; left: 0; right: 0; top: 0; height: calc(100% - var(--par, 0px)); transform: translate3d(0, var(--py, 0px), 0); will-change: transform; }
+.rb-b {
+  position: absolute; display: block; border-radius: 999px; translate: calc(-50% + var(--ox, 0px)) -50%;
+  background: radial-gradient(circle at 32% 28%, color-mix(in srgb, var(--bg) 90%, transparent), color-mix(in srgb, var(--accent-2) 30%, transparent) 55%, color-mix(in srgb, var(--accent) 40%, transparent));
+  border: 1px solid color-mix(in srgb, var(--bg) 70%, transparent);
+  animation: rb-float var(--d, 7s) ease-in-out var(--delay, 0s) infinite alternate;
+}
+@keyframes rb-float { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(var(--dx, 6px), var(--dy, -12px), 0); } }
+@media (max-width: 899px) { .rb-b { opacity: .6; } }
+@media (prefers-reduced-motion: reduce) {
+  .fx .page-ribbon svg, .rb-bubbles { transform: none; will-change: auto; }
+  .rb-b { animation: none; }
+}

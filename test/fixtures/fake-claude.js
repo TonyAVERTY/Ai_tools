@@ -9,6 +9,8 @@ const trace = async (what) => { if (process.env.FAKE_LOG) (await import('node:fs
 await trace('start');
 if (process.env.FAKE_DELAY_MS) await new Promise((r) => setTimeout(r, Number(process.env.FAKE_DELAY_MS)));
 if (prompt.includes('CRASH')) process.exit(3);
+// Quota Claude atteint : réponse en erreur, comme la vraie CLI
+if (prompt.includes('QUOTAERR')) { out({ type: 'result', subtype: 'success', is_error: true, result: 'Claude usage limit reached', total_cost_usd: 0, num_turns: 0, usage: {} }); process.exit(1); }
 // Le secret de l'utilisateur fuit dans stderr : l'application ne doit jamais le répercuter
 if (prompt.includes('LEAK')) { process.stderr.write('echec avec ' + (process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_CODE_OAUTH_TOKEN || '') + ' fin'); process.exit(3); }
 // Jeton d'abonnement refusé par Claude
@@ -20,7 +22,9 @@ const profile = { resume: 'Cartes de fidélité digitales.', proposition_valeur:
 // Post LinkedIn : reprend la direction donnée (si elle existe) ; un 2e passage (brouillons déjà produits) donne un autre texte
 const liDirection = /Direction donnée par l'auteur \(le sujet du post\) : « (.*?) »/s.exec(prompt)?.[1];
 const liPost = () => JSON.stringify({ post: `${prompt.includes('Brouillons déjà produits') ? 'Autre angle' : 'Premier angle'} : ${liDirection ? `sur ${liDirection}` : 'sujet choisi par Claude'}. ${'Un texte de post assez long pour passer le contrôle de taille. '.repeat(2)}` });
-const lines = prompt.includes('UN post LinkedIn') ? [liPost()]
+// Page IA : « ECHO » renvoie le dernier message de l'utilisateur (la conversation envoyée contient les précédents)
+const lines = prompt.includes('ECHO') ? ['Écho : ' + prompt.split('Utilisateur : ').pop().trim()]
+  : prompt.includes('UN post LinkedIn') ? [liPost()]
   : prompt.includes('Audite ce projet') ? ['## Résumé\nCode correct.\n## Constats\n**[FAIBLE]** Pas de tests — `src/a.js:1` — manque de couverture.']
   : prompt.includes('UNE accroche personnalisée') ? ['{"hook":"Boulangerie Le Fournil : des fournées de qualité à Rennes.","city":"Rennes","sector":"boulangerie"}']
   : prompt.includes('ENVDUMP') ? ['```json\n' + JSON.stringify({ env: process.env, cwd: process.cwd() }) + '\n```']
@@ -33,6 +37,10 @@ const lines = prompt.includes('UN post LinkedIn') ? [liPost()]
      'PROSPECT {"company":"Bad","email":"pas-un-email","score":5}',
      'PROSPECT {"company":"Coiffure Zen","email":"Hello@Zen.fr","website":"https://zen.fr","city":"Vern","score":6,"source":"https://zen.fr"}']
   : ['```json\n{"ok":true,"args":' + JSON.stringify(process.argv.slice(2)) + '}\n```'];
+// --include-partial-messages : le texte arrive d'abord en morceaux (stream_event), puis en message complet
+if (process.argv.includes('--include-partial-messages')) {
+  for (const t of lines) { const h = Math.ceil(t.length / 2); for (const piece of [t.slice(0, h), t.slice(h)]) out({ type: 'stream_event', event: { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: piece } } }); }
+}
 for (const t of lines) out({ type: 'assistant', message: { content: [{ type: 'text', text: t }] } });
 // Quota du compte (session 5h + semaine), remonté par la vraie CLI à chaque appel.
 // Surchargeable par les tests qui veulent simuler un quota serré (FAKE_FIVE_HOUR / FAKE_SEVEN_DAY).

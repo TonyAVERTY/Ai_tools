@@ -1,3 +1,4 @@
+import { RECOMMENDED, OTHERS, modelLabel } from './services/models.js';
 import { esc } from './http.js';
 import { STATUSES } from './services/crm.js';
 import { icalBox } from './icalview.js';
@@ -10,7 +11,7 @@ import { MODE_LABELS, CONSENT_TEXT, CONSENT_CHECKBOX, CONSENT_VERSION } from './
 const fmtDate = (ts) => (ts ? new Date(ts * 1000).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' }) : '—');
 
 // Icônes de la section : noms du sprite (src/icons.js), une seule fois par page
-const SECTION_ICONS = { target: 'target', search: 'search', spark: 'spark', chart: 'chart', mail: 'mail', linkedin: 'pen', send: 'send', repeat: 'repeat', users: 'users', gear: 'gear', git: 'git' };
+const SECTION_ICONS = { target: 'target', search: 'search', spark: 'spark', chart: 'chart', mail: 'mail', linkedin: 'pen', send: 'send', repeat: 'repeat', users: 'users', gear: 'gear', git: 'git', computer: 'computer' };
 
 /** Section dépliable. `title` peut contenir du HTML de confiance (badges), jamais de donnée utilisateur brute. */
 function acc(key, icon, title, sub, body, { open = false, cls = '' } = {}) {
@@ -22,7 +23,7 @@ function acc(key, icon, title, sub, body, { open = false, cls = '' } = {}) {
 
 const NAV = [['/', 'folder', 'Projets'], ['/mails', 'mail', 'Mails'], ['/calendar', 'clock', 'Calendrier'], ['/team', 'users', 'Équipe']];
 
-export function layout({ title, body, email }) {
+export function layout({ title, body, email, scripts = [] }) {
   return `<!doctype html>
 <html lang="fr">
 <head>
@@ -37,6 +38,9 @@ ${iconLinks()}
 <link rel="stylesheet" href="${assetUrl('/static/responsive.css')}">
 <script src="${assetUrl('/static/app.js')}" defer></script>
 <script src="${assetUrl('/static/responsive.js')}" defer></script>
+<script src="${assetUrl('/static/fx.js')}" defer></script>
+<script src="${assetUrl('/static/ajax.js')}" defer></script>
+${scripts.map((src) => `<script src="${assetUrl(src)}" defer></script>`).join('\n')}
 </head>
 <body class="app">
 <canvas id="bg" aria-hidden="true"></canvas>
@@ -56,6 +60,7 @@ ${email ? `<header class="top">
           <div data-jobs-list></div>
         </div>
       </div>
+      <a class="ia-link" href="/chat" aria-label="Assistant IA">${ic('spark')}<span>IA</span></a>
       <details class="user">
         <summary aria-label="Menu du compte : ${esc(email)}"><span class="avatar" aria-hidden="true">${esc(String(email).trim().charAt(0).toUpperCase())}</span></summary>
         <div class="user-pop">
@@ -409,7 +414,7 @@ function projectItem(p, smtp, dbCfg, imap) {
     </form>
     <div class="job" data-job="evolution"></div>`, { cls: 'main' })}
 
-  ${p.access !== 'member' ? acc('audit', 'shield', 'Audit du projet', 'Rapport qualité et sécurité du code, en lecture seule', `
+  ${p.access !== 'member' ? acc('audit', 'computer', 'Audit du projet', 'Rapport qualité et sécurité du code, en lecture seule', `
     <form data-action="audit" data-id="${p.id}" class="inline">
       <label>Raisonnement<select name="level">
         <option value="rapide" selected>Rapide (Haiku, économe)</option>
@@ -497,7 +502,7 @@ function hookRow(i, h, all, { fresh = false } = {}) {
   const n = typeof i === 'number' ? i + 1 : '';
   return `<div class="gitrow" data-discord-row>
       <input type="hidden" name="discord_id_${i}" value="${esc(h.id)}">
-      <div class="gitrow-head"><span class="srv-n">${ic('send')}<span class="badge" data-discord-title>Discord${n ? ` ${n}` : ''}</span></span>
+      <div class="gitrow-head"><span class="srv-n">${ic('discord')}<span class="badge" data-discord-title>Discord${n ? ` ${n}` : ''}</span></span>
         ${fresh ? ' <button type="button" class="linklike" data-discord-cancel>Annuler</button>' : `<span class="row"><button type="button" class="btn" data-notify-test data-hook="${esc(h.id)}">Envoyer un test</button>${trash(`discord_del_${i}`, 'Retirer ce webhook')}</span>`}</div>
       <fieldset class="evs"><legend class="lbl">${fresh ? '1. Quelles notifications veux-tu y recevoir ?' : 'Ce webhook reçoit'}</legend>
         <div class="checks">${Object.entries(all).map(([k, label]) => check(`discord_ev_${i}_${k}`, fresh ? CHANNEL_DEFAULT_EVENTS.includes(k) : h.events.includes(k), esc(label))).join('')}</div>
@@ -513,7 +518,7 @@ const CHANNEL_DEFAULT_EVENTS = ['reply', 'job_error', 'abuse'];
 function channelCard(type, label, s, fields) {
   const c = s.channels[type];
   return `<div class="gitrow" data-channel="${type}"${c ? '' : ' hidden'}>
-      <div class="gitrow-head"><span class="srv-n">${ic('send')}<span class="badge">${label}</span></span>
+      <div class="gitrow-head"><span class="srv-n">${ic(type === 'email' ? 'mail' : type)}<span class="badge">${label}</span></span>
         ${c ? `<span class="row"><button type="button" class="btn" data-notify-test data-channel="${type}">Envoyer un test</button>${trash(`${type}_del`, `Retirer ${label}`)}</span>` : '<button type="button" class="linklike" data-chan-cancel>Annuler</button>'}</div>
       <fieldset class="evs"><legend class="lbl">${c ? `${label} reçoit` : '1. Quelles notifications veux-tu y recevoir ?'}</legend>
         <div class="checks">${Object.entries(s.discord.all).map(([k, l]) => check(`${type}_ev_${k}`, c ? c.events.includes(k) : CHANNEL_DEFAULT_EVENTS.includes(k), esc(l))).join('')}</div>
@@ -533,10 +538,27 @@ function uncovered(d, channels = {}) {
 const SETTINGS_TOC = [['notif', 'Notifications'], ['git', 'Dépôts Git'], ['garde', 'Garde-fous'], ['budget', 'Budget et modèles IA'], ['prompts', 'Prompts IA'], ['opposition', "Liste d'opposition"]];
 
 export function settingsPage({ email, s, saved }) {
-  const model = (name, v) => `<span class="sel"><select name="${name}">
-    <option value="haiku" ${v === 'haiku' ? 'selected' : ''}>Haiku (économe)</option>
-    <option value="sonnet" ${v === 'sonnet' ? 'selected' : ''}>Sonnet (plus précis, plus cher)</option>
-  </select>${ic('down')}</span>`;
+  // Sélecteur de modèle en deux listes : les recommandés (avec une estimation relative du coût), puis tous les autres, plus compacts et sans estimation
+  const recTier = (m) => `${m.tier} · ${m.cost}`;
+  const model = (name, v, title) => {
+    const cur = RECOMMENDED.find((m) => m.id === v);
+    const radio = (m, extra = '') => `<input type="radio" name="${name}" value="${m.id}"${m.id === v ? ' checked' : ''} data-mp-label="${esc(m.label)}" data-mp-tier="${esc(extra)}">`;
+    return `<div class="field modelpick" data-modelpick>
+      <span class="lbl" id="${name}-l">${title}</span>
+      <details class="mp">
+        <summary aria-labelledby="${name}-l"><span class="mp-cur"><b data-mp-name>${esc(cur ? cur.label : modelLabel(v))}</b> <em data-mp-tier-out>${cur ? esc(recTier(cur)) : ''}</em></span>${ic('down')}</summary>
+        <div class="mp-pop" role="radiogroup" aria-labelledby="${name}-l">
+          <p class="mp-h">Recommandés</p>
+          ${RECOMMENDED.map((m) => `<label class="mp-rec">${radio(m, recTier(m))}<span class="mp-n"><b>${esc(m.label)}</b><small>${esc(m.note)}</small></span><span class="mp-t">${esc(m.tier)} <i>${esc(m.cost)}</i></span></label>`).join('\n          ')}
+          <hr class="mp-sep">
+          <p class="mp-h mp-h-s">Autres modèles</p>
+          <div class="mp-others">
+            ${OTHERS.map((m) => `<label class="mp-o">${radio(m, '')}<span>${esc(m.label)}</span></label>`).join('\n            ')}
+          </div>
+        </div>
+      </details>
+    </div>`;
+  };
   return layout({
     title: 'Réglages', email,
     body: `<div class="settings">
@@ -572,9 +594,9 @@ ${saved ? `<p class="ok-box" role="status">${ic('check')}<span><b>Réglages enre
     <details class="addmenu" data-addmenu>
       <summary class="btn">${ic('plus')}Ajouter un canal</summary>
       <div class="menu" role="menu" aria-label="Service de notification">
-        <button type="button" role="menuitem" data-chan-pick="discord">${ic('send')}<span><b>Discord</b><small>Un webhook par salon</small></span></button>
-        <button type="button" role="menuitem" data-chan-pick="slack"${s.channels.slack ? ' hidden' : ''}>${ic('send')}<span><b>Slack</b><small>Webhook entrant</small></span></button>
-        <button type="button" role="menuitem" data-chan-pick="telegram"${s.channels.telegram ? ' hidden' : ''}>${ic('send')}<span><b>Telegram</b><small>Bot et conversation</small></span></button>
+        <button type="button" role="menuitem" data-chan-pick="discord">${ic('discord')}<span><b>Discord</b><small>Un webhook par salon</small></span></button>
+        <button type="button" role="menuitem" data-chan-pick="slack"${s.channels.slack ? ' hidden' : ''}>${ic('slack')}<span><b>Slack</b><small>Webhook entrant</small></span></button>
+        <button type="button" role="menuitem" data-chan-pick="telegram"${s.channels.telegram ? ' hidden' : ''}>${ic('telegram')}<span><b>Telegram</b><small>Bot et conversation</small></span></button>
         <button type="button" role="menuitem" data-chan-pick="email"${s.channels.email ? ' hidden' : ''}>${ic('mail')}<span><b>E-mail</b><small>Une adresse de réception</small></span></button>
       </div>
     </details>
@@ -628,26 +650,33 @@ ${saved ? `<p class="ok-box" role="status">${ic('check')}<span><b>Réglages enre
   <div class="grid2">
     ${s.priced ? `<label class="field"><span class="lbl">Plafond sur 24 h glissantes</span><span class="unit"><input name="budget_day_usd" inputmode="decimal" value="${esc(s.budget_day_usd)}" placeholder="ex. 2"><span>$</span></span></label>
     <label class="field"><span class="lbl">Plafond sur 30 jours glissants</span><span class="unit"><input name="budget_month_usd" inputmode="decimal" value="${esc(s.budget_month_usd)}" placeholder="ex. 30"><span>$</span></span></label>` : ''}
-    <label class="field"><span class="lbl">Modèle pour la prospection</span>${model('prospect_model', s.prospect_model)}</label>
-    <label class="field"><span class="lbl">Modèle pour l'analyse de projet</span>${model('analyze_model', s.analyze_model)}</label>
+    ${model('prospect_model', s.prospect_model, 'Modèle pour la prospection')}
+    ${model('analyze_model', s.analyze_model, "Modèle pour l'analyse de projet")}
+    ${model('write_model', s.write_model, 'Modèle pour la rédaction (mails, relances, posts LinkedIn)')}
   </div>
-  <p class="hint">Haiku suffit pour la plupart des projets. Repasse en Sonnet uniquement si la fiche générée manque de précision.</p>
+  <p class="hint">Haiku suffit pour la plupart des projets : passe à Sonnet ou Opus seulement si les fiches ou les textes manquent de précision. Les estimations (économe, intermédiaire, plus cher) sont relatives : avec ton abonnement elles se voient dans ton quota Claude, avec une clé API dans le prix. Chaque modèle a ses propres prompts, réglables plus bas.</p>
 </section>
 
 <div class="save"><button class="btn primary">Enregistrer</button></div>
-</form>
 
-<section class="card" id="prompts" aria-labelledby="t-prompts">
-  <div class="card-h"><h2 id="t-prompts">Prompts IA</h2><p>Les consignes que Claude reçoit pour chaque tâche. Modifie-les pour changer le style, le ton ou les règles. Le contexte du projet et le format de réponse restent ajoutés automatiquement : un prompt modifié ne peut pas casser la lecture de la réponse. Ce qui est vide revient au texte par défaut.</p></div>
-  ${(s.prompts || []).map((p) => `<details class="prompt-def"${p.custom ? ' open' : ''}>
-    <summary><span>${esc(p.label)}</span>${p.custom ? ' <span class="badge warn">modifié</span>' : ''}</summary>
-    <label class="field"><span class="lbl">Consignes</span>
-      <textarea name="prompt_${p.key}" rows="9" maxlength="${s.promptMax}" data-prompt-text>${esc(p.text)}</textarea></label>
-    <p class="muted small">${esc(p.fixed)}${p.vars.length ? ` Valeurs insérées automatiquement : ${p.vars.map((v) => `<code>[[${v}]]</code>`).join(', ')}.` : ''}</p>
-    <div class="row-actions"><button type="button" class="btn small" data-prompt-reset data-default="${esc(p.def)}">${ic('repeat')}Revenir au texte par défaut</button></div>
+<section class="card" id="prompts" aria-labelledby="t-prompts" data-prompts data-pscope="*">
+  <div class="card-h"><h2 id="t-prompts">Prompts IA</h2><p>Les consignes que Claude reçoit pour chaque tâche. Modifie-les pour changer le style, le ton ou les règles. Le contexte du projet et le format de réponse restent ajoutés automatiquement : un prompt modifié ne peut pas casser la lecture de la réponse.</p></div>
+  <p class="hint">Chaque gamme de modèle a ses propres consignes, adaptées à sa façon de travailler (un petit modèle a besoin d'une méthode pas à pas, un grand d'un peu plus de recul). Un texte écrit dans « Tous les modèles » s'applique à toutes les gammes qui n'ont pas le leur. Ce qui est vide revient au texte par défaut.</p>
+  <div class="pscope-bar" role="group" aria-label="Gamme de modèle">
+    ${s.prompts.scopes.map((sc, i) => `<button type="button" class="pscope-tab" data-pscope-tab="${sc.id}" aria-pressed="${i === 0}">${esc(sc.label)}${sc.count ? ` <span class="badge warn">${sc.count}</span>` : ''}</button>`).join('\n    ')}
+  </div>
+  ${s.prompts.tasks.map((t) => `<details class="prompt-def"${Object.values(t.scopes).some((x) => x.custom) ? ' open' : ''}>
+    <summary><span>${esc(t.label)}</span><span class="muted small">modèle : ${esc(t.uses)}</span>${Object.values(t.scopes).some((x) => x.custom) ? ' <span class="badge warn">modifié</span>' : ''}</summary>
+    ${s.prompts.scopes.map((sc) => `<div class="pscope-box" data-pscope-box="${sc.id}">
+      <label class="field"><span class="lbl">Consignes · ${esc(sc.label)}${t.scopes[sc.id].custom ? ' (modifié)' : ''}</span>
+        <textarea name="${sc.id === '*' ? `prompt_${t.key}` : `prompt_${sc.id}_${t.key}`}" rows="14" maxlength="${s.promptMax}" data-prompt-text>${esc(t.scopes[sc.id].text)}</textarea></label>
+      <div class="row-actions"><button type="button" class="btn small" data-prompt-reset data-default="${esc(t.scopes[sc.id].def)}">${ic('repeat')}Revenir au texte par défaut</button></div>
+    </div>`).join('\n    ')}
+    <p class="muted small">${esc(t.fixed)}${t.vars.length ? ` Valeurs insérées automatiquement : ${t.vars.map((v) => `<code>[[${v}]]</code>`).join(', ')}.` : ''}</p>
   </details>`).join('\n  ')}
   <div class="save"><button class="btn primary">Enregistrer les réglages</button></div>
 </section>
+</form>
 
 <section class="card" id="opposition" aria-labelledby="t-opp">
   <div class="card-h"><h2 id="t-opp">Liste d'opposition</h2></div>

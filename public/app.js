@@ -1,5 +1,28 @@
 // Front vanilla, sans build. Polling léger uniquement sur les projets dépliés.
 (() => {
+  // Ce script peut être relancé sans recharger la page (public/ajax.js remplace le contenu, puis le ré-exécute) : la précédente exécution
+  // est d'abord arrêtée. Tout ce qui est branché sur document, window ou un minuteur passe par listen / every / later, pour pouvoir être retiré.
+  window.AiTools?.dispose?.();
+  let disposed = false;
+  const cleanups = [];
+  const timers = new Set();
+  const listen = (target, type, fn, opts) => { target.addEventListener(type, fn, opts); cleanups.push(() => target.removeEventListener(type, fn, opts)); };
+  const every = (fn, ms) => { const id = setInterval(fn, ms); cleanups.push(() => clearInterval(id)); return id; };
+  // Minuteur de rafraîchissement : ne part plus une fois cette exécution arrêtée, et s'annule avec elle
+  const later = (fn, ms) => {
+    if (disposed) return 0;
+    const id = setTimeout(() => { timers.delete(id); if (!disposed) fn(); }, ms);
+    timers.add(id);
+    return id;
+  };
+  window.AiTools = {
+    toast: (...a) => toast(...a),
+    dispose() { disposed = true; for (const f of cleanups.splice(0)) f(); for (const t of timers) clearTimeout(t); timers.clear(); },
+  };
+  // Rechargement et navigation sans quitter la page quand public/ajax.js est là ; navigation classique sinon
+  const reload = () => (window.AiNav ? window.AiNav.reload() : reload());
+  const go = (url) => (window.AiNav ? window.AiNav.go(url) : (location.href = url));
+
   const $ = (sel, el = document) => el.querySelector(sel);
   const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -9,7 +32,22 @@
   const warmupNotice = (w, count) => (!w?.active || (w.sentToday || 0) + count <= w.perDay ? null
     : `Conseil : ${w.perDay / 2} à ${w.perDay} mails par jour pendant la première semaine protègent la réputation de ton adresse d'envoi (encore ${w.daysLeft} jour${w.daysLeft > 1 ? 's' : ''}). Tu peux quand même envoyer plus.`);
 
+  // Lancement d'une tâche (analyse, recherche, envoi, audit…) : le bouton s'enfonce, puis un petit agent apporte la tâche au menu « Activité »
+  // (public/fx.js). Un seul point d'accroche, ici : toute route qui met un job en file passe par api().
+  const LAUNCH = /^\/api\/(projects\/\d+\/(analyze|template|followup_template|prospect|evolution|code-review|send|linkedin\/generate)|prospects\/\d+\/hook)$/;
+  let lastTrigger = null; // le bouton cliqué (ou validé au clavier) juste avant
+  listen(document, 'click', (e) => { const t = e.target.closest?.('button, a.btn, label.btn'); if (t) lastTrigger = t; }, true);
+  listen(document, 'submit', (e) => { lastTrigger = e.submitter || $('button:not([type=button])', e.target) || lastTrigger; }, true);
+
   async function api(path, body) {
+    const launching = body !== undefined && LAUNCH.test(path);
+    if (launching) window.AiFx?.press(lastTrigger);
+    const data = await call(path, body);
+    if (launching && !data.existing) launched(lastTrigger);
+    return data;
+  }
+
+  async function call(path, body) {
     const r = await fetch(path, body === undefined ? { headers: { Accept: 'application/json' } } : {
       method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(body),
     });
@@ -64,7 +102,7 @@
   $$('input.copy').forEach((i) => i.addEventListener('focus', () => i.select()));
 
   // ---------- Barre du haut : page courante en surbrillance ----------
-  $$('.pills a.pill, .user-pop a').forEach((a) => {
+  $$('.pills a.pill, .user-pop a, .ia-link').forEach((a) => {
     const here = a.pathname === '/' ? location.pathname === '/' : location.pathname === a.pathname || location.pathname.startsWith(`${a.pathname}/`);
     if (here) a.setAttribute('aria-current', 'page');
   });
@@ -93,7 +131,7 @@
       closeTimer = setTimeout(() => { userMenu.open = false; }, 220);
     });
     summary.addEventListener('click', (e) => { if (e.detail > 0 && hover.matches) e.preventDefault(); }); // clic souris : le survol l'a déjà ouvert
-    document.addEventListener('click', (e) => { if (userMenu.open && !userMenu.contains(e.target)) open(false); });
+    listen(document, 'click', (e) => { if (userMenu.open && !userMenu.contains(e.target)) open(false); });
     userMenu.addEventListener('keydown', (e) => { if (e.key === 'Escape' && userMenu.open) { open(false); summary.focus(); } });
   }
 
@@ -115,8 +153,8 @@
       mark(cur.id);
     };
     const schedule = () => { if (!queued) { queued = true; requestAnimationFrame(update); } };
-    addEventListener('scroll', schedule, { passive: true });
-    addEventListener('resize', schedule);
+    listen(window, 'scroll', schedule, { passive: true });
+    listen(window, 'resize', schedule);
     tocLinks.forEach((a) => a.addEventListener('click', () => mark(a.getAttribute('href').slice(1))));
     update();
   }
@@ -191,7 +229,7 @@
         await api('/link/claude/login/code', { id: loginId, code });
         loginId = null;
         closePopup();
-        location.href = '/';
+        go('/');
       } catch (err) {
         // Le serveur a fermé cette connexion (code refusé, expirée) : on repart de l'étape 1 avec le message
         loginId = null; sending = false; closePopup();
@@ -214,8 +252,8 @@
         if (CODE.test(t)) { codeInput.value = t; sendCode(); }
       } catch { /* accès refusé ou non géré : le code se colle à la main */ }
     }
-    window.addEventListener('focus', fromClipboard);
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) fromClipboard(); });
+    listen(window, 'focus', fromClipboard);
+    listen(document, 'visibilitychange', () => { if (!document.hidden) fromClipboard(); });
 
     dlg.addEventListener('close', () => {
       if (loginId) api('/link/claude/login/cancel', { id: loginId }).catch(() => {});
@@ -278,14 +316,14 @@
   const fmtWhen = (ts) => new Date(ts * 1000).toLocaleString('fr-FR', { weekday: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
   const plural = (n, w) => `${n} ${w}${n > 1 ? 's' : ''}`;
 
-  function jobItem(j) {
+  function jobItem(j, isNew = false) {
     const p = j.progress || {};
     const scheduled = j.status === 'queued' && j.runAfter && j.runAfter * 1000 > Date.now();
     const running = j.status === 'running';
     const v = running ? pctOf(p) : null;
     const state = scheduled ? `Programmé ${fmtWhen(j.runAfter)}` : running ? `Démarré ${ago(j.startedAt)}` : 'En file d\'attente';
     const msg = p.message || (running ? 'En cours…' : '');
-    return `<div class="jitem j-${scheduled ? 'scheduled' : j.status}">
+    return `<div class="jitem j-${scheduled ? 'scheduled' : j.status}${isNew ? ' new' : ''}">
       <div class="jrow">${scheduled ? '<span class="moon" aria-hidden="true"></span>' : running ? '<span class="pulse" aria-hidden="true"></span>' : '<span class="dot-wait" aria-hidden="true"></span>'}
         <strong>${esc(LABELS[j.type] || j.type)}</strong><span class="jproj">${j.project ? esc(j.project) : ''}</span>${v !== null ? `<span class="jpct">${v} %</span>` : ''}</div>
       ${msg ? `<div class="jmsg small muted">${esc(msg)}</div>` : ''}
@@ -295,9 +333,13 @@
     </div>`;
   }
 
+  let jobsSeen = null; // jobs déjà vus dans le menu : un job qui apparaît ensuite est mis en évidence un instant
   function renderJobsMenu(s) {
     if (!jobsBox) return;
     const list = s.jobs || [];
+    const ids = list.map((j) => j.id);
+    const fresh = new Set(jobsSeen ? ids.filter((id) => !jobsSeen.has(id)) : []);
+    jobsSeen = new Set([...(jobsSeen || []), ...ids]);
     jobsBox.hidden = !list.length;
     if (!list.length) { if (jobsOpen()) toggleJobs(false); return; }
     $('.spin-inline', jobsBtn).hidden = !s.queue;
@@ -307,7 +349,7 @@
     const running = list.filter((j) => j.status === 'running').length;
     $('[data-jobs-sub]', jobsPop).textContent = `${running} en cours · ${list.length - running} en attente`;
     // Redessine seulement si le contenu change : sinon l'animation d'apparition rejouerait à chaque poll
-    const html = list.map(jobItem).join('');
+    const html = list.map((j) => jobItem(j, fresh.has(j.id))).join('');
     const box = $('[data-jobs-list]', jobsPop);
     if (box._html === html) return;
     box._html = html;
@@ -327,18 +369,23 @@
     }
   }
   jobsBtn?.addEventListener('click', () => toggleJobs());
-  document.addEventListener('click', (e) => {
+  // Barre du haut hors de l'écran (page défilée) : le bouton « Activité » reste épinglé en haut à droite, avec son menu et la destination de l'agent
+  const topBar = $('.top');
+  if (jobsBox && topBar && 'IntersectionObserver' in window) {
+    new IntersectionObserver(([en]) => document.body.classList.toggle('hdr-off', !en.isIntersecting)).observe(topBar);
+  }
+  listen(document, 'click', (e) => {
     if (jobsOpen() && !e.target.closest('#jobs')) toggleJobs(false);
     const go = e.target.closest('[data-goto]');
     if (!go) return;
     sessionStorageSet('openProject', go.dataset.goto);
     const d = $(`details.project[data-id="${go.dataset.goto}"]`);
-    if (!d) { location.href = '/'; return; }
+    if (!d) { go('/'); return; }
     toggleJobs(false);
     d.open = true;
     d.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && jobsOpen()) { toggleJobs(false); jobsBtn.focus(); } });
+  listen(document, 'keydown', (e) => { if (e.key === 'Escape' && jobsOpen()) { toggleJobs(false); jobsBtn.focus(); } });
 
   let sysTimer;
   async function refreshSys() {
@@ -357,9 +404,22 @@
       busy = s.queue > 0;
     } catch { /* silencieux */ }
     // Plus réactif quand quelque chose tourne ou que le menu est ouvert
-    sysTimer = setTimeout(refreshSys, jobsOpen() ? 3000 : busy ? 6000 : 30_000);
+    sysTimer = later(refreshSys, jobsOpen() ? 3000 : busy ? 6000 : 30_000);
   }
   refreshSys();
+
+  // Une tâche vient d'être mise en file : le menu « Activité » se met à jour, l'agent y arrive avec sa brouette, puis le menu s'ouvre
+  // quelques secondes sur la liste des tâches en cours et à venir (comme la bulle de téléchargement de Chrome).
+  let activityTimer;
+  function showActivity() {
+    if (!jobsBox || jobsBox.hidden) return;
+    toggleJobs(true);
+    clearTimeout(activityTimer);
+    activityTimer = setTimeout(() => { if (jobsOpen() && !jobsPop.matches(':hover') && !jobsPop.contains(document.activeElement)) toggleJobs(false); }, 5500);
+  }
+  function launched(trigger) {
+    refreshSys().then(() => (window.AiFx ? window.AiFx.launch(trigger) : null)).then(showActivity).catch(() => {});
+  }
 
   // ---------- Rendu d'un job ----------
   function renderJob(box, job, type) {
@@ -446,7 +506,7 @@
     if (an && ACTIVE.includes(an.status)) st.analyzing = true;
     else if (st.analyzing && an) {
       st.analyzing = false;
-      if (an.status === 'done') { toast('Analyse terminée'); location.reload(); return; }
+      if (an.status === 'done') { toast('Analyse terminée'); reload(); return; }
       if (an.status === 'error') toast(`Analyse en échec : ${an.error}`, 'error');
     }
     if (an?.status === 'error' && !s.hasProfile) $('.profile p', el).outerHTML = `<p class="error small">${esc(an.error)}</p>`;
@@ -516,7 +576,7 @@
   function schedule(el, ms) {
     const st = state.get(el.dataset.id) || {};
     clearTimeout(st.timer);
-    st.timer = el.open ? setTimeout(() => refreshProject(el), ms) : null;
+    st.timer = el.open ? later(() => refreshProject(el), ms) : null;
     state.set(el.dataset.id, st);
   }
 
@@ -615,7 +675,7 @@
     if (start) focusTodo(start);
     projects.forEach((el) => el.addEventListener('toggle', () => { if (el.open) focusTodo(el); }));
     // La pastille « config » du projet rappelle la liste, même après l'avoir masquée
-    document.addEventListener('click', (e) => {
+    listen(document, 'click', (e) => {
       const badge = e.target.closest('[data-cfg]');
       const el = badge?.closest('details.project');
       if (!el) return;
@@ -676,7 +736,7 @@
   })();
 
   // ---------- Corbeilles : marquer un élément « à retirer » (annulable), retiré à l'enregistrement ----------
-  document.addEventListener('click', (e) => {
+  listen(document, 'click', (e) => {
     const btn = e.target.closest('[data-trash]');
     if (!btn) return;
     const wrap = btn.closest('.trash-wrap');
@@ -690,7 +750,7 @@
   });
 
   // ---------- Développeur : copier le jeton affiché une seule fois ----------
-  document.addEventListener('click', async (e) => {
+  listen(document, 'click', async (e) => {
     const b = e.target.closest('[data-copy-token]');
     if (!b) return;
     const code = $('[data-token]');
@@ -698,13 +758,35 @@
     catch { const r = document.createRange(); r.selectNodeContents(code); getSelection().removeAllRanges(); getSelection().addRange(r); toast('Sélectionné : copie-le avec Ctrl+C', 'error'); }
   });
 
-  // ---------- Réglages : revenir au prompt par défaut ----------
-  document.addEventListener('click', (e) => {
+  // ---------- Réglages : prompts par gamme de modèle ----------
+  // Onglets « Tous les modèles / Haiku / Sonnet / Opus / Fable » : un seul texte visible par tâche (les autres restent dans le formulaire).
+  listen(document, 'click', (e) => {
+    const tab = e.target.closest('[data-pscope-tab]');
+    if (!tab) return;
+    const card = tab.closest('[data-prompts]');
+    card.dataset.pscope = tab.dataset.pscopeTab;
+    for (const t of $$('[data-pscope-tab]', card)) t.setAttribute('aria-pressed', String(t === tab));
+  });
+  listen(document, 'click', (e) => {
     const b = e.target.closest('[data-prompt-reset]');
     if (!b) return;
-    const ta = $('[data-prompt-text]', b.closest('.prompt-def'));
+    const ta = $('[data-prompt-text]', b.closest('.pscope-box'));
     ta.value = b.dataset.default;
     ta.focus();
+  });
+  // Un texte que l'utilisateur n'a pas touché n'est pas renvoyé : il ne fige pas une gamme sur l'ancien défaut quand « Tous les modèles » change
+  listen(document, 'submit', (e) => {
+    for (const ta of $$('[data-prompt-text]', e.target)) if (ta.value === ta.defaultValue) ta.disabled = true;
+  });
+
+  // ---------- Réglages : choix du modèle (liste recommandée + autres) ----------
+  listen(document, 'change', (e) => {
+    const r = e.target.closest('[data-modelpick] input[type=radio]');
+    if (!r) return;
+    const box = r.closest('[data-modelpick]');
+    $('[data-mp-name]', box).textContent = r.dataset.mpLabel;
+    $('[data-mp-tier-out]', box).textContent = r.dataset.mpTier;
+    box.querySelector('details').open = false;
   });
 
   // ---------- Réglages : notifications, le « + » ouvre le menu des services ----------
@@ -727,7 +809,7 @@
     };
     const focusIn = (el) => { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); $('input:not([type="hidden"]):not([type="checkbox"])', el)?.focus({ preventScroll: true }); };
 
-    document.addEventListener('click', (e) => {
+    listen(document, 'click', (e) => {
       const pick = e.target.closest('[data-chan-pick]');
       if (pick) {
         menu.open = false;
@@ -766,7 +848,7 @@
       // un clic ailleurs referme le menu
       if (menu.open && !e.target.closest('[data-addmenu]')) menu.open = false;
     });
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && menu.open) { menu.open = false; $('summary', menu).focus(); } });
+    listen(document, 'keydown', (e) => { if (e.key === 'Escape' && menu.open) { menu.open = false; $('summary', menu).focus(); } });
   })();
 
   // ---------- Réglages : tester le token GitHub ----------
@@ -874,7 +956,7 @@
     box.innerHTML = `${head}${targetHtml}${gen}${draftHtml}${hist}`;
   }
 
-  document.addEventListener('click', async (e) => {
+  listen(document, 'click', async (e) => {
     const t = e.target.closest('[data-li-generate],[data-li-save],[data-li-copy],[data-li-publish],[data-li-schedule],[data-li-unschedule],[data-li-disconnect],[data-li-pages],[data-li-target-save],[data-li-pages-refresh]');
     if (!t) return;
     const proj = t.closest('.project');
@@ -940,7 +1022,7 @@
       }
     } catch (err) { toast(err.message, 'error'); t.disabled = false; }
   });
-  document.addEventListener('input', (e) => {
+  listen(document, 'input', (e) => {
     const area = e.target.closest('[data-li-body]');
     if (area) $('[data-li-count]', area.closest('.project')).textContent = area.value.length;
   });
@@ -960,7 +1042,7 @@
   // ---------- Sections dépliables animées ----------
   // <details class="anim"> : la hauteur du bloc qui suit le <summary> glisse à l'ouverture et à la fermeture.
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
-  document.addEventListener('click', (e) => {
+  listen(document, 'click', (e) => {
     const sum = e.target.closest('summary');
     const d = sum?.parentElement;
     const body = sum?.nextElementSibling;
@@ -990,7 +1072,7 @@
   // Le récap se charge à l'ouverture de sa section
   $$('details[data-acc="recap"]').forEach((d) => d.addEventListener('toggle', () => { if (d.open) loadRecap(d.closest('.project')); }));
 
-  document.addEventListener('click', async (e) => {
+  listen(document, 'click', async (e) => {
     const copy = e.target.closest('[data-copy-md]');
     if (copy) {
       const md = copy.closest('.job')?._markdown || '';
@@ -1051,7 +1133,7 @@
   });
 
   // ---------- Formulaires ----------
-  document.addEventListener('submit', async (e) => {
+  listen(document, 'submit', async (e) => {
     const form = e.target.closest('form[data-action]');
     if (!form) return;
     e.preventDefault();
@@ -1067,10 +1149,10 @@
         case 'create': {
           const r = await api('/api/projects', data);
           toast('Projet créé, analyse lancée');
-          setTimeout(() => location.reload(), 600);
+          setTimeout(() => reload(), 600);
           break;
         }
-        case 'target': await api(`/api/projects/${id}/target`, data); toast('Cible validée'); setTimeout(() => location.reload(), 500); break;
+        case 'target': await api(`/api/projects/${id}/target`, data); toast('Cible validée'); setTimeout(() => reload(), 500); break;
         case 'prospect': {
           const r = await api(`/api/projects/${id}/prospect`, data);
           toast(r.budgetBlocked ? `En file, mais ${r.budgetBlocked}` : r.existing ? 'Une recherche est déjà prévue ou en cours' : data.when === 'night' ? 'Recherche programmée cette nuit' : 'Recherche lancée en arrière-plan', r.budgetBlocked ? 'error' : 'ok');
@@ -1118,7 +1200,7 @@
           break;
         }
         case 'db': data.ssl = form.ssl.checked; await api(`/api/projects/${id}/db`, data); toast('Accès BDD enregistré'); form.password.value = ''; break;
-        case 'delete': await api(`/api/projects/${id}/delete`, {}); location.reload(); break;
+        case 'delete': await api(`/api/projects/${id}/delete`, {}); reload(); break;
       }
       if (proj) refreshProject(proj);
     } catch (err) {
@@ -1206,7 +1288,7 @@
   }
 
   // Survol : réticule + infobulle (souris et tactile)
-  document.addEventListener('pointermove', (e) => {
+  listen(document, 'pointermove', (e) => {
     const svg = e.target.closest?.('.chart svg');
     const fig = svg?.closest('.chart');
     // L'attribut hidden n'agit pas sur les éléments SVG : on passe par une classe
@@ -1263,12 +1345,12 @@
     $$('.chart', box).forEach((fig) => { if (fig.querySelector('.plot')) drawChart(fig); });
   }
 
-  document.addEventListener('click', (e) => {
+  listen(document, 'click', (e) => {
     const b = e.target.closest('[data-days]');
     if (b) loadHistory(b.closest('.project'), Number(b.dataset.days));
   });
   let resizeT;
-  window.addEventListener('resize', () => {
+  listen(window, 'resize', () => {
     clearTimeout(resizeT);
     resizeT = setTimeout(() => $$('.chart .plot').forEach((p) => drawChart(p.closest('.chart'))), 150);
   });
@@ -1409,7 +1491,7 @@
     });
   }
   // Import CSV : Excel enregistre souvent en Windows-1252, on détecte pour ne pas abîmer les accents
-  document.addEventListener('change', async (e) => {
+  listen(document, 'change', async (e) => {
     const input = e.target.closest('[data-import]');
     if (!input?.files?.length) return;
     const file = input.files[0];
@@ -1431,7 +1513,7 @@
     } catch (err) { report.innerHTML = ''; toast(err.message, 'error'); }
   });
 
-  document.addEventListener('click', (e) => {
+  listen(document, 'click', (e) => {
     const b = e.target.closest('[data-open-prospect]');
     if (b) openProspect(b.dataset.openProspect);
   });
@@ -1488,22 +1570,22 @@
     try { await api(`/api/prospects/${id}/status`, { status }); toast('Statut mis à jour'); } catch (err) { toast(err.message, 'error'); }
     loadProspects(d);
   };
-  document.addEventListener('dragstart', (e) => {
+  listen(document, 'dragstart', (e) => {
     const c = e.target.closest?.('[data-card]');
     if (!c) return;
     e.dataTransfer.setData('text/plain', c.dataset.card);
     e.dataTransfer.effectAllowed = 'move';
     c.classList.add('drag');
   });
-  document.addEventListener('dragend', (e) => { e.target.closest?.('[data-card]')?.classList.remove('drag'); $$('.kcol.over').forEach((c) => c.classList.remove('over')); });
-  document.addEventListener('dragover', (e) => {
+  listen(document, 'dragend', (e) => { e.target.closest?.('[data-card]')?.classList.remove('drag'); $$('.kcol.over').forEach((c) => c.classList.remove('over')); });
+  listen(document, 'dragover', (e) => {
     const col = e.target.closest?.('.kcol');
     if (!col) return;
     e.preventDefault();
     $$('.kcol.over').forEach((c) => { if (c !== col) c.classList.remove('over'); });
     col.classList.add('over');
   });
-  document.addEventListener('drop', (e) => {
+  listen(document, 'drop', (e) => {
     const col = e.target.closest?.('.kcol');
     if (!col) return;
     e.preventDefault();
@@ -1531,7 +1613,7 @@
       if (b) loadProspects(d, Number(b.dataset.page));
     });
   });
-  document.addEventListener('change', async (e) => {
+  listen(document, 'change', async (e) => {
     const sel = e.target.closest('[data-prospect]');
     if (!sel) return;
     if (sel.value === 'refused' && !confirm('Marquer en refus ajoute l\'adresse à la liste d\'opposition. Continuer ?')) return;
@@ -1587,7 +1669,7 @@
     row.append(g, i);
     box.append(p, row);
   }
-  document.addEventListener('click', async (e) => {
+  listen(document, 'click', async (e) => {
     const btn = e.target.closest('[data-ev-add]');
     if (!btn) return;
     const box = btn.closest('[data-suggest]');
@@ -1657,14 +1739,14 @@
       }
     } catch { /* hors ligne ou session expirée : la prochaine requête le dira */ }
   }
-  if ($('.top')) { pollReplies(); setInterval(pollReplies, 45_000); document.addEventListener('visibilitychange', () => { if (!document.hidden) pollReplies(); }); }
-  document.addEventListener('click', async (e) => {
+  if ($('.top')) { pollReplies(); every(pollReplies, 45_000); listen(document, 'visibilitychange', () => { if (!document.hidden) pollReplies(); }); }
+  listen(document, 'click', async (e) => {
     const c = e.target.closest('[data-copy-draft]');
     if (c) { copyText($('[data-draft]', c.closest('.reply-body')).value, c); return; }
     const s = e.target.closest('[data-reply-seen]');
     if (s) { await markSeen(s.dataset.replySeen); s.closest('.reply-row')?.classList.remove('unseen'); s.remove(); pollReplies(); }
   });
-  document.addEventListener('change', (e) => { if (e.target.matches('[data-autosubmit]')) e.target.form.submit(); });
+  listen(document, 'change', (e) => { if (e.target.matches('[data-autosubmit]')) e.target.form.requestSubmit(); });
 
   // ---------- Fond : constellation de particules qui fuient la souris ----------
   // Canvas 2D, ~90 points max : léger. Coupé quand l'onglet est caché, figé si l'OS demande moins d'animations.
@@ -1729,24 +1811,25 @@
         ctx.beginPath(); ctx.arc(p.x, p.y, p.r + glow * 1.5, 0, Math.PI * 2); ctx.fill();
       }
     }
+    cleanups.push(() => cancelAnimationFrame(raf));
     const loop = () => { step(); draw(); raf = requestAnimationFrame(loop); };
     const start = () => { cancelAnimationFrame(raf); if (reduceMotion.matches) draw(); else raf = requestAnimationFrame(loop); };
 
-    window.addEventListener('pointermove', (e) => { mouse.x = e.clientX; mouse.y = e.clientY; }, { passive: true });
-    document.addEventListener('pointerleave', () => { mouse.x = mouse.y = -1e4; });
-    window.addEventListener('blur', () => { mouse.x = mouse.y = -1e4; });
+    listen(window, 'pointermove', (e) => { mouse.x = e.clientX; mouse.y = e.clientY; }, { passive: true });
+    listen(document, 'pointerleave', () => { mouse.x = mouse.y = -1e4; });
+    listen(window, 'blur', () => { mouse.x = mouse.y = -1e4; });
     // Un clic souffle les particules alentour
-    window.addEventListener('pointerdown', (e) => {
+    listen(window, 'pointerdown', (e) => {
       for (const p of pts) {
         const dx = p.x - e.clientX, dy = p.y - e.clientY, d = Math.hypot(dx, dy);
         if (d < 240 && d > 0.5) { const f = (1 - d / 240) * 5; p.vx += (dx / d) * f; p.vy += (dy / d) * f; }
       }
     }, { passive: true });
     let rt;
-    window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { resize(); start(); }, 120); });
-    document.addEventListener('visibilitychange', () => { if (document.hidden) cancelAnimationFrame(raf); else start(); });
-    matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readColor);
-    reduceMotion.addEventListener('change', start);
+    listen(window, 'resize', () => { clearTimeout(rt); rt = setTimeout(() => { resize(); start(); }, 120); });
+    listen(document, 'visibilitychange', () => { if (document.hidden) cancelAnimationFrame(raf); else start(); });
+    listen(matchMedia('(prefers-color-scheme: dark)'), 'change', readColor);
+    listen(reduceMotion, 'change', start);
     readColor(); resize(); start();
   })();
 })();
