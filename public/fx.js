@@ -1,6 +1,6 @@
 // Lancement d'une tâche : le bouton « s'enfonce », puis un petit agent Claude pousse une brouette jusqu'au menu « Activité » (en haut à droite),
 // qui s'ouvre un instant sur la liste des tâches en cours et à venir, comme la bulle de téléchargement de Chrome.
-// Tout est dessiné en SVG et animé avec l'API Web Animations : rien en style="" (CSP). Aucun écouteur global : le module ne fait rien tant qu'on ne l'appelle pas.
+// Tout est dessiné en SVG et animé avec l'API Web Animations : aucun attribut de style dans le balisage (CSP). Aucun écouteur global : le module ne fait rien tant qu'on ne l'appelle pas.
 (() => {
   const calm = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
   const NS = 'http://www.w3.org/2000/svg';
