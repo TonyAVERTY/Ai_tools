@@ -8,6 +8,7 @@ import { assertCanRunAi } from './claudelink.js';
 import { budgetState } from './services/budget.js';
 import {
   linkedinAvailable, linkedinAccount, disconnectLinkedin, startLinkedin, finishLinkedin, listPosts, editDraft, publishPost, NOT_CONFIGURED, MAX_POST,
+  listLinkedinPages, setLinkedinTarget,
 } from './linkedin.js';
 
 export function registerLinkedinRoutes(router, app, { project, aiOpts }) {
@@ -35,9 +36,26 @@ export function registerLinkedinRoutes(router, app, { project, aiOpts }) {
     const p = await project(ctx);
     json(ctx.res, {
       configured: linkedinAvailable(cfg), canManage: p.access !== 'member', hasProfile: !!p.profile,
+      // Publier sur une page : activé quand l'application LinkedIn a les droits « page » (LINKEDIN_SCOPES)
+      pagesEnabled: cfg.linkedin?.pages === true,
       account: await linkedinAccount(db, p.id), posts: await listPosts(db, p.id), maxLength: MAX_POST,
     });
   });
+
+  // Les pages que le compte relié administre, et celle où partent les posts. Lecture réservée aux administrateurs du projet.
+  router.get('/api/projects/:id/linkedin/pages', async (ctx) => {
+    const p = await project(ctx, { need: 'admin' });
+    if (cfg.linkedin?.pages !== true) throw new HttpError(400, "Publier sur une page n'est pas activé sur ce service : l'application LinkedIn doit avoir l'accès « Community Management API » (LINKEDIN_SCOPES).", { expose: true });
+    const pages = await listLinkedinPages(app, p.id, { refresh: ctx.url?.searchParams?.get('refresh') === '1' });
+    json(ctx.res, { pages, target: (await linkedinAccount(db, p.id))?.target ?? null });
+  }, LIMIT);
+
+  router.post('/api/projects/:id/linkedin/target', async (ctx) => {
+    const p = await project(ctx, { need: 'admin' });
+    const b = await readBody(ctx.req);
+    const page = await setLinkedinTarget(app, p.id, b.urn);
+    json(ctx.res, { ok: true, target: page });
+  }, LIMIT);
 
   router.post('/api/projects/:id/linkedin/generate', async (ctx) => {
     const p = await project(ctx);

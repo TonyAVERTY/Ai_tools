@@ -26,16 +26,35 @@ function appleConfig() {
 }
 
 // Google reCAPTCHA v3 sur le démarrage de la connexion : les deux clés ensemble, ou aucune (reCAPTCHA désactivé, développement)
+// Droits LinkedIn que l'application peut demander (liste fermée : une faute de frappe fait échouer toutes les connexions)
+const LINKEDIN_SCOPES = ['openid', 'profile', 'email', 'w_member_social', 'w_organization_social', 'rw_organization_admin', 'r_organization_admin', 'r_organization_social'];
+
 /**
  * LinkedIn (connexion d'un compte à un projet, publication de posts). Désactivé sans clés : il faut une application sur
  * developer.linkedin.com avec les produits « Sign In with LinkedIn using OpenID Connect » et « Share on LinkedIn ».
+ *
+ * Publier sur une PAGE demande la « Community Management API », qui doit être le seul produit de son application (LinkedIn
+ * grise la demande sinon) : cette application-là n'a ni OpenID ni « Share ». Les droits demandés sont donc réglables
+ * (LINKEDIN_SCOPES), avec par défaut ceux d'une publication sur le profil. Une page demande au moins w_organization_social
+ * (publier) et rw_organization_admin ou r_organization_admin (lister les pages administrées).
  */
 function linkedinConfig(appUrl) {
   const clientId = (env.LINKEDIN_CLIENT_ID || '').trim();
   const clientSecret = (env.LINKEDIN_CLIENT_SECRET || '').trim();
   if (!clientId && !clientSecret) return null;
   if (!clientId || !clientSecret) throw new Error('LinkedIn : LINKEDIN_CLIENT_ID et LINKEDIN_CLIENT_SECRET vont ensemble');
-  return { clientId, clientSecret, redirectUri: (env.LINKEDIN_REDIRECT_URI || `${appUrl}/linkedin/callback`).trim() };
+  const scopes = [...new Set((env.LINKEDIN_SCOPES || 'openid profile w_member_social').split(/[\s,]+/).filter(Boolean))];
+  const unknown = scopes.filter((s) => !LINKEDIN_SCOPES.includes(s));
+  if (unknown.length) throw new Error(`LinkedIn : LINKEDIN_SCOPES contient des droits inconnus (${unknown.join(', ')}). Autorisés : ${LINKEDIN_SCOPES.join(', ')}`);
+  if (!scopes.some((s) => s === 'w_member_social' || s === 'w_organization_social')) throw new Error('LinkedIn : LINKEDIN_SCOPES doit contenir w_member_social (profil) ou w_organization_social (page)');
+  const apiVersion = (env.LINKEDIN_API_VERSION || '202604').trim();
+  if (!/^\d{6}$/.test(apiVersion)) throw new Error('LinkedIn : LINKEDIN_API_VERSION doit être au format AAAAMM (ex. 202604)');
+  return {
+    clientId, clientSecret, redirectUri: (env.LINKEDIN_REDIRECT_URI || `${appUrl}/linkedin/callback`).trim(),
+    scopes, apiVersion,
+    // Publier sur une page : le droit d'écrire pour elle, et de lister celles que le compte administre
+    pages: scopes.includes('w_organization_social') && (scopes.includes('rw_organization_admin') || scopes.includes('r_organization_admin')),
+  };
 }
 
 function recaptchaConfig() {

@@ -535,6 +535,23 @@ export const MIGRATIONS = [
       ) ${T}`,
     ],
   },
+  {
+    // LinkedIn : publier sur une page. Le compte relié garde les droits accordés (scope) et la cible choisie (NULL = le profil) ;
+    // chaque post publié garde le nom de l'endroit où il est parti.
+    name: 'linkedin_pages',
+    sqlite: [
+      'ALTER TABLE linkedin_accounts ADD COLUMN scope TEXT',
+      'ALTER TABLE linkedin_accounts ADD COLUMN target_urn TEXT',
+      'ALTER TABLE linkedin_accounts ADD COLUMN target_name TEXT',
+      'ALTER TABLE linkedin_posts ADD COLUMN author_name TEXT',
+    ],
+    mysql: [
+      { sql: 'ALTER TABLE linkedin_accounts ADD COLUMN scope VARCHAR(600) NULL', when: colMissing('linkedin_accounts', 'scope') },
+      { sql: 'ALTER TABLE linkedin_accounts ADD COLUMN target_urn VARCHAR(100) NULL', when: colMissing('linkedin_accounts', 'target_urn') },
+      { sql: 'ALTER TABLE linkedin_accounts ADD COLUMN target_name VARCHAR(255) NULL', when: colMissing('linkedin_accounts', 'target_name') },
+      { sql: 'ALTER TABLE linkedin_posts ADD COLUMN author_name VARCHAR(255) NULL', when: colMissing('linkedin_posts', 'author_name') },
+    ],
+  },
 ];
 
 // ---------- Aides de la migration 2 ----------
