@@ -2,7 +2,7 @@
 import { absoluteUrl } from './layout.js';
 
 /** Pages publiques à indexer (et seulement elles) : alimentent le sitemap et l'exception du noindex. */
-export const INDEXABLE_PATHS = ['/', '/fonctionnement', '/tarifs', '/mentions-legales', '/confidentialite', '/cgu'];
+export const INDEXABLE_PATHS = ['/', '/fonctionnement', '/tarifs', '/docs', '/docs/api', '/docs/mcp', '/mentions-legales', '/confidentialite', '/cgu'];
 
 // Pages d'application : jamais explorées (le noindex des pages est posé en plus, par en-tête et par balise)
 export const DISALLOWED_PATHS = ['/admin', '/account', '/settings', '/mails', '/calendar', '/cal/', '/developer', '/link', '/api/', '/auth/', '/u/', '/logout'];

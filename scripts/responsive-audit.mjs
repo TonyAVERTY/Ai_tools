@@ -30,7 +30,7 @@ await setDeveloperMode(s.db, u.id, true); await createApiToken(s.db, u.id, { nam
 await createFeed(s.app, u.id);
 const team = Number((await s.db.prepare("INSERT INTO teams(owner_id, name, created_at) VALUES(?, 'Équipe', ?)").run(u.id, now())).lastInsertRowid);
 await s.db.prepare("INSERT INTO team_members(team_id, user_id, role, created_at) VALUES(?, ?, 'member', ?)").run(team, other.id, now());
-const PUBLIC = ['/', '/fonctionnement', '/tarifs', '/mentions-legales', '/confidentialite', '/cgu', '/login', '/page-inconnue'];
+const PUBLIC = ['/', '/fonctionnement', '/tarifs', '/docs', '/docs/api', '/docs/mcp', '/mentions-legales', '/confidentialite', '/cgu', '/login', '/page-inconnue'];
 const APP = ['/', '/settings', '/account', '/mails', '/mails?v=replies', '/calendar', '/team', '/developer', '/admin', '/link'];
 const b = await chromium.launch(process.env.PLAYWRIGHT_CHROMIUM ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM } : {});
 const bad = [];
@@ -51,7 +51,8 @@ const probe = (W) => {
   const scrollers = [];
   for (const el of document.querySelectorAll('body *')) {
     const cs = getComputedStyle(el);
-    if (['auto', 'scroll'].includes(cs.overflowX) && el.scrollWidth > el.clientWidth + 1 && el.clientWidth > 0 && cs.position !== 'fixed') scrollers.push(`${el.tagName.toLowerCase()}${el.className && typeof el.className === 'string' ? '.' + el.className.trim().split(/\s+/).slice(0, 2).join('.') : ''} (${el.scrollWidth}>${el.clientWidth})`);
+    // un bloc de code qui défile dans son cadre est normal ; une page ou un tableau, non
+    if (el.tagName !== 'PRE' && ['auto', 'scroll'].includes(cs.overflowX) && el.scrollWidth > el.clientWidth + 1 && el.clientWidth > 0 && cs.position !== 'fixed') scrollers.push(`${el.tagName.toLowerCase()}${el.className && typeof el.className === 'string' ? '.' + el.className.trim().split(/\s+/).slice(0, 2).join('.') : ''} (${el.scrollWidth}>${el.clientWidth})`);
   }
   // Champs en dessous de 16 px : iOS zoome au focus et la page se met à défiler de côté
   const small = [...document.querySelectorAll('input:not([type=hidden]):not([type=checkbox]):not([type=radio]), select, textarea')].filter((e) => e.getBoundingClientRect().width && parseFloat(getComputedStyle(e).fontSize) < 16).length;
