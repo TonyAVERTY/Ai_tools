@@ -396,3 +396,23 @@ test('ruban de page sur toutes les pages du site (pas sur le dashboard), vrais l
   } finally { await apple.close(); }
   assert.match(read('public/site.css'), /\[hidden\] \{ display: none !important; \}/, 'un bouton « hidden » (réessayer la vérification) ne s\'affiche jamais par erreur');
 });
+
+test('connecté : « Connexion » et « Créer mon compte » deviennent « Dashboard » sur le site public', async () => {
+  const { startApp } = await import('./helpers/server.js');
+  const s = await startApp();
+  try {
+    const u = await s.newUser();
+    for (const path of ['/tarifs', '/fonctionnement', '/docs', '/cgu', '/page-inconnue']) {
+      const guest = await (await s.anon.get(path, { headers: { accept: 'text/html' } })).text();
+      assert.match(guest, /Créer mon compte/, `${path} visiteur`);
+      assert.doesNotMatch(guest, />Dashboard</, `${path} visiteur`);
+      const res = await u.get(path, { headers: { accept: 'text/html' } });
+      const page = await res.text();
+      assert.match(res.headers.get('vary') || '', /Cookie/i, `${path} Vary`);
+      assert.doesNotMatch(page, /Créer mon compte|>Connexion</, `${path} connecté`);
+      assert.doesNotMatch(page, /x-guest/, `${path} repères retirés`);
+      assert.match(page, /<a class="btn btn-primary" href="\/">Dashboard<\/a>/, `${path} bouton`);
+    }
+    assert.match(await (await s.anon.get('/tarifs', { headers: { accept: 'text/html' } })).text(), /<x-guest data-k="cta">/, 'repères présents côté visiteur');
+  } finally { await s.close(); }
+});

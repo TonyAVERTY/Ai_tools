@@ -35,6 +35,21 @@ export function absoluteUrl(appUrl, path) {
  * @param {object} [o.jsonLd]    données structurées (bloc de données, non exécuté : compatible avec la CSP)
  * @param {string[]} [o.scripts] scripts de l'application (chemins /static/…) ; aucun par défaut
  */
+// Contenu réservé aux visiteurs : entouré de repères, que withViewer() remplace pour quelqu'un déjà connecté
+export const guest = (key, markup) => `<x-guest data-k="${key}">${markup}</x-guest>`;
+const MEMBER = {
+  cta: '<a class="btn btn-primary" href="/">Dashboard</a>',
+  foot: '<li><a href="/">Dashboard</a></li>',
+  plan: '<a class="btn btn-primary" href="/">Ouvrir le dashboard</a>',
+  big: `<a class="btn btn-primary btn-lg" href="/">Dashboard${ic('arrow')}</a>`,
+};
+
+/** Page du site public vue par un compte connecté : « Connexion » et « Créer mon compte » deviennent « Dashboard ». */
+export function withViewer(page, signedIn) {
+  if (!signedIn) return page;
+  return page.replace(/<x-guest data-k="(\w+)">[\s\S]*?<\/x-guest>/g, (_, key) => MEMBER[key] ?? '');
+}
+
 export function siteLayout({ appUrl, path, title, description, body, noindex = false, jsonLd = null, scripts = [] }) {
   const url = absoluteUrl(appUrl, path === '/' ? '/' : path);
   const year = new Date().getFullYear();
@@ -80,8 +95,8 @@ ${SPRITE}
       ${NAV.map(([href, label]) => `<a href="${href}"${here(href)}>${esc(label)}</a>`).join('\n      ')}
     </nav>
     <div class="top-cta">
-      <a class="btn btn-secondary" href="/login"${here('/login')}>Connexion</a>
-      <a class="btn btn-primary" href="/login">Créer mon compte</a>
+      ${guest('cta', `<a class="btn btn-secondary" href="/login"${here('/login')}>Connexion</a>
+      <a class="btn btn-primary" href="/login">Créer mon compte</a>`)}
     </div>
   </div>
 </header>
@@ -95,7 +110,7 @@ ${body}
       <nav aria-label="Produit"><h3>Produit</h3><ul>
         <li><a href="/">Accueil</a></li>
         ${NAV.map(([href, label]) => `<li><a href="${href}"${here(href)}>${esc(label)}</a></li>`).join('\n        ')}
-        <li><a href="/login">Connexion</a></li>
+        ${guest('foot', '<li><a href="/login">Connexion</a></li>')}
       </ul></nav>
       <nav aria-label="Informations"><h3>Infos</h3><ul>
         <li><a href="/mentions-legales"${here('/mentions-legales')}>Mentions légales</a></li>

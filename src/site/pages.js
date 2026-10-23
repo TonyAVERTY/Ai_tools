@@ -3,7 +3,7 @@
 // rien ici ne promet un résultat, rien n'est chiffré au-delà de ce que le code fait réellement.
 import { esc } from '../http.js';
 import { brandMark } from '../assets.js';
-import { siteLayout, ic, CONTACT_EMAIL } from './layout.js';
+import { siteLayout, ic, guest, CONTACT_EMAIL } from './layout.js';
 import { PLAN_LIMITS, PLAN_PRICES, PLAN_LABELS, ANNUAL_FREE_MONTHS, annualPrice } from '../limits.js';
 
 const FREE = PLAN_LIMITS.free;
@@ -166,7 +166,7 @@ export function homePage({ appUrl, apple = false }) {
       <h1 class="h1" id="h1">Trouve de nouveaux clients, sans y passer tes soirées</h1>
       <p class="lead">Claude cherche des entreprises, écrit les mails et suit les réponses pendant que toi, tu valides. Les mails partent de ta propre boîte.</p>
       <div class="hero-btns">
-        ${btnArrow('btn-primary btn-lg', '/login', 'Créer mon compte')}
+        ${guest('big', btnArrow('btn-primary btn-lg', '/login', 'Créer mon compte'))}
         <a class="btn btn-secondary btn-lg" href="/fonctionnement">${ic('down')}Voir comment ça marche</a>
       </div>
       <p class="hero-note">Gratuit pour commencer, sans carte bancaire. Connexion avec ${providersText(apple)}.</p>
@@ -224,7 +224,7 @@ export function homePage({ appUrl, apple = false }) {
 <div class="wrap">
   <section class="cta" aria-labelledby="h-f">
     <div><h2 id="h-f">Prêt à remplir ton agenda ?</h2><p>Crée ton compte en une minute, avec ${providersText(apple)}.</p></div>
-    ${btnArrow('btn-primary btn-lg', '/login', 'Créer mon compte')}
+    ${guest('big', btnArrow('btn-primary btn-lg', '/login', 'Créer mon compte'))}
   </section>
 </div>`,
   });
@@ -304,7 +304,7 @@ ${steps}
 
   <section class="cta" aria-labelledby="h-f">
     <div><h2 id="h-f">Prêt à essayer ?</h2><p>Le plan Gratuit te laisse tout tester, sans carte bancaire.</p></div>
-    <div class="cta-b">${btnArrow('btn-primary btn-lg', '/login', 'Créer mon compte')}<a class="btn btn-secondary btn-lg" href="/tarifs">Voir les tarifs</a></div>
+    <div class="cta-b">${guest('big', btnArrow('btn-primary btn-lg', '/login', 'Créer mon compte'))}<a class="btn btn-secondary btn-lg" href="/tarifs">Voir les tarifs</a></div>
   </section>
 </div>
 </div>`,
@@ -369,7 +369,7 @@ export function pricingPage({ appUrl }) {
         <ul class="lim">
           ${limitRows(FREE)}
         </ul>
-        <a class="btn btn-primary" href="/login">Créer mon compte</a>
+        ${guest('plan', '<a class="btn btn-primary" href="/login">Créer mon compte</a>')}
       </article>
       ${PAID.map(paidPlan).join('\n      ')}
   </div>
