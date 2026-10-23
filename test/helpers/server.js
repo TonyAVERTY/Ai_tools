@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { now } from '../../src/db.js';
 import { createApp } from '../../src/server.js';
+import { hashSid } from '../../src/crypto.js';
 import { testDb } from './db.js';
 import { addUser, TEST_SECRET_KEY } from './users.js';
 import { RateLimiter } from '../../src/ratelimit.js';
@@ -53,7 +54,7 @@ export async function startApp({ cfg = {}, worker = false, rateLimit = false, cr
     const email = opts.email || `user${n}@test.fr`;
     const id = await addUser(app.db, { ...opts, email });
     const sid = `sess-${id}-${n}`;
-    await app.db.prepare('INSERT INTO sessions(id, user_id, created_at, expires_at) VALUES(?, ?, ?, ?)').run(sid, id, now(), now() + 3600);
+    await app.db.prepare('INSERT INTO sessions(id, user_id, created_at, expires_at) VALUES(?, ?, ?, ?)').run(hashSid(sid), id, now(), now() + 3600);
     const cookie = `sid=${sid}`;
     return { id, email, cookie, ...client(cookie) };
   };
