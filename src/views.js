@@ -398,8 +398,8 @@ ${usagePanel(usage)}
   <summary class="btn primary">+ Nouveau projet</summary>
   <form data-action="create" class="cfg">
     <label>Nom<input name="name" required maxlength="80"></label>
-    <label>Dépôt Git (Forgejo)<input name="gitUrl" required placeholder="https://${esc(forgejoHost || 'git.exemple.fr')}/Tony/MonProjet.git"></label>
-    <p class="muted small">Le lien ne pourra plus être modifié. Le projet est cloné et analysé une fois (Sonnet).</p>
+    <label>Dépôt Git<input name="gitUrl" required placeholder="https://github.com/utilisateur/projet.git"></label>
+    <p class="muted small">${forgejoHost ? `GitHub (dépôts publics) et ${esc(forgejoHost)} sont acceptés.` : 'GitHub est accepté (dépôts publics). Pour un autre serveur Git, ajoute-le dans <a href="/settings">Réglages</a>.'} Le lien ne pourra plus être modifié. Le projet est cloné et analysé une fois (Sonnet).</p>
     <button class="btn primary">Créer et analyser</button>
   </form>
 </details>
@@ -422,10 +422,11 @@ ${saved ? '<p class="ok">Enregistré.</p>' : ''}
   <label class="check"><input type="checkbox" name="weekly_report" ${s.weekly_report ? 'checked' : ''}> Rapport hebdo le lundi à 8h (mail + Discord)</label>
   <button type="button" class="btn small" data-report-send>Envoyer le rapport maintenant</button>
 
-  <h4>Forgejo</h4>
+  <h4>Dépôts Git</h4>
+  <p class="muted small">GitHub (dépôts publics) est toujours accepté, sans rien configurer. Pour utiliser aussi ton propre serveur Git (Forgejo, Gitea), même privé, renseigne-le ici : le token ne sert qu'à cet hôte et n'est jamais envoyé à GitHub.</p>
   <div class="grid2">
-    <label>Hôte autorisé<input name="forgejo_host" value="${esc(s.forgejo_host)}" placeholder="git.tony-averty.dev"></label>
-    <label>Token d'accès (lecture repo)<input name="forgejo_token" type="password" placeholder="${s.forgejo_token_set ? '•••••• (inchangé)' : ''}" autocomplete="new-password"></label>
+    <label>Mon serveur Git (facultatif)<input name="forgejo_host" value="${esc(s.forgejo_host)}" placeholder="git.mon-serveur.fr"></label>
+    <label>Token d'accès à ce serveur (lecture repo)<input name="forgejo_token" type="password" placeholder="${s.forgejo_token_set ? '•••••• (inchangé)' : ''}" autocomplete="new-password"></label>
   </div>
 
   <h4>SMTP global (mails vers toi)</h4>

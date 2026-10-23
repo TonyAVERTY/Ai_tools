@@ -18,7 +18,7 @@ import { registerTeamRoutes } from './teamroutes.js';
 import { registerLinkedinRoutes } from './linkedinroutes.js';
 import { dashboardPage, settingsPage, unsubPage, accountPage, linkPage } from './views.js';
 import { enqueue, latestJobs, cancelJob, usageSummary } from './services/jobs.js';
-import { validateGitUrl, removeRepo } from './services/git.js';
+import { validateGitUrl, removeRepo, DEFAULT_GIT_HOSTS } from './services/git.js';
 import { fetchRecap, clearRecapCache, validateSelect } from './services/recap.js';
 import { sendPause, pauseMessage as pauseMessageOf } from './services/abuse.js';
 import { guardTarget, pinDb, pinGit, checkForgejoHost } from './netguard.js';
@@ -316,10 +316,10 @@ export function registerRoutes(router, app) {
     const b = await readBody(req);
     const name = String(b.name || '').trim().slice(0, 80);
     if (!name) throw new HttpError(400, 'Nom requis');
+    // GitHub est accepté d'office ; le serveur Git personnel des Réglages (facultatif) s'y ajoute
     const host = await getSetting(db, userId, 'forgejo_host');
-    if (!host) throw new HttpError(400, "Configure l'hôte Forgejo dans Réglages");
     let gitUrl;
-    try { gitUrl = validateGitUrl(String(b.gitUrl || '').trim(), host); }
+    try { gitUrl = validateGitUrl(String(b.gitUrl || '').trim(), [...DEFAULT_GIT_HOSTS, host]); }
     catch (e) { throw new HttpError(400, e.message); }
     await pinGit(app, userId, gitUrl); // hôte public et port autorisé, sinon refus immédiat
     // Un même dépôt peut être un projet pour deux comptes différents : l'unicité est par utilisateur

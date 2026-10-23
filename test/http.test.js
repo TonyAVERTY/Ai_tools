@@ -82,7 +82,7 @@ test('dashboard, réglages, création de projet et statut', async () => {
 
   r = await post('/api/projects', { name: 'MEP', gitUrl: 'https://git.tony-averty.dev/Tony/MEP.git' });
   assert.equal(r.status, 400);
-  assert.match((await r.json()).error, /Forgejo/);
+  assert.match((await r.json()).error, /github\.com/);
 
   r = await post('/settings', { notify_email: 'moi@x.fr', forgejo_host: 'https://git.tony-averty.dev/', forgejo_token: 'tok123', global_daily_cap: '9999', send_delay_min: '1', send_delay_max: '2', prospect_model: 'opus', analyze_model: 'opus' }, { form: true });
   assert.equal(r.status, 303);
@@ -94,9 +94,10 @@ test('dashboard, réglages, création de projet et statut', async () => {
   assert.equal(await s('analyze_model'), 'haiku', 'opus refusé pour l\'analyse');
   assert.ok(!(await s('forgejo_token_enc')).includes('tok123'), 'token chiffré');
 
-  r = await post('/api/projects', { name: 'MEP', gitUrl: 'https://github.com/Tony/MEP.git' });
+  // Un autre hôte que GitHub et le serveur Git personnel : refusé (GitHub, lui, est accepté d'office : voir test/git-hosts.test.js)
+  r = await post('/api/projects', { name: 'MEP', gitUrl: 'https://gitlab.com/Tony/MEP.git' });
   assert.equal(r.status, 400);
-  assert.match((await r.json()).error, /doit être sur git\.tony-averty\.dev/);
+  assert.match((await r.json()).error, /doit être sur github\.com ou git\.tony-averty\.dev/);
   r = await post('/api/projects', { name: 'MEP', gitUrl: 'https://git.tony-averty.dev/Tony/MEP.git' });
   assert.equal(r.status, 200);
   const { id } = await r.json();

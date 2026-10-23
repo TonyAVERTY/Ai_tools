@@ -1,4 +1,4 @@
-// Clone / mise à jour des repos Forgejo. Clone superficiel (--depth 1) : léger sur le SSD.
+// Clone / mise à jour des dépôts Git (GitHub, ou le serveur Git perso de l'utilisateur). Clone superficiel (--depth 1) : léger sur le SSD.
 // Le token passe par variables d'env GIT_CONFIG_* : jamais écrit dans .git/config, invisible dans `ps`.
 // L'URL vient de l'utilisateur : https seulement, aucun hook ni sous-module, délai et taille bornés.
 import { spawn } from 'node:child_process';
@@ -10,12 +10,20 @@ import { tmpdir } from 'node:os';
 export const GIT_TIMEOUT_MS = 2 * 60_000;
 export const GIT_MAX_BYTES = 300 * 1024 * 1024;
 
-export function validateGitUrl(url, allowedHost) {
+/** Hôtes acceptés d'office, sans réglage : GitHub (dépôts publics). Le serveur Git personnel d'un utilisateur s'y ajoute. */
+export const DEFAULT_GIT_HOSTS = ['github.com'];
+
+/**
+ * @param {string} url
+ * @param {string|string[]} [allowedHosts]  hôtes (avec port éventuel) où le dépôt peut se trouver ; omis = pas de contrôle d'hôte
+ */
+export function validateGitUrl(url, allowedHosts) {
   let u;
   try { u = new URL(url); } catch { throw new Error('URL Git invalide'); }
   if (u.protocol !== 'https:') throw new Error('Seules les URL https:// sont acceptées');
   if (u.username || u.password) throw new Error("Ne mets pas d'identifiants dans l'URL, configure le token dans Réglages");
-  if (allowedHost && u.host !== allowedHost) throw new Error(`Le repo doit être sur ${allowedHost}`);
+  const hosts = [allowedHosts].flat().filter(Boolean);
+  if (hosts.length && !hosts.includes(u.host)) throw new Error(`Le repo doit être sur ${hosts.join(' ou ')}`);
   if (!/^\/[\w.-]+\/[\w.-]+?(\.git)?\/?$/.test(u.pathname)) throw new Error('Format attendu : https://hôte/utilisateur/repo.git');
   return u.toString().replace(/\/$/, '');
 }

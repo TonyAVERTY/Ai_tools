@@ -141,7 +141,7 @@ Sur le tableau de bord, dès qu'un projet existe, une liste en bas à gauche gui
 ## Comptes et multi-utilisateur
 
 - **Connexion** : Google ou Apple, sans mot de passe. Le compte est créé à la première connexion réussie (plan gratuit). Un même email ne se lie qu'à un seul fournisseur ; un compte suspendu ne peut plus se connecter et ses sessions tombent aussitôt.
-- **Cloisonnement** : projets, prospects, notes, modèles, journaux d'envoi, jobs, métriques et **réglages** (SMTP, Discord, budget IA, plafonds, hôte Forgejo…) sont propres à chaque compte. Toute requête est filtrée par l'utilisateur courant ; la ressource d'un autre compte répond « introuvable » (404). Un même dépôt Git peut être un projet pour deux comptes (unicité par utilisateur).
+- **Cloisonnement** : projets, prospects, notes, modèles, journaux d'envoi, jobs, métriques et **réglages** (SMTP, Discord, budget IA, plafonds, serveur Git perso…) sont propres à chaque compte. Toute requête est filtrée par l'utilisateur courant ; la ressource d'un autre compte répond « introuvable » (404). Un même dépôt Git peut être un projet pour deux comptes (unicité par utilisateur).
 - **Liste d'opposition** : volontairement commune à tous les comptes (une personne désinscrite ne doit plus être contactée par personne). Un compte n'y voit que le nombre de ses propres prospects concernés, jamais l'origine ni le motif d'un autre compte.
 - **Liaison Claude obligatoire** : après la connexion, un compte sans liaison valide est renvoyé vers `/link` et ne peut rien utiliser d'autre que cette page, Mon compte, la déconnexion et la suppression du compte (garde côté serveur sur toutes les routes, dans la file, le worker et le wrapper d'exécution). Voir « Liaison Claude et exécution isolée ».
 - **Mon compte** (`/account`) : email, fournisseur, état de la liaison Claude (mode, dates, valide ou non, 4 derniers caractères de la clé API) avec Tester, Changer de mode et Délier, et suppression du compte (confirmation par saisie de l'email). Elle efface tout : projets, prospects, notes, modèles, journaux, jobs, réglages, sessions et clones Git. Seule la liste d'opposition est conservée.
@@ -330,9 +330,13 @@ Dans Zero Trust, va dans Networks → Tunnels → Create a tunnel (Cloudflared).
 - Public hostname : `ai.tony-averty.dev` → `http://localhost:3100`
 - Copie le token, `install.sh` te le demandera.
 
-### Forgejo
+### Dépôts Git : GitHub par défaut, serveur perso facultatif
 
-Le token se crée dans Paramètres → Applications. Donne-lui la portée `read:repository` seulement, puis colle-le dans **Réglages** du panel avec l'hôte `git.tony-averty.dev`.
+- **GitHub est accepté d'office** (`github.com`, dépôts publics), sans rien configurer : `https://github.com/utilisateur/projet.git`.
+- **Un serveur Git personnel** (Forgejo, Gitea) s'ajoute dans **Réglages → Dépôts Git** : hôte (`git.tony-averty.dev`) et token. Il s'**ajoute** à GitHub, il ne le remplace pas. Les réglages gardent leurs clés historiques (`forgejo_host`, `forgejo_token_enc`), rien à migrer.
+- **Le token n'est présenté qu'à cet hôte** (`gitTokenFor`, `src/projects.js`) : jamais à GitHub ni à un autre serveur. Sans hôte perso renseigné, aucun token n'est envoyé.
+- **Limite connue** : les dépôts GitHub privés ne sont pas pris en charge (pas de token pour GitHub).
+- Côté Forgejo, le token se crée dans Paramètres → Applications, avec la portée `read:repository` seulement.
 
 ## À faire côté mails (sinon spam garanti)
 

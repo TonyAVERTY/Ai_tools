@@ -92,6 +92,17 @@ export function publicConfig(cfg, secretField) {
   return { ...rest, [`${secretField}Set`]: !!_omit };
 }
 
+/**
+ * Token à présenter à git pour cette URL. Il n'est destiné qu'au serveur Git personnel de l'utilisateur (Réglages) : jamais
+ * envoyé à un autre hôte, GitHub compris, sinon il fuiterait vers un service tiers.
+ */
+export async function gitTokenFor(app, userId, url) {
+  const host = await getSetting(app.db, userId, 'forgejo_host');
+  let target;
+  try { target = new URL(url).host; } catch { return null; }
+  return host && target === host ? forgejoToken(app, userId) : null;
+}
+
 export async function forgejoToken(app, userId) {
   try { return decrypt(app.cfg.secretKey, await getSetting(app.db, userId, 'forgejo_token_enc')); }
   catch { console.warn('[secrets] token Forgejo illisible, à ressaisir'); return null; }
