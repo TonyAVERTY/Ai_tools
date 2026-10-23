@@ -17,6 +17,9 @@ export const MODELS = { rapide: 'haiku', normal: 'sonnet', approfondi: 'opus' };
  * @param {(n:number)=>void} [o.onTurn]     appelé à chaque message de Claude (sert à estimer l'avancement)
  * @param {boolean} [o.chat]        conversation : AUCUN outil (ni fichiers, ni web, ni commandes), pas de session enregistrée, pas de commandes slash
  * @param {(text:string)=>void} [o.onDelta]  avec `chat` : appelé à chaque morceau de texte au fil de l'écriture
+ * @param {(name:string, input:object)=>void} [o.onTool]  appelé quand Claude utilise un outil (Read, Glob, Grep)
+ * @param {string[]} [o.extraDirs]   dossiers de pièces jointes lisibles en plus (page IA), dans `o.extraRoot`
+ * @param {string} [o.extraRoot]
  * @param {AbortSignal} [o.signal]
  * @param {number} [o.timeoutMs]
  * @param {string} [o.bin]
@@ -34,11 +37,13 @@ export function runClaude(o) {
     '--disallowedTools', 'Bash,Edit,Write,MultiEdit,NotebookEdit,Task',
   ];
   if (o.system) args.push('--append-system-prompt', o.system);
-  if (o.chat) args.push('--tools', '', '--no-session-persistence', '--disable-slash-commands', '--include-partial-messages');
+  // Conversation : uniquement les outils de lecture demandés (aucun par défaut), pas de session enregistrée
+  if (o.chat) args.push('--tools', (o.tools || []).join(','), '--no-session-persistence', '--disable-slash-commands', '--include-partial-messages');
+  for (const d of o.extraDirs || []) args.push('--add-dir', d);
 
   const launch = prepareLaunch({
     bin: o.bin || 'claude', args, cwd: o.cwd, allowedRoot: o.allowedRoot,
-    secretEnv: o.secretEnv, sandbox: o.sandbox,
+    secretEnv: o.secretEnv, sandbox: o.sandbox, extraDirs: o.extraDirs, extraRoot: o.extraRoot,
   });
   const secrets = Object.values(o.secretEnv || {}).filter((v) => v && v.length >= 8);
   // Aucune trace du secret dans les erreurs, stderr ou textes remontés (journaux, base, réponses HTTP)
@@ -79,6 +84,7 @@ export function runClaude(o) {
         o.onTurn?.(++turns);
         for (const block of ev.message?.content || []) {
           if (block.type === 'text' && block.text) { texts.push(block.text); o.onText?.(redact(block.text)); }
+          else if (block.type === 'tool_use') o.onTool?.(block.name, block.input || {});
         }
       } else if (ev.type === 'result') {
         result = ev;
