@@ -1,10 +1,19 @@
 // Page IA : conversations avec Claude, depuis le compte Claude de l'utilisateur (même accès que les jobs, voir makeClaude).
 // Chaque message part vers Claude sans aucun outil (ni fichiers, ni web, ni commandes) ; la réponse revient en flux (une ligne JSON par événement).
-// Les conversations sont privées : propres à chaque compte, supprimées avec lui.
+// Seule exception : ce que l'utilisateur JOINT au message. Un projet (dépôt en lecture seule) ou des fichiers (images, PDF, texte, images tirées d'une
+// vidéo) ouvrent les seuls outils de lecture (Read, Glob, Grep), dans le bac à sable, sur ces éléments et rien d'autre.
+// Les conversations sont privées : propres à chaque compte, supprimées avec lui (fichiers compris).
+import { existsSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 import { HttpError, json, readBody, html } from './http.js';
 import { now, getSetting, setSetting } from './db.js';
-import { makeClaude } from './handlers.js';
-import { chatPrompt, parseCustomPrompts, CHAT_MAX_MESSAGE } from './services/prompts.js';
+import { makeClaude, makeSync } from './handlers.js';
+import { chatPrompt, chatContext, parseCustomPrompts, CHAT_MAX_MESSAGE } from './services/prompts.js';
+import { getProject, repoDir } from './projects.js';
+import { needAccess, accessOn } from './teams.js';
+import { accessibleProjects } from './mailroutes.js';
+import { userChatRoot } from './users.js';
+import { FILES, shapeAttachment, removeAttachmentFiles, conversationAttachments, prepareRunDir, registerChatFileRoutes } from './chatfiles.js';
 import { normalizeModel } from './services/models.js';
 import { renderMarkdown } from './services/markdown.js';
 import { budgetState } from './services/budget.js';
@@ -20,6 +29,8 @@ export const CHAT = {
   timeoutMs: 5 * 60_000,
   pingMs: 15_000,            // petit signe de vie pendant que Claude réfléchit (les proxys coupent les connexions silencieuses)
   defaultModel: 'sonnet',
+  toolTurns: 14,             // allers-retours permis quand Claude lit un projet ou des fichiers joints
+  repoFreshMs: 15 * 60_000,  // un dépôt déjà cloné n'est remis à jour qu'après ce délai
 };
 
 const titleOf = (text) => {
@@ -43,14 +54,33 @@ export async function getConversation(db, userId, id) {
 }
 
 export async function conversationMessages(db, convId) {
-  return (await db.prepare('SELECT * FROM chat_messages WHERE conversation_id = ? ORDER BY id').all(Number(convId))).map(shapeMessage);
+  const rows = await db.prepare('SELECT * FROM chat_messages WHERE conversation_id = ? ORDER BY id').all(Number(convId));
+  const byMessage = new Map();
+  for (const a of (await db.prepare('SELECT * FROM chat_attachments WHERE conversation_id = ? ORDER BY id').all(Number(convId))).map(shapeAttachment)) {
+    if (!byMessage.has(a.messageId)) byMessage.set(a.messageId, []);
+    byMessage.get(a.messageId).push(a);
+  }
+  return rows.map((m) => ({ ...shapeMessage(m), attachments: byMessage.get(Number(m.id)) || [] }));
 }
+
+const KIND_WORD = { image: 'image', pdf: 'PDF', text: 'fichier texte', video: 'vidéo', project: 'projet' };
+/** « [Pièces jointes : image « a.png », projet « Atelier »] », ou rien : ce que Claude lit en plus du texte d'un message. */
+export const attachmentsNote = (atts) => (atts?.length ? `[Pièces jointes : ${atts.map((a) => `${KIND_WORD[a.kind] || 'fichier'} « ${a.name} »`).join(', ')}]\n` : '');
+
+/** Projet joint au dernier message de la personne dans cette conversation (le choix « reste » d'un message à l'autre dans la page). */
+export const lastProject = (messages) => {
+  const lastUser = [...messages].reverse().find((m) => m.role === 'user');
+  const p = lastUser?.attachments.find((a) => a.kind === 'project');
+  return p ? { id: p.projectId, name: p.name } : null;
+};
 
 export const chatModel = async (db, userId) => normalizeModel(await getSetting(db, userId, 'chat_model', CHAT.defaultModel), CHAT.defaultModel);
 
 export function registerChatRoutes(router, app) {
   const { db, cfg } = app;
   const claude = makeClaude(app);
+  const sync = makeSync(app);
+  const synced = new Map(); // projet → dernière mise à jour du dépôt par la page IA
   const busy = new Set(); // comptes avec une réponse en cours (une à la fois chacun)
   let running = 0;        // réponses en cours, tous comptes confondus
 
@@ -59,7 +89,7 @@ export function registerChatRoutes(router, app) {
     const messages = current ? await conversationMessages(db, current.id) : [];
     html(res, chatPage({
       email: session.email, conversations, current, messages, model: current?.model ?? await chatModel(db, session.userId),
-      max: CHAT_MAX_MESSAGE,
+      max: CHAT_MAX_MESSAGE, project: lastProject(messages), limits: { files: FILES.perMessage, maxMb: Object.fromEntries(Object.entries(FILES.maxBytes).map(([k, v]) => [k, Math.round(v / 1048576)])) },
     }));
   };
 
@@ -69,6 +99,18 @@ export function registerChatRoutes(router, app) {
     if (!current) throw new HttpError(404, 'Conversation introuvable');
     await page(res, session, current);
   });
+
+  // Projets dont l'utilisateur peut joindre le code : les siens, et ceux où il est administrateur de l'équipe
+  router.get('/api/chat/projects', async ({ res, session }) => {
+    const out = [];
+    for (const p of await accessibleProjects(db, session.userId)) {
+      const row = await db.prepare('SELECT id, user_id, team_id, name, profile_json FROM projects WHERE id = ?').get(p.id);
+      const access = await accessOn(db, row, session.userId);
+      if (access === 'owner' || access === 'admin') out.push({ id: Number(row.id), name: row.name, analyzed: !!row.profile_json });
+    }
+    json(res, { projects: out });
+  });
+  registerChatFileRoutes(router, app);
 
   router.get('/api/chat/conversations', async ({ res, session }) => json(res, { conversations: await listConversations(db, session.userId) }));
   router.get('/api/chat/conversations/:id', async ({ res, params, session }) => {
@@ -80,6 +122,7 @@ export function registerChatRoutes(router, app) {
   router.post('/api/chat/conversations/:id/delete', async ({ res, params, session }) => {
     const c = await getConversation(db, session.userId, params.id);
     if (!c) throw new HttpError(404, 'Conversation introuvable');
+    removeAttachmentFiles(cfg, session.userId, await conversationAttachments(db, c.id));
     await db.prepare('DELETE FROM chat_messages WHERE conversation_id = ?').run(c.id);
     await db.prepare('DELETE FROM chat_conversations WHERE id = ? AND user_id = ?').run(c.id, session.userId);
     json(res, { ok: true });
@@ -98,7 +141,9 @@ export function registerChatRoutes(router, app) {
   router.post('/api/chat/send', async ({ req, res, session }) => {
     const userId = session.userId;
     const b = await readBody(req);
-    const message = String(b.message ?? '').replace(/\r\n?/g, '\n').trim();
+    const ids = [...new Set((Array.isArray(b.attachments) ? b.attachments : []).map(Number).filter((n) => Number.isInteger(n) && n > 0))];
+    if (ids.length > FILES.perMessage) throw new HttpError(400, `${FILES.perMessage} pièces jointes au plus par message`, { expose: true });
+    const message = String(b.message ?? '').replace(/\r\n?/g, '\n').trim() || (ids.length || b.projectId ? 'Voici les pièces jointes.' : '');
     if (!message) throw new HttpError(400, 'Écris un message', { expose: true });
     if (message.length > CHAT_MAX_MESSAGE) throw new HttpError(400, `Message trop long (${CHAT_MAX_MESSAGE} caractères au plus)`, { expose: true });
 
@@ -108,6 +153,16 @@ export function registerChatRoutes(router, app) {
       if (!conv) throw new HttpError(404, 'Conversation introuvable');
     }
     const model = normalizeModel(b.model, conv?.model ?? await chatModel(db, userId));
+    // Pièces jointes : les siennes, téléversées et pas encore envoyées. Projet : un projet dont il peut lire le code (propriétaire ou administrateur d'équipe).
+    const pending = ids.length
+      ? await db.prepare(`SELECT * FROM chat_attachments WHERE user_id = ? AND message_id IS NULL AND kind <> 'project' AND id IN (${ids.map(() => '?').join(',')})`).all(userId, ...ids)
+      : [];
+    if (pending.length !== ids.length) throw new HttpError(404, 'Pièce jointe introuvable : joins-la de nouveau.', { expose: true });
+    let project = null;
+    if (b.projectId != null && b.projectId !== '') {
+      project = await getProject(app, Number(b.projectId), { userId });
+      needAccess(project.access, 'admin', 'joindre le code de ce projet');
+    }
 
     // Garde-fous : une réponse à la fois par compte, une charge raisonnable sur la machine, le budget et le plafond du jour
     if (busy.has(userId)) throw new HttpError(409, 'Une réponse est déjà en cours : attends qu\'elle se termine.', { expose: true });
@@ -131,6 +186,7 @@ export function registerChatRoutes(router, app) {
         if (total >= CHAT.maxConversations) {
           const old = await db.prepare('SELECT id FROM chat_conversations WHERE user_id = ? ORDER BY updated_at, id LIMIT ?').all(userId, total - CHAT.maxConversations + 1);
           for (const o of old) {
+            removeAttachmentFiles(cfg, userId, await conversationAttachments(db, o.id));
             await db.prepare('DELETE FROM chat_messages WHERE conversation_id = ?').run(o.id);
             await db.prepare('DELETE FROM chat_conversations WHERE id = ?').run(o.id);
           }
@@ -138,23 +194,51 @@ export function registerChatRoutes(router, app) {
         const id = Number((await db.prepare('INSERT INTO chat_conversations(user_id, title, model, created_at, updated_at) VALUES(?, ?, ?, ?, ?)').run(userId, titleOf(message), model, at, at)).lastInsertRowid);
         conv = await getConversation(db, userId, id);
       }
-      const history = (await conversationMessages(db, conv.id)).map(({ role, content }) => ({ role, content }));
+      const earlier = await conversationMessages(db, conv.id);
+      const history = earlier.map(({ role, content, attachments }) => ({ role, content: `${attachmentsNote(attachments)}${content}` }));
       const userMessageId = Number((await db.prepare('INSERT INTO chat_messages(conversation_id, role, content, created_at) VALUES(?, ?, ?, ?)').run(conv.id, 'user', message, at)).lastInsertRowid);
+      if (ids.length) await db.prepare(`UPDATE chat_attachments SET message_id = ?, conversation_id = ? WHERE user_id = ? AND message_id IS NULL AND id IN (${ids.map(() => '?').join(',')})`).run(userMessageId, conv.id, userId, ...ids);
+      if (project) await db.prepare("INSERT INTO chat_attachments(user_id, conversation_id, message_id, kind, name, project_id, created_at) VALUES(?, ?, ?, 'project', ?, ?, ?)").run(userId, conv.id, userMessageId, project.name, project.id, at);
       await db.prepare('UPDATE chat_conversations SET model = ?, updated_at = ? WHERE id = ?').run(model, at, conv.id);
+      const sent = (await conversationMessages(db, conv.id)).find((m) => m.id === userMessageId);
       if (b.model !== undefined) await setSetting(db, userId, 'chat_model', model);
 
       res.writeHead(200, { 'Content-Type': 'application/x-ndjson; charset=utf-8', 'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no' });
       const write = (o) => { if (!res.writableEnded && !res.destroyed) res.write(`${JSON.stringify(o)}\n`); };
-      write({ type: 'meta', conversationId: conv.id, title: conv.title, userMessageId, model });
+      write({ type: 'meta', conversationId: conv.id, title: conv.title, userMessageId, model, attachments: sent?.attachments ?? [] });
       ctrl = new AbortController();
       res.on('close', () => { if (!res.writableEnded) ctrl.abort(); }); // la personne a fermé la page ou cliqué sur « Arrêter »
       ping = setInterval(() => write({ type: 'ping' }), CHAT.pingMs);
 
-      const { system, prompt } = chatPrompt({ history, message, custom: parseCustomPrompts(await getSetting(db, userId, 'prompts_json', '')), model });
+      let run = null;
       try {
+        // Projet joint : son dépôt (à jour, sinon cloné) devient le dossier de travail de Claude, en lecture seule
+        let repo = null;
+        if (project) {
+          repo = repoDir(cfg, project.userId, project.id);
+          const fresh = synced.get(project.id) > Date.now() - CHAT.repoFreshMs;
+          if (!existsSync(join(repo, '.git')) || !fresh) {
+            write({ type: 'status', text: `Mise à jour du dépôt de « ${project.name} »…` });
+            try { await sync(project.userId, project.gitUrl, repo); synced.set(project.id, Date.now()); }
+            catch (e) {
+              if (!existsSync(join(repo, '.git'))) throw new HttpError(502, `Impossible de récupérer le dépôt de « ${project.name} » : ${String(e.message).slice(0, 160)}`, { expose: true });
+              write({ type: 'status', text: 'Dépôt non mis à jour : je lis la dernière copie.' });
+            }
+          }
+        }
+        // Fichiers de TOUTE la conversation (les plus récents d'abord, bornés) : Claude peut y revenir d'un message à l'autre
+        const files = (await conversationMessages(db, conv.id)).flatMap((m) => m.attachments).filter((a) => a.kind !== 'project').slice(-12);
+        run = files.length ? prepareRunDir(cfg, userId, files) : null;
+        const tools = repo || run?.files.length ? ['Read', 'Glob', 'Grep'] : [];
+        const prompts = parseCustomPrompts(await getSetting(db, userId, 'prompts_json', ''));
+        const base = chatPrompt({ history, message: `${attachmentsNote(sent?.attachments)}${message}`, custom: prompts, model });
+        const system = `${base.system}${chatContext({ project: project && { name: project.name, profile: project.profile }, files: run?.files ?? [] })}`;
         const r = await claude(userId, {
-          prompt, system, model, maxTurns: 1, tools: [], chat: true, signal: ctrl.signal, timeoutMs: CHAT.timeoutMs,
+          prompt: base.prompt, system, model, maxTurns: tools.length ? CHAT.toolTurns : 1, tools, chat: true, signal: ctrl.signal, timeoutMs: CHAT.timeoutMs,
+          // Dossier de travail : le dépôt joint (celui de son propriétaire), sinon le dossier des fichiers joints ; l'un et l'autre en lecture seule
+          ...(repo ? { cwd: repo, repoOwnerId: project.userId, extraDirs: run ? [run.dir] : [] } : run ? { cwd: run.dir, allowedRoot: userChatRoot(cfg, userId) } : {}),
           onDelta: (text) => write({ type: 'delta', text }),
+          onTool: (name, input) => write({ type: 'status', text: toolLine(name, input, repo, run) }),
         });
         const content = String(r.text ?? '').trim();
         if (ctrl.signal.aborted) return;
@@ -172,7 +256,7 @@ export function registerChatRoutes(router, app) {
         console.error('[chat]', e.message);
         if (!e.status) reportError(app, e, { method: 'POST', path: '/api/chat/send', userId });
         write({ type: 'error', error: e.expose || e.status < 500 ? e.message : "Claude n'a pas pu répondre. Réessaie dans un instant." });
-      }
+      } finally { run?.cleanup(); }
       res.end();
     } finally {
       finish();
@@ -188,4 +272,17 @@ function friendly(r, text) {
   if (/rate.?limit|quota|usage limit|too many|429|overloaded/.test(t)) return 'Ton quota Claude est atteint pour le moment : réessaie plus tard.';
   if (r?.subtype === 'error_max_turns') return 'La réponse a été interrompue : reformule ou réessaie.';
   return text ? String(text).slice(0, 300) : "Claude n'a pas répondu. Réessaie dans un instant.";
+}
+
+/** Ce que Claude est en train de lire, en une ligne pour l'utilisateur (chemins du dépôt joint ou des fichiers joints, jamais ceux du serveur). */
+function toolLine(name, input, repo, run) {
+  const rel = (p) => {
+    const v = String(p ?? '');
+    for (const root of [repo, run?.dir]) if (root && v.startsWith(root)) return v.slice(root.length).replace(/^\/+/, '');
+    return v.split('/').pop();
+  };
+  if (name === 'Read') return `Lit ${rel(input.file_path)}`;
+  if (name === 'Glob') return `Cherche les fichiers « ${String(input.pattern ?? '').slice(0, 60)} »`;
+  if (name === 'Grep') return `Cherche « ${String(input.pattern ?? '').slice(0, 60)} » dans le code`;
+  return 'Lit le projet…';
 }
