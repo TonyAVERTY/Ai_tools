@@ -31,16 +31,15 @@ export async function getProject(app, id, { userId, secrets = false, need = null
   const access = await accessOn(app.db, p, userId);
   if (!access) throw new HttpError(404, 'Projet introuvable');
   if (need) needAccess(access, need);
-  // SMTP du projet, sinon celui des Réglages du propriétaire : le projet peut donc envoyer dans les deux cas
-  const settingsSmtp = !p.smtp_enc && !!(await getSetting(app.db, p.user_id, 'smtp_enc'));
   const out = {
     id: p.id, userId: Number(p.user_id), name: p.name, gitUrl: p.git_url,
     access, teamId: p.team_id == null ? null : Number(p.team_id),
     profile: parse(p.profile_json), profileCommit: p.profile_commit, profileAt: p.profile_at,
     target: parse(p.target_json), targetValidated: !!p.target_validated,
     dailyMailCap: p.daily_mail_cap, createdAt: p.created_at,
-    hasSmtp: !!p.smtp_enc || settingsSmtp, hasOwnSmtp: !!p.smtp_enc,
-    smtpSource: p.smtp_enc ? 'project' : settingsSmtp ? 'settings' : null,
+    // Les mails d'un projet partent de SON adresse : pas de repli sur un SMTP commun (celui du serveur ne sert qu'aux mails d'AiTools)
+    hasSmtp: !!p.smtp_enc, hasOwnSmtp: !!p.smtp_enc,
+    smtpSource: p.smtp_enc ? 'project' : null,
     hasDb: !!p.db_enc, hasImap: !!p.imap_enc,
     inbox: parse(p.inbox_json),
     followupEnabled: !!p.followup_enabled, followupDays: p.followup_days,
@@ -48,7 +47,7 @@ export async function getProject(app, id, { userId, secrets = false, need = null
   if (access !== 'owner') out.ownerEmail = (await app.db.prepare('SELECT email FROM users WHERE id = ?').get(p.user_id))?.email ?? null;
   if (secrets && access !== 'member') {
     out.ownSmtp = readSecret(app.cfg.secretKey, p.smtp_enc, `SMTP du projet ${p.id}`);
-    out.smtp = out.ownSmtp || (settingsSmtp ? await globalSmtp(app, p.user_id) : null);
+    out.smtp = out.ownSmtp;
     out.dbCfg = readSecret(app.cfg.secretKey, p.db_enc, `accès BDD du projet ${p.id}`);
     out.imapCfg = readSecret(app.cfg.secretKey, p.imap_enc, `IMAP du projet ${p.id}`);
     out.imap = imapCredentials(out.imapCfg, out.smtp);
@@ -90,10 +89,6 @@ export function publicConfig(cfg, secretField) {
   if (!cfg) return {};
   const { [secretField]: _omit, ...rest } = cfg;
   return { ...rest, [`${secretField}Set`]: !!_omit };
-}
-
-export async function globalSmtp(app, userId) {
-  return readSecret(app.cfg.secretKey, await getSetting(app.db, userId, 'smtp_enc'), 'SMTP global');
 }
 
 export async function prospectStats(db, projectId) {

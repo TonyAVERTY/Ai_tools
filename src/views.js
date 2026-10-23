@@ -241,12 +241,12 @@ function targetForm(p) {
 }
 
 function configForms(p, smtp, dbCfg, imap) {
-  const source = { project: 'Ce projet envoie avec son propre SMTP.', settings: 'Ce projet utilise le SMTP des Réglages (aucun SMTP propre).', null: "Aucun SMTP : renseigne-en un ici ou dans les Réglages, sinon rien ne peut partir." }[p.smtpSource ?? 'null'];
+  const source = { project: 'Ce projet envoie depuis son adresse (SMTP ci-dessous).', null: "Aucun SMTP : renseigne celui de l'adresse d'envoi de ce projet, sinon rien ne peut partir." }[p.smtpSource ?? 'null'];
   return `<form data-action="smtp" data-id="${p.id}" class="cfg">
-  <h4>SMTP d'envoi de ce projet</h4>
-  <p class="muted small" data-smtp-source>${source} <strong>Laisse l'hôte vide pour utiliser le SMTP des Réglages.</strong> Un SMTP propre au projet permet d'envoyer depuis une autre adresse (une boîte par projet).</p>
+  <h4>SMTP d'envoi de ce projet (adresse du projet)</h4>
+  <p class="muted small" data-smtp-source>${source} Les mails de prospection et les relances de ce projet partent de cette adresse (une boîte par projet). Les mails d'AiTools (rapport, évolutions, invitations) partent, eux, du serveur.</p>
   <div class="grid3">
-    <label>Hôte<input name="host" value="${esc(smtp.host)}" placeholder="vide = SMTP des Réglages"></label>
+    <label>Hôte<input name="host" value="${esc(smtp.host)}" placeholder="smtp.exemple.fr"></label>
     <label>Port<input name="port" type="number" value="${esc(smtp.port || 587)}"></label>
     <label>Utilisateur<input name="user" value="${esc(smtp.user)}" autocomplete="off"></label>
     <label>Mot de passe<input name="pass" type="password" placeholder="${smtp.passSet ? '•••••• (inchangé)' : ''}" autocomplete="new-password"></label>
@@ -456,7 +456,7 @@ function gitRow(i, srv, { fresh = false } = {}) {
 /** Case à cocher du design : le <input> natif reste là (clavier, lecteurs d'écran), la case dessinée suit son état. */
 const check = (name, checked, text, { value = '' } = {}) => `<label class="opt"><input type="checkbox" name="${name}"${value ? ` value="${value}"` : ''}${checked ? ' checked' : ''}><span class="box">${ic('check')}</span><span>${text}</span></label>`;
 
-const SETTINGS_TOC = [['notif', 'Notifications'], ['git', 'Dépôts Git'], ['smtp', 'SMTP global'], ['discord', 'Discord'], ['garde', 'Garde-fous'], ['budget', 'Budget IA'], ['opposition', "Liste d'opposition"]];
+const SETTINGS_TOC = [['notif', 'Notifications'], ['git', 'Dépôts Git'], ['discord', 'Discord'], ['garde', 'Garde-fous'], ['budget', 'Budget IA'], ['opposition', "Liste d'opposition"]];
 
 export function settingsPage({ email, s, saved }) {
   const model = (name, v) => `<span class="sel"><select name="${name}">
@@ -475,7 +475,7 @@ ${saved ? `<p class="ok-box" role="status">${ic('check')}<span><b>Réglages enre
 <form method="post" action="/settings" class="settings-form">
 
 <section class="card" id="notif" aria-labelledby="t-notif">
-  <div class="card-h"><h2 id="t-notif">Notifications</h2><p>Où et quand AiTools te prévient.</p></div>
+  <div class="card-h"><h2 id="t-notif">Notifications</h2><p>Où et quand AiTools te prévient. Ces mails partent de l'adresse d'AiTools (SMTP du serveur), jamais de celle d'un projet.</p></div>
   <label class="field"><span class="lbl">Email de réception (évolutions, rapport hebdo)</span><input name="notify_email" type="email" value="${esc(s.notify_email)}" placeholder="toi@exemple.fr"></label>
   ${check('weekly_report', s.weekly_report, 'Rapport hebdo le lundi à 8h (mail + Discord)')}
   <div class="save"><button type="button" class="btn" data-report-send>${ic('send')}Envoyer le rapport maintenant</button></div>
@@ -505,17 +505,6 @@ ${saved ? `<p class="ok-box" role="status">${ic('check')}<span><b>Réglages enre
       ${Object.entries(GIT_SERVER_TYPES).map(([k, t]) => `<option value="${k}" data-label="${esc(t.label)}" data-hint="${esc(t.hint)}">${esc(t.label)}</option>`).join('')}
     </select>${ic('down')}</span>
     <span class="hint" data-git-max hidden>${MAX_GIT_SERVERS} serveurs au plus.</span>
-  </div>
-</section>
-
-<section class="card" id="smtp" aria-labelledby="t-smtp">
-  <div class="card-h"><h2 id="t-smtp">SMTP global</h2><p>Mails vers toi, et envoi des projets qui n'ont pas leur propre SMTP.</p></div>
-  <div class="grid2">
-    <label class="field"><span class="lbl">Hôte</span><input name="smtp_host" value="${esc(s.smtp.host)}" placeholder="smtp.exemple.fr"></label>
-    <label class="field"><span class="lbl">Port</span><input name="smtp_port" type="number" value="${esc(s.smtp.port || 587)}"></label>
-    <label class="field"><span class="lbl">Utilisateur</span><input name="smtp_user" value="${esc(s.smtp.user)}" autocomplete="off"></label>
-    <label class="field"><span class="lbl">Mot de passe</span><input name="smtp_pass" type="password" placeholder="${s.smtp.passSet ? '•••••• (inchangé)' : ''}" autocomplete="new-password"><span class="hint">Stocké chiffré.</span></label>
-    <label class="field"><span class="lbl">Expéditeur</span><input name="smtp_fromEmail" type="email" value="${esc(s.smtp.fromEmail)}"></label>
   </div>
 </section>
 

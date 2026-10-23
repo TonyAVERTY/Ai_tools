@@ -41,7 +41,7 @@ import {
   listProspects, parseFilters, STATUSES as PROSPECT_STATUSES, prospectDetail, addNote, deleteNote, setNextAction,
 } from './services/crm.js';
 import {
-  getProject, listProjects, createProject, saveSecretConfig, publicConfig, globalSmtp,
+  getProject, listProjects, createProject, saveSecretConfig, publicConfig,
   prospectStats, sentSince, repoDir, getTemplate, saveTemplate, abStats,
 } from './projects.js';
 
@@ -140,7 +140,6 @@ export function registerRoutes(router, app) {
       notify_email: await getSetting(db, userId, 'notify_email', ''),
       git_servers: publicGitServers(await listGitServers(db, userId)),
       github_token_set: !!await getSetting(db, userId, 'github_token_enc'),
-      smtp: publicConfig(await globalSmtp(app, userId), 'pass'),
       global_daily_cap: await getSetting(db, userId, 'global_daily_cap', '100'),
       send_delay_min: await getSetting(db, userId, 'send_delay_min', '20'),
       send_delay_max: await getSetting(db, userId, 'send_delay_max', '60'),
@@ -185,10 +184,6 @@ export function registerRoutes(router, app) {
     if (b.discord_remove === 'on') await set('discord_webhook_enc', null);
     await set('discord_events', JSON.stringify(Object.keys(EVENTS).filter((k) => b[`ev_${k}`] === 'on')));
 
-    if (b.smtp_host) await guardTarget(app, userId, 'smtp', String(b.smtp_host).trim(), b.smtp_port || 587, { lenient: true });
-    const prev = await globalSmtp(app, userId) || {};
-    const smtp = { host: b.smtp_host, port: b.smtp_port, user: b.smtp_user, pass: b.smtp_pass || prev.pass, fromEmail: b.smtp_fromEmail };
-    await set('smtp_enc', smtp.host ? encryptJson(cfg.secretKey, smtp) : null);
     redirect(res, '/settings?ok');
   });
 
@@ -288,7 +283,7 @@ export function registerRoutes(router, app) {
   // ---------- API JSON ----------
   router.post('/api/report/send', async ({ res, session }) => {
     const r = await sendWeeklyReport(app, session.userId);
-    if (!r.channels.length) throw new HttpError(400, 'Configure le SMTP global + l\'email de réception, ou un webhook Discord');
+    if (!r.channels.length) throw new HttpError(400, app.cfg.systemSmtp ? 'Configure ton email de réception, ou un webhook Discord' : "Le serveur n'a pas de SMTP (SYSTEM_SMTP_*) : configure un webhook Discord, ou demande à l'administrateur");
     json(res, { ok: true, channels: r.channels });
   }, { limit: 'mail_send' });
 
@@ -466,7 +461,7 @@ export function registerRoutes(router, app) {
     const { req, res } = ctx;
     const p = await project(ctx, { need: 'admin' });
     const b = await readBody(req);
-    // Hôte vide = « utiliser le SMTP des Réglages » : on efface celui du projet (le plafond quotidien reste réglable)
+    // Hôte vide = on efface le SMTP du projet (le plafond quotidien reste réglable) ; le projet ne peut plus envoyer tant qu'il n'en a pas
     if (!String(b.host || '').trim() || b.reset === true || b.reset === 'on') {
       await db.prepare('UPDATE projects SET smtp_enc = NULL WHERE id = ?').run(p.id);
       if (b.dailyCap !== undefined) await db.prepare('UPDATE projects SET daily_mail_cap = ? WHERE id = ?').run(int(b.dailyCap, 1, 200, 30), p.id);

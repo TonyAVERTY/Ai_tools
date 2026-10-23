@@ -88,7 +88,7 @@ Sur le tableau de bord, dès qu'un projet existe, une liste en bas à gauche gui
   - rapport hebdo.
 
   Un bouton permet d'envoyer une notification de test.
-- **Rapport hebdo** : le lundi à 8h, par mail (SMTP global vers ton email de réception) et en résumé sur Discord. Pour chaque projet, sur 7 jours :
+- **Rapport hebdo** : le lundi à 8h, par mail (SMTP du serveur, vers ton email de réception) et en résumé sur Discord. Pour chaque projet, sur 7 jours :
   - prospects trouvés ;
   - mails et relances envoyés ;
   - réponses et taux de réponse ;
@@ -196,7 +196,7 @@ Prix TTC : l'éditeur est en franchise de TVA (art. 293 B du CGI). Les offres pa
 
 ### SMTP par projet et équipes
 
-- **SMTP par projet** : chaque projet peut avoir son propre SMTP (une boîte d'envoi par projet). **Hôte vide = SMTP des Réglages** (`getProject` renvoie `smtpSource` : `project`, `settings` ou `null`). L'IMAP réutilise les identifiants du SMTP effectif.
+- **SMTP par projet** : chaque projet peut avoir son propre SMTP (une boîte d'envoi par projet). **Pas de SMTP commun** : un projet envoie depuis SON adresse ou pas du tout (hôte vide = on efface celui du projet). Les mails d'AiTools (rapport, évolutions, invitations, avertissement d'inactivité) partent du SMTP du serveur (`SYSTEM_SMTP_*`). L'ancien SMTP « global » des Réglages a été supprimé : une migration en copie le contenu dans chaque projet qui n'avait pas le sien (`getProject` renvoie `smtpSource` : `project` ou `null`). L'IMAP réutilise les identifiants du SMTP effectif.
 - **Équipes** (`src/teams.js`, `src/teamroutes.js`, page `/team`) : un propriétaire (offre avec `seats` ≥ 2) invite des membres par email (lien à usage unique, valable 7 jours, **lié à l'adresse invitée**, seule son empreinte est stockée) et partage des projets (`projects.team_id`). Sur un projet partagé **un membre agit comme le propriétaire** : ses données, son SMTP, son plan, ses plafonds et son accès Claude (le membre n'a pas besoin du sien). Rôles : `member` (travaille sur les projets), `admin` (règle en plus SMTP, IMAP, base du récap), propriétaire (gère l'équipe, partage, supprime). Un seul point d'accès (`getProject` / `accessOn`) : un projet hors équipe est introuvable (404), le retrait d'un membre coupe l'accès à la requête suivante. Un mail d'invitation part si `SYSTEM_SMTP_*` est configuré, sinon le lien est affiché au propriétaire.
 
 ### LinkedIn

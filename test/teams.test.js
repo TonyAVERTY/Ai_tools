@@ -258,26 +258,27 @@ test('supprimer son compte efface l\'équipe, les adhésions et les invitations'
   assert.ok(denied((await w.member.get(`/api/projects/${w.shared}/status`)).status));
 });
 
-test('SMTP du projet : hôte vide = retour au SMTP des Réglages, et la page l\'explique', async () => {
+test('SMTP du projet : le sien ou rien, et la page l\'explique ; hôte vide = on l\'efface', async () => {
   const u = await s.newUser({ admin: false, link: LINK });
   const p = await addProject(s.db, u.id, { name: 'Boîte propre' });
   const src = async () => (await (await u.get(`/api/projects/${p}/status`)).json()).smtpSource;
   assert.equal(await src(), null);
   assert.match(await text(u, '/'), /Aucun SMTP/);
+  assert.doesNotMatch(await text(u, '/'), /SMTP des Réglages|Laisse l'hôte vide/);
 
-  assert.equal((await u.post('/settings', { smtp_host: 'smtp.reglages.fr', smtp_port: '587', smtp_user: 'u', smtp_pass: 'p', smtp_fromEmail: 'r@exemple.fr' }, { form: true })).status, 303);
-  assert.equal(await src(), 'settings');
-  assert.match(await text(u, '/'), /utilise le SMTP des Réglages/);
-  assert.match(await text(u, '/'), /Laisse l'hôte vide/);
+  // Il n'y a plus de SMTP « global » dans les Réglages : la page n'en propose plus, et un envoi de formulaire le recevant l'ignore
+  assert.doesNotMatch(await text(u, '/settings'), /SMTP global|name="smtp_host"/);
+  assert.equal((await form(u, '/settings', { smtp_host: 'smtp.reglages.fr', smtp_port: '587', global_daily_cap: '100', send_delay_min: '20', send_delay_max: '60' })).status, 303);
+  assert.equal(await src(), null);
 
   const own = { host: 'smtp.projet.fr', port: 587, user: 'u', pass: 'p', fromEmail: 'p@exemple.fr', dailyCap: 20 };
   assert.equal((await u.post(`/api/projects/${p}/smtp`, own)).status, 200);
   assert.equal(await src(), 'project');
-  assert.match(await text(u, '/'), /propre SMTP/);
+  assert.match(await text(u, '/'), /depuis son adresse/);
 
   const r = await u.post(`/api/projects/${p}/smtp`, { host: '', dailyCap: 25 });
   assert.equal((await r.json()).reset, true);
-  assert.equal(await src(), 'settings');
+  assert.equal(await src(), null);
   assert.equal(Number((await row('SELECT daily_mail_cap c FROM projects WHERE id = ?', p)).c), 25, 'le plafond du projet reste réglable');
   assert.equal(await row('SELECT smtp_enc FROM projects WHERE id = ?', p).then((x) => x.smtp_enc), null);
 });
