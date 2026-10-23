@@ -160,6 +160,7 @@ export function registerRoutes(router, app) {
       prospect_model: await getSetting(db, userId, 'prospect_model', 'haiku'),
       analyze_model: await getSetting(db, userId, 'analyze_model', 'haiku'),
       weekly_report: await getSetting(db, userId, 'weekly_report', '0') === '1',
+      read_receipt: await getSetting(db, userId, 'read_receipt', '0') === '1',
       budget_day_usd: await getSetting(db, userId, 'budget_day_usd', ''),
       budget_month_usd: await getSetting(db, userId, 'budget_month_usd', ''),
       priced: (await getLinkState(db, userId))?.mode === MODES.api_key, // plafonds en $ : seulement avec une clé API
@@ -190,6 +191,8 @@ export function registerRoutes(router, app) {
     await set('analyze_model', b.analyze_model === 'sonnet' ? 'sonnet' : 'haiku');
     const money = (v) => { const n = Number(String(v || '').replace(',', '.')); return Number.isFinite(n) && n > 0 ? String(Math.round(n * 100) / 100) : ''; };
     await set('weekly_report', b.weekly_report === 'on' ? '1' : '0');
+    // Les cases décochées ne sont pas envoyées : la présence du champ « délais » signale le formulaire complet
+    if (b.send_delay_min !== undefined) await set('read_receipt', b.read_receipt === 'on' ? '1' : '0');
     // Champs absents du formulaire (compte en abonnement : pas de plafond en $) : les valeurs enregistrées ne bougent pas
     if (b.budget_day_usd !== undefined) await set('budget_day_usd', money(b.budget_day_usd));
     if (b.budget_month_usd !== undefined) await set('budget_month_usd', money(b.budget_month_usd));

@@ -4,8 +4,8 @@ import { layout } from './views.js';
 import { ic } from './icons.js';
 import { INTENTS } from './services/replies.js';
 
-const STATE_LABELS = { sent: 'Envoyé', replied: 'Répondu', bounced: 'Rejeté', refused: 'Refus', failed: 'Non envoyé' };
-const STATE_BADGE = { sent: '', replied: 'ok', bounced: 'err', refused: 'warn', failed: 'err' };
+const STATE_LABELS = { sent: 'Envoyé', read: 'Lu (accusé)', replied: 'Répondu', bounced: 'Rejeté', refused: 'Refus', failed: 'Non envoyé' };
+const STATE_BADGE = { sent: '', read: 'ok', replied: 'ok', bounced: 'err', refused: 'warn', failed: 'err' };
 const INTENT_BADGE = { interested: 'ok', question: '', later: 'warn', refused: 'err', other: '' };
 const KIND = { initial: 'Premier mail', followup: 'Relance' };
 
@@ -72,7 +72,7 @@ export function mailsPage(d) {
   </div>
   <div class="chips" role="group" aria-label="${d.view === 'replies' ? 'Intention' : 'État'}">${chips}</div>
   ${list}${pager}
-  ${d.view === 'sent' ? `<p class="muted small">Pas de suivi d'ouverture : il demande un pixel invisible dans chaque mail, ce qui abîme la délivrabilité et pose un problème de consentement (RGPD). L'état « Répondu » vient de la boîte de réception du projet (IMAP).</p>` : ''}
+  ${d.view === 'sent' ? `<p class="muted small">Pas de suivi d'ouverture espion (pixel, lien traqué) : il abîme la délivrabilité et pose un problème de consentement (RGPD). Alternative : l'accusé de lecture standard, que le destinataire accepte ou non d'envoyer (option dans Réglages → Garde-fous). « Lu » est donc un minimum, jamais un « non lu ». « Répondu » vient de la boîte de réception du projet (IMAP).</p>` : ''}
 </section>`,
   });
 }
