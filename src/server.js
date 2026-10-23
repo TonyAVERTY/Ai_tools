@@ -6,7 +6,7 @@ import { join, dirname, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadConfig } from './config.js';
 import { openDb } from './db.js';
-import { Router, json, redirect, html, HttpError } from './http.js';
+import { Router, json, redirect, html, esc, HttpError } from './http.js';
 import { RateLimiter, clientIp } from './ratelimit.js';
 import { getSession, checkOrigin, purgeExpired } from './auth.js';
 import { syncAdmins } from './users.js';
@@ -55,8 +55,20 @@ export async function createApp(cfg, { db, worker = true, createTransport, fetch
   registerRoutes(router, app);
 
   const server = createServer(async (req, res) => {
+    // Un défaut imprévu dans un gestionnaire ne doit jamais arrêter le serveur pour tous les utilisateurs
+    try { await handle(req, res); } catch (e) {
+      console.error('[http]', e);
+      if (!res.headersSent) res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end('Erreur interne');
+    }
+  });
+  const handle = async (req, res) => {
     for (const [k, v] of Object.entries(secHeaders)) res.setHeader(k, v);
-    const url = new URL(req.url, cfg.appUrl);
+    // `//` ou une cible illisible font échouer new URL : sans ce garde-fou la promesse rejetée arrête tout le processus
+    let url;
+    try { url = new URL(req.url, cfg.appUrl); } catch { res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8', Connection: 'close' }); return res.end('Requête invalide'); }
+    // Pages et API dépendent du compte connecté : jamais mises en cache (les fichiers statiques posent leur propre Cache-Control)
+    res.setHeader('Cache-Control', 'no-store');
     res.setHeader('Content-Security-Policy', cspFor(url.pathname, !!cfg.recaptcha));
     // Pages d'application, API, connexion, 404 : jamais indexées (seul le site public l'est)
     const robots = robotsHeaderFor(url.pathname);
@@ -115,9 +127,9 @@ export async function createApp(cfg, { db, worker = true, createTransport, fetch
       const msg = status >= 500 && !e.expose ? 'Erreur interne' : e.message;
       for (const [k, v] of Object.entries(e.headers || {})) res.setHeader(k, v);
       if (url.pathname.startsWith('/api/') || req.headers.accept?.includes('json')) json(res, { error: msg, ...(e.code ? { code: e.code } : {}), ...(e.data || {}) }, status);
-      else html(res, layout({ title: 'Erreur', body: `<section class="card"><h1>${status}</h1><p>${msg.replace(/</g, '&lt;')}</p><a href="/">Retour</a></section>` }), status);
+      else html(res, layout({ title: 'Erreur', body: `<section class="card"><h1>${status}</h1><p>${esc(msg)}</p><a href="/">Retour</a></section>` }), status);
     }
-  });
+  };
   // Pi : on limite ce qui traîne en mémoire
   server.keepAliveTimeout = 5000;
   server.headersTimeout = 10_000;
