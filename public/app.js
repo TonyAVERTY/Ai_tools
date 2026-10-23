@@ -334,11 +334,13 @@
   }
 
   let jobsSeen = null; // jobs déjà vus dans le menu : un job qui apparaît ensuite est mis en évidence un instant
+  const jobsFresh = new Map(); // job → fin de sa mise en évidence
   function renderJobsMenu(s) {
     if (!jobsBox) return;
     const list = s.jobs || [];
     const ids = list.map((j) => j.id);
-    const fresh = new Set(jobsSeen ? ids.filter((id) => !jobsSeen.has(id)) : []);
+    if (jobsSeen) for (const id of ids) if (!jobsSeen.has(id)) jobsFresh.set(id, Date.now() + 3500);
+    const fresh = new Set(ids.filter((id) => (jobsFresh.get(id) ?? 0) > Date.now()));
     jobsSeen = new Set([...(jobsSeen || []), ...ids]);
     jobsBox.hidden = !list.length;
     if (!list.length) { if (jobsOpen()) toggleJobs(false); return; }
@@ -415,10 +417,14 @@
     if (!jobsBox || jobsBox.hidden) return;
     toggleJobs(true);
     clearTimeout(activityTimer);
-    activityTimer = setTimeout(() => { if (jobsOpen() && !jobsPop.matches(':hover') && !jobsPop.contains(document.activeElement)) toggleJobs(false); }, 5500);
+    activityTimer = setTimeout(() => { if (jobsOpen() && !jobsPop.matches(':hover') && !jobsPop.contains(document.activeElement)) toggleJobs(false); }, 7500);
   }
+  // Le menu s'ouvre d'abord : les traits pointillés et l'agent vont jusqu'à la ligne de la nouvelle tâche, dans la liste
   function launched(trigger) {
-    refreshSys().then(() => (window.AiFx ? window.AiFx.launch(trigger) : null)).then(showActivity).catch(() => {});
+    refreshSys()
+      .then(() => { showActivity(); return new Promise((r) => setTimeout(r, 240)); })
+      .then(() => window.AiFx?.launch(trigger, $('.jitem.new', jobsPop) || $('.jitem', jobsPop)))
+      .catch(() => {});
   }
 
   // ---------- Rendu d'un job ----------
