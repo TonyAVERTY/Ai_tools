@@ -11,7 +11,7 @@ import { MODE_LABELS, CONSENT_TEXT, CONSENT_CHECKBOX, CONSENT_VERSION } from './
 const fmtDate = (ts) => (ts ? new Date(ts * 1000).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' }) : '—');
 
 // Icônes de la section : noms du sprite (src/icons.js), une seule fois par page
-const SECTION_ICONS = { target: 'target', search: 'search', spark: 'spark', chart: 'chart', mail: 'mail', linkedin: 'pen', send: 'send', repeat: 'repeat', users: 'users', gear: 'gear', git: 'git' };
+const SECTION_ICONS = { target: 'target', search: 'search', spark: 'spark', chart: 'chart', mail: 'mail', linkedin: 'pen', send: 'send', repeat: 'repeat', users: 'users', gear: 'gear', git: 'git', computer: 'computer' };
 
 /** Section dépliable. `title` peut contenir du HTML de confiance (badges), jamais de donnée utilisateur brute. */
 function acc(key, icon, title, sub, body, { open = false, cls = '' } = {}) {
@@ -410,7 +410,7 @@ function projectItem(p, smtp, dbCfg, imap) {
     </form>
     <div class="job" data-job="evolution"></div>`, { cls: 'main' })}
 
-  ${p.access !== 'member' ? acc('audit', 'shield', 'Audit du projet', 'Rapport qualité et sécurité du code, en lecture seule', `
+  ${p.access !== 'member' ? acc('audit', 'computer', 'Audit du projet', 'Rapport qualité et sécurité du code, en lecture seule', `
     <form data-action="audit" data-id="${p.id}" class="inline">
       <label>Raisonnement<select name="level">
         <option value="rapide" selected>Rapide (Haiku, économe)</option>

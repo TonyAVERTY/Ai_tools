@@ -15,6 +15,7 @@ const SYMBOLS = {
   check: '<path d="m5 12.5 4.5 4.5L19 7.5"></path>',
   chev: '<path d="m6 9 6 6 6-6"></path>',
   clock: '<circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path>',
+  computer: '<rect x="3" y="4" width="18" height="12" rx="2.5"></rect><path d="M8 20h8M12 16v4"></path>',
   copy: '<rect x="8" y="8" width="12" height="12" rx="3"></rect><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path>',
   db: '<ellipse cx="12" cy="6" rx="8" ry="3"></ellipse><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"></path>',
   dl: '<path d="M12 4v12M7 11l5 5 5-5M4 20h16"></path>',
