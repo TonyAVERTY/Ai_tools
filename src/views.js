@@ -35,6 +35,7 @@ ${iconLinks()}
 <script src="${assetUrl('/static/app.js')}" defer></script>
 </head>
 <body class="app">
+<canvas id="bg" aria-hidden="true"></canvas>
 ${SPRITE}
 <a class="skip" href="#contenu">Aller au contenu</a>
 ${email ? `<header class="top">

@@ -3,7 +3,7 @@ import { HttpError, html, redirect, readBody } from './http.js';
 import { getUser } from './users.js';
 import { limitsFor } from './services/plans.js';
 import {
-  ownedTeam, memberships, createTeam, deleteTeam, teamDetails, createInvite, revokeInvite, inviteUrl, acceptInvite, inspectInvite,
+  ownedTeam, memberships, createTeam, deleteTeam, teamDetails, createInvite, revokeInvite, acceptInvite, inspectInvite,
   setMemberRole, removeMember, setProjectShared, sendInviteMail, ROLES,
 } from './teams.js';
 import { teamPage, joinPage } from './teamviews.js';
@@ -53,7 +53,12 @@ export function registerTeamRoutes(router, app) {
     const inv = await createInvite(db, team, { email: b.email, role: b.role, byUserId: session.userId });
     const owner = await getUser(db, session.userId);
     const mail = await sendInviteMail(app, team, owner, inv);
-    await show(res, session, { invite: { email: inv.email, role: inv.role, url: inviteUrl(cfg, inv.token), mailed: mail.sent, mailReason: mail.reason } });
+    // Le lien ne part que par mail, à la personne invitée : sans mail, pas d'invitation (on ne l'affiche jamais au propriétaire)
+    if (!mail.sent) {
+      await revokeInvite(db, team, inv.id);
+      throw new HttpError(502, `Le mail d'invitation n'a pas pu partir (${mail.reason}). L'invitation n'a pas été créée : réessaie plus tard.`, { expose: true });
+    }
+    await show(res, session, { notice: `Invitation envoyée à ${inv.email}. Le lien n'est envoyé qu'à cette adresse.` });
   }), LIMIT);
 
   router.post('/team/invite/:id/revoke', guarded(async ({ res, session, params }) => {

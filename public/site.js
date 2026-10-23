@@ -1,7 +1,27 @@
 // Site public : deux petits plus, sans lesquels les pages restent complètes.
 //  - Tarifs : le sélecteur « Au mois / À l'année » (sans ce script, chaque plan annonce déjà son prix annuel).
 //  - Pages légales : le sommaire reste ouvert sur grand écran, et la section lue est repérée.
+//  - Tout le site : les blocs apparaissent en douceur quand on arrive dessus.
 (() => {
+  // ---------- Apparition au défilement ----------
+  // Seuls les blocs encore hors de l'écran sont masqués : ce qui est déjà visible ne clignote jamais, et sans ce script rien n'est caché.
+  if ('IntersectionObserver' in window && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const io = new IntersectionObserver((entries) => {
+      for (const e of entries) if (e.isIntersecting) {
+        const el = e.target;
+        el.classList.add('in'); io.unobserve(el);
+        // l'apparition terminée, le bloc redevient ordinaire (ses animations au survol reprennent leurs durées normales)
+        setTimeout(() => { el.classList.remove('reveal', 'in'); el.style.transitionDelay = ''; }, 1000);
+      }
+    }, { rootMargin: '0px 0px -8% 0px', threshold: 0.08 });
+    document.querySelectorAll('.card, .steps li, .tr, .plan, .stp, .cta, .lg-body .art h2, .acc, .claude-n').forEach((el, i) => {
+      if (el.getBoundingClientRect().top < innerHeight) return;
+      el.classList.add('reveal');
+      el.style.transitionDelay = `${(i % 4) * 60}ms`; // CSSOM : la CSP interdit style=""
+      io.observe(el);
+    });
+  }
+
   // ---------- Tarifs : mois / année ----------
   const plans = document.querySelector('[data-billing]');
   const bill = document.querySelector('[data-bill]');

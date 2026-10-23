@@ -69,21 +69,13 @@ Branches de travail : `feat/saas-mysql` (J1), `feat/saas-accounts` (J2, depuis l
 - **`/login` n'est pas en `Disallow` mais en `noindex`**, pour que le robot puisse lire le noindex.
 
 ### Marqueurs à compléter
-Visibles en jaune sur les pages légales tant que l'information manque. Un test compare cette liste aux pages et au code : ajouter ou retirer un marqueur impose de mettre cette liste à jour.
-
-- `[À COMPLÉTER : adresse du siège]` : mentions légales et confidentialité (adresse de l'EI).
-- `[À COMPLÉTER : hébergeur]` : mentions légales et confidentialité (nom, adresse, contact de l'hébergeur du serveur).
-- `[À COMPLÉTER : téléphone]` : mentions légales. La loi sur la confiance dans l'économie numérique demande un moyen de contact rapide pour l'éditeur ; à confirmer avec un juriste (un numéro, ou autre solution), sinon retirer la ligne.
-- `[À VALIDER : durées de conservation]` : confidentialité. Propositions : compte inactif supprimé après 24 mois (implémenté au J5, avec avertissement 30 jours avant), journal d'administration 12 mois, sessions 30 jours, sauvegardes environ 14 jours, journaux d'accès du serveur 12 mois (à vérifier avec la configuration réelle de Nginx/CloudPanel), prospects : recommandation de 3 ans après le dernier contact.
-- `[À VALIDER : transferts hors UE]` : confidentialité (Google, Apple, Anthropic aux États-Unis ; mécanismes cités de façon générale).
-- `[À VALIDER : cadre de sous-traitance]` : confidentialité et CGU. Les CGU et la politique tiennent lieu de cadre de l'article 28 RGPD ; un accord de sous-traitance dédié est peut-être préférable.
-- `[À VALIDER : limitation de responsabilité]` : CGU.
+Aucun marqueur restant : adresse du siège, hébergeur (ElypseCloud), durées de conservation, transferts hors UE, cadre de sous-traitance et limitation de responsabilité ont été validés par l'éditeur le 23/10/2026 (pas de téléphone : l'email est le moyen de contact). Un test compare cette liste aux pages et au code : si un marqueur jaune (à compléter ou à valider) revient sur une page, il faut le lister ici.
 
 ### À faire relire par un juriste
 - Clause d'abonnement (risque de suspension du compte Claude, exclusion de responsabilité « dans la mesure permise par la loi ») et sa case d'acceptation (décision 10 du cadrage).
 - Rôles RGPD (utilisateur responsable de traitement, AiTools sous-traitant), contenu de l'article 28 réellement couvert.
 - Affirmation de la page Tarifs sur la prospection B2B sans accord préalable (règle CNIL résumée, formulation prudente « en règle générale »).
-- Mentions du siège et du téléphone, médiation de la consommation (service réservé aux professionnels, donc non traitée), juridiction compétente.
+- Mentions du siège (sans téléphone : l'email est le seul moyen de contact affiché), médiation de la consommation (service réservé aux professionnels, donc non traitée), juridiction compétente.
 - Liens sortants, saisis de mémoire et à vérifier à la main : `anthropic.com/legal/consumer-terms`, `anthropic.com/legal/privacy`, `policies.google.com/privacy`, `apple.com/legal/privacy/fr-fr/`, `cnil.fr/fr/plaintes`.
 
 ### Non vérifié

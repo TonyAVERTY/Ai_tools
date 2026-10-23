@@ -9,17 +9,11 @@ import { PLAN_LIMITS, PLAN_PRICES, PLAN_LABELS, ANNUAL_FREE_MONTHS, annualPrice 
  * Marqueurs visibles tant que l'information n'est pas fournie ou validée. Leur liste est aussi dans docs/JOURNAL.md
  * (section « Marqueurs à compléter ») ; un test compare les deux pour qu'aucun ne soit oublié.
  */
-export const MARKERS = {
-  address: '[À COMPLÉTER : adresse du siège]',
-  host: '[À COMPLÉTER : hébergeur]',
-  phone: '[À COMPLÉTER : téléphone]',
-  retention: '[À VALIDER : durées de conservation]',
-  transfers: '[À VALIDER : transferts hors UE]',
-  processing: '[À VALIDER : cadre de sous-traitance]',
-  liability: '[À VALIDER : limitation de responsabilité]',
-};
+export const MARKERS = {};
 export const LEGAL_MARKERS = Object.values(MARKERS);
-const todo = (key) => `<mark class="todo">${MARKERS[key]}</mark>`;
+/** Adresses données par l'éditeur : siège de l'entreprise individuelle et hébergeur du serveur. */
+export const ADDRESS = '4 rue Alcide de Gasperi, 35340 Liffré';
+export const HOST = 'ElypseCloud, 29 rue Lebrix Mesmin, 33700 Mérignac';
 const PAGES = [['/mentions-legales', 'Mentions légales'], ['/confidentialite', 'Confidentialité'], ['/cgu', 'CGU']];
 
 export const LEGAL_UPDATED = '22 octobre 2026';
@@ -73,16 +67,15 @@ export function mentionsPage({ appUrl }) {
   <dt>Nom</dt><dd>Tony AVERTY, entrepreneur individuel (micro-entreprise)</dd>
   <dt>SIRET</dt><dd>100 142 819 00018</dd>
   <dt>Code APE</dt><dd>62.01Z (programmation informatique)</dd>
-  <dt>Siège</dt><dd>${todo('address')}</dd>
+  <dt>Siège</dt><dd>${ADDRESS}</dd>
   <dt>Email</dt><dd><a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a></dd>
-  <dt>Téléphone</dt><dd>${todo('phone')}</dd>
   <dt>TVA</dt><dd>TVA non applicable, art. 293 B du CGI</dd>
   <dt>Directeur de la publication</dt><dd>Tony AVERTY</dd>
 </dl>`,
       },
       {
         id: 'hebergeur', title: 'Hébergeur',
-        html: `<p>Le site et le service sont hébergés par : ${todo('host')}</p>`,
+        html: `<p>Le site et le service sont hébergés par : ${HOST}</p>`,
       },
       {
         id: 'propriete', title: 'Propriété intellectuelle',
@@ -119,10 +112,10 @@ export function privacyPage({ appUrl, apple = false, captcha = false, inactiveMo
     sections: [
       {
         id: 'roles', title: 'Qui est responsable de quoi',
-        html: `<p>AiTools est édité par Tony AVERTY, entrepreneur individuel (SIRET 100 142 819 00018), siège : ${todo('address')}. Contact : <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a>. Il n'y a pas de délégué à la protection des données.</p>
+        html: `<p>AiTools est édité par Tony AVERTY, entrepreneur individuel (SIRET 100 142 819 00018), siège : ${ADDRESS}. Contact : <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a>. Il n'y a pas de délégué à la protection des données.</p>
 <ul>
   <li><strong>Pour ton compte</strong> (identité, connexion, liaison Claude, réglages), AiTools est <strong>responsable de traitement</strong>.</li>
-  <li><strong>Pour les données de tes prospects</strong> (entreprises et adresses professionnelles que tu recherches, importes ou contactes), c'est <strong>toi le responsable de traitement</strong> : tu décides à qui tu écris et pourquoi. AiTools agit comme <strong>sous-traitant</strong> : il les traite uniquement pour faire fonctionner le service que tu utilises, sur tes instructions, avec les garanties de sécurité décrites plus bas, et les supprime avec ton compte. ${todo('processing')}</li>
+  <li><strong>Pour les données de tes prospects</strong> (entreprises et adresses professionnelles que tu recherches, importes ou contactes), c'est <strong>toi le responsable de traitement</strong> : tu décides à qui tu écris et pourquoi. AiTools agit comme <strong>sous-traitant</strong> : il les traite uniquement pour faire fonctionner le service que tu utilises, sur tes instructions, avec les garanties de sécurité décrites plus bas, et les supprime avec ton compte.</li>
 </ul>`,
       },
       {
@@ -148,7 +141,7 @@ export function privacyPage({ appUrl, apple = false, captcha = false, inactiveMo
       {
         id: 'durees', title: 'Combien de temps',
         html: `<div class="tw"><table>
-  <caption>Durées de conservation ${todo('retention')}</caption>
+  <caption>Durées de conservation</caption>
   <thead><tr><th scope="col">Donnée</th><th scope="col">Durée</th></tr></thead>
   <tbody>
     <tr><th scope="row">Compte et toutes ses données</th><td>Tant que le compte existe. Effacés quand tu supprimes ton compte depuis Mon compte, copie du code comprise.</td></tr>
@@ -171,14 +164,14 @@ export function privacyPage({ appUrl, apple = false, captcha = false, inactiveMo
   ${apple ? '<li><strong>Apple</strong> pour la connexion avec Apple : même principe, avec la possibilité de masquer ton email. <a href="https://www.apple.com/legal/privacy/fr-fr/" rel="noopener noreferrer">Politique d\'Apple</a>.</li>' : ''}
   <li><strong>Anthropic</strong>, par l'intermédiaire de <em>ton</em> accès Claude : le code de ton projet lu par Claude, la fiche et la cible, les domaines des prospects déjà connus pour éviter les doublons, et ce que Claude trouve sur le web transitent par ton compte Anthropic, selon les conditions que tu as acceptées avec lui. <a href="https://www.anthropic.com/legal/privacy" rel="noopener noreferrer">Politique d'Anthropic</a>.</li>
   ${captcha ? `<li><strong>Google reCAPTCHA</strong> (Google Ireland Limited, Google LLC) : protège la connexion contre les envois automatisés. Son script est chargé automatiquement à l'ouverture de la page de connexion, sans action de ta part. Il dépose des cookies et transmet à Google ton adresse IP, des informations sur ton navigateur et sur ton comportement sur la page. Base légale : l'intérêt légitime d'AiTools à protéger la connexion contre les abus. AiTools ne conserve pas le résultat de la vérification. Sans elle, la connexion n'est pas possible. Si cela te pose problème, écris-nous. <a href="https://policies.google.com/privacy" rel="noopener noreferrer">Politique de Google</a>.</li>` : ''}
-  <li><strong>L'hébergeur</strong> du serveur : ${todo('host')}</li>
+  <li><strong>L'hébergeur</strong> du serveur : ${HOST}</li>
   <li><strong>Tes propres services</strong>, quand tu les configures : serveur SMTP et IMAP de ta messagerie, Forgejo, base de données de ton projet, Discord. AiTools s'y connecte avec tes identifiants.</li>
 </ul>
 <p>Les adresses de tes prospects ne sont pas transmises à d'autres utilisateurs. Chaque compte est cloisonné : une ressource d'un autre compte répond « introuvable ».</p>`,
       },
       {
         id: 'transferts', title: 'Transferts hors de l\'Union européenne',
-        html: `<p>${apple ? 'Google, Apple et Anthropic' : 'Google et Anthropic'} peuvent traiter des données aux États-Unis. Ils s'appuient pour cela sur les mécanismes prévus par le RGPD (clauses contractuelles types, cadre de protection des données UE-États-Unis) décrits dans leurs politiques. ${todo('transfers')}</p>
+        html: `<p>${apple ? 'Google, Apple et Anthropic' : 'Google et Anthropic'} peuvent traiter des données aux États-Unis. Ils s'appuient pour cela sur les mécanismes prévus par le RGPD (clauses contractuelles types, cadre de protection des données UE-États-Unis) décrits dans leurs politiques.</p>
 <p>Le reste du service (base de données, application) est hébergé selon les indications de la section « hébergeur ».</p>`,
       },
       {
@@ -296,7 +289,7 @@ export function termsPage({ appUrl, apple = false }) {
       },
       {
         id: 'donnees', title: 'Données personnelles',
-        html: `<p>Les rôles de chacun sont décrits dans la <a href="/confidentialite">politique de confidentialité</a> : tu es responsable de traitement pour les données de tes prospects, AiTools est ton sous-traitant. Tu t'engages à n'enregistrer que des données que tu as le droit de traiter, et à informer les personnes concernées comme la loi l'exige. ${todo('processing')}</p>`,
+        html: `<p>Les rôles de chacun sont décrits dans la <a href="/confidentialite">politique de confidentialité</a> : tu es responsable de traitement pour les données de tes prospects, AiTools est ton sous-traitant. Tu t'engages à n'enregistrer que des données que tu as le droit de traiter, et à informer les personnes concernées comme la loi l'exige.</p>`,
       },
       {
         id: 'garanties', title: 'Disponibilité et résultats',
@@ -308,7 +301,7 @@ export function termsPage({ appUrl, apple = false }) {
       },
       {
         id: 'responsabilite', title: 'Responsabilité',
-        html: `<p>L'éditeur répond des dommages directs qui lui sont imputables. Dans la mesure permise par la loi, il n'est pas responsable des dommages indirects, de la suspension ou de la fermeture de ton compte Claude, des frais facturés par Anthropic ou tes autres prestataires, de la réputation de ton domaine d'envoi, ni de l'usage que tu fais du service en violation de ces conditions. Rien ici n'exclut la responsabilité en cas de faute lourde ou de dol, ni celle que la loi interdit de limiter. ${todo('liability')}</p>`,
+        html: `<p>L'éditeur répond des dommages directs qui lui sont imputables. Dans la mesure permise par la loi, il n'est pas responsable des dommages indirects, de la suspension ou de la fermeture de ton compte Claude, des frais facturés par Anthropic ou tes autres prestataires, de la réputation de ton domaine d'envoi, ni de l'usage que tu fais du service en violation de ces conditions. Rien ici n'exclut la responsabilité en cas de faute lourde ou de dol, ni celle que la loi interdit de limiter.</p>`,
       },
       {
         id: 'suspension', title: 'Suspension et résiliation',

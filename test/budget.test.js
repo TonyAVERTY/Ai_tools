@@ -143,3 +143,11 @@ test('quotaAlerts : un palier (80 %, 95 %) une seule fois, re-sonne si la fenêt
   a = await quotaAlerts(s.db, s.u, { sevenDay: { utilization: 0.97, resetsAt: 300 } });
   assert.deepEqual(a, [{ label: 'semaine Claude', level: 95, utilization: 0.97 }]);
 });
+
+test('quotaState : une mesure dont la fenêtre a été remise à zéro depuis ne bloque plus rien', async () => {
+  const s = await setup();
+  await setSetting(s.db, s.u, 'claude_rate_limit_json', JSON.stringify({ fiveHour: { utilization: 0.95, resetsAt: now() - 60 }, sevenDay: { utilization: 0.1 } }));
+  assert.equal((await quotaState(s.db, s.u)).blocked, false);
+  await setSetting(s.db, s.u, 'claude_rate_limit_json', JSON.stringify({ fiveHour: { utilization: 0.95, resetsAt: now() + 600 }, sevenDay: { utilization: 0.1 } }));
+  assert.equal((await quotaState(s.db, s.u)).blocked, true);
+});
