@@ -693,3 +693,40 @@ input.copy { font-family: var(--mono); font-size: .8125rem; }
 .suggest .sg-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .suggest input { min-width: 0; flex: 1 1 200px; }
 .suggest .done a { margin-right: 8px; }
+
+/* ---------- Réglages : choix du modèle (deux listes) ---------- */
+.modelpick { min-width: 0; }
+.modelpick:has(.mp[open]) { grid-column: 1 / -1; } /* la liste ouverte prend toute la largeur : les descriptions tiennent sur une ligne */
+.mp > summary { list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; padding: 0 14px; background: var(--card); border: 1px solid var(--control); border-radius: var(--radius); cursor: pointer; }
+.mp > summary::-webkit-details-marker { display: none; }
+.mp[open] > summary { border-color: var(--link); }
+.mp > summary .ic { width: 16px; height: 16px; color: var(--muted); }
+.mp-cur em { font-style: normal; font-size: .8125rem; color: var(--muted); }
+.mp-pop { margin-top: 8px; padding: 10px; background: var(--card); border: 1px solid var(--line-strong); border-radius: var(--radius); box-shadow: var(--shadow-3); }
+.mp-h { margin: 2px 4px 8px; font-size: .75rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.mp-h-s { margin-top: 10px; margin-bottom: 6px; }
+.mp-rec { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; min-height: 56px; padding: 8px 10px; border-radius: var(--radius-sm); cursor: pointer; }
+.mp-rec:hover, .mp-o:hover { background: var(--bg-sunk); }
+.mp-rec:has(input:checked), .mp-o:has(input:checked) { background: var(--info-bg); }
+.mp-rec input, .mp-o input { accent-color: var(--accent); margin: 0; }
+.mp-n { display: flex; flex-direction: column; min-width: 0; }
+.mp-n small { color: var(--muted); font-size: .8125rem; line-height: 1.35; }
+.mp-t { font-size: .8125rem; font-weight: 600; color: var(--info); white-space: nowrap; }
+.mp-t i { font-style: normal; letter-spacing: .08em; color: var(--text); }
+.mp-sep { border: 0; border-top: 1px solid var(--line-strong); margin: 8px 0 4px; }
+.mp-others { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 2px; max-height: 190px; overflow-y: auto; }
+.mp-o { display: flex; align-items: center; gap: 8px; min-height: 34px; padding: 4px 8px; border-radius: var(--radius-sm); font-size: .8125rem; color: var(--muted); cursor: pointer; }
+.mp-o:has(input:checked) { color: var(--text); font-weight: 600; }
+
+/* ---------- Réglages : prompts par gamme de modèle ---------- */
+.pscope-bar { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 14px; }
+.pscope-tab { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 14px; border: 1px solid var(--control); border-radius: 999px; background: var(--card); color: var(--text); font: inherit; font-weight: 600; cursor: pointer; }
+.pscope-tab[aria-pressed="true"] { background: var(--info-bg); border-color: var(--link); }
+.pscope-box { display: none; }
+[data-prompts][data-pscope="*"] [data-pscope-box="*"],
+[data-prompts][data-pscope="haiku"] [data-pscope-box="haiku"],
+[data-prompts][data-pscope="sonnet"] [data-pscope-box="sonnet"],
+[data-prompts][data-pscope="opus"] [data-pscope-box="opus"],
+[data-prompts][data-pscope="fable"] [data-pscope-box="fable"] { display: block; }
+.prompt-def > summary .muted { margin-left: auto; }
+.prompt-def > summary .badge { margin-left: 0; }

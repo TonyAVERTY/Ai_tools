@@ -4,6 +4,7 @@ import { readdirSync } from 'node:fs';
 import { runClaude, extractJson, rateLimitWindows } from './services/claude.js';
 import { addUsage } from './services/jobs.js';
 import { syncRepo } from './services/git.js';
+import { normalizeModel } from './services/models.js';
 import { analyzePrompt, prospectPrompt, templatePrompt, followupTemplatePrompt, evolutionPrompt, linkedinPostPrompt, hookPrompt, auditPrompt, parseCustomPrompts, LEVELS } from './services/prompts.js';
 import { linkedinAccount, saveDraft, recentDrafts } from './linkedin.js';
 import { followupCandidates, followupSubject, isBusinessHours } from './services/followup.js';
@@ -123,6 +124,10 @@ export function makeHandlers(app) {
   };
   // Consignes modifiées par l'utilisateur (Réglages) : celles du compte qui lance le job
   const custom = async (userId) => parseCustomPrompts(await getSetting(db, userId, 'prompts_json'));
+  // Modèles choisis dans les Réglages (liste de services/models.js ; toute autre valeur retombe sur Haiku)
+  const modelOf = async (userId, key) => normalizeModel(await getSetting(db, userId, key, 'haiku'));
+  // Rédaction (mails, relances, posts) : son propre réglage ; à défaut, le comportement d'avant (Haiku, et le modèle d'analyse pour LinkedIn)
+  const writeModel = async (userId, legacy) => normalizeModel(await getSetting(db, userId, 'write_model', ''), legacy);
   const inHours = () => (app.isBusinessHours || isBusinessHours)();
 
   // Premier mail ou relance : mêmes plafonds, mêmes délais, même journal
@@ -239,8 +244,8 @@ export function makeHandlers(app) {
       const commit = await sync(userId, project.gitUrl, dir);
 
       await ctx.progress({ message: 'Analyse du code par Claude…', pct: 10 });
-      const { prompt, system } = analyzePrompt(project.name, await custom(userId));
-      const model = await getSetting(db, userId, 'analyze_model', 'haiku');
+      const model = await modelOf(userId, 'analyze_model');
+      const { prompt, system } = analyzePrompt(project.name, await custom(userId), model);
       const sink = makeSink();
       const r = await claude(userId, {
         prompt, system, cwd: dir, model, maxTurns: 20, tools: ['Read', 'Glob', 'Grep'], signal: ctx.signal,
@@ -313,8 +318,8 @@ export function makeHandlers(app) {
         });
       };
       await report();
-      const { prompt, system } = prospectPrompt({ profile: project.profile, target: project.target, count, exclude, custom: await custom(userId) });
-      const model = await getSetting(db, userId, 'prospect_model', 'haiku');
+      const model = await modelOf(userId, 'prospect_model');
+      const { prompt, system } = prospectPrompt({ profile: project.profile, target: project.target, count, exclude, custom: await custom(userId), model });
       const r = await claude(userId, {
         prompt, system, model, tools: ['WebSearch', 'WebFetch'],
         maxTurns, onText, signal: ctx.signal,
@@ -331,8 +336,9 @@ export function makeHandlers(app) {
       const project = await getProject(app, ctx.job.project_id, { userId, secrets: true });
       if (!project.profile) throw new Error('Analyse le projet d\'abord');
       await ctx.progress({ message: 'Rédaction du modèle par Claude…', pct: 40 });
-      const { prompt, system } = templatePrompt({ profile: project.profile, target: project.target || {}, senderName: project.smtp?.fromName, custom: await custom(userId) });
-      const r = await claude(userId, { prompt, system, model: 'haiku', maxTurns: 1, tools: [], signal: ctx.signal });
+      const model = await writeModel(userId, 'haiku');
+      const { prompt, system } = templatePrompt({ profile: project.profile, target: project.target || {}, senderName: project.smtp?.fromName, custom: await custom(userId), model });
+      const r = await claude(userId, { prompt, system, model, maxTurns: 1, tools: [], signal: ctx.signal });
       addUsage(ctx, r);
       const t = extractJson(r.text);
       if (!t.subject || !t.body) throw new Error('Modèle de mail invalide');
@@ -345,8 +351,9 @@ export function makeHandlers(app) {
       const project = await getProject(app, ctx.job.project_id, { userId, secrets: true });
       if (!project.profile) throw new Error('Analyse le projet d\'abord');
       await ctx.progress({ message: 'Rédaction de la relance par Claude…', pct: 40 });
-      const { prompt, system } = followupTemplatePrompt({ profile: project.profile, senderName: project.smtp?.fromName, custom: await custom(userId) });
-      const r = await claude(userId, { prompt, system, model: 'haiku', maxTurns: 1, tools: [], signal: ctx.signal });
+      const model = await writeModel(userId, 'haiku');
+      const { prompt, system } = followupTemplatePrompt({ profile: project.profile, senderName: project.smtp?.fromName, custom: await custom(userId), model });
+      const r = await claude(userId, { prompt, system, model, maxTurns: 1, tools: [], signal: ctx.signal });
       addUsage(ctx, r);
       const t = extractJson(r.text);
       if (!t.body) throw new Error('Modèle de relance invalide');
@@ -363,11 +370,11 @@ export function makeHandlers(app) {
       if (!account) throw new Error("Connecte LinkedIn à ce projet d'abord");
       const direction = String(ctx.params.direction ?? '').trim().slice(0, 500);
       await ctx.progress({ message: direction ? 'Rédaction du post selon ta direction…' : 'Claude choisit un angle et rédige le post…', pct: 40 });
+      const model = await writeModel(userId, await modelOf(userId, 'analyze_model'));
       const { prompt, system } = linkedinPostPrompt({
-        profile: project.profile, target: project.target || {}, direction, previous: await recentDrafts(db, project.id), author: account.name, custom: await custom(userId),
+        profile: project.profile, target: project.target || {}, direction, previous: await recentDrafts(db, project.id), author: account.name, custom: await custom(userId), model,
       });
-      const model = await getSetting(db, userId, 'analyze_model', 'haiku');
-      const r = await claude(userId, { prompt, system, model: ['haiku', 'sonnet'].includes(model) ? model : 'haiku', maxTurns: 1, tools: [], signal: ctx.signal });
+      const r = await claude(userId, { prompt, system, model, maxTurns: 1, tools: [], signal: ctx.signal });
       addUsage(ctx, r);
       let body = '';
       try { body = String(extractJson(r.text).post ?? ''); } catch { body = ''; }
@@ -446,11 +453,11 @@ export function makeHandlers(app) {
       const prospect = await db.prepare('SELECT * FROM prospects WHERE id = ? AND project_id = ?').get(Number(ctx.params.prospectId), project.id);
       if (!prospect) throw new Error('Prospect introuvable');
       await ctx.progress({ message: `Lecture du site de ${prospect.company}…`, pct: 20 });
-      const { prompt, system } = hookPrompt({ profile: project.profile, prospect, custom: await custom(userId) });
-      const model = await getSetting(db, userId, 'prospect_model', 'haiku');
+      const model = await modelOf(userId, 'prospect_model');
+      const { prompt, system } = hookPrompt({ profile: project.profile, prospect, custom: await custom(userId), model });
       // Sans site, Claude n'a rien à lire : pas d'outil web, l'accroche s'appuie sur la fiche du prospect
       const r = await claude(userId, {
-        prompt, system, model: ['haiku', 'sonnet'].includes(model) ? model : 'haiku',
+        prompt, system, model,
         tools: prospect.website ? ['WebFetch'] : [], maxTurns: prospect.website ? 6 : 1, signal: ctx.signal,
       });
       addUsage(ctx, r);

@@ -85,15 +85,15 @@ test('dashboard, réglages, création de projet et statut', async () => {
   assert.equal(r.status, 400);
   assert.match((await r.json()).error, /github\.com/);
 
-  r = await post('/settings', { notify_email: 'moi@x.fr', git_type_0: 'forgejo', git_host_0: 'https://git.tony-averty.dev/', git_token_0: 'tok123', global_daily_cap: '9999', send_delay_min: '1', send_delay_max: '2', prospect_model: 'opus', analyze_model: 'opus' }, { form: true });
+  r = await post('/settings', { notify_email: 'moi@x.fr', git_type_0: 'forgejo', git_host_0: 'https://git.tony-averty.dev/', git_token_0: 'tok123', global_daily_cap: '9999', send_delay_min: '1', send_delay_max: '2', prospect_model: 'opus', analyze_model: 'gpt-4; rm -rf /' }, { form: true });
   assert.equal(r.status, 303);
   const s = async (k) => (await app.db.prepare('SELECT value FROM user_settings WHERE user_id = ? AND `key` = ?').get(uid, k))?.value;
   const servers = JSON.parse(await s('git_servers_json'));
   assert.deepEqual(servers.map((x) => [x.type, x.host]), [['forgejo', 'git.tony-averty.dev']]);
   assert.equal(await s('global_daily_cap'), '300', 'plafond borné');
   assert.equal(await s('send_delay_min'), '5');
-  assert.equal(await s('prospect_model'), 'haiku', 'opus refusé pour la prospection');
-  assert.equal(await s('analyze_model'), 'haiku', 'opus refusé pour l\'analyse');
+  assert.equal(await s('prospect_model'), 'opus', 'tous les modèles du catalogue sont acceptés');
+  assert.equal(await s('analyze_model'), 'haiku', 'un identifiant hors catalogue n\'est jamais transmis à Claude : retour à Haiku');
   assert.ok(servers[0].tokenEnc && !servers[0].tokenEnc.includes('tok123'), 'token chiffré');
 
   // Un autre hôte que GitHub et le serveur Git personnel : refusé (GitHub, lui, est accepté d'office : voir test/git-hosts.test.js)
