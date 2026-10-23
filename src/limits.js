@@ -12,6 +12,9 @@ const HOUR = 60 * MIN;
  * Une requête passe seulement si toutes les portées de la règle l'acceptent.
  */
 export const RATE_LIMITS = {
+  // API (mode développeur) : par adresse avant authentification, par compte ensuite
+  api_ip: { ip: { max: 300, windowMs: MIN } },
+  api: { user: { max: 120, windowMs: MIN } },
   // Connexion : démarrage (Google, Apple) et retours des fournisseurs
   auth_start: { ip: { max: 20, windowMs: 10 * MIN } },
   auth_callback: { ip: { max: 40, windowMs: 10 * MIN } },

@@ -114,7 +114,7 @@ function linkSection(link, consent) {
 </section>`;
 }
 
-export function accountPage({ user, error, link = null, consent = null, notice = null, usage = null }) {
+export function accountPage({ user, error, link = null, consent = null, notice = null, usage = null, developer = false }) {
   return layout({
     title: 'Mon compte', email: user.email,
     body: `<div class="narrow">
@@ -129,6 +129,10 @@ export function accountPage({ user, error, link = null, consent = null, notice =
 ${notice ? `<p class="${notice.ok ? 'msg msg-ok' : 'msg msg-err'}" role="status">${esc(notice.text)}</p>` : ''}
 ${usagePanel(usage)}
 ${linkSection(link, consent)}
+<section class="card">
+  <div class="card-h"><h2>Mode développeur</h2><p>L'API d'AiTools et le serveur MCP (relier Claude à ton panel) ne sont disponibles que si tu actives ce mode.</p></div>
+  <div class="row"><span class="badge ${developer ? 'ok' : ''}">${developer ? 'Activé' : 'Désactivé'}</span><a class="btn small" href="/developer">${ic('key')}${developer ? 'Jetons et documentation' : 'Activer'}</a></div>
+</section>
 <section class="card danger">
   <div class="card-h"><h2>Zone de danger</h2></div>
   <p class="card-d">Supprimer ton compte efface définitivement ton compte et toutes tes données : projets, prospects, notes, modèles de mail, journaux d'envoi, jobs, réglages et clones du code. Les adresses qui ont demandé à ne plus être contactées restent dans la liste d'opposition commune. Cette action est irréversible.</p>

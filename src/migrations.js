@@ -656,6 +656,36 @@ export const MIGRATIONS = [
     ],
   },
   {
+    // Jetons d'API (mode développeur) : seul le SHA-256 du jeton est gardé, jamais le jeton lui-même.
+    name: 'api_tokens',
+    sqlite: [
+      `CREATE TABLE api_tokens (
+        id INTEGER PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        token_hash TEXT NOT NULL UNIQUE,
+        prefix TEXT NOT NULL,        -- début du jeton, pour le reconnaître dans la liste
+        scopes TEXT NOT NULL,        -- read, write, jobs (séparés par des virgules)
+        created_at INTEGER NOT NULL, last_used_at INTEGER
+      )`,
+      'CREATE INDEX api_tokens_user ON api_tokens(user_id)',
+    ],
+    mysql: [
+      `CREATE TABLE IF NOT EXISTS api_tokens (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        user_id BIGINT NOT NULL,
+        name VARCHAR(100) NOT NULL,
+        token_hash VARCHAR(64) NOT NULL,
+        prefix VARCHAR(16) NOT NULL,
+        scopes VARCHAR(60) NOT NULL,
+        created_at BIGINT NOT NULL, last_used_at BIGINT NULL,
+        UNIQUE KEY api_tokens_hash (token_hash),
+        KEY api_tokens_user (user_id),
+        CONSTRAINT api_tokens_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      ) ${T}`,
+    ],
+  },
+  {
     // Identifiants de session : la base ne garde plus que leur empreinte SHA-256. Personne n'est déconnecté (voir hashSessionIds).
     name: 'session_id_hashing',
     sqlite: [hashSessionIds],
