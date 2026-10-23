@@ -78,10 +78,10 @@ export function teamPage({ user, owned = null, memberOf = [], canTeam = false, e
   <p class="muted small">Les projets partagés apparaissent dans ton tableau de bord, avec le nom du propriétaire.</p></section>` : '';
   return layout({
     title: 'Équipe', email: user.email,
-    body: `<h1>Équipe</h1>
-${error ? `<p class="error" role="alert">${esc(error)}</p>` : ''}${notice ? `<p class="ok" role="status">${esc(notice)}</p>` : ''}
+    body: `<div class="narrow"><h1>Équipe</h1>
+${error ? `<p class="msg msg-err" role="alert">${esc(error)}</p>` : ''}${notice ? `<p class="msg msg-ok" role="status">${esc(notice)}</p>` : ''}
 ${owned ? ownerSection(owned, invite) : createSection(canTeam)}
-${member}`,
+${member}</div>`,
   });
 }
 
@@ -93,5 +93,5 @@ export function joinPage({ user, token, info, error = null }) {
   <p class="muted small">Tu verras les projets qu'il partage avec l'équipe et pourras y travailler avec son accès Claude, son SMTP et ses plafonds. Tu pourras quitter l'équipe à tout moment.</p>
   ${error ? `<p class="error">${esc(error)}</p>` : ''}
   <form method="post" action="/team/join/${esc(token)}" class="row-actions"><button class="btn primary">Rejoindre l'équipe</button> <a class="btn" href="/">Pas maintenant</a></form></section>`;
-  return layout({ title: 'Invitation', email: user.email, body: `<h1>Invitation</h1>${body}` });
+  return layout({ title: 'Invitation', email: user.email, body: `<div class="narrow"><h1>Invitation</h1>${body}</div>` });
 }

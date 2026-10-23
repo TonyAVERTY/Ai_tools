@@ -80,7 +80,7 @@ test('pages d\'application : toujours protégées, la racine dépend de la sessi
   // Connecté sans liaison Claude : la racine ne montre plus le site, l'onboarding reprend la main
   const linked = await s.newUser({ email: 'lie@x.fr' });
   const dash = await (await linked.get('/', { headers: { accept: 'text/html' } })).text();
-  assert.match(dash, /<h1>Projets<\/h1>/, 'compte relié : le tableau de bord');
+  assert.match(dash, /<h1[^>]*>Projets<\/h1>/, 'compte relié : le tableau de bord');
   assert.doesNotMatch(dash, /Un panel pour prospecter/);
   const u = await s.newUser({ email: 'site@x.fr', admin: false });
   let r = await u.get('/', { headers: { accept: 'text/html' } });

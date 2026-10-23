@@ -59,10 +59,26 @@
   $$('input.copy').forEach((i) => i.addEventListener('focus', () => i.select()));
 
   // ---------- Barre du haut : page courante en surbrillance ----------
-  $$('.topnav a.navlink').forEach((a) => {
+  $$('.pills a.pill, .user-pop a').forEach((a) => {
     const here = a.pathname === '/' ? location.pathname === '/' : location.pathname === a.pathname || location.pathname.startsWith(`${a.pathname}/`);
     if (here) a.setAttribute('aria-current', 'page');
   });
+
+  // ---------- Nouveau projet : le formulaire s'ouvre sous le bouton ----------
+  const newForm = $('#new-project');
+  $$('[data-new-toggle]').forEach((b) => b.addEventListener('click', () => {
+    if (!newForm) return;
+    newForm.hidden = !newForm.hidden;
+    $$('[data-new-toggle][aria-expanded]').forEach((t) => t.setAttribute('aria-expanded', String(!newForm.hidden)));
+    if (!newForm.hidden) $('input', newForm)?.focus();
+  }));
+
+  // ---------- Menu du compte (avatar) : se ferme au clic ailleurs ou avec Échap ----------
+  const userMenu = $('details.user');
+  if (userMenu) {
+    document.addEventListener('click', (e) => { if (userMenu.open && !userMenu.contains(e.target)) userMenu.open = false; });
+    userMenu.addEventListener('keydown', (e) => { if (e.key === 'Escape' && userMenu.open) { userMenu.open = false; $('summary', userMenu).focus(); } });
+  }
 
   // ---------- Liaison Claude : fenêtre d'avertissement du mode abonnement ----------
   // Le serveur refuse de toute façon (400) une requête sans la case cochée ; ici on évite seulement l'envoi inutile.
@@ -493,7 +509,7 @@
     todo.classList.toggle('min', min);
     todo.dataset.project = id;
     todo.innerHTML = `<button type="button" class="todo-head" data-todo-toggle aria-expanded="${!min}">
-      <span class="todo-ring" data-pct="${Math.round((100 * c.done) / c.total)}"><b>${c.done}/${c.total}</b></span>
+      <svg class="ring" viewBox="0 0 44 44" role="img" aria-label="${c.done} étapes sur ${c.total}"><circle class="ring-t" cx="22" cy="22" r="18"></circle><circle class="ring-v" cx="22" cy="22" r="18" stroke-dasharray="${((113.1 * c.done) / c.total).toFixed(2)} 113.1" transform="rotate(-90 22 22)"></circle><text class="ring-x" x="22" y="26" text-anchor="middle">${c.done}/${c.total}</text></svg>
       <span class="todo-title"><strong>${c.ready ? 'Prêt à prospecter' : 'Mise en route'}</strong><span class="muted small">${esc(name)}</span></span>
       <span class="chev" aria-hidden="true"></span></button>
     <div class="todo-body">
@@ -502,8 +518,6 @@
         ${s.done ? '' : `<span class="muted small">${esc(s.hint)}</span>`}</div></li>`).join('')}</ul>
       <button type="button" class="todo-hide muted small" data-todo-hide>Masquer pour ce projet</button>
     </div>`;
-    const ring = $('.todo-ring', todo);
-    ring.style.setProperty('--p', `${ring.dataset.pct}%`); // CSSOM : la CSP interdit style=""
   }
 
   async function loadChecklist(el) {
@@ -1253,88 +1267,4 @@
     try { await api(`/api/prospects/${sel.dataset.prospect}/status`, { status: sel.value }); sel.className = `st-${sel.value}`; toast('Statut mis à jour'); }
     catch (err) { toast(err.message, 'error'); }
   });
-
-  // ---------- Fond : constellation de particules qui fuient la souris ----------
-  // Canvas 2D, ~90 points max : léger. Coupé quand l'onglet est caché, figé si l'OS demande moins d'animations.
-  (function particles() {
-    const cv = $('#bg');
-    const ctx = cv?.getContext?.('2d');
-    if (!ctx) return;
-    const LINK = 120;   // distance max d'un trait entre deux points
-    const R = 170;      // rayon d'influence de la souris
-    const mouse = { x: -1e4, y: -1e4 };
-    let W = 0, H = 0, pts = [], raf = 0, rgb = '47,91,234';
-
-    const readColor = () => {
-      const m = /^#?([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec(getComputedStyle(document.documentElement).getPropertyValue('--accent').trim());
-      if (m) rgb = m.slice(1).map((h) => parseInt(h, 16)).join(',');
-    };
-    const spawn = () => {
-      const a = Math.random() * Math.PI * 2, s = 0.12 + Math.random() * 0.25;
-      const bvx = Math.cos(a) * s, bvy = Math.sin(a) * s;
-      return { x: Math.random() * W, y: Math.random() * H, vx: bvx, vy: bvy, bvx, bvy, r: 1 + Math.random() * 1.6 };
-    };
-    function resize() {
-      const dpr = Math.min(2, window.devicePixelRatio || 1);
-      W = window.innerWidth; H = window.innerHeight;
-      cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      const n = Math.round(Math.min(90, Math.max(24, (W * H) / 16000)));
-      while (pts.length < n) pts.push(spawn());
-      pts.length = n;
-    }
-    function step() {
-      for (const p of pts) {
-        const dx = p.x - mouse.x, dy = p.y - mouse.y, d = Math.hypot(dx, dy);
-        if (d < R && d > 0.5) { const f = (1 - d / R) * 0.45; p.vx += (dx / d) * f; p.vy += (dy / d) * f; }
-        // Revient doucement à sa dérive de base après une poussée
-        p.vx += (p.bvx - p.vx) * 0.03; p.vy += (p.bvy - p.vy) * 0.03;
-        p.x += p.vx; p.y += p.vy;
-        if (p.x < -12) p.x = W + 12; else if (p.x > W + 12) p.x = -12;
-        if (p.y < -12) p.y = H + 12; else if (p.y > H + 12) p.y = -12;
-      }
-    }
-    function draw() {
-      ctx.clearRect(0, 0, W, H);
-      ctx.lineWidth = 1;
-      for (let i = 0; i < pts.length; i++) {
-        const a = pts[i];
-        for (let j = i + 1; j < pts.length; j++) {
-          const b = pts[j], dx = a.x - b.x, dy = a.y - b.y, d2 = dx * dx + dy * dy;
-          if (d2 > LINK * LINK) continue;
-          ctx.strokeStyle = `rgba(${rgb},${((1 - Math.sqrt(d2) / LINK) * 0.2).toFixed(3)})`;
-          ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
-        }
-        const md = Math.hypot(a.x - mouse.x, a.y - mouse.y);
-        if (md < R) {
-          ctx.strokeStyle = `rgba(${rgb},${((1 - md / R) * 0.45).toFixed(3)})`;
-          ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(mouse.x, mouse.y); ctx.stroke();
-        }
-      }
-      for (const p of pts) {
-        const glow = Math.max(0, 1 - Math.hypot(p.x - mouse.x, p.y - mouse.y) / R);
-        ctx.fillStyle = `rgba(${rgb},${(0.45 + glow * 0.5).toFixed(3)})`;
-        ctx.beginPath(); ctx.arc(p.x, p.y, p.r + glow * 1.5, 0, Math.PI * 2); ctx.fill();
-      }
-    }
-    const loop = () => { step(); draw(); raf = requestAnimationFrame(loop); };
-    const start = () => { cancelAnimationFrame(raf); if (reduceMotion.matches) draw(); else raf = requestAnimationFrame(loop); };
-
-    window.addEventListener('pointermove', (e) => { mouse.x = e.clientX; mouse.y = e.clientY; }, { passive: true });
-    document.addEventListener('pointerleave', () => { mouse.x = mouse.y = -1e4; });
-    window.addEventListener('blur', () => { mouse.x = mouse.y = -1e4; });
-    // Un clic souffle les particules alentour
-    window.addEventListener('pointerdown', (e) => {
-      for (const p of pts) {
-        const dx = p.x - e.clientX, dy = p.y - e.clientY, d = Math.hypot(dx, dy);
-        if (d < 240 && d > 0.5) { const f = (1 - d / 240) * 5; p.vx += (dx / d) * f; p.vy += (dy / d) * f; }
-      }
-    }, { passive: true });
-    let rt;
-    window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { resize(); start(); }, 120); });
-    document.addEventListener('visibilitychange', () => { if (document.hidden) cancelAnimationFrame(raf); else start(); });
-    matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readColor);
-    reduceMotion.addEventListener('change', start);
-    readColor(); resize(); start();
-  })();
 })();
