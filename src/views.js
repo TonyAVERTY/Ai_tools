@@ -1,3 +1,4 @@
+import { RECOMMENDED, OTHERS, modelLabel } from './services/models.js';
 import { esc } from './http.js';
 import { STATUSES } from './services/crm.js';
 import { icalBox } from './icalview.js';
@@ -533,10 +534,27 @@ function uncovered(d, channels = {}) {
 const SETTINGS_TOC = [['notif', 'Notifications'], ['git', 'Dépôts Git'], ['garde', 'Garde-fous'], ['budget', 'Budget et modèles IA'], ['prompts', 'Prompts IA'], ['opposition', "Liste d'opposition"]];
 
 export function settingsPage({ email, s, saved }) {
-  const model = (name, v) => `<span class="sel"><select name="${name}">
-    <option value="haiku" ${v === 'haiku' ? 'selected' : ''}>Haiku (économe)</option>
-    <option value="sonnet" ${v === 'sonnet' ? 'selected' : ''}>Sonnet (plus précis, plus cher)</option>
-  </select>${ic('down')}</span>`;
+  // Sélecteur de modèle en deux listes : les recommandés (avec une estimation relative du coût), puis tous les autres, plus compacts et sans estimation
+  const recTier = (m) => `${m.tier} · ${m.cost}`;
+  const model = (name, v, title) => {
+    const cur = RECOMMENDED.find((m) => m.id === v);
+    const radio = (m, extra = '') => `<input type="radio" name="${name}" value="${m.id}"${m.id === v ? ' checked' : ''} data-mp-label="${esc(m.label)}" data-mp-tier="${esc(extra)}">`;
+    return `<div class="field modelpick" data-modelpick>
+      <span class="lbl" id="${name}-l">${title}</span>
+      <details class="mp">
+        <summary aria-labelledby="${name}-l"><span class="mp-cur"><b data-mp-name>${esc(cur ? cur.label : modelLabel(v))}</b> <em data-mp-tier-out>${cur ? esc(recTier(cur)) : ''}</em></span>${ic('down')}</summary>
+        <div class="mp-pop" role="radiogroup" aria-labelledby="${name}-l">
+          <p class="mp-h">Recommandés</p>
+          ${RECOMMENDED.map((m) => `<label class="mp-rec">${radio(m, recTier(m))}<span class="mp-n"><b>${esc(m.label)}</b><small>${esc(m.note)}</small></span><span class="mp-t">${esc(m.tier)} <i>${esc(m.cost)}</i></span></label>`).join('\n          ')}
+          <hr class="mp-sep">
+          <p class="mp-h mp-h-s">Autres modèles</p>
+          <div class="mp-others">
+            ${OTHERS.map((m) => `<label class="mp-o">${radio(m, '')}<span>${esc(m.label)}</span></label>`).join('\n            ')}
+          </div>
+        </div>
+      </details>
+    </div>`;
+  };
   return layout({
     title: 'Réglages', email,
     body: `<div class="settings">
@@ -628,26 +646,33 @@ ${saved ? `<p class="ok-box" role="status">${ic('check')}<span><b>Réglages enre
   <div class="grid2">
     ${s.priced ? `<label class="field"><span class="lbl">Plafond sur 24 h glissantes</span><span class="unit"><input name="budget_day_usd" inputmode="decimal" value="${esc(s.budget_day_usd)}" placeholder="ex. 2"><span>$</span></span></label>
     <label class="field"><span class="lbl">Plafond sur 30 jours glissants</span><span class="unit"><input name="budget_month_usd" inputmode="decimal" value="${esc(s.budget_month_usd)}" placeholder="ex. 30"><span>$</span></span></label>` : ''}
-    <label class="field"><span class="lbl">Modèle pour la prospection</span>${model('prospect_model', s.prospect_model)}</label>
-    <label class="field"><span class="lbl">Modèle pour l'analyse de projet</span>${model('analyze_model', s.analyze_model)}</label>
+    ${model('prospect_model', s.prospect_model, 'Modèle pour la prospection')}
+    ${model('analyze_model', s.analyze_model, "Modèle pour l'analyse de projet")}
+    ${model('write_model', s.write_model, 'Modèle pour la rédaction (mails, relances, posts LinkedIn)')}
   </div>
-  <p class="hint">Haiku suffit pour la plupart des projets. Repasse en Sonnet uniquement si la fiche générée manque de précision.</p>
+  <p class="hint">Haiku suffit pour la plupart des projets : passe à Sonnet ou Opus seulement si les fiches ou les textes manquent de précision. Les estimations (économe, intermédiaire, plus cher) sont relatives : avec ton abonnement elles se voient dans ton quota Claude, avec une clé API dans le prix. Chaque modèle a ses propres prompts, réglables plus bas.</p>
 </section>
 
 <div class="save"><button class="btn primary">Enregistrer</button></div>
-</form>
 
-<section class="card" id="prompts" aria-labelledby="t-prompts">
-  <div class="card-h"><h2 id="t-prompts">Prompts IA</h2><p>Les consignes que Claude reçoit pour chaque tâche. Modifie-les pour changer le style, le ton ou les règles. Le contexte du projet et le format de réponse restent ajoutés automatiquement : un prompt modifié ne peut pas casser la lecture de la réponse. Ce qui est vide revient au texte par défaut.</p></div>
-  ${(s.prompts || []).map((p) => `<details class="prompt-def"${p.custom ? ' open' : ''}>
-    <summary><span>${esc(p.label)}</span>${p.custom ? ' <span class="badge warn">modifié</span>' : ''}</summary>
-    <label class="field"><span class="lbl">Consignes</span>
-      <textarea name="prompt_${p.key}" rows="9" maxlength="${s.promptMax}" data-prompt-text>${esc(p.text)}</textarea></label>
-    <p class="muted small">${esc(p.fixed)}${p.vars.length ? ` Valeurs insérées automatiquement : ${p.vars.map((v) => `<code>[[${v}]]</code>`).join(', ')}.` : ''}</p>
-    <div class="row-actions"><button type="button" class="btn small" data-prompt-reset data-default="${esc(p.def)}">${ic('repeat')}Revenir au texte par défaut</button></div>
+<section class="card" id="prompts" aria-labelledby="t-prompts" data-prompts data-pscope="*">
+  <div class="card-h"><h2 id="t-prompts">Prompts IA</h2><p>Les consignes que Claude reçoit pour chaque tâche. Modifie-les pour changer le style, le ton ou les règles. Le contexte du projet et le format de réponse restent ajoutés automatiquement : un prompt modifié ne peut pas casser la lecture de la réponse.</p></div>
+  <p class="hint">Chaque gamme de modèle a ses propres consignes, adaptées à sa façon de travailler (un petit modèle a besoin d'une méthode pas à pas, un grand d'un peu plus de recul). Un texte écrit dans « Tous les modèles » s'applique à toutes les gammes qui n'ont pas le leur. Ce qui est vide revient au texte par défaut.</p>
+  <div class="pscope-bar" role="group" aria-label="Gamme de modèle">
+    ${s.prompts.scopes.map((sc, i) => `<button type="button" class="pscope-tab" data-pscope-tab="${sc.id}" aria-pressed="${i === 0}">${esc(sc.label)}${sc.count ? ` <span class="badge warn">${sc.count}</span>` : ''}</button>`).join('\n    ')}
+  </div>
+  ${s.prompts.tasks.map((t) => `<details class="prompt-def"${Object.values(t.scopes).some((x) => x.custom) ? ' open' : ''}>
+    <summary><span>${esc(t.label)}</span><span class="muted small">modèle : ${esc(t.uses)}</span>${Object.values(t.scopes).some((x) => x.custom) ? ' <span class="badge warn">modifié</span>' : ''}</summary>
+    ${s.prompts.scopes.map((sc) => `<div class="pscope-box" data-pscope-box="${sc.id}">
+      <label class="field"><span class="lbl">Consignes · ${esc(sc.label)}${t.scopes[sc.id].custom ? ' (modifié)' : ''}</span>
+        <textarea name="${sc.id === '*' ? `prompt_${t.key}` : `prompt_${sc.id}_${t.key}`}" rows="14" maxlength="${s.promptMax}" data-prompt-text>${esc(t.scopes[sc.id].text)}</textarea></label>
+      <div class="row-actions"><button type="button" class="btn small" data-prompt-reset data-default="${esc(t.scopes[sc.id].def)}">${ic('repeat')}Revenir au texte par défaut</button></div>
+    </div>`).join('\n    ')}
+    <p class="muted small">${esc(t.fixed)}${t.vars.length ? ` Valeurs insérées automatiquement : ${t.vars.map((v) => `<code>[[${v}]]</code>`).join(', ')}.` : ''}</p>
   </details>`).join('\n  ')}
   <div class="save"><button class="btn primary">Enregistrer les réglages</button></div>
 </section>
+</form>
 
 <section class="card" id="opposition" aria-labelledby="t-opp">
   <div class="card-h"><h2 id="t-opp">Liste d'opposition</h2></div>

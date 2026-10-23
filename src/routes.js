@@ -36,7 +36,8 @@ import { cpuTemp } from './services/thermal.js';
 import { checkInbox } from './services/inbox.js';
 import { followupPlan } from './services/followup.js';
 import { warmupAdvice } from './services/warmup.js';
-import { PROMPT_DEFS, parseCustomPrompts, MAX_CUSTOM } from './services/prompts.js';
+import { PROMPT_DEFS, parseCustomPrompts, promptsView, MAX_CUSTOM } from './services/prompts.js';
+import { normalizeModel, PROMPT_SCOPES } from './services/models.js';
 import { nextNightSlot } from './services/paris-time.js';
 import { notify, notifyConfig, saveDiscordHooks, publicHooks, EVENTS, MAX_HOOKS } from './services/notify.js';
 import { listChannels, saveChannels, publicChannels, notifyChannels, CHANNEL_TYPES } from './services/channels.js';
@@ -152,6 +153,8 @@ export function registerRoutes(router, app) {
     const userId = session.userId;
     const discord = await notifyConfig(app, userId);
     const promptsRaw = await getSetting(db, userId, 'prompts_json', '');
+    const analyze = normalizeModel(await getSetting(db, userId, 'analyze_model', 'haiku'));
+    const models = { analyze, prospect: normalizeModel(await getSetting(db, userId, 'prospect_model', 'haiku')), write: normalizeModel(await getSetting(db, userId, 'write_model', ''), analyze) };
     const s = {
       notify_email: await getSetting(db, userId, 'notify_email', ''),
       git_servers: publicGitServers(await listGitServers(db, userId)),
@@ -159,8 +162,9 @@ export function registerRoutes(router, app) {
       global_daily_cap: await getSetting(db, userId, 'global_daily_cap', '100'),
       send_delay_min: await getSetting(db, userId, 'send_delay_min', '20'),
       send_delay_max: await getSetting(db, userId, 'send_delay_max', '60'),
-      prospect_model: await getSetting(db, userId, 'prospect_model', 'haiku'),
-      analyze_model: await getSetting(db, userId, 'analyze_model', 'haiku'),
+      prospect_model: models.prospect,
+      analyze_model: models.analyze,
+      write_model: models.write,
       weekly_report: await getSetting(db, userId, 'weekly_report', '0') === '1',
       read_receipt: await getSetting(db, userId, 'read_receipt', '0') === '1',
       budget_day_usd: await getSetting(db, userId, 'budget_day_usd', ''),
@@ -168,7 +172,7 @@ export function registerRoutes(router, app) {
       priced: (await getLinkState(db, userId))?.mode === MODES.api_key, // plafonds en $ : seulement avec une clé API
       discord: { hooks: publicHooks(discord.hooks), all: EVENTS, max: MAX_HOOKS },
       channels: publicChannels(await listChannels(app, userId, Object.keys(EVENTS))), canEmail: !!cfg.systemSmtp,
-      prompts: (() => { const own = parseCustomPrompts(promptsRaw); return Object.entries(PROMPT_DEFS).map(([key, d]) => ({ key, label: d.label, fixed: d.fixed, vars: d.vars, def: d.text, text: own[key] ?? d.text, custom: key in own })); })(),
+      prompts: promptsView(parseCustomPrompts(promptsRaw), models),
       promptMax: MAX_CUSTOM,
     };
     html(res, settingsPage({ email: session.email, s, saved: url.searchParams.has('ok') }));
@@ -189,8 +193,8 @@ export function registerRoutes(router, app) {
     await set('global_daily_cap', String(cap));
     await set('send_delay_min', String(dmin));
     await set('send_delay_max', String(dmax));
-    await set('prospect_model', b.prospect_model === 'sonnet' ? 'sonnet' : 'haiku');
-    await set('analyze_model', b.analyze_model === 'sonnet' ? 'sonnet' : 'haiku');
+    // Modèles : uniquement ceux du catalogue (services/models.js) ; un champ absent ne change rien
+    for (const k of ['prospect_model', 'analyze_model', 'write_model']) if (b[k] !== undefined) await set(k, normalizeModel(b[k]));
     const money = (v) => { const n = Number(String(v || '').replace(',', '.')); return Number.isFinite(n) && n > 0 ? String(Math.round(n * 100) / 100) : ''; };
     await set('weekly_report', b.weekly_report === 'on' ? '1' : '0');
     // Les cases décochées ne sont pas envoyées : la présence du champ « délais » signale le formulaire complet
@@ -201,11 +205,22 @@ export function registerRoutes(router, app) {
 
     await saveDiscordHooks(app, userId, b);
     await saveChannels(app, userId, b, Object.keys(EVENTS));
-    // Consignes des prompts : seules celles qui diffèrent du défaut sont gardées ; vide = retour au défaut
-    if (Object.keys(PROMPT_DEFS).some((k) => b[`prompt_${k}`] !== undefined)) {
-      const sent = Object.fromEntries(Object.keys(PROMPT_DEFS).map((k) => [k, String(b[`prompt_${k}`] ?? '')]));
-      if (Object.values(sent).some((v) => v.length > MAX_CUSTOM)) throw new HttpError(400, `Une consigne dépasse ${MAX_CUSTOM} caractères`, { expose: true });
-      const own = parseCustomPrompts(sent);
+    // Consignes des prompts, par gamme de modèle (« tous les modèles », Haiku, Sonnet, Opus, Fable). Un champ absent garde sa valeur ;
+    // un champ vide, ou identique à ce que la gamme reçoit déjà, revient au défaut.
+    const fieldName = (scope, key) => (scope === '*' ? `prompt_${key}` : `prompt_${scope}_${key}`);
+    if (PROMPT_SCOPES.some((sc) => Object.keys(PROMPT_DEFS).some((k) => b[fieldName(sc, k)] !== undefined))) {
+      const next = {};
+      const current = parseCustomPrompts(await getSetting(db, userId, 'prompts_json', ''));
+      for (const sc of PROMPT_SCOPES) {
+        next[sc] = { ...current[sc] };
+        for (const k of Object.keys(PROMPT_DEFS)) {
+          const v = b[fieldName(sc, k)];
+          if (v === undefined) continue;
+          if (String(v).length > MAX_CUSTOM) throw new HttpError(400, `Une consigne dépasse ${MAX_CUSTOM} caractères`, { expose: true });
+          next[sc][k] = String(v);
+        }
+      }
+      const own = parseCustomPrompts(next);
       await set('prompts_json', Object.keys(own).length ? JSON.stringify(own) : '');
     }
     redirect(res, '/settings?ok');

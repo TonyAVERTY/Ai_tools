@@ -698,13 +698,35 @@
     catch { const r = document.createRange(); r.selectNodeContents(code); getSelection().removeAllRanges(); getSelection().addRange(r); toast('Sélectionné : copie-le avec Ctrl+C', 'error'); }
   });
 
-  // ---------- Réglages : revenir au prompt par défaut ----------
+  // ---------- Réglages : prompts par gamme de modèle ----------
+  // Onglets « Tous les modèles / Haiku / Sonnet / Opus / Fable » : un seul texte visible par tâche (les autres restent dans le formulaire).
+  document.addEventListener('click', (e) => {
+    const tab = e.target.closest('[data-pscope-tab]');
+    if (!tab) return;
+    const card = tab.closest('[data-prompts]');
+    card.dataset.pscope = tab.dataset.pscopeTab;
+    for (const t of $$('[data-pscope-tab]', card)) t.setAttribute('aria-pressed', String(t === tab));
+  });
   document.addEventListener('click', (e) => {
     const b = e.target.closest('[data-prompt-reset]');
     if (!b) return;
-    const ta = $('[data-prompt-text]', b.closest('.prompt-def'));
+    const ta = $('[data-prompt-text]', b.closest('.pscope-box'));
     ta.value = b.dataset.default;
     ta.focus();
+  });
+  // Un texte que l'utilisateur n'a pas touché n'est pas renvoyé : il ne fige pas une gamme sur l'ancien défaut quand « Tous les modèles » change
+  document.addEventListener('submit', (e) => {
+    for (const ta of $$('[data-prompt-text]', e.target)) if (ta.value === ta.defaultValue) ta.disabled = true;
+  });
+
+  // ---------- Réglages : choix du modèle (liste recommandée + autres) ----------
+  document.addEventListener('change', (e) => {
+    const r = e.target.closest('[data-modelpick] input[type=radio]');
+    if (!r) return;
+    const box = r.closest('[data-modelpick]');
+    $('[data-mp-name]', box).textContent = r.dataset.mpLabel;
+    $('[data-mp-tier-out]', box).textContent = r.dataset.mpTier;
+    box.querySelector('details').open = false;
   });
 
   // ---------- Réglages : notifications, le « + » ouvre le menu des services ----------

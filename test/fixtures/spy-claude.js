@@ -8,6 +8,8 @@ import { fileURLToPath } from 'node:url';
 
 const model = process.argv[process.argv.indexOf('--model') + 1] || '';
 if (process.env.MODEL_SPY_FILE) appendFileSync(process.env.MODEL_SPY_FILE, model + '\n');
+// PROMPT_SPY_FILE : le prompt complet reçu (une ligne JSON par appel), pour vérifier les consignes réellement transmises
+if (process.env.PROMPT_SPY_FILE) appendFileSync(process.env.PROMPT_SPY_FILE, JSON.stringify({ model, prompt: process.argv[process.argv.indexOf('-p') + 1] || '' }) + '\n');
 
 const fakeClaude = resolve(dirname(fileURLToPath(import.meta.url)), 'fake-claude.js');
 const out = execFileSync(process.execPath, [fakeClaude, ...process.argv.slice(2)]);
