@@ -84,15 +84,16 @@ test('dashboard, réglages, création de projet et statut', async () => {
   assert.equal(r.status, 400);
   assert.match((await r.json()).error, /github\.com/);
 
-  r = await post('/settings', { notify_email: 'moi@x.fr', forgejo_host: 'https://git.tony-averty.dev/', forgejo_token: 'tok123', global_daily_cap: '9999', send_delay_min: '1', send_delay_max: '2', prospect_model: 'opus', analyze_model: 'opus' }, { form: true });
+  r = await post('/settings', { notify_email: 'moi@x.fr', git_type_0: 'forgejo', git_host_0: 'https://git.tony-averty.dev/', git_token_0: 'tok123', global_daily_cap: '9999', send_delay_min: '1', send_delay_max: '2', prospect_model: 'opus', analyze_model: 'opus' }, { form: true });
   assert.equal(r.status, 303);
   const s = async (k) => (await app.db.prepare('SELECT value FROM user_settings WHERE user_id = ? AND `key` = ?').get(uid, k))?.value;
-  assert.equal(await s('forgejo_host'), 'git.tony-averty.dev');
+  const servers = JSON.parse(await s('git_servers_json'));
+  assert.deepEqual(servers.map((x) => [x.type, x.host]), [['forgejo', 'git.tony-averty.dev']]);
   assert.equal(await s('global_daily_cap'), '300', 'plafond borné');
   assert.equal(await s('send_delay_min'), '5');
   assert.equal(await s('prospect_model'), 'haiku', 'opus refusé pour la prospection');
   assert.equal(await s('analyze_model'), 'haiku', 'opus refusé pour l\'analyse');
-  assert.ok(!(await s('forgejo_token_enc')).includes('tok123'), 'token chiffré');
+  assert.ok(servers[0].tokenEnc && !servers[0].tokenEnc.includes('tok123'), 'token chiffré');
 
   // Un autre hôte que GitHub et le serveur Git personnel : refusé (GitHub, lui, est accepté d'office : voir test/git-hosts.test.js)
   r = await post('/api/projects', { name: 'MEP', gitUrl: 'https://gitlab.com/Tony/MEP.git' });
@@ -190,7 +191,7 @@ test('« Cette nuit » programme le job au prochain créneau 1h-6h', async () =>
 });
 
 test('réglages Discord : URL validée, chiffrée, événements enregistrés', async () => {
-  const base = { notify_email: 'moi@x.fr', forgejo_host: 'git.tony-averty.dev', global_daily_cap: '100', send_delay_min: '20', send_delay_max: '60' };
+  const base = { notify_email: 'moi@x.fr', git_type_0: 'forgejo', git_host_0: 'git.tony-averty.dev', global_daily_cap: '100', send_delay_min: '20', send_delay_max: '60' };
   let r = await post('/settings', { ...base, discord_webhook: 'https://evil.com/api/webhooks/1/x' }, { form: true });
   assert.equal(r.status, 400);
   const hook = 'https://discord.com/api/webhooks/123456789012345678/abcdefghijklmnopqrstuvwxyz-ABC_123';
@@ -208,7 +209,7 @@ test('réglages Discord : URL validée, chiffrée, événements enregistrés', a
 });
 
 test('budget : réglages, jauge et avertissement au lancement', async () => {
-  const base = { notify_email: 'moi@x.fr', forgejo_host: 'git.tony-averty.dev', global_daily_cap: '100', send_delay_min: '20', send_delay_max: '60' };
+  const base = { notify_email: 'moi@x.fr', git_type_0: 'forgejo', git_host_0: 'git.tony-averty.dev', global_daily_cap: '100', send_delay_min: '20', send_delay_max: '60' };
   let r = await post('/settings', { ...base, budget_day_usd: '0,5', budget_month_usd: 'abc' }, { form: true });
   assert.equal(r.status, 303);
   const s = async (k) => (await app.db.prepare('SELECT value FROM user_settings WHERE user_id = ? AND `key` = ?').get(uid, k))?.value;
