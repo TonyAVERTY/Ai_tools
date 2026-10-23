@@ -14,6 +14,7 @@ export const CONTACT_EMAIL = 'contact@tony-averty.dev';
 const NAV = [
   ['/fonctionnement', 'Fonctionnement'],
   ['/tarifs', 'Tarifs'],
+  ['/docs', 'Docs'],
 ];
 
 const lockup = (label = true) => `<a class="lockup" href="/"${label ? ` aria-label="${SITE_NAME}, accueil"` : ''}>${brandMark()}<span class="wordmark">${SITE_NAME}</span></a>`;

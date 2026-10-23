@@ -6,7 +6,15 @@
     const heads = [...table.querySelectorAll('thead th')].map((th) => th.textContent.trim());
     if (!heads.length) { table.classList.add('flow'); table.dataset.rt = '1'; return; }
     for (const tr of table.querySelectorAll('tbody tr')) {
-      [...tr.children].forEach((td, i) => { if (td.tagName === 'TD') td.dataset.label = heads[i] ?? ''; });
+      [...tr.children].forEach((td, i) => {
+        if (td.tagName !== 'TD') return;
+        td.dataset.label = heads[i] ?? '';
+        // Le contenu de la cellule dans un seul bloc : en carte, la cellule est une ligne « titre / valeur » et ses morceaux ne doivent pas s'éparpiller
+        const cv = document.createElement('div');
+        cv.className = 'cv';
+        cv.append(...td.childNodes);
+        td.append(cv);
+      });
     }
     table.classList.add('stack');
     table.dataset.rt = '1';

@@ -49,6 +49,7 @@ td:has(> select), td:has(> .badge) { min-width: 7.5rem; }
   table.stack td, table.flow td { white-space: normal; }
   table.stack td, table.stack td * { overflow-wrap: anywhere; }
   .art table.stack, .art table.flow { min-width: 0; }
+  table.stack td > .cv { flex: 1 1 0; min-width: 0; text-align: right; }
   table.stack td > * { min-width: 0; max-width: 100%; }
   table.stack .badge { white-space: normal; text-align: left; }
   table.stack td select { width: auto; max-width: 62%; }

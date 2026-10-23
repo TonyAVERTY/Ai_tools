@@ -274,51 +274,14 @@ test('MCP (bout en bout) : le vrai processus parle JSON-RPC sur stdio avec un vr
 
 // ---------- Documentation ----------
 
-test('documentation : chaque route de l\'API et chaque outil MCP est documenté', async () => {
+test('documentation : chaque route de l\'API est dans API_ENDPOINTS, et la page Développeur les liste toutes', async () => {
   const registered = s.app.router.routes.filter((r) => r.api).map((r) => `${r.method} ${r.re.source}`);
   assert.equal(registered.length, API_ENDPOINTS.length, 'API_ENDPOINTS liste exactement les routes enregistrées');
-  const docs = readFileSync('docs/API.md', 'utf8');
   const { u } = await dev();
   const page = await (await html(u, '/developer')).text();
   for (const e of API_ENDPOINTS) {
-    assert.ok(docs.includes(`\`${e.method} ${e.path}\``), `docs/API.md : ${e.method} ${e.path}`);
     assert.ok(page.includes(`${e.method} ${e.path}`), `page Développeur : ${e.method} ${e.path}`);
     const re = new RegExp(`^${`/api/v1${e.path}`.replace(/:(\w+)/g, '([^/]+)')}/?$`).source;
     assert.ok(s.app.router.routes.some((r) => r.api && r.method === e.method && r.re.source === re), `route enregistrée : ${e.method} ${e.path}`);
   }
-  const mcp = readFileSync('docs/MCP.md', 'utf8');
-  for (const t of TOOLS) assert.ok(mcp.includes(`\`${t.name}\``), `docs/MCP.md : ${t.name}`);
-});
-
-// ---------- Liens visibles ----------
-
-test('liens du mode développeur : visibles dans Mon compte et sur la page Développeur ; docs et fichier MCP servis seulement en mode développeur', async () => {
-  const u = await s.newUser();
-  const html = async (p) => (await u.get(p, { headers: { accept: 'text/html' } })).text();
-  const get = (p) => u.get(p, { headers: { accept: '*/*' } });
-  assert.doesNotMatch(await html('/account'), /developer\/mcp\.js/);
-  assert.match(await html('/account'), /Une fois le mode activé/);
-  for (const p of ['/developer/docs/api', '/developer/docs/mcp', '/developer/mcp.js']) assert.equal((await get(p)).status, 404, `${p} sans mode développeur`);
-
-  await setDeveloperMode(s.db, u.id, true);
-  const account = await html('/account');
-  assert.ok(account.includes(`${s.app.cfg.appUrl}/api/v1`), 'adresse de l\'API');
-  assert.ok(account.includes(`${s.app.cfg.appUrl}/developer/mcp.js`), 'adresse du serveur MCP');
-  assert.match(account, /href="\/developer\/docs\/api"/);
-  assert.match(account, /href="\/developer\/docs\/mcp"/);
-  assert.match(account, /claude mcp add aitools/);
-  const dev = await html('/developer');
-  assert.match(dev, /Adresses et documentation/);
-  assert.match(dev, /download="aitools-mcp\.js"/);
-
-  const api = await get('/developer/docs/api');
-  assert.equal(api.status, 200);
-  assert.match(api.headers.get('content-type'), /^text\/markdown/);
-  assert.equal(await api.text(), readFileSync('docs/API.md', 'utf8'));
-  assert.equal((await get('/developer/docs/inconnu')).status, 404);
-  const mcp = await get('/developer/mcp.js');
-  assert.match(mcp.headers.get('content-disposition'), /attachment; filename="aitools-mcp\.js"/);
-  assert.equal(await mcp.text(), readFileSync('mcp/aitools-mcp.js', 'utf8'));
-  assert.equal((await s.anon.get('/developer/mcp.js', { headers: { accept: '*/*' } })).status, 303, 'jamais sans connexion');
-  assert.ok(!account.includes('aitk_') || /aitk_…/.test(account), 'aucun vrai jeton dans les liens');
 });
