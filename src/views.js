@@ -497,7 +497,7 @@ function hookRow(i, h, all, { fresh = false } = {}) {
   const n = typeof i === 'number' ? i + 1 : '';
   return `<div class="gitrow" data-discord-row>
       <input type="hidden" name="discord_id_${i}" value="${esc(h.id)}">
-      <div class="gitrow-head"><span class="srv-n">${ic('send')}<span class="badge" data-discord-title>Discord${n ? ` ${n}` : ''}</span></span>
+      <div class="gitrow-head"><span class="srv-n">${ic('discord')}<span class="badge" data-discord-title>Discord${n ? ` ${n}` : ''}</span></span>
         ${fresh ? ' <button type="button" class="linklike" data-discord-cancel>Annuler</button>' : `<span class="row"><button type="button" class="btn" data-notify-test data-hook="${esc(h.id)}">Envoyer un test</button>${trash(`discord_del_${i}`, 'Retirer ce webhook')}</span>`}</div>
       <fieldset class="evs"><legend class="lbl">${fresh ? '1. Quelles notifications veux-tu y recevoir ?' : 'Ce webhook reçoit'}</legend>
         <div class="checks">${Object.entries(all).map(([k, label]) => check(`discord_ev_${i}_${k}`, fresh ? CHANNEL_DEFAULT_EVENTS.includes(k) : h.events.includes(k), esc(label))).join('')}</div>
@@ -513,7 +513,7 @@ const CHANNEL_DEFAULT_EVENTS = ['reply', 'job_error', 'abuse'];
 function channelCard(type, label, s, fields) {
   const c = s.channels[type];
   return `<div class="gitrow" data-channel="${type}"${c ? '' : ' hidden'}>
-      <div class="gitrow-head"><span class="srv-n">${ic('send')}<span class="badge">${label}</span></span>
+      <div class="gitrow-head"><span class="srv-n">${ic(type === 'email' ? 'mail' : type)}<span class="badge">${label}</span></span>
         ${c ? `<span class="row"><button type="button" class="btn" data-notify-test data-channel="${type}">Envoyer un test</button>${trash(`${type}_del`, `Retirer ${label}`)}</span>` : '<button type="button" class="linklike" data-chan-cancel>Annuler</button>'}</div>
       <fieldset class="evs"><legend class="lbl">${c ? `${label} reçoit` : '1. Quelles notifications veux-tu y recevoir ?'}</legend>
         <div class="checks">${Object.entries(s.discord.all).map(([k, l]) => check(`${type}_ev_${k}`, c ? c.events.includes(k) : CHANNEL_DEFAULT_EVENTS.includes(k), esc(l))).join('')}</div>
@@ -572,9 +572,9 @@ ${saved ? `<p class="ok-box" role="status">${ic('check')}<span><b>Réglages enre
     <details class="addmenu" data-addmenu>
       <summary class="btn">${ic('plus')}Ajouter un canal</summary>
       <div class="menu" role="menu" aria-label="Service de notification">
-        <button type="button" role="menuitem" data-chan-pick="discord">${ic('send')}<span><b>Discord</b><small>Un webhook par salon</small></span></button>
-        <button type="button" role="menuitem" data-chan-pick="slack"${s.channels.slack ? ' hidden' : ''}>${ic('send')}<span><b>Slack</b><small>Webhook entrant</small></span></button>
-        <button type="button" role="menuitem" data-chan-pick="telegram"${s.channels.telegram ? ' hidden' : ''}>${ic('send')}<span><b>Telegram</b><small>Bot et conversation</small></span></button>
+        <button type="button" role="menuitem" data-chan-pick="discord">${ic('discord')}<span><b>Discord</b><small>Un webhook par salon</small></span></button>
+        <button type="button" role="menuitem" data-chan-pick="slack"${s.channels.slack ? ' hidden' : ''}>${ic('slack')}<span><b>Slack</b><small>Webhook entrant</small></span></button>
+        <button type="button" role="menuitem" data-chan-pick="telegram"${s.channels.telegram ? ' hidden' : ''}>${ic('telegram')}<span><b>Telegram</b><small>Bot et conversation</small></span></button>
         <button type="button" role="menuitem" data-chan-pick="email"${s.channels.email ? ' hidden' : ''}>${ic('mail')}<span><b>E-mail</b><small>Une adresse de réception</small></span></button>
       </div>
     </details>
