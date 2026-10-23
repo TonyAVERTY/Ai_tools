@@ -118,8 +118,8 @@ export async function pinGit(app, userId, url, opts) {
   return t ? { host: u.hostname, port: t.port, address: t.address, family: t.family } : null;
 }
 
-/** « hôte » ou « hôte:port » du serveur Git personnel saisi dans Réglages : contrôle à l'enregistrement. */
-export async function checkForgejoHost(app, userId, value) {
+/** « hôte » ou « hôte:port » d'un serveur Git saisi dans Réglages : contrôle à l'enregistrement. */
+export async function checkGitHost(app, userId, value) {
   const m = /^([^:/]+)(?::(\d{1,5}))?$/.exec(String(value || '').trim());
   if (!m) throw new HttpError(400, 'Hôte Git invalide (attendu : hôte ou hôte:port)', { expose: true });
   await guardTarget(app, userId, 'git', m[1], m[2] || 443, { lenient: true });
