@@ -43,7 +43,7 @@ ${newToken ? `<section class="card" role="status">
     ${API_ENDPOINTS.map((e) => `<tr><td><code>${e.method} ${esc(e.path)}</code></td><td>${e.scope ? esc(e.scope) : '—'}</td><td>${esc(e.summary)}</td></tr>`).join('')}
   </tbody></table></div>
   <pre class="md">curl -H "Authorization: Bearer $AITOOLS_TOKEN" ${esc(appUrl)}/api/v1/projects</pre>
-  <p class="muted small">Réponses d'erreur : <code>{ "error": "message", "code": "…" }</code>. Documentation complète : <code>docs/API.md</code> dans le dépôt.</p>
+  <p class="muted small">Réponses d'erreur : <code>{ "error": "message", "code": "…" }</code>. Référence complète, exemples et erreurs : <a href="/docs/api">documentation de l'API</a>.</p>
 </section>
 <section class="card">
   <div class="card-h"><h2>Serveur MCP (Claude)</h2><p>Le serveur MCP relie Claude à ton panel avec ces mêmes jetons : tu peux lui demander « quelles réponses sont arrivées ? » ou « ajoute une note à ce prospect ».</p></div>
@@ -51,7 +51,7 @@ ${newToken ? `<section class="card" role="status">
   -e AITOOLS_URL=${esc(appUrl)} \\
   -e AITOOLS_TOKEN=aitk_… \\
   -- node /chemin/vers/aitools/mcp/aitools-mcp.js</pre>
-  <p class="muted small">Documentation : <code>docs/MCP.md</code>. Le serveur n'a aucun droit propre : il ne peut faire que ce que son jeton autorise.</p>
+  <p class="muted small">Installation et outils : <a href="/docs/mcp">documentation du serveur MCP</a>. Le serveur n'a aucun droit propre : il ne peut faire que ce que son jeton autorise.</p>
 </section>
 <section class="card">
   <div class="card-h"><h2>Désactiver</h2><p>Désactiver le mode développeur coupe immédiatement tous les jetons (ils sont conservés, mais inutilisables).</p></div>

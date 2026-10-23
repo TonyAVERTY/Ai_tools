@@ -2,6 +2,7 @@
 import { html, send } from '../http.js';
 import { homePage, howPage, pricingPage } from './pages.js';
 import { mentionsPage, privacyPage, termsPage } from './legal.js';
+import { docsHomePage, docsApiPage, docsMcpPage } from './docs.js';
 import { robotsTxt, sitemapXml } from './seo.js';
 
 export function registerSiteRoutes(router, { cfg }) {
@@ -14,6 +15,9 @@ export function registerSiteRoutes(router, { cfg }) {
   router.get('/mentions-legales', async ({ res }) => html(res, mentionsPage(ctx)), open);
   router.get('/confidentialite', async ({ res }) => html(res, privacyPage(ctx)), open);
   router.get('/cgu', async ({ res }) => html(res, termsPage(ctx)), open);
+  router.get('/docs', async ({ res }) => html(res, docsHomePage(ctx)), open);
+  router.get('/docs/api', async ({ res }) => html(res, docsApiPage(ctx)), open);
+  router.get('/docs/mcp', async ({ res }) => html(res, docsMcpPage(ctx)), open);
 
   router.get('/robots.txt', async ({ res }) => {
     res.setHeader('Cache-Control', 'public, max-age=3600');

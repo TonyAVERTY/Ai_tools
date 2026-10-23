@@ -5,6 +5,7 @@ import { memberTeamIds } from './teams.js';
 import { getProject } from './projects.js';
 import { INTENTS, draftReply } from './services/replies.js';
 import { mailsPage } from './mailviews.js';
+import { suggestionFor } from './events.js';
 
 const PAGE_SIZE = 50;
 export const SENT_STATES = {
@@ -47,12 +48,16 @@ export function registerMailRoutes(router, app) {
     return senders.get(key);
   };
 
-  const shapeReply = async (r, userId) => ({
-    id: Number(r.id), projectId: Number(r.project_id), project: r.project, from: r.from_email, company: r.company || null,
-    subject: r.subject || '', text: r.body || '', intent: r.intent, intentLabel: INTENTS[r.intent] || INTENTS.other,
-    draft: draftReply(r.intent, { company: r.company, senderName: await senderName(r.project_id, userId) }),
-    receivedAt: Number(r.received_at), seen: !!r.seen_at,
-  });
+  const shapeReply = async (r, userId) => {
+    const out = {
+      id: Number(r.id), projectId: Number(r.project_id), project: r.project, from: r.from_email, company: r.company || null,
+      subject: r.subject || '', text: r.body || '', intent: r.intent, intentLabel: INTENTS[r.intent] || INTENTS.other,
+      draft: draftReply(r.intent, { company: r.company, senderName: await senderName(r.project_id, userId) }),
+      receivedAt: Number(r.received_at), seen: !!r.seen_at,
+    };
+    // Date, appel ou rendez-vous évoqué : une proposition à ajouter à l'agenda (ou l'événement déjà ajouté)
+    return { ...out, ...(await suggestionFor(db, userId, out)) };
+  };
   const REPLY_SELECT = `SELECT r.*, p.name project, x.company FROM replies r JOIN projects p ON p.id = r.project_id
     LEFT JOIN prospects x ON x.id = r.prospect_id`;
 

@@ -98,7 +98,7 @@ export function createMcpServer({ url, token, readonly = false, fetch: fetchFn =
 // ---------- Lancement : JSON-RPC ligne par ligne sur stdin / stdout ----------
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const url = process.env.AITOOLS_URL, token = process.env.AITOOLS_TOKEN;
-  if (!url || !token) { console.error('AITOOLS_URL et AITOOLS_TOKEN sont requis (voir docs/MCP.md).'); process.exit(1); }
+  if (!url || !token) { console.error('AITOOLS_URL et AITOOLS_TOKEN sont requis (voir la documentation : /docs/mcp sur ton panel).'); process.exit(1); }
   const server = createMcpServer({ url, token, readonly: process.env.AITOOLS_READONLY === '1' });
   const send = (m) => process.stdout.write(`${JSON.stringify(m)}\n`);
   createInterface({ input: process.stdin }).on('line', async (line) => {

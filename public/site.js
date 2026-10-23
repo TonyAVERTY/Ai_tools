@@ -22,6 +22,33 @@
     });
   }
 
+  // ---------- Documentation : onglets de code et bouton « Copier » ----------
+  for (const box of document.querySelectorAll('[data-ctabs]')) {
+    const tabs = [...box.querySelectorAll(':scope > .ctab')];
+    if (tabs.length < 2) continue;
+    box.classList.add('js-tabs');
+    const bar = document.createElement('div');
+    bar.className = 'tabbar';
+    bar.setAttribute('role', 'tablist');
+    const show = (i) => tabs.forEach((t, j) => { t.hidden = i !== j; bar.children[j].setAttribute('aria-selected', String(i === j)); });
+    tabs.forEach((t, i) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.setAttribute('role', 'tab'); b.textContent = t.dataset.label;
+      b.addEventListener('click', () => show(i));
+      bar.append(b);
+    });
+    box.prepend(bar);
+    show(0);
+  }
+  document.addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-copy]');
+    if (!b) return;
+    const label = b.querySelector('span');
+    try { await navigator.clipboard.writeText(b.closest('.code').querySelector('code').textContent); label.textContent = 'Copié'; }
+    catch { label.textContent = 'Sélectionne et copie'; }
+    setTimeout(() => { label.textContent = 'Copier'; }, 1800);
+  });
+
   // ---------- Tarifs : mois / année ----------
   const plans = document.querySelector('[data-billing]');
   const bill = document.querySelector('[data-bill]');

@@ -667,3 +667,29 @@ input.copy { font-family: var(--mono); font-size: .8125rem; }
 .tip-body p { margin: 6px 0; }
 .devlinks { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
 .devlink { display: flex; flex-direction: column; gap: 6px; }
+.reply-more { display: block; padding: 10px 14px; border-radius: var(--radius); background: var(--card); border: 1px solid var(--line-strong); border-left: 4px solid var(--accent); box-shadow: var(--shadow-3); font-weight: 600; font-size: .9375rem; text-decoration: none; text-align: center; }
+
+/* ---------- Notifications : menu « + Ajouter un canal » ---------- */
+.sub { margin: 22px 0 4px; font-size: 1.0625rem; }
+.chanlist { display: flex; flex-direction: column; gap: 12px; margin: 12px 0; }
+.chanlist > .gitlist { display: contents; }
+.addmenu { display: inline-block; max-width: 100%; }
+.addmenu > summary { list-style: none; cursor: pointer; }
+.addmenu > summary::-webkit-details-marker { display: none; }
+.addmenu .menu { display: flex; flex-direction: column; margin-top: 8px; min-width: 260px; max-width: 100%; /* s'ouvre dans la page (jamais coupé par la carte) */ padding: 6px; background: var(--card); border: 1px solid var(--line-strong); border-radius: var(--radius); box-shadow: var(--shadow-3); }
+.addmenu .menu button { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 52px; padding: 6px 10px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.addmenu .menu button:hover, .addmenu .menu button:focus-visible { background: var(--bg-sunk); }
+.addmenu .menu button[hidden] { display: none; }
+.addmenu .menu span { display: flex; flex-direction: column; }
+.addmenu .menu small { color: var(--muted); font-size: .8125rem; }
+
+/* ---------- Événements de l'agenda et propositions ---------- */
+.cal-ev.event { background: var(--info-bg); color: var(--info); }
+.evform { margin-top: 8px; }
+.evlist { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.evlist li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); }
+.suggest { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border: 1px solid var(--accent); border-radius: var(--radius); background: var(--info-bg); }
+.suggest .why { margin: 0; font-size: .875rem; }
+.suggest .sg-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.suggest input { min-width: 0; flex: 1 1 200px; }
+.suggest .done a { margin-right: 8px; }
