@@ -18,7 +18,7 @@ function acc(key, icon, title, sub, body, { open = false, cls = '' } = {}) {
 </details>`;
 }
 
-const NAV = [['/', 'folder', 'Projets'], ['/team', 'users', 'Équipe']];
+const NAV = [['/', 'folder', 'Projets'], ['/mails', 'mail', 'Mails'], ['/team', 'users', 'Équipe']];
 
 export function layout({ title, body, email }) {
   return `<!doctype html>

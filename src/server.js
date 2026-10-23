@@ -46,10 +46,10 @@ const STATIC = {
 };
 
 // `fetch`, `validateApiKey`, `validateToken`, `syncRepo`, `limiter` : points d'injection pour les tests (aucun appel réseau réel)
-export async function createApp(cfg, { db, worker = true, createTransport, fetch, validateApiKey, validateToken, syncRepo, limiter, resolveHost } = {}) {
+export async function createApp(cfg, { db, worker = true, createTransport, fetch, validateApiKey, validateToken, syncRepo, limiter, resolveHost, resolveMx } = {}) {
   db ??= await openDb(cfg.db, { adminEmails: cfg.adminEmails });
   await syncAdmins(db, cfg.adminEmails || []); // ADMIN_EMAILS fait foi pour le rôle admin
-  const app = { db, cfg, createTransport, fetch, validateApiKey, validateToken, syncRepo, resolveHost, limiter: limiter || new RateLimiter() };
+  const app = { db, cfg, createTransport, fetch, validateApiKey, validateToken, syncRepo, resolveHost, resolveMx, limiter: limiter || new RateLimiter() };
   const secHeaders = securityHeaders(cfg.appUrl);
   const router = new Router();
   registerRoutes(router, app);

@@ -43,6 +43,7 @@ async function setup() {
   const app = { resolveHost: async () => [{ address: '93.184.216.34', family: 4 }],
     db, cfg: { dataDir: tmp, claudeBin: resolve('test/fixtures/fake-claude.js'), sandbox: { enabled: false, production: false }, secretKey: TEST_SECRET_KEY, appUrl: 'https://ai.test' },
     createTransport: () => ({ verify: async () => true, sendMail: async (m) => { sentMails.push(m); }, close() {} }),
+    resolveMx: async () => [{ exchange: 'mx.test', priority: 10 }], // pas de DNS réel
     isBusinessHours: () => true, // horloge figée : le test ne dépend pas de l'heure à laquelle on le lance
   };
   const userId = await addUser(db);

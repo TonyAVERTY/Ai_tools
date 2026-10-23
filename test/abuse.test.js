@@ -19,7 +19,7 @@ import { ABUSE } from '../src/limits.js';
 async function world() {
   const db = await testDb();
   const app = {
-    db, resolveHost: async () => [{ address: '93.184.216.34', family: 4 }],
+    db, resolveHost: async () => [{ address: '93.184.216.34', family: 4 }], resolveMx: async () => [{ exchange: 'mx.test', priority: 10 }],
     cfg: { dataDir: '/tmp/x', appUrl: 'https://ai.test', secretKey: TEST_SECRET_KEY, sandbox: { enabled: false } },
     fetch: async (url, o) => { app.hooks.push({ url, body: JSON.parse(o.body) }); return { ok: true, status: 204 }; },
     hooks: [],

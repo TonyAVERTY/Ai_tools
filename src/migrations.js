@@ -622,6 +622,40 @@ export const MIGRATIONS = [
     mysql: ["UPDATE prospects SET status = 'refused' WHERE status IN ('new', 'sent') AND email IN (SELECT email FROM blacklist)"],
   },
   {
+    // Réponses des prospects lues dans la boîte : texte, intention (classement automatique), lu / non lu (popup d'arrivée).
+    name: 'replies',
+    sqlite: [
+      `CREATE TABLE replies (
+        id INTEGER PRIMARY KEY,
+        project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        prospect_id INTEGER REFERENCES prospects(id) ON DELETE CASCADE,
+        uid INTEGER,                -- UID IMAP : une réponse n'est enregistrée qu'une fois
+        from_email TEXT NOT NULL, subject TEXT, body TEXT,
+        intent TEXT NOT NULL DEFAULT 'other',   -- interested | question | later | refused | other
+        received_at INTEGER NOT NULL, seen_at INTEGER
+      )`,
+      'CREATE UNIQUE INDEX replies_uid ON replies(project_id, uid)',
+      'CREATE INDEX replies_project ON replies(project_id, received_at)',
+      'CREATE INDEX replies_prospect ON replies(prospect_id)',
+    ],
+    mysql: [
+      `CREATE TABLE IF NOT EXISTS replies (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        project_id BIGINT NOT NULL,
+        prospect_id BIGINT NULL,
+        uid BIGINT NULL,
+        from_email VARCHAR(255) NOT NULL, subject TEXT, body TEXT,
+        intent VARCHAR(20) NOT NULL DEFAULT 'other',
+        received_at BIGINT NOT NULL, seen_at BIGINT NULL,
+        UNIQUE KEY replies_uid (project_id, uid),
+        KEY replies_project (project_id, received_at),
+        KEY replies_prospect (prospect_id),
+        CONSTRAINT replies_project_fk FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+        CONSTRAINT replies_prospect_fk FOREIGN KEY (prospect_id) REFERENCES prospects(id) ON DELETE CASCADE
+      ) ${T}`,
+    ],
+  },
+  {
     // Identifiants de session : la base ne garde plus que leur empreinte SHA-256. Personne n'est déconnecté (voir hashSessionIds).
     name: 'session_id_hashing',
     sqlite: [hashSessionIds],

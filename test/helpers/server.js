@@ -16,13 +16,15 @@ export const APP_URL = 'https://ai.tony-averty.dev';
 // Limiteur sans plafond réaliste : les tests qui répètent des requêtes ne butent pas sur le débit. `rateLimit: true` rétablit
 // les seuils réels de src/limits.js ; un objet { clock } les garde avec une horloge injectée.
 // Résolveur DNS des tests : tout nom pointe vers une adresse publique (aucune requête DNS réelle)
+// Serveurs de réception : tout domaine en a un (la vérification d'adresses ne fait aucune requête DNS réelle)
+export const FAKE_MX = async () => [{ exchange: 'mx.test', priority: 10 }];
 export const PUBLIC_DNS = async () => [{ address: '93.184.216.34', family: 4 }];
 
 const unlimited = () => new RateLimiter({
   rules: Object.fromEntries(Object.entries(RATE_LIMITS).map(([k, v]) => [k, Object.fromEntries(Object.entries(v).map(([sc, c]) => [sc, { ...c, max: 1e9 }]))])),
 });
 
-export async function startApp({ cfg = {}, worker = false, rateLimit = false, createTransport, resolveHost, fetch: injectedFetch } = {}) {
+export async function startApp({ cfg = {}, worker = false, rateLimit = false, createTransport, resolveHost, resolveMx, fetch: injectedFetch } = {}) {
   const tmp = mkdtempSync(join(tmpdir(), 'aitools-srv-'));
   const config = {
     appUrl: APP_URL, google: { clientId: 'gid', clientSecret: 'gsecret' }, apple: null, adminEmails: [],
@@ -30,7 +32,7 @@ export async function startApp({ cfg = {}, worker = false, rateLimit = false, cr
     sandbox: { enabled: false, production: false, roBinds: [] }, ...cfg,
   };
   const limiter = rateLimit ? new RateLimiter(rateLimit === true ? {} : rateLimit) : unlimited();
-  const app = await createApp(config, { db: await testDb(), worker, limiter, createTransport, fetch: injectedFetch, resolveHost: resolveHost || PUBLIC_DNS });
+  const app = await createApp(config, { db: await testDb(), worker, limiter, createTransport, fetch: injectedFetch, resolveHost: resolveHost || PUBLIC_DNS, resolveMx: resolveMx || FAKE_MX });
   await new Promise((r) => app.server.listen(0, '127.0.0.1', r));
   const base = `http://127.0.0.1:${app.server.address().port}`;
 

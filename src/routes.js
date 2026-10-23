@@ -15,6 +15,7 @@ import { registerAdminRoutes } from './adminroutes.js';
 import { loginsOf } from './claudelogin.js';
 import { accessOn, memberTeamIds } from './teams.js';
 import { registerTeamRoutes } from './teamroutes.js';
+import { registerMailRoutes } from './mailroutes.js';
 import { registerLinkedinRoutes } from './linkedinroutes.js';
 import { dashboardPage, settingsPage, unsubPage, accountPage, linkPage } from './views.js';
 import { enqueue, latestJobs, cancelJob, usageSummary } from './services/jobs.js';
@@ -28,6 +29,7 @@ import { allowedToSend, EMAIL_RE } from './services/mailer.js';
 import { cpuTemp } from './services/thermal.js';
 import { checkInbox } from './services/inbox.js';
 import { followupPlan } from './services/followup.js';
+import { warmupAdvice } from './services/warmup.js';
 import { nextNightSlot } from './services/paris-time.js';
 import { notify, notifyConfig, saveDiscordHooks, publicHooks, EVENTS, MAX_HOOKS } from './services/notify.js';
 import { budgetState, AI_JOBS } from './services/budget.js';
@@ -61,6 +63,7 @@ export function registerRoutes(router, app) {
   registerSiteRoutes(router, app);
   registerAdminRoutes(router, app);
   registerTeamRoutes(router, app);
+  registerMailRoutes(router, app);
   registerLinkedinRoutes(router, app, { project, aiOpts });
   // Déjà connecté : la page de connexion n'a rien à offrir, on va au tableau de bord
   router.get('/login', async ({ req, res, url }) => {
@@ -373,6 +376,7 @@ export function registerRoutes(router, app) {
     });
     json(res, {
       jobs, templates, stats, sendMax,
+      warmup: await warmupAdvice(db, p.id, { sentToday: await sentSince(db, day, userId, p.id) }),
       followup: { enabled: p.followupEnabled, days: p.followupDays, ...(await followupPlan(db, p)) },
       targetValidated: p.targetValidated, hasProfile: !!p.profile, hasSmtp: p.hasSmtp, smtpSource: p.smtpSource, access: p.access,
       hasImap: p.hasImap, inbox: p.inbox, ab: await abStats(db, p.id), checklist: await projectChecklist(app, p),
