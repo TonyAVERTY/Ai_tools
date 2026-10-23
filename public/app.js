@@ -657,6 +657,34 @@
     });
   })();
 
+  // ---------- Réglages : plusieurs webhooks Discord ----------
+  // Le « + » ajoute une ligne (adresse + événements reçus) : on sépare ainsi ce qui est dit ou fait, salon par salon.
+  (() => {
+    const list = $('[data-discordlist]');
+    const tpl = $('#discord-row-tpl');
+    if (!list || !tpl) return;
+    const add = $('[data-discord-add]');
+    const full = $('[data-discord-max]');
+    let next = Number(list.dataset.next) || 0;
+    const rows = () => $$('[data-discord-row]', list);
+    const renumber = () => rows().forEach((r, i) => { $('[data-discord-title]', r).textContent = `Webhook ${i + 1}`; });
+    add.addEventListener('click', () => {
+      if (rows().length >= Number(list.dataset.max)) { full.hidden = false; return; }
+      const holder = document.createElement('div');
+      holder.innerHTML = tpl.innerHTML.replaceAll('__I__', String(next++));
+      const el = holder.firstElementChild;
+      list.append(el);
+      renumber();
+      $('input[name^="discord_url_"]', el).focus();
+    });
+    list.addEventListener('click', (e) => {
+      if (!e.target.closest('[data-discord-cancel]')) return;
+      e.target.closest('[data-discord-row]').remove();
+      full.hidden = true;
+      renumber();
+    });
+  })();
+
   // ---------- Réglages : tester le token GitHub ----------
   // Dit à qui appartient le token, à quels dépôts il donne accès, et lesquels de tes projets en font partie. Ne modifie rien.
   (() => {
@@ -894,8 +922,9 @@
       return;
     }
 
-    if (e.target.closest('[data-notify-test]')) {
-      try { await api('/api/notify/test', {}); toast('Notification envoyée sur Discord'); }
+    const hookTest = e.target.closest('[data-notify-test]');
+    if (hookTest) {
+      try { await api('/api/notify/test', hookTest.dataset.hook ? { hook: hookTest.dataset.hook } : {}); toast('Notification envoyée sur Discord'); }
       catch (err) { toast(err.message, 'error'); }
       return;
     }

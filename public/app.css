@@ -439,6 +439,8 @@ figure.chart figcaption { font-size: .9375rem; font-weight: 600; margin-bottom: 
 .gitrow p { margin: 0; }
 .gitrow label { margin: 0; }
 [data-git-type][hidden], [data-git-max][hidden] { display: none; }
+.evs { border: 0; padding: 0; margin: 0; min-width: 0; }
+.evs legend { padding: 0; margin-bottom: 6px; }
 .gitadd { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .gittest { display: flex; flex-direction: column; gap: 10px; padding: 14px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--card); }
 .gittest[hidden] { display: none; }
