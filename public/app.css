@@ -462,3 +462,19 @@ input.copy { width: 100%; font-family: ui-monospace, SFMono-Regular, Menlo, mono
 [data-git-type][hidden], [data-git-max][hidden] { display: none; } /* sans cette règle, le style des champs écrase l'attribut hidden */
 .gitadd { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 10px 0 4px; }
 .linklike { border: 0; background: transparent; padding: 0; color: var(--accent); cursor: pointer; text-decoration: underline; font: inherit; }
+
+/* Test du token GitHub */
+.gittest { border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; display: grid; gap: 8px; }
+.gittest[hidden] { display: none; }
+.gittest.good { border-color: color-mix(in srgb, var(--ok) 45%, var(--line)); }
+.gittest.bad { border-color: color-mix(in srgb, var(--err) 45%, var(--line)); }
+.gittest p, .gittest h5 { margin: 0; }
+.gittest h5 { font-size: .9rem; }
+.gitprojects, .gitrepos { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 4px; }
+.gitrepos { max-height: 220px; overflow-y: auto; font-size: .9rem; }
+.gittest .warn { color: var(--warn); }
+.gittest .ok { color: var(--ok); }
+.gittest .error { color: var(--err); }
+.gitprojects li.ok, .gitprojects li.error { color: var(--text); }
+.gitprojects li.ok > span:first-child { color: var(--ok); font-weight: 700; }
+.gitprojects li.error > span:first-child { color: var(--err); font-weight: 700; }
