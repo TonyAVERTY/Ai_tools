@@ -82,7 +82,7 @@ function docPage({ appUrl, path, title, description, h1, lead, sections }) {
   const toc = sections.map((s) => `<li><a href="#${s.id}">${esc(s.title)}</a>${s.sub?.length ? `<ol>${s.sub.map(([id, label]) => `<li><a href="#${id}">${esc(label)}</a></li>`).join('')}</ol>` : ''}</li>`).join('\n        ');
   const body = sections.map((s) => `<section id="${s.id}" class="doc-s"><h2>${esc(s.title)}</h2>\n${s.html}</section>`).join('\n\n');
   return siteLayout({
-    appUrl, path, title, description,
+    appUrl, path, title, description, fx: true,
     body: `<div class="wrap">
   <div class="lg-head">
     <nav class="pills" aria-label="Documentation">

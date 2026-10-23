@@ -416,3 +416,22 @@ test('connecté : « Connexion » et « Créer mon compte » deviennent « Dashb
     assert.match(await (await s.anon.get('/tarifs', { headers: { accept: 'text/html' } })).text(), /<x-guest data-k="cta">/, 'repères présents côté visiteur');
   } finally { await s.close(); }
 });
+
+test('ruban animé (parallaxe + bulles) : seulement sur les pages de documentation, avec son script et sans style en ligne', async () => {
+  const s = await startApp();
+  try {
+    for (const path of ['/docs', '/docs/api', '/docs/mcp']) {
+      const page = await (await s.anon.get(path, { headers: { accept: 'text/html' } })).text();
+      assert.match(page, /<body class="site fx">/, path);
+      assert.match(page, /\/static\/site\.js/, path);
+      assert.doesNotMatch(page, /\sstyle="/, `${path} : la CSP interdit style=""`);
+    }
+    for (const path of ['/', '/tarifs', '/fonctionnement', '/cgu']) {
+      assert.match(await (await s.anon.get(path, { headers: { accept: 'text/html' } })).text(), /<body class="site">/, `${path} : ruban fixe`);
+    }
+    const js = readFileSync(new URL('../public/site.js', import.meta.url), 'utf8');
+    assert.match(js, /prefers-reduced-motion/, 'animations coupées si le système le demande');
+    const css = readFileSync(new URL('../public/site.css', import.meta.url), 'utf8');
+    assert.match(css, /\.rb-b[\s\S]*prefers-reduced-motion[\s\S]*animation: none/);
+  } finally { await s.close(); }
+});
