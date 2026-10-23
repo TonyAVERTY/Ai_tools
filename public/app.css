@@ -654,3 +654,16 @@ input.copy { font-family: var(--mono); font-size: .8125rem; }
 .cal-t { font-weight: 700; }
 .li-schedule { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin-top: 10px; }
 .li-schedule label { display: flex; flex-direction: column; gap: 6px; font-weight: 600; font-size: .875rem; }
+
+/* ---------- Petit « i » d'aide (tutoriel) ---------- */
+.tip { margin: 10px 0; }
+.tip > summary { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; cursor: pointer; list-style: none; color: var(--accent); font-weight: 600; }
+.tip > summary::-webkit-details-marker { display: none; }
+.tip-i { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--accent); font: italic 700 .9375rem/1 Georgia, 'Times New Roman', serif; }
+.tip[open] .tip-i, .tip > summary:hover .tip-i { background: var(--accent); color: var(--on-accent, #fff); }
+.tip-body { padding: 4px 16px 12px; border-left: 3px solid var(--accent); background: var(--bg-sunk); border-radius: 0 var(--radius) var(--radius) 0; }
+.tip-body h4 { margin: 14px 0 6px; }
+.tip-body ol { margin: 6px 0 6px 1.2em; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.tip-body p { margin: 6px 0; }
+.devlinks { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+.devlink { display: flex; flex-direction: column; gap: 6px; }
