@@ -1,7 +1,7 @@
 import { createServer } from 'node:http';
 import { readFileSync, readdirSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { join, dirname } from 'node:path';
+import { join, dirname, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadConfig } from './config.js';
 import { openDb } from './db.js';
@@ -30,16 +30,16 @@ function asset(file, type, maxAge) {
   const etag = '"' + createHash('sha1').update(body).digest('base64url').slice(0, 20) + '"';
   return { type, body, etag, cache: `public, max-age=${maxAge}` };
 }
+const IMG_TYPES = { '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg' };
 const STATIC = {
   '/static/app.css': asset('app.css', 'text/css; charset=utf-8', 3600),
   '/static/site.css': asset('site.css', 'text/css; charset=utf-8', 3600),
   '/static/app.js': asset('app.js', 'text/javascript; charset=utf-8', 3600),
   '/static/captcha.js': asset('captcha.js', 'text/javascript; charset=utf-8', 3600),
-  '/static/favicon.svg': asset('favicon.svg', 'image/svg+xml', 86400),
-  // Les navigateurs réclament /favicon.ico d'office : on leur sert le même SVG plutôt qu'un 404
-  '/favicon.ico': asset('favicon.svg', 'image/svg+xml', 86400),
+  // Les navigateurs réclament /favicon.ico d'office
+  '/favicon.ico': asset('favicon.ico', 'image/x-icon', 86400),
   '/static/site.js': asset('site.js', 'text/javascript; charset=utf-8', 3600),
-  ...Object.fromEntries(readdirSync(join(ROOT, 'public', 'img')).map((f) => [`/static/img/${f}`, asset(`img/${f}`, 'image/svg+xml', 86400)])),
+  ...Object.fromEntries(readdirSync(join(ROOT, 'public', 'img')).map((f) => [`/static/img/${f}`, asset(`img/${f}`, IMG_TYPES[extname(f)] || 'application/octet-stream', 86400)])),
 };
 
 // `fetch`, `validateApiKey`, `validateToken`, `syncRepo`, `limiter` : points d'injection pour les tests (aucun appel réseau réel)

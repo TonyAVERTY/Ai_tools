@@ -2,6 +2,7 @@
 // de la connexion). Les textes sont écrits en mots de tous les jours, pour être lus tels quels par n'importe qui :
 // rien ici ne promet un résultat, rien n'est chiffré au-delà de ce que le code fait réellement.
 import { esc } from '../http.js';
+import { brandMark } from '../assets.js';
 import { siteLayout, nextBlock, journey, CONTACT_EMAIL } from './layout.js';
 import { PLAN_LIMITS, PLAN_PRICES, PLAN_LABELS, ANNUAL_FREE_MONTHS, annualPrice } from '../limits.js';
 
@@ -110,7 +111,7 @@ const HOME_JSON_LD = (appUrl) => ({
 // La barre avance et une alerte « réponse » apparaît en boucle (CSS seul, coupé si on réduit les animations).
 const MOCKUP = `<figure class="shot">
   <div class="mock" role="img" aria-label="Aperçu du tableau de bord : un projet dont la cible est validée, une recherche de contacts en cours et trois contacts avec leur statut">
-    <div class="mock-top"><span class="brand"><span class="mark"></span>AiTools</span><span class="push">Mon compte · Réglages</span></div>
+    <div class="mock-top"><span class="brand">${brandMark()}AiTools</span><span class="push">Mon compte · Réglages</span></div>
     <div class="card">
       <div class="mock-name"><span>Atelier Exemple</span><span class="badge ok">cible validée</span></div>
       <p class="mock-sub">Fiche du projet écrite à partir de ton code</p>
