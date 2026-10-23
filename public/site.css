@@ -407,3 +407,6 @@ body.site {
 .fields { margin-top: 16px; }
 .errs { margin-top: 14px; font-size: .9375rem; line-height: 1.9; }
 @media (max-width: 700px) { .ep { padding: 16px; } .scope { margin-left: 0; } }
+
+/* Repère des contenus réservés aux visiteurs (remplacé pour un compte connecté) : sans effet sur la mise en page */
+x-guest { display: contents; }
