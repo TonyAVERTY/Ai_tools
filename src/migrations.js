@@ -552,6 +552,20 @@ export const MIGRATIONS = [
       { sql: 'ALTER TABLE linkedin_posts ADD COLUMN author_name VARCHAR(255) NULL', when: colMissing('linkedin_posts', 'author_name') },
     ],
   },
+  {
+    // Le SMTP « global » des Réglages disparaît : les mails d'AiTools (rapport, évolutions, invitations, avertissements) partent
+    // du SMTP du serveur (SYSTEM_SMTP_*). Pour ne rien casser, chaque projet qui s'appuyait sur ce SMTP en garde une copie.
+    name: 'global_smtp_to_projects',
+    sqlite: [
+      `UPDATE projects SET smtp_enc = (SELECT s.value FROM user_settings s WHERE s.user_id = projects.user_id AND s.key = 'smtp_enc')
+        WHERE smtp_enc IS NULL AND EXISTS (SELECT 1 FROM user_settings s WHERE s.user_id = projects.user_id AND s.key = 'smtp_enc')`,
+      "DELETE FROM user_settings WHERE key = 'smtp_enc'",
+    ],
+    mysql: [
+      `UPDATE projects p JOIN user_settings s ON s.user_id = p.user_id AND s.\`key\` = 'smtp_enc' SET p.smtp_enc = s.value WHERE p.smtp_enc IS NULL`,
+      "DELETE FROM user_settings WHERE `key` = 'smtp_enc'",
+    ],
+  },
 ];
 
 // ---------- Aides de la migration 2 ----------
