@@ -66,7 +66,7 @@ body.site {
 .h1 { font-size: 2.125rem; line-height: 1.1; font-weight: 700; letter-spacing: -.03em; }
 .lead { margin-top: 16px; font-size: 1.0625rem; line-height: 1.55; color: var(--muted); max-width: 34em; }
 .hero-btns { display: flex; flex-direction: column; gap: 12px; margin-top: 28px; }
-.hero-note { margin-top: 14px; font-size: .875rem; color: var(--muted); }
+.hero-note { margin-top: 14px; position: relative; font-size: .875rem; color: var(--muted); }
 .art-hero { position: relative; padding: 8px 0; }
 .ribbon { position: absolute; left: -40px; top: -30px; width: calc(100% + 80px); height: calc(100% + 60px); pointer-events: none; }
 
@@ -254,7 +254,6 @@ body.site {
 .art caption { text-align: left; padding: 10px 14px; font-weight: 600; background: var(--card-2); border-bottom: 1px solid var(--line); }
 .call { margin-top: 20px; padding: 16px 18px; border-radius: var(--radius); background: var(--info-bg); border: 1px solid var(--line-strong); font-size: 1rem; line-height: 1.6; }
 .call b { display: block; font-weight: 600; }
-.todo { background: var(--bg-sunk); color: var(--text); border: 1px dashed var(--control); border-radius: 6px; padding: 0 6px; }
 
 /* pied de page */
 .foot { border-top: 1px solid var(--line); background: var(--bg-sunk); padding: 40px 0 32px; }
@@ -284,7 +283,11 @@ body.site {
   .top-in { flex-wrap: nowrap; padding-top: 14px; padding-bottom: 14px; }
   .nav { order: 0; width: auto; gap: 8px; }
   .hero { padding: 88px 0 96px; }
-  .hero-in { grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: 64px; align-items: center; }
+  .hero-in { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 112px; align-items: center; }
+  /* le ruban traverse tout l'écran, de bord à bord, derrière le texte et la maquette */
+  .art-hero { position: static; padding: 8px 0 8px 32px; }
+  .ribbon { left: 0; top: 0; width: 100%; height: 100%; z-index: -1; }
+  .hero { padding-bottom: 168px; isolation: isolate; }
   .h1 { font-size: 3.5rem; }
   .page .h1, .lg-head .h1, .nf h1 { font-size: 3rem; }
   .lead { font-size: 1.25rem; }
@@ -312,3 +315,31 @@ body.site {
 /* finitions */
 .plan .price small { display: block; margin-top: 2px; }
 .more .grid, .guard .grid { align-items: start; }
+
+/* ---------- Animations : seulement pour qui n'a pas demandé de réduire les mouvements ---------- */
+@keyframes rise { from { opacity: 0; transform: translateY(16px); } }
+@keyframes draw { from { stroke-dashoffset: 1; } }
+@keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+@keyframes grow { from { width: 0; } }
+@media (prefers-reduced-motion: no-preference) {
+  .hero-in > div:first-child > * { animation: rise .7s var(--ease) both; }
+  .hero-in > div:first-child > :nth-child(2) { animation-delay: .08s; }
+  .hero-in > div:first-child > :nth-child(3) { animation-delay: .16s; }
+  .hero-in > div:first-child > :nth-child(4) { animation-delay: .24s; }
+  .hero-in > div:first-child > :nth-child(5) { animation-delay: .32s; }
+  .ribbon path { stroke-dasharray: 1; animation: draw 1.8s var(--ease) .1s both; }
+  .mock { animation: rise .8s var(--ease) .25s both, float 7s ease-in-out 1.2s infinite; }
+  .mock .bar { animation: grow 1.4s var(--ease) .9s both; }
+  .btn { transition: transform var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease), filter var(--t-fast) var(--ease), background var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease); }
+  .btn:hover { transform: translateY(-2px); box-shadow: var(--shadow-2); }
+  .btn:active { transform: translateY(0) scale(.98); }
+  .card, .steps li, .tr, .plan, .shot { transition: transform var(--t) var(--ease), box-shadow var(--t) var(--ease), border-color var(--t) var(--ease); }
+  .card:hover, .steps li:hover, .tr:hover, .plan:hover { transform: translateY(-4px); box-shadow: var(--shadow-2); border-color: var(--line-strong); }
+  .card-i { transition: transform var(--t) var(--ease); }
+  .card:hover .card-i, .tr:hover .card-i { transform: rotate(-6deg) scale(1.08); }
+  /* apparition au défilement : seuls les blocs encore hors écran sont masqués (public/site.js), rien ne clignote */
+  .reveal { opacity: 0; transform: translateY(22px); }
+  .reveal.in { opacity: 1; transform: none; transition: opacity .6s var(--ease), transform .6s var(--ease); }
+  .lnk .ic, .btn .ic { transition: transform var(--t) var(--ease); }
+  .lnk:hover .ic, .btn:hover .ic { transform: translateX(3px); }
+}

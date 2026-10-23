@@ -13,7 +13,9 @@ import { PLAN_LIMITS } from '../src/limits.js';
 const LINK = { v: 1, mode: 'api_key', valid: true };
 const HTML = { headers: { accept: 'text/html' } };
 let s;
-before(async () => { s = await startApp(); });
+const sent = []; // mails d'invitation : le lien n'existe que là, jamais dans la page du propriétaire
+const SYSTEM_SMTP = { host: 'smtp.test', port: 587, user: 'u', pass: 'p', fromEmail: 'noreply@aitools.test' };
+before(async () => { s = await startApp({ cfg: { systemSmtp: SYSTEM_SMTP }, createTransport: () => ({ sendMail: async (m) => { sent.push(m); }, close() {} }) }); });
 after(async () => { await s.close(); });
 
 const setPlan = (u, plan) => s.db.prepare('UPDATE users SET plan = ? WHERE id = ?').run(plan, u.id);
@@ -42,7 +44,10 @@ async function world({ plan = 'growth' } = {}) {
 const invite = async (w, email, role = 'member') => {
   const r = await form(w.owner, '/team/invite', { email, role });
   assert.equal(r.status, 200);
-  return /value="([^"]*\/team\/join\/[^"]+)"/.exec(await r.text())?.[1].split('/team/join/')[1];
+  assert.doesNotMatch(await r.text(), /\/team\/join\//, 'le propriétaire ne voit jamais le lien');
+  const mail = sent.at(-1);
+  assert.equal(mail.to, email.toLowerCase());
+  return /\/team\/join\/([\w-]+)/.exec(mail.text)?.[1];
 };
 const join = async (u, token) => form(u, `/team/join/${token}`);
 
@@ -275,4 +280,35 @@ test('SMTP du projet : hôte vide = retour au SMTP des Réglages, et la page l\'
   assert.equal(await src(), 'settings');
   assert.equal(Number((await row('SELECT daily_mail_cap c FROM projects WHERE id = ?', p)).c), 25, 'le plafond du projet reste réglable');
   assert.equal(await row('SELECT smtp_enc FROM projects WHERE id = ?', p).then((x) => x.smtp_enc), null);
+});
+
+test('invitation : mail HTML aux couleurs du site, lien seulement dans le mail ; sans mail, pas d\'invitation', async () => {
+  const w = await world();
+  const before = sent.length;
+  const token = await invite(w, w.member.email);
+  assert.equal(sent.length, before + 1);
+  const mail = sent.at(-1);
+  assert.match(mail.html, /<!doctype html>/i);
+  assert.ok(mail.html.includes(`/team/join/${token}`), 'bouton et lien de secours');
+  assert.match(mail.html, /Rejoindre l(&#39;|')équipe/);
+  assert.match(mail.html, /#1e296a/, 'bandeau indigo du logo');
+  assert.match(mail.html, /logo-mark-dark\.png/);
+  assert.doesNotMatch(mail.html, /#7c4dff|#2f5bea/, 'plus de violet');
+  assert.match(mail.text, /\/team\/join\//, 'version texte conservée');
+  const again = await form(w.owner, '/team/invite', { email: 'autre@exemple.fr', role: 'member' });
+  assert.match(await again.text(), /Invitation envoyée à autre@exemple\.fr/);
+
+  // SMTP du serveur en panne : l'invitation n'est pas créée, et aucun lien n'est montré au propriétaire
+  const down = await startApp({ cfg: { systemSmtp: SYSTEM_SMTP }, createTransport: () => ({ sendMail: async () => { throw new Error('connexion refusée'); }, close() {} }) });
+  try {
+    const owner = await down.newUser({ admin: false, link: LINK });
+    await down.db.prepare('UPDATE users SET plan = ? WHERE id = ?').run('growth', owner.id);
+    assert.equal((await owner.post('/team/create', { name: 'T' }, { form: true, headers: { accept: 'text/html' } })).status, 303);
+    const r = await owner.post('/team/invite', { email: 'x@exemple.fr', role: 'member' }, { form: true, headers: { accept: 'text/html' } });
+    assert.equal(r.status, 400);
+    const h = await r.text();
+    assert.match(h, /n&#39;a pas pu partir|n'a pas pu partir/);
+    assert.doesNotMatch(h, /\/team\/join\//);
+    assert.equal(await down.db.prepare('SELECT 1 x FROM team_invites').get(), undefined, 'aucune invitation orpheline');
+  } finally { await down.close(); }
 });

@@ -31,6 +31,7 @@ import { followupPlan } from './services/followup.js';
 import { nextNightSlot } from './services/paris-time.js';
 import { notify, notifyConfig, EVENTS, WEBHOOK_RE } from './services/notify.js';
 import { budgetState, AI_JOBS } from './services/budget.js';
+import { currentClaudeQuota } from './services/usagelive.js';
 import { sendWeeklyReport } from './services/report.js';
 import { exportProspects, importProspects } from './services/csv.js';
 import { quotaFor, planLimitError, withUserLock, assertRoom, usageView } from './services/plans.js';
@@ -309,8 +310,9 @@ export function registerRoutes(router, app) {
       OR (j.status = 'queued' AND (j.run_after IS NULL OR j.run_after <= ?)))`).get(...mineArgs, now())).n;
     const scheduled = (await db.prepare(`SELECT COUNT(*) n FROM jobs j LEFT JOIN projects p ON p.id = j.project_id WHERE ${mine} AND j.status = 'queued' AND j.run_after > ?`).get(...mineArgs, now())).n;
     const link = await getLinkState(db, userId);
-    // Le quota d'abonnement n'existe qu'en mode abonnement ou serveur : jamais de barre en mode clé API
-    const rlRaw = link?.mode === MODES.api_key ? null : await getSetting(db, userId, 'claude_rate_limit_json');
+    // Le quota d'abonnement n'existe qu'en mode abonnement : relevé en direct chez Anthropic (il compte aussi ce que la personne
+    // fait avec son Claude en dehors d'AiTools), à défaut la dernière mesure d'un job. Jamais de barre en mode clé API.
+    const quota = link?.mode === MODES.api_key ? null : await currentClaudeQuota(app, userId);
     // Détail pour le menu « jobs » de la barre du haut : en cours d'abord, puis la file, puis les programmés
     const jobs = (await db.prepare(`SELECT j.id, j.type, j.status, j.progress_json, j.run_after, j.started_at, j.created_at, p.id pid, p.name project
       FROM jobs j LEFT JOIN projects p ON p.id = j.project_id
@@ -322,7 +324,7 @@ export function registerRoutes(router, app) {
     }));
     json(res, {
       temp: session.user.isAdmin ? cpuTemp() : null, queue, scheduled, jobs, usage: await usageSummary(db, userId), budget: await budgetState(db, userId),
-      claudeRateLimit: rlRaw ? JSON.parse(rlRaw) : null, linkMode: link?.mode ?? null,
+      claudeRateLimit: quota, linkMode: link?.mode ?? null,
     });
   });
 
