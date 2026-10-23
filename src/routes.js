@@ -145,12 +145,10 @@ export function registerRoutes(router, app) {
       send_delay_max: await getSetting(db, userId, 'send_delay_max', '60'),
       prospect_model: await getSetting(db, userId, 'prospect_model', 'haiku'),
       analyze_model: await getSetting(db, userId, 'analyze_model', 'haiku'),
-      // La liste d'opposition est commune à tous les comptes : on n'en montre que ce qui touche SES prospects
-      blacklist_count: (await db.prepare(`SELECT COUNT(DISTINCT x.email) n FROM prospects x JOIN projects p ON p.id = x.project_id
-        WHERE p.user_id = ? AND x.email IN (SELECT email FROM blacklist)`).get(userId)).n,
       weekly_report: await getSetting(db, userId, 'weekly_report', '0') === '1',
       budget_day_usd: await getSetting(db, userId, 'budget_day_usd', ''),
       budget_month_usd: await getSetting(db, userId, 'budget_month_usd', ''),
+      priced: (await getLinkState(db, userId))?.mode === MODES.api_key, // plafonds en $ : seulement avec une clé API
       discord: { set: !!discord.url, events: discord.events, all: EVENTS },
     };
     html(res, settingsPage({ email: session.email, s, saved: url.searchParams.has('ok') }));
@@ -175,8 +173,9 @@ export function registerRoutes(router, app) {
     await set('analyze_model', b.analyze_model === 'sonnet' ? 'sonnet' : 'haiku');
     const money = (v) => { const n = Number(String(v || '').replace(',', '.')); return Number.isFinite(n) && n > 0 ? String(Math.round(n * 100) / 100) : ''; };
     await set('weekly_report', b.weekly_report === 'on' ? '1' : '0');
-    await set('budget_day_usd', money(b.budget_day_usd));
-    await set('budget_month_usd', money(b.budget_month_usd));
+    // Champs absents du formulaire (compte en abonnement : pas de plafond en $) : les valeurs enregistrées ne bougent pas
+    if (b.budget_day_usd !== undefined) await set('budget_day_usd', money(b.budget_day_usd));
+    if (b.budget_month_usd !== undefined) await set('budget_month_usd', money(b.budget_month_usd));
 
     const hook = String(b.discord_webhook || '').trim();
     if (hook && !WEBHOOK_RE.test(hook)) throw new HttpError(400, 'URL de webhook Discord invalide (https://discord.com/api/webhooks/…)');
@@ -589,6 +588,8 @@ export function registerRoutes(router, app) {
     await db.prepare('UPDATE prospects SET status = ? WHERE id = ?').run(b.status, row.id);
     if (b.status === 'refused') {
       await db.prepare("INSERT OR IGNORE INTO blacklist(email, reason, created_at) VALUES(?, 'refused', ?)").run(row.email, now());
+      // Le refus vaut pour tous les comptes : chez les autres, l'adresse n'est plus proposée ni contactée (sans dire qui ni pourquoi)
+      await db.prepare("UPDATE prospects SET status = 'refused' WHERE email = ? AND status IN ('new','sent')").run(row.email);
     }
     json(res, { ok: true });
   });

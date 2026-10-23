@@ -1238,7 +1238,7 @@
     try {
       const r = await api(`/api/projects/${input.dataset.import}/prospects/import`, { csv });
       report.innerHTML = `<p class="small"><span class="ok">${r.imported} importé(s)</span> sur ${r.total} ·
-        ${r.duplicates} déjà présent(s) · ${r.blacklisted} sur liste d'opposition · ${r.invalid.length} invalide(s)</p>
+        ${r.skipped} ignoré(s) (déjà présents ou à ne pas contacter) · ${r.invalid.length} invalide(s)</p>
         ${r.invalid.length ? `<details class="small"><summary>Lignes ignorées</summary><ul>${r.invalid.map((x) => `<li>Ligne ${x.line} : ${esc(x.reason)}</li>`).join('')}</ul></details>` : ''}`;
       toast(`${r.imported} prospect(s) importé(s)`);
       loadProspects(d);

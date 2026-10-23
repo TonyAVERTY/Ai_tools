@@ -566,6 +566,13 @@ export const MIGRATIONS = [
       "DELETE FROM user_settings WHERE `key` = 'smtp_enc'",
     ],
   },
+  {
+    // Liste d'opposition : les prospects déjà présents chez les autres comptes passent en « refus » (ils ne sont plus contactés, et
+    // l'état affiché le dit sans révéler d'où vient l'opposition).
+    name: 'opposition_propagation',
+    sqlite: ["UPDATE prospects SET status = 'refused' WHERE status IN ('new', 'sent') AND email IN (SELECT email FROM blacklist)"],
+    mysql: ["UPDATE prospects SET status = 'refused' WHERE status IN ('new', 'sent') AND email IN (SELECT email FROM blacklist)"],
+  },
 ];
 
 // ---------- Aides de la migration 2 ----------

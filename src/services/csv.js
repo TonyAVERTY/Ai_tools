@@ -90,7 +90,9 @@ export async function importProspects(db, projectId, text, { at = now(), limit =
   if (data.length > MAX_ROWS) throw new Error(`Maximum ${MAX_ROWS} lignes par import (${data.length} dans le fichier)`);
 
   const dateLabel = new Date(at * 1000).toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris' });
-  const res = { total: data.length, imported: 0, duplicates: 0, blacklisted: 0, invalid: [] };
+  // `skipped` : déjà présents OU à ne pas contacter. Le rapport ne distingue pas les deux : la liste d'opposition, commune à tous
+  // les comptes, ne doit révéler la présence d'aucune adresse précise.
+  const res = { total: data.length, imported: 0, skipped: 0, invalid: [] };
   const seen = new Set();
   const get = (r, k, max = 200) => (col[k] === undefined ? '' : unformula(String(r[col[k]] ?? '').trim()).slice(0, max));
 
@@ -104,9 +106,9 @@ export async function importProspects(db, projectId, text, { at = now(), limit =
       const line = i + 2;
       const email = get(r, 'email').toLowerCase();
       if (!EMAIL_RE.test(email)) { if (res.invalid.length < 50) res.invalid.push({ line, reason: `email invalide : "${email || 'vide'}"` }); continue; }
-      if (seen.has(email) || await exists.get(projectId, email)) { res.duplicates++; continue; }
+      if (seen.has(email) || await exists.get(projectId, email)) { res.skipped++; continue; }
       seen.add(email);
-      if (await optOut.get(email)) { res.blacklisted++; continue; }
+      if (await optOut.get(email)) { res.skipped++; continue; }
       if (limit != null && res.imported >= limit) throw limitError || new Error('Plafond de prospects atteint');
       const s = Number(get(r, 'score'));
       await insert.run(
