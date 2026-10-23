@@ -17,3 +17,18 @@ export function assetUrl(path) {
   }
   return cache.get(path);
 }
+
+/**
+ * Logo de marque (monogramme « AI ») : version claire par défaut, version sombre quand le navigateur est en thème sombre.
+ * Décoratif (le nom « AiTools » est écrit à côté), d'où l'alt vide.
+ */
+export function brandMark(cls = '') {
+  return `<picture class="brand-mark${cls ? ` ${cls}` : ''}" aria-hidden="true"><source srcset="${assetUrl('/static/img/logo-mark-dark.png')}" media="(prefers-color-scheme: dark)"><img src="${assetUrl('/static/img/logo-mark.png')}" alt="" width="30" height="24"></picture>`;
+}
+
+/** Liens d'icônes du <head> (onglet du navigateur, écran d'accueil iOS). */
+export function iconLinks() {
+  return `<link rel="icon" href="/favicon.ico" sizes="48x48">
+<link rel="icon" type="image/png" sizes="32x32" href="${assetUrl('/static/img/favicon-32.png')}">
+<link rel="apple-touch-icon" href="${assetUrl('/static/img/apple-touch-icon.png')}">`;
+}
