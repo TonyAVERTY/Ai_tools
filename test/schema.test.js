@@ -22,6 +22,7 @@ function parseDdl(statements) {
   const tables = new Map();
   const cascade = (item) => [...item.matchAll(/REFERENCES\s+`?(\w+)`?\s*\([^)]*\)\s*ON DELETE CASCADE/gi)].map((r) => r[1]);
   for (const st of statements) {
+    if (typeof st !== 'string' && !st.sql) continue; // étape JavaScript : aucun DDL
     const sql = (typeof st === 'string' ? st : st.sql).replace(/--[^\n]*/g, '').trim();
     let a;
     if ((a = /^DROP TABLE (?:IF EXISTS )?`?(\w+)`?/i.exec(sql))) { tables.delete(a[1]); continue; }

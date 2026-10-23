@@ -7,8 +7,9 @@ import { join } from 'node:path';
 import { now, setSetting } from '../src/db.js';
 import { testDb } from './helpers/db.js';
 import { createApp } from '../src/server.js';
-import { unsubToken } from '../src/crypto.js';
+import { unsubToken, hashSid } from '../src/crypto.js';
 import { addUser, TEST_SECRET_KEY } from './helpers/users.js';
+import { PUBLIC_DNS, FAKE_MX } from './helpers/server.js';
 
 const APP_URL = 'https://ai.tony-averty.dev';
 let app, base, cookie, tmp, uid;
@@ -19,11 +20,11 @@ before(async () => {
     appUrl: APP_URL, google: { clientId: 'cid', clientSecret: 'cs' }, apple: null, adminEmails: ['me@gmail.com'],
     secretKey: TEST_SECRET_KEY, dataDir: tmp, claudeBin: 'claude', sandbox: { enabled: false, production: false },
   };
-  app = await createApp(cfg, { db: await testDb(), worker: false });
+  app = await createApp(cfg, { db: await testDb(), worker: false, resolveHost: PUBLIC_DNS, resolveMx: FAKE_MX }); // DNS injecté : le test ne dépend pas du réseau
   await new Promise((r) => app.server.listen(0, '127.0.0.1', r));
   base = `http://127.0.0.1:${app.server.address().port}`;
   uid = await addUser(app.db, { email: 'me@gmail.com' });
-  await app.db.prepare('INSERT INTO sessions(id, user_id, created_at, expires_at) VALUES(?, ?, ?, ?)').run('sess1', uid, now(), now() + 3600);
+  await app.db.prepare('INSERT INTO sessions(id, user_id, created_at, expires_at) VALUES(?, ?, ?, ?)').run(hashSid('sess1'), uid, now(), now() + 3600);
   cookie = 'sid=sess1';
 });
 after(async () => { await app.close(); rmSync(tmp, { recursive: true, force: true }); });
@@ -135,7 +136,7 @@ test('dashboard, réglages, création de projet et statut', async () => {
   r = await get('/');
   const page = await r.text();
   assert.ok(!page.includes('secretpass'), 'le mot de passe ne ressort jamais dans la page');
-  assert.match(page, /readonly disabled/);
+  assert.doesNotMatch(page, /readonly disabled/, 'plus de SMTP commun affiché en lecture seule : chaque projet a le sien');
 
   r = await get(`/api/projects/${id}/recap`);
   assert.match((await r.json()).error, /non configuré/);
@@ -227,6 +228,10 @@ test('réglages Discord : URL validée, chiffrée, événements enregistrés, pl
 
 test('budget : réglages, jauge et avertissement au lancement', async () => {
   const base = { notify_email: 'moi@x.fr', git_type_0: 'forgejo', git_host_0: 'git.tony-averty.dev', global_daily_cap: '100', send_delay_min: '20', send_delay_max: '60' };
+  // Les plafonds en $ n'existent qu'avec une clé API ; le quota d'abonnement, qu'avec un jeton d'abonnement : on passe de l'un à l'autre
+  const subscriptionLink = (await app.db.prepare('SELECT claude_link_json j FROM users WHERE id = ?').get(uid)).j;
+  const setLink = (j) => app.db.prepare('UPDATE users SET claude_link_json = ? WHERE id = ?').run(j, uid);
+  await setLink(JSON.stringify({ v: 1, mode: 'api_key', valid: true }));
   let r = await post('/settings', { ...base, budget_day_usd: '0,5', budget_month_usd: 'abc' }, { form: true });
   assert.equal(r.status, 303);
   const s = async (k) => (await app.db.prepare('SELECT value FROM user_settings WHERE user_id = ? AND `key` = ?').get(uid, k))?.value;
@@ -236,15 +241,18 @@ test('budget : réglages, jauge et avertissement au lancement', async () => {
   let sys = await (await get('/api/system')).json();
   assert.equal(sys.budget.blocked, true);
   assert.equal(sys.claudeRateLimit, null, 'pas encore mesuré sans appel Claude');
-  await setSetting(app.db, uid, 'claude_rate_limit_json', JSON.stringify({ at: now(), fiveHour: { utilization: 0.42, resetsAt: 123 }, sevenDay: { utilization: 0.1, resetsAt: 456 } }));
+  await setLink(subscriptionLink);
+  await setSetting(app.db, uid, 'claude_rate_limit_json', JSON.stringify({ at: now(), fiveHour: { utilization: 0.42, resetsAt: 4_000_000_000 }, sevenDay: { utilization: 0.1, resetsAt: 4_000_000_000 } }));
   sys = await (await get('/api/system')).json();
   assert.equal(sys.claudeRateLimit.fiveHour.utilization, 0.42);
   assert.equal(sys.claudeRateLimit.sevenDay.utilization, 0.1);
+  await setLink(JSON.stringify({ v: 1, mode: 'api_key', valid: true }));
   const id = (await app.db.prepare('SELECT id FROM projects LIMIT 1').get()).id;
   await app.db.prepare("UPDATE jobs SET status = 'cancelled' WHERE status IN ('queued', 'running')").run();
   r = await post(`/api/projects/${id}/evolution`, { count: 2, level: 'rapide' });
   assert.match((await r.json()).budgetBlocked, /budget IA des dernières 24 h atteint/);
   await post('/settings', { ...base, budget_day_usd: '' }, { form: true });
+  await setLink(subscriptionLink);
 });
 
 test('fiche prospect : routes notes et prochaine action', async () => {

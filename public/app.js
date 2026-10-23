@@ -4,6 +4,11 @@
   const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
+  // Montée en charge : un conseil (jamais un blocage) pendant la première semaine d'envois d'un projet
+  const warmupLine = (w) => (w?.active ? ` · conseil : ${w.perDay / 2} à ${w.perDay} par jour cette première semaine` : '');
+  const warmupNotice = (w, count) => (!w?.active || (w.sentToday || 0) + count <= w.perDay ? null
+    : `Conseil : ${w.perDay / 2} à ${w.perDay} mails par jour pendant la première semaine protègent la réputation de ton adresse d'envoi (encore ${w.daysLeft} jour${w.daysLeft > 1 ? 's' : ''}). Tu peux quand même envoyer plus.`);
+
   async function api(path, body) {
     const r = await fetch(path, body === undefined ? { headers: { Accept: 'application/json' } } : {
       method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(body),
@@ -52,7 +57,7 @@
   const ACTIVE = ['queued', 'running'];
   const LABELS = {
     analyze: 'Analyse', prospect: 'Recherche', template: 'Modèle', send: 'Envoi', evolution: 'Évolutions',
-    followup_template: 'Modèle de relance', followup: 'Relances', linkedin_post: 'Post LinkedIn',
+    followup_template: 'Modèle de relance', followup: 'Relances', linkedin_post: 'Post LinkedIn', audit: 'Audit', hook: 'Accroche',
   };
 
   // Champs en lecture seule à copier (lien d'invitation) : un clic sélectionne tout
@@ -100,11 +105,14 @@
     const mark = (id) => tocLinks.forEach((a) => { if (a.getAttribute('href') === `#${id}`) a.setAttribute('aria-current', 'true'); else a.removeAttribute('aria-current'); });
     const update = () => {
       queued = false;
-      const atEnd = innerHeight + scrollY >= document.documentElement.scrollHeight - 4;
-      // La section en cours : la dernière dont le haut a passé le tiers supérieur de l'écran (la dernière, tout en bas de la page)
+      // La ligne de lecture descend du tiers de l'écran (haut de page) jusqu'au bas de l'écran (bas de page) : ainsi les dernières
+      // sections, trop courtes pour jamais atteindre le tiers supérieur, sont elles aussi repérées, chacune à son tour.
+      const range = document.documentElement.scrollHeight - innerHeight;
+      const progress = range > 0 ? Math.min(1, Math.max(0, scrollY / range)) : 0;
+      const line = innerHeight * (0.33 + 0.67 * progress);
       let cur = sections[0];
-      for (const sec of sections) if (sec.getBoundingClientRect().top <= innerHeight * 0.33) cur = sec;
-      mark((atEnd ? sections.at(-1) : cur).id);
+      for (const sec of sections) if (sec.getBoundingClientRect().top <= line) cur = sec;
+      mark(cur.id);
     };
     const schedule = () => { if (!queued) { queued = true; requestAnimationFrame(update); } };
     addEventListener('scroll', schedule, { passive: true });
@@ -399,6 +407,15 @@
         box._markdown = r.markdown;
         return;
       }
+      if (type === 'audit') {
+        const when = job.finishedAt ? new Date(job.finishedAt * 1000).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' }) : '';
+        // r.html est rendu et échappé par le serveur (src/services/markdown.js)
+        box.innerHTML = `<div class="evo-done"><p class="ok small">Audit terminé${when ? ` · ${esc(when)}` : ''}</p>
+          <button type="button" class="btn small" data-copy-md>Copier le rapport (Markdown)</button></div>
+          ${r.html || `<pre class="md">${esc(r.markdown)}</pre>`}`;
+        box._markdown = r.markdown;
+        return;
+      }
       box.innerHTML = `<p class="ok small">${esc(txt)}</p>`;
     }
   }
@@ -412,7 +429,7 @@
     try { s = await api(`/api/projects/${id}/status`); } catch (e) { return schedule(el, 30_000); }
     const st = state.get(id) || {};
     const jobs = s.jobs;
-    for (const type of ['prospect', 'template', 'send', 'evolution', 'followup_template', 'followup', 'linkedin_post']) renderJob($(`[data-job="${type}"]`, el), jobs[type], type);
+    for (const type of ['prospect', 'template', 'send', 'evolution', 'audit', 'followup_template', 'followup', 'linkedin_post']) renderJob($(`[data-job="${type}"]`, el), jobs[type], type);
 
     const running = Object.entries(jobs).filter(([, j]) => ACTIVE.includes(j.status)).map(([t]) => LABELS[t]);
     $('[data-state]', el).innerHTML = running.length
@@ -471,10 +488,11 @@
     if (!s.sendMax) blockers.push(s.stats.new ? 'plafond du jour atteint' : 'aucun prospect à contacter');
     $('button', sendForm).disabled = blockers.length > 0;
     sendForm.count.max = s.sendMax || 1;
+    sendForm.dataset.warmup = JSON.stringify(s.warmup || {});
     if (Number(sendForm.count.value) > s.sendMax && s.sendMax) sendForm.count.value = s.sendMax;
     $('[data-send-info]', sendForm).textContent = blockers.length
       ? `Bloqué : ${blockers.join(', ')}`
-      : `${s.stats.new} prospect(s) en attente · max ${s.sendMax} maintenant`;
+      : `${s.stats.new} prospect(s) en attente · max ${s.sendMax} maintenant${warmupLine(s.warmup)}`;
     $('[data-count]', el).textContent = `(${s.stats.total || 0})`;
 
     // Boîte de réception + test A/B
@@ -657,6 +675,38 @@
     });
   })();
 
+  // ---------- Corbeilles : marquer un élément « à retirer » (annulable), retiré à l'enregistrement ----------
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-trash]');
+    if (!btn) return;
+    const wrap = btn.closest('.trash-wrap');
+    const on = btn.getAttribute('aria-pressed') !== 'true';
+    $('[data-trash-input]', wrap).value = on ? '1' : '';
+    btn.setAttribute('aria-pressed', String(on));
+    $('.trash-note', wrap).hidden = !on;
+    // Une ligne entière (serveur Git, webhook) s'estompe tant qu'elle est marquée ; un simple token ne marque que son bouton
+    const row = btn.closest('.gitrow');
+    if (row && !btn.classList.contains('txt')) row.classList.toggle('to-delete', on);
+  });
+
+  // ---------- Développeur : copier le jeton affiché une seule fois ----------
+  document.addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-copy-token]');
+    if (!b) return;
+    const code = $('[data-token]');
+    try { await navigator.clipboard.writeText(code.textContent); toast('Jeton copié'); }
+    catch { const r = document.createRange(); r.selectNodeContents(code); getSelection().removeAllRanges(); getSelection().addRange(r); toast('Sélectionné : copie-le avec Ctrl+C', 'error'); }
+  });
+
+  // ---------- Réglages : revenir au prompt par défaut ----------
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-prompt-reset]');
+    if (!b) return;
+    const ta = $('[data-prompt-text]', b.closest('.prompt-def'));
+    ta.value = b.dataset.default;
+    ta.focus();
+  });
+
   // ---------- Réglages : plusieurs webhooks Discord ----------
   // Le « + » ajoute une ligne (adresse + événements reçus) : on sépare ainsi ce qui est dit ou fait, salon par salon.
   (() => {
@@ -770,19 +820,28 @@
         <label>De quoi doit parler le post ? <span class="muted small">(facultatif)</span>
           <textarea name="direction" rows="3" maxlength="500" data-li-direction placeholder="Ex. : le lancement de la nouvelle offre, un retour d'expérience, un conseil pour mes clients… Laisse vide : Claude choisit le sujet.">${esc(direction)}</textarea></label>
         <button type="button" class="btn primary" data-li-generate="${id}">${draft ? 'Régénérer un autre post' : 'Générer un post'}</button></div>`;
-    const draftHtml = draft ? `<div class="li-draft"><label>Brouillon (modifiable)
-        <textarea rows="11" maxlength="${s.maxLength}" data-li-body="${draft.id}">${esc(draft.body)}</textarea></label>
+    const liWhen = (ts) => new Date(ts * 1000).toLocaleString('fr-FR', { dateStyle: 'full', timeStyle: 'short', timeZone: 'Europe/Paris' });
+    const scheduled = draft?.status === 'scheduled';
+    const publishBtn = s.canManage && !acc.expired
+      ? `<button type="button" class="btn${scheduled ? '' : ' primary'}" data-li-publish="${id}" data-where="${esc(where || 'LinkedIn')}"${where ? '' : ' disabled'}>${scheduled ? 'Publier maintenant' : `Publier sur ${esc(acc.target ? acc.target.name : 'LinkedIn')}`}</button>` : '<span class="muted small">Un administrateur du projet publie.</span>';
+    const scheduleBox = !draft || scheduled || !s.canManage || acc.expired ? '' : `<div class="li-schedule"><label>Programmer la publication
+          <input type="datetime-local" data-li-when></label>
+        <button type="button" class="btn" data-li-schedule="${id}"${where ? '' : ' disabled'}>Programmer</button></div>`;
+    const draftHtml = draft ? `<div class="li-draft"><label>${scheduled ? 'Post programmé (annule la programmation pour le modifier)' : 'Brouillon (modifiable)'}
+        <textarea rows="11" maxlength="${s.maxLength}" data-li-body="${draft.id}"${scheduled ? ' readonly' : ''}>${esc(draft.body)}</textarea></label>
         <p class="muted small"><span data-li-count>${draft.body.length}</span> / ${s.maxLength} caractères${draft.direction ? ` · direction : « ${esc(draft.direction)} »` : ' · sujet choisi par Claude'}</p>
-        <div class="row-actions"><button type="button" class="btn" data-li-save="${id}">Enregistrer</button>
+        ${scheduled ? `<p class="ok small">Programmé : ${esc(liWhen(draft.scheduledAt))} (heure de Paris). Il part tout seul, dans les 15 minutes qui suivent l'heure choisie.</p>` : ''}
+        ${draft.scheduleError ? `<p class="error small">La dernière publication programmée a échoué : ${esc(draft.scheduleError)}</p>` : ''}
+        <div class="row-actions">${scheduled ? `<button type="button" class="btn" data-li-unschedule="${id}">Annuler la programmation</button>` : `<button type="button" class="btn" data-li-save="${id}">Enregistrer</button>`}
           <button type="button" class="btn" data-li-copy>Copier</button>
-          ${s.canManage && !acc.expired ? `<button type="button" class="btn primary" data-li-publish="${id}" data-where="${esc(where || 'LinkedIn')}"${where ? '' : ' disabled'}>Publier sur ${esc(acc.target ? acc.target.name : 'LinkedIn')}</button>` : '<span class="muted small">Un administrateur du projet publie.</span>'}</div></div>` : '';
+          ${publishBtn}</div>${scheduleBox}</div>` : '';
     const history = posts.filter((x) => x !== draft && x.status === 'published');
     const hist = history.length ? `<details class="li-history"><summary>Posts publiés (${history.length})</summary>${history.map((x) => `<article class="card"><p class="muted small">Publié le ${esc(liDay(x.publishedAt))}${x.publishedOn ? ` sur ${esc(x.publishedOn)}` : ''}</p><p class="li-text">${esc(x.body)}</p></article>`).join('')}</details>` : '';
     box.innerHTML = `${head}${targetHtml}${gen}${draftHtml}${hist}`;
   }
 
   document.addEventListener('click', async (e) => {
-    const t = e.target.closest('[data-li-generate],[data-li-save],[data-li-copy],[data-li-publish],[data-li-disconnect],[data-li-pages],[data-li-target-save],[data-li-pages-refresh]');
+    const t = e.target.closest('[data-li-generate],[data-li-save],[data-li-copy],[data-li-publish],[data-li-schedule],[data-li-unschedule],[data-li-disconnect],[data-li-pages],[data-li-target-save],[data-li-pages-refresh]');
     if (!t) return;
     const proj = t.closest('.project');
     const id = proj?.dataset.id;
@@ -799,6 +858,20 @@
       } else if (t.matches('[data-li-copy]')) {
         await navigator.clipboard.writeText(body().value);
         toast('Post copié');
+      } else if (t.matches('[data-li-schedule]')) {
+        const when = $('[data-li-when]', proj).value;
+        if (!when) { toast('Choisis la date et l\'heure de publication', 'error'); return; }
+        const at = Math.floor(new Date(when).getTime() / 1000); // l'heure saisie est celle de ton navigateur
+        if (!confirm(`Programmer la publication le ${new Date(at * 1000).toLocaleString('fr-FR', { dateStyle: 'full', timeStyle: 'short' })} ?\nLe post sera publié automatiquement et sera visible publiquement par tout le monde.`)) return;
+        t.disabled = true;
+        await api(`/api/projects/${id}/linkedin/schedule`, { postId: Number(body().dataset.liBody), body: body().value, at, confirm: true });
+        toast('Publication programmée');
+        loadLinkedin(proj);
+      } else if (t.matches('[data-li-unschedule]')) {
+        t.disabled = true;
+        await api(`/api/projects/${id}/linkedin/unschedule`, { postId: Number(body().dataset.liBody) });
+        toast('Programmation annulée');
+        loadLinkedin(proj);
       } else if (t.matches('[data-li-publish]')) {
         if (!confirm(`Publier ce post sur ${t.dataset.where || 'LinkedIn'} ? Il sera visible publiquement par tout le monde.`)) return;
         t.disabled = true;
@@ -924,7 +997,10 @@
 
     const hookTest = e.target.closest('[data-notify-test]');
     if (hookTest) {
-      try { await api('/api/notify/test', hookTest.dataset.hook ? { hook: hookTest.dataset.hook } : {}); toast('Notification envoyée sur Discord'); }
+      try {
+        await api('/api/notify/test', hookTest.dataset.channel ? { channel: hookTest.dataset.channel } : hookTest.dataset.hook ? { hook: hookTest.dataset.hook } : {});
+        toast(hookTest.dataset.channel ? 'Notification de test envoyée' : 'Notification envoyée sur Discord');
+      }
       catch (err) { toast(err.message, 'error'); }
       return;
     }
@@ -972,6 +1048,12 @@
           toast(r.budgetBlocked ? `En file, mais ${r.budgetBlocked}` : r.existing ? 'Une recherche est déjà prévue ou en cours' : data.when === 'night' ? 'Évolutions programmées cette nuit' : 'Recherche d\'évolutions lancée', r.budgetBlocked ? 'error' : 'ok');
           break;
         }
+        case 'audit': {
+          if (data.level === 'approfondi' && !confirm('Le niveau approfondi utilise Opus et consomme beaucoup de quota. Continuer ?')) break;
+          const r = await api(`/api/projects/${id}/code-review`, data);
+          toast(r.budgetBlocked ? `En file, mais ${r.budgetBlocked}` : r.existing ? 'Un audit est déjà prévu ou en cours' : 'Audit lancé', r.budgetBlocked ? 'error' : 'ok');
+          break;
+        }
         case 'template': {
           data.kind = form.dataset.kind;
           const r = await api(`/api/projects/${id}/template/save`, data);
@@ -980,7 +1062,8 @@
         }
         case 'send': {
           const n = Number(data.count);
-          if (!confirm(`Envoyer ${n} mail(s) de prospection maintenant ?\nIls partiront espacés de quelques dizaines de secondes.`)) break;
+          const advice = warmupNotice(JSON.parse(form.dataset.warmup || '{}'), n);
+          if (!confirm(`Envoyer ${n} mail(s) de prospection maintenant ?\nIls partiront espacés de quelques dizaines de secondes.${advice ? `\n\n${advice}` : ''}`)) break;
           await api(`/api/projects/${id}/send`, { count: n, confirm: true });
           toast('Envoi lancé');
           break;
@@ -1187,7 +1270,7 @@
   }
 
   // ---------- Liste des prospects (mini CRM) ----------
-  const STATUS = { new: 'À contacter', sent: 'Contacté', replied: 'A répondu', client: 'Client', refused: 'Refus', bounced: 'Rejeté' };
+  const STATUS = { new: 'À contacter', sent: 'Contacté', replied: 'A répondu', client: 'Client', refused: 'Refus', bounced: 'Rejeté', invalid: 'Adresse invalide' };
   // Seuls les liens http(s) sont cliquables : un "javascript:" venu d'une page web scrapée ne doit jamais s'exécuter ici
   const safeUrl = (u) => (/^https?:\/\//i.test(String(u || '')) ? String(u) : '');
   const fmtDate = (ts) => new Date(ts * 1000).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' });
@@ -1220,7 +1303,12 @@
         <button type="button" class="btn small" data-close>Fermer</button>
       </div>
       ${d.optOut ? `<p class="error small">Sur la liste d'opposition (${d.optOut.reason === 'bounce' ? 'adresse invalide' : d.optOut.reason === 'refused' ? 'refus' : 'désinscription'}) : ne plus contacter.</p>` : ''}
-      ${p.hook ? `<p class="hook">« ${esc(p.hook)} »</p>` : ''}
+      ${(() => {
+        const busy = d.hookJob && ['queued', 'running'].includes(d.hookJob.status);
+        return `<div class="hook-row">${p.hook ? `<p class="hook">« ${esc(p.hook)} »</p>` : '<p class="muted small">Pas d\'accroche pour ce prospect.</p>'}
+          <button type="button" class="btn small" data-regen-hook${busy ? ' disabled' : ''}>${busy ? 'Régénération en cours…' : p.hook ? "Régénérer l'accroche" : 'Générer une accroche'}</button>
+          ${d.hookJob?.status === 'error' ? `<p class="error small">Échec : ${esc(d.hookJob.error)}</p>` : ''}</div>`;
+      })()}
       ${source ? `<p class="small muted">Email trouvé sur : <a href="${esc(source)}" target="_blank" rel="noopener noreferrer">${esc(source)}</a></p>` : ''}
 
       <h4>Historique</h4>
@@ -1254,6 +1342,20 @@
       if (del && confirm('Supprimer cette note ?')) {
         await api(`/api/prospects/${id}/notes/${del.dataset.delNote}/delete`, {}).catch((err) => toast(err.message, 'error'));
         openProspect(id);
+      }
+      const regen = e.target.closest('[data-regen-hook]');
+      if (regen) {
+        regen.disabled = true;
+        try {
+          await api(`/api/prospects/${id}/hook`, {});
+          toast("Accroche en cours de rédaction : Claude lit le site du prospect");
+          // La fiche se met à jour toute seule quand le job se termine
+          for (let i = 0; i < 60 && dlg.open && dlg.dataset.id === id; i++) {
+            await new Promise((r) => setTimeout(r, 3000));
+            const d = await api(`/api/prospects/${id}`);
+            if (!d.hookJob || !['queued', 'running'].includes(d.hookJob.status)) { if (dlg.open && dlg.dataset.id === id) openProspect(id); refreshOpenLists(); break; }
+          }
+        } catch (err) { toast(err.message, 'error'); regen.disabled = false; }
       }
       if (e.target.closest('[data-clear-next]')) {
         await api(`/api/prospects/${id}/next`, { action: '' }).catch((err) => toast(err.message, 'error'));
@@ -1309,6 +1411,7 @@
     const qs = new URLSearchParams({ ...filters, page });
     // L'export suit les filtres affichés
     $('[data-export]', d).href = `/api/projects/${proj.dataset.id}/prospects.csv?${new URLSearchParams(filters)}`;
+    if (d.dataset.view === 'board') return loadBoard(d, proj, filters, box);
     try {
       const r = await api(`/api/projects/${proj.dataset.id}/prospects?${qs}`);
       d.dataset.page = r.page;
@@ -1327,7 +1430,62 @@
     } catch (err) { box.innerHTML = `<p class="error small">${esc(err.message)}</p>`; }
   }
 
+  // Kanban : une colonne par statut ; on glisse une fiche pour changer son statut (ou on utilise le menu de la fiche, au clavier)
+  async function loadBoard(d, proj, filters, box) {
+    try {
+      const { status: _ignored, ...f } = filters; // les colonnes sont les statuts
+      const r = await api(`/api/projects/${proj.dataset.id}/kanban?${new URLSearchParams(f)}`);
+      const card = (x) => `<article class="kcard" draggable="true" data-card="${x.id}">
+        <button type="button" class="link" data-open-prospect="${x.id}">${esc(x.company)}</button>
+        <div class="small muted">${esc(x.email)}${x.city ? ` · ${esc(x.city)}` : ''}${x.score ? ` · ${x.score}/10` : ''}</div>
+        ${x.next_action ? `<div class="small ${x.next_action_at * 1000 <= Date.now() ? 'warn' : 'muted'}">→ ${esc(x.next_action)} (${fmtDay(x.next_action_at)})</div>` : ''}
+        <select data-prospect="${x.id}" class="st-${x.status}" aria-label="Statut de ${esc(x.company)}">${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${k === x.status ? 'selected' : ''}>${v}</option>`).join('')}</select>
+      </article>`;
+      box.innerHTML = `<div class="kanban">${r.columns.map((c) => `<section class="kcol" data-col="${c.status}" aria-label="${esc(c.label)}">
+        <h4>${esc(c.label)} <span class="n">${c.total}</span></h4>
+        <div class="kcards" data-drop="${c.status}">${c.rows.map(card).join('') || '<p class="muted small">Vide</p>'}
+          ${c.total > c.rows.length ? `<p class="muted small">+ ${c.total - c.rows.length} autre(s) : affine avec les filtres ou passe en liste.</p>` : ''}</div>
+      </section>`).join('')}</div>`;
+      $('[data-pager]', d).innerHTML = '';
+    } catch (err) { box.innerHTML = `<p class="error small">${esc(err.message)}</p>`; }
+  }
+  const moveProspect = async (d, id, status) => {
+    if (status === 'refused' && !confirm('Marquer en refus ajoute l\'adresse à la liste d\'opposition. Continuer ?')) return;
+    try { await api(`/api/prospects/${id}/status`, { status }); toast('Statut mis à jour'); } catch (err) { toast(err.message, 'error'); }
+    loadProspects(d);
+  };
+  document.addEventListener('dragstart', (e) => {
+    const c = e.target.closest?.('[data-card]');
+    if (!c) return;
+    e.dataTransfer.setData('text/plain', c.dataset.card);
+    e.dataTransfer.effectAllowed = 'move';
+    c.classList.add('drag');
+  });
+  document.addEventListener('dragend', (e) => { e.target.closest?.('[data-card]')?.classList.remove('drag'); $$('.kcol.over').forEach((c) => c.classList.remove('over')); });
+  document.addEventListener('dragover', (e) => {
+    const col = e.target.closest?.('.kcol');
+    if (!col) return;
+    e.preventDefault();
+    $$('.kcol.over').forEach((c) => { if (c !== col) c.classList.remove('over'); });
+    col.classList.add('over');
+  });
+  document.addEventListener('drop', (e) => {
+    const col = e.target.closest?.('.kcol');
+    if (!col) return;
+    e.preventDefault();
+    col.classList.remove('over');
+    const id = e.dataTransfer.getData('text/plain');
+    const card = id && $(`[data-card="${CSS.escape(id)}"]`);
+    if (card && card.closest('.kcol') !== col) moveProspect(col.closest('details.prospects'), id, col.dataset.col);
+  });
+
   $$('details.prospects').forEach((d) => {
+    d.dataset.view = 'list';
+    for (const b of $$('[data-view-mode]', d)) b.addEventListener('click', () => {
+      d.dataset.view = b.dataset.viewMode;
+      for (const o of $$('[data-view-mode]', d)) { o.classList.toggle('on', o === b); o.setAttribute('aria-pressed', String(o === b)); }
+      loadProspects(d);
+    });
     d.addEventListener('toggle', () => { if (d.open) loadProspects(d); });
     const form = $('[data-filters]', d);
     let t;
@@ -1345,7 +1503,72 @@
     if (sel.value === 'refused' && !confirm('Marquer en refus ajoute l\'adresse à la liste d\'opposition. Continuer ?')) return;
     try { await api(`/api/prospects/${sel.dataset.prospect}/status`, { status: sel.value }); sel.className = `st-${sel.value}`; toast('Statut mis à jour'); }
     catch (err) { toast(err.message, 'error'); }
+    const d = sel.closest('details.prospects');
+    if (d?.dataset.view === 'board') loadProspects(d); // la fiche change de colonne
   });
+
+  // ---------- Réponses des prospects : popup d'arrivée, page « Mails » ----------
+  // La popup ne s'affiche que pour les réponses non lues ; tout le texte vient de la base et passe par textContent.
+  const popHost = (() => {
+    let host = $('.reply-pops');
+    if (!host) { host = document.createElement('div'); host.className = 'reply-pops'; host.setAttribute('aria-live', 'polite'); document.body.append(host); }
+    return host;
+  })();
+  const shownReplies = new Set();
+  const copyText = async (text, btn) => {
+    try { await navigator.clipboard.writeText(text); toast('Réponse copiée'); } catch { const ta = $('textarea', btn.closest('details')); ta?.select(); toast('Sélectionnée : copie-la avec Ctrl+C', 'error'); }
+  };
+  const markSeen = async (id) => { try { await api(`/api/replies/${id}/seen`, {}); } catch { /* sera réessayé au prochain passage */ } };
+  function replyPopup(r) {
+    const el = document.createElement('details');
+    el.className = 'reply-pop';
+    const sum = document.createElement('summary');
+    const who = document.createElement('strong'); who.textContent = r.from;
+    sum.append(who, ' vous a apporté une réponse');
+    const badge = document.createElement('span'); badge.className = 'badge'; badge.textContent = r.intentLabel; sum.append(' ', badge);
+    const close = document.createElement('button'); close.type = 'button'; close.className = 'reply-x'; close.setAttribute('aria-label', 'Fermer'); close.textContent = '×';
+    close.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); markSeen(r.id); el.remove(); });
+    sum.append(close);
+    const body = document.createElement('div'); body.className = 'reply-body';
+    const sub = document.createElement('p'); sub.className = 'muted small'; sub.textContent = `${r.project}${r.subject ? ` · ${r.subject}` : ''}`;
+    const txt = document.createElement('p'); txt.className = 'reply-text'; txt.textContent = r.text || '(texte non disponible)';
+    const lbl = document.createElement('p'); lbl.className = 'lbl'; lbl.textContent = 'Voici une réponse toute rédigée :';
+    const ta = document.createElement('textarea'); ta.readOnly = true; ta.rows = 8; ta.value = r.draft;
+    const acts = document.createElement('div'); acts.className = 'row-actions';
+    const copy = document.createElement('button'); copy.type = 'button'; copy.className = 'btn small'; copy.textContent = 'Copier la réponse';
+    copy.addEventListener('click', () => copyText(ta.value, copy));
+    const read = document.createElement('button'); read.type = 'button'; read.className = 'btn small'; read.textContent = 'Marquer comme lu';
+    read.addEventListener('click', () => { markSeen(r.id); el.remove(); });
+    const all = document.createElement('a'); all.className = 'btn small'; all.href = '/mails?v=replies'; all.textContent = 'Toutes les réponses';
+    acts.append(copy, read, all);
+    body.append(sub, txt, lbl, ta, acts);
+    el.append(sum, body);
+    popHost.append(el);
+  }
+  function paintUnseen(n) {
+    for (const a of $$('.pill[href="/mails"]')) {
+      let b = $('.pill-n', a);
+      if (!n) { b?.remove(); continue; }
+      if (!b) { b = document.createElement('span'); b.className = 'pill-n'; a.append(b); }
+      b.textContent = n > 9 ? '9+' : String(n);
+    }
+  }
+  async function pollReplies() {
+    if (document.hidden || !$('.top')) return;
+    try {
+      const d = await api('/api/replies?unseen=1&limit=5');
+      paintUnseen(d.unseen);
+      for (const r of d.replies) if (!shownReplies.has(r.id)) { shownReplies.add(r.id); replyPopup(r); }
+    } catch { /* hors ligne ou session expirée : la prochaine requête le dira */ }
+  }
+  if ($('.top')) { pollReplies(); setInterval(pollReplies, 45_000); document.addEventListener('visibilitychange', () => { if (!document.hidden) pollReplies(); }); }
+  document.addEventListener('click', async (e) => {
+    const c = e.target.closest('[data-copy-draft]');
+    if (c) { copyText($('[data-draft]', c.closest('.reply-body')).value, c); return; }
+    const s = e.target.closest('[data-reply-seen]');
+    if (s) { await markSeen(s.dataset.replySeen); s.closest('.reply-row')?.classList.remove('unseen'); s.remove(); pollReplies(); }
+  });
+  document.addEventListener('change', (e) => { if (e.target.matches('[data-autosubmit]')) e.target.form.submit(); });
 
   // ---------- Fond : constellation de particules qui fuient la souris ----------
   // Canvas 2D, ~90 points max : léger. Coupé quand l'onglet est caché, figé si l'OS demande moins d'animations.

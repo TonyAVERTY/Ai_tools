@@ -1,6 +1,7 @@
 // Pages de l'équipe : gestion par le propriétaire, équipes dont on est membre, confirmation d'une invitation.
 import { esc } from './http.js';
 import { layout } from './views.js';
+import { ic } from './icons.js';
 import { ROLES, ROLE_LABELS } from './teams.js';
 
 const fmt = (ts) => (ts ? new Date(ts * 1000).toLocaleDateString('fr-FR', { dateStyle: 'medium', timeZone: 'Europe/Paris' }) : '—');
@@ -20,7 +21,7 @@ function ownerSection(d) {
     ${d.members.map((m) => `<tr><td>${esc(m.email)}</td>
       <td><form method="post" action="/team/member/${m.id}/role" class="inline-form">${roleSelect(m.role)} <button class="btn small">Changer</button></form></td>
       <td>${fmt(m.since)}</td>
-      <td><form method="post" action="/team/member/${m.id}/remove"><button class="btn small danger">Retirer</button></form></td></tr>`).join('')}
+      <td><form method="post" action="/team/member/${m.id}/remove"><button class="btn small danger">${ic('trash')}Retirer</button></form></td></tr>`).join('')}
     </tbody></table></div>` : '<p class="muted">Personne dans l\'équipe pour l\'instant.</p>';
   const invites = d.invites.length ? `<h4>Invitations en attente</h4><div class="table-wrap"><table>
     <thead><tr><th>Adresse</th><th>Rôle</th><th>Expire le</th><th></th></tr></thead><tbody>
@@ -50,7 +51,7 @@ function ownerSection(d) {
 <section class="card">
   <h4>Supprimer l'équipe</h4>
   <p class="muted small">Les membres perdent tout accès tout de suite. Tes projets restent à toi, intacts.</p>
-  <form method="post" action="/team/delete"><button class="btn danger">Supprimer l'équipe</button></form>
+  <form method="post" action="/team/delete"><button class="btn danger">${ic('trash')}Supprimer l'équipe</button></form>
 </section>`;
 }
 

@@ -30,7 +30,7 @@ export function makeMessageId(fromEmail) {
   return `<${Date.now().toString(36)}.${randomBytes(9).toString('base64url')}@${domain}>`;
 }
 
-export function buildProspectMail({ template, prospect, smtp, unsubUrl, subject = template.subject, messageId, inReplyTo }) {
+export function buildProspectMail({ template, prospect, smtp, unsubUrl, subject = template.subject, messageId, inReplyTo, readReceipt = false }) {
   const vars = {
     entreprise: prospect.company,
     ville: prospect.city || '',
@@ -51,6 +51,8 @@ export function buildProspectMail({ template, prospect, smtp, unsubUrl, subject 
     headers: {
       'List-Unsubscribe': `<${unsubUrl}>`,
       'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+      // Accusé de lecture standard (MDN) : la messagerie du destinataire LUI demande s'il accepte d'en envoyer un
+      ...(readReceipt ? { 'Disposition-Notification-To': smtp.fromEmail } : {}),
     },
   };
 }

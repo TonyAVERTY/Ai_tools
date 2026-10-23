@@ -31,11 +31,11 @@ test('checkInbox sur un vrai serveur IMAP', { skip: !live && 'IMAP_TEST non déf
   const zen = await add('hello@zen.fr', '<m2@codebzh.fr>');
   const ferme = await add('contact@ferme.fr', '<m3@codebzh.fr>');
 
-  assert.deepEqual(await checkInbox(app, userId, id), { replies: 1, bounces: 1, ignored: 2 });
+  assert.deepEqual(await checkInbox(app, userId, id), { replies: 1, bounces: 1, receipts: 0, ignored: 2 });
   const st = async (pid) => (await db.prepare('SELECT status FROM prospects WHERE id = ?').get(pid)).status;
   assert.equal(await st(fournil), 'replied');
   assert.equal(await st(zen), 'sent', 'une absence n\'est pas une réponse');
   assert.equal(await st(ferme), 'bounced');
-  assert.deepEqual(await checkInbox(app, userId, id), { replies: 0, bounces: 0, ignored: 0 }, 'rien de relu');
+  assert.deepEqual(await checkInbox(app, userId, id), { replies: 0, bounces: 0, receipts: 0, ignored: 0 }, 'rien de relu');
   assert.equal((await getProject(app, id, { userId })).inbox.lastUid, 4);
 });
