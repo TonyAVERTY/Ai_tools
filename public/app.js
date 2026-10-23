@@ -92,6 +92,27 @@
     userMenu.addEventListener('keydown', (e) => { if (e.key === 'Escape' && userMenu.open) { open(false); summary.focus(); } });
   }
 
+  // ---------- Réglages : le sommaire suit la lecture (la section en cours est surlignée en direct) ----------
+  const tocLinks = $$('.settings .toc a[href^="#"]');
+  if (tocLinks.length) {
+    const sections = tocLinks.map((a) => document.getElementById(a.getAttribute('href').slice(1))).filter(Boolean);
+    let queued = false;
+    const mark = (id) => tocLinks.forEach((a) => { if (a.getAttribute('href') === `#${id}`) a.setAttribute('aria-current', 'true'); else a.removeAttribute('aria-current'); });
+    const update = () => {
+      queued = false;
+      const atEnd = innerHeight + scrollY >= document.documentElement.scrollHeight - 4;
+      // La section en cours : la dernière dont le haut a passé le tiers supérieur de l'écran (la dernière, tout en bas de la page)
+      let cur = sections[0];
+      for (const sec of sections) if (sec.getBoundingClientRect().top <= innerHeight * 0.33) cur = sec;
+      mark((atEnd ? sections.at(-1) : cur).id);
+    };
+    const schedule = () => { if (!queued) { queued = true; requestAnimationFrame(update); } };
+    addEventListener('scroll', schedule, { passive: true });
+    addEventListener('resize', schedule);
+    tocLinks.forEach((a) => a.addEventListener('click', () => mark(a.getAttribute('href').slice(1))));
+    update();
+  }
+
   // ---------- Liaison Claude : fenêtre d'avertissement du mode abonnement ----------
   // Le serveur refuse de toute façon (400) une requête sans la case cochée ; ici on évite seulement l'envoi inutile.
   $$('[data-open-dialog]').forEach((b) => b.addEventListener('click', () => $('#' + b.dataset.openDialog)?.showModal()));
