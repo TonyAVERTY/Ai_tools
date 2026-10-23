@@ -40,7 +40,7 @@ export function adminPage({ user, list, audit, q = '', notice = null, error = nu
   const auditRows = audit.map((r) => `<tr><td>${fmt(r.at)}</td><td>${esc(r.admin)}</td><td>${esc(r.label)}</td><td>${esc(r.target || '—')}</td><td class="small">${esc(r.detail || '')}</td></tr>`).join('');
   return layout({
     title: 'Administration', email: user.email,
-    body: `<h1>Administration</h1>
+    body: `<div class="stack"><h1>Administration</h1>
 <p class="muted small">Comptes et compteurs d'usage uniquement : aucun accès aux prospects, mails ni notes des utilisateurs.</p>
 ${notice ? `<p class="ok" role="status">${esc(notice)}</p>` : ''}
 ${error ? `<p class="error" role="alert">${esc(error)}</p>` : ''}
@@ -61,6 +61,6 @@ ${error ? `<p class="error" role="alert">${esc(error)}</p>` : ''}
     <thead><tr><th>Date</th><th>Par</th><th>Action</th><th>Compte</th><th>Détail</th></tr></thead>
     <tbody>${auditRows || '<tr><td colspan="5">Rien pour le moment.</td></tr>'}</tbody>
   </table></div>
-</section>`,
+</section></div>`,
   });
 }
