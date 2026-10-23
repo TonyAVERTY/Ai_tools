@@ -343,3 +343,7 @@ body.site {
   .lnk .ic, .btn .ic { transition: transform var(--t) var(--ease); }
   .lnk:hover .ic, .btn:hover .ic { transform: translateX(3px); }
 }
+
+/* Pastille flottante « reCAPTCHA » de Google : masquée (elle fait « site pas fini »). C'est permis par Google tant que la mention
+   de protection reste visible : elle l'est, sous les boutons de la page de connexion (src/site/pages.js). */
+.grecaptcha-badge { visibility: hidden; }

@@ -367,3 +367,14 @@ test('offres : prix de 10 à 100 € TTC, annuel = 2 mois offerts, plafonds tena
   assert.ok(!h.includes('illimité)'));
   assert.deepEqual(Object.keys(PLAN_PRICES).filter((k) => PLAN_LIMITS[k].projects == null), [], 'aucune offre payante illimitée');
 });
+
+test('connexion : la pastille flottante reCAPTCHA est masquée, la mention de protection reste visible', async () => {
+  assert.match(read('public/site.css'), /\.grecaptcha-badge \{ visibility: hidden; \}/);
+  const withCaptcha = await startApp({ cfg: { recaptcha: { siteKey: 'k', secret: 's', minScore: 0.5 } } });
+  try {
+    const h = await (await withCaptcha.anon.get('/login', { headers: { accept: 'text/html' } })).text();
+    assert.match(h, /protégé par Google reCAPTCHA/);
+    assert.match(h, /policies\.google\.com\/privacy/);
+    assert.match(h, /policies\.google\.com\/terms/);
+  } finally { await withCaptcha.close(); }
+});
