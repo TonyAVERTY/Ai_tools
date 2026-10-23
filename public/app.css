@@ -816,6 +816,9 @@ input.copy { font-family: var(--mono); font-size: .8125rem; }
 .fx-agent .fx-tire { fill: var(--card); stroke: var(--text); stroke-width: 2.6; }
 .fx-agent .fx-spoke { fill: none; stroke: var(--muted); stroke-width: 1.4; }
 .fx-agent .fx-hub { fill: var(--text); }
+.fx-trail { position: fixed; left: 0; top: 0; z-index: 998; pointer-events: none; overflow: visible; }
+.fx-trail .fx-dash { fill: none; stroke: var(--accent); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1 9; }
+.fx-trail .fx-dot { fill: var(--accent); }
 .fx-ring { position: fixed; z-index: 999; border-radius: 50%; border: 2px solid var(--accent); pointer-events: none; }
 .jobs-btn { will-change: transform; }
 .jitem.new { animation: fx-flash 2.6s ease-out; }
