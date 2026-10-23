@@ -19,6 +19,7 @@ import { notify, notifyJob } from './services/notify.js';
 import { budgetState, AI_JOBS, quotaState, isQuotaSensitive } from './services/budget.js';
 import { layout } from './views.js';
 import { homePage, notFoundPage } from './site/pages.js';
+import { withViewer } from './site/layout.js';
 import { securityHeaders, robotsHeaderFor, cspFor } from './site/seo.js';
 import { hasUsableLink, isLinkExempt, LINK_REQUIRED_MESSAGE } from './claudelink.js';
 import { memberTeamIds, purgeInvites } from './teams.js';
@@ -90,7 +91,8 @@ export async function createApp(cfg, { db, worker = true, createTransport, fetch
       if (!route) {
         const wantsJson = url.pathname.startsWith('/api/') || req.headers.accept?.includes('json');
         if (wantsJson || !isRead) throw new HttpError(404, 'Page introuvable');
-        return html(res, notFoundPage({ appUrl: cfg.appUrl }), 404);
+        res.setHeader('Vary', 'Cookie');
+        return html(res, withViewer(notFoundPage({ appUrl: cfg.appUrl }), !!(await getSession(db, req))), 404);
       }
       const ip = clientIp(req, cfg.trustProxy);
       // API (mode développeur) : jeton « Bearer », jamais de cookie ; pas de CSRF possible puisque rien n'est envoyé automatiquement
