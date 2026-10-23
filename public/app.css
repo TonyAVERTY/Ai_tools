@@ -105,6 +105,13 @@ input::placeholder, textarea::placeholder { color: var(--muted); }
 input:hover, select:hover, textarea:hover { border-color: var(--link); }
 input:disabled, input[readonly] { background: var(--bg-sunk); color: var(--muted); cursor: not-allowed; }
 input[type="search"] { -webkit-appearance: none; appearance: none; }
+/* Safari iOS : date, heure et date-heure gardent une largeur native et un texte centré qui débordent de la carte */
+input[type="date"], input[type="time"], input[type="datetime-local"], input[type="month"], input[type="week"] {
+  -webkit-appearance: none; appearance: none; min-width: 0; max-width: 100%; box-sizing: border-box; text-align: left; line-height: 44px;
+}
+input[type="date"]::-webkit-date-and-time-value, input[type="time"]::-webkit-date-and-time-value, input[type="datetime-local"]::-webkit-date-and-time-value { text-align: left; min-height: 1.2em; margin: 0; }
+input[type="date"]::-webkit-calendar-picker-indicator, input[type="time"]::-webkit-calendar-picker-indicator, input[type="datetime-local"]::-webkit-calendar-picker-indicator { opacity: .7; cursor: pointer; }
+.grid2 > *, .grid3 > * { min-width: 0; }
 .sel { position: relative; display: block; }
 .sel select { -webkit-appearance: none; appearance: none; padding-right: 40px; }
 .sel .ic { position: absolute; right: 12px; top: 12px; color: var(--muted); pointer-events: none; }
@@ -470,7 +477,7 @@ figure.chart figcaption { font-size: .9375rem; font-weight: 600; margin-bottom: 
 
 /* ---------- Équipe, administration ---------- */
 .inline-form { display: flex; align-items: center; gap: 8px; margin: 0; flex-wrap: wrap; }
-.inline-form select { width: auto; min-width: 9em; margin: 0; }
+.inline-form select { width: auto; min-width: min(9em, 100%); max-width: 100%; margin: 0; }
 input.copy { font-family: var(--mono); font-size: .8125rem; }
 .admin-table td { vertical-align: top; }
 /* Neuf colonnes : cellules plus serrées, en-têtes et adresses qui peuvent passer à la ligne, pour tenir dans la carte sans défilement */
@@ -874,3 +881,6 @@ html.nav-busy { cursor: progress; }
 .msg-status { margin: 4px 6px 0; }
 .chat-main.dragging { outline: 2px dashed var(--accent); outline-offset: -6px; background: var(--info-bg); }
 @media (max-width: 900px) { .chat-row { flex-wrap: wrap; } .chat-row textarea { flex-basis: 100%; order: -1; } .chat-projlist { left: 0; } }
+
+/* Téléphone : la liste des projets de la page IA s'ouvre sur toute la largeur du formulaire, pas depuis le bouton */
+@media (max-width: 600px) { .chat-form { position: relative; } .chat-proj { position: static; } .chat-projlist { left: 12px; right: 12px; min-width: 0; max-width: none; } }
