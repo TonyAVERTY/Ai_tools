@@ -57,7 +57,7 @@
   const ACTIVE = ['queued', 'running'];
   const LABELS = {
     analyze: 'Analyse', prospect: 'Recherche', template: 'Modèle', send: 'Envoi', evolution: 'Évolutions',
-    followup_template: 'Modèle de relance', followup: 'Relances', linkedin_post: 'Post LinkedIn',
+    followup_template: 'Modèle de relance', followup: 'Relances', linkedin_post: 'Post LinkedIn', audit: 'Audit', hook: 'Accroche',
   };
 
   // Champs en lecture seule à copier (lien d'invitation) : un clic sélectionne tout
@@ -407,6 +407,15 @@
         box._markdown = r.markdown;
         return;
       }
+      if (type === 'audit') {
+        const when = job.finishedAt ? new Date(job.finishedAt * 1000).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' }) : '';
+        // r.html est rendu et échappé par le serveur (src/services/markdown.js)
+        box.innerHTML = `<div class="evo-done"><p class="ok small">Audit terminé${when ? ` · ${esc(when)}` : ''}</p>
+          <button type="button" class="btn small" data-copy-md>Copier le rapport (Markdown)</button></div>
+          ${r.html || `<pre class="md">${esc(r.markdown)}</pre>`}`;
+        box._markdown = r.markdown;
+        return;
+      }
       box.innerHTML = `<p class="ok small">${esc(txt)}</p>`;
     }
   }
@@ -420,7 +429,7 @@
     try { s = await api(`/api/projects/${id}/status`); } catch (e) { return schedule(el, 30_000); }
     const st = state.get(id) || {};
     const jobs = s.jobs;
-    for (const type of ['prospect', 'template', 'send', 'evolution', 'followup_template', 'followup', 'linkedin_post']) renderJob($(`[data-job="${type}"]`, el), jobs[type], type);
+    for (const type of ['prospect', 'template', 'send', 'evolution', 'audit', 'followup_template', 'followup', 'linkedin_post']) renderJob($(`[data-job="${type}"]`, el), jobs[type], type);
 
     const running = Object.entries(jobs).filter(([, j]) => ACTIVE.includes(j.status)).map(([t]) => LABELS[t]);
     $('[data-state]', el).innerHTML = running.length
@@ -678,6 +687,15 @@
     // Une ligne entière (serveur Git, webhook) s'estompe tant qu'elle est marquée ; un simple token ne marque que son bouton
     const row = btn.closest('.gitrow');
     if (row && !btn.classList.contains('txt')) row.classList.toggle('to-delete', on);
+  });
+
+  // ---------- Réglages : revenir au prompt par défaut ----------
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-prompt-reset]');
+    if (!b) return;
+    const ta = $('[data-prompt-text]', b.closest('.prompt-def'));
+    ta.value = b.dataset.default;
+    ta.focus();
   });
 
   // ---------- Réglages : plusieurs webhooks Discord ----------
@@ -947,7 +965,10 @@
 
     const hookTest = e.target.closest('[data-notify-test]');
     if (hookTest) {
-      try { await api('/api/notify/test', hookTest.dataset.hook ? { hook: hookTest.dataset.hook } : {}); toast('Notification envoyée sur Discord'); }
+      try {
+        await api('/api/notify/test', hookTest.dataset.channel ? { channel: hookTest.dataset.channel } : hookTest.dataset.hook ? { hook: hookTest.dataset.hook } : {});
+        toast(hookTest.dataset.channel ? 'Notification de test envoyée' : 'Notification envoyée sur Discord');
+      }
       catch (err) { toast(err.message, 'error'); }
       return;
     }
@@ -993,6 +1014,12 @@
           if (data.level === 'approfondi' && !confirm('Le niveau approfondi utilise Opus et consomme beaucoup de quota. Continuer ?')) break;
           const r = await api(`/api/projects/${id}/evolution`, data);
           toast(r.budgetBlocked ? `En file, mais ${r.budgetBlocked}` : r.existing ? 'Une recherche est déjà prévue ou en cours' : data.when === 'night' ? 'Évolutions programmées cette nuit' : 'Recherche d\'évolutions lancée', r.budgetBlocked ? 'error' : 'ok');
+          break;
+        }
+        case 'audit': {
+          if (data.level === 'approfondi' && !confirm('Le niveau approfondi utilise Opus et consomme beaucoup de quota. Continuer ?')) break;
+          const r = await api(`/api/projects/${id}/code-review`, data);
+          toast(r.budgetBlocked ? `En file, mais ${r.budgetBlocked}` : r.existing ? 'Un audit est déjà prévu ou en cours' : 'Audit lancé', r.budgetBlocked ? 'error' : 'ok');
           break;
         }
         case 'template': {
@@ -1244,7 +1271,12 @@
         <button type="button" class="btn small" data-close>Fermer</button>
       </div>
       ${d.optOut ? `<p class="error small">Sur la liste d'opposition (${d.optOut.reason === 'bounce' ? 'adresse invalide' : d.optOut.reason === 'refused' ? 'refus' : 'désinscription'}) : ne plus contacter.</p>` : ''}
-      ${p.hook ? `<p class="hook">« ${esc(p.hook)} »</p>` : ''}
+      ${(() => {
+        const busy = d.hookJob && ['queued', 'running'].includes(d.hookJob.status);
+        return `<div class="hook-row">${p.hook ? `<p class="hook">« ${esc(p.hook)} »</p>` : '<p class="muted small">Pas d\'accroche pour ce prospect.</p>'}
+          <button type="button" class="btn small" data-regen-hook${busy ? ' disabled' : ''}>${busy ? 'Régénération en cours…' : p.hook ? "Régénérer l'accroche" : 'Générer une accroche'}</button>
+          ${d.hookJob?.status === 'error' ? `<p class="error small">Échec : ${esc(d.hookJob.error)}</p>` : ''}</div>`;
+      })()}
       ${source ? `<p class="small muted">Email trouvé sur : <a href="${esc(source)}" target="_blank" rel="noopener noreferrer">${esc(source)}</a></p>` : ''}
 
       <h4>Historique</h4>
@@ -1278,6 +1310,20 @@
       if (del && confirm('Supprimer cette note ?')) {
         await api(`/api/prospects/${id}/notes/${del.dataset.delNote}/delete`, {}).catch((err) => toast(err.message, 'error'));
         openProspect(id);
+      }
+      const regen = e.target.closest('[data-regen-hook]');
+      if (regen) {
+        regen.disabled = true;
+        try {
+          await api(`/api/prospects/${id}/hook`, {});
+          toast("Accroche en cours de rédaction : Claude lit le site du prospect");
+          // La fiche se met à jour toute seule quand le job se termine
+          for (let i = 0; i < 60 && dlg.open && dlg.dataset.id === id; i++) {
+            await new Promise((r) => setTimeout(r, 3000));
+            const d = await api(`/api/prospects/${id}`);
+            if (!d.hookJob || !['queued', 'running'].includes(d.hookJob.status)) { if (dlg.open && dlg.dataset.id === id) openProspect(id); refreshOpenLists(); break; }
+          }
+        } catch (err) { toast(err.message, 'error'); regen.disabled = false; }
       }
       if (e.target.closest('[data-clear-next]')) {
         await api(`/api/prospects/${id}/next`, { action: '' }).catch((err) => toast(err.message, 'error'));
@@ -1333,6 +1379,7 @@
     const qs = new URLSearchParams({ ...filters, page });
     // L'export suit les filtres affichés
     $('[data-export]', d).href = `/api/projects/${proj.dataset.id}/prospects.csv?${new URLSearchParams(filters)}`;
+    if (d.dataset.view === 'board') return loadBoard(d, proj, filters, box);
     try {
       const r = await api(`/api/projects/${proj.dataset.id}/prospects?${qs}`);
       d.dataset.page = r.page;
@@ -1351,7 +1398,62 @@
     } catch (err) { box.innerHTML = `<p class="error small">${esc(err.message)}</p>`; }
   }
 
+  // Kanban : une colonne par statut ; on glisse une fiche pour changer son statut (ou on utilise le menu de la fiche, au clavier)
+  async function loadBoard(d, proj, filters, box) {
+    try {
+      const { status: _ignored, ...f } = filters; // les colonnes sont les statuts
+      const r = await api(`/api/projects/${proj.dataset.id}/kanban?${new URLSearchParams(f)}`);
+      const card = (x) => `<article class="kcard" draggable="true" data-card="${x.id}">
+        <button type="button" class="link" data-open-prospect="${x.id}">${esc(x.company)}</button>
+        <div class="small muted">${esc(x.email)}${x.city ? ` · ${esc(x.city)}` : ''}${x.score ? ` · ${x.score}/10` : ''}</div>
+        ${x.next_action ? `<div class="small ${x.next_action_at * 1000 <= Date.now() ? 'warn' : 'muted'}">→ ${esc(x.next_action)} (${fmtDay(x.next_action_at)})</div>` : ''}
+        <select data-prospect="${x.id}" class="st-${x.status}" aria-label="Statut de ${esc(x.company)}">${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${k === x.status ? 'selected' : ''}>${v}</option>`).join('')}</select>
+      </article>`;
+      box.innerHTML = `<div class="kanban">${r.columns.map((c) => `<section class="kcol" data-col="${c.status}" aria-label="${esc(c.label)}">
+        <h4>${esc(c.label)} <span class="n">${c.total}</span></h4>
+        <div class="kcards" data-drop="${c.status}">${c.rows.map(card).join('') || '<p class="muted small">Vide</p>'}
+          ${c.total > c.rows.length ? `<p class="muted small">+ ${c.total - c.rows.length} autre(s) : affine avec les filtres ou passe en liste.</p>` : ''}</div>
+      </section>`).join('')}</div>`;
+      $('[data-pager]', d).innerHTML = '';
+    } catch (err) { box.innerHTML = `<p class="error small">${esc(err.message)}</p>`; }
+  }
+  const moveProspect = async (d, id, status) => {
+    if (status === 'refused' && !confirm('Marquer en refus ajoute l\'adresse à la liste d\'opposition. Continuer ?')) return;
+    try { await api(`/api/prospects/${id}/status`, { status }); toast('Statut mis à jour'); } catch (err) { toast(err.message, 'error'); }
+    loadProspects(d);
+  };
+  document.addEventListener('dragstart', (e) => {
+    const c = e.target.closest?.('[data-card]');
+    if (!c) return;
+    e.dataTransfer.setData('text/plain', c.dataset.card);
+    e.dataTransfer.effectAllowed = 'move';
+    c.classList.add('drag');
+  });
+  document.addEventListener('dragend', (e) => { e.target.closest?.('[data-card]')?.classList.remove('drag'); $$('.kcol.over').forEach((c) => c.classList.remove('over')); });
+  document.addEventListener('dragover', (e) => {
+    const col = e.target.closest?.('.kcol');
+    if (!col) return;
+    e.preventDefault();
+    $$('.kcol.over').forEach((c) => { if (c !== col) c.classList.remove('over'); });
+    col.classList.add('over');
+  });
+  document.addEventListener('drop', (e) => {
+    const col = e.target.closest?.('.kcol');
+    if (!col) return;
+    e.preventDefault();
+    col.classList.remove('over');
+    const id = e.dataTransfer.getData('text/plain');
+    const card = id && $(`[data-card="${CSS.escape(id)}"]`);
+    if (card && card.closest('.kcol') !== col) moveProspect(col.closest('details.prospects'), id, col.dataset.col);
+  });
+
   $$('details.prospects').forEach((d) => {
+    d.dataset.view = 'list';
+    for (const b of $$('[data-view-mode]', d)) b.addEventListener('click', () => {
+      d.dataset.view = b.dataset.viewMode;
+      for (const o of $$('[data-view-mode]', d)) { o.classList.toggle('on', o === b); o.setAttribute('aria-pressed', String(o === b)); }
+      loadProspects(d);
+    });
     d.addEventListener('toggle', () => { if (d.open) loadProspects(d); });
     const form = $('[data-filters]', d);
     let t;
@@ -1369,6 +1471,8 @@
     if (sel.value === 'refused' && !confirm('Marquer en refus ajoute l\'adresse à la liste d\'opposition. Continuer ?')) return;
     try { await api(`/api/prospects/${sel.dataset.prospect}/status`, { status: sel.value }); sel.className = `st-${sel.value}`; toast('Statut mis à jour'); }
     catch (err) { toast(err.message, 'error'); }
+    const d = sel.closest('details.prospects');
+    if (d?.dataset.view === 'board') loadProspects(d); // la fiche change de colonne
   });
 
   // ---------- Réponses des prospects : popup d'arrivée, page « Mails » ----------

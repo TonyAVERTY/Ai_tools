@@ -23,6 +23,8 @@ export const RATE_LIMITS = {
   csv: { user: { max: 10, windowMs: 10 * MIN } },
   // Envois : lancement d'un lot, rapport par mail, notification de test
   mail_send: { user: { max: 30, windowMs: HOUR } },
+  // Régénération d'accroche : un appel Claude (lecture du site) à chaque fois
+  enrich: { user: { max: 40, windowMs: HOUR } },
   // Création de projet (clone du dépôt, analyse)
   project_create: { user: { max: 10, windowMs: HOUR } },
   // Suppression de compte
