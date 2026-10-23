@@ -66,10 +66,9 @@ export function buildIcs(events, { name = 'AiTools', at = now() } = {}) {
 /** Les événements d'un compte : prochaines actions (30 jours en arrière, 1 an en avant) et posts LinkedIn programmés ou publiés récemment. */
 export async function eventsFor(app, userId, { at = now(), host = 'aitools' } = {}) {
   const { db } = app;
-  const ids = (await accessibleProjects(db, userId)).map((p) => Number(p.id));
-  if (!ids.length) return [];
-  const marks = ids.map(() => '?').join(',');
   const events = [];
+  const ids = (await accessibleProjects(db, userId)).map((p) => Number(p.id));
+  const marks = ids.length ? ids.map(() => '?').join(',') : 'NULL'; // « IN (NULL) » : aucune ligne, les événements ajoutés à la main restent
   for (const r of await db.prepare(`SELECT x.id, x.company, x.next_action, x.next_action_at, p.name project FROM prospects x JOIN projects p ON p.id = x.project_id
       WHERE x.project_id IN (${marks}) AND x.next_action_at IS NOT NULL AND x.next_action_at BETWEEN ? AND ? ORDER BY x.next_action_at LIMIT 1000`).all(...ids, at - 30 * 86400, at + 365 * 86400)) {
     events.push({ uid: `action-${r.id}-${r.next_action_at}@${host}`, at: Number(r.next_action_at), minutes: 30, title: `${r.next_action} : ${r.company}`, description: `Projet ${r.project}` });
@@ -77,6 +76,9 @@ export async function eventsFor(app, userId, { at = now(), host = 'aitools' } = 
   for (const r of await db.prepare(`SELECT l.id, l.body, l.scheduled_at, p.name project FROM linkedin_posts l JOIN projects p ON p.id = l.project_id
       WHERE l.project_id IN (${marks}) AND l.status = 'scheduled' AND l.scheduled_at IS NOT NULL ORDER BY l.scheduled_at LIMIT 500`).all(...ids)) {
     events.push({ uid: `linkedin-${r.id}-${r.scheduled_at}@${host}`, at: Number(r.scheduled_at), minutes: 15, title: `Post LinkedIn programmé : ${r.project}`, description: String(r.body).slice(0, 300) });
+  }
+  for (const r of await db.prepare('SELECT id, title, notes, starts_at, minutes FROM calendar_events WHERE user_id = ? AND starts_at BETWEEN ? AND ? ORDER BY starts_at LIMIT 1000').all(Number(userId), at - 30 * 86400, at + 365 * 86400)) {
+    events.push({ uid: `event-${r.id}@${host}`, at: Number(r.starts_at), minutes: Number(r.minutes), title: r.title, description: r.notes || '' });
   }
   return events.sort((a, b) => a.at - b.at);
 }

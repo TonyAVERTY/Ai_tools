@@ -11,6 +11,22 @@ const KIND = { initial: 'Premier mail', followup: 'Relance' };
 
 const when = (ts) => new Date(ts * 1000).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' });
 
+/** Proposition d'ajout à l'agenda (ou événement déjà ajouté) pour une réponse. */
+function suggestBlock(r) {
+  if (r.event) {
+    return `<div class="suggest done" data-suggest="${r.id}"><p class="why"><b>${ic('check')} Ajouté à ton calendrier :</b> ${esc(r.event.title)}</p>
+      <div class="sg-row"><a class="btn small" href="${esc(r.event.links.google)}" target="_blank" rel="noopener noreferrer">Google Agenda</a><a class="btn small" href="${esc(r.event.links.ics)}">Fichier .ics</a></div></div>`;
+  }
+  const s = r.suggestion;
+  if (!s) return '';
+  const why = s.dateToChoose ? "Le prospect semble partant mais n'a pas donné de date : choisis un créneau."
+    : `Il évoque « ${esc(s.phrase)} »${s.guessed ? " ; l'heure n'est pas précisée, vérifie-la" : ''}${s.vague ? ' ; date approximative, à confirmer' : ''}.`;
+  return `<div class="suggest" data-suggest="${r.id}" data-minutes="${s.minutes}"><p class="why"><b>${ic('clock')} Ajouter à ton calendrier ?</b> ${why}</p>
+    <label class="field"><span class="lbl">Titre</span><input data-ev-title value="${esc(s.title)}" maxlength="200"></label>
+    <div class="sg-row"><label class="field"><span class="lbl">Date et heure (Paris)</span><input type="datetime-local" data-ev-when value="${esc(s.whenLocal)}"></label>
+    <button type="button" class="btn primary" data-ev-add="${r.id}">${ic('plus')}Ajouter à mon calendrier</button></div></div>`;
+}
+
 function link(base, over) {
   const q = new URLSearchParams();
   const all = { v: base.view === 'replies' ? 'replies' : '', project: base.project || '', filter: base.filter || '', page: '', ...over };
@@ -42,6 +58,7 @@ export function mailsPage(d) {
       <div class="reply-body">
         ${r.subject ? `<p class="muted small">Objet : ${esc(r.subject)}</p>` : ''}
         <p class="reply-text">${esc(r.text || '(texte non disponible)')}</p>
+        ${suggestBlock(r)}
         <label class="field"><span class="lbl">Réponse suggérée (à relire, puis à envoyer depuis ta messagerie)</span>
           <textarea rows="9" readonly data-draft>${esc(r.draft)}</textarea></label>
         <div class="row-actions"><button type="button" class="btn small" data-copy-draft>${ic('copy')}Copier la réponse</button>
