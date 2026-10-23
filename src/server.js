@@ -21,6 +21,7 @@ import { layout } from './views.js';
 import { homePage, notFoundPage } from './site/pages.js';
 import { withViewer } from './site/layout.js';
 import { reportError } from './services/errormail.js';
+import { purgePendingUploads, sweepRunDirs } from './chatfiles.js';
 import { securityHeaders, robotsHeaderFor, cspFor } from './site/seo.js';
 import { hasUsableLink, isLinkExempt, LINK_REQUIRED_MESSAGE } from './claudelink.js';
 import { memberTeamIds, purgeInvites } from './teams.js';
@@ -154,7 +155,8 @@ export async function createApp(cfg, { db, worker = true, createTransport, fetch
   // Pi : on limite ce qui traîne en mémoire
   server.keepAliveTimeout = 5000;
   server.headersTimeout = 10_000;
-  server.requestTimeout = 30_000;
+  // Pièces jointes de la page IA (jusqu'à 50 Mo) : le temps de recevoir un corps de requête est plus long que 30 s ; l'envoi des en-têtes reste à 10 s
+  server.requestTimeout = 180_000;
 
   let w = null;
   let scheduler = null;
@@ -187,7 +189,7 @@ export async function createApp(cfg, { db, worker = true, createTransport, fetch
   let purging = null;
   const purge = setInterval(() => {
     app.limiter.sweep();
-    purging = Promise.all([purgeExpired(db), purgeInvites(db)]).catch((e) => console.error('[purge]', e.message));
+    purging = Promise.all([purgeExpired(db), purgeInvites(db), purgePendingUploads(app), sweepRunDirs(cfg)]).catch((e) => console.error('[purge]', e.message));
   }, 3600_000);
   purge.unref();
 

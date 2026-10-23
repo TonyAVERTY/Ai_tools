@@ -8,6 +8,7 @@ const app = readFileSync(new URL('../public/app.js', import.meta.url), 'utf8');
 const routes = readFileSync(new URL('../src/routes.js', import.meta.url), 'utf8');
 const linkedin = readFileSync(new URL('../src/linkedinroutes.js', import.meta.url), 'utf8');
 const fx = readFileSync(new URL('../public/fx.js', import.meta.url), 'utf8');
+const read = (f) => readFileSync(new URL(`../public/${f}`, import.meta.url), 'utf8');
 
 test('chaque route qui met un job en file déclenche l\'animation (et celles qui n\'en lancent pas, non)', () => {
   const src = /const LAUNCH = \/(.+)\/;/.exec(app)[1];
@@ -28,6 +29,10 @@ test('fx.js : aucun style en ligne dans le balisage, aucun écouteur global, mou
   assert.doesNotMatch(fx, /\b(document|window)\.addEventListener/, 'le module ne fait rien tant qu\'on ne l\'appelle pas');
   assert.match(fx, /prefers-reduced-motion/);
   assert.match(fx, /window\.AiFx = \{ press, launch, bump \}/);
+  // deux traits pointillés bleus : un vertical (V), un horizontal (H), tracés au rythme de l'agent
+  assert.match(fx, /V\$\{[^}]+\} H\$\{[^}]+\}/);
+  assert.match(read('app.css'), /\.fx-trail \.fx-dash \{[^}]*stroke: var\(--accent\)[^}]*stroke-dasharray/);
+  assert.match(read('app.js'), /AiFx\?\.launch\(trigger, \$\('\.jitem\.new', jobsPop\)/, 'le trait va jusqu\'à la ligne de la nouvelle tâche, menu ouvert');
 });
 
 let s;
