@@ -656,6 +656,40 @@ export const MIGRATIONS = [
     ],
   },
   {
+    // Événements de l'agenda : ajoutés à la main, ou proposés à partir d'une réponse de prospect (date, appel, rendez-vous).
+    name: 'calendar_events',
+    sqlite: [
+      `CREATE TABLE calendar_events (
+        id INTEGER PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE,
+        prospect_id INTEGER,
+        reply_id INTEGER,
+        title TEXT NOT NULL, notes TEXT,
+        starts_at INTEGER NOT NULL, minutes INTEGER NOT NULL DEFAULT 30,
+        created_at INTEGER NOT NULL
+      )`,
+      'CREATE INDEX calendar_events_user ON calendar_events(user_id, starts_at)',
+      'CREATE INDEX calendar_events_reply ON calendar_events(reply_id)',
+    ],
+    mysql: [
+      `CREATE TABLE IF NOT EXISTS calendar_events (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        user_id BIGINT NOT NULL,
+        project_id BIGINT NULL,
+        prospect_id BIGINT NULL,
+        reply_id BIGINT NULL,
+        title VARCHAR(255) NOT NULL, notes TEXT,
+        starts_at BIGINT NOT NULL, minutes INT NOT NULL DEFAULT 30,
+        created_at BIGINT NOT NULL,
+        KEY calendar_events_user (user_id, starts_at),
+        KEY calendar_events_reply (reply_id),
+        CONSTRAINT calendar_events_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        CONSTRAINT calendar_events_project_fk FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+      ) ${T}`,
+    ],
+  },
+  {
     // Accusés de lecture (MDN, RFC 8098) : le destinataire choisit d'en envoyer un ; aucun pixel espion.
     name: 'read_receipts',
     sqlite: ['ALTER TABLE mail_log ADD COLUMN read_at INTEGER'],

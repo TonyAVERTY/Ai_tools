@@ -7,6 +7,7 @@ import { ic } from './icons.js';
 import { icalBox } from './icalview.js';
 import { accessibleProjects } from './mailroutes.js';
 import { parisParts, parisTime } from './services/paris-time.js';
+import { eventLinks, toParisLocal, listEvents, DURATIONS } from './events.js';
 import { createFeed, deleteFeed, feedToken, feedUrl, userOfFeed, buildIcs, eventsFor } from './services/ical.js';
 
 const MONTHS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
@@ -15,12 +16,15 @@ const pad = (n) => String(n).padStart(2, '0');
 const hhmm = (ts) => { const p = parisParts(new Date(ts * 1000)); return `${pad(p.hour)}:${pad(p.minute)}`; };
 
 /** Événements du mois affiché, classés par jour (heure de Paris). */
-export async function monthEvents(db, ids, year, month) {
+export async function monthEvents(db, ids, year, month, userId = null) {
   const start = Math.floor(parisTime(year, month, 1, 0).getTime() / 1000);
   const end = Math.floor((month === 12 ? parisTime(year + 1, 1, 1, 0) : parisTime(year, month + 1, 1, 0)).getTime() / 1000);
   const byDay = new Map();
   const add = (ts, ev) => { const d = parisParts(new Date(ts * 1000)).day; (byDay.get(d) || byDay.set(d, []).get(d)).push({ ...ev, at: ts }); };
-  if (!ids.length) return byDay;
+  if (userId != null) {
+    for (const r of await db.prepare('SELECT title, starts_at FROM calendar_events WHERE user_id = ? AND starts_at >= ? AND starts_at < ?').all(Number(userId), start, end)) add(Number(r.starts_at), { kind: 'event', label: r.title, project: 'Événement' });
+  }
+  if (!ids.length) { for (const list of byDay.values()) list.sort((a, b) => a.at - b.at); return byDay; }
   const marks = ids.map(() => '?').join(',');
   for (const r of await db.prepare(`SELECT x.company, x.next_action, x.next_action_at, p.name project FROM prospects x JOIN projects p ON p.id = x.project_id
       WHERE x.project_id IN (${marks}) AND x.next_action_at >= ? AND x.next_action_at < ?`).all(...ids, start, end)) {
@@ -37,7 +41,7 @@ export async function monthEvents(db, ids, year, month) {
 
 const KIND = { action: ['Action', 'ic-action'], scheduled: ['LinkedIn programmé', 'warn'], published: ['LinkedIn publié', 'ok'] };
 
-export function calendarPage({ email, year, month, byDay, feed, today }) {
+export function calendarPage({ email, year, month, byDay, feed, today, upcoming = [], error = null }) {
   const first = parisParts(parisTime(year, month, 1, 12));
   const lead = (['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].indexOf(first.weekday) + 7) % 7;
   const total = new Date(Date.UTC(year, month, 0)).getUTCDate();
@@ -58,6 +62,26 @@ export function calendarPage({ email, year, month, byDay, feed, today }) {
   <div class="cal"><div class="cal-head">${DAYS.map((d) => `<span>${d}</span>`).join('')}</div><div class="cal-grid">${grid}</div></div>
   <p class="muted small">Heures de Paris. Les posts LinkedIn se programment depuis le projet (section LinkedIn).</p>
 </section>
+<section class="card" id="evenements">
+  <div class="card-h"><h2>Événements</h2><p>Ajoute un rendez-vous, un appel ou un rappel. Quand un prospect te répond avec une date ou accepte un appel, AiTools te propose de l'ajouter ici d'un clic (popup et page Mails).</p></div>
+  ${error ? `<p class="msg msg-err" role="alert">${esc(error)}</p>` : ''}
+  <form method="post" action="/calendar/events" class="cfg evform">
+    <label class="field"><span class="lbl">Titre</span><input name="title" maxlength="200" required placeholder="ex. Appel avec Boulangerie Dupont"></label>
+    <div class="grid2">
+      <label class="field"><span class="lbl">Date</span><input type="date" name="date" required value="${esc(`${today.year}-${pad(today.month)}-${pad(today.day)}`)}"></label>
+      <label class="field"><span class="lbl">Heure (Paris)</span><input type="time" name="time" required value="10:00"></label>
+      <label class="field"><span class="lbl">Durée</span><span class="sel"><select name="minutes">${DURATIONS.map((m) => `<option value="${m}"${m === 30 ? ' selected' : ''}>${m < 60 ? `${m} min` : `${m / 60} h${m % 60 ? ` ${m % 60}` : ''}`}</option>`).join('')}</select>${ic('down')}</span></label>
+    </div>
+    <label class="field"><span class="lbl">Notes (facultatif)</span><textarea name="notes" rows="2" maxlength="1000"></textarea></label>
+    <div class="row"><button class="btn primary">${ic('plus')}Ajouter à mon calendrier</button></div>
+  </form>
+  ${upcoming.length ? `<h3 class="sub">À venir</h3><ul class="evlist">${upcoming.map((e) => {
+    const l = eventLinks({ id: e.id, title: e.title, notes: e.notes, starts_at: e.startsAt, minutes: e.minutes });
+    return `<li><div><strong>${esc(e.title)}</strong><span class="muted small"> · ${esc(new Date(e.startsAt * 1000).toLocaleString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' }))}</span>${e.notes ? `<div class="muted small">${esc(e.notes)}</div>` : ''}</div>
+      <div class="row-actions"><a class="btn small" href="${esc(l.google)}" target="_blank" rel="noopener noreferrer">Google Agenda</a><a class="btn small" href="${esc(l.ics)}">Fichier .ics</a>
+      <form method="post" action="/calendar/events/${e.id}/delete"><button class="btn small danger" aria-label="Supprimer ${esc(e.title)}">${ic('trash')}Supprimer</button></form></div></li>`;
+  }).join('')}</ul>` : ''}
+</section>
 <section class="card">
   <div class="card-h"><h2>Agenda externe</h2></div>
   ${feedBox}
@@ -75,7 +99,8 @@ export function registerCalendarRoutes(router, app) {
     const month = m && year === +m[1] && +m[2] >= 1 && +m[2] <= 12 ? +m[2] : t.month;
     const ids = (await accessibleProjects(db, session.userId)).map((p) => Number(p.id));
     const token = await feedToken(app, session.userId);
-    html(res, calendarPage({ email: session.email, year, month, byDay: await monthEvents(db, ids, year, month), feed: { url: token ? feedUrl(cfg, token) : null }, today: t }));
+    const upcoming = await listEvents(db, session.userId, { from: now() - 3600, to: now() + 365 * 86400, limit: 10 });
+    html(res, calendarPage({ email: session.email, year, month, byDay: await monthEvents(db, ids, year, month, session.userId), feed: { url: token ? feedUrl(cfg, token) : null }, today: t, upcoming, error: url.searchParams.get('e') }));
   });
 
   // Retour sur la page d'où vient l'action (liste blanche : jamais une adresse arbitraire)

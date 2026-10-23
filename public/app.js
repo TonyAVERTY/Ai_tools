@@ -1553,6 +1553,54 @@
     try { await navigator.clipboard.writeText(text); toast('Réponse copiée'); } catch { const ta = $('textarea', btn.closest('details')); ta?.select(); toast('Sélectionnée : copie-la avec Ctrl+C', 'error'); }
   };
   const markSeen = async (id) => { try { await api(`/api/replies/${id}/seen`, {}); } catch { /* sera réessayé au prochain passage */ } };
+  // Proposition « Ajouter à ton calendrier » : titre et date préremplis à partir de la réponse, l'utilisateur corrige puis confirme
+  function suggestDom(r) {
+    const box = document.createElement('div');
+    box.className = 'suggest';
+    box.dataset.suggest = r.id;
+    if (r.event) { doneDom(box, r.event); return box; }
+    const s = r.suggestion;
+    if (!s) return null;
+    box.dataset.minutes = s.minutes;
+    const why = document.createElement('p'); why.className = 'why';
+    const b = document.createElement('b'); b.textContent = 'Ajouter à ton calendrier ? ';
+    why.append(b, s.dateToChoose ? "Il semble partant mais n'a pas donné de date : choisis un créneau."
+      : `Il évoque « ${s.phrase} »${s.guessed ? " ; l'heure n'est pas précisée, vérifie-la" : ''}${s.vague ? ' ; date approximative, à confirmer' : ''}.`);
+    const title = document.createElement('input'); title.value = s.title; title.maxLength = 200; title.setAttribute('data-ev-title', ''); title.setAttribute('aria-label', 'Titre');
+    const row = document.createElement('div'); row.className = 'sg-row';
+    const when = document.createElement('input'); when.type = 'datetime-local'; when.value = s.whenLocal; when.setAttribute('data-ev-when', ''); when.setAttribute('aria-label', 'Date et heure (Paris)');
+    const add = document.createElement('button'); add.type = 'button'; add.className = 'btn primary'; add.textContent = 'Ajouter à mon calendrier'; add.dataset.evAdd = r.id;
+    row.append(when, add);
+    box.append(why, title, row);
+    return box;
+  }
+  // Après l'ajout : l'événement est dans l'agenda d'AiTools ; deux liens pour l'avoir aussi dans SON agenda
+  function doneDom(box, ev) {
+    box.className = 'suggest done';
+    box.replaceChildren();
+    const p = document.createElement('p'); p.className = 'why';
+    const b = document.createElement('b'); b.textContent = 'Ajouté à ton calendrier : ';
+    p.append(b, ev.title);
+    const row = document.createElement('div'); row.className = 'sg-row';
+    const g = document.createElement('a'); g.className = 'btn small'; g.href = ev.links.google; g.target = '_blank'; g.rel = 'noopener noreferrer'; g.textContent = 'Google Agenda';
+    const i = document.createElement('a'); i.className = 'btn small'; i.href = ev.links.ics; i.textContent = 'Fichier .ics';
+    row.append(g, i);
+    box.append(p, row);
+  }
+  document.addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-ev-add]');
+    if (!btn) return;
+    const box = btn.closest('[data-suggest]');
+    const title = $('[data-ev-title]', box).value.trim();
+    const when = $('[data-ev-when]', box).value;
+    if (!title || !when) { toast('Renseigne un titre, une date et une heure', 'error'); return; }
+    btn.disabled = true;
+    try {
+      const r = await api(`/api/replies/${btn.dataset.evAdd}/event`, { title, when, minutes: Number(box.dataset.minutes) || 30 });
+      doneDom(box, r.event);
+      toast(r.existing ? 'Déjà dans ton calendrier' : 'Ajouté à ton calendrier');
+    } catch (err) { toast(err.message, 'error'); btn.disabled = false; }
+  });
   function replyPopup(r) {
     const el = document.createElement('details');
     el.className = 'reply-pop';
@@ -1575,7 +1623,10 @@
     read.addEventListener('click', () => { el.remove(); markSeen(r.id).then(pollReplies); });
     const all = document.createElement('a'); all.className = 'btn small'; all.href = '/mails?v=replies'; all.textContent = 'Toutes les réponses';
     acts.append(copy, read, all);
-    body.append(sub, txt, lbl, ta, acts);
+    body.append(sub, txt);
+    const sg = suggestDom(r);
+    if (sg) body.append(sg);
+    body.append(lbl, ta, acts);
     el.append(sum, body);
     popHost.append(el);
   }
