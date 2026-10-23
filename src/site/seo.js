@@ -63,6 +63,7 @@ export function securityHeaders(appUrl) {
     'Referrer-Policy': 'same-origin',
     'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()',
     'Cross-Origin-Opener-Policy': 'same-origin',
+    'Cross-Origin-Resource-Policy': 'same-origin',
     'Content-Security-Policy': CSP,
   };
   if (/^https:\/\//i.test(String(appUrl))) headers['Strict-Transport-Security'] = 'max-age=31536000';

@@ -15,6 +15,8 @@ export const RATE_LIMITS = {
   // Connexion : démarrage (Google, Apple) et retours des fournisseurs
   auth_start: { ip: { max: 20, windowMs: 10 * MIN } },
   auth_callback: { ip: { max: 40, windowMs: 10 * MIN } },
+  // Désinscription (page publique, lien reçu par mail) : large pour un lecteur légitime, étroit pour un robot qui devine
+  unsub: { ip: { max: 60, windowMs: 10 * MIN } },
   // Liaison Claude : chaque essai de clé ou de jeton coûte un appel réseau chez Anthropic
   link: { user: { max: 10, windowMs: 10 * MIN }, ip: { max: 30, windowMs: 10 * MIN } },
   // Export / import CSV
