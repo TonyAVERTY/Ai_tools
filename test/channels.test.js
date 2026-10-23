@@ -105,3 +105,15 @@ test('e-mail : plafond de 20 notifications par heure, SMTP du serveur requis', a
   } finally { await noSmtp.close(); }
   assert.ok(EVENTS.reply);
 });
+
+test('menu « + » : les vrais logos Discord, Slack et Telegram (pas un avion en papier), l\'enveloppe pour l\'e-mail', async () => {
+  const u = await s.newUser();
+  const html = await page(u);
+  const menu = html.slice(html.indexOf('data-addmenu'), html.indexOf('</details>', html.indexOf('data-addmenu')));
+  for (const [k, icon] of [['discord', 'discord'], ['slack', 'slack'], ['telegram', 'telegram'], ['email', 'mail']]) {
+    assert.match(menu, new RegExp(`data-chan-pick="${k}"[^>]*><svg class="ic"[^>]*><use href="#i-${icon}">`), k);
+  }
+  assert.doesNotMatch(menu, /#i-send/);
+  for (const k of ['discord', 'slack', 'telegram']) assert.match(html, new RegExp(`<symbol id="i-${k}"[^>]*><path fill="currentColor" stroke="none" d="M`), `symbole ${k} dans le sprite`);
+  assert.match(html, /<span class="srv-n"><svg class="ic"[^>]*><use href="#i-telegram">/, 'même logo dans l\'en-tête de la carte');
+});
