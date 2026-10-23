@@ -36,14 +36,15 @@ test('pages publiques : 200 sans session, complètes (une h1, title, description
     assert.match(h, /<meta name="robots" content="index, follow">/);
     assert.match(h, /<a class="skip" href="#contenu">/, `${p} : lien d'évitement`);
     assert.match(h, /<main id="contenu"/);
-    assert.match(h, /<header class="site-head">/);
-    assert.match(h, /<footer class="site-foot">/);
+    assert.match(h, /<header class="top">/);
+    assert.match(h, /<footer class="foot">/);
     assert.match(h, /<link rel="icon" href="\/favicon\.ico" sizes="48x48">/);
     assert.match(h, /<link rel="apple-touch-icon" href="\/static\/img\/apple-touch-icon\.png\?v=\w+">/);
     assert.match(h, /<meta property="og:image" content="[^"]+\/static\/img\/share_img\.jpg\?v=\w+">/);
     assert.match(h, /<meta name="twitter:card" content="summary_large_image">/);
-    assert.match(h, /href="\/static\/app\.css\?v=[0-9a-f]{10}"/, `${p} : feuilles de style versionnées`);
-    assert.match(h, /href="\/static\/app\.css\?v=[0-9a-f]{10}"/, `${p} : feuilles de style versionnées`);
+    assert.match(h, /href="\/static\/tokens\.css\?v=[0-9a-f]{10}"/, `${p} : jetons de design versionnés`);
+    assert.match(h, /href="\/static\/site\.css\?v=[0-9a-f]{10}"/, `${p} : feuille de style versionnée`);
+    assert.doesNotMatch(h, /app\.css/, `${p} : le site n'embarque pas le CSS du tableau de bord`);
   }
 });
 
@@ -152,7 +153,7 @@ test('en-têtes de sécurité, HSTS seulement en https, noindex sur l\'applicati
 });
 
 test('fichiers statiques : cache, ETag, 304, HEAD', async () => {
-  for (const [p, type] of [['/static/site.css', /text\/css/], ['/static/app.css', /text\/css/], ['/favicon.ico', /image\/x-icon/], ['/static/img/logo-mark.png', /image\/png/], ['/static/img/share_img.jpg', /image\/jpeg/], ['/static/site.js', /text\/javascript/], ['/static/img/ecran-projet.svg', /image\/svg\+xml/]]) {
+  for (const [p, type] of [['/static/site.css', /text\/css/], ['/static/tokens.css', /text\/css/], ['/static/app.css', /text\/css/], ['/favicon.ico', /image\/x-icon/], ['/static/img/logo-mark.png', /image\/png/], ['/static/img/share_img.jpg', /image\/jpeg/], ['/static/site.js', /text\/javascript/], ['/static/img/logo-mark-dark.png', /image\/png/]]) {
     const r = await s.anon.get(p);
     assert.equal(r.status, 200, p);
     assert.match(r.headers.get('content-type'), type);
@@ -206,7 +207,7 @@ test('textes : faits réels du statut, tarifs sans prix inventé, aucun terme in
   }
   const tarifs = await text('/tarifs');
   assert.match(tarifs, /Bientôt/);
-  for (const n of Object.values(PLAN_LIMITS.free)) assert.ok(tarifs.includes(`<strong>${n}</strong>`), `plan gratuit : ${n}`);
+  for (const n of Object.values(PLAN_LIMITS.free)) assert.ok(tarifs.includes(`<b>${n}</b>`), `plan gratuit : ${n}`);
   // Les seuls montants permis sont ceux de la configuration (prix mensuels, annuels, équivalent mensuel, prix de 12 mois)
   const allowed = new Set(['0']);
   for (const [k, m] of Object.entries(PLAN_PRICES)) for (const v of [m, annualPrice(k), m * 12, (annualPrice(k) / 12).toFixed(2).replace('.', ',')]) allowed.add(String(v).replace(/,00$/, ''));
@@ -254,7 +255,7 @@ test('marqueurs légaux : ceux des pages sont exactement ceux listés dans le jo
   for (const p of ['/', '/fonctionnement', '/tarifs', '/login']) assert.doesNotMatch(await text(p), /\[À (COMPLÉTER|VALIDER)/, p);
 });
 
-// ---------- Couleurs : mêmes jetons que le tableau de bord, contrastes AA ----------
+// ---------- Couleurs : jetons de tokens.css, contrastes AA ----------
 const hexToRgb = (h) => { let v = h.replace('#', ''); if (v.length === 3) v = [...v].map((c) => c + c).join(''); return [0, 2, 4].map((i) => parseInt(v.slice(i, i + 2), 16) / 255); };
 const lum = (hex) => {
   const [r, g, b] = hexToRgb(hex).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
@@ -263,41 +264,40 @@ const lum = (hex) => {
 const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
 const tokens = (block) => Object.fromEntries([...block.matchAll(/--([\w-]+):\s*(#[0-9a-fA-F]{3,6})\b/g)].map((m) => [m[1], m[2]]));
 
-test('couleurs : site.css réutilise les jetons du tableau de bord, sans seconde palette', () => {
-  const app = read('public/app.css');
+test('couleurs : site.css lit les jetons de tokens.css, sans valeur en dur ni seconde palette', () => {
   const site = read('public/site.css');
   const code = site.replace(/\/\*[\s\S]*?\*\//g, ''); // les commentaires peuvent citer ce qu'on évite
-  for (const t of ['bg', 'card', 'text', 'muted', 'line', 'accent']) {
+  const tk = read('public/tokens.css');
+  for (const t of ['bg', 'card', 'text', 'muted', 'line', 'accent', 'grad', 'on-grad', 'nav-on-bg']) {
     assert.match(site, new RegExp(`var\\(--${t}\\)`), `--${t} utilisé par le site`);
-    assert.match(app, new RegExp(`--${t}:`), `--${t} défini par le tableau de bord`);
+    assert.match(tk, new RegExp(`--${t}:`), `--${t} défini dans tokens.css`);
     assert.doesNotMatch(site, new RegExp(`--${t}\\s*:`), `--${t} ne doit pas être redéfini`);
   }
-  assert.doesNotMatch(site, /#[0-9a-fA-F]{3,8}\b/, 'aucune couleur en dur dans site.css');
-  assert.doesNotMatch(site, /\b(rgb|hsl|oklch)a?\(/, 'aucune couleur calculée hors jetons');
-  assert.doesNotMatch(code, /--accent-2|violet|purple/i, 'pas de dégradé violet');
-  assert.match(site, /prefers-reduced-motion: no-preference/, 'animations réservées à qui les accepte');
-  assert.match(site, /:focus-visible/);
+  assert.doesNotMatch(code, /#[0-9a-fA-F]{3,8}\b/, 'aucune couleur en dur dans site.css');
+  assert.doesNotMatch(code, /\b(rgb|hsl|oklch)a?\(/, 'aucune couleur calculée hors jetons');
+  assert.doesNotMatch(code, /violet|purple/i, 'pas de violet');
+  assert.match(tk, /prefers-reduced-motion: reduce/, 'animations coupées pour qui le demande');
+  assert.match(tk, /:focus-visible/);
   const layout = readFileSync(new URL('../src/site/layout.js', import.meta.url), 'utf8');
-  assert.match(layout, /\/static\/app\.css[\s\S]*\/static\/site\.css/, 'site.css chargé après app.css');
+  assert.match(layout, /\/static\/tokens\.css[\s\S]*\/static\/site\.css/, 'site.css chargé après tokens.css');
 });
 
-test('contrastes AA (4,5:1) des couples texte/fond du site, thèmes clair et sombre', () => {
-  const app = read('public/app.css');
-  const light = tokens(app.match(/:root\s*\{([^}]*)\}/)[1]);
-  const dark = tokens(app.match(/prefers-color-scheme: dark\)\s*\{\s*:root\s*\{([^}]*)\}/)[1]);
-  const themes = {
-    clair: { ...light, onAccent: light['accent-text'] }, // bouton principal : --accent-text sur --accent
-    sombre: { ...light, ...dark, onAccent: dark.bg }, // thème sombre : site.css passe le texte du bouton en var(--bg)
-  };
+test('contrastes AA (4,5:1) des couples texte/fond du design, thèmes clair et sombre', () => {
+  const tk = read('public/tokens.css');
+  const light = tokens(tk.match(/:root\s*\{([^}]*)\}/)[1]);
+  const dark = tokens(tk.match(/prefers-color-scheme: dark\)\s*\{\s*:root\s*\{([^}]*)\}/)[1]);
+  const themes = { clair: light, sombre: { ...light, ...dark } };
   for (const [name, t] of Object.entries(themes)) {
     const pairs = [
-      ['text/bg', t.text, t.bg], ['text/card', t.text, t.card], ['muted/bg', t.muted, t.bg], ['muted/card', t.muted, t.card],
-      ['accent/bg', t.accent, t.bg], ['accent/card', t.accent, t.card], ['bouton principal', t.onAccent, t.accent],
-      ['ok/card', t.ok, t.card], ['warn/card', t.warn, t.card], ['err/card', t.err, t.card],
+      ['text/bg', t.text, t.bg], ['text/card', t.text, t.card], ['text/bg-sunk', t.text, t['bg-sunk']],
+      ['muted/bg', t.muted, t.bg], ['muted/card', t.muted, t.card], ['muted/bg-sunk', t.muted, t['bg-sunk']],
+      ['link/bg', t.link, t.bg], ['link/card', t.link, t.card],
+      ['bouton principal (début du dégradé)', t['on-grad'], t.accent], ['bouton principal (fin du dégradé)', t['on-grad'], t['accent-2']],
+      ['ok', t.ok, t['ok-bg']], ['warn', t.warn, t['warn-bg']], ['err', t.err, t['err-bg']], ['info', t.info, t['info-bg']],
+      ['barre active', t['nav-on-text'], t['nav-on-bg']],
     ];
     for (const [label, fg, bg] of pairs) assert.ok(ratio(fg, bg) >= 4.5, `${name} : ${label} = ${ratio(fg, bg).toFixed(2)}`);
   }
-  assert.match(read('public/site.css'), /prefers-color-scheme: dark\)\s*\{\s*body\.site \.btn\.primary \{ color: var\(--bg\); \}/);
 });
 
 test('liens entre pages : chaque lien et chaque image du site mène quelque part, les ancres existent, le parcours est complet', async () => {
@@ -327,10 +327,10 @@ test('liens entre pages : chaque lien et chaque image du site mène quelque part
   const tarifs = html['/tarifs'];
   assert.match(tarifs, /href="\/link\?start=claude"/);
   assert.doesNotMatch(tarifs, /setup-token/);
-  // L'accueil est vivant : images, compteurs, galerie
-  assert.match(html['/'], /data-gallery/);
-  assert.match(html['/'], /data-count="50"/);
-  assert.ok((html['/'].match(/<img src="\/static\/img\//g) || []).length >= 5);
+  // Le design : maquette du tableau de bord sur l'accueil, quatre étapes détaillées sur Fonctionnement
+  assert.match(html['/'], /class="mock"/);
+  assert.equal((html['/fonctionnement'].match(/<section class="stp/g) || []).length, 4);
+  assert.match(html['/'], /<picture class="brand-mark/, 'le vrai logo, pas un espace réservé');
   // Le logo (monogramme) est décoratif : son nom est écrit à côté, donc alt vide et aria-hidden
   assert.doesNotMatch(html['/'].replace(/<picture class="brand-mark[^>]*>.*?<\/picture>/g, ''), /<img(?![^>]*\salt="[^"]+")/, 'toutes les images ont un texte alternatif');
 });
@@ -352,12 +352,13 @@ test('offres : prix de 10 à 100 € TTC, annuel = 2 mois offerts, plafonds tena
     assert.ok(l.aiJobs >= Math.ceil(l.prospects / 50), `${k} : assez de tâches IA pour trouver ${l.prospects} contacts`);
     prev = l;
     // la page montre le nom, les deux prix, l'équivalent mensuel et les plafonds
-    assert.ok(h.includes(`>${PLAN_LABELS[k]} <span class="badge warn">Bientôt`), `${k} : carte`);
+    assert.ok(h.includes(`id="plan-${k}">${PLAN_LABELS[k]}</h2><span class="badge b-info">`), `${k} : carte`);
+    assert.match(h, new RegExp(`id="plan-${k}">[\\s\\S]*?Bientôt`), `${k} : pas encore ouvert`);
     assert.ok(h.includes(`${PLAN_PRICES[k]}\u00a0€ <small>par mois, TTC`), `${k} : prix mensuel`);
     assert.ok(h.includes(`${annualPrice(k)}\u00a0€ <small>par an, TTC`), `${k} : prix annuel`);
-    assert.ok(h.includes(`<strong>${l.mails.toLocaleString('fr-FR')}</strong>`), `${k} : mails`);
+    assert.ok(h.includes(`<b>${l.mails.toLocaleString('fr-FR')}</b>`), `${k} : mails`);
   }
-  assert.match(h, /id="bill-year"/);
+  assert.match(h, /data-period="year"/);
   assert.match(h, /2 mois offerts/);
   // L'ancien plan illimité n'est pas vendu ; un plan inconnu retombe sur « gratuit »
   assert.ok(!h.includes('illimité)'));
