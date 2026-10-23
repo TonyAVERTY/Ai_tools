@@ -180,7 +180,7 @@ test('aucune ressource externe : tout est servi par l\'application, rien en lign
       for (const p of [...PUBLIC_PAGES, '/login', '/inexistant']) {
         const h = await (await client.get(p, { headers: { accept: 'text/html' } })).text();
         // Seuls scripts permis : ceux de l'application (mouvement du site, vérification de la connexion), jamais en ligne
-        for (const m of h.matchAll(/<script[^>]*\ssrc="([^"]+)"/gi)) assert.ok(['/static/site.js', '/static/captcha.js'].includes(m[1].split('?')[0]), `${p} : script ${m[1]}`);
+        for (const m of h.matchAll(/<script[^>]*\ssrc="([^"]+)"/gi)) assert.ok(['/static/site.js', '/static/responsive.js', '/static/captcha.js'].includes(m[1].split('?')[0]), `${p} : script ${m[1]}`);
         assert.doesNotMatch(h, /<script(?![^>]*(ld\+json|\ssrc=))/i, `${p} : aucun script en ligne`);
         assert.doesNotMatch(h, /<style[\s>]/i, `${p} : pas de <style>`);
         assert.doesNotMatch(h, /\sstyle="/i, `${p} : pas de style en ligne (CSP)`);

@@ -34,7 +34,9 @@ export function layout({ title, body, email }) {
 ${iconLinks()}
 <link rel="stylesheet" href="${assetUrl('/static/tokens.css')}">
 <link rel="stylesheet" href="${assetUrl('/static/app.css')}">
+<link rel="stylesheet" href="${assetUrl('/static/responsive.css')}">
 <script src="${assetUrl('/static/app.js')}" defer></script>
+<script src="${assetUrl('/static/responsive.js')}" defer></script>
 </head>
 <body class="app">
 <canvas id="bg" aria-hidden="true"></canvas>

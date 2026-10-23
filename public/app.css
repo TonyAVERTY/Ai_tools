@@ -667,3 +667,4 @@ input.copy { font-family: var(--mono); font-size: .8125rem; }
 .tip-body p { margin: 6px 0; }
 .devlinks { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
 .devlink { display: flex; flex-direction: column; gap: 6px; }
+.reply-more { display: block; padding: 10px 14px; border-radius: var(--radius); background: var(--card); border: 1px solid var(--line-strong); border-left: 4px solid var(--accent); box-shadow: var(--shadow-3); font-weight: 600; font-size: .9375rem; text-decoration: none; text-align: center; }

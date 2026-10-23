@@ -63,7 +63,8 @@ ${noindex ? '' : `<link rel="canonical" href="${esc(url)}">\n`}<meta name="color
 ${iconLinks()}
 <link rel="stylesheet" href="${assetUrl('/static/tokens.css')}">
 <link rel="stylesheet" href="${assetUrl('/static/site.css')}">
-${['/static/site.js', ...scripts].map((src) => `<script src="${esc(assetUrl(src))}" defer></script>\n`).join('')}${jsonLd ? `<script type="application/ld+json">${JSON.stringify(jsonLd).replace(/</g, '\\u003c')}</script>\n` : ''}</head>
+<link rel="stylesheet" href="${assetUrl('/static/responsive.css')}">
+${['/static/site.js', '/static/responsive.js', ...scripts].map((src) => `<script src="${esc(assetUrl(src))}" defer></script>\n`).join('')}${jsonLd ? `<script type="application/ld+json">${JSON.stringify(jsonLd).replace(/</g, '\\u003c')}</script>\n` : ''}</head>
 <body class="site">
 <a class="skip" href="#contenu">Aller au contenu</a>
 <div class="page-ribbon" aria-hidden="true"><svg viewBox="0 0 100 1000" preserveAspectRatio="none" focusable="false">
