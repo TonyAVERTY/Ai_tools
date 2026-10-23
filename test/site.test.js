@@ -250,7 +250,10 @@ test('marqueurs légaux : ceux des pages sont exactement ceux listés dans le jo
   }
   assert.deepEqual([...inPages].sort(), [...listed].sort(), 'écart entre les pages et la liste du journal');
   assert.deepEqual([...new Set(LEGAL_MARKERS)].sort(), [...listed].sort(), 'écart entre le code et la liste du journal');
-  for (const m of ['[À COMPLÉTER : adresse du siège]', '[À COMPLÉTER : hébergeur]']) assert.ok(listed.has(m), m);
+  assert.equal(listed.size, 0, 'plus aucun marqueur : tout a été renseigné ou validé');
+  assert.match(await text('/mentions-legales'), /4 rue Alcide de Gasperi, 35340 Liffré/);
+  assert.match(await text('/mentions-legales'), /ElypseCloud, 29 rue Lebrix Mesmin, 33700 Mérignac/);
+  assert.doesNotMatch(await text('/mentions-legales'), /Téléphone/);
   // Pas de marqueur sur les pages commerciales
   for (const p of ['/', '/fonctionnement', '/tarifs', '/login']) assert.doesNotMatch(await text(p), /\[À (COMPLÉTER|VALIDER)/, p);
 });

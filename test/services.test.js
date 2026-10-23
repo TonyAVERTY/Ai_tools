@@ -22,7 +22,7 @@ test('runClaude parse le flux et la conso', async () => {
   assert.ok(j.args.includes('Read,Grep'));
   assert.ok(j.args.join(' ').includes('Bash,Edit,Write'));
   assert.equal(seen.length, 1);
-  assert.deepEqual(r.rateLimit.unifiedWindows.five_hour, { utilization: 0.33, resetsAt: 1_700_000_000 });
+  assert.deepEqual(r.rateLimit.unifiedWindows.five_hour, { utilization: 0.33, resetsAt: 4_000_000_000 });
 });
 
 test('runClaude remonte une erreur si le process meurt', async () => {
