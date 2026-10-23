@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { now, setSetting } from '../src/db.js';
 import { testDb } from './helpers/db.js';
-import { addUser } from './helpers/users.js';
+import { addUser, TEST_SECRET_KEY } from './helpers/users.js';
 import { encrypt } from '../src/crypto.js';
 import { notify, notifyJob, WEBHOOK_RE } from '../src/services/notify.js';
 import { Worker, enqueue } from '../src/services/jobs.js';
@@ -16,7 +16,7 @@ async function setup({ events } = {}) {
   const db = await testDb();
   const sent = [];
   const app = { resolveHost: async () => [{ address: '93.184.216.34', family: 4 }],
-    db, cfg: { secretKey: randomBytes(32), appUrl: 'https://ai.test' },
+    db, cfg: { secretKey: TEST_SECRET_KEY, appUrl: 'https://ai.test' },
     fetch: async (url, opts) => { sent.push({ url, body: JSON.parse(opts.body) }); return { ok: true, status: 204 }; },
   };
   const userId = await addUser(db);

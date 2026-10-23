@@ -167,7 +167,7 @@ test('liaison : essais de clé limités par compte, un autre compte n\'est pas p
     const blocked = await a.post('/link/api-key', { apiKey: 'pas-une-cle' });
     assert.equal(blocked.status, 429);
     assert.ok(Number(blocked.headers.get('retry-after')) >= 1);
-    for (const p of ['/link/subscription', '/link/test', '/link/unlink', '/link/server']) assert.equal((await a.post(p, {})).status, 429, p);
+    for (const p of ['/link/subscription', '/link/test', '/link/unlink']) assert.equal((await a.post(p, {})).status, 429, p);
     assert.equal((await b.post('/link/api-key', { apiKey: 'pas-une-cle' })).status, 400);
   } finally { await s.close(); }
 });
@@ -203,7 +203,7 @@ test('chaque règle citée par une route existe, et les points sensibles sont to
     const find = (method, path) => routes.find((r) => r.method === method && r.re.test(path));
     for (const [m, p] of [
       ['GET', '/auth/google'], ['GET', '/auth/apple'], ['GET', '/auth/google/callback'], ['POST', '/auth/apple/callback'],
-      ['POST', '/link/api-key'], ['POST', '/link/subscription'], ['POST', '/link/server'], ['POST', '/link/test'], ['POST', '/link/unlink'],
+      ['POST', '/link/api-key'], ['POST', '/link/subscription'], ['POST', '/link/test'], ['POST', '/link/unlink'],
       ['GET', '/api/projects/1/prospects.csv'], ['POST', '/api/projects/1/prospects/import'], ['POST', '/api/projects/1/send'],
       ['POST', '/api/report/send'], ['POST', '/api/notify/test'], ['POST', '/api/projects'], ['POST', '/account/delete'],
       ['POST', '/api/projects/1/imap'], ['POST', '/api/projects/1/inbox/check'], ['GET', '/api/projects/1/recap'],

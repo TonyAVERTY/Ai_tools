@@ -10,7 +10,7 @@ import { enqueue, Worker, jobRefusal } from '../src/services/jobs.js';
 import { AI_JOBS } from '../src/services/budget.js';
 import { makeClaude } from '../src/handlers.js';
 import {
-  LINK_REQUIRED_MESSAGE, CONSENT_VERSION, CONSENT_CHECKBOX, aiRefusal, validateApiKey, getLinkState,
+  LINK_REQUIRED_MESSAGE, CONSENT_VERSION, CONSENT_CHECKBOX, aiRefusal, validateApiKey, getLinkState, hasUsableLink,
 } from '../src/claudelink.js';
 import { HttpError } from '../src/http.js';
 import { startApp } from './helpers/server.js';
@@ -211,20 +211,18 @@ test('drapeau CLAUDE_CLI_MODE_ENABLED=false : mode abonnement masqué et refusé
   } finally { await off.close(); }
 });
 
-test('mode « Claude du serveur » : réservé aux admins (liaison et exécution)', async () => {
-  const user = await s.newUser({ admin: false });
-  assert.equal((await user.post('/link/server', {})).status, 403);
-  assert.equal((await row(user.id)).claude_link_json, null);
-  assert.ok(!(await (await user.get('/link', { headers: { accept: 'text/html' } })).text()).includes('/link/server'));
+test('plus de mode « Claude du serveur » : ni bouton, ni route, et une ancienne liaison de ce type ne lance rien', async () => {
   const admin = await s.newUser({ admin: true, link: null });
-  assert.match(await (await admin.get('/link', { headers: { accept: 'text/html' } })).text(), /action="\/link\/server"/);
-  assert.equal((await admin.post('/link/server', {})).status, 200);
-  assert.equal((await getLinkState(s.db, admin.id)).mode, 'server');
-  assert.equal(await aiRefusal(s.db, admin.id), null);
-  // un admin rétrogradé (ADMIN_EMAILS) perd le mode serveur
-  await s.db.prepare('UPDATE users SET is_admin = 0 WHERE id = ?').run(admin.id);
-  assert.match(await aiRefusal(s.db, admin.id), /réservé aux administrateurs/);
-  await s.db.prepare('UPDATE users SET is_admin = 1 WHERE id = ?').run(admin.id);
+  const page = await (await admin.get('/link', { headers: { accept: 'text/html' } })).text();
+  assert.ok(!page.includes('/link/server') && !page.includes('Claude du serveur'), 'aucun bouton, même pour un admin');
+  assert.equal((await admin.post('/link/server', {})).status, 404);
+  assert.equal(await getLinkState(s.db, admin.id), null);
+  // Une liaison « server » restée en base (ancienne version) compte comme « pas de liaison » : le CLI du serveur ne sert jamais
+  await s.db.prepare('UPDATE users SET claude_link_json = ? WHERE id = ?').run(JSON.stringify({ v: 1, mode: 'server', valid: true }), admin.id);
+  assert.equal(await getLinkState(s.db, admin.id), null);
+  assert.equal(await aiRefusal(s.db, admin.id), LINK_REQUIRED_MESSAGE);
+  assert.equal(await hasUsableLink(s.db, admin.id), false);
+  assert.equal((await admin.post('/link/test', {})).status, 400);
 });
 
 test('onboarding bloquant : sans liaison, tout est refusé côté serveur sauf liaison, compte, déconnexion', async () => {

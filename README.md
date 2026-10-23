@@ -39,6 +39,15 @@ Le site (`ai.tony-averty.dev`) est servi par la même application, dans `src/sit
 - **Ajouter une page** : une fonction dans `pages.js` qui appelle `siteLayout`, une route dans `src/site/routes.js`, et son chemin dans `INDEXABLE_PATHS` (`src/site/seo.js`) si elle doit être référencée.
 - **Essayer en local** : `APP_URL=http://localhost:3199 PORT=3199 SECRET_KEY=<64 hexa> GOOGLE_CLIENT_ID=x GOOGLE_CLIENT_SECRET=y DB_DRIVER=sqlite SANDBOX=off node src/server.js` (base SQLite en mémoire, perdue à l'arrêt).
 
+## Liste de mise en route
+
+Sur le tableau de bord, dès qu'un projet existe, une liste en bas à gauche guide la configuration : analyser le projet, valider la cible, chercher des prospects, SMTP, modèle de mail, premier envoi, puis le facultatif (boîte IMAP, relance automatique, idées d'évolution, compte LinkedIn relié, premier post publié).
+
+- **Calculée à chaque lecture** à partir de l'état réel du projet (`src/checklist.js`, route `GET /api/projects/:id/checklist`, aussi incluse dans `/status`). Rien n'est stocké : elle ne peut pas se désynchroniser, et une étape défaite (jeton LinkedIn expiré, par exemple) redevient à faire.
+- **Chaque ligne ouvre la bonne section** du projet et y fait défiler la page. Les sections terminées reçoivent une coche, et le projet une pastille « config 5/11 ».
+- **Selon les droits et la configuration** : un membre d'équipe ne voit pas le SMTP ni l'IMAP (il ne peut pas les régler), et les étapes LinkedIn disparaissent si `LINKEDIN_CLIENT_ID` n'est pas défini.
+- **Côté navigateur** (localStorage) : la liste peut être réduite, ou masquée pour un projet (la pastille la rappelle). Réduite par défaut sous 1700 px de large, pour ne pas recouvrir le contenu. Elle disparaît toute seule quand tout est fait.
+
 ## Suivi des réponses, relances et test A/B
 
 - **Détection des réponses** : la boîte de réception du projet est lue en IMAP toutes les 15 minutes, et à la demande avec « Vérifier maintenant ».
@@ -132,7 +141,7 @@ Le site (`ai.tony-averty.dev`) est servi par la même application, dans `src/sit
 ## Comptes et multi-utilisateur
 
 - **Connexion** : Google ou Apple, sans mot de passe. Le compte est créé à la première connexion réussie (plan gratuit). Un même email ne se lie qu'à un seul fournisseur ; un compte suspendu ne peut plus se connecter et ses sessions tombent aussitôt.
-- **Cloisonnement** : projets, prospects, notes, modèles, journaux d'envoi, jobs, métriques et **réglages** (SMTP, Discord, budget IA, plafonds, hôte Forgejo…) sont propres à chaque compte. Toute requête est filtrée par l'utilisateur courant ; la ressource d'un autre compte répond « introuvable » (404). Un même dépôt Git peut être un projet pour deux comptes (unicité par utilisateur).
+- **Cloisonnement** : projets, prospects, notes, modèles, journaux d'envoi, jobs, métriques et **réglages** (SMTP, Discord, budget IA, plafonds, serveur Git perso…) sont propres à chaque compte. Toute requête est filtrée par l'utilisateur courant ; la ressource d'un autre compte répond « introuvable » (404). Un même dépôt Git peut être un projet pour deux comptes (unicité par utilisateur).
 - **Liste d'opposition** : volontairement commune à tous les comptes (une personne désinscrite ne doit plus être contactée par personne). Un compte n'y voit que le nombre de ses propres prospects concernés, jamais l'origine ni le motif d'un autre compte.
 - **Liaison Claude obligatoire** : après la connexion, un compte sans liaison valide est renvoyé vers `/link` et ne peut rien utiliser d'autre que cette page, Mon compte, la déconnexion et la suppression du compte (garde côté serveur sur toutes les routes, dans la file, le worker et le wrapper d'exécution). Voir « Liaison Claude et exécution isolée ».
 - **Mon compte** (`/account`) : email, fournisseur, état de la liaison Claude (mode, dates, valide ou non, 4 derniers caractères de la clé API) avec Tester, Changer de mode et Délier, et suppression du compte (confirmation par saisie de l'email). Elle efface tout : projets, prospects, notes, modèles, journaux, jobs, réglages, sessions et clones Git. Seule la liste d'opposition est conservée.
@@ -144,7 +153,7 @@ Chaque utilisateur relie SON accès ; ses jobs IA tournent avec cet accès uniqu
 - **Clé API Anthropic** (recommandé) : vérifiée par `GET /v1/models` (aucun token consommé), chiffrée AES-256-GCM dans `users.claude_link_json`, jamais réaffichée. Passée par `ANTHROPIC_API_KEY` au seul processus enfant, jamais écrite sur disque. Pas de barre de quota d'abonnement dans ce mode.
 - **Connexion avec Claude (abonnement)** : une fenêtre d'avertissement (risque pour le compte Claude au regard des conditions d'Anthropic) impose de cocher « J'ai compris et j'accepte ce risque » ; l'acceptation est horodatée avec la version du texte. L'utilisateur génère un jeton sur sa machine avec `claude setup-token` et le colle ; il est vérifié par un appel minimal du CLI (quelques tokens décomptés de l'abonnement), chiffré, et passé par `CLAUDE_CODE_OAUTH_TOKEN` au seul processus enfant. `CLAUDE_CLI_MODE_ENABLED=false` masque ce mode et le refuse côté serveur.
 - **Se connecter avec Claude (connexion guidée)** : après la case du risque, le serveur lance `claude setup-token` (`src/claudelogin.js`, via `script` pour disposer d'un pseudo-terminal, `HOME` jetable, environnement assaini), récupère le lien de connexion et l'affiche à l'utilisateur. Il se connecte sur claude.com, recopie le petit code affiché, et le serveur le transmet au CLI puis capte le jeton (rangé chiffré, comme un jeton collé). Une seule connexion en cours par utilisateur, 5 minutes au plus, 5 en même temps sur le serveur. Prérequis : le binaire `claude` (`CLAUDE_BIN`) et la commande `script` (util-linux). La saisie manuelle du jeton reste proposée en secours.
-- **Claude du serveur** (admins de `ADMIN_EMAILS`) : la configuration du CLI de la machine, comme avant.
+- **Pas de mode « Claude du serveur »** : le CLI connecté sur la machine n'est jamais utilisé à la place d'un utilisateur (il consommerait le quota de son propriétaire). Une ancienne liaison de ce type compte comme « pas de liaison » : le compte doit relier sa clé API ou son abonnement.
 - **Bac à sable** : chaque job passe par bubblewrap (racine reconstruite en lecture seule, `/tmp` et `HOME` vides, seul le clone du projet de l'utilisateur monté en lecture seule, PID/IPC/UTS isolés, réseau conservé) avec un environnement en liste blanche (`PATH`, `LANG`, `HOME` jetable, le secret de l'utilisateur). En production le job est refusé si `bwrap` manque ; `SANDBOX=off` ne vaut qu'en développement. Installation : `apt install bubblewrap`. Si Node ou le CLI sont installés hors de `/usr`, liste leurs dossiers dans `SANDBOX_RO_BINDS`.
 - **Clones git** d'URL fournies par les utilisateurs : https uniquement (`GIT_ALLOW_PROTOCOL=https`), pas de hooks ni de sous-modules, 2 minutes et 300 Mo au plus.
 - **Quota, budget IA, pauses et notifications** sont propres à chaque compte.
@@ -321,9 +330,13 @@ Dans Zero Trust, va dans Networks → Tunnels → Create a tunnel (Cloudflared).
 - Public hostname : `ai.tony-averty.dev` → `http://localhost:3100`
 - Copie le token, `install.sh` te le demandera.
 
-### Forgejo
+### Dépôts Git : GitHub par défaut, serveur perso facultatif
 
-Le token se crée dans Paramètres → Applications. Donne-lui la portée `read:repository` seulement, puis colle-le dans **Réglages** du panel avec l'hôte `git.tony-averty.dev`.
+- **GitHub est accepté d'office** (`github.com`, dépôts publics), sans rien configurer : `https://github.com/utilisateur/projet.git`.
+- **Un serveur Git personnel** (Forgejo, Gitea) s'ajoute dans **Réglages → Dépôts Git** : hôte (`git.tony-averty.dev`) et token. Il s'**ajoute** à GitHub, il ne le remplace pas. Les réglages gardent leurs clés historiques (`forgejo_host`, `forgejo_token_enc`), rien à migrer.
+- **Le token n'est présenté qu'à cet hôte** (`gitTokenFor`, `src/projects.js`) : jamais à GitHub ni à un autre serveur. Sans hôte perso renseigné, aucun token n'est envoyé.
+- **Limite connue** : les dépôts GitHub privés ne sont pas pris en charge (pas de token pour GitHub).
+- Côté Forgejo, le token se crée dans Paramètres → Applications, avec la portée `read:repository` seulement.
 
 ## À faire côté mails (sinon spam garanti)
 

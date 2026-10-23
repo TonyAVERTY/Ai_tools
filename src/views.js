@@ -187,12 +187,6 @@ export function linkPage({ user, link, cliModeEnabled, error, start = false }) {
     <div class="row-actions"><button type="button" class="btn" data-close-dialog>Annuler</button></div>
   </div>
 </dialog>` : '';
-  const server = user.isAdmin ? `
-<section class="card">
-  <h4>Claude du serveur (administrateurs)</h4>
-  <p class="muted small">Utilise la configuration du CLI Claude déjà connectée sur la machine qui héberge AiTools.</p>
-  <form method="post" action="/link/server"><button class="btn">Utiliser Claude du serveur</button></form>
-</section>` : '';
   return layout({
     title: 'Relier Claude', email: user.email,
     body: `<h1>Relier Claude</h1>
@@ -205,7 +199,7 @@ ${error ? `<p class="error">${esc(error)}</p>` : ''}
     <label>Clé API<input name="apiKey" type="password" autocomplete="new-password" spellcheck="false" required placeholder="sk-ant-…"></label>
     <button class="btn primary">Vérifier et relier</button>
   </form>
-</section>${subscription}${server}`,
+</section>${subscription}`,
   });
 }
 
@@ -297,7 +291,7 @@ function templateForm(p, kind) {
 function projectItem(p, smtp, dbCfg, imap) {
   const profile = p.profile;
   return `<details class="project card anim" data-id="${p.id}">
-<summary><span class="pname">${esc(p.name)}</span>${p.access !== 'owner' ? `<span class="badge" title="Projet partagé par ${esc(p.ownerEmail || '')}">équipe de ${esc(p.ownerEmail || '')}</span>` : p.teamId ? '<span class="badge ok">partagé</span>' : ''}<span class="pstate" data-state></span></summary>
+<summary><span class="pname">${esc(p.name)}</span>${p.access !== 'owner' ? `<span class="badge" title="Projet partagé par ${esc(p.ownerEmail || '')}">équipe de ${esc(p.ownerEmail || '')}</span>` : p.teamId ? '<span class="badge ok">partagé</span>' : ''}<span class="pcfg badge" data-cfg title="Afficher la liste de mise en route" hidden></span><span class="pstate" data-state></span></summary>
 <div class="pbody">
   <label>Dépôt Git<input class="locked" value="${esc(p.gitUrl)}" readonly disabled></label>
 
@@ -404,15 +398,16 @@ ${usagePanel(usage)}
   <summary class="btn primary">+ Nouveau projet</summary>
   <form data-action="create" class="cfg">
     <label>Nom<input name="name" required maxlength="80"></label>
-    <label>Dépôt Git (Forgejo)<input name="gitUrl" required placeholder="https://${esc(forgejoHost || 'git.exemple.fr')}/Tony/MonProjet.git"></label>
-    <p class="muted small">Le lien ne pourra plus être modifié. Le projet est cloné et analysé une fois (Sonnet).</p>
+    <label>Dépôt Git<input name="gitUrl" required placeholder="https://github.com/utilisateur/projet.git"></label>
+    <p class="muted small">${forgejoHost ? `GitHub (dépôts publics) et ${esc(forgejoHost)} sont acceptés.` : 'GitHub est accepté (dépôts publics). Pour un autre serveur Git, ajoute-le dans <a href="/settings">Réglages</a>.'} Le lien ne pourra plus être modifié. Le projet est cloné et analysé une fois (Sonnet).</p>
     <button class="btn primary">Créer et analyser</button>
   </form>
 </details>
 <dialog class="prospect-dialog" id="prospect-dialog" aria-label="Fiche prospect"><div data-dialog-body></div></dialog>
 <div class="projects">
 ${projects.length ? projects.map((x) => projectItem(x.project, x.smtp, x.dbCfg, x.imap)).join('\n') : '<p class="muted">Aucun projet pour l\'instant.</p>'}
-</div>`,
+</div>
+${projects.length ? '<aside class="todo" id="todo" aria-label="Mise en route du projet" hidden></aside>' : ''}`,
   });
 }
 
@@ -427,10 +422,11 @@ ${saved ? '<p class="ok">Enregistré.</p>' : ''}
   <label class="check"><input type="checkbox" name="weekly_report" ${s.weekly_report ? 'checked' : ''}> Rapport hebdo le lundi à 8h (mail + Discord)</label>
   <button type="button" class="btn small" data-report-send>Envoyer le rapport maintenant</button>
 
-  <h4>Forgejo</h4>
+  <h4>Dépôts Git</h4>
+  <p class="muted small">GitHub (dépôts publics) est toujours accepté, sans rien configurer. Pour utiliser aussi ton propre serveur Git (Forgejo, Gitea), même privé, renseigne-le ici : le token ne sert qu'à cet hôte et n'est jamais envoyé à GitHub.</p>
   <div class="grid2">
-    <label>Hôte autorisé<input name="forgejo_host" value="${esc(s.forgejo_host)}" placeholder="git.tony-averty.dev"></label>
-    <label>Token d'accès (lecture repo)<input name="forgejo_token" type="password" placeholder="${s.forgejo_token_set ? '•••••• (inchangé)' : ''}" autocomplete="new-password"></label>
+    <label>Mon serveur Git (facultatif)<input name="forgejo_host" value="${esc(s.forgejo_host)}" placeholder="git.mon-serveur.fr"></label>
+    <label>Token d'accès à ce serveur (lecture repo)<input name="forgejo_token" type="password" placeholder="${s.forgejo_token_set ? '•••••• (inchangé)' : ''}" autocomplete="new-password"></label>
   </div>
 
   <h4>SMTP global (mails vers toi)</h4>

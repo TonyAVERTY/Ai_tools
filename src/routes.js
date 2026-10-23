@@ -1,3 +1,4 @@
+import { projectChecklist } from './checklist.js';
 import { now, getSetting, setSetting } from './db.js';
 import { encrypt, encryptJson, decryptJson, verifyUnsubToken } from './crypto.js';
 import { html, json, redirect, readBody, HttpError } from './http.js';
@@ -5,7 +6,7 @@ import { startLogin, finishLogin, destroySession, getSession, checkOrigin } from
 import { verifyCaptcha } from './captcha.js';
 import { deleteUser, normalizeEmail, getUser } from './users.js';
 import {
-  assertCanRunAi, getLinkState, assertLoginConsent, linkLoginToken, validateSubscriptionToken, linkApiKey, linkSubscriptionToken, linkServer, unlink, testLink, lastConsent,
+  assertCanRunAi, getLinkState, assertLoginConsent, linkLoginToken, validateSubscriptionToken, linkApiKey, linkSubscriptionToken, unlink, testLink, lastConsent,
   MODES,
 } from './claudelink.js';
 import { loginPage } from './site/pages.js';
@@ -17,7 +18,7 @@ import { registerTeamRoutes } from './teamroutes.js';
 import { registerLinkedinRoutes } from './linkedinroutes.js';
 import { dashboardPage, settingsPage, unsubPage, accountPage, linkPage } from './views.js';
 import { enqueue, latestJobs, cancelJob, usageSummary } from './services/jobs.js';
-import { validateGitUrl, removeRepo } from './services/git.js';
+import { validateGitUrl, removeRepo, DEFAULT_GIT_HOSTS } from './services/git.js';
 import { fetchRecap, clearRecapCache, validateSelect } from './services/recap.js';
 import { sendPause, pauseMessage as pauseMessageOf } from './services/abuse.js';
 import { guardTarget, pinDb, pinGit, checkForgejoHost } from './netguard.js';
@@ -234,7 +235,6 @@ export function registerRoutes(router, app) {
     loginsOf(app).cancel(session.userId, (await readBody(req)).id);
     json(res, { ok: true });
   }, LINK_LIMIT);
-  router.post('/link/server', linkAction((b, s) => linkServer(app, s.userId)), LINK_LIMIT);
   router.post('/link/test', async ({ req, res, session }) => {
     const r = await testLink(app, session.userId);
     if (wantsJson(req)) return json(res, r);
@@ -316,10 +316,10 @@ export function registerRoutes(router, app) {
     const b = await readBody(req);
     const name = String(b.name || '').trim().slice(0, 80);
     if (!name) throw new HttpError(400, 'Nom requis');
+    // GitHub est accepté d'office ; le serveur Git personnel des Réglages (facultatif) s'y ajoute
     const host = await getSetting(db, userId, 'forgejo_host');
-    if (!host) throw new HttpError(400, "Configure l'hôte Forgejo dans Réglages");
     let gitUrl;
-    try { gitUrl = validateGitUrl(String(b.gitUrl || '').trim(), host); }
+    try { gitUrl = validateGitUrl(String(b.gitUrl || '').trim(), [...DEFAULT_GIT_HOSTS, host]); }
     catch (e) { throw new HttpError(400, e.message); }
     await pinGit(app, userId, gitUrl); // hôte public et port autorisé, sinon refus immédiat
     // Un même dépôt peut être un projet pour deux comptes différents : l'unicité est par utilisateur
@@ -343,6 +343,9 @@ export function registerRoutes(router, app) {
     json(ctx.res, { ok: true });
   });
 
+  // Mise en route : ce qui est configuré et ce qui reste à faire (aussi inclus dans /status pour le rafraîchissement)
+  router.get('/api/projects/:id/checklist', async (ctx) => json(ctx.res, await projectChecklist(app, await project(ctx))));
+
   router.get('/api/projects/:id/status', async (ctx) => {
     const { res } = ctx;
     const p = await project(ctx);
@@ -363,7 +366,7 @@ export function registerRoutes(router, app) {
       jobs, templates, stats, sendMax,
       followup: { enabled: p.followupEnabled, days: p.followupDays, ...(await followupPlan(db, p)) },
       targetValidated: p.targetValidated, hasProfile: !!p.profile, hasSmtp: p.hasSmtp, smtpSource: p.smtpSource, access: p.access,
-      hasImap: p.hasImap, inbox: p.inbox, ab: await abStats(db, p.id),
+      hasImap: p.hasImap, inbox: p.inbox, ab: await abStats(db, p.id), checklist: await projectChecklist(app, p),
     });
   });
 
