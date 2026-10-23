@@ -248,6 +248,6 @@ test('Tarifs : plus de « pas encore appliqués », chiffres identiques à la co
     const h = await (await s.anon.get('/tarifs', { headers: { accept: 'text/html' } })).text();
     assert.doesNotMatch(h, /pas encore appliqu/);
     assert.match(h, /appliqués par le serveur/);
-    for (const n of Object.values(PLAN_LIMITS.free)) assert.ok(h.includes(`<strong>${n}</strong>`), String(n));
+    for (const n of Object.values(PLAN_LIMITS.free)) assert.ok(h.includes(`<b>${n}</b>`), String(n));
   } finally { await s.close(); }
 });
