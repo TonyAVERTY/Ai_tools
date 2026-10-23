@@ -204,7 +204,11 @@ export function makeHandlers(app) {
       });
       await sink.flush();
       addUsage(ctx, r);
-      if (!r.ok) throw new Error(`Analyse incomplète (${r.subtype})`);
+      if (!r.ok) {
+        // « success » + is_error : Claude a répondu par une erreur (quota, jeton, API). Son texte (déjà masqué) dit laquelle.
+        const said = String(r.text ?? '').replace(/\s+/g, ' ').trim().slice(0, 240);
+        throw new Error(`Analyse incomplète (${r.subtype})${said ? ` : ${said}` : ''}`);
+      }
       const profile = extractJson(r.text);
       if (!profile.resume || !profile.cible) throw new Error('Fiche projet incomplète');
       const { cible, ...rest } = profile;
