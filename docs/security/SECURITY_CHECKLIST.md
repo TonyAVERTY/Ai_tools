@@ -33,6 +33,15 @@ Détails et preuves : `SECURITY_AUDIT.md`.
 - [ ] Envoi d'un mail de test avec nodemailer 10 après déploiement
 - [ ] Planifier un `npm audit` régulier
 
+## Surfaces ajoutées (API, MCP, canaux, agenda)
+- [x] API : jeton Bearer seul, SHA-256 en base, droits séparés, isolation entre comptes, limite de débit, mode désactivable — `test/api.test.js`
+- [x] MCP : lecture seule possible, jeton masqué, contenu de tiers signalé — `test/api.test.js`
+- [x] Slack / Telegram / e-mail : hôtes fixes, secrets chiffrés, pas d'injection d'en-tête — `test/channels.test.js`
+- [x] Lien iCal : chiffré, régénérable, 404 identique, isolation — `test/calendar.test.js`
+- [x] Posts programmés : confirmation, rôle administrateur, pas de double publication — `test/linkedin.test.js`
+- [ ] Relecture externe de l'API et du MCP avant ouverture publique
+- [ ] Migrations `replies`, `api_tokens` et `calendar` vérifiées sur MySQL (testées sur SQLite seulement)
+
 ## Infrastructure (à vérifier sur le serveur)
 - [ ] `NODE_ENV=production`, `TRUST_PROXY=true`, `ALLOW_PRIVATE_HOSTS` désactivé, reCAPTCHA configuré
 - [ ] Port 3100 non joignable depuis l'extérieur

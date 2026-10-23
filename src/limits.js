@@ -12,6 +12,8 @@ const HOUR = 60 * MIN;
  * Une requête passe seulement si toutes les portées de la règle l'acceptent.
  */
 export const RATE_LIMITS = {
+  // Abonnement iCal (lien secret) : un agenda interroge au plus quelques fois par heure
+  ical: { ip: { max: 60, windowMs: 10 * MIN } },
   // API (mode développeur) : par adresse avant authentification, par compte ensuite
   api_ip: { ip: { max: 300, windowMs: MIN } },
   api: { user: { max: 120, windowMs: MIN } },

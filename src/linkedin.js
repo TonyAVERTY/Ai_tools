@@ -7,6 +7,7 @@ import { createHash, timingSafeEqual } from 'node:crypto';
 import { now } from './db.js';
 import { encrypt, decrypt, randomId } from './crypto.js';
 import { HttpError, parseCookies, setCookie, redirect } from './http.js';
+import { notify } from './services/notify.js';
 
 const AUTH_URL = 'https://www.linkedin.com/oauth/v2/authorization';
 const TOKEN_URL = 'https://www.linkedin.com/oauth/v2/accessToken';
@@ -73,8 +74,8 @@ export async function recentDrafts(db, projectId, n = 4) {
 }
 
 export async function listPosts(db, projectId, n = 10) {
-  return (await db.prepare('SELECT id, direction, body, status, remote_id, created_at, published_at, author_name FROM linkedin_posts WHERE project_id = ? ORDER BY id DESC LIMIT ?').all(Number(projectId), n))
-    .map((r) => ({ id: Number(r.id), direction: r.direction, body: r.body, status: r.status, remoteId: r.remote_id, createdAt: r.created_at, publishedAt: r.published_at, publishedOn: r.author_name || null }));
+  return (await db.prepare('SELECT id, direction, body, status, remote_id, created_at, published_at, author_name, scheduled_at, schedule_error FROM linkedin_posts WHERE project_id = ? ORDER BY id DESC LIMIT ?').all(Number(projectId), n))
+    .map((r) => ({ id: Number(r.id), direction: r.direction, body: r.body, status: r.status, remoteId: r.remote_id, createdAt: r.created_at, publishedAt: r.published_at, publishedOn: r.author_name || null, scheduledAt: r.scheduled_at ? Number(r.scheduled_at) : null, scheduleError: r.schedule_error || null }));
 }
 
 /** Modifie le texte d'un brouillon (jamais d'un post déjà publié). */
@@ -84,6 +85,53 @@ export async function editDraft(db, projectId, postId, body) {
   if (text.length > MAX_POST) throw fail(400, `LinkedIn limite un post à ${MAX_POST} caractères (il en fait ${text.length}).`);
   const r = await db.prepare("UPDATE linkedin_posts SET body = ? WHERE id = ? AND project_id = ? AND status = 'draft'").run(text, Number(postId), Number(projectId));
   if (!r.changes) throw fail(404, 'Brouillon introuvable (ou déjà publié)');
+}
+
+// ---------- Programmation ----------
+
+export const SCHEDULE_MIN_SECONDS = 5 * 60;          // pas dans moins de 5 minutes : le temps de se raviser
+export const SCHEDULE_MAX_SECONDS = 365 * 86400;
+
+/** Programme la publication d'un brouillon à `at` (secondes). Le planificateur la fait partir (au plus ~15 minutes après l'heure). */
+export async function schedulePost(db, projectId, postId, at, { clock = now() } = {}) {
+  const t = Math.floor(Number(at));
+  if (!Number.isFinite(t) || t < clock + SCHEDULE_MIN_SECONDS) throw fail(400, 'Choisis une date au moins 5 minutes dans le futur');
+  if (t > clock + SCHEDULE_MAX_SECONDS) throw fail(400, 'Programme un post au plus un an à l\'avance');
+  const r = await db.prepare("UPDATE linkedin_posts SET status = 'scheduled', scheduled_at = ?, schedule_error = NULL WHERE id = ? AND project_id = ? AND status = 'draft'")
+    .run(t, Number(postId), Number(projectId));
+  if (!r.changes) throw fail(404, 'Brouillon introuvable (ou déjà programmé ou publié)');
+  return t;
+}
+
+/** Annule la programmation : le post redevient un brouillon. */
+export async function unschedulePost(db, projectId, postId) {
+  const r = await db.prepare("UPDATE linkedin_posts SET status = 'draft', scheduled_at = NULL WHERE id = ? AND project_id = ? AND status = 'scheduled'")
+    .run(Number(postId), Number(projectId));
+  if (!r.changes) throw fail(404, 'Aucun post programmé');
+}
+
+/**
+ * Publie les posts dont l'heure est passée. Un échec (jeton expiré, refus de LinkedIn…) remet le post en brouillon avec la raison
+ * et prévient l'utilisateur : jamais de nouvelle tentative en boucle, et jamais de double publication (verrou de publishPost).
+ * @returns {Promise<{published: number, failed: number}>}
+ */
+export async function publishDuePosts(app, { at = now() } = {}) {
+  const { db } = app;
+  const due = await db.prepare(`SELECT l.id, l.project_id, p.user_id, p.name FROM linkedin_posts l JOIN projects p ON p.id = l.project_id JOIN users u ON u.id = p.user_id
+    WHERE l.status = 'scheduled' AND l.scheduled_at <= ? AND u.status = 'active' ORDER BY l.scheduled_at LIMIT 20`).all(at);
+  const out = { published: 0, failed: 0 };
+  for (const post of due) {
+    try {
+      await publishPost(app, post.project_id, post.id);
+      out.published++;
+    } catch (e) {
+      out.failed++;
+      const reason = String(e.message || 'Erreur inconnue').slice(0, 400);
+      await db.prepare("UPDATE linkedin_posts SET status = 'draft', scheduled_at = NULL, schedule_error = ? WHERE id = ? AND status IN ('scheduled', 'publishing')").run(reason, post.id);
+      await notify(app, post.user_id, 'job_error', { title: `${post.name} · post LinkedIn non publié`, level: 'error', description: `${reason}\nLe post est redevenu un brouillon : reprogramme-le ou publie-le à la main.` });
+    }
+  }
+  return out;
 }
 
 // ---------- Connexion OAuth ----------
@@ -249,16 +297,17 @@ export async function publishPost(app, projectId, postId) {
   const { db } = app;
   const post = await db.prepare('SELECT id, body, status FROM linkedin_posts WHERE id = ? AND project_id = ?').get(Number(postId), Number(projectId));
   if (!post) throw fail(404, 'Brouillon introuvable');
-  if (post.status !== 'draft') throw fail(409, 'Ce post est déjà publié');
+  if (!['draft', 'scheduled'].includes(post.status)) throw fail(409, 'Ce post est déjà publié');
+  const before = post.status;
   const { acc, token, scopes } = await accountToken(app, projectId);
   const toPage = !!acc.target_urn;
   if (toPage && !ORG_URN.test(acc.target_urn)) throw fail(400, 'La page choisie est invalide : choisis-la de nouveau.');
   if (toPage && !scopes.includes('w_organization_social')) throw fail(400, "Ce compte n'a pas le droit de publier sur une page : reconnecte-le.");
   if (!toPage && !scopes.includes('w_member_social')) throw fail(400, "Ce compte n'a pas le droit de publier sur ton profil : choisis une page où publier.");
   // Verrou : on marque d'abord le brouillon pour qu'un double clic ne publie jamais deux fois
-  const lock = await db.prepare("UPDATE linkedin_posts SET status = 'publishing' WHERE id = ? AND status = 'draft'").run(post.id);
+  const lock = await db.prepare("UPDATE linkedin_posts SET status = 'publishing' WHERE id = ? AND status IN ('draft', 'scheduled')").run(post.id);
   if (!lock.changes) throw fail(409, 'Publication déjà en cours');
-  const unlock = () => db.prepare("UPDATE linkedin_posts SET status = 'draft' WHERE id = ?").run(post.id);
+  const unlock = () => db.prepare('UPDATE linkedin_posts SET status = ? WHERE id = ?').run(before, post.id);
 
   const r = await (toPage
     ? call(app, `${REST}/posts`, {
@@ -293,7 +342,7 @@ export async function publishPost(app, projectId, postId) {
   }
   const remote = r.headers?.get?.('x-restli-id') || (await r.json().catch(() => null))?.id || null;
   const publishedOn = toPage ? (acc.target_name || 'page LinkedIn') : null;
-  await db.prepare("UPDATE linkedin_posts SET status = 'published', remote_id = ?, published_at = ?, author_name = ? WHERE id = ?")
+  await db.prepare("UPDATE linkedin_posts SET status = 'published', scheduled_at = NULL, remote_id = ?, published_at = ?, author_name = ? WHERE id = ?")
     .run(remote ? String(remote).slice(0, 200) : null, now(), publishedOn, post.id);
   return { remoteId: remote, publishedOn };
 }

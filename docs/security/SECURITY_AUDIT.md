@@ -82,3 +82,17 @@ Un abus distribué (DDoS) n'est pas arrêté par le limiteur local. Le bac à sa
 ## 9. Points relevant d'une validation juridique (non techniques)
 
 Conservation des données, durées, mentions RGPD, base légale de la prospection B2B, liste d'opposition globale : traités côté produit (pages légales, suppression de compte, purge d'inactivité) mais **la conformité RGPD n'est pas certifiée par cet audit** et demande une validation juridique.
+
+## 10. Addendum : nouvelles surfaces (23 octobre 2026)
+
+Ajoutées après l'audit initial ; relues et testées localement, **non auditées par un tiers**.
+
+| Surface | Mesures | Risque résiduel |
+|---|---|---|
+| API v1 (mode développeur) | Jeton `Bearer` seul (jamais de cookie, aucun CORS), SHA-256 en base, affiché une fois, 5 par compte, droits `read` / `write` / `jobs`, mode désactivable (coupe tout), limites par IP puis par compte, même contrôle d'accès que le panel, `404` pour les ressources d'autrui, envoi de mails refusé sans `confirm: true` | Un jeton `jobs` volé permet d'envoyer des mails depuis le compte : donner `jobs` seulement si nécessaire, révoquer au moindre doute |
+| Serveur MCP | Aucun droit propre, mode lecture seule, jeton masqué dans les erreurs, contenus de tiers signalés comme données | Injection de prompt par le texte d'une réponse de prospect : Claude doit rester sous le contrôle de l'utilisateur pour les actions d'écriture |
+| Canaux Slack / Telegram / e-mail | Hôtes fixes validés par motif (pas de SSRF), secrets chiffrés et jamais réaffichés, e-mail depuis le SMTP du serveur avec plafond horaire, titre nettoyé (pas d'injection d'en-tête) | Un webhook Slack ou un jeton Telegram fuité permet d'écrire dans ce canal |
+| Lien iCal | Jeton de 256 bits, chiffré en base, régénérable, `404` identique pour tout lien inconnu, limite par IP, compte suspendu = lien coupé, contenu limité aux actions et posts du compte | Le lien est un secret porteur : quiconque l'a lit l'agenda (à régénérer s'il fuit) |
+| Prompts modifiables | Seules les consignes se modifient ; contexte, format de réponse et règles légales de collecte restent dans le code ; 4 000 caractères au plus ; propres à chaque compte | Un prompt mal écrit dégrade la qualité des résultats de ce compte, pas la sécurité |
+| Réponses lues dans la boîte | Texte borné (3 000 caractères), échappé à l'affichage, classement local (aucun appel externe), refus écrit = opposition | Le classement par mots-clés peut se tromper : l'utilisateur relit |
+| Posts LinkedIn programmés | Confirmation obligatoire, réservé aux administrateurs du projet, verrou anti double publication, un échec remet en brouillon (jamais de nouvelle tentative en boucle) et prévient | Publication jusqu'à ~15 minutes après l'heure (cadence du planificateur) |

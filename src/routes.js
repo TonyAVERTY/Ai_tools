@@ -18,6 +18,8 @@ import { registerTeamRoutes } from './teamroutes.js';
 import { registerMailRoutes } from './mailroutes.js';
 import { registerApiV1 } from './apiv1.js';
 import { registerDeveloperRoutes } from './developerroutes.js';
+import { registerCalendarRoutes } from './calendar.js';
+import { feedToken, feedUrl } from './services/ical.js';
 import { developerMode } from './apitokens.js';
 import { registerLinkedinRoutes } from './linkedinroutes.js';
 import { dashboardPage, settingsPage, unsubPage, accountPage, linkPage } from './views.js';
@@ -72,6 +74,7 @@ export function registerRoutes(router, app) {
   registerLinkedinRoutes(router, app, { project, aiOpts });
   registerApiV1(router, app, { aiOpts });
   registerDeveloperRoutes(router, app);
+  registerCalendarRoutes(router, app);
   // Déjà connecté : la page de connexion n'a rien à offrir, on va au tableau de bord
   router.get('/login', async ({ req, res, url }) => {
     if (await getSession(db, req)) return redirect(res, '/');
@@ -278,6 +281,7 @@ export function registerRoutes(router, app) {
     const t = url.searchParams.get('t');
     html(res, accountPage({
       user: session.user, error: url.searchParams.get('e'), link: await getLinkState(db, session.userId), developer: await developerMode(db, session.userId),
+      ical: await (async () => { const t = await feedToken(app, session.userId); return t ? feedUrl(cfg, t) : null; })(),
       consent: await lastConsent(db, session.userId), cliModeEnabled, usage: await usageView(db, await getUser(db, session.userId)),
       notice: t === 'unlinked' ? { ok: true, text: 'Liaison supprimée : le secret a été effacé et tes jobs IA en attente ont été annulés.' }
         : t === 'ok' || t === 'ko' ? { ok: t === 'ok', text: String(url.searchParams.get('m') || '').slice(0, 300) } : null,
