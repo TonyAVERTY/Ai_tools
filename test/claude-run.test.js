@@ -8,7 +8,7 @@ import { now, getSetting, setSetting } from '../src/db.js';
 import { encrypt } from '../src/crypto.js';
 import { enqueue, Worker, latestJobs } from '../src/services/jobs.js';
 import { quotaState, budgetState, AI_JOBS, isQuotaSensitive } from '../src/services/budget.js';
-import { makeClaude, makeHandlers } from '../src/handlers.js';
+import { makeClaude, makeHandlers, claudeDiagnostic } from '../src/handlers.js';
 import { extractJson } from '../src/services/claude.js';
 import { buildBwrapArgs, buildChildEnv, prepareLaunch, isInside, SANDBOX_HOME } from '../src/services/sandbox.js';
 import { validateGitUrl, syncRepo, gitEnv, cloneArgs, fetchArgs, GIT_HARDENING, dirSize } from '../src/services/git.js';
@@ -377,4 +377,23 @@ test('alertes de quota : envoyées au webhook de l\'utilisateur concerné seulem
   assert.equal(sent[0].url, hookA);
   assert.equal(await getSetting(s.db, b.id, 'claude_quota_notified_json'), null, 'B n\'a rien reçu ni mémorisé');
   delete s.app.fetch;
+});
+
+test('diagnostic d\'un échec Claude : forme du secret et contenu du dépôt, jamais la valeur', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'diag-'));
+  writeFileSync(join(dir, 'CLAUDE.md'), 'x');
+  mkdirSync(join(dir, '.claude'));
+  const token = `sk-ant-oat01-${'T'.repeat(40)}`;
+  const line = claudeDiagnostic({
+    userId: 7, cred: { mode: 'subscription_token', secretEnv: { CLAUDE_CODE_OAUTH_TOKEN: token } },
+    cfg: { sandbox: { enabled: true, production: true } }, cwd: dir, r: { subtype: 'success' },
+  });
+  assert.match(line, /user=7 mode=subscription_token secret=CLAUDE_CODE_OAUTH_TOKEN\(len=53,propre\)/);
+  assert.match(line, /bac_a_sable=oui\(prod\)/);
+  assert.match(line, /fichiers_claude_du_depot=(\.claude,CLAUDE\.md|CLAUDE\.md,\.claude)/);
+  assert.ok(!line.includes(token) && !line.includes('TTTTTT'), 'aucune valeur secrète dans la ligne');
+  const dirty = claudeDiagnostic({ userId: 7, cred: { mode: 'subscription_token', secretEnv: { CLAUDE_CODE_OAUTH_TOKEN: `${token}\u001b(B` } }, cfg: { sandbox: {} }, cwd: null, r: { subtype: 'success' } });
+  assert.match(dirty, /CARACTERES_PARASITES/);
+  assert.match(claudeDiagnostic({ userId: 1, cred: { mode: 'server', secretEnv: {} }, cfg: {}, cwd: null, r: {} }), /secret=AUCUN/);
+  rmSync(dir, { recursive: true, force: true });
 });
