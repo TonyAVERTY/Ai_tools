@@ -1,5 +1,5 @@
 // Chiffrement AES-256-GCM des secrets stockés en BDD (mdp SMTP/BDD, token Forgejo).
-import { createCipheriv, createDecipheriv, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 
 export function encrypt(key, plain) {
   if (plain == null || plain === '') return null;
@@ -31,5 +31,8 @@ export function verifyUnsubToken(key, email, token) {
   const got = Buffer.from(String(token || ''));
   return expected.length === got.length && timingSafeEqual(expected, got);
 }
+
+/** Empreinte d'un jeton de session : la base ne garde jamais l'identifiant porté par le cookie (une fuite de la base ne donne aucune session). */
+export const hashSid = (sid) => createHash('sha256').update(String(sid)).digest('hex');
 
 export const randomId = (bytes = 32) => randomBytes(bytes).toString('base64url');

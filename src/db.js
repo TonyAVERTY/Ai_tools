@@ -263,9 +263,10 @@ function migrationContext({ adminEmails } = {}) {
   return { ownerEmail: list[0] || null, now: now() };
 }
 
-// Instruction de migration : chaîne SQL ou { sql, params(ctx), when(q, ctx) }
+// Instruction de migration : chaîne SQL, { sql, params(ctx), when(q, ctx) } ou { run(q, ctx, exec) } (étape en JavaScript)
 async function runStatement(st, q, ctx, exec = q) {
   if (typeof st === 'string') return exec(st, []);
+  if (st.run) return st.run(q, ctx, exec); // étape en JavaScript : q lit, exec écrit
   if (st.when && !(await st.when(q, ctx))) return undefined;
   return exec(st.sql, st.params ? st.params(ctx) : []);
 }
