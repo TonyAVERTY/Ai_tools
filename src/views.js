@@ -291,7 +291,7 @@ function templateForm(p, kind) {
 function projectItem(p, smtp, dbCfg, imap) {
   const profile = p.profile;
   return `<details class="project card anim" data-id="${p.id}">
-<summary><span class="pname">${esc(p.name)}</span>${p.access !== 'owner' ? `<span class="badge" title="Projet partagé par ${esc(p.ownerEmail || '')}">équipe de ${esc(p.ownerEmail || '')}</span>` : p.teamId ? '<span class="badge ok">partagé</span>' : ''}<span class="pstate" data-state></span></summary>
+<summary><span class="pname">${esc(p.name)}</span>${p.access !== 'owner' ? `<span class="badge" title="Projet partagé par ${esc(p.ownerEmail || '')}">équipe de ${esc(p.ownerEmail || '')}</span>` : p.teamId ? '<span class="badge ok">partagé</span>' : ''}<span class="pcfg badge" data-cfg title="Afficher la liste de mise en route" hidden></span><span class="pstate" data-state></span></summary>
 <div class="pbody">
   <label>Dépôt Git<input class="locked" value="${esc(p.gitUrl)}" readonly disabled></label>
 
@@ -406,7 +406,8 @@ ${usagePanel(usage)}
 <dialog class="prospect-dialog" id="prospect-dialog" aria-label="Fiche prospect"><div data-dialog-body></div></dialog>
 <div class="projects">
 ${projects.length ? projects.map((x) => projectItem(x.project, x.smtp, x.dbCfg, x.imap)).join('\n') : '<p class="muted">Aucun projet pour l\'instant.</p>'}
-</div>`,
+</div>
+${projects.length ? '<aside class="todo" id="todo" aria-label="Mise en route du projet" hidden></aside>' : ''}`,
   });
 }
 
