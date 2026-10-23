@@ -29,12 +29,17 @@ export function parseHeaders(raw) {
   return out;
 }
 
-/** @returns {{type: 'reply'|'auto'|'bounce', from: string, ids: string[]}} */
+/** @returns {{type: 'reply'|'auto'|'bounce'|'receipt', from: string, ids: string[]}} */
 export function classify(msg) {
   const h = msg.headers || {};
   const from = String(msg.from || '').toLowerCase();
   const subject = String(msg.subject || '').trim();
   const refs = [...new Set([...ids(msg.inReplyTo), ...ids(h.references)])];
+
+  // Accusé de lecture (MDN) : jamais une réponse, même s'il porte « Auto-Submitted »
+  if (/report-type=["']?disposition-notification/i.test(h['content-type'] || '')) {
+    return { type: 'receipt', from, ids: [...new Set([...refs, ...ids(msg.body)])] };
+  }
 
   const bounce = /^(mailer-daemon|postmaster)@/.test(from)
     || /report-type=["']?delivery-status/i.test(h['content-type'] || '')
@@ -52,13 +57,14 @@ export function classify(msg) {
 
 /** Applique une liste de messages aux prospects du projet. Idempotent. */
 export async function applyMessages(db, projectId, messages, { at = now() } = {}) {
-  const res = { replies: 0, bounces: 0, ignored: 0 };
+  const res = { replies: 0, bounces: 0, receipts: 0, ignored: 0 };
   const byMsgId = db.prepare('SELECT prospect_id FROM mail_log WHERE project_id = ? AND message_id = ? AND prospect_id IS NOT NULL LIMIT 1');
   const byEmail = db.prepare('SELECT id FROM prospects WHERE project_id = ? AND email = ? LIMIT 1');
   const byDomain = db.prepare("SELECT id FROM prospects WHERE project_id = ? AND status = 'sent' AND substr(email, instr(email, '@') + 1) = ?");
   const markReply = db.prepare("UPDATE prospects SET status = 'replied', replied_at = ?, reply_subject = ? WHERE id = ? AND status = 'sent'");
   const markBounce = db.prepare("UPDATE prospects SET status = 'bounced' WHERE id = ? AND status = 'sent'");
   const blacklist = db.prepare("INSERT OR IGNORE INTO blacklist(email, reason, created_at) SELECT email, 'bounce', ? FROM prospects WHERE id = ?");
+  const markRead = db.prepare('UPDATE mail_log SET read_at = ? WHERE project_id = ? AND message_id = ? AND read_at IS NULL');
   const known = db.prepare('SELECT 1 x FROM replies WHERE project_id = ? AND uid = ?');
   const storeReply = db.prepare('INSERT OR IGNORE INTO replies(project_id, prospect_id, uid, from_email, subject, body, intent, received_at) VALUES(?, ?, ?, ?, ?, ?, ?, ?)');
   const prospectEmail = db.prepare('SELECT email FROM prospects WHERE id = ?');
@@ -73,6 +79,12 @@ export async function applyMessages(db, projectId, messages, { at = now() } = {}
     if (c.type === 'bounce') {
       const pid = await fromIds(c.ids);
       if (pid && (await markBounce.run(pid)).changes) { await blacklist.run(at, pid); res.bounces++; } else res.ignored++;
+      continue;
+    }
+    if (c.type === 'receipt') {
+      // L'accusé cite notre Message-ID : on retrouve le mail. « Lu » ne se retire jamais et ne dépend pas d'une réponse.
+      const ok = (await Promise.all(c.ids.map((id) => markRead.run(at, projectId, id)))).some((r) => r.changes);
+      if (ok) res.receipts++; else res.ignored++;
       continue;
     }
     if (c.type === 'auto') { res.ignored++; continue; }
@@ -153,8 +165,8 @@ export async function fetchInbox(creds, state, { since, max = 500 }) {
       for (const msg of out.messages) {
         const type = classify(msg).type;
         if (type === 'auto') continue;
-        const full = await client.fetchOne(String(msg.uid), { source: { maxLength: type === 'bounce' ? 100_000 : 60_000 } }, { uid: true });
-        if (type === 'bounce') msg.body = full?.source ? full.source.toString('utf8') : '';
+        const full = await client.fetchOne(String(msg.uid), { source: { maxLength: type === 'bounce' || type === 'receipt' ? 100_000 : 60_000 } }, { uid: true });
+        if (type === 'bounce' || type === 'receipt') msg.body = full?.source ? full.source.toString('utf8') : '';
         else msg.text = full?.source ? extractReplyText(full.source) : '';
       }
       lastUid = Math.max(lastUid, ...uids);

@@ -8,19 +8,20 @@ import { mailsPage } from './mailviews.js';
 
 const PAGE_SIZE = 50;
 export const SENT_STATES = {
-  sent: 'Envoyé', replied: 'Répondu', bounced: 'Rejeté', refused: 'Refus', failed: 'Non envoyé',
+  sent: 'Envoyé', read: 'Lu (accusé)', replied: 'Répondu', bounced: 'Rejeté', refused: 'Refus', failed: 'Non envoyé',
 };
 
 // État d'un envoi, tel qu'on le lit dans l'historique : le journal d'envoi + le statut actuel du prospect
 const STATE_SQL = {
   failed: 'm.error IS NOT NULL',
   replied: "m.error IS NULL AND x.status IN ('replied', 'client')",
+  read: "m.error IS NULL AND m.read_at IS NOT NULL AND (x.status IS NULL OR x.status NOT IN ('replied', 'client', 'bounced', 'refused'))",
   bounced: "m.error IS NULL AND x.status = 'bounced'",
   refused: "m.error IS NULL AND x.status = 'refused'",
-  sent: "m.error IS NULL AND (x.status IS NULL OR x.status NOT IN ('replied', 'client', 'bounced', 'refused'))",
+  sent: "m.error IS NULL AND m.read_at IS NULL AND (x.status IS NULL OR x.status NOT IN ('replied', 'client', 'bounced', 'refused'))",
 };
 export const stateOf = (row) => (row.error ? 'failed'
-  : ['replied', 'client'].includes(row.status) ? 'replied' : row.status === 'bounced' ? 'bounced' : row.status === 'refused' ? 'refused' : 'sent');
+  : ['replied', 'client'].includes(row.status) ? 'replied' : row.status === 'bounced' ? 'bounced' : row.status === 'refused' ? 'refused' : row.read_at ? 'read' : 'sent');
 
 /** Projets auxquels la personne a accès : les siens, puis ceux que son équipe partage. */
 export async function accessibleProjects(db, userId) {
@@ -110,7 +111,7 @@ export function registerMailRoutes(router, app) {
     for (const [k, cond] of Object.entries(STATE_SQL)) counts[k] = Number((await db.prepare(`SELECT COUNT(*) n ${from} AND ${cond}`).get(...scope)).n);
     const where = state ? ` AND ${STATE_SQL[state]}` : '';
     const total = Number((await db.prepare(`SELECT COUNT(*) n ${from}${where}`).get(...scope)).n);
-    const rows = await db.prepare(`SELECT m.id, m.sent_at, m.email, m.subject, m.kind, m.error, p.name project, x.status, x.company
+    const rows = await db.prepare(`SELECT m.id, m.sent_at, m.email, m.subject, m.kind, m.error, m.read_at, p.name project, x.status, x.company
       ${from}${where} ORDER BY m.sent_at DESC, m.id DESC LIMIT ? OFFSET ?`).all(...scope, PAGE_SIZE, (page - 1) * PAGE_SIZE);
     html(res, mailsPage({ ...base, filter: state, counts, total, pages: Math.max(1, Math.ceil(total / PAGE_SIZE)), rows: rows.map((r) => ({ ...r, state: stateOf(r) })) }));
   });

@@ -656,6 +656,12 @@ export const MIGRATIONS = [
     ],
   },
   {
+    // Accusés de lecture (MDN, RFC 8098) : le destinataire choisit d'en envoyer un ; aucun pixel espion.
+    name: 'read_receipts',
+    sqlite: ['ALTER TABLE mail_log ADD COLUMN read_at INTEGER'],
+    mysql: [{ sql: 'ALTER TABLE mail_log ADD COLUMN read_at BIGINT NULL', when: colMissing('mail_log', 'read_at') }],
+  },
+  {
     // Agenda : lien iCal secret par compte ; posts LinkedIn programmés (publiés par le planificateur à l'heure choisie).
     name: 'calendar',
     sqlite: [

@@ -91,7 +91,7 @@ Réponses reçues, de la plus récente à la plus ancienne. Filtres : `unseen=1`
 Marque une réponse comme lue.
 
 ### `GET /projects/:id/mails` — droit `read`
-Mails envoyés : `sentAt`, `to`, `subject`, `kind` (`initial`, `followup`), `error`, `prospectStatus`. Paramètres : `limit` (200 au plus), `offset`.
+Mails envoyés : `sentAt`, `to`, `subject`, `kind` (`initial`, `followup`), `error`, `readAt` (accusé de lecture reçu, sinon `null` : un destinataire peut lire sans en envoyer), `prospectStatus`. Paramètres : `limit` (200 au plus), `offset`.
 
 ### `GET /jobs/:id` — droit `read`
 `{ id, type, status, progress, result, error, createdAt, finishedAt }`. Statuts : `queued`, `running`, `done`, `error`, `cancelled`.

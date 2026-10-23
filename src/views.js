@@ -603,6 +603,8 @@ ${saved ? `<p class="ok-box" role="status">${ic('check')}<span><b>Réglages enre
     <label class="field"><span class="lbl">Délai min entre 2 mails</span><span class="unit"><input name="send_delay_min" type="number" min="5" value="${esc(s.send_delay_min)}"><span>secondes</span></span></label>
     <label class="field"><span class="lbl">Délai max entre 2 mails</span><span class="unit"><input name="send_delay_max" type="number" min="5" value="${esc(s.send_delay_max)}"><span>secondes</span></span></label>
   </div>
+  ${check('read_receipt', s.read_receipt, 'Demander un accusé de lecture dans les mails de prospection')}
+  <p class="hint">Alternative au suivi d'ouverture : aucun pixel espion, aucun lien traqué. La messagerie du destinataire lui demande s'il accepte d'envoyer un accusé ; beaucoup refusent ou l'ignorent, « Lu » est donc un minimum, jamais un « non lu ».</p>
 </section>
 
 <section class="card" id="budget" aria-labelledby="t-budget">

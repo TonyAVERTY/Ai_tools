@@ -39,7 +39,7 @@ export const API_ENDPOINTS = [
   { method: 'POST', path: '/prospects/:id/hook', scope: 'jobs', summary: 'Régénère l\'accroche du prospect à partir de son site (tâche asynchrone).' },
   { method: 'GET', path: '/replies', scope: 'read', summary: 'Réponses reçues, avec intention et réponse suggérée. Filtres : unseen=1, intent, limit, offset.' },
   { method: 'POST', path: '/replies/:id/seen', scope: 'write', summary: 'Marque une réponse comme lue.' },
-  { method: 'GET', path: '/projects/:id/mails', scope: 'read', summary: 'Mails envoyés (limit, offset).' },
+  { method: 'GET', path: '/projects/:id/mails', scope: 'read', summary: 'Mails envoyés avec readAt (accusé de lecture reçu, si le destinataire en a envoyé un) ; limit, offset.' },
   { method: 'GET', path: '/jobs/:id', scope: 'read', summary: 'État et résultat d\'une tâche.' },
   { method: 'POST', path: '/projects/:id/jobs', scope: 'jobs', summary: 'Lance une tâche : { "type": "analyze | prospect | evolution | audit | send", … }. « send » exige { "confirm": true }.' },
 ];
@@ -185,10 +185,10 @@ export function registerApiV1(router, app, { aiOpts = {} } = {}) {
     needScope(ctx.api, 'read');
     const p = await project(ctx);
     const q = ctx.url.searchParams;
-    const rows = await db.prepare(`SELECT m.id, m.sent_at, m.email, m.subject, m.kind, m.error, x.status prospect_status
+    const rows = await db.prepare(`SELECT m.id, m.sent_at, m.email, m.subject, m.kind, m.error, m.read_at, x.status prospect_status
       FROM mail_log m LEFT JOIN prospects x ON x.id = m.prospect_id WHERE m.project_id = ? ORDER BY m.sent_at DESC, m.id DESC LIMIT ? OFFSET ?`)
       .all(p.id, int(q.get('limit'), 1, 200, 50), int(q.get('offset'), 0, 1_000_000, 0));
-    json(ctx.res, { mails: rows.map((m) => ({ id: Number(m.id), sentAt: Number(m.sent_at), to: m.email, subject: m.subject, kind: m.kind, error: m.error, prospectStatus: m.prospect_status })) });
+    json(ctx.res, { mails: rows.map((m) => ({ id: Number(m.id), sentAt: Number(m.sent_at), to: m.email, subject: m.subject, kind: m.kind, error: m.error, readAt: m.read_at ? Number(m.read_at) : null, prospectStatus: m.prospect_status })) });
   });
 
   // ---------- Tâches ----------

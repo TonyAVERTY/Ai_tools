@@ -198,3 +198,52 @@ test('envoi : une adresse invalide n\'est pas envoyée, marquée « adresse inva
   assert.deepEqual(st, { 'a@mauvais.fr': 'invalid', 'd@yopmail.com': 'invalid', 'c@bon.fr': 'sent' });
   assert.equal((await bounceStats(db, uid, { since: 0 })).bounced, 0, 'une adresse invalide n\'est pas un rejet');
 });
+
+// ---------- Accusés de lecture (alternative au pixel espion) ----------
+
+test('accusé de lecture : en-tête demandé seulement si l\'option est active, aucun pixel ni lien traqué', async () => {
+  const { buildProspectMail } = await import('../src/services/mailer.js');
+  const args = { template: { subject: 'S', body: 'Bonjour {{entreprise}}' }, prospect: { company: 'A', email: 'a@a.fr' }, smtp: { fromEmail: 'moi@x.fr' }, unsubUrl: 'https://p.test/u/a/t' };
+  assert.equal(buildProspectMail(args).headers['Disposition-Notification-To'], undefined, 'désactivé par défaut');
+  const mail = buildProspectMail({ ...args, readReceipt: true });
+  assert.equal(mail.headers['Disposition-Notification-To'], 'moi@x.fr');
+  assert.doesNotMatch(mail.html, /<img/i, 'aucun pixel');
+  assert.deepEqual([...mail.html.matchAll(/href="([^"]+)"/g)].map((m) => m[1]).filter((u) => !u.includes('/u/')), [], 'aucun lien traqué');
+});
+
+test('accusé reçu dans la boîte : le mail passe en « Lu », jamais compté comme réponse ni comme rejet ; page et API', async () => {
+  const { classify } = await import('../src/services/inbox.js');
+  const mdn = { from: 'a@atelier.fr', subject: 'Lu : Bonjour', headers: { 'content-type': 'multipart/report; report-type=disposition-notification; boundary=x', 'auto-submitted': 'auto-replied' }, body: 'Original-Message-ID: <abc.def@x.fr>' };
+  assert.equal(classify(mdn).type, 'receipt');
+  assert.deepEqual(classify(mdn).ids, ['<abc.def@x.fr>']);
+  const db = await testDb();
+  const { addUser } = await import('./helpers/users.js');
+  const uid = await addUser(db, {});
+  const pid = await addProject(db, uid, { gitUrl: 'https://github.com/a/b.git' });
+  const x = Number((await db.prepare("INSERT INTO prospects(project_id, company, email, status, sent_at, created_at) VALUES(?, 'Atelier', 'a@atelier.fr', 'sent', ?, ?)").run(pid, now(), now())).lastInsertRowid);
+  await db.prepare('INSERT INTO mail_log(project_id, prospect_id, email, sent_at, kind, subject, message_id) VALUES(?, ?, ?, ?, ?, ?, ?)').run(pid, x, 'a@atelier.fr', now(), 'initial', 'Bonjour', '<abc.def@x.fr>');
+  const r = await applyMessages(db, pid, [mdn, mdn], { at: now() });
+  assert.equal(r.receipts, 1, 'une seule fois');
+  assert.equal(r.replies + r.bounces, 0);
+  assert.ok((await db.prepare('SELECT read_at FROM mail_log WHERE prospect_id = ?').get(x)).read_at);
+  assert.equal((await db.prepare('SELECT status FROM prospects WHERE id = ?').get(x)).status, 'sent', 'lire n\'est pas répondre');
+  assert.equal((await db.prepare('SELECT COUNT(*) n FROM replies').get()).n, 0);
+  // l'accusé d'un autre projet ne marque rien
+  assert.equal((await applyMessages(db, pid + 99, [mdn], { at: now() })).receipts, 0);
+});
+
+test('page Mails : état « Lu (accusé) », filtre, et mention honnête (minimum, jamais « non lu »)', async () => {
+  const u = await s.newUser();
+  const pid = await addProject(s.db, u.id, { gitUrl: 'https://github.com/u/read.git' });
+  const x = Number((await s.db.prepare("INSERT INTO prospects(project_id, company, email, status, sent_at, created_at) VALUES(?, 'Lecteur', 'l@x.fr', 'sent', ?, ?)").run(pid, now(), now())).lastInsertRowid);
+  await s.db.prepare('INSERT INTO mail_log(project_id, prospect_id, email, sent_at, kind, subject, read_at) VALUES(?, ?, ?, ?, ?, ?, ?)').run(pid, x, 'l@x.fr', now(), 'initial', 'Lu celui-ci', now());
+  await s.db.prepare('INSERT INTO mail_log(project_id, prospect_id, email, sent_at, kind, subject) VALUES(?, ?, ?, ?, ?, ?)').run(pid, x, 'l@x.fr', now(), 'followup', 'Pas d\'accusé');
+  const get = async (p) => (await u.get(p, { headers: { accept: 'text/html' } })).text();
+  const all = await get('/mails');
+  assert.match(all, /Lu \(accusé\)/);
+  assert.match(all, /jamais un « non lu »/);
+  const read = await get('/mails?filter=read');
+  assert.match(read, /Lu celui-ci/);
+  assert.doesNotMatch(read, /Pas d&#39;accusé/);
+  assert.doesNotMatch(await get('/mails?filter=sent'), /Lu celui-ci/, '« Envoyé » exclut ce qui a été lu');
+});
