@@ -46,6 +46,7 @@ const STATIC = {
   '/static/captcha.js': asset('captcha.js', 'text/javascript; charset=utf-8', 3600),
   '/static/chat.js': asset('chat.js', 'text/javascript; charset=utf-8', 3600),
   '/static/fx.js': asset('fx.js', 'text/javascript; charset=utf-8', 3600),
+  '/static/ajax.js': asset('ajax.js', 'text/javascript; charset=utf-8', 3600),
   // Les navigateurs réclament /favicon.ico d'office
   '/favicon.ico': asset('favicon.ico', 'image/x-icon', 86400),
   '/static/site.js': asset('site.js', 'text/javascript; charset=utf-8', 3600),

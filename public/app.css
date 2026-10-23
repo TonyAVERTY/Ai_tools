@@ -823,3 +823,10 @@ input.copy { font-family: var(--mono); font-size: .8125rem; }
 @media (prefers-reduced-motion: reduce) { .jitem.new { animation: none; } }
 /* Page défilée : le menu « Activité » reste visible, épinglé en haut à droite */
 body.hdr-off .jobs { position: fixed; top: 10px; right: 12px; z-index: 60; padding: 3px; background: var(--card); border: 1px solid var(--line-strong); border-radius: 999px; box-shadow: var(--shadow-3); }
+
+/* ---------- Navigation sans rafraîchissement (public/ajax.js) : filet de chargement en haut de page ---------- */
+html.nav-busy { cursor: progress; }
+.nav-bar { position: fixed; top: 0; left: 0; height: 3px; width: 0; z-index: 2000; background: var(--grad); pointer-events: none; opacity: 0; transition: opacity .2s; }
+.nav-bar.on { opacity: 1; animation: nav-run 1.1s ease-in-out infinite; }
+@keyframes nav-run { 0% { left: 0; width: 0; } 50% { left: 15%; width: 60%; } 100% { left: 100%; width: 0; } }
+@media (prefers-reduced-motion: reduce) { .nav-bar.on { animation: none; width: 100%; } }

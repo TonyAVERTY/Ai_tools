@@ -190,7 +190,7 @@
       } catch (err) { showError(err.message); return; }
       del.closest('li').remove();
       none.hidden = list.children.length > 0;
-      if (root.dataset.conv === id) location.href = '/chat';
+      if (root.dataset.conv === id) { if (window.AiNav) window.AiNav.go('/chat'); else location.href = '/chat'; }
     }
   });
 

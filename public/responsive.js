@@ -1,6 +1,7 @@
 // Tableaux sur téléphone : chaque cellule reprend le titre de sa colonne (data-label), pour l'affichage « une carte par ligne »
 // défini dans responsive.css. Sans JavaScript, le tableau défile simplement dans son cadre.
 (() => {
+  window.AiRt?.disconnect(); // relancé après un remplacement de page (public/ajax.js) : l'observateur précédent s'arrête
   const mark = (table) => {
     if (table.dataset.rt) return;
     const heads = [...table.querySelectorAll('thead th')].map((th) => th.textContent.trim());
@@ -23,9 +24,10 @@
   scan();
   // Tableaux fabriqués après coup par app.js (liste des prospects, récap…)
   let queued = false;
-  new MutationObserver(() => {
+  window.AiRt = new MutationObserver(() => {
     if (queued) return;
     queued = true;
     requestAnimationFrame(() => { queued = false; scan(); });
-  }).observe(document.body, { childList: true, subtree: true });
+  });
+  window.AiRt.observe(document.body, { childList: true, subtree: true });
 })();
