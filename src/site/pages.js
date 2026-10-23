@@ -1,14 +1,14 @@
-// Pages publiques du site (rendu serveur ; le seul script est public/site.js, pour le mouvement, plus la vérification anti-robot
-// de la connexion). Les textes sont écrits en mots de tous les jours, pour être lus tels quels par n'importe qui :
+// Pages publiques du site, d'après le design Claude Design (rendu serveur ; scripts : public/site.js pour les tarifs et le
+// sommaire légal, plus la vérification anti-robot de la connexion). Les textes sont écrits en mots de tous les jours :
 // rien ici ne promet un résultat, rien n'est chiffré au-delà de ce que le code fait réellement.
 import { esc } from '../http.js';
 import { brandMark } from '../assets.js';
-import { siteLayout, nextBlock, journey, CONTACT_EMAIL } from './layout.js';
+import { siteLayout, ic, CONTACT_EMAIL } from './layout.js';
 import { PLAN_LIMITS, PLAN_PRICES, PLAN_LABELS, ANNUAL_FREE_MONTHS, annualPrice } from '../limits.js';
 
 const FREE = PLAN_LIMITS.free;
 /** Montant en euros à la française (« 8,33 € ») ; entier sans décimales. */
-const euros = (n) => `${Number.isInteger(n) ? n : n.toFixed(2).replace('.', ',')}\u00a0€`;
+const euros = (n) => `${Number.isInteger(n) ? n : n.toFixed(2).replace('.', ',')} €`;
 const PAID = Object.keys(PLAN_PRICES);
 const PLAN_BLURBS = {
   starter: 'Pour lancer un premier vrai projet.',
@@ -16,14 +16,15 @@ const PLAN_BLURBS = {
   business: 'Pour une activité qui repose sur la prospection.',
   intensive: 'Pour le plus gros volume que le service permet.',
 };
-const limitRows = (l) => `<li><span>Projets</span><strong>${l.projects}</strong></li>
-        <li><span>Contacts</span><strong>${l.prospects.toLocaleString('fr-FR')}</strong></li>
-        <li><span>Mails par mois</span><strong>${l.mails.toLocaleString('fr-FR')}</strong></li>
-        <li><span>Tâches IA par mois</span><strong>${l.aiJobs}</strong></li>
-        <li><span>Places d'équipe</span><strong>${l.seats}</strong></li>`;
+const fr = (n) => n.toLocaleString('fr-FR');
+const limitRows = (l) => [
+  ['Projets', l.projects], ['Contacts', fr(l.prospects)], ['Mails par mois', fr(l.mails)], ['Tâches IA par mois', l.aiJobs], ["Places d'équipe", l.seats],
+].map(([label, v]) => `<li><span>${label}</span><b>${v}</b></li>`).join('\n          ');
 
 /** « Google » ou « Google ou Apple » selon la configuration réelle de la connexion. */
 export const providersText = (apple) => (apple ? 'Google ou Apple' : 'Google');
+
+const btnArrow = (cls, href, label) => `<a class="btn ${cls}" href="${href}">${label}${ic('arrow')}</a>`;
 
 // ---------- Connexion ----------
 // Avec reCAPTCHA (clés configurées), la vérification se fait toute seule : public/captcha.js charge le script de Google
@@ -32,42 +33,42 @@ export const providersText = (apple) => (apple ? 'Google ou Apple' : 'Google');
 function captchaBox(siteKey) {
   return `<div class="captcha" data-captcha data-sitekey="${esc(siteKey)}">
       <p class="fine" role="status" data-captcha-status>Vérification anti-robot en cours, ça prend une seconde…</p>
-      <p><button type="button" class="btn" data-captcha-load hidden>Réessayer la vérification</button></p>
-      <noscript><p class="error">JavaScript est nécessaire pour la vérification anti-robot.</p></noscript>
+      <p><button type="button" class="btn btn-secondary" data-captcha-load hidden>Réessayer la vérification</button></p>
+      <noscript><p class="msg msg-err">JavaScript est nécessaire pour la vérification anti-robot.</p></noscript>
     </div>`;
 }
 
-const loginButtons = ({ apple, captcha }) => (captcha
-  ? `<form method="post" action="/auth/google" data-captcha-form><input type="hidden" name="captcha" value=""><button class="btn primary" disabled>Se connecter avec Google</button></form>
-      ${apple ? '<form method="post" action="/auth/apple" data-captcha-form><input type="hidden" name="captcha" value=""><button class="btn apple" disabled>Se connecter avec Apple</button></form>' : ''}
-      <p class="fine">Ce site est protégé par Google reCAPTCHA, qui vérifie tout seul que tu es bien une personne (<a href="/confidentialite#destinataires">en savoir plus</a>). La <a href="https://policies.google.com/privacy" rel="noopener noreferrer">politique de confidentialité</a> et les <a href="https://policies.google.com/terms" rel="noopener noreferrer">conditions d'utilisation</a> de Google s'appliquent.</p>`
-  : `<a class="btn primary" href="/auth/google">Se connecter avec Google</a>
-      ${apple ? '<a class="btn apple" href="/auth/apple">Se connecter avec Apple</a>' : ''}`);
+const PROVIDERS = [['google', 'G', 'Google'], ['apple', 'A', 'Apple']];
+const loginButtons = ({ apple, captcha }) => PROVIDERS.filter(([k]) => k === 'google' || apple).map(([k, letter, name]) => {
+  const inner = `<span class="brand" aria-hidden="true">${letter}</span>Se connecter avec ${name}`;
+  return captcha
+    ? `<form method="post" action="/auth/${k}" data-captcha-form><input type="hidden" name="captcha" value=""><button class="btn btn-secondary btn-lg btn-block" disabled>${inner}</button></form>`
+    : `<a class="btn btn-secondary btn-lg btn-block" href="/auth/${k}">${inner}</a>`;
+}).join('\n      ');
 
 export function loginPage({ appUrl, error = null, apple = false, bye = false, captcha = null }) {
   return siteLayout({
     appUrl, path: '/login', noindex: true, scripts: captcha ? ['/static/captcha.js'] : [],
     title: 'Connexion · AiTools',
     description: `Connecte-toi à AiTools avec ton compte ${providersText(apple)}. Ton compte est créé à la première connexion, sans mot de passe.`,
-    body: `<div class="wrap auth">
+    body: `<div class="stage-p"><div class="wrap">
+<section class="auth" aria-labelledby="c-h">
+  ${brandMark()}
   <div>
-    <p class="eyebrow"><span class="mark" aria-hidden="true"></span>Connexion</p>
-    <h1>Entre dans ton espace</h1>
-    <p class="lead">Ton compte se crée tout seul la première fois, sans mot de passe. Juste après, tu relies ton accès Claude : sans lui, rien ne peut se lancer.</p>
-    <p class="fine">Tu n'as pas encore de compte ? C'est le même bouton. Le plan gratuit ne demande pas de carte bancaire. Tu veux d'abord comprendre ? Regarde <a href="/fonctionnement">comment ça marche</a> ou <a href="/tarifs">les tarifs</a>.</p>
+    <h1 id="c-h">Connexion</h1>
+    <p class="sub">Choisis le compte avec lequel tu te connectes. Ton compte se crée tout seul la première fois.</p>
   </div>
-  <section class="card" aria-labelledby="connexion-titre">
-    <h2 id="connexion-titre">Continuer avec</h2>
-    ${bye ? '<p class="ok" role="status">Ton compte et toutes ses données ont été supprimés.</p>' : ''}
-    ${error ? `<p class="error" role="alert">${esc(error)}</p>` : ''}
-    ${captcha ? captchaBox(captcha.siteKey) : ''}
-    <div class="login-btns">
+  ${bye ? '<p class="msg msg-ok" role="status">Ton compte et toutes ses données ont été supprimés.</p>' : ''}
+  ${error ? `<p class="msg msg-err" role="alert">${esc(error)}</p>` : ''}
+  ${captcha ? captchaBox(captcha.siteKey) : ''}
+  <div class="auth-b">
       ${loginButtons({ apple, captcha })}
-    </div>
-    <p class="fine">En te connectant, tu acceptes les <a href="/cgu">conditions d'utilisation</a> et tu reconnais avoir pris connaissance de la <a href="/confidentialite">politique de confidentialité</a>.</p>
-  </section>
-</div>
-${nextBlock(journey('how', 'pricing', 'home'), 'Pas encore sûr ?')}`,
+  </div>
+  <p class="safe">${ic('shield')}Aucun mot de passe à créer ni à retenir.</p>
+  ${captcha ? `<p class="fine">Ce site est protégé par Google reCAPTCHA, qui vérifie tout seul que tu es bien une personne (<a href="/confidentialite#destinataires">en savoir plus</a>). La <a href="https://policies.google.com/privacy" rel="noopener noreferrer">politique de confidentialité</a> et les <a href="https://policies.google.com/terms" rel="noopener noreferrer">conditions d'utilisation</a> de Google s'appliquent.</p>` : ''}
+  <p class="fine">En continuant, tu acceptes les <a href="/cgu">CGU</a> et la <a href="/confidentialite">politique de confidentialité</a>. Tu veux d'abord comprendre ? Regarde <a href="/fonctionnement">comment ça marche</a> ou <a href="/tarifs">les tarifs</a>.</p>
+</section>
+</div></div>`,
   });
 }
 
@@ -77,16 +78,15 @@ export function notFoundPage({ appUrl }) {
     appUrl, path: '/404', noindex: true,
     title: 'Page introuvable · AiTools',
     description: "Cette page n'existe pas ou a changé d'adresse.",
-    body: `<div class="wrap page-head">
-  <p class="eyebrow"><span class="mark" aria-hidden="true"></span>Erreur 404</p>
-  <h1>Cette page n'existe pas</h1>
-  <p class="lead">L'adresse est peut-être mal saisie, ou la page a changé de place. Voici où aller ensuite.</p>
-  <div class="cta-row">
-    <a class="btn primary" href="/">Retour à l'accueil</a>
-    <a class="textlink" href="/fonctionnement">Voir le fonctionnement</a>
-    <a class="textlink" href="/tarifs">Voir les tarifs</a>
-  </div>
-</div>`,
+    body: `<div class="stage-p"><div class="wrap">
+<section class="nf" aria-labelledby="n-h">
+  <p class="code">Erreur 404</p>
+  <svg class="rib" aria-hidden="true" focusable="false" viewBox="0 0 160 24"><path d="M8 16 C40 2 70 26 100 12 S140 8 152 6" fill="none" stroke="url(#g-nf)" stroke-width="10" stroke-linecap="round"></path></svg>
+  <h1 id="n-h">Cette page n'existe pas</h1>
+  <p>Le lien est peut-être cassé, ou la page a été déplacée.</p>
+  <div class="btns"><a class="btn btn-primary btn-lg" href="/">${ic('back')}Retour à l'accueil</a></div>
+</section>
+</div></div>`,
   });
 }
 
@@ -107,68 +107,51 @@ const HOME_JSON_LD = (appUrl) => ({
   publisher: { '@type': 'Person', name: 'Tony AVERTY' },
 });
 
-// Maquette du tableau de bord : les vrais composants (.card, .badge, .running, .bar, table), des données d'exemple.
-// La barre avance et une alerte « réponse » apparaît en boucle (CSS seul, coupé si on réduit les animations).
-const MOCKUP = `<figure class="shot">
-  <div class="mock" role="img" aria-label="Aperçu du tableau de bord : un projet dont la cible est validée, une recherche de contacts en cours et trois contacts avec leur statut">
-    <div class="mock-top"><span class="brand">${brandMark()}AiTools</span><span class="push">Mon compte · Réglages</span></div>
-    <div class="card">
-      <div class="mock-name"><span>Atelier Exemple</span><span class="badge ok">cible validée</span></div>
-      <p class="mock-sub">Fiche du projet écrite à partir de ton code</p>
-      <div class="running"><div>
-        <div class="run-head"><span>Recherche de contacts</span><span class="jpct">en cours</span></div>
-        <p class="mock-sub">Dernier trouvé : Menuiserie Exemple</p>
-        <div class="bar"><span class="w-60 grow"></span></div>
-      </div></div>
-    </div>
-    <div class="card">
-      <div class="table-wrap"><table>
-        <thead><tr><th>Entreprise</th><th class="col-city">Ville</th><th>Note</th><th>Où ça en est</th></tr></thead>
-        <tbody>
-          <tr><td>Menuiserie Exemple</td><td class="col-city">Lyon</td><td>8</td><td class="st-new">À contacter</td></tr>
-          <tr><td>Garage Exemple</td><td class="col-city">Nantes</td><td>7</td><td class="st-replied">A répondu</td></tr>
-          <tr><td>Cabinet Exemple</td><td class="col-city">Lille</td><td>6</td><td>Contacté</td></tr>
-        </tbody>
-      </table></div>
-    </div>
-    <span class="btn small primary">Lancer la recherche</span> <span class="btn small">Modèle de mail</span>
-    <span class="ping" aria-hidden="true">Nouvelle réponse : Garage Exemple</span>
-  </div>
-  <figcaption class="fine">Ton tableau de bord, avec des exemples.</figcaption>
-</figure>`;
+const badge = (cls, icon, text) => `<span class="badge${cls ? ` ${cls}` : ''}">${icon ? ic(icon) : ''}${text}</span>`;
 
-// Galerie d'écrans (images de public/img) : chaque écran renvoie vers l'étape correspondante de « Fonctionnement »
-const SCREENS = [
-  ['ecran-projet', "Il lit ton projet", "Claude regarde ton code et écrit une fiche : ce que tu proposes, et à qui.", '/fonctionnement#etape-2', "Ton projet, lu en quelques minutes"],
-  ['ecran-cible', "Tu choisis la cible", "Qui, où, combien : rien ne démarre sans ton feu vert.", '/fonctionnement#etape-3', "La cible, c'est toi qui décides"],
-  ['ecran-prospects', "Il trouve des contacts", "Des entreprises avec une adresse pro publiée, une note et la page d'où elle vient.", '/fonctionnement#etape-4', "Des contacts trouvés pour toi"],
-  ['ecran-mail', "Il écrit les mails", "Un modèle que tu relis, que tu corriges, puis que tu valides.", '/fonctionnement#etape-5', "Un mail écrit, que tu relis"],
-  ['ecran-reponses', "Tu suis les réponses", "Qui a répondu, qui relancer, quoi faire ensuite : tout au même endroit.", '/fonctionnement#etape-7', "Les réponses, au même endroit"],
-];
-const gallery = () => `<section class="wrap block gallery-block" aria-labelledby="titre-galerie">
-  <div class="gallery-head" data-reveal>
-    <h2 id="titre-galerie">Un coup d'œil, écran par écran</h2>
-    <p class="lead">Voilà à quoi ça ressemble, de ton projet jusqu'à la réponse de ton futur client.</p>
-  </div>
-  <div class="gallery" data-gallery>
-    <ul class="track" data-track aria-label="Les écrans d'AiTools">
-      ${SCREENS.map(([img, title, text, href, alt], i) => `<li class="slide" data-slide>
-        <a class="slide-link" href="${href}">
-          <span class="slide-n">${i + 1}</span>
-          <h3>${esc(title)}</h3>
-          <p>${esc(text)}</p>
-          <img src="/static/img/${img}.svg" alt="${esc(alt)}" width="300" height="560" loading="lazy">
-          <span class="slide-more">Voir cette étape</span>
-        </a>
-      </li>`).join('\n      ')}
-    </ul>
-    <div class="gallery-ctl">
-      <button type="button" class="ctl" data-prev aria-label="Écran précédent">&larr;</button>
-      <span class="dots">${SCREENS.map((s, i) => `<button type="button" class="dot" data-dot aria-label="Écran ${i + 1}" aria-current="${i === 0}"></button>`).join('')}</span>
-      <button type="button" class="ctl" data-next aria-label="Écran suivant">&rarr;</button>
+// Maquette du tableau de bord : données d'exemple, clairement signalées comme telles
+const HERO_MOCK = `<div class="art-hero">
+  <svg class="ribbon" aria-hidden="true" focusable="false" viewBox="0 0 800 460" preserveAspectRatio="none"><path d="M-30 400 C140 470 230 130 420 210 S690 400 840 70" fill="none" stroke="url(#g-hero)" stroke-width="26" stroke-linecap="round"></path></svg>
+  <div class="mock" role="img" aria-label="Maquette du tableau de bord : projet Atelier Exemple, cible validée, recherche de contacts à 64 %, trois contacts avec leurs statuts">
+    <div class="mock-h">
+      <div><p class="mock-t">Atelier Exemple</p><p class="mock-s">Menuiserie · Bretagne</p></div>
+      ${badge('b-ok', 'check', 'Cible validée')}
+    </div>
+    <div>
+      <div class="prog-h"><span>Recherche de contacts</span><span>64 %</span></div>
+      <div class="track"><div class="bar"></div></div>
+    </div>
+    <div class="tw">
+      <table>
+        <thead><tr><th scope="col">Contact</th><th scope="col">Statut</th></tr></thead>
+        <tbody>
+          <tr><td>Boulangerie Exemple<span class="td-s">Rennes</span></td><td>${badge('b-info', 'mail', 'À contacter')}</td></tr>
+          <tr><td>Cabinet Exemple<span class="td-s">Vannes</span></td><td>${badge('b-warn', 'clock', 'Contacté')}</td></tr>
+          <tr><td>Garage Exemple<span class="td-s">Lorient</span></td><td>${badge('b-ok', 'reply', 'A répondu')}</td></tr>
+        </tbody>
+      </table>
     </div>
   </div>
-</section>`;
+</div>`;
+
+const BENEFITS = [
+  ['mail', 'Prospection par mail avec ton propre Claude', 'Il trouve des entreprises qui te correspondent et prépare chaque mail.'],
+  ['reply', 'Relance automatique dans le même fil', "Pas de réponse ? Si tu l'as activée, une seule relance arrive dans la même conversation."],
+  ['eye', 'Suivi des réponses', "Tu vois en un coup d'œil qui a répondu, qui attend, qui reste à contacter."],
+  ['pen', 'Posts LinkedIn écrits par Claude', 'Il rédige, tu relis et tu publies quand ça te va.'],
+];
+const STEPS = [
+  ['Relie ton accès Claude', "Tu connectes ta propre clé Anthropic ou ton abonnement Claude. C'est ton accès qui travaille, pas celui d'AiTools."],
+  ['Ajoute ton dépôt Git', 'GitHub ou ton propre serveur : Claude lit ton projet pour comprendre ce que tu proposes.'],
+  ['Valide la cible', "Il te dit à qui il pense parler. Tu corriges, puis tu valides."],
+  ['Lance la recherche', "Il trouve les contacts et écrit les mails. Tu les relis et tu confirmes l'envoi."],
+];
+const TRUST = (apple) => [
+  ['shield', 'Rien ne part sans ton accord', "Le premier envoi attend ta confirmation, chaque post attend ton clic. La relance, c'est toi qui l'actives."],
+  ['box', 'Tes données restent cloisonnées par compte', "Personne d'autre ne voit tes prospects ni tes brouillons. Un clic dans Mon compte et tout est effacé."],
+  ['lock', 'Tes secrets sont chiffrés', 'Tes accès sont stockés chiffrés, jamais en clair.'],
+  ['user', 'Aucun mot de passe', `Tu te connectes avec ${providersText(apple)}.`],
+];
 
 export function homePage({ appUrl, apple = false }) {
   return siteLayout({
@@ -176,318 +159,269 @@ export function homePage({ appUrl, apple = false }) {
     title: 'AiTools : trouve des clients par mail avec ton propre Claude',
     description: 'AiTools lit ton projet, trouve des entreprises qui pourraient avoir besoin de toi, écrit et envoie tes mails, relance et suit les réponses. Gratuit pour commencer.',
     jsonLd: HOME_JSON_LD(appUrl),
-    body: `<div class="hero-bg">
-<span class="blob b1" aria-hidden="true"></span><span class="blob b2" aria-hidden="true"></span>
-<section class="wrap hero" aria-labelledby="titre-accueil">
-  <div class="hero-text">
-    <p class="eyebrow"><span class="mark" aria-hidden="true"></span>Trouver des clients par mail</p>
-    <h1 id="titre-accueil">Trouve de nouveaux clients, <span class="rot" data-rotate="sans y passer tes soirées|sans te prendre la tête|sans rien oublier|sans partir de zéro">sans y passer tes soirées</span></h1>
-    <p class="lead">AiTools lit ton projet, cherche des entreprises qui pourraient avoir besoin de toi, écrit les mails et les envoie depuis ta propre boîte mail. Toi, tu choisis qui contacter, tu relis, et tu décides combien de mails partent.</p>
-    <div class="cta-row">
-      <a class="btn primary" href="/login">Créer mon compte</a>
-      <a class="textlink" href="/fonctionnement">Voir comment ça marche</a>
-    </div>
-    <p class="fine">Gratuit pour commencer, sans carte bancaire (<a href="/tarifs">voir les tarifs</a>). Tu te connectes avec ${providersText(apple)}, sans mot de passe.</p>
-  </div>
-  ${MOCKUP}
-</section>
-</div>
-
-<div class="rule" aria-hidden="true"></div>
-
-<section class="wrap block counters" aria-label="Le plan gratuit en chiffres">
-  <ul class="count-row">
-    <li data-reveal><strong data-count="${FREE.projects}">${FREE.projects}</strong><span>projet</span></li>
-    <li data-reveal><strong data-count="${FREE.prospects}">${FREE.prospects}</strong><span>contacts</span></li>
-    <li data-reveal><strong data-count="${FREE.mails}">${FREE.mails}</strong><span>mails par mois</span></li>
-    <li data-reveal><strong data-count="${FREE.aiJobs}">${FREE.aiJobs}</strong><span>tâches IA par mois</span></li>
-  </ul>
-  <p class="fine center" data-reveal>Ce que tu as sans payer, tous les mois. <a href="/tarifs">Tous les détails sur la page Tarifs.</a></p>
-</section>
-
-${gallery()}
-
-<div class="rule" aria-hidden="true"></div>
-
-<section class="wrap block" aria-labelledby="titre-regles">
-  <div class="split">
-    <div class="sticky" data-reveal>
-      <h2 id="titre-regles">C'est toi qui tiens les commandes</h2>
-      <p>AiTools fait le gros du travail. Ton accès à Claude et ta boîte mail restent les tiens.</p>
-    </div>
-    <ul class="facts">
-      <li data-reveal>
-        <h3>Ton accès à Claude</h3>
-        <p>Tu branches ta propre clé Anthropic, ou ton abonnement Claude en un clic (avec un risque à connaître, expliqué sur la page <a href="/tarifs#acces-claude">Tarifs</a>). AiTools ne te revend rien.</p>
-      </li>
-      <li data-reveal>
-        <h3>Ta boîte mail</h3>
-        <p>Les mails partent de ton adresse, depuis ta messagerie. Les réponses arrivent dans ta boîte, comme d'habitude, et AiTools les repère pour toi.</p>
-      </li>
-      <li data-reveal>
-        <h3>Tes règles</h3>
-        <p>On écrit à des professionnels, jamais à des particuliers. Chaque mail a un lien pour ne plus en recevoir, et ce choix est toujours respecté. <a href="/fonctionnement#envois">Voir comment les envois sont encadrés.</a></p>
-      </li>
-      <li data-reveal>
-        <h3>Tes données</h3>
-        <p>Chaque compte est séparé des autres. Un clic dans Mon compte et tout est effacé. <a href="/confidentialite">Lire la politique de confidentialité.</a></p>
-      </li>
-    </ul>
-  </div>
-</section>
-
-<section class="wrap block" aria-labelledby="titre-etapes">
-  <h2 id="titre-etapes" data-reveal>De ton projet à la réponse du client</h2>
-  <ol class="steps compact">
-    <li data-reveal><h3>Il lit ton projet</h3><p>Claude parcourt ton code sans rien modifier, puis écrit une fiche : ce que tu fais, pour qui, et pourquoi c'est utile.</p></li>
-    <li data-reveal><h3>Tu choisis la cible</h3><p>Quels métiers, quelle région, quelle taille d'entreprise. Rien ne démarre tant que tu n'as pas dit oui.</p></li>
-    <li data-reveal><h3>Il cherche des contacts</h3><p>Des adresses pro publiées sur le web, avec la page d'où elles viennent et une note de pertinence.</p></li>
-    <li data-reveal><h3>Il écrit les mails</h3><p>Un mail, une variante pour tester, une relance. Tu corriges ce que tu veux, puis tu valides.</p></li>
-    <li data-reveal><h3>Il envoie sans se presser</h3><p>Par petits lots, à la vitesse que tu fixes, avec une pause entre chaque mail pour rester naturel.</p></li>
-    <li data-reveal><h3>Il suit les réponses</h3><p>Qui a répondu, qui relancer, quoi noter. Tu gardes une fiche par contact.</p></li>
-  </ol>
-  <p data-reveal><a class="textlink" href="/fonctionnement">Voir chaque étape en détail</a></p>
-</section>
-
-<section class="wrap block" aria-labelledby="titre-limites">
-  <h2 id="titre-limites" data-reveal>Ce qu'AiTools ne fait pas</h2>
-  <div class="statement">
-    <p data-reveal>Il ne promet aucune réponse : un bon mail reste un mail envoyé à quelqu'un qui n'a rien demandé.</p>
-    <p data-reveal>Il demande à Claude de ne garder que des adresses pro publiées au grand jour, sans jamais les deviner. Claude peut quand même se tromper : relis les fiches avant d'envoyer.</p>
-    <p data-reveal>Il n'écrit pas aux particuliers, et il n'envoie rien dans ton dos : les premiers mails partent quand tu confirmes, la relance quand tu l'actives.</p>
-  </div>
-</section>
-
-<div class="rule" aria-hidden="true"></div>
-
-<section class="wrap block" aria-labelledby="titre-fin">
-  <div class="closing" data-reveal>
+    body: `<section class="hero" aria-labelledby="h1">
+  <div class="wrap hero-in">
     <div>
-      <h2 id="titre-fin">Commence avec le plan gratuit</h2>
-      <p>${FREE.projects} projet, ${FREE.prospects} contacts, ${FREE.mails} mails et ${FREE.aiJobs} tâches IA par mois. Des offres de ${euros(PLAN_PRICES.starter)} à ${euros(PLAN_PRICES.intensive)} TTC par mois arrivent, avec ${ANNUAL_FREE_MONTHS} mois offerts en annuel : <a href="/tarifs">tout est expliqué sur la page Tarifs</a>.</p>
+      <span class="eyebrow">${ic('check')}Tu valides avant le premier envoi</span>
+      <h1 class="h1" id="h1">Trouve de nouveaux clients, sans y passer tes soirées</h1>
+      <p class="lead">Claude cherche des entreprises, écrit les mails et suit les réponses pendant que toi, tu valides. Les mails partent de ta propre boîte.</p>
+      <div class="hero-btns">
+        ${btnArrow('btn-primary btn-lg', '/login', 'Créer mon compte')}
+        <a class="btn btn-secondary btn-lg" href="/fonctionnement">${ic('down')}Voir comment ça marche</a>
+      </div>
+      <p class="hero-note">Gratuit pour commencer, sans carte bancaire. Connexion avec ${providersText(apple)}.</p>
     </div>
-    <a class="btn primary" href="/login">Créer mon compte</a>
+    ${HERO_MOCK}
   </div>
 </section>
 
-${nextBlock(journey('how', 'pricing', 'login'))}`,
+<section class="sec sec-alt" aria-labelledby="h-b">
+  <div class="wrap">
+    <h2 class="h2" id="h-b">Ce que Claude fait pour toi</h2>
+    <div class="grid g4">
+      ${BENEFITS.map(([i, t, p]) => `<article class="card"><span class="card-i">${ic(i)}</span><h3>${esc(t)}</h3><p>${esc(p)}</p></article>`).join('\n      ')}
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="etapes" aria-labelledby="h-e">
+  <div class="wrap">
+    <h2 class="h2" id="h-e">Comment ça marche</h2>
+    <p class="sec-lead">Quatre étapes, et la main reste chez toi du début à la fin.</p>
+    <ol class="steps">
+      ${STEPS.map(([t, p], i) => `<li><span class="num">${i + 1}</span><h3>${esc(t)}</h3><p>${esc(p)}</p></li>`).join('\n      ')}
+    </ol>
+    <a class="lnk" href="/fonctionnement">Voir chaque étape en détail${ic('arrow')}</a>
+  </div>
+</section>
+
+<section class="sec sec-alt" aria-labelledby="h-c">
+  <div class="wrap">
+    <h2 class="h2" id="h-c">Tu gardes la main</h2>
+    <p class="sec-lead">Rien ne part dans ton dos. Claude peut se tromper : relis les fiches avant d'envoyer, et n'écris qu'à des professionnels.</p>
+    <div class="trust">
+      ${TRUST(apple).map(([i, t, p]) => `<div class="tr"><span class="card-i">${ic(i)}</span><div><h3>${esc(t)}</h3><p>${esc(p)}</p></div></div>`).join('\n      ')}
+    </div>
+    <a class="lnk" href="/fonctionnement#envois">Voir comment les envois sont encadrés${ic('arrow')}</a>
+  </div>
+</section>
+
+<section class="sec" id="tarifs" aria-labelledby="h-t">
+  <div class="wrap">
+    <h2 class="h2" id="h-t">Des tarifs simples</h2>
+    <p class="sec-lead">Tu commences gratuitement, tu passes à un plan payant quand ça te rapporte.</p>
+    <div class="price-g">
+      <article class="card"><div class="ph"><h3>Gratuit</h3>${badge('b-ok', 'check', 'Disponible')}</div><p class="price">0 €</p>
+        <ul class="list"><li>${ic('check')}${FREE.projects} projet, ${fr(FREE.prospects)} contacts, ${fr(FREE.mails)} mails et ${FREE.aiJobs} tâches IA par mois</li><li>${ic('check')}Sans carte bancaire, sans limite de durée</li></ul></article>
+      <article class="card"><div class="ph"><h3>Plans payants</h3>${badge('', 'clock', 'Bientôt')}</div><p class="price">${PLAN_PRICES.starter} à ${PLAN_PRICES.intensive} € <small>TTC par mois</small></p>
+        <ul class="list"><li>${ic('check')}${['Un', 'Deux', 'Trois', 'Quatre', 'Cinq', 'Six'][PAID.length - 1] ?? PAID.length} plans, de ${PLAN_LABELS[PAID[0]]} à ${PLAN_LABELS[PAID.at(-1)]}</li><li>${ic('check')}En annuel, ${ANNUAL_FREE_MONTHS} mois offerts</li></ul></article>
+    </div>
+    <p class="price-n">Ton accès à Claude est facturé à part, par Anthropic : AiTools n'achète pas de Claude à ta place.</p>
+    <a class="lnk" href="/tarifs">Voir tous les tarifs${ic('arrow')}</a>
+  </div>
+</section>
+
+<div class="wrap">
+  <section class="cta" aria-labelledby="h-f">
+    <div><h2 id="h-f">Prêt à remplir ton agenda ?</h2><p>Crée ton compte en une minute, avec ${providersText(apple)}.</p></div>
+    ${btnArrow('btn-primary btn-lg', '/login', 'Créer mon compte')}
+  </section>
+</div>`,
   });
 }
 
 // ---------- Fonctionnement ----------
+const shot = (label, inner) => `<div class="shot" role="img" aria-label="${esc(label)}">${inner}</div>`;
+const how = ({ icon, title, tip, rev = false, n, text, mock }) => `<section class="stp${rev ? ' rev' : ''}" id="etape-${n}" aria-labelledby="e${n}">
+  <div class="stp-t">
+    <span class="num">${n}</span>
+    <h2 id="e${n}">${esc(title)}</h2>
+    ${text}
+    ${tip ? `<p class="tip">${ic(icon)}${esc(tip)}</p>` : ''}
+  </div>
+  ${mock}
+</section>`;
+
 export function howPage({ appUrl, apple = false }) {
+  const steps = [
+    how({
+      n: 1, icon: 'lock', tip: 'Tes accès sont stockés chiffrés.', title: 'Relie ton accès Claude',
+      text: `<p>Tu te connectes avec ${providersText(apple)}, puis tu relies ton propre accès à Claude : une clé Anthropic, ou ton abonnement Claude (avec un risque à connaître, expliqué sur la page <a href="/tarifs#acces-claude">Tarifs</a>). C'est lui qui cherche, écrit et suit les réponses. Son coût est facturé à part, par Anthropic.</p>`,
+      mock: shot('Maquette : accès Claude connecté, secret chiffré', `<div class="sh-h"><span class="sh-t">Accès Claude</span>${badge('b-ok', 'check', 'Connecté')}</div>
+    <div class="row"><span class="row-l"><span class="ico">${ic('link')}</span><span><b>Ton compte Claude</b><span class="sh-s"> · facturé par Anthropic</span></span></span></div>
+    <div class="row"><span class="row-l"><span class="ico">${ic('lock')}</span><span><b>Secret chiffré</b></span></span>${badge('b-info', '', 'Cloisonné par compte')}</div>`),
+    }),
+    how({
+      n: 2, rev: true, title: 'Ajoute ton dépôt Git',
+      text: `<p>GitHub, ou ton propre serveur (Forgejo, Gitea, GitLab) ajouté dans les réglages. Si le dépôt est privé, tu donnes un token en lecture seule. Claude lit le README, les fichiers de description et les pages principales (une quinzaine de fichiers au plus), sans rien modifier, dans un espace isolé. Il en sort une fiche : ce que tu proposes, à qui, et pourquoi.</p>`,
+      mock: shot('Maquette : choix entre GitHub et mon serveur, champ adresse du dépôt', `<div class="sh-h"><span class="sh-t">Ton dépôt</span>${badge('', '', 'Étape 2 sur 4')}</div>
+    <div class="opts"><span class="opt opt-on">${ic('git')}GitHub<span>Sélectionné</span></span><span class="opt">${ic('git')}Mon serveur<span>Adresse Git</span></span></div>
+    <div><p class="lbl">Adresse du dépôt</p><span class="fld">github.com/ton-compte/ton-projet</span></div>`),
+    }),
+    how({
+      n: 3, title: 'Valide la cible',
+      text: `<p>Claude te dit à qui il pense parler : des métiers, une zone, une taille d'entreprise, la personne à contacter. Tu corriges ce qui ne va pas, puis tu valides. Tant que tu n'as pas cliqué sur « Valider la cible », la recherche reste verrouillée.</p>`,
+      mock: shot('Maquette : cible proposée par Claude, à valider', `<div class="sh-h"><span class="sh-t">Atelier Exemple</span>${badge('b-warn', 'clock', 'Cible à valider')}</div>
+    <p class="sh-s">Cible proposée par Claude</p>
+    <div class="chips"><span class="chip">Menuisiers</span><span class="chip">Artisans du bâtiment</span><span class="chip">Bretagne</span></div>
+    <div class="btns"><span class="btn btn-secondary">Modifier</span><span class="btn btn-primary">${ic('check')}Valider la cible</span></div>`),
+    }),
+    how({
+      n: 4, rev: true, title: 'Lance la recherche, valide les mails',
+      text: `<p>Claude trouve de 1 à 50 contacts à la fois, tout de suite ou « cette nuit ». Il doit ne garder que des adresses pro publiées au grand jour, sans jamais les deviner, et noter la page d'où elles viennent. Il peut se tromper : relis les fiches.</p>
+    <p>Il écrit ensuite un mail court, un deuxième objet pour comparer, et une relance. Tu relis, tu ajustes, tu valides, puis tu confirmes chaque lot (100 mails au plus), envoyé depuis ta boîte avec une pause au hasard entre deux mails. La relance est facultative, il n'y en a qu'une. Les réponses se suivent dans le tableau de bord.</p>`,
+      mock: shot('Maquette : recherche de contacts à 64 %, brouillon de mail à valider', `<div class="sh-h"><span class="sh-t">Atelier Exemple</span>${badge('b-ok', 'check', 'Cible validée')}</div>
+    <div><div class="prog-h"><span>Recherche de contacts</span><span>64 %</span></div><div class="track"><div class="bar"></div></div></div>
+    <div class="mail"><span class="mail-s">Objet : une idée pour ton atelier</span><span class="mail-p">Bonjour, j'ai vu votre atelier à Vannes…</span></div>
+    <div class="btns"><span class="btn btn-secondary">Relire</span><span class="btn btn-primary">${ic('send')}Valider l'envoi</span></div>`),
+    }),
+  ].join('\n\n');
+
+  const guards = [
+    ['Un budget que tu fixes', "Tu peux limiter la dépense en IA sur 24 heures et sur 30 jours. Quand la limite est atteinte, les tâches IA attendent (elles ne sont pas perdues) et les envois continuent. Une tâche déjà commencée n'est jamais coupée."],
+    ['Un œil sur ton quota', "Avec un abonnement, la barre du haut montre le quota restant que Claude indique lui-même. Au-delà de 85 %, l'analyse et les idées d'évolution sont reportées pour garder de la marge à la recherche de contacts."],
+    ['Des envois encadrés', "Pas de particuliers, un lien de désinscription dans chaque mail, une liste d'opposition respectée pour tout le monde, des plafonds sur 24 heures par projet et pour tout ton compte. Les règles qui t'incombent sont rappelées sur la page <a href=\"/tarifs#envois\">Tarifs</a>."],
+    ['Des modèles économes au départ', 'La recherche et l\'analyse utilisent Haiku par défaut (le plus léger). Tu passes à Sonnet dans les réglages si les fiches manquent de précision.'],
+  ];
+
   return siteLayout({
     appUrl, path: '/fonctionnement',
     title: 'Comment ça marche : de ton projet aux réponses · AiTools',
     description: "Comment AiTools lit ton projet, trouve des contacts, écrit et envoie les mails, relance et suit les réponses : étape par étape, avec ce qu'il ne sait pas faire.",
-    body: `<div class="wrap page-head">
-  <p class="eyebrow"><span class="mark" aria-hidden="true"></span>Fonctionnement</p>
-  <h1>Comment ça marche, vraiment</h1>
-  <p class="lead">Sept étapes, dans cet ordre. Pour chacune : ce que fait l'outil, ce que tu décides, et ce qu'il ne sait pas faire. Pour voir des images d'abord, passe par <a href="/#titre-galerie">la galerie de l'accueil</a>.</p>
+    body: `<div class="page">
+<div class="wrap">
+  <h1 class="h1">Comment ça marche, pas à pas</h1>
+  <p class="lead">Quatre étapes. À chacune, tu vois ce que Claude prépare, et rien ne part sans ton accord.</p>
+
+${steps}
+
+  <section class="guard" id="envois" aria-labelledby="h-g">
+    <h2 class="h2 block-h" id="h-g">Pour ne pas te faire déborder</h2>
+    <div class="grid g2">
+      ${guards.map(([t, p]) => `<article class="card"><h3>${esc(t)}</h3><p>${p}</p></article>`).join('\n      ')}
+    </div>
+  </section>
+
+  <section class="cta" aria-labelledby="h-f">
+    <div><h2 id="h-f">Prêt à essayer ?</h2><p>Le plan Gratuit te laisse tout tester, sans carte bancaire.</p></div>
+    <div class="cta-b">${btnArrow('btn-primary btn-lg', '/login', 'Créer mon compte')}<a class="btn btn-secondary btn-lg" href="/tarifs">Voir les tarifs</a></div>
+  </section>
 </div>
-
-<div class="rule" aria-hidden="true"></div>
-
-<section class="wrap block" aria-label="Les étapes">
-  <ol class="steps">
-    <li id="etape-1" data-reveal>
-      <h2>Tu relies ton accès à Claude</h2>
-      <p>Tu te connectes avec ${providersText(apple)}, puis AiTools te demande ton propre accès à Claude. Tant que ce n'est pas fait, tu peux gérer ton compte, mais rien ne se lance.</p>
-      <ul>
-        <li>Soit une clé Anthropic (un code secret que tu crées sur ton compte Anthropic). Elle est vérifiée sans rien consommer, rangée sous clé, et on ne réaffiche que ses 4 derniers caractères.</li>
-        <li>Soit ton abonnement Claude : tu cliques sur « Se connecter avec Claude », tu te connectes sur le site de Claude, tu recopies le petit code qu'il affiche, et AiTools récupère le jeton tout seul. Ça comporte un risque, détaillé sur la page <a href="/tarifs#acces-claude">Tarifs</a>.</li>
-      </ul>
-    </li>
-    <li id="etape-2" data-reveal>
-      <h2>Tu ajoutes un projet</h2>
-      <p>Un projet, c'est l'adresse de ton code sur Git (l'endroit où il est rangé), sur le Forgejo que tu indiques dans les réglages. Si c'est privé, tu fournis un code d'accès en lecture seule. AiTools en fait une copie sur le serveur et Claude la lit : le README, les fichiers de description, les pages principales, une quinzaine de fichiers au plus.</p>
-      <p>Il en sort une fiche : ce que fait ton produit, ce qu'il apporte, les arguments qui comptent, et une cible conseillée. Ça ne se fait qu'une fois, puis quand tu le demandes. Chaque tâche IA tourne dans un espace isolé qui ne voit que la copie de ton projet.</p>
-    </li>
-    <li id="etape-3" data-reveal>
-      <h2>Tu valides la cible</h2>
-      <p>La fiche propose une cible : une description, des métiers, une zone, une taille d'entreprise, la personne à contacter, des recherches à faire. Tu corriges ce qui ne va pas. Tant que tu n'as pas cliqué sur « Valider la cible », la recherche reste verrouillée.</p>
-    </li>
-    <li id="etape-4" data-reveal>
-      <h2>Il cherche des contacts</h2>
-      <p>Tu demandes de 1 à 50 contacts, tout de suite ou « cette nuit » (entre 1 h et 6 h, heure de Paris). Claude cherche sur le web. Il doit ne garder que des adresses pro publiées au grand jour, sans jamais les deviner, et noter la page exacte où il les a vues.</p>
-      <p>Chaque fiche contient l'entreprise, l'adresse mail, le site, la ville, le métier, une phrase d'accroche écrite d'après leur site, la source et une note de 1 à 10. Les adresses de la liste d'opposition sont écartées. Tu peux aussi importer ta propre liste (un fichier CSV de 2 000 lignes au plus).</p>
-      <p><strong>Ce qu'il ne sait pas faire :</strong> Claude peut se tromper d'adresse ou mal juger une entreprise. Relis les fiches.</p>
-    </li>
-    <li id="etape-5" data-reveal>
-      <h2>Il écrit les mails</h2>
-      <p>Claude propose un premier mail court, un deuxième objet pour comparer lequel marche le mieux (les envois alternent entre les deux), et un mail de relance. Tu modifies, tu enregistres, puis tu valides. Des mots-clés comme <code>{{entreprise}}</code>, <code>{{ville}}</code> et <code>{{accroche}}</code> personnalisent chaque mail.</p>
-      <p>Le lien pour ne plus recevoir de mails, et la mention d'où vient l'adresse, sont ajoutés tout seuls à chaque envoi.</p>
-    </li>
-    <li id="etape-6" data-reveal>
-      <h2>Il envoie, sans se presser</h2>
-      <p>Tu choisis la taille de chaque lot (100 mails au plus) et tu confirmes. Les mails partent depuis ta messagerie, avec une pause au hasard entre deux envois (20 à 60 secondes au départ). Il y a des plafonds sur 24 heures : par projet (réglable, 200 au plus) et pour tout ton compte (réglable, 300 au plus). Un contact n'est écrit qu'une seule fois.</p>
-      <p><strong>Ce qu'il ne sait pas faire :</strong> protéger la réputation de ton adresse d'envoi. Ça dépend de ton nom de domaine, et il vaut mieux commencer par de petits lots.</p>
-    </li>
-    <li id="etape-7" data-reveal>
-      <h2>Il suit les réponses, et relance une fois</h2>
-      <p>Si tu renseignes ta boîte de réception, AiTools la consulte toutes les 15 minutes. Une réponse passe le contact en « A répondu ». Les réponses automatiques (absence, vacances) sont ignorées. Un mail qui revient en erreur passe le contact en « Rejeté » et l'adresse part dans la liste d'opposition.</p>
-      <p>La relance est facultative : tu l'actives, et il n'y en a qu'une, après le nombre de jours que tu choisis (7 au départ), dans la même conversation. Elle part seulement aux heures de bureau (du lundi au vendredi, de 9 h à 18 h, heure de Paris), si ta boîte a été consultée dans les deux dernières heures, et dans la limite des plafonds.</p>
-      <p>Chaque contact a sa fiche : l'historique des mails, une prochaine action avec une date, des notes. Tu peux filtrer et exporter en CSV. Le récap affiche tes envois et tes réponses semaine par semaine.</p>
-    </li>
-  </ol>
-  <p class="fine" data-reveal>En plus : un rapport par mail chaque semaine, des alertes sur Discord, et un bouton « Évolution » qui t'envoie par mail des idées d'améliorations tirées de ton propre code.</p>
-</section>
-
-<div class="rule" aria-hidden="true"></div>
-
-<section class="wrap block" id="envois" aria-labelledby="titre-garde-fous">
-  <div class="split">
-    <div class="sticky" data-reveal>
-      <h2 id="titre-garde-fous">Pour ne pas te faire déborder</h2>
-      <p>Des limites que tu fixes toi-même, pour garder la main sur ton compte Claude et sur tes envois.</p>
-    </div>
-    <ul class="facts">
-      <li data-reveal>
-        <h3>Un budget que tu fixes</h3>
-        <p>Tu peux limiter la dépense en IA sur 24 heures et sur 30 jours. Quand la limite est atteinte, les tâches IA attendent (elles ne sont pas perdues) et les envois continuent. Une tâche déjà commencée n'est jamais coupée : la limite peut donc être dépassée d'une tâche.</p>
-      </li>
-      <li data-reveal>
-        <h3>Un œil sur ton quota</h3>
-        <p>Avec un abonnement, la barre du haut montre ce que Claude indique lui-même comme quota restant. Au-delà de 85 %, l'analyse et les idées d'évolution sont reportées pour garder de la marge à la recherche de contacts.</p>
-      </li>
-      <li data-reveal>
-        <h3>Des modèles économes au départ</h3>
-        <p>La recherche et l'analyse utilisent Haiku par défaut (le plus léger). Tu passes à Sonnet dans les réglages si les fiches manquent de précision.</p>
-      </li>
-      <li data-reveal>
-        <h3>Des envois encadrés</h3>
-        <p>Pas de particuliers, un lien de désinscription dans chaque mail, une liste d'opposition respectée pour tout le monde. Les règles qui t'incombent sont rappelées sur la page <a href="/tarifs#envois">Tarifs</a>.</p>
-      </li>
-    </ul>
-  </div>
-</section>
-
-<section class="wrap block" aria-labelledby="titre-suite">
-  <div class="closing" data-reveal>
-    <div>
-      <h2 id="titre-suite">Prêt à essayer ?</h2>
-      <p>Le plan gratuit suffit pour un premier projet. Les limites sont sur la page <a href="/tarifs">Tarifs</a>.</p>
-    </div>
-    <a class="btn primary" href="/login">Créer mon compte</a>
-  </div>
-</section>
-
-${nextBlock(journey('home', 'pricing', 'login'))}`,
+</div>`,
   });
 }
 
 // ---------- Tarifs ----------
+const FAQ = [
+  ['Faut-il une carte bancaire ?', 'Non. Le plan gratuit n\'en demande pas, et le paiement n\'existe pas encore dans l\'outil.'],
+  ['Quand puis-je passer à un plan payant ?', 'Les plans payants ne sont pas encore ouverts : rien n\'est facturé aujourd\'hui, et tu seras prévenu avant toute ouverture. Le plan Gratuit te permet de tout tester dès maintenant.'],
+  ['Dois-je fournir mon propre accès à Claude ?', 'Oui. Ton accès à Claude est facturé à part, par Anthropic : AiTools n\'achète pas de Claude à ta place. C\'est ce qui explique les prix bas : tu ne paies à AiTools que l\'outil (les projets, les contacts, les envois et le suivi), pas la machine qui réfléchit.'],
+  ['Combien me coûtera Claude ?', 'Ça dépend de ton usage et de ton contrat avec Anthropic. AiTools ne peut pas le prévoir à ta place, mais tu peux fixer un budget maximum dans les réglages. Pour comprendre ce qui consomme quoi, regarde <a href="/fonctionnement">comment ça marche</a>.'],
+  ['Que se passe-t-il quand j\'atteins un plafond ?', 'La nouvelle action est refusée, mais rien n\'est supprimé. Les plafonds repartent de zéro le 1er du mois, à l\'heure de Paris.'],
+  [`Que veut dire « ${ANNUAL_FREE_MONTHS} mois offerts » ?`, `En payant à l'année, tu règles ${12 - ANNUAL_FREE_MONTHS} mois et tu profites de 12. Par exemple ${PLAN_LABELS.growth} : ${euros(annualPrice('growth'))} par an au lieu de ${euros(PLAN_PRICES.growth * 12)}.`],
+  ["Comment fonctionne l'équipe ?", "Tu invites des collègues par email, tu choisis ce que chacun peut faire (membre ou administrateur) et tu partages les projets que tu veux. Ils travaillent avec <em>ton</em> offre, ton SMTP et ton accès Claude : pas besoin d'abonnement pour eux. Le nombre de places dépend de l'offre."],
+  ['Les prix incluent-ils la TVA ?', 'Oui, ce sont des prix TTC. L\'éditeur est en franchise de TVA (art. 293 B du CGI), donc aucun supplément ne s\'ajoute.'],
+  ['Puis-je supprimer mon compte ?', 'Oui, quand tu veux, depuis Mon compte. Ça efface tes projets, tes contacts, tes modèles, tes réglages et la copie de ton code. Seule la liste d\'opposition, qui protège les personnes désinscrites, est gardée.'],
+];
+
 export function pricingPage({ appUrl }) {
+  const paidPlan = (k) => `<article class="plan" aria-labelledby="plan-${k}">
+        <div class="ph"><h2 id="plan-${k}">${PLAN_LABELS[k]}</h2>${badge('b-info', 'clock', 'Bientôt')}</div>
+        <p class="tag">${PLAN_BLURBS[k]}</p>
+        <div>
+          <p class="price when-month">${euros(PLAN_PRICES[k])} <small>par mois, TTC</small></p>
+          <p class="price when-year">${euros(annualPrice(k))} <small>par an, TTC</small></p>
+          <p class="sub when-month">ou ${euros(annualPrice(k))} par an, ${ANNUAL_FREE_MONTHS} mois offerts</p>
+          <p class="sub when-year">soit ${euros(annualPrice(k) / 12)} par mois, ${ANNUAL_FREE_MONTHS} mois offerts</p>
+        </div>
+        <ul class="lim">
+          ${limitRows(PLAN_LIMITS[k])}
+        </ul>
+        <a class="btn btn-secondary" href="mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(`Me prévenir : offre ${PLAN_LABELS[k]}`)}">Me prévenir à l'ouverture</a>
+      </article>`;
   return siteLayout({
     appUrl, path: '/tarifs',
     title: 'Tarifs : gratuit, puis 10 à 100 € par mois · AiTools',
     description: `Plan gratuit, puis des offres de ${PLAN_PRICES.starter} € à ${PLAN_PRICES.intensive} € TTC par mois, avec ${ANNUAL_FREE_MONTHS} mois offerts en annuel. Ton accès Claude est facturé à part, par Anthropic.`,
-    body: `<div class="wrap page-head">
-  <p class="eyebrow"><span class="mark" aria-hidden="true"></span>Tarifs</p>
-  <h1>Gratuit pour commencer, de ${euros(PLAN_PRICES.starter)} à ${euros(PLAN_PRICES.intensive)} par mois ensuite</h1>
-  <p class="lead">Le plan gratuit existe déjà. Les offres payantes arrivent : voici leurs prix, pour que tu saches où tu vas. Ton accès à Claude reste un coût à part, qui ne passe pas par AiTools, et c'est pour ça que nos prix sont bas.</p>
-</div>
+    body: `<div class="page">
+<div class="wrap">
+  <h1 class="h1">Des tarifs simples, sans surprise</h1>
+  <p class="lead">Un plan gratuit pour tout tester. Les plans payants arrivent bientôt, de ${euros(PLAN_PRICES.starter)} à ${euros(PLAN_PRICES.intensive)} TTC par mois.</p>
 
-<section class="wrap" aria-label="Plans">
-  <div class="billing">
-    <input type="radio" name="billing" id="bill-month" checked>
-    <label for="bill-month">Au mois</label>
-    <input type="radio" name="billing" id="bill-year">
-    <label for="bill-year">À l'année <span class="badge ok">${ANNUAL_FREE_MONTHS} mois offerts</span></label>
-    <div class="plans plan-grid">
-    <article class="card plan" aria-labelledby="plan-gratuit" data-reveal>
-      <h2 id="plan-gratuit">Gratuit</h2>
-      <p class="plan-blurb">Pour tout tester, sans carte bancaire.</p>
-      <p class="price">0 €</p>
-      <p class="price-sub">sans limite de durée</p>
-      <ul class="limits">
-        ${limitRows(FREE)}
-      </ul>
-      <a class="btn primary" href="/login">Créer mon compte</a>
-    </article>
-    ${PAID.map((k) => `<article class="card plan soon" aria-labelledby="plan-${k}" data-reveal>
-      <h2 id="plan-${k}">${PLAN_LABELS[k]} <span class="badge warn">Bientôt</span></h2>
-      <p class="plan-blurb">${PLAN_BLURBS[k]}</p>
-      <p class="price when-month">${euros(PLAN_PRICES[k])} <small>par mois, TTC</small></p>
-      <p class="price when-year">${euros(annualPrice(k))} <small>par an, TTC</small></p>
-      <p class="price-sub when-month">payé chaque mois</p>
-      <p class="price-sub when-year">soit ${euros(annualPrice(k) / 12)} par mois, ${ANNUAL_FREE_MONTHS} mois offerts</p>
-      <ul class="limits">
-        ${limitRows(PLAN_LIMITS[k])}
-      </ul>
-      <a class="btn" href="mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(`Me prévenir : offre ${PLAN_LABELS[k]}`)}">Me prévenir à l'ouverture</a>
-    </article>`).join('\n    ')}
-    </div>
+  <div class="claude-n" role="note">
+    ${ic('info')}
+    <p><b>Ton accès à Claude est facturé à part, par Anthropic : AiTools n'achète pas de Claude à ta place.</b><span>C'est ce qui explique les prix bas.</span></p>
   </div>
-  <p class="fine plan-note">Prix TTC. L'éditeur est en franchise de TVA (art. 293 B du CGI) : le prix affiché est le prix payé. En annuel, tu paies ${12 - ANNUAL_FREE_MONTHS} mois et tu en profites 12. Les offres payantes ne sont pas encore ouvertes : rien n'est facturé aujourd'hui, et tu seras prévenu avant toute ouverture.</p>
-  <p class="fine plan-note">Ces plafonds sont appliqués par le serveur. Les mails et les tâches IA se comptent par mois (heure de Paris) et repartent de zéro le 1er. Quand un plafond est atteint, la nouvelle action est refusée, mais rien n'est supprimé. Un compte ne peut pas envoyer plus de 300 mails par 24 heures, quelle que soit l'offre : c'est une protection pour la réputation de ton adresse.</p>
-</section>
 
-<section class="wrap block" id="acces-claude" aria-labelledby="titre-claude">
-  <div class="split">
-    <div class="sticky" data-reveal>
-      <h2 id="titre-claude">Ton accès à Claude : deux façons, deux coûts</h2>
-      <p>AiTools n'achète pas de Claude à ta place. Chaque tâche IA utilise ton accès à toi, et rien que le tien.</p>
+  <div class="bill" data-bill hidden>
+    <div class="seg" role="group" aria-label="Période de facturation">
+      <button class="seg-b" type="button" data-period="month" aria-pressed="true">Au mois</button>
+      <button class="seg-b" type="button" data-period="year" aria-pressed="false">À l'année</button>
     </div>
-    <ul class="facts">
-      <li data-reveal>
+    ${badge('b-ok', 'check', `${ANNUAL_FREE_MONTHS} mois offerts`)}
+  </div>
+
+  <div class="plans" data-billing="month">
+      <article class="plan plan-free" aria-labelledby="plan-gratuit">
+        <div class="ph"><h2 id="plan-gratuit">Gratuit</h2>${badge('b-ok', 'check', 'Disponible')}</div>
+        <p class="tag">Pour tout tester, sans carte bancaire.</p>
+        <div><p class="price">0 €</p><p class="sub">Sans limite de durée</p></div>
+        <ul class="lim">
+          ${limitRows(FREE)}
+        </ul>
+        <a class="btn btn-primary" href="/login">Créer mon compte</a>
+      </article>
+      ${PAID.map(paidPlan).join('\n      ')}
+  </div>
+
+  <div class="mentions">
+    <p>Prix TTC. L'éditeur est en franchise de TVA (art. 293 B du CGI) : le prix affiché est le prix payé. En annuel, tu paies ${12 - ANNUAL_FREE_MONTHS} mois et tu en profites 12. Les offres payantes ne sont pas encore ouvertes : rien n'est facturé aujourd'hui, et tu seras prévenu avant toute ouverture.</p>
+    <p>Ces plafonds sont appliqués par le serveur. Les mails et les tâches IA se comptent par mois (heure de Paris) et repartent de zéro le 1er. Quand un plafond est atteint, la nouvelle action est refusée, mais rien n'est supprimé. Un compte ne peut pas envoyer plus de 300 mails par 24 heures, quelle que soit l'offre : c'est une protection pour la réputation de ton adresse.</p>
+  </div>
+
+  <section class="more" id="acces-claude" aria-labelledby="h-claude">
+    <h2 class="h2 block-h" id="h-claude">Ton accès à Claude : deux façons, deux coûts</h2>
+    <div class="grid g2">
+      <article class="card">
         <h3>Une clé Anthropic (recommandé)</h3>
         <p>Tu crées une clé sur console.anthropic.com. Anthropic te facture à l'usage, selon ses tarifs, sur ton compte. C'est la façon prévue pour brancher un outil comme celui-ci. Tu peux fixer une limite de dépense par jour et par mois dans les réglages d'AiTools.</p>
-      </li>
-      <li data-reveal>
+      </article>
+      <article class="card">
         <h3>Ton abonnement Claude (Pro, Max), avec un risque</h3>
-        <p>Tu cliques sur le bouton ci-dessous : un lien s'affiche en quelques secondes, tu te connectes à Claude, tu recopies le petit code qu'il te montre, et AiTools récupère le jeton tout seul. Pas de facture en plus, mais les règles d'Anthropic peuvent ne pas autoriser d'utiliser un abonnement à travers une application comme AiTools. Ton compte Claude pourrait être limité, suspendu ou fermé.</p>
+        <p>Tu te connectes à Claude, tu recopies le petit code qu'il te montre, et AiTools récupère le jeton tout seul. Pas de facture en plus, mais les règles d'Anthropic peuvent ne pas autoriser d'utiliser un abonnement à travers une application comme AiTools. Ton compte Claude pourrait être limité, suspendu ou fermé.</p>
         <p>AiTools ne peut pas l'empêcher et n'en est pas responsable. Une fenêtre d'avertissement et une case à cocher te le rappellent avant toute connexion, et ton accord est enregistré avec sa date. Lis les <a href="https://www.anthropic.com/legal/consumer-terms" rel="noopener noreferrer">conditions d'Anthropic</a> avant de choisir. Ce mode peut aussi être désactivé sur le service.</p>
-        <p><a class="btn primary" href="/link?start=claude">Se connecter avec Claude</a></p>
+        <a class="btn btn-secondary" href="/link?start=claude">Se connecter avec Claude</a>
         <p class="fine">Pas encore de compte AiTools ? Le bouton te demande d'abord de te connecter, puis te ramène ici.</p>
-      </li>
-    </ul>
-  </div>
-</section>
-
-<section class="wrap block" id="envois" aria-labelledby="titre-envois">
-  <div class="split">
-    <div class="sticky" data-reveal>
-      <h2 id="titre-envois">Tu restes responsable de tes envois</h2>
-      <p>AiTools t'aide à rester dans les clous. Il ne remplace pas ta responsabilité d'expéditeur.</p>
+      </article>
     </div>
-    <ul class="facts">
-      <li data-reveal>
+  </section>
+
+  <section class="more" id="envois" aria-labelledby="h-envois">
+    <h2 class="h2 block-h" id="h-envois">Tu restes responsable de tes envois</h2>
+    <p class="sec-lead">AiTools t'aide à rester dans les clous. Il ne remplace pas ta responsabilité d'expéditeur.</p>
+    <div class="grid g3">
+      <article class="card">
         <h3>Entre professionnels, pas aux particuliers</h3>
         <p>Écrire à un professionnel est en général possible sans son accord préalable, à condition que le message ait un lien avec son activité et qu'il puisse facilement dire stop. Pour un particulier, il faut son accord : n'utilise pas AiTools pour ça.</p>
-      </li>
-      <li data-reveal>
+      </article>
+      <article class="card">
         <h3>Se désinscrire, et être respecté</h3>
         <p>Chaque mail contient un lien de désinscription en un clic. Une adresse qui se désinscrit, refuse ou rejette un mail entre dans une liste d'opposition qu'AiTools respecte pour tous les comptes.</p>
-      </li>
-      <li data-reveal>
+      </article>
+      <article class="card">
         <h3>Dire d'où vient l'adresse</h3>
         <p>Chaque mail rappelle où l'adresse du destinataire a été trouvée. Pour les données de tes contacts, c'est toi le responsable : la <a href="/confidentialite">politique de confidentialité</a> et les <a href="/cgu">conditions d'utilisation</a> détaillent qui fait quoi.</p>
-      </li>
-    </ul>
-  </div>
-</section>
+      </article>
+    </div>
+  </section>
 
-<section class="wrap block" aria-labelledby="titre-questions">
-  <h2 id="titre-questions" data-reveal>Questions fréquentes</h2>
-  <div class="statement" data-reveal>
-    <h3>Faut-il une carte bancaire ?</h3>
-    <p>Non. Le plan gratuit n'en demande pas, et le paiement n'existe pas encore dans l'outil.</p>
-    <h3>Pourquoi des prix aussi bas ?</h3>
-    <p>Parce que l'intelligence artificielle n'est pas dans notre facture : tu utilises ton propre accès à Claude. Tu ne paies donc à AiTools que l'outil (les projets, les contacts, les envois et le suivi), pas la machine qui réfléchit.</p>
-    <h3>Que veut dire « ${ANNUAL_FREE_MONTHS} mois offerts » ?</h3>
-    <p>En payant à l'année, tu règles ${12 - ANNUAL_FREE_MONTHS} mois et tu profites de 12. Par exemple ${PLAN_LABELS.growth} : ${euros(annualPrice('growth'))} par an au lieu de ${euros(PLAN_PRICES.growth * 12)}.</p>
-    <h3>Comment fonctionne l'équipe ?</h3>
-    <p>Tu invites des collègues par email, tu choisis ce que chacun peut faire (membre ou administrateur) et tu partages les projets que tu veux. Ils travaillent avec <em>ton</em> offre, ton SMTP et ton accès Claude : pas besoin d'abonnement pour eux. Le nombre de places dépend de l'offre.</p>
-    <h3>Les prix incluent-ils la TVA ?</h3>
-    <p>Oui, ce sont des prix TTC. L'éditeur est en franchise de TVA (art. 293 B du CGI), donc aucun supplément ne s'ajoute.</p>
-    <h3>Puis-je supprimer mon compte ?</h3>
-    <p>Oui, quand tu veux, depuis Mon compte. Ça efface tes projets, tes contacts, tes modèles, tes réglages et la copie de ton code. Seule la liste d'opposition, qui protège les personnes désinscrites, est gardée.</p>
-    <h3>Combien me coûtera Claude ?</h3>
-    <p>Ça dépend de ton usage et de ton contrat avec Anthropic. AiTools ne peut pas le prévoir à ta place, mais tu peux fixer un budget maximum. Pour comprendre ce qui consomme quoi, regarde <a href="/fonctionnement">comment ça marche</a>.</p>
-  </div>
-</section>
-
-${nextBlock(journey('how', 'home', 'login'))}`,
+  <section class="faq" aria-labelledby="faq-h">
+    <h2 class="h2" id="faq-h">Questions fréquentes</h2>
+    <div class="acc">
+      ${FAQ.map(([q, a], i) => `<details${i === 0 ? ' open' : ''}><summary>${esc(q)}${ic('chev')}</summary><p class="acc-b">${a}</p></details>`).join('\n      ')}
+    </div>
+  </section>
+</div>
+</div>`,
   });
 }
