@@ -68,7 +68,9 @@ export async function prospectDetail(db, id) {
   // La liste d'opposition est commune à tous les comptes : on n'en révèle que le strict nécessaire. Le motif d'un
   // autre compte (refus, adresse invalide) n'est pas montré ; seule la désinscription, acte de la personne elle-même, l'est.
   const row = await db.prepare('SELECT reason FROM blacklist WHERE email = ?').get(p.email);
-  const optOut = row ? { reason: row.reason === 'unsubscribe' ? 'unsubscribe' : p.status === 'bounced' ? 'bounce' : 'refused' } : null;
+  // Seulement si le prospect de CE compte porte déjà ce statut : un compte ne découvre jamais qu'une adresse est sur la liste à cause d'un autre.
+  const optOut = row && (p.status === 'refused' || p.status === 'bounced')
+    ? { reason: row.reason === 'unsubscribe' ? 'unsubscribe' : p.status === 'bounced' ? 'bounce' : 'refused' } : null;
   return { prospect: p, mails, notes, optOut };
 }
 

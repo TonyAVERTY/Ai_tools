@@ -260,7 +260,7 @@ test('CSV : export en pièce jointe, import via l\'API', async () => {
   assert.match(r.headers.get('content-disposition'), /attachment; filename="prospects-mep-\d{4}-\d{2}-\d{2}\.csv"/);
   assert.match(await r.text(), /a@atelier\.fr/);
   r = await post(`/api/projects/${pid}/prospects/import`, { csv: 'email;entreprise\nnouveau@client.fr;Nouveau' });
-  assert.deepEqual(await r.json(), { total: 1, imported: 1, duplicates: 0, blacklisted: 0, invalid: [] });
+  assert.deepEqual(await r.json(), { total: 1, imported: 1, skipped: 0, invalid: [] });
   r = await post(`/api/projects/${pid}/prospects/import`, { csv: 'nom\nx' });
   assert.equal(r.status, 400);
   r = await fetch(`${base}/api/projects/${pid}/prospects.csv`);

@@ -456,7 +456,7 @@ function gitRow(i, srv, { fresh = false } = {}) {
 /** Case à cocher du design : le <input> natif reste là (clavier, lecteurs d'écran), la case dessinée suit son état. */
 const check = (name, checked, text, { value = '' } = {}) => `<label class="opt"><input type="checkbox" name="${name}"${value ? ` value="${value}"` : ''}${checked ? ' checked' : ''}><span class="box">${ic('check')}</span><span>${text}</span></label>`;
 
-const SETTINGS_TOC = [['notif', 'Notifications'], ['git', 'Dépôts Git'], ['discord', 'Discord'], ['garde', 'Garde-fous'], ['budget', 'Budget IA'], ['opposition', "Liste d'opposition"]];
+const SETTINGS_TOC = [['notif', 'Notifications'], ['git', 'Dépôts Git'], ['discord', 'Discord'], ['garde', 'Garde-fous'], ['budget', 'Budget et modèles IA'], ['opposition', "Liste d'opposition"]];
 
 export function settingsPage({ email, s, saved }) {
   const model = (name, v) => `<span class="sel"><select name="${name}">
@@ -528,10 +528,12 @@ ${saved ? `<p class="ok-box" role="status">${ic('check')}<span><b>Réglages enre
 </section>
 
 <section class="card" id="budget" aria-labelledby="t-budget">
-  <div class="card-h"><h2 id="t-budget">Budget IA</h2><p>En équivalent $ API remonté par Claude Code (ton abonnement Pro ne facture rien en plus : c'est un garde-fou pour ton quota). Au-delà, les jobs IA attendent sans être perdus ; envois et relances continuent. Vide = pas de limite.</p></div>
+  <div class="card-h"><h2 id="t-budget">${s.priced ? 'Budget IA' : 'Modèles IA'}</h2>${s.priced
+    ? "<p>Avec ta clé API, chaque job est facturé par Anthropic : en équivalent $ API remonté par Claude Code. Au-delà d'un plafond, les jobs IA attendent sans être perdus ; envois et relances continuent. Vide = pas de limite.</p>"
+    : "<p>Avec ton abonnement Claude rien n'est facturé en plus : le garde-fou est ton quota Claude (affiché en haut), pas un budget en $.</p>"}</div>
   <div class="grid2">
-    <label class="field"><span class="lbl">Plafond sur 24 h glissantes</span><span class="unit"><input name="budget_day_usd" inputmode="decimal" value="${esc(s.budget_day_usd)}" placeholder="ex. 2"><span>$</span></span></label>
-    <label class="field"><span class="lbl">Plafond sur 30 jours glissants</span><span class="unit"><input name="budget_month_usd" inputmode="decimal" value="${esc(s.budget_month_usd)}" placeholder="ex. 30"><span>$</span></span></label>
+    ${s.priced ? `<label class="field"><span class="lbl">Plafond sur 24 h glissantes</span><span class="unit"><input name="budget_day_usd" inputmode="decimal" value="${esc(s.budget_day_usd)}" placeholder="ex. 2"><span>$</span></span></label>
+    <label class="field"><span class="lbl">Plafond sur 30 jours glissants</span><span class="unit"><input name="budget_month_usd" inputmode="decimal" value="${esc(s.budget_month_usd)}" placeholder="ex. 30"><span>$</span></span></label>` : ''}
     <label class="field"><span class="lbl">Modèle pour la prospection</span>${model('prospect_model', s.prospect_model)}</label>
     <label class="field"><span class="lbl">Modèle pour l'analyse de projet</span>${model('analyze_model', s.analyze_model)}</label>
   </div>
@@ -543,7 +545,7 @@ ${saved ? `<p class="ok-box" role="status">${ic('check')}<span><b>Réglages enre
 
 <section class="card" id="opposition" aria-labelledby="t-opp">
   <div class="card-h"><h2 id="t-opp">Liste d'opposition</h2></div>
-  <p class="card-d">${s.blacklist_count} de tes prospects ont demandé à ne plus être contactés. La liste d'opposition est commune à tous les comptes : une adresse désinscrite n'est plus jamais contactée, quel que soit le projet.</p>
+  <p class="card-d">Une personne qui se désinscrit, refuse ou dont l'adresse est invalide n'est plus jamais contactée ni proposée, quel que soit le compte ou le projet. Cette liste est commune à tous les comptes et personne ne peut la consulter : tu ne vois que le statut de tes propres prospects.</p>
 </section>
 </div>
 </div>`,
