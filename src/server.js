@@ -1,6 +1,7 @@
 import { createServer } from 'node:http';
 import { readFileSync, readdirSync } from 'node:fs';
 import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { join, dirname, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadConfig } from './config.js';
@@ -21,6 +22,7 @@ import { securityHeaders, robotsHeaderFor, cspFor } from './site/seo.js';
 import { hasUsableLink, isLinkExempt, LINK_REQUIRED_MESSAGE } from './claudelink.js';
 import { memberTeamIds, purgeInvites } from './teams.js';
 import { sandboxStartupMessages } from './services/sandbox.js';
+import { gitVersionNotes } from './services/git.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -174,6 +176,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const cfg = loadConfig();
   if (!cfg.adminEmails.length) console.warn('ADMIN_EMAILS est vide : aucun administrateur (back-office inaccessible).');
   for (const m of sandboxStartupMessages(cfg.sandbox)) console.warn(m);
+  try { for (const m of gitVersionNotes(execFileSync('git', ['--version'], { encoding: 'utf8', timeout: 5000 }))) console.warn(m); } catch { console.warn('git est introuvable ou ne répond pas : aucun dépôt ne pourra être cloné.'); }
   if (cfg.production && cfg.allowPrivateHosts) console.warn('ALLOW_PRIVATE_HOSTS est actif en production : seuls les administrateurs peuvent viser des hôtes privés.');
   if (cfg.production && !cfg.trustProxy) console.warn("TRUST_PROXY est désactivé : derrière Nginx, tous les visiteurs partagent la même adresse pour la limitation de débit. Pose TRUST_PROXY=true.");
   if (!cfg.recaptcha) console.warn(`reCAPTCHA désactivé (RECAPTCHA_SITE_KEY / RECAPTCHA_SECRET absentes)${cfg.sandbox.production ? " : à configurer avant l'ouverture au public" : ''}.`);
