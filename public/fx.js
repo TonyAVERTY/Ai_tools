@@ -33,6 +33,8 @@
 
   const center = (el) => { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height }; };
   const visible = (el) => !!el && !el.hidden && !el.closest('[hidden]') && el.getBoundingClientRect().width > 0;
+  const HOP = 80; // distance parcourue par saut (px)
+  const HOP_H = 16; // hauteur d'un saut (px)
   const ease = (t) => (t < 0.5 ? 2 * t * t : 1 - ((-2 * t + 2) ** 2) / 2);
   const wait = (anim) => anim.finished.catch(() => {});
 
@@ -78,7 +80,7 @@
     const lh = Math.abs(end.x - a0.x); // trait horizontal : jusqu'à la cible
     const total = lv + lh;
     if (total < 8) { bump(target); return; }
-    const dur = Math.round(Math.min(2200, Math.max(1100, 700 + total * 0.9)));
+    const dur = Math.round(Math.min(3600, Math.max(1800, 900 + total * 2.2)));
 
     const svg = document.createElementNS(NS, 'svg');
     svg.setAttribute('class', 'fx-trail');
@@ -106,7 +108,7 @@
     document.body.append(svg, node);
 
     // Marche : la roue tourne, les jambes alternent, le personnage rebondit
-    const cycle = { duration: 380, iterations: Infinity };
+    const cycle = { duration: 520, iterations: Infinity };
     const loops = [
       node.querySelector('.fx-wheel').animate([{ transform: 'rotate(0)' }, { transform: 'rotate(360deg)' }], { duration: 520, iterations: Infinity }),
       node.querySelector('.fx-leg-a').animate([{ transform: 'rotate(-24deg)' }, { transform: 'rotate(24deg)' }], { ...cycle, direction: 'alternate', easing: 'ease-in-out' }),
@@ -124,8 +126,10 @@
         const x = d <= lv ? a0.x : a0.x + sx * (d - lv);
         const y = d <= lv ? a0.y + sy * d : end.y;
         path.setAttribute('d', d <= lv ? `M${a0.x} ${a0.y} V${y}` : `M${a0.x} ${a0.y} V${end.y} H${x}`);
+        const p = (d % HOP) / HOP; // un saut tous les HOP pixels parcourus : l'agent sautille, d'un rythme tranquille
+        const hop = -HOP_H * 4 * p * (1 - p);
         const scale = t < 0.06 ? 0.5 + (t / 0.06) * 0.5 : t > 0.92 ? 1 - ((t - 0.92) / 0.08) * 0.6 : 1; // apparaît au départ, rétrécit en arrivant
-        node.style.transform = `translate(${(x - W / 2).toFixed(1)}px, ${(y - H / 2).toFixed(1)}px) scaleX(${d > lv ? sx : 1}) scale(${scale.toFixed(3)})`;
+        node.style.transform = `translate(${(x - W / 2).toFixed(1)}px, ${(y - H / 2 + hop).toFixed(1)}px) scaleX(${d > lv ? sx : 1}) scale(${scale.toFixed(3)})`;
         node.style.opacity = String(t > 0.95 ? (1 - t) / 0.05 : 1);
         if (t < 1) requestAnimationFrame(frame); else resolve();
       };
