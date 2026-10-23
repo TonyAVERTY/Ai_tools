@@ -49,6 +49,55 @@
     setTimeout(() => { label.textContent = 'Copier'; }, 1800);
   });
 
+  // ---------- Documentation : ruban en parallaxe + bulles ----------
+  // Le ruban (SVG) recule de 25 % du défilement : il défile moins vite que le texte. Les bulles, posées le long de son tracé, suivent
+  // exactement le même mouvement pour rester dedans. Sans script, ou avec « réduire les animations », le ruban reste fixe dans la page.
+  const ribbon = document.querySelector('.fx .page-ribbon');
+  const path = ribbon?.querySelector('path');
+  if (ribbon && path && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const K = 0.25;
+    const layer = document.createElement('div');
+    layer.className = 'rb-bubbles';
+    ribbon.append(layer);
+    // Des points du tracé (coordonnées 0-100 × 0-1000 du SVG) deviennent des positions en pourcentage de la page
+    const total = path.getTotalLength();
+    const count = Math.min(220, Math.round(document.documentElement.scrollHeight / 130)); // une bulle tous les ~130 px de page
+    let seed = 7;
+    const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+    for (let i = 0; i < count; i++) {
+      const pt = path.getPointAtLength(((i + rnd() * 0.8) / count) * total);
+      const b = document.createElement('span');
+      b.className = 'rb-b';
+      const size = 8 + Math.round(rnd() * 14);
+      b.style.width = b.style.height = `${size}px`;
+      b.style.left = `${pt.x}%`;
+      b.style.setProperty('--ox', `${Math.round((rnd() - 0.5) * 14)}px`); // le trait fait 26 px de large : les bulles restent dedans
+      b.style.top = `${pt.y / 10}%`;
+      b.style.setProperty('--d', `${(5 + rnd() * 6).toFixed(1)}s`);
+      b.style.setProperty('--delay', `${(-rnd() * 6).toFixed(1)}s`);
+      b.style.setProperty('--dx', `${Math.round((rnd() - 0.5) * 22)}px`);
+      b.style.setProperty('--dy', `${Math.round(-6 - rnd() * 14)}px`);
+      layer.append(b);
+    }
+    // Le ruban est raccourci de la distance dont il prend du retard (25 % du défilement possible) : en bas de page il est donc exactement
+    // arrivé au bout de son tracé, et il couvre toujours la fenêtre
+    const root = document.documentElement.style;
+    let ticking = false;
+    const measure = () => {
+      const scrollable = Math.max(0, document.documentElement.scrollHeight - innerHeight);
+      root.setProperty('--par', `${Math.round(scrollable * K)}px`);
+      update();
+    };
+    const update = () => {
+      ticking = false;
+      root.setProperty('--py', `${Math.round(scrollY * K)}px`);
+    };
+    addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(update); } }, { passive: true });
+    addEventListener('resize', measure);
+    addEventListener('load', measure);
+    measure();
+  }
+
   // ---------- Tarifs : mois / année ----------
   const plans = document.querySelector('[data-billing]');
   const bill = document.querySelector('[data-bill]');

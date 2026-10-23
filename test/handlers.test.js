@@ -256,6 +256,47 @@ test('analyse : modèle économique (Haiku) par défaut, Sonnet uniquement sur d
   } finally { rmSync(s.tmp, { recursive: true, force: true }); }
 });
 
+test('modèle et consignes de sa gamme : le prompt de la gamme du modèle choisi (et ce modèle) arrivent à Claude, pour chaque tâche', async () => {
+  const s = await setup();
+  const spyFile = join(s.tmp, 'prompts.log');
+  s.app.cfg.claudeBin = makeClaudeBin(s.tmp, { fixture: 'spy-claude.js', env: { PROMPT_SPY_FILE: spyFile } });
+  const last = () => JSON.parse(readFileSync(spyFile, 'utf8').trim().split('\n').pop());
+  try {
+    assert.equal((await run(s, 'analyze')).status, 'done'); // le modèle de mail s'écrit à partir de la fiche du projet
+    await setSetting(s.db, s.userId, 'prompts_json', JSON.stringify({ '*': { template: 'email de prospection MARQUE-COMMUNE' }, haiku: { template: 'email de prospection MARQUE-HAIKU' }, opus: { template: 'email de prospection MARQUE-OPUS' } }));
+    // rédaction : Haiku par défaut
+    const tj = await run(s, 'template'); assert.equal(tj.status, 'done', tj.error);
+    assert.equal(last().model, 'haiku');
+    assert.match(last().prompt, /MARQUE-HAIKU/);
+    // modèle précis de la gamme Opus
+    await setSetting(s.db, s.userId, 'write_model', 'claude-opus-5-5');
+    assert.equal((await run(s, 'template')).status, 'done');
+    assert.equal(last().model, 'claude-opus-5-5');
+    assert.match(last().prompt, /MARQUE-OPUS/);
+    assert.doesNotMatch(last().prompt, /MARQUE-HAIKU/);
+    // gamme sans texte propre : « tous les modèles »
+    await setSetting(s.db, s.userId, 'write_model', 'claude-sonnet-5-5');
+    assert.equal((await run(s, 'template')).status, 'done');
+    assert.match(last().prompt, /MARQUE-COMMUNE/);
+    // sans personnalisation : consignes par défaut de la gamme
+    await setSetting(s.db, s.userId, 'prompts_json', '');
+    await setSetting(s.db, s.userId, 'write_model', 'haiku');
+    assert.equal((await run(s, 'template')).status, 'done');
+    assert.match(last().prompt, /Reste sous 100 mots/);
+    await setSetting(s.db, s.userId, 'write_model', 'claude-fable-5-1');
+    assert.equal((await run(s, 'template')).status, 'done');
+    assert.match(last().prompt, /excellent commercial/);
+    // analyse : son propre réglage, sa propre gamme ; un identifiant hors catalogue retombe sur Haiku
+    await setSetting(s.db, s.userId, 'analyze_model', 'claude-opus-4-8');
+    assert.equal((await run(s, 'analyze')).status, 'done');
+    assert.equal(last().model, 'claude-opus-4-8');
+    assert.match(last().prompt, /Remonte à l'intention du produit/);
+    await setSetting(s.db, s.userId, 'analyze_model', '--dangerously-skip-permissions');
+    assert.equal((await run(s, 'analyze')).status, 'done');
+    assert.equal(last().model, 'haiku');
+  } finally { rmSync(s.tmp, { recursive: true, force: true }); }
+});
+
 test('quota Claude serré : alerte Discord à 80 %, pas en dessous', async () => {
   const s = await setup();
   const sent = [];
@@ -302,7 +343,7 @@ test('audit du dépôt, accroche régénérée, consignes personnalisées transm
     assert.match(other.error, /Prospect introuvable/);
     // Consignes personnalisées : elles font partie du prompt reçu par Claude (CRASH fait échouer la fausse CLI), le défaut non
     assert.equal((await run(s, 'template')).status, 'done');
-    await setSetting(s.db, s.userId, 'prompts_json', JSON.stringify({ template: 'CRASH' }));
+    await setSetting(s.db, s.userId, 'prompts_json', JSON.stringify({ '*': { template: 'CRASH' } }));
     assert.equal((await run(s, 'template')).status, 'error', 'la consigne personnalisée est bien transmise');
     await setSetting(s.db, s.userId, 'prompts_json', '');
     assert.equal((await run(s, 'template')).status, 'done', 'retour au défaut');

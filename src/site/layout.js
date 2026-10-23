@@ -33,6 +33,7 @@ export function absoluteUrl(appUrl, path) {
  * @param {string} o.body        contenu de <main>, déjà échappé
  * @param {boolean} [o.noindex]  page à ne pas indexer (connexion, 404)
  * @param {object} [o.jsonLd]    données structurées (bloc de données, non exécuté : compatible avec la CSP)
+ * @param {boolean} [o.fx]       ruban animé (parallaxe + bulles, voir public/site.js) : pages de documentation
  * @param {string[]} [o.scripts] scripts de l'application (chemins /static/…) ; aucun par défaut
  */
 // Contenu réservé aux visiteurs : entouré de repères, que withViewer() remplace pour quelqu'un déjà connecté
@@ -50,7 +51,7 @@ export function withViewer(page, signedIn) {
   return page.replace(/<x-guest data-k="(\w+)">[\s\S]*?<\/x-guest>/g, (_, key) => MEMBER[key] ?? '');
 }
 
-export function siteLayout({ appUrl, path, title, description, body, noindex = false, jsonLd = null, scripts = [] }) {
+export function siteLayout({ appUrl, path, title, description, body, noindex = false, jsonLd = null, scripts = [], fx = false }) {
   const url = absoluteUrl(appUrl, path === '/' ? '/' : path);
   const year = new Date().getFullYear();
   const here = (href) => (href === path ? ' aria-current="page"' : '');
@@ -81,7 +82,7 @@ ${iconLinks()}
 <link rel="stylesheet" href="${assetUrl('/static/site.css')}">
 <link rel="stylesheet" href="${assetUrl('/static/responsive.css')}">
 ${['/static/site.js', '/static/responsive.js', ...scripts].map((src) => `<script src="${esc(assetUrl(src))}" defer></script>\n`).join('')}${jsonLd ? `<script type="application/ld+json">${JSON.stringify(jsonLd).replace(/</g, '\\u003c')}</script>\n` : ''}</head>
-<body class="site">
+<body class="site${fx ? ' fx' : ''}">
 <a class="skip" href="#contenu">Aller au contenu</a>
 <div class="page-ribbon" aria-hidden="true"><svg viewBox="0 0 100 1000" preserveAspectRatio="none" focusable="false">
 <defs><linearGradient id="g-page" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="100" y2="1000"><stop offset="0" stop-color="#1288b7"></stop><stop offset="1" stop-color="#0db8c5"></stop></linearGradient></defs>

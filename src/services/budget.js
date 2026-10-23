@@ -10,7 +10,10 @@ const usd = (n) => `${n.toFixed(2)} $`;
 
 // La dépense compte au moment où le job s'est terminé (un job de nuit compte la nuit). Budget propre à chaque utilisateur.
 async function spentSince(db, userId, since) {
-  return (await db.prepare('SELECT COALESCE(SUM(cost_usd), 0) c FROM jobs WHERE user_id = ? AND COALESCE(finished_at, created_at) > ?').get(userId, since)).c;
+  const jobs = (await db.prepare('SELECT COALESCE(SUM(cost_usd), 0) c FROM jobs WHERE user_id = ? AND COALESCE(finished_at, created_at) > ?').get(userId, since)).c;
+  // La page IA (chat) consomme aussi : ses réponses comptent dans le même budget
+  const chat = (await db.prepare('SELECT COALESCE(SUM(m.cost_usd), 0) c FROM chat_messages m JOIN chat_conversations c ON c.id = m.conversation_id WHERE c.user_id = ? AND m.created_at > ?').get(userId, since)).c;
+  return Number(jobs) + Number(chat);
 }
 
 async function limit(db, userId, key) {
