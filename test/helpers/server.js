@@ -21,7 +21,7 @@ const unlimited = () => new RateLimiter({
   rules: Object.fromEntries(Object.entries(RATE_LIMITS).map(([k, v]) => [k, Object.fromEntries(Object.entries(v).map(([sc, c]) => [sc, { ...c, max: 1e9 }]))])),
 });
 
-export async function startApp({ cfg = {}, worker = false, rateLimit = false, createTransport, resolveHost } = {}) {
+export async function startApp({ cfg = {}, worker = false, rateLimit = false, createTransport, resolveHost, fetch: injectedFetch } = {}) {
   const tmp = mkdtempSync(join(tmpdir(), 'aitools-srv-'));
   const config = {
     appUrl: APP_URL, google: { clientId: 'gid', clientSecret: 'gsecret' }, apple: null, adminEmails: [],
@@ -29,7 +29,7 @@ export async function startApp({ cfg = {}, worker = false, rateLimit = false, cr
     sandbox: { enabled: false, production: false, roBinds: [] }, ...cfg,
   };
   const limiter = rateLimit ? new RateLimiter(rateLimit === true ? {} : rateLimit) : unlimited();
-  const app = await createApp(config, { db: await testDb(), worker, limiter, createTransport, resolveHost: resolveHost || PUBLIC_DNS });
+  const app = await createApp(config, { db: await testDb(), worker, limiter, createTransport, fetch: injectedFetch, resolveHost: resolveHost || PUBLIC_DNS });
   await new Promise((r) => app.server.listen(0, '127.0.0.1', r));
   const base = `http://127.0.0.1:${app.server.address().port}`;
 

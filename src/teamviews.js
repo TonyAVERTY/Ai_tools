@@ -12,7 +12,7 @@ const RIGHTS = `<ul class="muted small">
   <li><strong>Propriétaire</strong> (toi) : gère l'équipe, partage et supprime les projets.</li>
 </ul>`;
 
-function ownerSection(d, invite) {
+function ownerSection(d) {
   const seats = d.seats;
   const seatText = seats.limit == null ? `${seats.used} place${seats.used > 1 ? 's' : ''} utilisée${seats.used > 1 ? 's' : ''}` : `${seats.used} / ${seats.limit} places utilisées`;
   const members = d.members.length ? `<div class="table-wrap"><table>
@@ -27,15 +27,10 @@ function ownerSection(d, invite) {
     ${d.invites.map((i) => `<tr><td>${esc(i.email)}</td><td>${esc(ROLE_LABELS[i.role])}</td><td>${fmt(i.expiresAt)}</td>
       <td><form method="post" action="/team/invite/${i.id}/revoke"><button class="btn small">Annuler</button></form></td></tr>`).join('')}
     </tbody></table></div>` : '';
-  const created = invite ? `<div class="notice card"><p><strong>Invitation créée pour ${esc(invite.email)}</strong> (${esc(ROLE_LABELS[invite.role].toLowerCase())}).</p>
-    <p>${invite.mailed ? 'Un mail vient de lui être envoyé. ' : 'Le mail n\'a pas pu partir (' + esc(invite.mailReason || 'SMTP du serveur absent') + '). '}Voici le lien, à lui transmettre toi-même si besoin. <strong>Il ne sera plus affiché.</strong></p>
-    <p><input class="copy" readonly value="${esc(invite.url)}"></p>
-    <p class="muted small">Valable 7 jours, une seule fois, et seulement avec ${esc(invite.email)}.</p></div>` : '';
   return `<section class="card">
   <h4>Équipe « ${esc(d.team.name)} »</h4>
   <p class="muted">${esc(seatText)}. L'équipe utilise ton offre : tes plafonds, ton SMTP et ton accès Claude servent à tous sur les projets partagés.${seats.free === 0 ? ' <a href="/tarifs">Voir les offres avec plus de places</a>.' : ''}</p>
   ${RIGHTS}
-  ${created}
   ${members}
   ${invites}
   <h4>Inviter quelqu'un</h4>
@@ -70,7 +65,7 @@ function createSection(canTeam) {
   <p class="muted">Ton offre actuelle ne comprend pas de place d'équipe. <a href="/tarifs">Voir les offres qui en proposent</a>.</p></section>`;
 }
 
-export function teamPage({ user, owned = null, memberOf = [], canTeam = false, error = null, notice = null, invite = null }) {
+export function teamPage({ user, owned = null, memberOf = [], canTeam = false, error = null, notice = null }) {
   const member = memberOf.length ? `<section class="card"><h4>Équipes dont je suis membre</h4>
   <div class="table-wrap"><table><tbody>${memberOf.map((t) => `<tr><td><strong>${esc(t.name)}</strong><br><span class="muted small">de ${esc(t.ownerEmail)}</span></td>
     <td>${esc(ROLE_LABELS[t.role])}</td>
@@ -80,7 +75,7 @@ export function teamPage({ user, owned = null, memberOf = [], canTeam = false, e
     title: 'Équipe', email: user.email,
     body: `<div class="narrow"><h1>Équipe</h1>
 ${error ? `<p class="msg msg-err" role="alert">${esc(error)}</p>` : ''}${notice ? `<p class="msg msg-ok" role="status">${esc(notice)}</p>` : ''}
-${owned ? ownerSection(owned, invite) : createSection(canTeam)}
+${owned ? ownerSection(owned) : createSection(canTeam)}
 ${member}</div>`,
   });
 }

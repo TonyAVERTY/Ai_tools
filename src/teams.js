@@ -14,6 +14,7 @@ import { HttpError } from './http.js';
 import { getUser, normalizeEmail } from './users.js';
 import { limitsFor } from './services/plans.js';
 import { EMAIL_RE, createTransport } from './services/mailer.js';
+import { inviteMail } from './services/mailhtml.js';
 import { pinSmtp } from './netguard.js';
 
 export const ROLES = ['admin', 'member'];
@@ -101,7 +102,7 @@ export async function teamDetails(db, team) {
 }
 
 /**
- * Crée une invitation. Le jeton n'est renvoyé qu'ici (seule son empreinte est stockée) : à transmettre à la personne invitée.
+ * Crée une invitation. Le jeton n'est renvoyé qu'ici (seule son empreinte est stockée) et ne part que par mail, à la personne invitée.
  * Une même adresse n'a qu'une invitation à la fois (la plus récente remplace l'ancienne).
  */
 export async function createInvite(db, team, { email, role, byUserId }) {
@@ -118,9 +119,9 @@ export async function createInvite(db, team, { email, role, byUserId }) {
     throw forbidden(`Ton offre comprend ${seats.limit} place${seats.limit > 1 ? 's' : ''} d'équipe, toutes utilisées (membres et invitations en attente). Voir les tarifs : /tarifs`);
   }
   const token = randomId(24);
-  await db.prepare('INSERT INTO team_invites(team_id, email, role, token_hash, created_by, created_at, expires_at) VALUES(?, ?, ?, ?, ?, ?, ?)')
+  const r = await db.prepare('INSERT INTO team_invites(team_id, email, role, token_hash, created_by, created_at, expires_at) VALUES(?, ?, ?, ?, ?, ?, ?)')
     .run(team.id, addr, role, hash(token), Number(byUserId), now(), now() + INVITE_TTL);
-  return { token, email: addr, role };
+  return { id: Number(r.lastInsertRowid), token, email: addr, role };
 }
 
 export async function revokeInvite(db, team, inviteId) {
@@ -177,7 +178,7 @@ export async function setProjectShared(db, team, projectId, shared) {
   if (!r.changes && !(await db.prepare('SELECT 1 FROM projects WHERE id = ? AND user_id = ?').get(Number(projectId), team.owner_id))) throw new HttpError(404, 'Projet introuvable');
 }
 
-/** Mail d'invitation via le SMTP du serveur (SYSTEM_SMTP_*). Sans lui, le lien est simplement affiché au propriétaire. */
+/** Mail d'invitation (HTML + texte) via le SMTP du serveur (SYSTEM_SMTP_*). C'est le seul endroit où le lien existe : le propriétaire ne le voit jamais. */
 export async function sendInviteMail(app, team, owner, invite) {
   const smtp = app.cfg.systemSmtp;
   if (!smtp) return { sent: false, reason: 'SMTP du serveur non configuré' };
@@ -190,7 +191,10 @@ export async function sendInviteMail(app, team, owner, invite) {
   ].join('\n');
   const transport = (app.createTransport || createTransport)(await pinSmtp(app, null, smtp));
   try {
-    await transport.sendMail({ from: smtp.fromEmail, to: invite.email, subject: `Invitation à l'équipe « ${team.name} » sur AiTools`, text });
+    await transport.sendMail({
+      from: smtp.fromEmail, to: invite.email, subject: `Invitation à l'équipe « ${team.name} » sur AiTools`, text,
+      html: inviteMail({ teamName: team.name, ownerEmail: owner.email, role: invite.role, email: invite.email, url, appUrl: app.cfg.appUrl }),
+    });
     return { sent: true };
   } catch (e) { return { sent: false, reason: `envoi impossible (${String(e.message).slice(0, 100)})` }; }
   finally { transport.close?.(); }

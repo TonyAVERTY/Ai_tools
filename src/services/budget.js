@@ -47,7 +47,8 @@ export async function quotaState(db, userId) {
   try { rl = JSON.parse(raw); } catch { return { blocked: false, reason: null }; }
   for (const [key, label] of Object.entries(WINDOW_LABELS)) {
     const w = rl[key];
-    if (w?.utilization >= QUOTA_PAUSE_THRESHOLD) {
+    // Une mesure dont la fenêtre a été remise à zéro depuis ne bloque plus rien
+    if (w?.utilization >= QUOTA_PAUSE_THRESHOLD && !(w.resetsAt && w.resetsAt < now())) {
       return { blocked: true, reason: `quota de la ${label} à ${Math.round(w.utilization * 100)} %` };
     }
   }

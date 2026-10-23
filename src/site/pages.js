@@ -111,7 +111,7 @@ const badge = (cls, icon, text) => `<span class="badge${cls ? ` ${cls}` : ''}">$
 
 // Maquette du tableau de bord : données d'exemple, clairement signalées comme telles
 const HERO_MOCK = `<div class="art-hero">
-  <svg class="ribbon" aria-hidden="true" focusable="false" viewBox="0 0 800 460" preserveAspectRatio="none"><path d="M-30 400 C140 470 230 130 420 210 S690 400 840 70" fill="none" stroke="url(#g-hero)" stroke-width="26" stroke-linecap="round"></path></svg>
+  <svg class="ribbon" aria-hidden="true" focusable="false" viewBox="0 0 800 460" preserveAspectRatio="none"><path d="M-30 452 C150 492 270 472 370 422 S560 302 640 258 S780 195 840 60" fill="none" stroke="url(#g-hero)" stroke-width="26" stroke-linecap="round" pathLength="1"></path></svg>
   <div class="mock" role="img" aria-label="Maquette du tableau de bord : projet Atelier Exemple, cible validée, recherche de contacts à 64 %, trois contacts avec leurs statuts">
     <div class="mock-h">
       <div><p class="mock-t">Atelier Exemple</p><p class="mock-s">Menuiserie · Bretagne</p></div>

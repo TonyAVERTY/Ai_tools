@@ -186,11 +186,14 @@
 
   // ---------- Barre système ----------
   // "IA 24 h : 0,42 $ / 2 $" : orange à 80 %, rouge une fois atteint
+  // Ce que les jobs lancés PAR AiTools ont consommé (équivalent API). Ce que la personne fait ailleurs avec son Claude n'y est pas :
+  // Anthropic ne le communique pas à une application ; le quota réel du compte est la mesure « Claude … » à côté.
+  const GAUGE_TIP = "Équivalent API des jobs lancés par AiTools uniquement. Ce que tu fais ailleurs avec Claude n'est pas compté ici : vois le quota « Claude » à côté.";
   function gauge(label, x) {
     const used = `${x.used.toFixed(2)} $`;
-    if (!x.limit) return `<span title="Équivalent API, consommé sur ton quota Pro">IA ${label} : ${used}</span>`;
+    if (!x.limit) return `<span title="${GAUGE_TIP}">IA via AiTools ${label} : ${used}</span>`;
     const r = x.used / x.limit;
-    return `<span class="${r >= 1 ? 'error' : r >= 0.8 ? 'warn' : ''}" title="Équivalent API, consommé sur ton quota Pro">IA ${label} : ${used} / ${x.limit} $</span>`;
+    return `<span class="${r >= 1 ? 'error' : r >= 0.8 ? 'warn' : ''}" title="${GAUGE_TIP}">IA via AiTools ${label} : ${used} / ${x.limit} $</span>`;
   }
 
   // Quota du compte Claude Pro lui-même (session glissante de 5 h + semaine glissante de 7 j),
@@ -199,17 +202,30 @@
     if (!ts) return '';
     return new Date(ts * 1000).toLocaleString('fr-FR', { weekday: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
   }
-  function claudeBit(label, w) {
+  const WHY = {
+    denied: "Anthropic refuse le relevé en direct avec ce jeton (relie-toi avec « Se connecter avec Claude »)",
+    rate: 'Anthropic limite les relevés : nouvel essai dans une minute',
+    network: 'Anthropic ne répond pas',
+    unavailable: 'le relevé en direct est indisponible chez Anthropic',
+    format: 'réponse inattendue du relevé en direct',
+  };
+  // Relevé en direct chez Anthropic : il compte tout l'usage du compte Claude, y compris hors AiTools.
+  // Sinon : dernière mesure faite pendant un job, avec son âge et la raison.
+  function claudeBit(label, w, rl) {
     if (!w) return '';
+    if (w.expired) return `<span class="muted" title="Cette fenêtre a été remise à zéro depuis la dernière mesure">Claude ${label} : – (remise à zéro)</span>`;
     const cls = w.utilization >= 1 ? 'error' : w.utilization >= 0.8 ? 'warn' : '';
     const reset = resetLabel(w.resetsAt);
-    return `<span class="${cls}"${reset ? ` title="Réinitialisation ${esc(reset)}"` : ''}>Claude ${label} : ${pct(w.utilization)}</span>`;
+    const live = rl.source === 'live' && !rl.error;
+    const title = `${live ? 'Relevé en direct chez Anthropic, tout ton usage Claude compris (y compris hors AiTools).' : `Dernière mesure ${ago(rl.at)} (pendant un job AiTools)${rl.error ? ` : ${WHY[rl.error] || 'relevé en direct indisponible'}` : ''}.`}${reset ? ` Réinitialisation ${reset}.` : ''}`;
+    return `<span class="${cls}" title="${esc(title)}">Claude ${label} : ${pct(w.utilization)}${live ? '' : ` · ${esc(ago(rl.at))}`}</span>`;
   }
   function claudeQuota(rl, mode) {
     // Clé API : pas de quota d'abonnement à afficher
     if (mode === 'api_key') return '';
-    if (!rl) return '<span class="muted" title="Mesuré après le premier job IA">Claude : pas encore mesuré</span>';
-    return `${claudeBit('session 5h', rl.fiveHour)} ${claudeBit('semaine', rl.sevenDay)}`.trim();
+    if (!rl) return '<span class="muted" title="Le relevé en direct se fait avec ton abonnement Claude">Claude : pas encore mesuré</span>';
+    if (!rl.fiveHour && !rl.sevenDay) return `<span class="muted" title="${esc(WHY[rl.error] || 'relevé indisponible')}">Claude : relevé indisponible</span>`;
+    return `${claudeBit('session 5h', rl.fiveHour, rl)} ${claudeBit('semaine', rl.sevenDay, rl)}`.trim();
   }
 
   // ---------- Menu « jobs » : détail de ce qui tourne, avec l'avancement ----------
@@ -1267,4 +1283,88 @@
     try { await api(`/api/prospects/${sel.dataset.prospect}/status`, { status: sel.value }); sel.className = `st-${sel.value}`; toast('Statut mis à jour'); }
     catch (err) { toast(err.message, 'error'); }
   });
+
+  // ---------- Fond : constellation de particules qui fuient la souris ----------
+  // Canvas 2D, ~90 points max : léger. Coupé quand l'onglet est caché, figé si l'OS demande moins d'animations.
+  (function particles() {
+    const cv = $('#bg');
+    const ctx = cv?.getContext?.('2d');
+    if (!ctx) return;
+    const LINK = 120;   // distance max d'un trait entre deux points
+    const R = 170;      // rayon d'influence de la souris
+    const mouse = { x: -1e4, y: -1e4 };
+    let W = 0, H = 0, pts = [], raf = 0, rgb = '47,91,234';
+
+    const readColor = () => {
+      const m = /^#?([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec(getComputedStyle(document.documentElement).getPropertyValue('--accent').trim());
+      if (m) rgb = m.slice(1).map((h) => parseInt(h, 16)).join(',');
+    };
+    const spawn = () => {
+      const a = Math.random() * Math.PI * 2, s = 0.12 + Math.random() * 0.25;
+      const bvx = Math.cos(a) * s, bvy = Math.sin(a) * s;
+      return { x: Math.random() * W, y: Math.random() * H, vx: bvx, vy: bvy, bvx, bvy, r: 1 + Math.random() * 1.6 };
+    };
+    function resize() {
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      W = window.innerWidth; H = window.innerHeight;
+      cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const n = Math.round(Math.min(110, Math.max(30, (W * H) / 13000)));
+      while (pts.length < n) pts.push(spawn());
+      pts.length = n;
+    }
+    function step() {
+      for (const p of pts) {
+        const dx = p.x - mouse.x, dy = p.y - mouse.y, d = Math.hypot(dx, dy);
+        if (d < R && d > 0.5) { const f = (1 - d / R) * 0.45; p.vx += (dx / d) * f; p.vy += (dy / d) * f; }
+        // Revient doucement à sa dérive de base après une poussée
+        p.vx += (p.bvx - p.vx) * 0.03; p.vy += (p.bvy - p.vy) * 0.03;
+        p.x += p.vx; p.y += p.vy;
+        if (p.x < -12) p.x = W + 12; else if (p.x > W + 12) p.x = -12;
+        if (p.y < -12) p.y = H + 12; else if (p.y > H + 12) p.y = -12;
+      }
+    }
+    function draw() {
+      ctx.clearRect(0, 0, W, H);
+      ctx.lineWidth = 1;
+      for (let i = 0; i < pts.length; i++) {
+        const a = pts[i];
+        for (let j = i + 1; j < pts.length; j++) {
+          const b = pts[j], dx = a.x - b.x, dy = a.y - b.y, d2 = dx * dx + dy * dy;
+          if (d2 > LINK * LINK) continue;
+          ctx.strokeStyle = `rgba(${rgb},${((1 - Math.sqrt(d2) / LINK) * 0.38).toFixed(3)})`;
+          ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+        }
+        const md = Math.hypot(a.x - mouse.x, a.y - mouse.y);
+        if (md < R) {
+          ctx.strokeStyle = `rgba(${rgb},${((1 - md / R) * 0.45).toFixed(3)})`;
+          ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(mouse.x, mouse.y); ctx.stroke();
+        }
+      }
+      for (const p of pts) {
+        const glow = Math.max(0, 1 - Math.hypot(p.x - mouse.x, p.y - mouse.y) / R);
+        ctx.fillStyle = `rgba(${rgb},${(0.6 + glow * 0.4).toFixed(3)})`;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r + glow * 1.5, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+    const loop = () => { step(); draw(); raf = requestAnimationFrame(loop); };
+    const start = () => { cancelAnimationFrame(raf); if (reduceMotion.matches) draw(); else raf = requestAnimationFrame(loop); };
+
+    window.addEventListener('pointermove', (e) => { mouse.x = e.clientX; mouse.y = e.clientY; }, { passive: true });
+    document.addEventListener('pointerleave', () => { mouse.x = mouse.y = -1e4; });
+    window.addEventListener('blur', () => { mouse.x = mouse.y = -1e4; });
+    // Un clic souffle les particules alentour
+    window.addEventListener('pointerdown', (e) => {
+      for (const p of pts) {
+        const dx = p.x - e.clientX, dy = p.y - e.clientY, d = Math.hypot(dx, dy);
+        if (d < 240 && d > 0.5) { const f = (1 - d / 240) * 5; p.vx += (dx / d) * f; p.vy += (dy / d) * f; }
+      }
+    }, { passive: true });
+    let rt;
+    window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { resize(); start(); }, 120); });
+    document.addEventListener('visibilitychange', () => { if (document.hidden) cancelAnimationFrame(raf); else start(); });
+    matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readColor);
+    reduceMotion.addEventListener('change', start);
+    readColor(); resize(); start();
+  })();
 })();
