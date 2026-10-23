@@ -217,12 +217,16 @@ test('couche service : getProject, enqueue, cancelJob, budget, usage, rapport, e
 });
 
 test('réglages : chaque compte a les siens', async () => {
-  const r = await B.post('/settings', { notify_email: 'b-notify@x.fr', forgejo_host: 'git.b.fr', global_daily_cap: '5', send_delay_min: '5', send_delay_max: '6' }, { form: true });
+  const r = await B.post('/settings', { notify_email: 'b-notify@x.fr', git_type_0: 'forgejo', git_host_0: 'git.b.fr', git_token_0: 'tok-de-b', global_daily_cap: '5', send_delay_min: '5', send_delay_max: '6' }, { form: true });
   assert.equal(r.status, 303);
   const val = (u, k) => s.db.prepare('SELECT value FROM user_settings WHERE user_id = ? AND `key` = ?').get(u, k).then((x) => x?.value);
   assert.equal(await val(B.id, 'notify_email'), 'b-notify@x.fr');
   assert.equal(await val(A.id, 'notify_email'), 'a-notify@secret-a.fr', 'les réglages de A sont intacts');
-  assert.equal(await val(A.id, 'forgejo_host'), 'git.test');
+  assert.equal(await val(A.id, 'forgejo_host'), 'git.test', 'le serveur Git de A est intact');
+  assert.equal(await val(A.id, 'git_servers_json'), undefined, 'et B n\'a rien écrit chez A');
+  const servers = JSON.parse(await val(B.id, 'git_servers_json'));
+  assert.deepEqual(servers.map((x) => x.host), ['git.b.fr']);
+  assert.ok(!JSON.stringify(servers).includes('tok-de-b'), 'le token de B est chiffré');
 });
 
 test('tâches de fond : le planificateur ne traite que les comptes actifs, projet par projet avec son propriétaire', async () => {

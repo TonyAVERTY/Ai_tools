@@ -330,13 +330,16 @@ Dans Zero Trust, va dans Networks → Tunnels → Create a tunnel (Cloudflared).
 - Public hostname : `ai.tony-averty.dev` → `http://localhost:3100`
 - Copie le token, `install.sh` te le demandera.
 
-### Dépôts Git : GitHub par défaut, serveur perso facultatif
+### Dépôts Git : GitHub par défaut, serveurs ajoutables
 
-- **GitHub est accepté d'office** (`github.com`, dépôts publics), sans rien configurer : `https://github.com/utilisateur/projet.git`.
-- **Un serveur Git personnel** (Forgejo, Gitea) s'ajoute dans **Réglages → Dépôts Git** : hôte (`git.tony-averty.dev`) et token. Il s'**ajoute** à GitHub, il ne le remplace pas. Les réglages gardent leurs clés historiques (`forgejo_host`, `forgejo_token_enc`), rien à migrer.
-- **Le token n'est présenté qu'à cet hôte** (`gitTokenFor`, `src/projects.js`) : jamais à GitHub ni à un autre serveur. Sans hôte perso renseigné, aucun token n'est envoyé.
-- **Limite connue** : les dépôts GitHub privés ne sont pas pris en charge (pas de token pour GitHub).
-- Côté Forgejo, le token se crée dans Paramètres → Applications, avec la portée `read:repository` seulement.
+**Réglages → Dépôts Git**, par utilisateur :
+
+- **GitHub est toujours là** (`github.com`), avec un champ pour son token. Un lien public (`https://github.com/utilisateur/projet.git`) passe sans rien régler ; un dépôt **privé** demande un token.
+- **Le « + »** propose le type de serveur à ajouter (Forgejo, Gitea, GitLab), puis une ligne avec les mêmes champs : **URL** et **token**. Jusqu'à 5 serveurs. Un serveur sans token ne sert que pour des dépôts publics.
+- **Authentification** selon le type : Forgejo et Gitea en `Authorization: token …`, GitHub en Basic (`x-access-token`), GitLab en Basic (`oauth2`). **GitLab n'a pas été testé contre un vrai serveur.**
+- **Chaque token n'est présenté qu'à son hôte exact** (`gitCredentialFor`, `src/gitservers.js`), jamais à un autre ni à un hôte qui lui ressemble. Il est chiffré en base, jamais réaffiché, remplaçable, supprimable. Changer l'URL d'un serveur ne lui laisse pas son ancien token. Les erreurs de git masquent les en-têtes d'authentification.
+- **Token GitHub conseillé** : « fine-grained », *Only select repositories*, permission *Contents : Read-only*. Côté Forgejo/Gitea : portée `read:repository` ; GitLab : `read_repository`.
+- **Compatibilité** : l'ancien réglage unique (`forgejo_host` + `forgejo_token_enc`) reste lu comme un premier serveur Forgejo, et entre dans la liste (`git_servers_json`) à la première sauvegarde des Réglages.
 
 ## À faire côté mails (sinon spam garanti)
 

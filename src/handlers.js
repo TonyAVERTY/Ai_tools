@@ -18,7 +18,8 @@ import { getUser } from './users.js';
 import { pinSmtp, pinGit } from './netguard.js';
 import { sendPause, pauseMessage, evaluateSending } from './services/abuse.js';
 import { evolutionMail } from './services/mailhtml.js';
-import { getProject, repoDir, gitTokenFor, globalSmtp, sentSince, getTemplate, saveTemplate, pickVariant } from './projects.js';
+import { gitCredentialFor } from './gitservers.js';
+import { getProject, repoDir, globalSmtp, sentSince, getTemplate, saveTemplate, pickVariant } from './projects.js';
 
 const sleep = (ms, signal) => new Promise((resolve, reject) => {
   const t = setTimeout(resolve, ms);
@@ -115,7 +116,10 @@ export function makeHandlers(app) {
   const { db, cfg } = app;
   const claude = makeClaude(app);
   // Dépôts Git (GitHub ou serveur perso) : l'hôte est revérifié à chaque synchronisation, git se connecte à l'adresse vérifiée
-  const sync = async (userId, url, dir, token) => (app.syncRepo || syncRepo)(url, dir, token, { pin: await pinGit(app, userId, url) });
+  const sync = async (userId, url, dir) => {
+    const cred = await gitCredentialFor(app, userId, url); // le token de SON hôte seulement, jamais celui d'un autre
+    return (app.syncRepo || syncRepo)(url, dir, cred?.token ?? null, { pin: await pinGit(app, userId, url), scheme: cred?.scheme, user: cred?.user });
+  };
   const inHours = () => (app.isBusinessHours || isBusinessHours)();
 
   // Premier mail ou relance : mêmes plafonds, mêmes délais, même journal
@@ -214,7 +218,7 @@ export function makeHandlers(app) {
       const project = await getProject(app, ctx.job.project_id, { userId });
       await ctx.progress({ message: 'Récupération du repo…', pct: 3 });
       const dir = repoDir(cfg, userId, project.id);
-      const commit = await sync(userId, project.gitUrl, dir, await gitTokenFor(app, userId, project.gitUrl));
+      const commit = await sync(userId, project.gitUrl, dir);
 
       await ctx.progress({ message: 'Analyse du code par Claude…', pct: 10 });
       const { prompt, system } = analyzePrompt(project.name);
@@ -369,7 +373,7 @@ export function makeHandlers(app) {
 
       await ctx.progress({ message: 'Mise à jour du repo…', pct: 3 });
       const dir = repoDir(cfg, userId, project.id);
-      await sync(userId, project.gitUrl, dir, await gitTokenFor(app, userId, project.gitUrl));
+      await sync(userId, project.gitUrl, dir);
 
       await ctx.progress({ message: `Recherche de ${count} évolutions (${level})…`, pct: 10 });
       const { prompt, system } = evolutionPrompt({ projectName: project.name, profile: project.profile, count, level });
