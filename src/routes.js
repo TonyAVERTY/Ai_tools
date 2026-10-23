@@ -13,7 +13,7 @@ import { loginPage } from './site/pages.js';
 import { registerSiteRoutes } from './site/routes.js';
 import { registerAdminRoutes } from './adminroutes.js';
 import { loginsOf } from './claudelogin.js';
-import { accessOn, memberTeamIds } from './teams.js';
+import { accessOn, memberTeamIds, needAccess } from './teams.js';
 import { registerTeamRoutes } from './teamroutes.js';
 import { registerMailRoutes } from './mailroutes.js';
 import { registerLinkedinRoutes } from './linkedinroutes.js';
@@ -30,8 +30,10 @@ import { cpuTemp } from './services/thermal.js';
 import { checkInbox } from './services/inbox.js';
 import { followupPlan } from './services/followup.js';
 import { warmupAdvice } from './services/warmup.js';
+import { PROMPT_DEFS, parseCustomPrompts, MAX_CUSTOM } from './services/prompts.js';
 import { nextNightSlot } from './services/paris-time.js';
 import { notify, notifyConfig, saveDiscordHooks, publicHooks, EVENTS, MAX_HOOKS } from './services/notify.js';
+import { listChannels, saveChannels, publicChannels, notifyChannels, CHANNEL_TYPES } from './services/channels.js';
 import { budgetState, AI_JOBS } from './services/budget.js';
 import { currentClaudeQuota } from './services/usagelive.js';
 import { sendWeeklyReport } from './services/report.js';
@@ -40,7 +42,7 @@ import { quotaFor, planLimitError, withUserLock, assertRoom, usageView } from '.
 import { history, saveSnapshot } from './services/metrics.js';
 import { evolutionHtml } from './services/markdown.js';
 import {
-  listProspects, parseFilters, STATUSES as PROSPECT_STATUSES, prospectDetail, addNote, deleteNote, setNextAction,
+  listProspects, kanbanColumns, parseFilters, STATUSES as PROSPECT_STATUSES, prospectDetail, addNote, deleteNote, setNextAction,
 } from './services/crm.js';
 import {
   getProject, listProjects, createProject, saveSecretConfig, publicConfig,
@@ -139,6 +141,7 @@ export function registerRoutes(router, app) {
   router.get('/settings', async ({ res, session, url }) => {
     const userId = session.userId;
     const discord = await notifyConfig(app, userId);
+    const promptsRaw = await getSetting(db, userId, 'prompts_json', '');
     const s = {
       notify_email: await getSetting(db, userId, 'notify_email', ''),
       git_servers: publicGitServers(await listGitServers(db, userId)),
@@ -153,6 +156,9 @@ export function registerRoutes(router, app) {
       budget_month_usd: await getSetting(db, userId, 'budget_month_usd', ''),
       priced: (await getLinkState(db, userId))?.mode === MODES.api_key, // plafonds en $ : seulement avec une clé API
       discord: { hooks: publicHooks(discord.hooks), all: EVENTS, max: MAX_HOOKS },
+      channels: publicChannels(await listChannels(app, userId, Object.keys(EVENTS))), canEmail: !!cfg.systemSmtp,
+      prompts: (() => { const own = parseCustomPrompts(promptsRaw); return Object.entries(PROMPT_DEFS).map(([key, d]) => ({ key, label: d.label, fixed: d.fixed, vars: d.vars, def: d.text, text: own[key] ?? d.text, custom: key in own })); })(),
+      promptMax: MAX_CUSTOM,
     };
     html(res, settingsPage({ email: session.email, s, saved: url.searchParams.has('ok') }));
   });
@@ -181,6 +187,14 @@ export function registerRoutes(router, app) {
     if (b.budget_month_usd !== undefined) await set('budget_month_usd', money(b.budget_month_usd));
 
     await saveDiscordHooks(app, userId, b);
+    await saveChannels(app, userId, b, Object.keys(EVENTS));
+    // Consignes des prompts : seules celles qui diffèrent du défaut sont gardées ; vide = retour au défaut
+    if (Object.keys(PROMPT_DEFS).some((k) => b[`prompt_${k}`] !== undefined)) {
+      const sent = Object.fromEntries(Object.keys(PROMPT_DEFS).map((k) => [k, String(b[`prompt_${k}`] ?? '')]));
+      if (Object.values(sent).some((v) => v.length > MAX_CUSTOM)) throw new HttpError(400, `Une consigne dépasse ${MAX_CUSTOM} caractères`, { expose: true });
+      const own = parseCustomPrompts(sent);
+      await set('prompts_json', Object.keys(own).length ? JSON.stringify(own) : '');
+    }
     redirect(res, '/settings?ok');
   });
 
@@ -287,11 +301,19 @@ export function registerRoutes(router, app) {
   router.post('/api/notify/test', async ({ req, res, session }) => {
     const b = await readBody(req);
     const { hooks } = await notifyConfig(app, session.userId);
-    if (!hooks.length) throw new HttpError(400, 'Aucun webhook Discord configuré');
+    const test = { title: 'Notification de test', description: 'Les notifications AiTools arrivent bien ici.', level: 'ok' };
+    // Un canal précis (Slack, Telegram, e-mail)
+    if (b.channel) {
+      if (!CHANNEL_TYPES[b.channel]) throw new HttpError(400, 'Canal inconnu');
+      const done = await notifyChannels(app, session.userId, 'test', test, Object.keys(EVENTS), { force: true, only: String(b.channel) });
+      if (!done.length) throw new HttpError(502, `${CHANNEL_TYPES[b.channel]} n'a pas accepté la notification (réglage à vérifier${b.channel === 'email' ? ', SMTP du serveur compris' : ''})`);
+      return json(res, { ok: true });
+    }
+    if (!hooks.length && !Object.keys(await listChannels(app, session.userId, Object.keys(EVENTS))).length) throw new HttpError(400, 'Aucun canal de notification configuré');
     const hookId = b.hook ? String(b.hook) : null;
     if (hookId && !hooks.some((h) => h.id === hookId)) throw new HttpError(404, 'Webhook introuvable');
-    const ok = await notify(app, session.userId, 'test', { title: 'Notification de test', description: 'Les notifications AiTools arrivent bien ici.', level: 'ok' }, { force: true, hookId });
-    if (!ok) throw new HttpError(502, 'Discord a refusé la notification (webhook supprimé ?)');
+    const ok = await notify(app, session.userId, 'test', test, { force: true, hookId });
+    if (!ok) throw new HttpError(502, 'Aucun canal n\'a accepté la notification (webhook supprimé ?)');
     json(res, { ok: true });
   }, { limit: 'mail_send' });
 
@@ -365,6 +387,7 @@ export function registerRoutes(router, app) {
     const jobs = await latestJobs(db, p.id);
     // Rendu côté serveur (échappé) : le front n'injecte jamais le Markdown brut de Claude
     if (jobs.evolution?.result?.markdown) jobs.evolution.result.html = evolutionHtml(jobs.evolution.result.markdown);
+    if (jobs.audit?.result?.markdown) jobs.audit.result.html = evolutionHtml(jobs.audit.result.markdown);
     const tplOut = (row) => (row ? { subject: row.subject, subjectB: row.subject_b, body: row.body, status: row.status, updated_at: row.updated_at } : null);
     const templates = { initial: tplOut(await getTemplate(db, p.id, 'initial')), followup: tplOut(await getTemplate(db, p.id, 'followup')) };
     const stats = await prospectStats(db, p.id);
@@ -434,6 +457,9 @@ export function registerRoutes(router, app) {
     await assertRoom(db, await getUser(db, p.userId), 'prospects');
     if (!p.targetValidated) throw new HttpError(400, 'Valide la cible avant de prospecter');
   }));
+  // Audit du dépôt : réservé aux administrateurs du projet (il lit tout le code), jamais aux simples membres
+  router.post('/api/projects/:id/code-review', jobRoute('audit', (b) => ({ level: ['rapide', 'normal', 'approfondi'].includes(b.level) ? b.level : 'rapide' }),
+    (p) => needAccess(p.access, 'admin', "l'audit du code")));
   router.post('/api/projects/:id/evolution', jobRoute('evolution', (b) => ({
     count: int(b.count, 1, 20, 5),
     level: ['rapide', 'normal', 'approfondi'].includes(b.level) ? b.level : 'rapide',
@@ -573,6 +599,12 @@ export function registerRoutes(router, app) {
     json(res, await listProspects(db, p.id, parseFilters(url.searchParams)));
   });
 
+  router.get('/api/projects/:id/kanban', async (ctx) => {
+    const { res, url } = ctx;
+    const p = await project(ctx);
+    json(res, { columns: await kanbanColumns(db, p.id, parseFilters(url.searchParams)) });
+  });
+
   const STATUSES = Object.keys(PROSPECT_STATUSES);
   // ---------- Fiche prospect ----------
   // Un prospect n'est accessible que par le propriétaire de son projet ; sinon 404, comme s'il n'existait pas
@@ -581,7 +613,7 @@ export function registerRoutes(router, app) {
       WHERE x.id = ?`).get(Number(params.id));
     // Le propriétaire du projet ou un membre de l'équipe qui le partage ; sinon 404, comme s'il n'existait pas
     if (!row || !(await accessOn(db, { user_id: row.user_id, team_id: row.team_id }, session.userId))) throw new HttpError(404, 'Prospect introuvable');
-    return { id: row.id, email: row.email };
+    return { id: row.id, email: row.email, projectId: Number(row.pid), ownerId: Number(row.user_id) };
   };
   router.post('/api/prospects/:id/status', async (ctx) => {
     const { req, res } = ctx;
@@ -597,7 +629,20 @@ export function registerRoutes(router, app) {
     json(res, { ok: true });
   });
 
-  router.get('/api/prospects/:id', async (ctx) => json(ctx.res, await prospectDetail(db, (await ownedProspect(ctx)).id)));
+  router.get('/api/prospects/:id', async (ctx) => {
+    const row = await ownedProspect(ctx);
+    const detail = await prospectDetail(db, row.id);
+    // Régénération de l'accroche en cours ou terminée pour CE prospect
+    const job = await db.prepare("SELECT status, error, result_json FROM jobs WHERE project_id = ? AND type = 'hook' AND params_json = ? ORDER BY id DESC LIMIT 1")
+      .get(row.projectId, JSON.stringify({ prospectId: row.id }));
+    json(ctx.res, { ...detail, hookJob: job ? { status: job.status, error: job.error } : null });
+  });
+  router.post('/api/prospects/:id/hook', async (ctx) => {
+    const row = await ownedProspect(ctx);
+    await assertCanRunAi(db, row.ownerId, aiOpts);
+    const r = await enqueue(db, { userId: row.ownerId, projectId: row.projectId, type: 'hook', params: { prospectId: row.id } }, aiOpts);
+    json(ctx.res, r);
+  }, { limit: 'enrich' });
   router.post('/api/prospects/:id/notes', async (ctx) => {
     const id = (await ownedProspect(ctx)).id;
     const noteId = await addNote(db, id, (await readBody(ctx.req)).body);

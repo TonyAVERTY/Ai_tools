@@ -277,7 +277,8 @@ select.st-replied, select.st-client { color: var(--ok); font-weight: 600; }
 select.st-refused, select.st-bounced, select.st-invalid { color: var(--err); font-weight: 600; }
 select.st-new { color: var(--link); font-weight: 600; }
 pre.md { white-space: pre-wrap; background: var(--bg-sunk); padding: 12px; border-radius: var(--radius); font-size: .875rem; max-height: 480px; overflow: auto; }
-.pfilters { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+.pfilters { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; align-items: center; }
+.pfilters input[type="search"] { grid-column: 1 / -1; } /* la recherche prend toute la ligne, les filtres se répartissent selon la place réelle du panneau */
 .pfilters input, .pfilters select { margin: 0; }
 .csv { justify-content: flex-start; }
 label.btn.file { margin: 0; }
@@ -489,8 +490,6 @@ input.copy { font-family: var(--mono); font-size: .8125rem; }
   .form, .grid2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .grid3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .opts { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .pfilters { grid-template-columns: minmax(0, 1.4fr) repeat(3, minmax(0, 1fr)); }
-  .pfilters input[type="search"] { grid-column: 1 / -1; }
 }
 
 @media (min-width: 900px) {
@@ -517,8 +516,6 @@ input.copy { font-family: var(--mono); font-size: .8125rem; }
   .toc a:hover { color: var(--text); }
   .toc a[aria-current="true"] { color: var(--text); font-weight: 600; box-shadow: inset 2px 0 0 var(--accent); }
   .settings-main { max-width: 780px; }
-  .pfilters { grid-template-columns: minmax(0, 1.4fr) repeat(4, auto); }
-  .pfilters input[type="search"] { grid-column: auto; }
   /* mise en route : panneau flottant, ou pastille ronde quand elle est réduite */
   .todo { left: 24px; right: auto; bottom: 24px; width: 340px; border-width: 1px; border-radius: var(--radius-lg); max-height: min(70vh, 560px); }
   .todo.min { width: 64px; height: 64px; border-radius: 999px; }
@@ -611,3 +608,28 @@ input.copy { font-family: var(--mono); font-size: .8125rem; }
 .reply-x:hover { background: var(--bg-sunk); color: var(--text); }
 .pill-n { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; margin-left: 6px; padding: 0 5px; border-radius: 999px; background: var(--accent); color: var(--on-accent, #fff); font-size: .6875rem; font-weight: 700; line-height: 1; }
 .card h1 .ic { width: 24px; height: 24px; margin-right: 10px; vertical-align: -4px; }
+
+/* ---------- Réglages : prompts modifiables ---------- */
+.prompt-def { border: 1px solid var(--line); border-radius: var(--radius); margin: 0 0 10px; background: var(--card); }
+.prompt-def > summary { display: flex; align-items: center; gap: 10px; padding: 12px 14px; min-height: 44px; cursor: pointer; font-weight: 600; }
+.prompt-def[open] > summary { border-bottom: 1px solid var(--line); }
+.prompt-def > :not(summary) { margin-left: 14px; margin-right: 14px; }
+.prompt-def > label { margin-top: 12px; }
+.prompt-def textarea { width: 100%; font: .875rem/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.prompt-def .row-actions { margin-bottom: 14px; }
+
+/* ---------- Prospects : vue Kanban ---------- */
+.viewtoggle { display: inline-flex; gap: 6px; margin: 0 0 12px; }
+.viewtoggle .btn.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent, #fff); }
+.kanban { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(230px, 1fr); gap: 12px; overflow-x: auto; padding-bottom: 8px; align-items: start; }
+.kcol { background: var(--bg-sunk); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px; min-height: 120px; transition: border-color var(--t-fast) var(--ease), background var(--t-fast) var(--ease); }
+.kcol.over { border-color: var(--accent); background: var(--card); }
+.kcol h4 { display: flex; justify-content: space-between; margin: 0 0 8px; font-size: .875rem; }
+.kcol h4 .n { color: var(--muted); font-weight: 500; }
+.kcards { display: flex; flex-direction: column; gap: 8px; }
+.kcard { background: var(--card); border: 1px solid var(--line-strong); border-radius: 10px; padding: 10px; cursor: grab; display: flex; flex-direction: column; gap: 4px; overflow-wrap: anywhere; }
+.kcard.drag { opacity: .45; }
+.kcard select { margin-top: 4px; width: 100%; font-size: .8125rem; }
+.hook-row { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin: 8px 0; }
+.hook-row .hook { margin: 0; }
+.kcard .link { text-align: left; align-self: flex-start; }

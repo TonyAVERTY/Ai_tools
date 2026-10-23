@@ -280,3 +280,31 @@ test('quota Claude serré : alerte Discord à 80 %, pas en dessous', async () =>
     assert.equal(sent.length, 1);
   } finally { rmSync(s.tmp, { recursive: true, force: true }); }
 });
+
+test('audit du dépôt, accroche régénérée, consignes personnalisées transmises à Claude', async () => {
+  const s = await setup();
+  try {
+    assert.equal((await run(s, 'analyze')).status, 'done');
+    // Audit : rapport Markdown en lecture seule, gardé dans le résultat du job
+    const au = await run(s, 'audit', { level: 'rapide' });
+    assert.equal(au.status, 'done', au.error);
+    assert.match(au.result.markdown, /## Constats[\s\S]*src\/a\.js:1/);
+    // Accroche : remplace l'ancienne, complète la ville / le secteur manquants sans écraser ceux qui existent
+    const pid = Number((await s.db.prepare("INSERT INTO prospects(project_id, company, email, website, city, hook, status, created_at) VALUES(?, 'Boulangerie Le Fournil', 'c@fournil.fr', 'https://fournil.fr', 'Vern', 'ancienne accroche', 'new', ?)").run(s.id, now())).lastInsertRowid);
+    const h = await run(s, 'hook', { prospectId: pid });
+    assert.equal(h.status, 'done', h.error);
+    const row = await s.db.prepare('SELECT hook, city, sector FROM prospects WHERE id = ?').get(pid);
+    assert.match(row.hook, /Fournil : des fournées/);
+    assert.equal(row.city, 'Vern', 'la ville renseignée n\'est pas écrasée');
+    assert.equal(row.sector, 'boulangerie', 'le secteur manquant est complété');
+    // Un prospect d'un autre projet n'est jamais touché
+    const other = await run(s, 'hook', { prospectId: 999999 });
+    assert.match(other.error, /Prospect introuvable/);
+    // Consignes personnalisées : elles font partie du prompt reçu par Claude (CRASH fait échouer la fausse CLI), le défaut non
+    assert.equal((await run(s, 'template')).status, 'done');
+    await setSetting(s.db, s.userId, 'prompts_json', JSON.stringify({ template: 'CRASH' }));
+    assert.equal((await run(s, 'template')).status, 'error', 'la consigne personnalisée est bien transmise');
+    await setSetting(s.db, s.userId, 'prompts_json', '');
+    assert.equal((await run(s, 'template')).status, 'done', 'retour au défaut');
+  } finally { rmSync(s.tmp, { recursive: true, force: true }); }
+});

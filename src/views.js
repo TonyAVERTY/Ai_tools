@@ -362,6 +362,10 @@ function projectItem(p, smtp, dbCfg, imap) {
     </section>`, { cls: 'sub' })}
 
     ${acc('prospects', 'users', 'Prospects <span data-count></span>', 'Recherche, filtres, fiches, import et export CSV', `
+      <div class="viewtoggle" role="group" aria-label="Affichage des prospects">
+        <button type="button" class="btn small on" data-view-mode="list" aria-pressed="true">Liste</button>
+        <button type="button" class="btn small" data-view-mode="board" aria-pressed="false">Kanban</button>
+      </div>
       <form class="pfilters" data-filters>
         <input type="search" name="q" placeholder="Rechercher : entreprise, email, ville, secteur" aria-label="Rechercher">
         <select name="status" aria-label="Statut"><option value="">Tous les statuts</option>${Object.entries(STATUSES).map(([k, l]) => `<option value="${k}">${l}</option>`).join('')}</select>
@@ -391,6 +395,19 @@ function projectItem(p, smtp, dbCfg, imap) {
       <button class="btn primary">Chercher et envoyer par mail</button>
     </form>
     <div class="job" data-job="evolution"></div>`, { cls: 'main' })}
+
+  ${p.access !== 'member' ? acc('audit', 'shield', 'Audit du projet', 'Rapport qualité et sécurité du code, en lecture seule', `
+    <form data-action="audit" data-id="${p.id}" class="inline">
+      <label>Raisonnement<select name="level">
+        <option value="rapide" selected>Rapide (Haiku, économe)</option>
+        <option value="normal">Normal (Sonnet, plus cher)</option>
+        <option value="approfondi">Approfondi (Opus, coûteux)</option>
+      </select></label>
+      <label>Quand<select name="when"><option value="now">Maintenant</option><option value="night">Cette nuit (1h-6h)</option></select></label>
+      <button class="btn primary">${ic('shield')}Lancer l'audit</button>
+    </form>
+    <p class="muted small">Claude lit le dépôt (sans rien modifier) et signale les défauts de code, de sécurité, de tests et de dépendances, avec le fichier concerné.</p>
+    <div class="job" data-job="audit"></div>`, { cls: 'main' }) : ''}
 
   ${acc('linkedin', 'linkedin', 'LinkedIn', 'Relie un compte, Claude écrit des posts, tu relis et publies', `
     <div class="linkedin" data-linkedin><p class="muted">Chargement…</p></div>
@@ -476,6 +493,19 @@ function hookRow(i, h, all, { fresh = false } = {}) {
     </div>`;
 }
 
+/** Carte d'un canal (Slack, Telegram, e-mail) : champs propres au canal, événements reçus, test, retrait. */
+function channelCard(type, label, s, fields) {
+  const c = s.channels[type];
+  return `<div class="gitrow" data-channel="${type}">
+      <div class="gitrow-head"><span class="srv-n">${ic('send')}<span class="badge">${label}</span></span>
+        ${c ? `<span class="row"><button type="button" class="btn" data-notify-test data-channel="${type}">Envoyer un test</button>${trash(`${type}_del`, `Retirer ${label}`)}</span>` : ''}</div>
+      ${fields}
+      <fieldset class="evs"><legend class="lbl">${label} reçoit</legend>
+        <div class="checks">${Object.entries(s.discord.all).map(([k, l]) => check(`${type}_ev_${k}`, c ? c.events.includes(k) : ['reply', 'job_error', 'abuse'].includes(k), esc(l))).join('')}</div>
+      </fieldset>
+    </div>`;
+}
+
 /** Événements que plus aucun webhook ne reçoit : de quoi penser à en ajouter un. */
 function uncovered(d) {
   if (!d.hooks.length) return '';
@@ -483,7 +513,7 @@ function uncovered(d) {
   return missing.length ? `<p class="hint">Aucun webhook ne reçoit pour l'instant : ${missing.join(' · ')}.</p>` : '';
 }
 
-const SETTINGS_TOC = [['notif', 'Notifications'], ['git', 'Dépôts Git'], ['discord', 'Discord'], ['garde', 'Garde-fous'], ['budget', 'Budget et modèles IA'], ['opposition', "Liste d'opposition"]];
+const SETTINGS_TOC = [['notif', 'Notifications'], ['git', 'Dépôts Git'], ['discord', 'Discord'], ['canaux', 'Slack, Telegram, e-mail'], ['garde', 'Garde-fous'], ['budget', 'Budget et modèles IA'], ['prompts', 'Prompts IA'], ['opposition', "Liste d'opposition"]];
 
 export function settingsPage({ email, s, saved }) {
   const model = (name, v) => `<span class="sel"><select name="${name}">
@@ -548,6 +578,15 @@ ${saved ? `<p class="ok-box" role="status">${ic('check')}<span><b>Réglages enre
   </div>
 </section>
 
+<section class="card" id="canaux" aria-labelledby="t-canaux">
+  <div class="card-h"><h2 id="t-canaux">Slack, Telegram, e-mail</h2><p>Les mêmes notifications que Discord, sur d'autres canaux (un de chaque). Les adresses et jetons sont stockés chiffrés et ne sont jamais réaffichés.</p></div>
+  ${channelCard('slack', 'Slack', s, `<label class="field"><span class="lbl">URL du webhook entrant</span><input name="slack_url" type="password" placeholder="${s.channels.slack ? '•••••• (inchangé)' : 'https://hooks.slack.com/services/…'}" autocomplete="off"><span class="hint">Slack : Apps → Incoming Webhooks.</span></label>`)}
+  ${channelCard('telegram', 'Telegram', s, `<label class="field"><span class="lbl">Jeton du bot</span><input name="telegram_token" type="password" placeholder="${s.channels.telegram ? '•••••• (inchangé)' : '123456789:AA…'}" autocomplete="off"><span class="hint">Crée un bot avec @BotFather.</span></label>
+    <label class="field"><span class="lbl">Identifiant de la conversation</span><input name="telegram_chat" value="${esc(s.channels.telegram?.chat || '')}" placeholder="123456789 ou @mon_canal" autocomplete="off"><span class="hint">Écris d'abord à ton bot, puis lis l'identifiant avec @userinfobot.</span></label>`)}
+  ${channelCard('email', 'E-mail', s, `<label class="field"><span class="lbl">Adresse de réception</span><input name="email_to" type="email" value="${esc(s.channels.email?.to || '')}" placeholder="toi@exemple.fr" autocomplete="off"><span class="hint">${s.canEmail ? "Envoyé depuis l'adresse d'AiTools. Au plus 20 notifications par heure." : "Le SMTP du serveur n'est pas configuré : aucun mail ne peut partir pour l'instant."}</span></label>`)}
+  <div class="save"><button class="btn primary">Enregistrer les réglages</button></div>
+</section>
+
 <section class="card" id="garde" aria-labelledby="t-garde">
   <div class="card-h"><h2 id="t-garde">Garde-fous</h2><p>Des plafonds et des délais pour garder la main.</p></div>
   <div class="grid2">
@@ -572,6 +611,18 @@ ${saved ? `<p class="ok-box" role="status">${ic('check')}<span><b>Réglages enre
 
 <div class="save"><button class="btn primary">Enregistrer</button></div>
 </form>
+
+<section class="card" id="prompts" aria-labelledby="t-prompts">
+  <div class="card-h"><h2 id="t-prompts">Prompts IA</h2><p>Les consignes que Claude reçoit pour chaque tâche. Modifie-les pour changer le style, le ton ou les règles. Le contexte du projet et le format de réponse restent ajoutés automatiquement : un prompt modifié ne peut pas casser la lecture de la réponse. Ce qui est vide revient au texte par défaut.</p></div>
+  ${(s.prompts || []).map((p) => `<details class="prompt-def"${p.custom ? ' open' : ''}>
+    <summary><span>${esc(p.label)}</span>${p.custom ? ' <span class="badge warn">modifié</span>' : ''}</summary>
+    <label class="field"><span class="lbl">Consignes</span>
+      <textarea name="prompt_${p.key}" rows="9" maxlength="${s.promptMax}" data-prompt-text>${esc(p.text)}</textarea></label>
+    <p class="muted small">${esc(p.fixed)}${p.vars.length ? ` Valeurs insérées automatiquement : ${p.vars.map((v) => `<code>[[${v}]]</code>`).join(', ')}.` : ''}</p>
+    <div class="row-actions"><button type="button" class="btn small" data-prompt-reset data-default="${esc(p.def)}">${ic('repeat')}Revenir au texte par défaut</button></div>
+  </details>`).join('\n  ')}
+  <div class="save"><button class="btn primary">Enregistrer les réglages</button></div>
+</section>
 
 <section class="card" id="opposition" aria-labelledby="t-opp">
   <div class="card-h"><h2 id="t-opp">Liste d'opposition</h2></div>
