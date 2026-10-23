@@ -225,11 +225,11 @@ test('Mon compte et tableau de bord : barres d\'usage du mois, plafond atteint s
       const h = await (await u.get(page, { headers: { accept: 'text/html' } })).text();
       assert.match(h, /Usage du mois/, page);
       assert.match(h, /plan gratuit/, page);
-      assert.match(h, /Mails ce mois-ci<\/span><span class="jpct">100 \/ 100/, page);
-      assert.match(h, /<div class="bar usage full"><span class="w-100">/, page);
+      assert.match(h, /Mails ce mois-ci<\/span><span class="g-v">100 \/ 100/, page);
+      assert.match(h, /<div class="bar usage full"[^>]*><span class="w-100">/, page);
       assert.match(h, /<span class="w-100">/);
       assert.match(h, /Plafond atteint : .*mails ce mois-ci/, page);
-      assert.match(h, /Projets<\/span><span class="jpct">1 \/ 1/, page);
+      assert.match(h, /Projets<\/span><span class="g-v">1 \/ 1/, page);
       assert.doesNotMatch(h, /style="/, 'pas de style en ligne (CSP)');
     }
     assert.ok(pid);

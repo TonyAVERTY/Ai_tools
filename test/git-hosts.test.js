@@ -172,7 +172,7 @@ const rawServers = async (id) => JSON.parse((await getSetting(s.db, id, 'git_ser
 test('réglages : GitHub et son token d\'abord, puis le « + » avec le choix du type, sans serveur par défaut', async () => {
   const u = await user();
   const html = await (await u.get('/settings', { headers: { accept: 'text/html' } })).text();
-  assert.match(html, /<strong>GitHub<\/strong>/);
+  assert.match(html, /<span class="badge">github\.com<\/span>/);
   assert.match(html, /name="github_token"/);
   assert.match(html, /data-git-add/);
   for (const t of ['forgejo', 'gitea', 'gitlab']) assert.match(html, new RegExp(`<option value="${t}"`), t);
@@ -204,7 +204,7 @@ test('réglages : on ajoute plusieurs serveurs de types différents, chacun avec
   // la page les affiche, jamais les tokens
   const html = await (await u.get('/settings', { headers: { accept: 'text/html' } })).text();
   assert.match(html, /value="git\.a\.fr"/);
-  assert.match(html, /<strong>GitLab<\/strong>/);
+  assert.match(html, /<span class="badge">GitLab<\/span>/);
   assert.ok(!html.includes('tok-a') && !html.includes('tok-b'));
   assert.equal((html.match(/placeholder="•••••• \(inchangé\)"/g) || []).length, 2, 'deux tokens enregistrés, un sans');
   // tous leurs hôtes sont acceptés à la création d'un projet
