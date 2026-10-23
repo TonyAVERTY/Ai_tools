@@ -833,3 +833,42 @@ html.nav-busy { cursor: progress; }
 .nav-bar.on { opacity: 1; animation: nav-run 1.1s ease-in-out infinite; }
 @keyframes nav-run { 0% { left: 0; width: 0; } 50% { left: 15%; width: 60%; } 100% { left: 100%; width: 0; } }
 @media (prefers-reduced-motion: reduce) { .nav-bar.on { animation: none; width: 100%; } }
+
+/* ---------- Page IA : pièces jointes (photos, vidéos, fichiers, projet) ---------- */
+.chat-form { flex-direction: column; align-items: stretch; gap: 8px; }
+.chat-row { display: flex; align-items: flex-end; gap: 8px; }
+.chat-row textarea { flex: 1; min-width: 0; }
+.icon-btn { display: grid; place-items: center; flex: none; width: 44px; min-width: 44px; padding: 0; list-style: none; cursor: pointer; }
+.icon-btn::-webkit-details-marker { display: none; }
+.icon-btn .ic { width: 20px; height: 20px; }
+.chat-proj { position: relative; flex: none; }
+.chat-proj[open] > summary { border-color: var(--link); background: var(--info-bg); }
+.chat-projlist { position: absolute; left: 0; bottom: calc(100% + 8px); z-index: 20; display: flex; flex-direction: column; min-width: 260px; max-width: min(360px, 80vw); max-height: 260px; overflow-y: auto; padding: 6px; background: var(--card); border: 1px solid var(--line-strong); border-radius: var(--radius); box-shadow: var(--shadow-3); }
+.chat-projlist p { margin: 8px; }
+.chat-projlist button { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 6px 10px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text); font: inherit; text-align: left; cursor: pointer; }
+.chat-projlist button:hover, .chat-projlist button:focus-visible { background: var(--bg-sunk); }
+.chat-projlist button .ic { color: var(--link); }
+.chat-projlist button small { margin-left: auto; }
+.chat-tray { display: flex; flex-wrap: wrap; gap: 8px; }
+.tray-chip { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; min-height: 40px; padding: 4px 6px 4px 10px; border: 1px solid var(--control); border-radius: 999px; background: var(--card); font-size: .875rem; }
+.tray-chip img { width: 30px; height: 30px; border-radius: 6px; object-fit: cover; }
+.tray-chip .ic { width: 16px; height: 16px; color: var(--link); flex: none; }
+.tray-chip .tray-n { min-width: 0; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tray-chip small { color: var(--muted); white-space: nowrap; }
+.tray-chip.bad { border-color: var(--err); background: var(--err-bg); }
+.tray-chip.bad small { color: var(--err); }
+.tray-project { background: var(--info-bg); border-color: var(--link); }
+.tray-x { display: grid; place-items: center; width: 28px; height: 28px; flex: none; border: 0; border-radius: 50%; background: transparent; color: var(--muted); cursor: pointer; }
+.tray-x:hover { background: var(--bg-sunk); color: var(--text); }
+.tray-x .ic { width: 14px; height: 14px; color: inherit; }
+.atts { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; margin-bottom: 6px; }
+.att-img img { display: block; max-width: 220px; max-height: 180px; border-radius: 12px; border: 1px solid var(--line); object-fit: cover; }
+.att-video { display: block; max-width: min(320px, 100%); max-height: 220px; border-radius: 12px; background: var(--bg-sunk); }
+.att-chip { display: inline-flex; align-items: center; gap: 6px; max-width: 260px; padding: 6px 12px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--card); color: var(--text); font-size: .875rem; text-decoration: none; }
+.att-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.att-chip small { color: var(--muted); }
+.att-chip .ic { width: 16px; height: 16px; color: var(--link); flex: none; }
+.att-project { background: var(--info-bg); }
+.msg-status { margin: 4px 6px 0; }
+.chat-main.dragging { outline: 2px dashed var(--accent); outline-offset: -6px; background: var(--info-bg); }
+@media (max-width: 900px) { .chat-row { flex-wrap: wrap; } .chat-row textarea { flex-basis: 100%; order: -1; } .chat-projlist { left: 0; } }
