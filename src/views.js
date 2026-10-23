@@ -23,7 +23,7 @@ function acc(key, icon, title, sub, body, { open = false, cls = '' } = {}) {
 
 const NAV = [['/', 'folder', 'Projets'], ['/mails', 'mail', 'Mails'], ['/calendar', 'clock', 'Calendrier'], ['/team', 'users', 'Équipe']];
 
-export function layout({ title, body, email }) {
+export function layout({ title, body, email, scripts = [] }) {
   return `<!doctype html>
 <html lang="fr">
 <head>
@@ -38,6 +38,7 @@ ${iconLinks()}
 <link rel="stylesheet" href="${assetUrl('/static/responsive.css')}">
 <script src="${assetUrl('/static/app.js')}" defer></script>
 <script src="${assetUrl('/static/responsive.js')}" defer></script>
+${scripts.map((src) => `<script src="${assetUrl(src)}" defer></script>`).join('\n')}
 </head>
 <body class="app">
 <canvas id="bg" aria-hidden="true"></canvas>
@@ -57,6 +58,7 @@ ${email ? `<header class="top">
           <div data-jobs-list></div>
         </div>
       </div>
+      <a class="ia-link" href="/chat" aria-label="Assistant IA">${ic('spark')}<span>IA</span></a>
       <details class="user">
         <summary aria-label="Menu du compte : ${esc(email)}"><span class="avatar" aria-hidden="true">${esc(String(email).trim().charAt(0).toUpperCase())}</span></summary>
         <div class="user-pop">

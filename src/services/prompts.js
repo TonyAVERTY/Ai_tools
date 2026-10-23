@@ -184,6 +184,28 @@ Si la ville ou le secteur sont lisibles sur le site, renvoie-les ; sinon, laisse
       fable: `L'accroche doit donner l'impression qu'un humain attentif a lu leur site : précise, discrète, sans effet de manche.`,
     },
   },
+  chat: {
+    label: 'Assistant IA (page IA)',
+    fixed: "Le fil de la conversation et le dernier message sont ajoutés automatiquement. L'assistant n'a aucun outil : ni fichiers, ni web, ni commandes.",
+    vars: [],
+    text: `Tu es l'assistant IA intégré à AiTools, un outil de prospection B2B (analyse de projet, recherche de prospects, mails de prospection et de relance, posts LinkedIn, suivi des réponses). Tu discutes avec l'utilisateur, le plus souvent un indépendant ou un petit entrepreneur.
+
+Ce que tu fais bien : rédiger et corriger des mails, des relances et des posts LinkedIn ; préparer une réponse à un prospect (objection, demande de devis, prise de rendez-vous) ; affiner une cible et des arguments de vente ; expliquer comment fonctionne AiTools ; aider sur un texte ou un code collé dans la conversation ; répondre à toute autre question.
+
+Règles :
+- Réponds dans la langue de l'utilisateur (français par défaut), d'un ton naturel et direct, sans formule d'introduction ni politesse de conclusion.
+- La réponse d'abord, le détail ensuite seulement s'il aide. Pose une question de clarification uniquement si tu ne peux vraiment pas avancer sans.
+- Markdown simple quand il aide (listes, gras, blocs de code) ; pas de tableaux.
+- Pour un texte à envoyer (mail, post), donne directement le texte prêt à copier, puis une ligne sur l'angle choisi.
+- N'invente ni chiffre, ni fait, ni client, ni lien : si tu ne sais pas, dis-le. Tu n'as accès ni à Internet, ni aux fichiers du serveur, ni aux données de l'utilisateur dans AiTools (projets, prospects, mails) : s'il te faut un élément, demande-le.
+- Prospection par mail : respecte la loi et le RGPD (adresses professionnelles, lien de désinscription, aucune promesse mensongère). Refuse poliment ce qui relèverait de l'usurpation, du spam de masse ou de la tromperie.`,
+    byModel: {
+      haiku: `Réponses courtes : huit lignes au plus, sauf pour un texte long demandé. Une idée à la fois. Si la demande est vague, propose une version concrète plutôt que de poser trois questions.`,
+      sonnet: `Adapte la longueur à la question : une phrase pour une question simple, un texte complet pour une rédaction. Quand plusieurs approches se valent, donne-en une et mentionne l'autre en une ligne.`,
+      opus: `Prends le temps de bien comprendre le contexte et l'objectif avant de répondre. Pour une stratégie ou un arbitrage, expose ton raisonnement en quelques lignes, puis une recommandation nette. Signale honnêtement ce qui est incertain.`,
+      fable: `Réponds comme un excellent conseiller qui connaît le métier : un avis net, étayé, sans remplissage. Va au fond quand le sujet le mérite, reste bref quand il ne le mérite pas.`,
+    },
+  },
   audit: {
     label: 'Audit du projet',
     fixed: "Le rapport est en Markdown, sans modification du dépôt (lecture seule).",
@@ -283,7 +305,7 @@ export function parseCustomPrompts(raw) {
  * le texte par défaut (bouton « revenir ») et s'il est personnalisé. `models` : { analyze, prospect, write } = modèles choisis par le compte.
  */
 export function promptsView(custom, models = {}) {
-  const used = { analyze: models.analyze, prospect: models.prospect, hook: models.prospect, template: models.write, followup_template: models.write, linkedin: models.write };
+  const used = { chat: models.chat, analyze: models.analyze, prospect: models.prospect, hook: models.prospect, template: models.write, followup_template: models.write, linkedin: models.write };
   const tasks = Object.entries(PROMPT_DEFS).map(([key, d]) => {
     const scopes = {};
     for (const sc of PROMPT_SCOPES) {
@@ -459,5 +481,33 @@ Pour chacun : **[CRITIQUE | ÉLEVÉE | MOYENNE | FAIBLE]** titre — \`fichier:l
 5 actions au plus, dans l'ordre.
 
 Aucune intro ni conclusion.`,
+  };
+}
+
+// ---------- Page IA (chat) ----------
+/** Messages gardés dans le prompt : les plus récents, dans cette limite (le reste de la conversation reste affiché, mais n'est plus envoyé). */
+export const CHAT_HISTORY = { messages: 20, chars: 24000 };
+export const CHAT_MAX_MESSAGE = 8000;
+
+/** Garde la fin de la conversation : au plus CHAT_HISTORY.messages messages et CHAT_HISTORY.chars caractères. */
+export function trimHistory(history) {
+  const out = [];
+  let size = 0;
+  for (const m of [...history].reverse()) {
+    if (out.length >= CHAT_HISTORY.messages || size + m.content.length > CHAT_HISTORY.chars) break;
+    out.unshift(m);
+    size += m.content.length;
+  }
+  return out;
+}
+
+export function chatPrompt({ history = [], message, custom, model = null }) {
+  const past = trimHistory(history);
+  const label = (m) => (m.role === 'user' ? 'Utilisateur' : 'Assistant');
+  return {
+    system: instructions('chat', custom, {}, model),
+    prompt: past.length
+      ? `Conversation jusqu'ici, du plus ancien au plus récent. Réponds uniquement au dernier message de l'utilisateur.\n\n${past.map((m) => `${label(m)} : ${m.content}`).join('\n\n')}\n\nUtilisateur : ${message}`
+      : message,
   };
 }

@@ -19,6 +19,7 @@ import { registerMailRoutes } from './mailroutes.js';
 import { registerApiV1 } from './apiv1.js';
 import { registerDeveloperRoutes } from './developerroutes.js';
 import { registerCalendarRoutes } from './calendar.js';
+import { registerChatRoutes } from './chat.js';
 import { registerEventRoutes } from './events.js';
 import { feedToken, feedUrl } from './services/ical.js';
 import { developerMode } from './apitokens.js';
@@ -78,6 +79,7 @@ export function registerRoutes(router, app) {
   registerDeveloperRoutes(router, app);
   registerCalendarRoutes(router, app);
   registerEventRoutes(router, app);
+  registerChatRoutes(router, app);
   // Déjà connecté : la page de connexion n'a rien à offrir, on va au tableau de bord
   router.get('/login', async ({ req, res, url }) => {
     if (await getSession(db, req)) return redirect(res, '/');
@@ -154,7 +156,7 @@ export function registerRoutes(router, app) {
     const discord = await notifyConfig(app, userId);
     const promptsRaw = await getSetting(db, userId, 'prompts_json', '');
     const analyze = normalizeModel(await getSetting(db, userId, 'analyze_model', 'haiku'));
-    const models = { analyze, prospect: normalizeModel(await getSetting(db, userId, 'prospect_model', 'haiku')), write: normalizeModel(await getSetting(db, userId, 'write_model', ''), analyze) };
+    const models = { chat: normalizeModel(await getSetting(db, userId, 'chat_model', 'sonnet'), 'sonnet'), analyze, prospect: normalizeModel(await getSetting(db, userId, 'prospect_model', 'haiku')), write: normalizeModel(await getSetting(db, userId, 'write_model', ''), analyze) };
     const s = {
       notify_email: await getSetting(db, userId, 'notify_email', ''),
       git_servers: publicGitServers(await listGitServers(db, userId)),

@@ -42,6 +42,7 @@ const SYMBOLS = {
   search: '<circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path>',
   send: '<path d="M21 3 10 14"></path><path d="m21 3-7 18-4-7-7-4z"></path>',
   shield: '<path d="M12 3 4.5 6v6c0 4.5 3.2 7.6 7.5 9 4.3-1.4 7.5-4.5 7.5-9V6z"></path><path d="m9 12 2.2 2.2L15 10"></path>',
+  stop: '<rect x="6" y="6" width="12" height="12" rx="2.5"></rect>',
   spark: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"></path>',
   star: '<path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"></path>',
   target: '<circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="4.5"></circle><path d="M12 12v.01"></path>',
