@@ -1,9 +1,10 @@
 // Gabarit du site public : balisage sémantique, métadonnées (title, description, canonical, Open Graph), liens
 // d'évitement, navigation. Aucune ressource externe (CSS, images et favicon servis par l'application ; un seul script, site.js, pour le mouvement).
 import { esc } from '../http.js';
-import { assetUrl } from '../assets.js';
+import { assetUrl, brandMark, iconLinks } from '../assets.js';
 
 export const SITE_NAME = 'AiTools';
+const OG_IMAGE = '/static/img/share_img.jpg'; // 1024 x 541, aperçu des liens partagés
 export const CONTACT_EMAIL = 'contact@tony-averty.dev';
 
 const NAV = [
@@ -80,9 +81,12 @@ ${noindex ? '' : `<link rel="canonical" href="${esc(url)}">\n`}<meta name="color
 <meta property="og:title" content="${esc(title)}">
 <meta property="og:description" content="${esc(description)}">
 <meta property="og:url" content="${esc(url)}">
-<meta name="twitter:card" content="summary">
-<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
-<link rel="alternate icon" href="/favicon.ico">
+<meta property="og:image" content="${esc(absoluteUrl(appUrl, assetUrl(OG_IMAGE)))}">
+<meta property="og:image:width" content="1024">
+<meta property="og:image:height" content="541">
+<meta property="og:image:alt" content="${SITE_NAME} : prospection, relances et posts LinkedIn pilotés par Claude">
+<meta name="twitter:card" content="summary_large_image">
+${iconLinks()}
 <link rel="stylesheet" href="${assetUrl('/static/app.css')}">
 <link rel="stylesheet" href="${assetUrl('/static/site.css')}">
 ${['/static/site.js', ...scripts].map((src) => `<script src="${esc(assetUrl(src))}" defer></script>\n`).join('')}${jsonLd ? `<script type="application/ld+json">${JSON.stringify(jsonLd).replace(/</g, '\\u003c')}</script>\n` : ''}</head>
@@ -90,7 +94,7 @@ ${['/static/site.js', ...scripts].map((src) => `<script src="${esc(assetUrl(src)
 <a class="skip" href="#contenu">Aller au contenu</a>
 <header class="site-head">
   <div class="wrap head-in">
-    <a class="brand" href="/" aria-label="${SITE_NAME}, accueil"><span class="mark" aria-hidden="true"></span>${SITE_NAME}</a>
+    <a class="brand" href="/" aria-label="${SITE_NAME}, accueil">${brandMark()}${SITE_NAME}</a>
     <nav class="site-nav" aria-label="Navigation principale">
       <ul>
         ${NAV.map(link).join('\n        ')}
@@ -106,7 +110,7 @@ ${body}
 <footer class="site-foot">
   <div class="wrap foot-in">
     <div>
-      <a class="brand" href="/"><span class="mark" aria-hidden="true"></span>${SITE_NAME}</a>
+      <a class="brand" href="/">${brandMark()}${SITE_NAME}</a>
       <p>Un panel qui pilote Claude Code pour prospecter par mail, avec ton propre accès Claude.</p>
       <p class="fine">Édité par Tony AVERTY, entrepreneur individuel. © ${year}</p>
     </div>

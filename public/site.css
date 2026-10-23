@@ -39,6 +39,7 @@ body.site h1, body.site h2, body.site h3 { color: var(--text); background: none;
 .site-head { border-bottom: 1px solid var(--line); background: var(--card); }
 .head-in { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 22px; padding-top: 12px; padding-bottom: 12px; }
 .site-head .brand { display: inline-flex; align-items: center; gap: 9px; font-size: 1.1rem; letter-spacing: -.01em; }
+.brand .brand-mark { margin-right: 0; }
 /* Signature visuelle : un carré à coin rabattu, repris sur les numéros d'étapes et les repères de section */
 .mark { display: inline-block; width: 15px; height: 15px; background: var(--accent);
   clip-path: polygon(0 0, 68% 0, 100% 32%, 100% 100%, 0 100%); }
@@ -81,7 +82,8 @@ body.site h1, body.site h2, body.site h3 { color: var(--text); background: none;
 .mock { border: 1px solid var(--line); border-radius: 14px; background: var(--bg); padding: 12px; user-select: none; }
 .mock-top { display: flex; align-items: center; gap: 10px; padding: 2px 4px 12px; font-size: .85rem; }
 .mock-top .brand { display: inline-flex; align-items: center; gap: 7px; }
-.mock-top .mark { width: 11px; height: 11px; }
+.mock-top .brand-mark { margin-right: 0; }
+.mock-top .brand-mark img { height: 14px; }
 .mock-top .push { margin-left: auto; color: var(--muted); }
 .mock .card { padding: 12px 14px; margin-bottom: 10px; }
 .mock-name { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-weight: 600; }

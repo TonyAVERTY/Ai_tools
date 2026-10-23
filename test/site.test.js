@@ -38,7 +38,10 @@ test('pages publiques : 200 sans session, complètes (une h1, title, description
     assert.match(h, /<main id="contenu"/);
     assert.match(h, /<header class="site-head">/);
     assert.match(h, /<footer class="site-foot">/);
-    assert.match(h, /<link rel="icon" type="image\/svg\+xml" href="\/static\/favicon\.svg">/);
+    assert.match(h, /<link rel="icon" href="\/favicon\.ico" sizes="48x48">/);
+    assert.match(h, /<link rel="apple-touch-icon" href="\/static\/img\/apple-touch-icon\.png\?v=\w+">/);
+    assert.match(h, /<meta property="og:image" content="[^"]+\/static\/img\/share_img\.jpg\?v=\w+">/);
+    assert.match(h, /<meta name="twitter:card" content="summary_large_image">/);
     assert.match(h, /href="\/static\/app\.css\?v=[0-9a-f]{10}"/, `${p} : feuilles de style versionnées`);
     assert.match(h, /href="\/static\/app\.css\?v=[0-9a-f]{10}"/, `${p} : feuilles de style versionnées`);
   }
@@ -149,7 +152,7 @@ test('en-têtes de sécurité, HSTS seulement en https, noindex sur l\'applicati
 });
 
 test('fichiers statiques : cache, ETag, 304, HEAD', async () => {
-  for (const [p, type] of [['/static/site.css', /text\/css/], ['/static/app.css', /text\/css/], ['/static/favicon.svg', /image\/svg\+xml/], ['/favicon.ico', /image\/svg\+xml/], ['/static/site.js', /text\/javascript/], ['/static/img/ecran-projet.svg', /image\/svg\+xml/]]) {
+  for (const [p, type] of [['/static/site.css', /text\/css/], ['/static/app.css', /text\/css/], ['/favicon.ico', /image\/x-icon/], ['/static/img/logo-mark.png', /image\/png/], ['/static/img/share_img.jpg', /image\/jpeg/], ['/static/site.js', /text\/javascript/], ['/static/img/ecran-projet.svg', /image\/svg\+xml/]]) {
     const r = await s.anon.get(p);
     assert.equal(r.status, 200, p);
     assert.match(r.headers.get('content-type'), type);
@@ -328,7 +331,8 @@ test('liens entre pages : chaque lien et chaque image du site mène quelque part
   assert.match(html['/'], /data-gallery/);
   assert.match(html['/'], /data-count="50"/);
   assert.ok((html['/'].match(/<img src="\/static\/img\//g) || []).length >= 5);
-  assert.doesNotMatch(html['/'], /<img(?![^>]*\salt="[^"]+")/, 'toutes les images ont un texte alternatif');
+  // Le logo (monogramme) est décoratif : son nom est écrit à côté, donc alt vide et aria-hidden
+  assert.doesNotMatch(html['/'].replace(/<picture class="brand-mark[^>]*>.*?<\/picture>/g, ''), /<img(?![^>]*\salt="[^"]+")/, 'toutes les images ont un texte alternatif');
 });
 
 test('offres : prix de 10 à 100 € TTC, annuel = 2 mois offerts, plafonds tenables par le serveur et croissants', async () => {

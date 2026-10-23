@@ -1,6 +1,6 @@
 import { esc } from './http.js';
 import { STATUSES } from './services/crm.js';
-import { assetUrl } from './assets.js';
+import { assetUrl, brandMark, iconLinks } from './assets.js';
 import { MODE_LABELS, CONSENT_TEXT, CONSENT_CHECKBOX, CONSENT_VERSION } from './claudelink.js';
 
 const fmtDate = (ts) => (ts ? new Date(ts * 1000).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' }) : '—');
@@ -36,13 +36,14 @@ export function layout({ title, body, email }) {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <title>${esc(title)} · AiTools</title>
+${iconLinks()}
 <link rel="stylesheet" href="${assetUrl('/static/app.css')}">
 <script src="${assetUrl('/static/app.js')}" defer></script>
 </head>
 <body>
 <canvas id="bg" aria-hidden="true"></canvas>
 ${email ? `<header class="top">
-  <a class="brand" href="/"><span class="logo" aria-hidden="true"></span>AiTools</a>
+  <a class="brand" href="/">${brandMark()}AiTools</a>
   <div class="sys" id="sys" aria-live="polite"></div>
   <div class="jobs" id="jobs" hidden>
     <button type="button" class="jobs-btn" aria-expanded="false" aria-controls="jobs-pop"><span class="spin-inline"></span><span data-jobs-count></span><span class="chev" aria-hidden="true"></span></button>
