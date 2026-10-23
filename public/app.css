@@ -254,6 +254,8 @@ form.send { display: flex; margin: 0; padding: 0; border: 0; }
 .bar.indet > span { width: 35%; animation: indet 1.4s ease-in-out infinite; }
 .bar.usage { height: 8px; margin: 0; }
 .bar.usage.full > span { background: var(--err); }
+.bar.usage.warn > span { background: var(--warn); }
+.sub-h { font-size: .9375rem; margin: var(--s-4) 0 var(--s-2); }
 @keyframes indet { from { left: -35%; } to { left: 100%; } }
 .spinner, .spin-inline { display: inline-block; border: 2px solid var(--line-strong); border-top-color: var(--accent); border-radius: 50%; animation: spin .9s linear infinite; flex: none; }
 .spinner { width: 22px; height: 22px; border-width: 3px; }
