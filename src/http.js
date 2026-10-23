@@ -5,7 +5,7 @@ export class Router {
   add(method, path, handler, opts = {}) {
     const keys = [];
     const re = new RegExp('^' + path.replace(/:(\w+)/g, (_, k) => { keys.push(k); return '([^/]+)'; }) + '/?$');
-    this.routes.push({ method, re, keys, handler, public: !!opts.public, limit: opts.limit || null, admin: !!opts.admin });
+    this.routes.push({ method, re, keys, handler, public: !!opts.public, limit: opts.limit || null, admin: !!opts.admin, api: !!opts.api });
   }
   get(p, h, o) { this.add('GET', p, h, o); }
   post(p, h, o) { this.add('POST', p, h, o); }

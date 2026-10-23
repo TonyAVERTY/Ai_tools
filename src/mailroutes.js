@@ -22,16 +22,17 @@ const STATE_SQL = {
 export const stateOf = (row) => (row.error ? 'failed'
   : ['replied', 'client'].includes(row.status) ? 'replied' : row.status === 'bounced' ? 'bounced' : row.status === 'refused' ? 'refused' : 'sent');
 
+/** Projets auxquels la personne a accès : les siens, puis ceux que son équipe partage. */
+export async function accessibleProjects(db, userId) {
+  const teams = await memberTeamIds(db, userId);
+  return teams.length
+    ? db.prepare(`SELECT id, name FROM projects WHERE user_id = ? OR team_id IN (${teams.map(() => '?').join(',')}) ORDER BY LOWER(name)`).all(Number(userId), ...teams)
+    : db.prepare('SELECT id, name FROM projects WHERE user_id = ? ORDER BY LOWER(name)').all(Number(userId));
+}
+
 export function registerMailRoutes(router, app) {
   const { db } = app;
-
-  // Projets auxquels la personne a accès : les siens, puis ceux que son équipe partage
-  const myProjects = async (userId) => {
-    const teams = await memberTeamIds(db, userId);
-    return teams.length
-      ? db.prepare(`SELECT id, name FROM projects WHERE user_id = ? OR team_id IN (${teams.map(() => '?').join(',')}) ORDER BY LOWER(name)`).all(Number(userId), ...teams)
-      : db.prepare('SELECT id, name FROM projects WHERE user_id = ? ORDER BY LOWER(name)').all(Number(userId));
-  };
+  const myProjects = (userId) => accessibleProjects(db, userId);
   const inList = (ids) => ids.map(() => '?').join(',');
 
   // Nom d'expéditeur du projet pour signer le brouillon (lisible seulement par le propriétaire et les administrateurs)

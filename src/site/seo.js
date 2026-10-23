@@ -5,7 +5,7 @@ import { absoluteUrl } from './layout.js';
 export const INDEXABLE_PATHS = ['/', '/fonctionnement', '/tarifs', '/mentions-legales', '/confidentialite', '/cgu'];
 
 // Pages d'application : jamais explorées (le noindex des pages est posé en plus, par en-tête et par balise)
-export const DISALLOWED_PATHS = ['/admin', '/account', '/settings', '/mails', '/link', '/api/', '/auth/', '/u/', '/logout'];
+export const DISALLOWED_PATHS = ['/admin', '/account', '/settings', '/mails', '/developer', '/link', '/api/', '/auth/', '/u/', '/logout'];
 
 export function robotsTxt(appUrl) {
   return [

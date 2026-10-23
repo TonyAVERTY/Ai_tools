@@ -9,6 +9,7 @@ import { openDb } from './db.js';
 import { Router, json, redirect, html, esc, HttpError } from './http.js';
 import { RateLimiter, clientIp } from './ratelimit.js';
 import { getSession, checkOrigin, purgeExpired } from './auth.js';
+import { authenticateApi } from './apitokens.js';
 import { syncAdmins } from './users.js';
 import { registerRoutes } from './routes.js';
 import { Worker } from './services/jobs.js';
@@ -90,6 +91,13 @@ export async function createApp(cfg, { db, worker = true, createTransport, fetch
         return html(res, notFoundPage({ appUrl: cfg.appUrl }), 404);
       }
       const ip = clientIp(req, cfg.trustProxy);
+      // API (mode développeur) : jeton « Bearer », jamais de cookie ; pas de CSRF possible puisque rien n'est envoyé automatiquement
+      if (route.api) {
+        app.limiter.enforce(route.limit, { ip }); // par adresse, avant toute lecture en base
+        const api = await authenticateApi(db, req);
+        app.limiter.enforce('api', { ip, userId: api.userId });
+        return await route.handler({ req, res, url, params: route.params, session: null, api, app });
+      }
       if (route.public && route.limit) app.limiter.enforce(route.limit, { ip });
       const session = route.public ? null : await getSession(db, req);
       // Back-office : 404 pour tout autre que les administrateurs (visiteurs compris), sans rien révéler

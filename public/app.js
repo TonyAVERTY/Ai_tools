@@ -689,6 +689,15 @@
     if (row && !btn.classList.contains('txt')) row.classList.toggle('to-delete', on);
   });
 
+  // ---------- Développeur : copier le jeton affiché une seule fois ----------
+  document.addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-copy-token]');
+    if (!b) return;
+    const code = $('[data-token]');
+    try { await navigator.clipboard.writeText(code.textContent); toast('Jeton copié'); }
+    catch { const r = document.createRange(); r.selectNodeContents(code); getSelection().removeAllRanges(); getSelection().addRange(r); toast('Sélectionné : copie-le avec Ctrl+C', 'error'); }
+  });
+
   // ---------- Réglages : revenir au prompt par défaut ----------
   document.addEventListener('click', (e) => {
     const b = e.target.closest('[data-prompt-reset]');
