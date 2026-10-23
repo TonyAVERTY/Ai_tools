@@ -46,8 +46,8 @@ export function calendarPage({ email, year, month, byDay, feed, today }) {
   const cells = [...Array(lead).fill(null), ...Array.from({ length: total }, (_, i) => i + 1)];
   while (cells.length % 7) cells.push(null);
   const isToday = (d) => today.year === year && today.month === month && today.day === d;
-  const grid = cells.map((d) => (d === null ? '<div class="cal-cell off"></div>' : `<div class="cal-cell${isToday(d) ? ' today' : ''}">
-      <span class="cal-d">${d}</span>
+  const grid = cells.map((d, i) => (d === null ? '<div class="cal-cell off"></div>' : `<div class="cal-cell${isToday(d) ? ' today' : ''}${(byDay.get(d) || []).length ? ' has' : ''}">
+      <span class="cal-d">${d}<span class="cal-wd"> ${DAYS[i % 7]} ${MONTHS[month - 1]}</span></span>
       ${(byDay.get(d) || []).map((e) => `<div class="cal-ev ${e.kind}" title="${esc(`${e.project} · ${e.label}`)}"><span class="cal-t">${esc(hhmm(e.at))}</span> ${esc(e.label)}</div>`).join('')}</div>`)).join('');
   const feedBox = icalBox(feed.url, '/calendar');
   return layout({

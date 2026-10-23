@@ -1441,7 +1441,7 @@
         ${x.next_action ? `<div class="small ${x.next_action_at * 1000 <= Date.now() ? 'warn' : 'muted'}">→ ${esc(x.next_action)} (${fmtDay(x.next_action_at)})</div>` : ''}
         <select data-prospect="${x.id}" class="st-${x.status}" aria-label="Statut de ${esc(x.company)}">${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${k === x.status ? 'selected' : ''}>${v}</option>`).join('')}</select>
       </article>`;
-      box.innerHTML = `<div class="kanban">${r.columns.map((c) => `<section class="kcol" data-col="${c.status}" aria-label="${esc(c.label)}">
+      box.innerHTML = `<div class="kanban">${r.columns.map((c) => `<section class="kcol${c.total ? '' : ' empty'}" data-col="${c.status}" aria-label="${esc(c.label)}">
         <h4>${esc(c.label)} <span class="n">${c.total}</span></h4>
         <div class="kcards" data-drop="${c.status}">${c.rows.map(card).join('') || '<p class="muted small">Vide</p>'}
           ${c.total > c.rows.length ? `<p class="muted small">+ ${c.total - c.rows.length} autre(s) : affine avec les filtres ou passe en liste.</p>` : ''}</div>
@@ -1527,7 +1527,7 @@
     sum.append(who, ' vous a apporté une réponse');
     const badge = document.createElement('span'); badge.className = 'badge'; badge.textContent = r.intentLabel; sum.append(' ', badge);
     const close = document.createElement('button'); close.type = 'button'; close.className = 'reply-x'; close.setAttribute('aria-label', 'Fermer'); close.textContent = '×';
-    close.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); markSeen(r.id); el.remove(); });
+    close.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); el.remove(); markSeen(r.id).then(pollReplies); });
     sum.append(close);
     const body = document.createElement('div'); body.className = 'reply-body';
     const sub = document.createElement('p'); sub.className = 'muted small'; sub.textContent = `${r.project}${r.subject ? ` · ${r.subject}` : ''}`;
@@ -1538,7 +1538,7 @@
     const copy = document.createElement('button'); copy.type = 'button'; copy.className = 'btn small'; copy.textContent = 'Copier la réponse';
     copy.addEventListener('click', () => copyText(ta.value, copy));
     const read = document.createElement('button'); read.type = 'button'; read.className = 'btn small'; read.textContent = 'Marquer comme lu';
-    read.addEventListener('click', () => { markSeen(r.id); el.remove(); });
+    read.addEventListener('click', () => { el.remove(); markSeen(r.id).then(pollReplies); });
     const all = document.createElement('a'); all.className = 'btn small'; all.href = '/mails?v=replies'; all.textContent = 'Toutes les réponses';
     acts.append(copy, read, all);
     body.append(sub, txt, lbl, ta, acts);
@@ -1556,9 +1556,20 @@
   async function pollReplies() {
     if (document.hidden || !$('.top')) return;
     try {
-      const d = await api('/api/replies?unseen=1&limit=5');
+      const d = await api('/api/replies?unseen=1&limit=10');
       paintUnseen(d.unseen);
-      for (const r of d.replies) if (!shownReplies.has(r.id)) { shownReplies.add(r.id); replyPopup(r); }
+      // Deux popups au plus à l'écran : le reste est résumé en une ligne (sur téléphone, des popups empilées cacheraient la page)
+      const room = Math.max(0, 2 - $$('.reply-pop', popHost).length);
+      const fresh = d.replies.filter((r) => !shownReplies.has(r.id));
+      for (const r of fresh.slice(0, room)) { shownReplies.add(r.id); replyPopup(r); }
+      $('.reply-more', popHost)?.remove();
+      const rest = d.unseen - $$('.reply-pop', popHost).length;
+      if (rest > 0) {
+        const more = document.createElement('a');
+        more.className = 'reply-more'; more.href = '/mails?v=replies';
+        more.textContent = `+ ${rest} autre${rest > 1 ? 's' : ''} réponse${rest > 1 ? 's' : ''} non lue${rest > 1 ? 's' : ''}`;
+        popHost.append(more);
+      }
     } catch { /* hors ligne ou session expirée : la prochaine requête le dira */ }
   }
   if ($('.top')) { pollReplies(); setInterval(pollReplies, 45_000); document.addEventListener('visibilitychange', () => { if (!document.hidden) pollReplies(); }); }

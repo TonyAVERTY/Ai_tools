@@ -38,6 +38,8 @@ const STATIC = {
   '/static/tokens.css': asset('tokens.css', 'text/css; charset=utf-8', 3600),
   '/static/app.css': asset('app.css', 'text/css; charset=utf-8', 3600),
   '/static/site.css': asset('site.css', 'text/css; charset=utf-8', 3600),
+  '/static/responsive.css': asset('responsive.css', 'text/css; charset=utf-8', 3600),
+  '/static/responsive.js': asset('responsive.js', 'text/javascript; charset=utf-8', 3600),
   '/static/app.js': asset('app.js', 'text/javascript; charset=utf-8', 3600),
   '/static/captcha.js': asset('captcha.js', 'text/javascript; charset=utf-8', 3600),
   // Les navigateurs réclament /favicon.ico d'office
