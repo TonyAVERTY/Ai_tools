@@ -8,7 +8,7 @@ import { now, setSetting } from '../src/db.js';
 import { testDb } from './helpers/db.js';
 import { createApp } from '../src/server.js';
 import { unsubToken } from '../src/crypto.js';
-import { addUser } from './helpers/users.js';
+import { addUser, TEST_SECRET_KEY } from './helpers/users.js';
 
 const APP_URL = 'https://ai.tony-averty.dev';
 let app, base, cookie, tmp, uid;
@@ -17,7 +17,7 @@ before(async () => {
   tmp = mkdtempSync(join(tmpdir(), 'aitools-http-'));
   const cfg = {
     appUrl: APP_URL, google: { clientId: 'cid', clientSecret: 'cs' }, apple: null, adminEmails: ['me@gmail.com'],
-    secretKey: randomBytes(32), dataDir: tmp, claudeBin: 'claude', sandbox: { enabled: false, production: false },
+    secretKey: TEST_SECRET_KEY, dataDir: tmp, claudeBin: 'claude', sandbox: { enabled: false, production: false },
   };
   app = await createApp(cfg, { db: await testDb(), worker: false });
   await new Promise((r) => app.server.listen(0, '127.0.0.1', r));

@@ -20,7 +20,6 @@ export const MODELS = { rapide: 'haiku', normal: 'sonnet', approfondi: 'opus' };
  * @param {string} [o.bin]
  * @param {object} o.sandbox        cfg.sandbox (obligatoire : voir services/sandbox.js)
  * @param {Record<string,string>} [o.secretEnv]  secret de l'utilisateur du job (ANTHROPIC_API_KEY ou CLAUDE_CODE_OAUTH_TOKEN), transmis au seul processus enfant
- * @param {boolean} [o.serverConfig]  mode « Claude du serveur » (admins) : configuration CLI du serveur
  * @param {string} [o.allowedRoot]  dossier des clones de l'utilisateur : `cwd` doit s'y trouver
  */
 export function runClaude(o) {
@@ -36,7 +35,7 @@ export function runClaude(o) {
 
   const launch = prepareLaunch({
     bin: o.bin || 'claude', args, cwd: o.cwd, allowedRoot: o.allowedRoot,
-    secretEnv: o.secretEnv, serverConfig: o.serverConfig, sandbox: o.sandbox,
+    secretEnv: o.secretEnv, sandbox: o.sandbox,
   });
   const secrets = Object.values(o.secretEnv || {}).filter((v) => v && v.length >= 8);
   // Aucune trace du secret dans les erreurs, stderr ou textes remontés (journaux, base, réponses HTTP)

@@ -168,7 +168,7 @@ test('bwrap : ligne de commande — racine en lecture seule, tmpfs, un seul doss
   // Rien d'autre n'est monté : ni la racine entière, ni /home, /root, /var, ni la config Claude du serveur
   const mounts = a.flatMap((x, i) => (['--bind', '--ro-bind', '--bind-try', '--ro-bind-try'].includes(x) ? [a[i + 1]] : []));
   assert.deepEqual(mounts.sort(), ['/bin', '/etc', '/lib', '/lib64', '/opt/claude', '/run/systemd/resolve', '/sbin', '/usr', work].sort());
-  assert.ok(!a.includes('--bind') && !a.includes('--bind-try'), 'aucun montage en écriture hors mode serveur');
+  assert.ok(!a.includes('--bind') && !a.includes('--bind-try'), 'aucun montage en écriture');
   assert.ok(!a.join(' ').includes('.claude'));
   assert.ok(!mounts.includes('/'));
   // Sans projet : seul le HOME vide
@@ -178,15 +178,19 @@ test('bwrap : ligne de commande — racine en lecture seule, tmpfs, un seul doss
   assert.throws(() => buildBwrapArgs({ command: [] }), /vide/);
 });
 
-test('bwrap : la configuration du CLI du serveur n\'est montée que pour le mode serveur', () => {
+test('bwrap : la configuration du CLI du serveur n\'est jamais montée, même si on la demande', () => {
   const sb = { enabled: true, production: true, bwrapBin: 'bwrap', roBinds: [], serverHome: '/home/svc' };
-  const deps = { parentEnv: { PATH: '/usr/bin' }, hasBwrap: () => true, resolveBin: () => '/usr/bin/claude' };
+  const deps = { parentEnv: { PATH: '/usr/bin', HOME: '/home/svc' }, hasBwrap: () => true, resolveBin: () => '/usr/bin/claude' };
   const work = resolve('/srv/aitools/repos/1/1');
-  const user = prepareLaunch({ bin: 'claude', args: ['-p', 'x'], cwd: work, allowedRoot: resolve('/srv/aitools/repos/1'), sandbox: sb, secretEnv: { ANTHROPIC_API_KEY: KEY_A } }, deps);
-  assert.ok(!user.args.join(' ').includes('.claude'));
-  assert.ok(!user.args.some((x) => x === '/home/svc' || x.startsWith('/home/svc')));
-  const server = prepareLaunch({ bin: 'claude', args: ['-p', 'x'], cwd: work, allowedRoot: resolve('/srv/aitools/repos/1'), sandbox: sb, serverConfig: true }, deps);
-  assert.ok(pairIdx(server.args, '--bind-try', join('/home/svc', '.claude'), `${SANDBOX_HOME}/.claude`) >= 0);
+  // `serverConfig` n'existe plus : un appelant qui le passerait encore n'obtient aucun montage de /home/svc
+  const l = prepareLaunch({ bin: 'claude', args: ['-p', 'x'], cwd: work, allowedRoot: resolve('/srv/aitools/repos/1'), sandbox: sb, serverConfig: true, secretEnv: { ANTHROPIC_API_KEY: KEY_A } }, deps);
+  assert.ok(!l.args.join(' ').includes('.claude'));
+  assert.ok(!l.args.some((x) => x === '/home/svc' || x.startsWith('/home/svc')));
+  assert.equal(l.env.HOME, SANDBOX_HOME);
+  // Développement (SANDBOX=off) : HOME jetable, jamais celui du serveur
+  const dev = prepareLaunch({ bin: 'claude', args: ['-p', 'x'], cwd: work, allowedRoot: resolve('/srv/aitools/repos/1'), sandbox: { enabled: false, production: false, serverHome: '/home/svc' }, serverConfig: true }, deps);
+  assert.notEqual(dev.env.HOME, '/home/svc');
+  dev.cleanup();
 });
 
 test('bwrap : prepareLaunch — le secret n\'est jamais dans argv (visible dans ps), seulement dans l\'environnement', () => {

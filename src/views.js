@@ -187,12 +187,6 @@ export function linkPage({ user, link, cliModeEnabled, error, start = false }) {
     <div class="row-actions"><button type="button" class="btn" data-close-dialog>Annuler</button></div>
   </div>
 </dialog>` : '';
-  const server = user.isAdmin ? `
-<section class="card">
-  <h4>Claude du serveur (administrateurs)</h4>
-  <p class="muted small">Utilise la configuration du CLI Claude déjà connectée sur la machine qui héberge AiTools.</p>
-  <form method="post" action="/link/server"><button class="btn">Utiliser Claude du serveur</button></form>
-</section>` : '';
   return layout({
     title: 'Relier Claude', email: user.email,
     body: `<h1>Relier Claude</h1>
@@ -205,7 +199,7 @@ ${error ? `<p class="error">${esc(error)}</p>` : ''}
     <label>Clé API<input name="apiKey" type="password" autocomplete="new-password" spellcheck="false" required placeholder="sk-ant-…"></label>
     <button class="btn primary">Vérifier et relier</button>
   </form>
-</section>${subscription}${server}`,
+</section>${subscription}`,
   });
 }
 
