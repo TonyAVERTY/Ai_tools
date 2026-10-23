@@ -707,32 +707,66 @@
     ta.focus();
   });
 
-  // ---------- Réglages : plusieurs webhooks Discord ----------
-  // Le « + » ajoute une ligne (adresse + événements reçus) : on sépare ainsi ce qui est dit ou fait, salon par salon.
+  // ---------- Réglages : notifications, le « + » ouvre le menu des services ----------
+  // Service → notifications voulues → lien du webhook. Discord peut avoir plusieurs lignes (un webhook par salon) ;
+  // Slack, Telegram et e-mail une seule carte chacun, déjà dans la page mais masquée jusqu'au choix.
   (() => {
+    const menu = $('[data-addmenu]');
     const list = $('[data-discordlist]');
     const tpl = $('#discord-row-tpl');
-    if (!list || !tpl) return;
-    const add = $('[data-discord-add]');
+    if (!menu || !list || !tpl) return;
     const full = $('[data-discord-max]');
+    const empty = $('[data-chan-empty]');
     let next = Number(list.dataset.next) || 0;
     const rows = () => $$('[data-discord-row]', list);
-    const renumber = () => rows().forEach((r, i) => { $('[data-discord-title]', r).textContent = `Webhook ${i + 1}`; });
-    add.addEventListener('click', () => {
-      if (rows().length >= Number(list.dataset.max)) { full.hidden = false; return; }
-      const holder = document.createElement('div');
-      holder.innerHTML = tpl.innerHTML.replaceAll('__I__', String(next++));
-      const el = holder.firstElementChild;
-      list.append(el);
-      renumber();
-      $('input[name^="discord_url_"]', el).focus();
+    const renumber = () => rows().forEach((r, i) => { $('[data-discord-title]', r).textContent = `Discord ${i + 1}`; });
+    const sync = () => {
+      const any = rows().length || $$('[data-channel]:not([hidden])').length;
+      if (empty) empty.hidden = !!any;
+      full.hidden = rows().length < Number(list.dataset.max);
+    };
+    const focusIn = (el) => { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); $('input:not([type="hidden"]):not([type="checkbox"])', el)?.focus({ preventScroll: true }); };
+
+    document.addEventListener('click', (e) => {
+      const pick = e.target.closest('[data-chan-pick]');
+      if (pick) {
+        menu.open = false;
+        const type = pick.dataset.chanPick;
+        if (type === 'discord') {
+          if (rows().length >= Number(list.dataset.max)) { full.hidden = false; return; }
+          const holder = document.createElement('div');
+          holder.innerHTML = tpl.innerHTML.replaceAll('__I__', String(next++));
+          const el = holder.firstElementChild;
+          list.append(el);
+          renumber();
+          focusIn(el);
+        } else {
+          const card = $(`[data-channel="${type}"]`);
+          card.hidden = false;
+          pick.hidden = true;
+          focusIn(card);
+        }
+        sync();
+        return;
+      }
+      if (e.target.closest('[data-discord-cancel]')) {
+        e.target.closest('[data-discord-row]').remove();
+        renumber(); sync();
+        return;
+      }
+      const cancel = e.target.closest('[data-chan-cancel]');
+      if (cancel) {
+        const card = cancel.closest('[data-channel]');
+        card.hidden = true;
+        for (const f of $$('input[type="password"], input[type="text"], input[type="email"]', card)) f.value = '';
+        $(`[data-chan-pick="${card.dataset.channel}"]`).hidden = false;
+        sync();
+        return;
+      }
+      // un clic ailleurs referme le menu
+      if (menu.open && !e.target.closest('[data-addmenu]')) menu.open = false;
     });
-    list.addEventListener('click', (e) => {
-      if (!e.target.closest('[data-discord-cancel]')) return;
-      e.target.closest('[data-discord-row]').remove();
-      full.hidden = true;
-      renumber();
-    });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && menu.open) { menu.open = false; $('summary', menu).focus(); } });
   })();
 
   // ---------- Réglages : tester le token GitHub ----------
@@ -1441,7 +1475,7 @@
         ${x.next_action ? `<div class="small ${x.next_action_at * 1000 <= Date.now() ? 'warn' : 'muted'}">→ ${esc(x.next_action)} (${fmtDay(x.next_action_at)})</div>` : ''}
         <select data-prospect="${x.id}" class="st-${x.status}" aria-label="Statut de ${esc(x.company)}">${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${k === x.status ? 'selected' : ''}>${v}</option>`).join('')}</select>
       </article>`;
-      box.innerHTML = `<div class="kanban">${r.columns.map((c) => `<section class="kcol" data-col="${c.status}" aria-label="${esc(c.label)}">
+      box.innerHTML = `<div class="kanban">${r.columns.map((c) => `<section class="kcol${c.total ? '' : ' empty'}" data-col="${c.status}" aria-label="${esc(c.label)}">
         <h4>${esc(c.label)} <span class="n">${c.total}</span></h4>
         <div class="kcards" data-drop="${c.status}">${c.rows.map(card).join('') || '<p class="muted small">Vide</p>'}
           ${c.total > c.rows.length ? `<p class="muted small">+ ${c.total - c.rows.length} autre(s) : affine avec les filtres ou passe en liste.</p>` : ''}</div>
@@ -1519,6 +1553,54 @@
     try { await navigator.clipboard.writeText(text); toast('Réponse copiée'); } catch { const ta = $('textarea', btn.closest('details')); ta?.select(); toast('Sélectionnée : copie-la avec Ctrl+C', 'error'); }
   };
   const markSeen = async (id) => { try { await api(`/api/replies/${id}/seen`, {}); } catch { /* sera réessayé au prochain passage */ } };
+  // Proposition « Ajouter à ton calendrier » : titre et date préremplis à partir de la réponse, l'utilisateur corrige puis confirme
+  function suggestDom(r) {
+    const box = document.createElement('div');
+    box.className = 'suggest';
+    box.dataset.suggest = r.id;
+    if (r.event) { doneDom(box, r.event); return box; }
+    const s = r.suggestion;
+    if (!s) return null;
+    box.dataset.minutes = s.minutes;
+    const why = document.createElement('p'); why.className = 'why';
+    const b = document.createElement('b'); b.textContent = 'Ajouter à ton calendrier ? ';
+    why.append(b, s.dateToChoose ? "Il semble partant mais n'a pas donné de date : choisis un créneau."
+      : `Il évoque « ${s.phrase} »${s.guessed ? " ; l'heure n'est pas précisée, vérifie-la" : ''}${s.vague ? ' ; date approximative, à confirmer' : ''}.`);
+    const title = document.createElement('input'); title.value = s.title; title.maxLength = 200; title.setAttribute('data-ev-title', ''); title.setAttribute('aria-label', 'Titre');
+    const row = document.createElement('div'); row.className = 'sg-row';
+    const when = document.createElement('input'); when.type = 'datetime-local'; when.value = s.whenLocal; when.setAttribute('data-ev-when', ''); when.setAttribute('aria-label', 'Date et heure (Paris)');
+    const add = document.createElement('button'); add.type = 'button'; add.className = 'btn primary'; add.textContent = 'Ajouter à mon calendrier'; add.dataset.evAdd = r.id;
+    row.append(when, add);
+    box.append(why, title, row);
+    return box;
+  }
+  // Après l'ajout : l'événement est dans l'agenda d'AiTools ; deux liens pour l'avoir aussi dans SON agenda
+  function doneDom(box, ev) {
+    box.className = 'suggest done';
+    box.replaceChildren();
+    const p = document.createElement('p'); p.className = 'why';
+    const b = document.createElement('b'); b.textContent = 'Ajouté à ton calendrier : ';
+    p.append(b, ev.title);
+    const row = document.createElement('div'); row.className = 'sg-row';
+    const g = document.createElement('a'); g.className = 'btn small'; g.href = ev.links.google; g.target = '_blank'; g.rel = 'noopener noreferrer'; g.textContent = 'Google Agenda';
+    const i = document.createElement('a'); i.className = 'btn small'; i.href = ev.links.ics; i.textContent = 'Fichier .ics';
+    row.append(g, i);
+    box.append(p, row);
+  }
+  document.addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-ev-add]');
+    if (!btn) return;
+    const box = btn.closest('[data-suggest]');
+    const title = $('[data-ev-title]', box).value.trim();
+    const when = $('[data-ev-when]', box).value;
+    if (!title || !when) { toast('Renseigne un titre, une date et une heure', 'error'); return; }
+    btn.disabled = true;
+    try {
+      const r = await api(`/api/replies/${btn.dataset.evAdd}/event`, { title, when, minutes: Number(box.dataset.minutes) || 30 });
+      doneDom(box, r.event);
+      toast(r.existing ? 'Déjà dans ton calendrier' : 'Ajouté à ton calendrier');
+    } catch (err) { toast(err.message, 'error'); btn.disabled = false; }
+  });
   function replyPopup(r) {
     const el = document.createElement('details');
     el.className = 'reply-pop';
@@ -1527,7 +1609,7 @@
     sum.append(who, ' vous a apporté une réponse');
     const badge = document.createElement('span'); badge.className = 'badge'; badge.textContent = r.intentLabel; sum.append(' ', badge);
     const close = document.createElement('button'); close.type = 'button'; close.className = 'reply-x'; close.setAttribute('aria-label', 'Fermer'); close.textContent = '×';
-    close.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); markSeen(r.id); el.remove(); });
+    close.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); el.remove(); markSeen(r.id).then(pollReplies); });
     sum.append(close);
     const body = document.createElement('div'); body.className = 'reply-body';
     const sub = document.createElement('p'); sub.className = 'muted small'; sub.textContent = `${r.project}${r.subject ? ` · ${r.subject}` : ''}`;
@@ -1538,10 +1620,13 @@
     const copy = document.createElement('button'); copy.type = 'button'; copy.className = 'btn small'; copy.textContent = 'Copier la réponse';
     copy.addEventListener('click', () => copyText(ta.value, copy));
     const read = document.createElement('button'); read.type = 'button'; read.className = 'btn small'; read.textContent = 'Marquer comme lu';
-    read.addEventListener('click', () => { markSeen(r.id); el.remove(); });
+    read.addEventListener('click', () => { el.remove(); markSeen(r.id).then(pollReplies); });
     const all = document.createElement('a'); all.className = 'btn small'; all.href = '/mails?v=replies'; all.textContent = 'Toutes les réponses';
     acts.append(copy, read, all);
-    body.append(sub, txt, lbl, ta, acts);
+    body.append(sub, txt);
+    const sg = suggestDom(r);
+    if (sg) body.append(sg);
+    body.append(lbl, ta, acts);
     el.append(sum, body);
     popHost.append(el);
   }
@@ -1556,9 +1641,20 @@
   async function pollReplies() {
     if (document.hidden || !$('.top')) return;
     try {
-      const d = await api('/api/replies?unseen=1&limit=5');
+      const d = await api('/api/replies?unseen=1&limit=10');
       paintUnseen(d.unseen);
-      for (const r of d.replies) if (!shownReplies.has(r.id)) { shownReplies.add(r.id); replyPopup(r); }
+      // Deux popups au plus à l'écran : le reste est résumé en une ligne (sur téléphone, des popups empilées cacheraient la page)
+      const room = Math.max(0, 2 - $$('.reply-pop', popHost).length);
+      const fresh = d.replies.filter((r) => !shownReplies.has(r.id));
+      for (const r of fresh.slice(0, room)) { shownReplies.add(r.id); replyPopup(r); }
+      $('.reply-more', popHost)?.remove();
+      const rest = d.unseen - $$('.reply-pop', popHost).length;
+      if (rest > 0) {
+        const more = document.createElement('a');
+        more.className = 'reply-more'; more.href = '/mails?v=replies';
+        more.textContent = `+ ${rest} autre${rest > 1 ? 's' : ''} réponse${rest > 1 ? 's' : ''} non lue${rest > 1 ? 's' : ''}`;
+        popHost.append(more);
+      }
     } catch { /* hors ligne ou session expirée : la prochaine requête le dira */ }
   }
   if ($('.top')) { pollReplies(); setInterval(pollReplies, 45_000); document.addEventListener('visibilitychange', () => { if (!document.hidden) pollReplies(); }); }

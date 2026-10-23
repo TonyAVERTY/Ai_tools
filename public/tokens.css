@@ -38,6 +38,10 @@
   --err: #b4233a; --err-bg: #fde7eb;
   --info: #0b6f96; --info-bg: #e1f1f8;
   --on-err: #ffffff;
+  /* documentation : blocs de code (toujours sombres) et méthodes HTTP */
+  --code-bg: #0f1a33; --code-fg: #e6edf9; --code-muted: #9fb0d0; --code-line: #2a3a5e; --code-hover: #1b2b4d;
+  --tk-k: #7cc4ff; --tk-s: #a5e3a1; --tk-n: #ffcb7b; --tk-b: #f59ad4; --tk-c: #8c9bbd;
+  --m-get: #12633b; --m-post: #1a55bd; --on-m: #ffffff;
   --shadow: 0 1px 2px rgba(21, 30, 83, .08);
   --shadow-2: 0 4px 12px rgba(21, 30, 83, .10), 0 1px 3px rgba(21, 30, 83, .06);
   --shadow-3: 0 18px 44px rgba(21, 30, 83, .20), 0 2px 6px rgba(21, 30, 83, .08);
@@ -64,6 +68,8 @@
     --err: #ff8a9b; --err-bg: #33141f;
     --info: #5cc4ec; --info-bg: #0e2a40;
     --on-err: #2a0a14;
+    --code-bg: #0a1226; --code-line: #26365a; --code-hover: #17274a;
+    --m-get: #5fd6a0; --m-post: #7cb2ff; --on-m: #071022;
     --shadow: 0 1px 2px rgba(0, 0, 0, .45);
     --shadow-2: 0 6px 16px rgba(0, 0, 0, .45), 0 1px 3px rgba(0, 0, 0, .4);
     --shadow-3: 0 22px 54px rgba(0, 0, 0, .6), 0 2px 8px rgba(0, 0, 0, .45);

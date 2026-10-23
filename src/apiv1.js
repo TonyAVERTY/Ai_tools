@@ -1,6 +1,6 @@
 // API JSON publique (v1), réservée au mode développeur. Authentification : « Authorization: Bearer aitk_… » (voir apitokens.js).
 // Même contrôle d'accès que le panel : un jeton ne voit que les projets de son compte (et ceux que son équipe partage).
-// Documentation : docs/API.md (et la page /developer du panel).
+// Documentation : /docs/api (src/site/docs.js + src/apidocs.js) et la page /developer du panel.
 import { json, readBody, HttpError } from './http.js';
 import { now } from './db.js';
 import { getUser } from './users.js';
@@ -25,7 +25,7 @@ const LEVELS = ['rapide', 'normal', 'approfondi'];
 
 export const API_VERSION = 'v1';
 
-/** Toutes les routes de l'API, une seule fois : la page /developer et docs/API.md en dépendent (un test vérifie qu'aucune n'est oubliée). */
+/** Toutes les routes de l'API, une seule fois : la page /developer et la documentation /docs/api en dépendent (un test vérifie qu'aucune n'est oubliée). */
 export const API_ENDPOINTS = [
   { method: 'GET', path: '/me', scope: null, summary: 'Compte du jeton : adresse, plan, droits.' },
   { method: 'GET', path: '/projects', scope: 'read', summary: 'Tes projets (et ceux que ton équipe partage) avec leurs compteurs de prospects.' },

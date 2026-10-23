@@ -19,6 +19,7 @@ import { registerMailRoutes } from './mailroutes.js';
 import { registerApiV1 } from './apiv1.js';
 import { registerDeveloperRoutes } from './developerroutes.js';
 import { registerCalendarRoutes } from './calendar.js';
+import { registerEventRoutes } from './events.js';
 import { feedToken, feedUrl } from './services/ical.js';
 import { developerMode } from './apitokens.js';
 import { registerLinkedinRoutes } from './linkedinroutes.js';
@@ -75,6 +76,7 @@ export function registerRoutes(router, app) {
   registerApiV1(router, app, { aiOpts });
   registerDeveloperRoutes(router, app);
   registerCalendarRoutes(router, app);
+  registerEventRoutes(router, app);
   // Déjà connecté : la page de connexion n'a rien à offrir, on va au tableau de bord
   router.get('/login', async ({ req, res, url }) => {
     if (await getSession(db, req)) return redirect(res, '/');
