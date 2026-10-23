@@ -47,6 +47,7 @@ code { font-family: var(--mono); font-size: .875rem; background: var(--bg-sunk);
 .user > summary { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 999px; cursor: pointer; list-style: none; }
 .user > summary:hover .avatar, .user[open] > summary .avatar { box-shadow: 0 0 0 3px var(--bg-sunk), 0 0 0 5px var(--accent); }
 .user-pop { position: absolute; right: 0; top: calc(100% + 8px); z-index: 30; width: 240px; max-width: calc(100vw - 24px); padding: 6px; background: var(--card); border: 1px solid var(--line-strong); border-radius: var(--radius); box-shadow: var(--shadow-3); }
+.user-pop::before { content: ""; position: absolute; left: 0; right: 0; top: -10px; height: 10px; } /* pont invisible : le menu reste ouvert quand la souris traverse l'espace */
 .user-mail { padding: 8px 10px 10px; margin-bottom: 4px; border-bottom: 1px solid var(--line); font-size: .8125rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .user-pop a, .user-pop button { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 0 10px; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--text); font: inherit; font-weight: 600; font-size: .9375rem; text-decoration: none; cursor: pointer; text-align: left; }
 .user-pop a:hover, .user-pop button:hover { background: var(--bg-sunk); }

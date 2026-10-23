@@ -73,11 +73,23 @@
     if (!newForm.hidden) $('input', newForm)?.focus();
   }));
 
-  // ---------- Menu du compte (avatar) : se ferme au clic ailleurs ou avec Échap ----------
+  // ---------- Menu du compte (avatar) : s'ouvre au survol, se ferme quand on le quitte ----------
+  // Avec une souris : survol (le clic sur l'avatar ne le referme pas). Au doigt ou au clavier : clic / Entrée, comme un menu ordinaire.
   const userMenu = $('details.user');
   if (userMenu) {
-    document.addEventListener('click', (e) => { if (userMenu.open && !userMenu.contains(e.target)) userMenu.open = false; });
-    userMenu.addEventListener('keydown', (e) => { if (e.key === 'Escape' && userMenu.open) { userMenu.open = false; $('summary', userMenu).focus(); } });
+    const hover = matchMedia('(hover: hover) and (pointer: fine)');
+    const summary = $('summary', userMenu);
+    let closeTimer;
+    const open = (v) => { clearTimeout(closeTimer); userMenu.open = v; };
+    userMenu.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse' && hover.matches) open(true); });
+    userMenu.addEventListener('pointerleave', (e) => {
+      if (e.pointerType !== 'mouse' || !hover.matches) return;
+      clearTimeout(closeTimer);
+      closeTimer = setTimeout(() => { userMenu.open = false; }, 220);
+    });
+    summary.addEventListener('click', (e) => { if (e.detail > 0 && hover.matches) e.preventDefault(); }); // clic souris : le survol l'a déjà ouvert
+    document.addEventListener('click', (e) => { if (userMenu.open && !userMenu.contains(e.target)) open(false); });
+    userMenu.addEventListener('keydown', (e) => { if (e.key === 'Escape' && userMenu.open) { open(false); summary.focus(); } });
   }
 
   // ---------- Liaison Claude : fenêtre d'avertissement du mode abonnement ----------
