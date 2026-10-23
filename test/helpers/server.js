@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { now } from '../../src/db.js';
 import { createApp } from '../../src/server.js';
 import { testDb } from './db.js';
-import { addUser } from './users.js';
+import { addUser, TEST_SECRET_KEY } from './users.js';
 import { RateLimiter } from '../../src/ratelimit.js';
 import { RATE_LIMITS } from '../../src/limits.js';
 
@@ -25,8 +25,8 @@ export async function startApp({ cfg = {}, worker = false, rateLimit = false, cr
   const tmp = mkdtempSync(join(tmpdir(), 'aitools-srv-'));
   const config = {
     appUrl: APP_URL, google: { clientId: 'gid', clientSecret: 'gsecret' }, apple: null, adminEmails: [],
-    secretKey: randomBytes(32), dataDir: tmp, claudeBin: 'claude', cliModeEnabled: true,
-    sandbox: { enabled: false, production: false, roBinds: [], serverHome: tmp }, ...cfg,
+    secretKey: TEST_SECRET_KEY, dataDir: tmp, claudeBin: 'claude', cliModeEnabled: true,
+    sandbox: { enabled: false, production: false, roBinds: [] }, ...cfg,
   };
   const limiter = rateLimit ? new RateLimiter(rateLimit === true ? {} : rateLimit) : unlimited();
   const app = await createApp(config, { db: await testDb(), worker, limiter, createTransport, resolveHost: resolveHost || PUBLIC_DNS });

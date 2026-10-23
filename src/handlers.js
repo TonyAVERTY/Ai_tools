@@ -90,7 +90,7 @@ export function makeClaude(app) {
     const cred = await resolveCredentials(app, userId); // refuse sans liaison valide (dernier garde-fou)
     const r = await runClaude({
       bin: cfg.claudeBin, ...o,
-      sandbox: cfg.sandbox, secretEnv: cred.secretEnv, serverConfig: cred.serverConfig,
+      sandbox: cfg.sandbox, secretEnv: cred.secretEnv,
       allowedRoot: userRepoRoot(cfg, userId),
     });
     if (!r.ok) console.warn(claudeDiagnostic({ userId, cred, cfg, cwd: o.cwd, r }));

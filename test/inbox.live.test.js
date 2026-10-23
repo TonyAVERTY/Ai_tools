@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { now } from '../src/db.js';
 import { testDb } from './helpers/db.js';
-import { addUser } from './helpers/users.js';
+import { addUser, TEST_SECRET_KEY } from './helpers/users.js';
 
 import { checkInbox } from '../src/services/inbox.js';
 import { createProject, saveSecretConfig, getProject } from '../src/projects.js';
@@ -15,7 +15,7 @@ const live = process.env.IMAP_TEST;
 test('checkInbox sur un vrai serveur IMAP', { skip: !live && 'IMAP_TEST non défini' }, async () => {
   const [host, port, user, pass] = live.split(':');
   const db = await testDb();
-  const app = { db, cfg: { secretKey: randomBytes(32) } };
+  const app = { db, cfg: { secretKey: TEST_SECRET_KEY } };
   const userId = await addUser(db);
   const id = await createProject(app, { userId, name: 'P', gitUrl: 'https://git.x/T/P.git' });
   await saveSecretConfig(app, id, 'smtp_enc', { host: 'smtp.x', user, pass, fromEmail: user }, 'pass');
