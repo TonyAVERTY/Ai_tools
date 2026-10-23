@@ -29,7 +29,7 @@ import { cpuTemp } from './services/thermal.js';
 import { checkInbox } from './services/inbox.js';
 import { followupPlan } from './services/followup.js';
 import { nextNightSlot } from './services/paris-time.js';
-import { notify, notifyConfig, EVENTS, WEBHOOK_RE } from './services/notify.js';
+import { notify, notifyConfig, saveDiscordHooks, publicHooks, EVENTS, MAX_HOOKS } from './services/notify.js';
 import { budgetState, AI_JOBS } from './services/budget.js';
 import { currentClaudeQuota } from './services/usagelive.js';
 import { sendWeeklyReport } from './services/report.js';
@@ -149,7 +149,7 @@ export function registerRoutes(router, app) {
       budget_day_usd: await getSetting(db, userId, 'budget_day_usd', ''),
       budget_month_usd: await getSetting(db, userId, 'budget_month_usd', ''),
       priced: (await getLinkState(db, userId))?.mode === MODES.api_key, // plafonds en $ : seulement avec une clé API
-      discord: { set: !!discord.url, events: discord.events, all: EVENTS },
+      discord: { hooks: publicHooks(discord.hooks), all: EVENTS, max: MAX_HOOKS },
     };
     html(res, settingsPage({ email: session.email, s, saved: url.searchParams.has('ok') }));
   });
@@ -177,12 +177,7 @@ export function registerRoutes(router, app) {
     if (b.budget_day_usd !== undefined) await set('budget_day_usd', money(b.budget_day_usd));
     if (b.budget_month_usd !== undefined) await set('budget_month_usd', money(b.budget_month_usd));
 
-    const hook = String(b.discord_webhook || '').trim();
-    if (hook && !WEBHOOK_RE.test(hook)) throw new HttpError(400, 'URL de webhook Discord invalide (https://discord.com/api/webhooks/…)');
-    if (hook) await set('discord_webhook_enc', encrypt(cfg.secretKey, hook));
-    if (b.discord_remove === 'on') await set('discord_webhook_enc', null);
-    await set('discord_events', JSON.stringify(Object.keys(EVENTS).filter((k) => b[`ev_${k}`] === 'on')));
-
+    await saveDiscordHooks(app, userId, b);
     redirect(res, '/settings?ok');
   });
 
@@ -286,9 +281,13 @@ export function registerRoutes(router, app) {
     json(res, { ok: true, channels: r.channels });
   }, { limit: 'mail_send' });
 
-  router.post('/api/notify/test', async ({ res, session }) => {
-    if (!(await notifyConfig(app, session.userId)).url) throw new HttpError(400, 'Aucun webhook Discord configuré');
-    const ok = await notify(app, session.userId, 'test', { title: 'Notification de test', description: 'Les notifications AiTools arrivent bien ici.', level: 'ok' }, { force: true });
+  router.post('/api/notify/test', async ({ req, res, session }) => {
+    const b = await readBody(req);
+    const { hooks } = await notifyConfig(app, session.userId);
+    if (!hooks.length) throw new HttpError(400, 'Aucun webhook Discord configuré');
+    const hookId = b.hook ? String(b.hook) : null;
+    if (hookId && !hooks.some((h) => h.id === hookId)) throw new HttpError(404, 'Webhook introuvable');
+    const ok = await notify(app, session.userId, 'test', { title: 'Notification de test', description: 'Les notifications AiTools arrivent bien ici.', level: 'ok' }, { force: true, hookId });
     if (!ok) throw new HttpError(502, 'Discord a refusé la notification (webhook supprimé ?)');
     json(res, { ok: true });
   }, { limit: 'mail_send' });

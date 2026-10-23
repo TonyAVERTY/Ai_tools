@@ -190,22 +190,39 @@ test('« Cette nuit » programme le job au prochain créneau 1h-6h', async () =>
   assert.ok(listed.project);
 });
 
-test('réglages Discord : URL validée, chiffrée, événements enregistrés', async () => {
+test('réglages Discord : URL validée, chiffrée, événements enregistrés, plusieurs webhooks', async () => {
   const base = { notify_email: 'moi@x.fr', git_type_0: 'forgejo', git_host_0: 'git.tony-averty.dev', global_daily_cap: '100', send_delay_min: '20', send_delay_max: '60' };
-  let r = await post('/settings', { ...base, discord_webhook: 'https://evil.com/api/webhooks/1/x' }, { form: true });
+  const stored = async () => JSON.parse((await app.db.prepare("SELECT value FROM user_settings WHERE user_id = ? AND `key` = 'discord_hooks_json'").get(uid)).value);
+  let r = await post('/settings', { ...base, discord_url_0: 'https://evil.com/api/webhooks/1/x' }, { form: true });
   assert.equal(r.status, 400);
   const hook = 'https://discord.com/api/webhooks/123456789012345678/abcdefghijklmnopqrstuvwxyz-ABC_123';
-  r = await post('/settings', { ...base, discord_webhook: hook, ev_reply: 'on', ev_job_error: 'on' }, { form: true });
+  const hook2 = 'https://discord.com/api/webhooks/223456789012345678/zyxwvutsrqponmlkjihgfedcba-ABC_123';
+  r = await post('/settings', { ...base, discord_url_0: hook, discord_ev_0_reply: 'on', discord_ev_0_job_error: 'on' }, { form: true });
   assert.equal(r.status, 303);
-  const enc = (await app.db.prepare("SELECT value FROM user_settings WHERE user_id = ? AND `key` = 'discord_webhook_enc'").get(uid)).value;
-  assert.ok(!enc.includes('abcdefghijklmnop'), 'URL chiffrée');
-  assert.deepEqual(JSON.parse((await app.db.prepare("SELECT value FROM user_settings WHERE user_id = ? AND `key` = 'discord_events'").get(uid)).value), ['job_error', 'reply']);
+  let list = await stored();
+  assert.equal(list.length, 1);
+  assert.ok(!JSON.stringify(list).includes('abcdefghijklmnop'), 'URL chiffrée');
+  assert.deepEqual(list[0].events, ['job_error', 'reply']);
   r = await get('/settings');
-  const page = await r.text();
+  let page = await r.text();
   assert.ok(!page.includes('abcdefghijklmnop'), 'URL jamais réaffichée');
   assert.match(page, /data-notify-test/);
-  r = await post('/settings', { ...base, discord_remove: 'on' }, { form: true });
-  assert.equal((await app.db.prepare("SELECT value FROM user_settings WHERE user_id = ? AND `key` = 'discord_webhook_enc'").get(uid)).value, null);
+  assert.match(page, /data-discord-add/, 'bouton « + » pour un autre webhook');
+  assert.match(page, /Aucun webhook ne reçoit pour l&#39;instant|Aucun webhook ne reçoit pour l'instant/, 'événements sans webhook signalés');
+
+  // Un second webhook pour d'autres événements ; l'adresse laissée vide du premier est conservée
+  const id0 = list[0].id;
+  r = await post('/settings', { ...base, discord_id_0: id0, discord_url_0: '', discord_ev_0_reply: 'on', discord_ev_0_job_error: 'on', discord_url_1: hook2, discord_ev_1_weekly: 'on', discord_ev_1_job_done: 'on' }, { form: true });
+  assert.equal(r.status, 303);
+  list = await stored();
+  assert.equal(list.length, 2);
+  assert.equal(list[0].id, id0);
+  assert.deepEqual(list[1].events, ['job_done', 'weekly']);
+  r = await post('/settings', { ...base, discord_id_0: id0, discord_ev_0_reply: 'on', discord_url_0: '', discord_id_1: list[1].id, discord_url_1: '', discord_del_1: '1' }, { form: true });
+  list = await stored();
+  assert.equal(list.length, 1, 'webhook retiré');
+  r = await post('/settings', { ...base, discord_id_0: id0, discord_url_0: '', discord_del_0: '1' }, { form: true });
+  assert.deepEqual(await stored(), []);
 });
 
 test('budget : réglages, jauge et avertissement au lancement', async () => {

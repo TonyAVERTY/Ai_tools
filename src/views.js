@@ -456,6 +456,28 @@ function gitRow(i, srv, { fresh = false } = {}) {
 /** Case à cocher du design : le <input> natif reste là (clavier, lecteurs d'écran), la case dessinée suit son état. */
 const check = (name, checked, text, { value = '' } = {}) => `<label class="opt"><input type="checkbox" name="${name}"${value ? ` value="${value}"` : ''}${checked ? ' checked' : ''}><span class="box">${ic('check')}</span><span>${text}</span></label>`;
 
+/** Une ligne « webhook Discord » : adresse (jamais réaffichée) et événements reçus. `fresh` : ligne qui vient d'être ajoutée (gabarit). */
+function hookRow(i, h, all, { fresh = false } = {}) {
+  const n = typeof i === 'number' ? i + 1 : '';
+  return `<div class="gitrow" data-discord-row>
+      <input type="hidden" name="discord_id_${i}" value="${esc(h.id)}">
+      <div class="gitrow-head"><span class="srv-n">${ic('send')}<span class="badge" data-discord-title>Webhook${n ? ` ${n}` : ''}</span></span>
+        ${fresh ? ' <button type="button" class="linklike" data-discord-cancel>Annuler</button>' : `<button type="button" class="btn" data-notify-test data-hook="${esc(h.id)}">Envoyer un test</button>`}</div>
+      <label class="field"><span class="lbl">URL du webhook</span><input name="discord_url_${i}" type="password" placeholder="${fresh ? 'https://discord.com/api/webhooks/…' : '•••••• (inchangé)'}" autocomplete="off"><span class="hint">Stocké chiffré.</span></label>
+      <fieldset class="evs"><legend class="lbl">Ce webhook reçoit</legend>
+        <div class="checks">${Object.entries(all).map(([k, label]) => check(`discord_ev_${i}_${k}`, h.events.includes(k), esc(label))).join('')}</div>
+      </fieldset>
+      ${fresh ? '' : check(`discord_del_${i}`, false, 'Retirer ce webhook', { value: '1' })}
+    </div>`;
+}
+
+/** Événements que plus aucun webhook ne reçoit : de quoi penser à en ajouter un. */
+function uncovered(d) {
+  if (!d.hooks.length) return '';
+  const missing = Object.entries(d.all).filter(([k]) => !d.hooks.some((h) => h.events.includes(k))).map(([, l]) => esc(l));
+  return missing.length ? `<p class="hint">Aucun webhook ne reçoit pour l'instant : ${missing.join(' · ')}.</p>` : '';
+}
+
 const SETTINGS_TOC = [['notif', 'Notifications'], ['git', 'Dépôts Git'], ['discord', 'Discord'], ['garde', 'Garde-fous'], ['budget', 'Budget et modèles IA'], ['opposition', "Liste d'opposition"]];
 
 export function settingsPage({ email, s, saved }) {
@@ -509,13 +531,16 @@ ${saved ? `<p class="ok-box" role="status">${ic('check')}<span><b>Réglages enre
 </section>
 
 <section class="card" id="discord" aria-labelledby="t-discord">
-  <div class="card-h"><h2 id="t-discord">Discord</h2><p>Reçois les réponses et les alertes dans un salon. Salon Discord › Modifier › Intégrations › Webhooks › Nouveau webhook › Copier l'URL.</p></div>
-  <label class="field"><span class="lbl">URL du webhook</span><input name="discord_webhook" type="password" placeholder="${s.discord.set ? '•••••• (inchangé)' : 'https://discord.com/api/webhooks/…'}" autocomplete="off"><span class="hint">Stocké chiffré.</span></label>
-  ${s.discord.set ? check('discord_remove', false, 'Supprimer le webhook') : ''}
-  <div class="checks">
-    ${Object.entries(s.discord.all).map(([k, label]) => check(`ev_${k}`, s.discord.events.includes(k), esc(label))).join('')}
+  <div class="card-h"><h2 id="t-discord">Discord</h2><p>Reçois les réponses et les alertes dans un salon. Salon Discord › Modifier › Intégrations › Webhooks › Nouveau webhook › Copier l'URL. Un webhook par salon : ajoute-en un autre avec « + » pour séparer ce qui est dit ou fait (réponses d'un côté, erreurs de l'autre).</p></div>
+  <div class="gitlist" data-discordlist data-next="${s.discord.hooks.length}" data-max="${s.discord.max}">
+    ${s.discord.hooks.map((h, i) => hookRow(i, h, s.discord.all)).join('\n    ')}
   </div>
-  ${s.discord.set ? `<div class="save"><button type="button" class="btn" data-notify-test>Envoyer une notification de test</button></div>` : ''}
+  <template id="discord-row-tpl">${hookRow('__I__', { id: '', events: [] }, s.discord.all, { fresh: true })}</template>
+  ${uncovered(s.discord)}
+  <div class="gitadd">
+    <button type="button" class="btn" data-discord-add>${ic('plus')}${s.discord.hooks.length ? 'Ajouter un autre webhook' : 'Ajouter un webhook'}</button>
+    <span class="hint" data-discord-max hidden>${s.discord.max} webhooks au plus.</span>
+  </div>
 </section>
 
 <section class="card" id="garde" aria-labelledby="t-garde">
