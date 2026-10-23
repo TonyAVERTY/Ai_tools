@@ -12,15 +12,24 @@ const HOUR = 60 * MIN;
  * Une requête passe seulement si toutes les portées de la règle l'acceptent.
  */
 export const RATE_LIMITS = {
+  // Abonnement iCal (lien secret) : un agenda interroge au plus quelques fois par heure
+  ical: { ip: { max: 60, windowMs: 10 * MIN } },
+  // API (mode développeur) : par adresse avant authentification, par compte ensuite
+  api_ip: { ip: { max: 300, windowMs: MIN } },
+  api: { user: { max: 120, windowMs: MIN } },
   // Connexion : démarrage (Google, Apple) et retours des fournisseurs
   auth_start: { ip: { max: 20, windowMs: 10 * MIN } },
   auth_callback: { ip: { max: 40, windowMs: 10 * MIN } },
+  // Désinscription (page publique, lien reçu par mail) : large pour un lecteur légitime, étroit pour un robot qui devine
+  unsub: { ip: { max: 60, windowMs: 10 * MIN } },
   // Liaison Claude : chaque essai de clé ou de jeton coûte un appel réseau chez Anthropic
   link: { user: { max: 10, windowMs: 10 * MIN }, ip: { max: 30, windowMs: 10 * MIN } },
   // Export / import CSV
   csv: { user: { max: 10, windowMs: 10 * MIN } },
   // Envois : lancement d'un lot, rapport par mail, notification de test
   mail_send: { user: { max: 30, windowMs: HOUR } },
+  // Régénération d'accroche : un appel Claude (lecture du site) à chaque fois
+  enrich: { user: { max: 40, windowMs: HOUR } },
   // Création de projet (clone du dépôt, analyse)
   project_create: { user: { max: 10, windowMs: HOUR } },
   // Suppression de compte

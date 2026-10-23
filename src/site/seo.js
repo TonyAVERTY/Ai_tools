@@ -5,7 +5,7 @@ import { absoluteUrl } from './layout.js';
 export const INDEXABLE_PATHS = ['/', '/fonctionnement', '/tarifs', '/mentions-legales', '/confidentialite', '/cgu'];
 
 // Pages d'application : jamais explorées (le noindex des pages est posé en plus, par en-tête et par balise)
-export const DISALLOWED_PATHS = ['/admin', '/account', '/settings', '/link', '/api/', '/auth/', '/u/', '/logout'];
+export const DISALLOWED_PATHS = ['/admin', '/account', '/settings', '/mails', '/calendar', '/cal/', '/developer', '/link', '/api/', '/auth/', '/u/', '/logout'];
 
 export function robotsTxt(appUrl) {
   return [
@@ -63,6 +63,7 @@ export function securityHeaders(appUrl) {
     'Referrer-Policy': 'same-origin',
     'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()',
     'Cross-Origin-Opener-Policy': 'same-origin',
+    'Cross-Origin-Resource-Policy': 'same-origin',
     'Content-Security-Policy': CSP,
   };
   if (/^https:\/\//i.test(String(appUrl))) headers['Strict-Transport-Security'] = 'max-age=31536000';

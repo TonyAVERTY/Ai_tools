@@ -4,7 +4,7 @@ import { readdirSync } from 'node:fs';
 import { runClaude, extractJson, rateLimitWindows } from './services/claude.js';
 import { addUsage } from './services/jobs.js';
 import { syncRepo } from './services/git.js';
-import { analyzePrompt, prospectPrompt, templatePrompt, followupTemplatePrompt, evolutionPrompt, linkedinPostPrompt, LEVELS } from './services/prompts.js';
+import { analyzePrompt, prospectPrompt, templatePrompt, followupTemplatePrompt, evolutionPrompt, linkedinPostPrompt, hookPrompt, auditPrompt, parseCustomPrompts, LEVELS } from './services/prompts.js';
 import { linkedinAccount, saveDraft, recentDrafts } from './linkedin.js';
 import { followupCandidates, followupSubject, isBusinessHours } from './services/followup.js';
 import { EMAIL_RE, createTransport, buildProspectMail, allowedToSend, makeMessageId } from './services/mailer.js';
@@ -17,6 +17,7 @@ import { quotaFor, recordUsage, planLimitMessage } from './services/plans.js';
 import { getUser } from './users.js';
 import { pinSmtp, pinGit } from './netguard.js';
 import { sendPause, pauseMessage, evaluateSending } from './services/abuse.js';
+import { verifyAddress, defaultMx } from './services/verify.js';
 import { evolutionMail } from './services/mailhtml.js';
 import { gitCredentialFor } from './gitservers.js';
 import { getProject, repoDir, sentSince, getTemplate, saveTemplate, pickVariant } from './projects.js';
@@ -120,6 +121,8 @@ export function makeHandlers(app) {
     const cred = await gitCredentialFor(app, userId, url); // le token de SON hôte seulement, jamais celui d'un autre
     return (app.syncRepo || syncRepo)(url, dir, cred?.token ?? null, { pin: await pinGit(app, userId, url), scheme: cred?.scheme, user: cred?.user });
   };
+  // Consignes modifiées par l'utilisateur (Réglages) : celles du compte qui lance le job
+  const custom = async (userId) => parseCustomPrompts(await getSetting(db, userId, 'prompts_json'));
   const inHours = () => (app.isBusinessHours || isBusinessHours)();
 
   // Premier mail ou relance : mêmes plafonds, mêmes délais, même journal
@@ -165,10 +168,15 @@ export function makeHandlers(app) {
     const markBounced = db.prepare("UPDATE prospects SET status = 'bounced' WHERE id = ?");
     const original = db.prepare("SELECT subject, message_id FROM mail_log WHERE prospect_id = ? AND kind = 'initial' AND error IS NULL ORDER BY id LIMIT 1");
     const current = db.prepare('SELECT status, followup_at FROM prospects WHERE id = ?');
-    let sent = 0, failed = 0;
+    const markInvalid = db.prepare("UPDATE prospects SET status = 'invalid' WHERE id = ? AND status = 'new'");
+    const mxCache = new Map();
+    const readReceipt = (await getSetting(db, userId, 'read_receipt', '0')) === '1';
+    let sent = 0, failed = 0, invalid = 0;
     await ctx.progress({ sent, failed, total: n, message: `0/${n} ${kind === 'followup' ? 'relances envoyées' : 'envoyés'}`, pct: 0 });
 
-    for (const p of candidates.slice(0, n)) {
+    // Les adresses refusées par la vérification ne comptent pas dans le lot : on continue dans la liste jusqu'à `n` envois tentés
+    for (const p of candidates) {
+      if (sent + failed >= n) break;
       if (await ctx.cancelled()) break;
       if (kind === 'followup' && !inHours()) break; // le reste repartira au prochain créneau
       // Re-vérifie juste avant l'envoi : désinscription, réponse arrivée pendant le batch…
@@ -176,6 +184,16 @@ export function makeHandlers(app) {
       if (kind === 'followup') {
         const c = await current.get(p.id);
         if (c.status !== 'sent' || c.followup_at) continue;
+      }
+      if (kind === 'initial') {
+        // Adresse mal formée, jetable ou sans serveur de réception : on ne l'essaie pas (un rejet abîme la réputation d'envoi)
+        const v = await verifyAddress(p.email, { resolveMx: app.resolveMx || defaultMx, cache: mxCache });
+        if (!v.ok) {
+          await markInvalid.run(p.id);
+          await log.run(project.id, p.id, p.email, now(), `Adresse non envoyée : ${v.reason}`, kind, null, null, null);
+          invalid++;
+          continue;
+        }
       }
       const unsubUrl = `${cfg.appUrl}/u/${encodeURIComponent(p.email)}/${unsubToken(cfg.secretKey, p.email)}`;
       let variant = null, subject, inReplyTo;
@@ -189,7 +207,7 @@ export function makeHandlers(app) {
       }
       const mail = buildProspectMail({
         template, prospect: p, smtp: project.smtp, unsubUrl, subject, inReplyTo,
-        messageId: makeMessageId(project.smtp.fromEmail),
+        messageId: makeMessageId(project.smtp.fromEmail), readReceipt,
       });
       try {
         await transport.sendMail(mail);
@@ -209,7 +227,7 @@ export function makeHandlers(app) {
     }
     transport.close();
     await evaluateSending(app, userId); // trop de rejets : le compte passe en pause d'envoi
-    return { sent, failed, total: n };
+    return { sent, failed, total: n, ...(invalid ? { invalid } : {}) };
   }
 
   return {
@@ -221,7 +239,7 @@ export function makeHandlers(app) {
       const commit = await sync(userId, project.gitUrl, dir);
 
       await ctx.progress({ message: 'Analyse du code par Claude…', pct: 10 });
-      const { prompt, system } = analyzePrompt(project.name);
+      const { prompt, system } = analyzePrompt(project.name, await custom(userId));
       const model = await getSetting(db, userId, 'analyze_model', 'haiku');
       const sink = makeSink();
       const r = await claude(userId, {
@@ -295,7 +313,7 @@ export function makeHandlers(app) {
         });
       };
       await report();
-      const { prompt, system } = prospectPrompt({ profile: project.profile, target: project.target, count, exclude });
+      const { prompt, system } = prospectPrompt({ profile: project.profile, target: project.target, count, exclude, custom: await custom(userId) });
       const model = await getSetting(db, userId, 'prospect_model', 'haiku');
       const r = await claude(userId, {
         prompt, system, model, tools: ['WebSearch', 'WebFetch'],
@@ -313,7 +331,7 @@ export function makeHandlers(app) {
       const project = await getProject(app, ctx.job.project_id, { userId, secrets: true });
       if (!project.profile) throw new Error('Analyse le projet d\'abord');
       await ctx.progress({ message: 'Rédaction du modèle par Claude…', pct: 40 });
-      const { prompt, system } = templatePrompt({ profile: project.profile, target: project.target || {}, senderName: project.smtp?.fromName });
+      const { prompt, system } = templatePrompt({ profile: project.profile, target: project.target || {}, senderName: project.smtp?.fromName, custom: await custom(userId) });
       const r = await claude(userId, { prompt, system, model: 'haiku', maxTurns: 1, tools: [], signal: ctx.signal });
       addUsage(ctx, r);
       const t = extractJson(r.text);
@@ -327,7 +345,7 @@ export function makeHandlers(app) {
       const project = await getProject(app, ctx.job.project_id, { userId, secrets: true });
       if (!project.profile) throw new Error('Analyse le projet d\'abord');
       await ctx.progress({ message: 'Rédaction de la relance par Claude…', pct: 40 });
-      const { prompt, system } = followupTemplatePrompt({ profile: project.profile, senderName: project.smtp?.fromName });
+      const { prompt, system } = followupTemplatePrompt({ profile: project.profile, senderName: project.smtp?.fromName, custom: await custom(userId) });
       const r = await claude(userId, { prompt, system, model: 'haiku', maxTurns: 1, tools: [], signal: ctx.signal });
       addUsage(ctx, r);
       const t = extractJson(r.text);
@@ -346,7 +364,7 @@ export function makeHandlers(app) {
       const direction = String(ctx.params.direction ?? '').trim().slice(0, 500);
       await ctx.progress({ message: direction ? 'Rédaction du post selon ta direction…' : 'Claude choisit un angle et rédige le post…', pct: 40 });
       const { prompt, system } = linkedinPostPrompt({
-        profile: project.profile, target: project.target || {}, direction, previous: await recentDrafts(db, project.id), author: account.name,
+        profile: project.profile, target: project.target || {}, direction, previous: await recentDrafts(db, project.id), author: account.name, custom: await custom(userId),
       });
       const model = await getSetting(db, userId, 'analyze_model', 'haiku');
       const r = await claude(userId, { prompt, system, model: ['haiku', 'sonnet'].includes(model) ? model : 'haiku', maxTurns: 1, tools: [], signal: ctx.signal });
@@ -376,7 +394,7 @@ export function makeHandlers(app) {
       await sync(userId, project.gitUrl, dir);
 
       await ctx.progress({ message: `Recherche de ${count} évolutions (${level})…`, pct: 10 });
-      const { prompt, system } = evolutionPrompt({ projectName: project.name, profile: project.profile, count, level });
+      const { prompt, system } = evolutionPrompt({ projectName: project.name, profile: project.profile, count, level, custom: await custom(userId) });
       const { model, maxTurns } = LEVELS[level];
       const sink = makeSink();
       const r = await claude(userId, {
@@ -397,6 +415,54 @@ export function makeHandlers(app) {
       });
       transport.close();
       return { markdown: r.text, sentTo: to };
+    },
+
+    // Audit du dépôt : rapport en lecture seule (Read / Glob / Grep), gardé dans le résultat du job
+    async audit(ctx) {
+      const userId = ctx.job.user_id;
+      const project = await getProject(app, ctx.job.project_id, { userId });
+      const level = LEVELS[ctx.params.level] ? ctx.params.level : 'normal';
+      await ctx.progress({ message: 'Mise à jour du repo…', pct: 3 });
+      const dir = repoDir(cfg, userId, project.id);
+      await sync(userId, project.gitUrl, dir);
+      await ctx.progress({ message: `Audit du code (${level})…`, pct: 10 });
+      const { prompt, system } = auditPrompt({ projectName: project.name, level, custom: await custom(userId) });
+      const { model, maxTurns } = LEVELS[level];
+      const sink = makeSink();
+      const r = await claude(userId, {
+        prompt, system, cwd: dir, model, maxTurns, tools: ['Read', 'Glob', 'Grep'], signal: ctx.signal,
+        onTurn: (n) => sink.push(() => ctx.progress({ message: `Audit du code (${level}) · étape ${n}…`, pct: turnPct(10, 95, n, maxTurns) })),
+      });
+      await sink.flush();
+      addUsage(ctx, r);
+      if (!r.text?.trim()) throw new Error(`Pas de résultat (${r.subtype})`);
+      return { markdown: r.text, level };
+    },
+
+    // Accroche d'un prospect : régénérée à partir de son site ; ville et secteur complétés s'ils manquaient
+    async hook(ctx) {
+      const userId = ctx.job.user_id;
+      const project = await getProject(app, ctx.job.project_id, { userId });
+      const prospect = await db.prepare('SELECT * FROM prospects WHERE id = ? AND project_id = ?').get(Number(ctx.params.prospectId), project.id);
+      if (!prospect) throw new Error('Prospect introuvable');
+      await ctx.progress({ message: `Lecture du site de ${prospect.company}…`, pct: 20 });
+      const { prompt, system } = hookPrompt({ profile: project.profile, prospect, custom: await custom(userId) });
+      const model = await getSetting(db, userId, 'prospect_model', 'haiku');
+      // Sans site, Claude n'a rien à lire : pas d'outil web, l'accroche s'appuie sur la fiche du prospect
+      const r = await claude(userId, {
+        prompt, system, model: ['haiku', 'sonnet'].includes(model) ? model : 'haiku',
+        tools: prospect.website ? ['WebFetch'] : [], maxTurns: prospect.website ? 6 : 1, signal: ctx.signal,
+      });
+      addUsage(ctx, r);
+      let out = {};
+      try { out = extractJson(r.text); } catch { out = {}; }
+      const hook = String(out.hook ?? '').replace(/\s+/g, ' ').trim().slice(0, 300);
+      if (hook.length < 15) throw new Error("Claude n'a pas produit d'accroche exploitable : réessaie");
+      const city = String(out.city ?? '').trim().slice(0, 100);
+      const sector = String(out.sector ?? '').trim().slice(0, 100);
+      await db.prepare('UPDATE prospects SET hook = ?, city = COALESCE(NULLIF(city, \'\'), ?), sector = COALESCE(NULLIF(sector, \'\'), ?) WHERE id = ?')
+        .run(hook, city || null, sector || null, prospect.id);
+      return { prospectId: prospect.id, hook };
     },
   };
 }

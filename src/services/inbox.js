@@ -5,6 +5,7 @@ import { getProject } from '../projects.js';
 import { notify } from './notify.js';
 import { pinImap } from '../netguard.js';
 import { evaluateSending } from './abuse.js';
+import { extractReplyText, classifyIntent } from './replies.js';
 
 // Webmails grand public : une réponse d'un autre @gmail.com ne dit rien sur l'entreprise
 const GENERIC_DOMAINS = new Set([
@@ -28,12 +29,17 @@ export function parseHeaders(raw) {
   return out;
 }
 
-/** @returns {{type: 'reply'|'auto'|'bounce', from: string, ids: string[]}} */
+/** @returns {{type: 'reply'|'auto'|'bounce'|'receipt', from: string, ids: string[]}} */
 export function classify(msg) {
   const h = msg.headers || {};
   const from = String(msg.from || '').toLowerCase();
   const subject = String(msg.subject || '').trim();
   const refs = [...new Set([...ids(msg.inReplyTo), ...ids(h.references)])];
+
+  // Accusé de lecture (MDN) : jamais une réponse, même s'il porte « Auto-Submitted »
+  if (/report-type=["']?disposition-notification/i.test(h['content-type'] || '')) {
+    return { type: 'receipt', from, ids: [...new Set([...refs, ...ids(msg.body)])] };
+  }
 
   const bounce = /^(mailer-daemon|postmaster)@/.test(from)
     || /report-type=["']?delivery-status/i.test(h['content-type'] || '')
@@ -51,13 +57,17 @@ export function classify(msg) {
 
 /** Applique une liste de messages aux prospects du projet. Idempotent. */
 export async function applyMessages(db, projectId, messages, { at = now() } = {}) {
-  const res = { replies: 0, bounces: 0, ignored: 0 };
+  const res = { replies: 0, bounces: 0, receipts: 0, ignored: 0 };
   const byMsgId = db.prepare('SELECT prospect_id FROM mail_log WHERE project_id = ? AND message_id = ? AND prospect_id IS NOT NULL LIMIT 1');
   const byEmail = db.prepare('SELECT id FROM prospects WHERE project_id = ? AND email = ? LIMIT 1');
   const byDomain = db.prepare("SELECT id FROM prospects WHERE project_id = ? AND status = 'sent' AND substr(email, instr(email, '@') + 1) = ?");
   const markReply = db.prepare("UPDATE prospects SET status = 'replied', replied_at = ?, reply_subject = ? WHERE id = ? AND status = 'sent'");
   const markBounce = db.prepare("UPDATE prospects SET status = 'bounced' WHERE id = ? AND status = 'sent'");
   const blacklist = db.prepare("INSERT OR IGNORE INTO blacklist(email, reason, created_at) SELECT email, 'bounce', ? FROM prospects WHERE id = ?");
+  const markRead = db.prepare('UPDATE mail_log SET read_at = ? WHERE project_id = ? AND message_id = ? AND read_at IS NULL');
+  const known = db.prepare('SELECT 1 x FROM replies WHERE project_id = ? AND uid = ?');
+  const storeReply = db.prepare('INSERT OR IGNORE INTO replies(project_id, prospect_id, uid, from_email, subject, body, intent, received_at) VALUES(?, ?, ?, ?, ?, ?, ?, ?)');
+  const prospectEmail = db.prepare('SELECT email FROM prospects WHERE id = ?');
 
   const fromIds = async (list) => {
     for (const id of list) { const r = await byMsgId.get(projectId, id); if (r) return r.prospect_id; }
@@ -71,6 +81,12 @@ export async function applyMessages(db, projectId, messages, { at = now() } = {}
       if (pid && (await markBounce.run(pid)).changes) { await blacklist.run(at, pid); res.bounces++; } else res.ignored++;
       continue;
     }
+    if (c.type === 'receipt') {
+      // L'accusé cite notre Message-ID : on retrouve le mail. « Lu » ne se retire jamais et ne dépend pas d'une réponse.
+      const ok = (await Promise.all(c.ids.map((id) => markRead.run(at, projectId, id)))).some((r) => r.changes);
+      if (ok) res.receipts++; else res.ignored++;
+      continue;
+    }
     if (c.type === 'auto') { res.ignored++; continue; }
 
     // Réponse : 1) fil de discussion, 2) même adresse, 3) même domaine pro (un seul prospect en attente dessus)
@@ -82,8 +98,25 @@ export async function applyMessages(db, projectId, messages, { at = now() } = {}
         if (rows.length === 1) pid = rows[0].id;
       }
     }
-    if (pid && (await markReply.run(at, String(msg.subject || '').slice(0, 300), pid)).changes) res.replies++;
-    else res.ignored++;
+    if (!pid) { res.ignored++; continue; }
+    const changed = (await markReply.run(at, String(msg.subject || '').slice(0, 300), pid)).changes;
+    if (changed) res.replies++; else res.ignored++;
+    // La réponse elle-même : texte, intention, « non lue » (c'est ce qui déclenche la notification dans le panel).
+    // Sans UID (lecture non IMAP), seule la première réponse d'un prospect est enregistrée : l'appel reste idempotent.
+    if (msg.uid != null ? !(await known.get(projectId, msg.uid)) : changed) {
+      const text = String(msg.text || '');
+      const intent = classifyIntent(msg.subject, text);
+      await storeReply.run(projectId, pid, msg.uid ?? null, c.from, String(msg.subject || '').slice(0, 300), text, intent, at);
+      if (intent === 'refused') {
+        // Un refus écrit vaut opposition : même effet que « Refus » dans la fiche (liste commune à tous les comptes)
+        const mail = (await prospectEmail.get(pid))?.email;
+        await db.prepare("UPDATE prospects SET status = 'refused' WHERE id = ? AND status IN ('new','sent','replied')").run(pid);
+        if (mail) {
+          await db.prepare("INSERT OR IGNORE INTO blacklist(email, reason, created_at) VALUES(?, 'refused', ?)").run(mail, at);
+          await db.prepare("UPDATE prospects SET status = 'refused' WHERE email = ? AND status IN ('new','sent')").run(mail);
+        }
+      }
+    }
   }
   return res;
 }
@@ -128,11 +161,13 @@ export async function fetchInbox(creds, state, { since, max = 500 }) {
           headers: parseHeaders(m.headers),
         });
       }
-      // Les bounces citent notre Message-ID dans le corps : on lit seulement leur début
+      // Les bounces citent notre Message-ID dans le corps : on lit seulement leur début. Les réponses : leur texte (borné)
       for (const msg of out.messages) {
-        if (classify(msg).type !== 'bounce') continue;
-        const full = await client.fetchOne(String(msg.uid), { source: { maxLength: 100_000 } }, { uid: true });
-        msg.body = full?.source ? full.source.toString('utf8') : '';
+        const type = classify(msg).type;
+        if (type === 'auto') continue;
+        const full = await client.fetchOne(String(msg.uid), { source: { maxLength: type === 'bounce' || type === 'receipt' ? 100_000 : 60_000 } }, { uid: true });
+        if (type === 'bounce' || type === 'receipt') msg.body = full?.source ? full.source.toString('utf8') : '';
+        else msg.text = full?.source ? extractReplyText(full.source) : '';
       }
       lastUid = Math.max(lastUid, ...uids);
     }

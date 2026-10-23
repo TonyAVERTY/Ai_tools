@@ -4,6 +4,7 @@ import { getSetting, setSetting } from '../db.js';
 import { encrypt, decrypt } from '../crypto.js';
 import { HttpError } from '../http.js';
 import { parseEvolutions, EFFORTS } from './markdown.js';
+import { notifyChannels } from './channels.js';
 
 // Uniquement de vraies URLs de webhook Discord : jamais d'envoi vers une adresse arbitraire
 export const WEBHOOK_RE = /^https:\/\/(?:canary\.|ptb\.)?discord(?:app)?\.com\/api\/webhooks\/\d{5,25}\/[\w-]{20,120}$/;
@@ -114,7 +115,9 @@ async function post(app, url, body) {
  */
 export async function notify(app, userId, event, { title, description = '', level = 'info', fields = [], footer }, { force = false, hookId = null } = {}) {
   const targets = (await listHooks(app, userId)).filter((h) => (!hookId || h.id === hookId) && (force || h.events.includes(event)));
-  if (!targets.length) return false;
+  // Slack, Telegram, e-mail : mêmes événements ; jamais sur un test ciblé d'un webhook Discord précis
+  const others = hookId ? [] : await notifyChannels(app, userId, event, { title, description, level, fields }, ALL_EVENTS, { force });
+  if (!targets.length) return others.length > 0;
   const body = {
     username: 'AiTools',
     allowed_mentions: { parse: [] }, // un "@everyone" dans un nom d'entreprise ne pingera personne
@@ -132,7 +135,7 @@ export async function notify(app, userId, event, { title, description = '', leve
     }],
   };
   const sent = await Promise.all(targets.map((h) => post(app, h.url, body)));
-  return sent.some(Boolean);
+  return sent.some(Boolean) || others.length > 0;
 }
 
 const duration = (s) => (s < 60 ? `${s} s` : s < 3600 ? `${Math.round(s / 60)} min` : `${Math.floor(s / 3600)} h ${Math.round((s % 3600) / 60)} min`);

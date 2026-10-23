@@ -4,7 +4,7 @@
 // en ajouter une. Côté MySQL, chaque instruction est idempotente (CREATE ... IF NOT EXISTS) : MySQL
 // valide implicitement chaque DDL, une migration interrompue peut donc être rejouée.
 //
-// Une instruction est soit une chaîne SQL, soit { sql, params?(ctx), when?(q, ctx) } :
+// Une instruction est soit une chaîne SQL, soit { sql, params?(ctx), when?(q, ctx) } ou { run(q, ctx, exec) } (étape JavaScript) :
 //   - params(ctx) fournit les paramètres liés (ctx = { ownerEmail, now }) ;
 //   - when(q, ctx) décide si l'instruction s'applique (q(sql, params) renvoie les lignes) : c'est ce qui rend
 //     les ALTER TABLE rejouables côté MySQL (pas de IF NOT EXISTS sur ADD COLUMN) ;
@@ -12,7 +12,55 @@
 // sqliteForeignKeysOff : la migration reconstruit des tables (SQLite ne sait pas retirer un UNIQUE) ; les clés
 // étrangères sont suspendues pendant la migration, puis PRAGMA foreign_key_check vérifie le résultat.
 
+import { hashSid } from './crypto.js';
+
 const T = 'ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci';
+
+// Les sessions existantes gardent leur validité : le cookie n'change pas, seule la valeur stockée devient son empreinte.
+const hashSessionIds = {
+  run: async (q, ctx, exec) => {
+    // Une empreinte (64 caractères hexadécimaux) n'est pas rehachée : la migration peut être rejouée côté MySQL
+    for (const r of await q('SELECT id FROM sessions')) if (!/^[0-9a-f]{64}$/.test(r.id)) await exec('UPDATE sessions SET id = ? WHERE id = ?', [hashSid(r.id), r.id]);
+  },
+};
+
+
+// ---------- Aides de la migration 2 ----------
+
+function ownerParams(ctx) { return [ctx.ownerEmail, ctx.now]; }
+function ownerParams0(ctx) { return [ctx.ownerEmail ?? null]; }
+
+// Des données existent-elles (une instance déjà utilisée) ? Alors elles ont besoin d'un propriétaire.
+async function hasLegacyData(q) {
+  for (const t of ['projects', 'settings', 'jobs']) {
+    if ((await q(`SELECT COUNT(*) n FROM ${t}`))[0].n > 0) return true;
+  }
+  return false;
+}
+
+async function checkOwner(q, ctx) {
+  if (ctx.ownerEmail) return;
+  if (await hasLegacyData(q)) {
+    throw new Error('Migration comptes : des données existent, définis ADMIN_EMAILS (le premier email devient propriétaire de ces données).');
+  }
+}
+
+const infoSchema = (what) => `SELECT 1 x FROM information_schema.${what} WHERE table_schema = DATABASE() AND table_name = ?`;
+function colMissing(t, c) {
+  return async (q) => !(await q(`${infoSchema('columns')} AND column_name = ?`, [t, c])).length;
+}
+function idxExists(t, i) {
+  return async (q) => (await q(`${infoSchema('statistics')} AND index_name = ?`, [t, i])).length > 0;
+}
+function idxMissing(t, i) {
+  return async (q) => !(await idxExists(t, i)(q));
+}
+function fkMissing(t, name) {
+  return async (q) => !(await q(`${infoSchema('table_constraints')} AND constraint_name = ? AND constraint_type = 'FOREIGN KEY'`, [t, name])).length;
+}
+function tableExists(t) {
+  return async (q) => (await q(infoSchema('tables'), [t])).length > 0;
+}
 
 export const MIGRATIONS = [
   {
@@ -573,41 +621,107 @@ export const MIGRATIONS = [
     sqlite: ["UPDATE prospects SET status = 'refused' WHERE status IN ('new', 'sent') AND email IN (SELECT email FROM blacklist)"],
     mysql: ["UPDATE prospects SET status = 'refused' WHERE status IN ('new', 'sent') AND email IN (SELECT email FROM blacklist)"],
   },
+  {
+    // Réponses des prospects lues dans la boîte : texte, intention (classement automatique), lu / non lu (popup d'arrivée).
+    name: 'replies',
+    sqlite: [
+      `CREATE TABLE replies (
+        id INTEGER PRIMARY KEY,
+        project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        prospect_id INTEGER REFERENCES prospects(id) ON DELETE CASCADE,
+        uid INTEGER,                -- UID IMAP : une réponse n'est enregistrée qu'une fois
+        from_email TEXT NOT NULL, subject TEXT, body TEXT,
+        intent TEXT NOT NULL DEFAULT 'other',   -- interested | question | later | refused | other
+        received_at INTEGER NOT NULL, seen_at INTEGER
+      )`,
+      'CREATE UNIQUE INDEX replies_uid ON replies(project_id, uid)',
+      'CREATE INDEX replies_project ON replies(project_id, received_at)',
+      'CREATE INDEX replies_prospect ON replies(prospect_id)',
+    ],
+    mysql: [
+      `CREATE TABLE IF NOT EXISTS replies (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        project_id BIGINT NOT NULL,
+        prospect_id BIGINT NULL,
+        uid BIGINT NULL,
+        from_email VARCHAR(255) NOT NULL, subject TEXT, body TEXT,
+        intent VARCHAR(20) NOT NULL DEFAULT 'other',
+        received_at BIGINT NOT NULL, seen_at BIGINT NULL,
+        UNIQUE KEY replies_uid (project_id, uid),
+        KEY replies_project (project_id, received_at),
+        KEY replies_prospect (prospect_id),
+        CONSTRAINT replies_project_fk FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+        CONSTRAINT replies_prospect_fk FOREIGN KEY (prospect_id) REFERENCES prospects(id) ON DELETE CASCADE
+      ) ${T}`,
+    ],
+  },
+  {
+    // Accusés de lecture (MDN, RFC 8098) : le destinataire choisit d'en envoyer un ; aucun pixel espion.
+    name: 'read_receipts',
+    sqlite: ['ALTER TABLE mail_log ADD COLUMN read_at INTEGER'],
+    mysql: [{ sql: 'ALTER TABLE mail_log ADD COLUMN read_at BIGINT NULL', when: colMissing('mail_log', 'read_at') }],
+  },
+  {
+    // Agenda : lien iCal secret par compte ; posts LinkedIn programmés (publiés par le planificateur à l'heure choisie).
+    name: 'calendar',
+    sqlite: [
+      `CREATE TABLE ical_feeds (
+        user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+        token_hash TEXT NOT NULL UNIQUE,
+        token_enc TEXT NOT NULL,     -- le lien d'un agenda doit pouvoir être réaffiché : chiffré, jamais en clair
+        created_at INTEGER NOT NULL
+      )`,
+      'ALTER TABLE linkedin_posts ADD COLUMN scheduled_at INTEGER',
+      'ALTER TABLE linkedin_posts ADD COLUMN schedule_error TEXT',
+    ],
+    mysql: [
+      `CREATE TABLE IF NOT EXISTS ical_feeds (
+        user_id BIGINT NOT NULL PRIMARY KEY,
+        token_hash VARCHAR(64) NOT NULL,
+        token_enc TEXT NOT NULL,
+        created_at BIGINT NOT NULL,
+        UNIQUE KEY ical_feeds_hash (token_hash),
+        CONSTRAINT ical_feeds_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      ) ${T}`,
+      { sql: 'ALTER TABLE linkedin_posts ADD COLUMN scheduled_at BIGINT NULL', when: colMissing('linkedin_posts', 'scheduled_at') },
+      { sql: 'ALTER TABLE linkedin_posts ADD COLUMN schedule_error VARCHAR(500) NULL', when: colMissing('linkedin_posts', 'schedule_error') },
+    ],
+  },
+  {
+    // Jetons d'API (mode développeur) : seul le SHA-256 du jeton est gardé, jamais le jeton lui-même.
+    name: 'api_tokens',
+    sqlite: [
+      `CREATE TABLE api_tokens (
+        id INTEGER PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        token_hash TEXT NOT NULL UNIQUE,
+        prefix TEXT NOT NULL,        -- début du jeton, pour le reconnaître dans la liste
+        scopes TEXT NOT NULL,        -- read, write, jobs (séparés par des virgules)
+        created_at INTEGER NOT NULL, last_used_at INTEGER
+      )`,
+      'CREATE INDEX api_tokens_user ON api_tokens(user_id)',
+    ],
+    mysql: [
+      `CREATE TABLE IF NOT EXISTS api_tokens (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        user_id BIGINT NOT NULL,
+        name VARCHAR(100) NOT NULL,
+        token_hash VARCHAR(64) NOT NULL,
+        prefix VARCHAR(16) NOT NULL,
+        scopes VARCHAR(60) NOT NULL,
+        created_at BIGINT NOT NULL, last_used_at BIGINT NULL,
+        UNIQUE KEY api_tokens_hash (token_hash),
+        KEY api_tokens_user (user_id),
+        CONSTRAINT api_tokens_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      ) ${T}`,
+    ],
+  },
+  {
+    // Identifiants de session : la base ne garde plus que leur empreinte SHA-256. Personne n'est déconnecté (voir hashSessionIds).
+    name: 'session_id_hashing',
+    sqlite: [hashSessionIds],
+    mysql: [hashSessionIds],
+  },
 ];
 
-// ---------- Aides de la migration 2 ----------
-
-function ownerParams(ctx) { return [ctx.ownerEmail, ctx.now]; }
-function ownerParams0(ctx) { return [ctx.ownerEmail ?? null]; }
-
-// Des données existent-elles (une instance déjà utilisée) ? Alors elles ont besoin d'un propriétaire.
-async function hasLegacyData(q) {
-  for (const t of ['projects', 'settings', 'jobs']) {
-    if ((await q(`SELECT COUNT(*) n FROM ${t}`))[0].n > 0) return true;
-  }
-  return false;
-}
-
-async function checkOwner(q, ctx) {
-  if (ctx.ownerEmail) return;
-  if (await hasLegacyData(q)) {
-    throw new Error('Migration comptes : des données existent, définis ADMIN_EMAILS (le premier email devient propriétaire de ces données).');
-  }
-}
-
-const infoSchema = (what) => `SELECT 1 x FROM information_schema.${what} WHERE table_schema = DATABASE() AND table_name = ?`;
-function colMissing(t, c) {
-  return async (q) => !(await q(`${infoSchema('columns')} AND column_name = ?`, [t, c])).length;
-}
-function idxExists(t, i) {
-  return async (q) => (await q(`${infoSchema('statistics')} AND index_name = ?`, [t, i])).length > 0;
-}
-function idxMissing(t, i) {
-  return async (q) => !(await idxExists(t, i)(q));
-}
-function fkMissing(t, name) {
-  return async (q) => !(await q(`${infoSchema('table_constraints')} AND constraint_name = ? AND constraint_type = 'FOREIGN KEY'`, [t, name])).length;
-}
-function tableExists(t) {
-  return async (q) => (await q(infoSchema('tables'), [t])).length > 0;
-}
