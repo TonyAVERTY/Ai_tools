@@ -1,9 +1,12 @@
 // Hôtes Git : GitHub accepté d'office, serveur Git personnel facultatif dans les Réglages, et le token de ce serveur ne part jamais ailleurs.
 import { test, before, after } from 'node:test';
+import { mkdtempSync, writeFileSync, chmodSync, rmSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import assert from 'node:assert/strict';
 import { startApp } from './helpers/server.js';
 import { testTokenLink, addProject } from './helpers/users.js';
-import { validateGitUrl, DEFAULT_GIT_HOSTS, gitEnv, syncRepo } from '../src/services/git.js';
+import { validateGitUrl, DEFAULT_GIT_HOSTS, gitEnv, syncRepo, authHint, gitVersionNotes } from '../src/services/git.js';
 import { gitTokenFor, gitCredentialFor, listGitServers, publicGitServers, MAX_GIT_SERVERS } from '../src/gitservers.js';
 import { makeHandlers } from '../src/handlers.js';
 import { encrypt } from '../src/crypto.js';
@@ -285,4 +288,80 @@ test('compatibilité : l\'ancien réglage unique (forgejo_host + token) reste un
 test('git : GitLab s\'authentifie en Basic avec oauth2, et le nom d\'utilisateur de l\'auth Basic suit le type', () => {
   assert.equal(gitEnv('tok-gl', { scheme: 'basic', user: 'oauth2' }).GIT_CONFIG_VALUE_0, `Authorization: Basic ${Buffer.from('oauth2:tok-gl').toString('base64')}`);
   assert.equal(gitEnv('tok-gh', { scheme: 'basic' }).GIT_CONFIG_VALUE_0, `Authorization: Basic ${Buffer.from('x-access-token:tok-gh').toString('base64')}`);
+});
+
+// ---------- Quand l'accès au dépôt est refusé : un message qui dit quoi faire ----------
+
+const GIT_NO_USER = "fatal: could not read Username for 'https://github.com': terminal prompts disabled";
+
+test('refus d\'accès : le message dépend de ce qui a vraiment été envoyé (pas de token, token refusé, dépôt hors du token)', () => {
+  // le message de git est identique avec et sans token : c'est « tokenSent » qui tranche
+  assert.match(authHint(GIT_NO_USER, 'https://github.com/a/b.git', false), /aucun token n'est configuré pour GitHub.*Réglages/);
+  assert.match(authHint(GIT_NO_USER, 'https://github.com/a/b.git', true), /GitHub a refusé le token.*« Tester ce token »/);
+  assert.match(authHint('remote: Repository not found. fatal: repository \'https://github.com/a/b.git/\' not found', 'https://github.com/a/b.git', true), /n'a pas accès à ce dépôt.*ajoute-le aux dépôts du token/i);
+  assert.match(authHint("fatal: unable to access: The requested URL returned error: 403", 'https://github.com/a/b.git', true), /n'a pas accès à ce dépôt/);
+  // un autre serveur : son nom, et pas de renvoi au bouton GitHub
+  assert.match(authHint(GIT_NO_USER, 'https://git.mon-serveur.fr/a/b.git', false), /aucun token n'est configuré pour git\.mon-serveur\.fr/);
+  const refused = authHint(GIT_NO_USER, 'https://git.mon-serveur.fr/a/b.git', true);
+  assert.match(refused, /git\.mon-serveur\.fr a refusé le token/);
+  assert.doesNotMatch(refused, /Tester ce token/);
+  // sans rapport avec l'authentification : rien à ajouter
+  assert.equal(authHint('fatal: unable to access: Could not resolve host: github.com', 'https://github.com/a/b.git', true), null);
+  assert.equal(authHint('Délai dépassé', 'https://github.com/a/b.git', false), null);
+  assert.equal(authHint(GIT_NO_USER, 'pas une url', false), null);
+});
+
+test('refus d\'accès : syncRepo remonte le conseil, garde le message de git entre parenthèses, et ne fuit jamais le token', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'gh-hint-'));
+  const bin = `${dir}/git`;
+  writeFileSync(bin, `#!/bin/sh\necho "sent: $GIT_CONFIG_VALUE_0" >&2\necho "${GIT_NO_USER}" >&2\nexit 128\n`);
+  chmodSync(bin, 0o755);
+  try {
+    const noToken = await syncRepo('https://github.com/a/b.git', `${dir}/c1`, null, { gitBin: bin }).catch((e) => e.message);
+    assert.match(noToken, /^Git : Dépôt privé ou introuvable : aucun token n'est configuré pour GitHub/);
+    assert.match(noToken, /\(.*could not read Username/, 'le message de git reste visible');
+    const withToken = await syncRepo('https://github.com/a/b.git', `${dir}/c2`, 'tok-secret', { gitBin: bin, scheme: 'basic' }).catch((e) => e.message);
+    assert.match(withToken, /GitHub a refusé le token/);
+    assert.ok(!withToken.includes('tok-secret') && !withToken.includes(Buffer.from('x-access-token:tok-secret').toString('base64')), `fuite : ${withToken}`);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('git trop ancien : prévenu au démarrage (token dès 2.31, épinglage dès 2.37)', () => {
+  assert.deepEqual(gitVersionNotes('git version 2.43.0'), []);
+  assert.deepEqual(gitVersionNotes('git version 2.37.1'), []);
+  assert.equal(gitVersionNotes('git version 2.34.1').length, 1);
+  assert.match(gitVersionNotes('git version 2.34.1')[0], /curloptResolve/);
+  const old = gitVersionNotes('git version 2.30.2');
+  assert.equal(old.length, 2);
+  assert.match(old[0], /token.*2\.31/);
+  assert.deepEqual(gitVersionNotes('pas une version'), []);
+});
+
+test('git réel : l\'en-tête d\'authentification part bien (Basic pour GitHub, « token » pour Forgejo, rien sans token)', async (t) => {
+  const { execFile } = await import('node:child_process');
+  const { promisify } = await import('node:util');
+  const { createServer } = await import('node:https');
+  const run = promisify(execFile);
+  const dir = mkdtempSync(join(tmpdir(), 'gh-tls-'));
+  try { await run('git', ['--version']); await run('openssl', ['version']); } catch { t.skip('git ou openssl absent'); return; }
+  await run('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', `${dir}/k.pem`, '-out', `${dir}/c.pem`, '-days', '1', '-subj', '/CN=localhost'], { stdio: 'ignore' });
+  const seen = [];
+  const srv = createServer({ key: readFileSync(`${dir}/k.pem`), cert: readFileSync(`${dir}/c.pem`) }, (req, res) => {
+    seen.push(req.headers.authorization ?? null);
+    res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="x"' });
+    res.end();
+  });
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  try {
+    const probe = async (token, opts) => {
+      seen.length = 0;
+      const env = { ...gitEnv(token, opts), GIT_SSL_NO_VERIFY: '1' };
+      await run('git', ['-c', 'protocol.https.allow=always', 'ls-remote', `https://localhost:${srv.address().port}/a/b.git`], { env, timeout: 15_000 }).catch(() => {});
+      return seen.find(Boolean) ?? null;
+    };
+    assert.equal(await probe('tok-gh', { scheme: 'basic' }), `Basic ${Buffer.from('x-access-token:tok-gh').toString('base64')}`);
+    assert.equal(await probe('tok-gl', { scheme: 'basic', user: 'oauth2' }), `Basic ${Buffer.from('oauth2:tok-gl').toString('base64')}`);
+    assert.equal(await probe('tok-fj', { scheme: 'token' }), 'token tok-fj');
+    assert.equal(await probe(null, {}), null, 'sans token : aucun en-tête');
+  } finally { srv.close(); rmSync(dir, { recursive: true, force: true }); }
 });
