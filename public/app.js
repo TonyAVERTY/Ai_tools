@@ -593,6 +593,43 @@
     });
   })();
 
+  // ---------- Réglages : tester le token GitHub ----------
+  // Dit à qui appartient le token, à quels dépôts il donne accès, et lesquels de tes projets en font partie. Ne modifie rien.
+  (() => {
+    const btn = $('[data-github-test]');
+    if (!btn) return;
+    const out = $('[data-github-result]');
+    const field = $('input[name="github_token"]');
+    const show = (html, kind) => { out.hidden = false; out.className = `gittest ${kind}`; out.innerHTML = html; };
+    const mark = { true: ['ok', '✓', 'accessible avec ce token'], false: ['error', '✗', "pas accessible avec ce token (ajoute ce dépôt à ceux du token)"], null: ['muted', '?', 'non déterminé (liste tronquée)'] };
+
+    btn.addEventListener('click', async () => {
+      const spin = $('.spin-inline', btn);
+      btn.disabled = true;
+      spin.hidden = false;
+      try {
+        const r = await api('/settings/github/test', { token: field.value });
+        if (!r.ok) { show(`<p class="error">${esc(r.message)}</p>`, 'bad'); return; }
+        const projects = r.projects.length
+          ? `<h5>Tes projets sur GitHub</h5><ul class="gitprojects">${r.projects.map((p) => {
+            const [cls, sign, text] = mark[String(p.access)];
+            return `<li class="${cls}"><span aria-hidden="true">${sign}</span> <strong>${esc(p.name)}</strong> <span class="muted small">${esc(p.repo)} : ${esc(text)}</span></li>`;
+          }).join('')}</ul>`
+          : '<p class="muted small">Aucun de tes projets n\'est sur GitHub pour l\'instant.</p>';
+        const repos = r.repos.length
+          ? `<details><summary>${r.repos.length}${r.truncated ? '+' : ''} dépôt(s) accessible(s)${r.truncated ? ' (les 100 plus récents)' : ''}</summary><ul class="gitrepos">${r.repos.map((x) => `<li>${esc(x.name)} <span class="badge">${x.private ? 'privé' : 'public'}</span></li>`).join('')}</ul></details>`
+          : '<p class="warn">Ce token ne donne accès à aucun dépôt : ajoute-en dans les réglages du token sur GitHub.</p>';
+        show(`<p class="ok"><strong>Token valide</strong> · compte <strong>@${esc(r.login)}</strong> · token ${esc(r.kind)}${r.expiresAt ? ` · expire le ${esc(r.expiresAt)}` : ''}</p>
+          ${r.warning ? `<p class="warn small">${esc(r.warning)}</p>` : ''}${projects}${repos}`, 'good');
+      } catch (e) {
+        show(`<p class="error">${esc(e.message)}</p>`, 'bad');
+      } finally {
+        btn.disabled = false;
+        spin.hidden = true;
+      }
+    });
+  })();
+
   // ---------- LinkedIn ----------
   // Section d'un projet : relier un compte, donner une direction (facultative), générer / régénérer un post, le relire et le publier.
   const liDay = (ts) => new Date(ts * 1000).toLocaleDateString('fr-FR', { dateStyle: 'medium', timeZone: 'Europe/Paris' });

@@ -1,6 +1,6 @@
 import { projectChecklist } from './checklist.js';
 import { now, getSetting, setSetting } from './db.js';
-import { encrypt, encryptJson, decryptJson, verifyUnsubToken } from './crypto.js';
+import { encrypt, decrypt, encryptJson, decryptJson, verifyUnsubToken } from './crypto.js';
 import { html, json, redirect, readBody, HttpError } from './http.js';
 import { startLogin, finishLogin, destroySession, getSession, checkOrigin } from './auth.js';
 import { verifyCaptcha } from './captcha.js';
@@ -22,6 +22,7 @@ import { validateGitUrl, removeRepo } from './services/git.js';
 import { fetchRecap, clearRecapCache, validateSelect } from './services/recap.js';
 import { sendPause, pauseMessage as pauseMessageOf } from './services/abuse.js';
 import { guardTarget, pinDb, pinGit } from './netguard.js';
+import { checkGithubToken } from './githubcheck.js';
 import { listGitServers, publicGitServers, allowedGitHosts, saveGitServers, saveGithubToken } from './gitservers.js';
 import { allowedToSend, EMAIL_RE } from './services/mailer.js';
 import { cpuTemp } from './services/thermal.js';
@@ -201,6 +202,20 @@ export function registerRoutes(router, app) {
   });
 
   const LINK_LIMIT = { limit: 'link' };
+
+  // Test du token GitHub : celui tapé dans le champ (pas encore enregistré), sinon celui qui est enregistré
+  router.post('/settings/github/test', async ({ req, res, session }) => {
+    const userId = session.userId;
+    const b = await readBody(req);
+    let token = String(b.token ?? '').trim().slice(0, 600);
+    if (!token) {
+      try { token = decrypt(cfg.secretKey, await getSetting(db, userId, 'github_token_enc')) || ''; }
+      catch { throw new HttpError(400, 'Le token enregistré est illisible : saisis-le de nouveau.'); }
+    }
+    if (!token) throw new HttpError(400, 'Aucun token à tester : colle-le dans le champ, ou enregistre-le d\'abord.');
+    const mine = await db.prepare('SELECT name, git_url AS url FROM projects WHERE user_id = ? ORDER BY LOWER(name)').all(userId);
+    json(res, await checkGithubToken(app, token, mine));
+  }, LINK_LIMIT);
   const wantsJson = (req) => !!req.headers.accept?.includes('json');
   // Formulaire HTML : l'erreur revient sur la page de liaison ; appel JSON : code HTTP + { error }
   const linkAction = (fn, okTo = '/') => async ({ req, res, session }) => {

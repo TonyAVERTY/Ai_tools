@@ -446,6 +446,11 @@ ${saved ? '<p class="ok">Enregistré.</p>' : ''}
     <div class="gitrow">
       <div class="gitrow-head"><strong>GitHub</strong> <span class="badge">github.com</span></div>
       <label>Token (dépôts privés, lecture seule)<input name="github_token" type="password" placeholder="${s.github_token_set ? '•••••• (inchangé)' : 'github_pat_…'}" autocomplete="new-password"></label>
+      <div class="row-actions">
+        <button type="button" class="btn small" data-github-test><span class="spin-inline" hidden></span><span data-label>Tester ce token</span></button>
+        <span class="muted small">Teste le token tapé ci-dessus, sinon celui qui est enregistré. Rien n'est modifié.</span>
+      </div>
+      <div class="gittest" data-github-result role="status" aria-live="polite" hidden></div>
       <p class="muted small">Inutile pour un dépôt public. Crée un <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer">token à portée limitée</a> : <em>Only select repositories</em> (tes dépôts) et la permission <em>Contents : Read-only</em>, rien d'autre.</p>
       ${s.github_token_set ? '<label class="check"><input type="checkbox" name="github_token_clear" value="1"> Supprimer le token GitHub enregistré</label>' : ''}
     </div>
