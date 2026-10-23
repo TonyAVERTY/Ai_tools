@@ -43,7 +43,7 @@ export function mailLayout({ title, subtitle = '', preheader = '', content, appU
 <tr><td align="center" style="padding:28px 12px;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:640px;font-family:${FONT};">
     <tr><td style="padding:0 4px 14px;font-size:14px;font-weight:700;color:${C.text};letter-spacing:.2px;">
-      <span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${C.accent};margin-right:8px;"></span>AiTools
+      ${appUrl ? `<img src="${esc(appUrl.replace(/\/$/, ''))}/static/img/logo-mark.png" width="30" height="24" alt="" style="display:inline-block;vertical-align:-4px;margin-right:8px;border:0;">` : `<span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${C.accent};margin-right:8px;"></span>`}AiTools
     </td></tr>
     <tr><td style="background:${C.accent};background-image:linear-gradient(135deg,#2f5bea,#7c4dff);border-radius:14px 14px 0 0;padding:24px 20px;">
       <div style="font-size:22px;line-height:1.3;font-weight:700;color:#ffffff;">${esc(title)}</div>
