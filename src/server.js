@@ -20,6 +20,7 @@ import { budgetState, AI_JOBS, quotaState, isQuotaSensitive } from './services/b
 import { layout } from './views.js';
 import { homePage, notFoundPage } from './site/pages.js';
 import { withViewer } from './site/layout.js';
+import { reportError } from './services/errormail.js';
 import { securityHeaders, robotsHeaderFor, cspFor } from './site/seo.js';
 import { hasUsableLink, isLinkExempt, LINK_REQUIRED_MESSAGE } from './claudelink.js';
 import { memberTeamIds, purgeInvites } from './teams.js';
@@ -62,6 +63,7 @@ export async function createApp(cfg, { db, worker = true, createTransport, fetch
     // Un défaut imprévu dans un gestionnaire ne doit jamais arrêter le serveur pour tous les utilisateurs
     try { await handle(req, res); } catch (e) {
       console.error('[http]', e);
+      reportError(app, e, { method: req.method, path: req.url });
       if (!res.headersSent) res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
       res.end('Erreur interne');
     }
@@ -77,6 +79,7 @@ export async function createApp(cfg, { db, worker = true, createTransport, fetch
     // Pages d'application, API, connexion, 404 : jamais indexées (seul le site public l'est)
     const robots = robotsHeaderFor(url.pathname);
     if (robots) res.setHeader('X-Robots-Tag', robots);
+    let session = null; // pour l'alerte d'erreur : le compte concerné, si la requête était connectée
     try {
       const isRead = req.method === 'GET' || req.method === 'HEAD';
       const st = isRead ? STATIC[url.pathname] : null;
@@ -103,7 +106,7 @@ export async function createApp(cfg, { db, worker = true, createTransport, fetch
         return await route.handler({ req, res, url, params: route.params, session: null, api, app });
       }
       if (route.public && route.limit) app.limiter.enforce(route.limit, { ip });
-      const session = route.public ? null : await getSession(db, req);
+      session = route.public ? null : await getSession(db, req);
       // Back-office : 404 pour tout autre que les administrateurs (visiteurs compris), sans rien révéler
       if (route.admin && !session?.user.isAdmin) {
         if (url.pathname.startsWith('/api/') || !isRead || req.headers.accept?.includes('json')) throw new HttpError(404, 'Page introuvable');
@@ -134,7 +137,10 @@ export async function createApp(cfg, { db, worker = true, createTransport, fetch
       await route.handler({ req, res, url, params: route.params, session, app });
     } catch (e) {
       const status = e.status || 500;
-      if (status >= 500 && !e.expose) console.error(`[${req.method} ${url.pathname}]`, e);
+      if (status >= 500 && !e.expose) {
+        console.error(`[${req.method} ${url.pathname}]`, e);
+        reportError(app, e, { method: req.method, path: url.pathname, userId: session?.userId });
+      }
       if (res.headersSent) return res.end();
       const msg = status >= 500 && !e.expose ? 'Erreur interne' : e.message;
       for (const [k, v] of Object.entries(e.headers || {})) res.setHeader(k, v);
