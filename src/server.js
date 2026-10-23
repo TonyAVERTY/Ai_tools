@@ -34,6 +34,7 @@ function asset(file, type, maxAge) {
 }
 const IMG_TYPES = { '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg' };
 const STATIC = {
+  '/static/tokens.css': asset('tokens.css', 'text/css; charset=utf-8', 3600),
   '/static/app.css': asset('app.css', 'text/css; charset=utf-8', 3600),
   '/static/site.css': asset('site.css', 'text/css; charset=utf-8', 3600),
   '/static/app.js': asset('app.js', 'text/javascript; charset=utf-8', 3600),

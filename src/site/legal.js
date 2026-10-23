@@ -2,7 +2,7 @@
 // Textes rédigés d'après le code (données réellement collectées, cookies réellement posés) pour l'entrepreneur
 // individuel Tony AVERTY. Ce sont des modèles sérieux, pas un avis juridique : voir docs/JOURNAL.md pour ce qui reste
 // à compléter (marqueurs visibles) et à faire relire.
-import { siteLayout, nextBlock, journey, CONTACT_EMAIL } from './layout.js';
+import { siteLayout, ic, CONTACT_EMAIL } from './layout.js';
 import { PLAN_LIMITS, PLAN_PRICES, PLAN_LABELS, ANNUAL_FREE_MONTHS, annualPrice } from '../limits.js';
 
 /**
@@ -20,28 +20,41 @@ export const MARKERS = {
 };
 export const LEGAL_MARKERS = Object.values(MARKERS);
 const todo = (key) => `<mark class="todo">${MARKERS[key]}</mark>`;
+const PAGES = [['/mentions-legales', 'Mentions légales'], ['/confidentialite', 'Confidentialité'], ['/cgu', 'CGU']];
 
 export const LEGAL_UPDATED = '22 octobre 2026';
 
-/** Gabarit commun : titre, sommaire, sections numérotées par ancre. */
+/** Gabarit commun (design Claude Design) : onglets des trois pages, titre, date, sommaire numéroté, texte. */
 function legalPage({ appUrl, path, title, description, h1, lead, sections }) {
-  const toc = sections.map((s) => `<li><a href="#${s.id}">${s.title}</a></li>`).join('');
-  const body = sections.map((s) => `<h2 id="${s.id}">${s.title}</h2>\n${s.html}`).join('\n');
+  const toc = sections.map((s, i) => `<li><a href="#${s.id}"><span>${i + 1}</span>${s.title}</a></li>`).join('\n        ');
+  const body = sections.map((s, i) => `<h2 id="${s.id}">${i + 1}. ${s.title}</h2>\n${s.html}`).join('\n\n');
   return siteLayout({
     appUrl, path, title, description,
-    body: `<div class="wrap page-head">
-  <p class="eyebrow"><span class="mark" aria-hidden="true"></span>Informations légales</p>
-  <h1>${h1}</h1>
-  <p class="lead">${lead}</p>
-  <p class="updated">Dernière mise à jour : ${LEGAL_UPDATED}</p>
-</div>
-<div class="wrap prose-wrap">
-  <nav class="toc" aria-label="Sommaire"><h2>Sommaire</h2><ol>${toc}</ol></nav>
-  <div class="prose">
-${body}
+    body: `<div class="wrap">
+  <div class="lg-head">
+    <nav class="pills" aria-label="Pages légales">
+      ${PAGES.map(([href, label]) => `<a class="pill" href="${href}"${href === path ? ' aria-current="page"' : ''}>${label}</a>`).join('\n      ')}
+    </nav>
+    <h1 class="h1">${h1}</h1>
+    <p class="maj">Dernière mise à jour : ${LEGAL_UPDATED}</p>
+    <p class="lg-intro">${lead}</p>
   </div>
-</div>
-${nextBlock(journey('home', 'how', 'pricing'), 'Retour au site')}`,
+
+  <div class="lg-body">
+    <details class="toc" open>
+      <summary>Sommaire${ic('chev')}</summary>
+      <nav aria-label="Sommaire">
+        <ol>
+        ${toc}
+        </ol>
+      </nav>
+    </details>
+
+    <article class="art">
+${body}
+    </article>
+  </div>
+</div>`,
   });
 }
 
@@ -114,7 +127,7 @@ export function privacyPage({ appUrl, apple = false, captcha = false, inactiveMo
       },
       {
         id: 'donnees', title: 'Les données collectées',
-        html: `<div class="table-wrap"><table>
+        html: `<div class="tw"><table>
   <caption>Données réellement enregistrées par AiTools</caption>
   <thead><tr><th scope="col">Catégorie</th><th scope="col">Contenu</th><th scope="col">Pourquoi et sur quelle base</th></tr></thead>
   <tbody>
@@ -134,7 +147,7 @@ export function privacyPage({ appUrl, apple = false, captcha = false, inactiveMo
       },
       {
         id: 'durees', title: 'Combien de temps',
-        html: `<div class="table-wrap"><table>
+        html: `<div class="tw"><table>
   <caption>Durées de conservation ${todo('retention')}</caption>
   <thead><tr><th scope="col">Donnée</th><th scope="col">Durée</th></tr></thead>
   <tbody>
@@ -171,7 +184,7 @@ export function privacyPage({ appUrl, apple = false, captcha = false, inactiveMo
       {
         id: 'cookies', title: 'Cookies et traceurs',
         html: `<p>AiTools ne pose que des cookies <strong>strictement nécessaires</strong> au service. Ceux d'AiTools sont exemptés de consentement : c'est pourquoi aucun bandeau ne s'affiche${captcha ? ' (ceux de Google, sur la page de connexion, sont décrits plus bas)' : ''}. Pas d'analyse d'audience, pas de publicité, pas de police ni de script chargés depuis un autre site${captcha ? ', sauf la vérification anti-robot de Google, uniquement sur la page de connexion (voir plus bas)' : ''}.</p>
-<div class="table-wrap"><table>
+<div class="tw"><table>
   <caption>Cookies posés par AiTools</caption>
   <thead><tr><th scope="col">Nom</th><th scope="col">Rôle</th><th scope="col">Durée</th></tr></thead>
   <tbody>

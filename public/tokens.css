@@ -1,0 +1,83 @@
+/* Jetons de design d'AiTools (identité du logo : indigo + ruban bleu-cyan). Source unique des couleurs, rayons, ombres et
+   durées : le site public et le tableau de bord les lisent via var(--…), rien n'est redéfini ailleurs.
+   Thème sombre = réglage du système (prefers-color-scheme). Le dégradé n'est utilisé que pour le bouton principal,
+   les barres de progression et le ruban : jamais pour du texte. */
+:root {
+  --radius: 12px;
+  --radius-sm: 10px;
+  --radius-lg: 14px;
+  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px;
+  --s-5: 24px; --s-6: 32px; --s-7: 48px; --s-8: 64px;
+  --ease: cubic-bezier(.2, .7, .2, 1);
+  --t-fast: 120ms; --t: 200ms; --t-slow: 320ms;
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  /* marque */
+  --indigo: #1e296a;
+  --accent: #1288b7;
+  --accent-2: #0db8c5;
+  --grad: linear-gradient(135deg, #1288b7, #0db8c5);
+  --on-grad: #081022;
+
+  /* clair */
+  --bg: #f4f7fc;
+  --bg-sunk: #eaeff8;
+  --card: #ffffff;
+  --card-2: #f8faff;
+  --text: #0e1535;
+  --muted: #55638a;
+  --link: #0b6f96;
+  --line: #d8e0ef;
+  --line-strong: #b9c5df;
+  --control: #7280a4;
+  --logo-ink: #1e296a;
+  --nav-on-bg: #1e296a;
+  --nav-on-text: #e1e9f6;
+  --ok: #0e6b43; --ok-bg: #e2f4ea;
+  --warn: #8a5200; --warn-bg: #fdf0d8;
+  --err: #b4233a; --err-bg: #fde7eb;
+  --info: #0b6f96; --info-bg: #e1f1f8;
+  --on-err: #ffffff;
+  --shadow: 0 1px 2px rgba(21, 30, 83, .08);
+  --shadow-2: 0 4px 12px rgba(21, 30, 83, .10), 0 1px 3px rgba(21, 30, 83, .06);
+  --shadow-3: 0 18px 44px rgba(21, 30, 83, .20), 0 2px 6px rgba(21, 30, 83, .08);
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b1224;
+    --bg-sunk: #080e1d;
+    --card: #111a33;
+    --card-2: #16213f;
+    --text: #e1e9f6;
+    --muted: #9aa8c7;
+    --link: #5cc4ec;
+    --line: #212e55;
+    --line-strong: #33447a;
+    --control: #5f71a8;
+    --logo-ink: #e1e9f6;
+    --nav-on-bg: #24307b;
+    --nav-on-text: #e1e9f6;
+    --ok: #5fd6a0; --ok-bg: #0e2a26;
+    --warn: #f2b84b; --warn-bg: #2b2310;
+    --err: #ff8a9b; --err-bg: #33141f;
+    --info: #5cc4ec; --info-bg: #0e2a40;
+    --on-err: #2a0a14;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .45);
+    --shadow-2: 0 6px 16px rgba(0, 0, 0, .45), 0 1px 3px rgba(0, 0, 0, .4);
+    --shadow-3: 0 22px 54px rgba(0, 0, 0, .6), 0 2px 8px rgba(0, 0, 0, .45);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
