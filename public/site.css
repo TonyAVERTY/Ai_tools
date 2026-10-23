@@ -2,9 +2,10 @@
    Les couleurs, rayons, ombres et durées viennent de tokens.css (jamais de valeur en dur ici).
    Mobile d'abord ; deux paliers : 640 px (tablette) et 900 px (bureau). */
 *, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html { -webkit-text-size-adjust: 100%; }
 body.site {
-  margin: 0; background: var(--bg); color: var(--text); font-family: var(--font); font-size: 1rem; line-height: 1.55;
+  position: relative; overflow-x: hidden; margin: 0; background: var(--bg); color: var(--text); font-family: var(--font); font-size: 1rem; line-height: 1.55;
   -webkit-font-smoothing: antialiased;
 }
 .site h1, .site h2, .site h3, .site p { margin: 0; }
@@ -67,8 +68,7 @@ body.site {
 .lead { margin-top: 16px; font-size: 1.0625rem; line-height: 1.55; color: var(--muted); max-width: 34em; }
 .hero-btns { display: flex; flex-direction: column; gap: 12px; margin-top: 28px; }
 .hero-note { margin-top: 14px; position: relative; font-size: .875rem; color: var(--muted); }
-.art-hero { position: relative; padding: 8px 0; }
-.ribbon { position: absolute; left: -40px; top: -30px; width: calc(100% + 80px); height: calc(100% + 60px); pointer-events: none; }
+.art-hero { padding: 8px 0; }
 
 /* maquettes (données d'exemple, jamais de vraies données) */
 .mock { position: relative; background: var(--card); border: 1px solid var(--line-strong); border-radius: var(--radius-lg); box-shadow: var(--shadow-3); padding: 18px; display: flex; flex-direction: column; gap: 16px; }
@@ -202,7 +202,7 @@ body.site {
 .auth .sub { color: var(--muted); font-size: .9375rem; min-height: 0; margin-top: 6px; }
 .auth-b { display: flex; flex-direction: column; gap: 12px; width: 100%; }
 .auth-b form { display: contents; }
-.brand { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 6px; background: var(--bg-sunk); border: 1px solid var(--line-strong); font-size: .75rem; font-weight: 700; color: var(--text); }
+.prov { width: 20px; height: 20px; flex: none; }
 .safe { display: flex; gap: 10px; align-items: flex-start; text-align: left; padding: 12px 14px; border-radius: var(--radius); background: var(--ok-bg); color: var(--ok); font-size: .9375rem; font-weight: 600; width: 100%; }
 .safe .ic { margin-top: 2px; width: 18px; height: 18px; }
 .msg { width: 100%; padding: 12px 14px; border-radius: var(--radius); font-size: .9375rem; font-weight: 600; text-align: left; }
@@ -285,9 +285,7 @@ body.site {
   .hero { padding: 88px 0 96px; }
   .hero-in { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 112px; align-items: center; }
   /* le ruban traverse tout l'écran, de bord à bord, derrière le texte et la maquette */
-  .art-hero { position: static; padding: 8px 0 8px 32px; }
-  .ribbon { left: 0; top: 0; width: 100%; height: 100%; z-index: -1; }
-  .hero { padding-bottom: 168px; isolation: isolate; }
+  .art-hero { padding: 8px 0 8px 32px; }
   .h1 { font-size: 3.5rem; }
   .page .h1, .lg-head .h1, .nf h1 { font-size: 3rem; }
   .lead { font-size: 1.25rem; }
@@ -318,7 +316,6 @@ body.site {
 
 /* ---------- Animations : seulement pour qui n'a pas demandé de réduire les mouvements ---------- */
 @keyframes rise { from { opacity: 0; transform: translateY(16px); } }
-@keyframes draw { from { stroke-dashoffset: 1; } }
 @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
 @keyframes grow { from { width: 0; } }
 @media (prefers-reduced-motion: no-preference) {
@@ -327,7 +324,6 @@ body.site {
   .hero-in > div:first-child > :nth-child(3) { animation-delay: .16s; }
   .hero-in > div:first-child > :nth-child(4) { animation-delay: .24s; }
   .hero-in > div:first-child > :nth-child(5) { animation-delay: .32s; }
-  .ribbon path { stroke-dasharray: 1; animation: draw 1.8s var(--ease) .1s both; }
   .mock { animation: rise .8s var(--ease) .25s both, float 7s ease-in-out 1.2s infinite; }
   .mock .bar { animation: grow 1.4s var(--ease) .9s both; }
   .btn { transition: transform var(--t-fast) var(--ease), box-shadow var(--t-fast) var(--ease), filter var(--t-fast) var(--ease), background var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease); }
@@ -347,3 +343,15 @@ body.site {
 /* Pastille flottante « reCAPTCHA » de Google : masquée (elle fait « site pas fini »). C'est permis par Google tant que la mention
    de protection reste visible : elle l'est, sous les boutons de la page de connexion (src/site/pages.js). */
 .grecaptcha-badge { visibility: hidden; }
+
+/* ---------- Ruban de page : il traverse toute la page, de haut en bas, et suit donc le défilement ---------- */
+.page-ribbon { position: absolute; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; }
+.page-ribbon svg { display: block; width: 100%; height: 100%; }
+.page-ribbon path { fill: none; stroke: url(#g-page); stroke-width: 26px; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+@media (max-width: 899px) { .page-ribbon { opacity: .3; } }
+.sec-alt { background: color-mix(in srgb, var(--bg-sunk) 70%, transparent); }
+.top { background: color-mix(in srgb, var(--bg) 92%, transparent); }
+.foot { background: color-mix(in srgb, var(--bg-sunk) 90%, transparent); }
+/* vérification anti-robot : silencieuse tant que tout va bien, visible seulement en cas de problème */
+.captcha [data-captcha-status] { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.captcha:has([data-captcha-load]:not([hidden])) [data-captcha-status] { position: static; width: auto; height: auto; overflow: visible; clip-path: none; white-space: normal; }
