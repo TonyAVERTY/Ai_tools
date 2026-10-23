@@ -1,5 +1,6 @@
 // Handlers des jobs en arrière-plan.
 import { now, getSetting, setSetting } from './db.js';
+import { readdirSync } from 'node:fs';
 import { runClaude, extractJson, rateLimitWindows } from './services/claude.js';
 import { addUsage } from './services/jobs.js';
 import { syncRepo } from './services/git.js';
@@ -60,6 +61,26 @@ export function parseProspectLine(line) {
 }
 
 /**
+ * Ligne de diagnostic d'un appel à Claude qui a répondu en erreur (« Not logged in », quota…). Aucune valeur secrète :
+ * seulement le mode, la présence et la forme du secret (longueur, caractères), le bac à sable et ce que contient le dossier de travail.
+ */
+export function claudeDiagnostic({ userId, cred, cfg, cwd, r }) {
+  const secrets = Object.entries(cred.secretEnv || {}).map(([name, v]) => {
+    const s = String(v ?? '');
+    const clean = /^[\x21-\x7e]+$/.test(s); // un jeton ne contient ni espace ni caractère de contrôle
+    return `${name}(len=${s.length},${clean ? 'propre' : 'CARACTERES_PARASITES'})`;
+  });
+  let ctx = 'aucun';
+  if (cwd) {
+    try { ctx = readdirSync(cwd).filter((f) => /^(\.claude|\.mcp\.json|CLAUDE\.md)$/.test(f)).join(',') || 'rien'; }
+    catch { ctx = 'illisible'; }
+  }
+  const sb = cfg.sandbox || {};
+  return `[claude] échec user=${Number(userId)} mode=${cred.mode} secret=${secrets.join(',') || 'AUCUN'} `
+    + `bac_a_sable=${sb.enabled ? 'oui' : 'non'}${sb.production ? '(prod)' : ''} fichiers_claude_du_depot=${ctx} subtype=${r.subtype}`;
+}
+
+/**
  * Tout appel à Claude passe par ici. Le secret est relu pour le user_id du job (jamais un autre), l'exécution se fait
  * dans le bac à sable avec un environnement assaini, et le quota remonté par le CLI est enregistré pour CET utilisateur.
  */
@@ -72,6 +93,7 @@ export function makeClaude(app) {
       sandbox: cfg.sandbox, secretEnv: cred.secretEnv, serverConfig: cred.serverConfig,
       allowedRoot: userRepoRoot(cfg, userId),
     });
+    if (!r.ok) console.warn(claudeDiagnostic({ userId, cred, cfg, cwd: o.cwd, r }));
     // État du quota d'abonnement (session 5h + semaine), affiché dans la barre système. Une clé API n'en a pas.
     const w = cred.mode === 'api_key' ? null : rateLimitWindows(r.rateLimit);
     if (w) {
