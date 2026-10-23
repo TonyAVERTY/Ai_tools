@@ -129,8 +129,41 @@ export async function syncRepo(url, dir, token, opts = {}) {
   } catch (e) {
     // On ne remonte jamais stderr brut (pourrait contenir l'en-tête d'auth)
     const msg = String(e.stderr || e.message).replace(/Authorization: (?:token|Basic) \S+/gi, 'Authorization: ***');
-    throw new Error(`Git : ${msg.split('\n').filter(Boolean).slice(-2).join(' ')}`);
+    const raw = msg.split('\n').filter(Boolean).slice(-2).join(' ');
+    const hint = authHint(raw, url, !!token);
+    throw new Error(hint ? `Git : ${hint} (${raw})` : `Git : ${raw}`);
   }
+}
+
+/**
+ * Traduit un refus d'accès de git en une phrase qui dit quoi faire. Le message de git est le même quand aucun token n'a été
+ * envoyé et quand le serveur l'a refusé (« could not read Username ») : seul ce qu'on a réellement envoyé permet de les distinguer.
+ * @returns {string|null} null : l'échec n'a rien à voir avec l'authentification
+ */
+export function authHint(stderr, url, tokenSent) {
+  let host;
+  try { host = new URL(url).host; } catch { return null; }
+  const where = host === 'github.com' ? 'GitHub' : host;
+  const notFound = /Repository not found|not found|returned error: (?:403|404)/i.test(stderr);
+  const refused = /could not read Username|Authentication failed|Invalid username|returned error: 401|terminal prompts disabled/i.test(stderr);
+  if (!notFound && !refused) return null;
+  if (!tokenSent) {
+    return `Dépôt privé ou introuvable : aucun token n'est configuré pour ${where}. Ajoute-le dans Réglages → Dépôts Git, puis clique sur « Réanalyser ».`;
+  }
+  return notFound && !refused
+    ? `Le token n'a pas accès à ce dépôt (ou il n'existe pas). Ajoute-le aux dépôts du token sur ${where}, puis clique sur « Réanalyser ».`
+    : `${where} a refusé le token (invalide, expiré, révoqué ou sans accès à ce dépôt). Vérifie-le dans Réglages${host === 'github.com' ? ' avec « Tester ce token »' : ''}, puis clique sur « Réanalyser ».`;
+}
+
+/** Versions de git trop anciennes pour ce qu'on lui demande ; à afficher au démarrage. */
+export function gitVersionNotes(versionOutput) {
+  const m = /(\d+)\.(\d+)(?:\.(\d+))?/.exec(String(versionOutput));
+  if (!m) return [];
+  const v = Number(m[1]) * 1000 + Number(m[2]);
+  return [
+    ...(v < 2031 ? [`git ${m[0]} : trop ancien pour l'authentification par token (GIT_CONFIG_COUNT demande git ≥ 2.31) : les dépôts privés ne pourront pas être clonés.`] : []),
+    ...(v < 2037 ? [`git ${m[0]} : l'épinglage d'adresse (http.curloptResolve) demande git ≥ 2.37, il sera ignoré.`] : []),
+  ];
 }
 
 export function removeRepo(dir) { rmSync(dir, { recursive: true, force: true }); }
