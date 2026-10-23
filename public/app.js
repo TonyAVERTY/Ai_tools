@@ -9,7 +9,22 @@
   const warmupNotice = (w, count) => (!w?.active || (w.sentToday || 0) + count <= w.perDay ? null
     : `Conseil : ${w.perDay / 2} à ${w.perDay} mails par jour pendant la première semaine protègent la réputation de ton adresse d'envoi (encore ${w.daysLeft} jour${w.daysLeft > 1 ? 's' : ''}). Tu peux quand même envoyer plus.`);
 
+  // Lancement d'une tâche (analyse, recherche, envoi, audit…) : le bouton s'enfonce, puis un petit agent apporte la tâche au menu « Activité »
+  // (public/fx.js). Un seul point d'accroche, ici : toute route qui met un job en file passe par api().
+  const LAUNCH = /^\/api\/(projects\/\d+\/(analyze|template|followup_template|prospect|evolution|code-review|send|linkedin\/generate)|prospects\/\d+\/hook)$/;
+  let lastTrigger = null; // le bouton cliqué (ou validé au clavier) juste avant
+  document.addEventListener('click', (e) => { const t = e.target.closest?.('button, a.btn, label.btn'); if (t) lastTrigger = t; }, true);
+  document.addEventListener('submit', (e) => { lastTrigger = e.submitter || $('button:not([type=button])', e.target) || lastTrigger; }, true);
+
   async function api(path, body) {
+    const launching = body !== undefined && LAUNCH.test(path);
+    if (launching) window.AiFx?.press(lastTrigger);
+    const data = await call(path, body);
+    if (launching && !data.existing) launched(lastTrigger);
+    return data;
+  }
+
+  async function call(path, body) {
     const r = await fetch(path, body === undefined ? { headers: { Accept: 'application/json' } } : {
       method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(body),
     });
@@ -278,14 +293,14 @@
   const fmtWhen = (ts) => new Date(ts * 1000).toLocaleString('fr-FR', { weekday: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
   const plural = (n, w) => `${n} ${w}${n > 1 ? 's' : ''}`;
 
-  function jobItem(j) {
+  function jobItem(j, isNew = false) {
     const p = j.progress || {};
     const scheduled = j.status === 'queued' && j.runAfter && j.runAfter * 1000 > Date.now();
     const running = j.status === 'running';
     const v = running ? pctOf(p) : null;
     const state = scheduled ? `Programmé ${fmtWhen(j.runAfter)}` : running ? `Démarré ${ago(j.startedAt)}` : 'En file d\'attente';
     const msg = p.message || (running ? 'En cours…' : '');
-    return `<div class="jitem j-${scheduled ? 'scheduled' : j.status}">
+    return `<div class="jitem j-${scheduled ? 'scheduled' : j.status}${isNew ? ' new' : ''}">
       <div class="jrow">${scheduled ? '<span class="moon" aria-hidden="true"></span>' : running ? '<span class="pulse" aria-hidden="true"></span>' : '<span class="dot-wait" aria-hidden="true"></span>'}
         <strong>${esc(LABELS[j.type] || j.type)}</strong><span class="jproj">${j.project ? esc(j.project) : ''}</span>${v !== null ? `<span class="jpct">${v} %</span>` : ''}</div>
       ${msg ? `<div class="jmsg small muted">${esc(msg)}</div>` : ''}
@@ -295,9 +310,13 @@
     </div>`;
   }
 
+  let jobsSeen = null; // jobs déjà vus dans le menu : un job qui apparaît ensuite est mis en évidence un instant
   function renderJobsMenu(s) {
     if (!jobsBox) return;
     const list = s.jobs || [];
+    const ids = list.map((j) => j.id);
+    const fresh = new Set(jobsSeen ? ids.filter((id) => !jobsSeen.has(id)) : []);
+    jobsSeen = new Set([...(jobsSeen || []), ...ids]);
     jobsBox.hidden = !list.length;
     if (!list.length) { if (jobsOpen()) toggleJobs(false); return; }
     $('.spin-inline', jobsBtn).hidden = !s.queue;
@@ -307,7 +326,7 @@
     const running = list.filter((j) => j.status === 'running').length;
     $('[data-jobs-sub]', jobsPop).textContent = `${running} en cours · ${list.length - running} en attente`;
     // Redessine seulement si le contenu change : sinon l'animation d'apparition rejouerait à chaque poll
-    const html = list.map(jobItem).join('');
+    const html = list.map((j) => jobItem(j, fresh.has(j.id))).join('');
     const box = $('[data-jobs-list]', jobsPop);
     if (box._html === html) return;
     box._html = html;
@@ -327,6 +346,11 @@
     }
   }
   jobsBtn?.addEventListener('click', () => toggleJobs());
+  // Barre du haut hors de l'écran (page défilée) : le bouton « Activité » reste épinglé en haut à droite, avec son menu et la destination de l'agent
+  const topBar = $('.top');
+  if (jobsBox && topBar && 'IntersectionObserver' in window) {
+    new IntersectionObserver(([en]) => document.body.classList.toggle('hdr-off', !en.isIntersecting)).observe(topBar);
+  }
   document.addEventListener('click', (e) => {
     if (jobsOpen() && !e.target.closest('#jobs')) toggleJobs(false);
     const go = e.target.closest('[data-goto]');
@@ -360,6 +384,19 @@
     sysTimer = setTimeout(refreshSys, jobsOpen() ? 3000 : busy ? 6000 : 30_000);
   }
   refreshSys();
+
+  // Une tâche vient d'être mise en file : le menu « Activité » se met à jour, l'agent y arrive avec sa brouette, puis le menu s'ouvre
+  // quelques secondes sur la liste des tâches en cours et à venir (comme la bulle de téléchargement de Chrome).
+  let activityTimer;
+  function showActivity() {
+    if (!jobsBox || jobsBox.hidden) return;
+    toggleJobs(true);
+    clearTimeout(activityTimer);
+    activityTimer = setTimeout(() => { if (jobsOpen() && !jobsPop.matches(':hover') && !jobsPop.contains(document.activeElement)) toggleJobs(false); }, 5500);
+  }
+  function launched(trigger) {
+    refreshSys().then(() => (window.AiFx ? window.AiFx.launch(trigger) : null)).then(showActivity).catch(() => {});
+  }
 
   // ---------- Rendu d'un job ----------
   function renderJob(box, job, type) {

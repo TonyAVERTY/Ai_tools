@@ -38,6 +38,7 @@ ${iconLinks()}
 <link rel="stylesheet" href="${assetUrl('/static/responsive.css')}">
 <script src="${assetUrl('/static/app.js')}" defer></script>
 <script src="${assetUrl('/static/responsive.js')}" defer></script>
+<script src="${assetUrl('/static/fx.js')}" defer></script>
 ${scripts.map((src) => `<script src="${assetUrl(src)}" defer></script>`).join('\n')}
 </head>
 <body class="app">

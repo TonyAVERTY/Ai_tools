@@ -795,3 +795,31 @@ input.copy { font-family: var(--mono); font-size: .8125rem; }
   .ia-link { padding: 0 10px; }
 }
 @media (prefers-reduced-motion: reduce) { .typing i { animation: none; opacity: .6; } .chat-log { scroll-behavior: auto; } }
+
+/* ---------- Lancement d'une tâche : l'agent Claude et sa brouette (public/fx.js) ---------- */
+.fx-agent { position: fixed; left: 0; top: 0; z-index: 1000; width: 132px; height: 76px; pointer-events: none; will-change: transform; filter: drop-shadow(0 4px 6px color-mix(in srgb, var(--text) 25%, transparent)); }
+.fx-agent svg { display: block; overflow: visible; }
+.fx-agent .fx-shadow { fill: color-mix(in srgb, var(--text) 18%, transparent); }
+.fx-agent .fx-body { fill: var(--accent); stroke: var(--info); stroke-width: 1.5; }
+.fx-agent .fx-eye { fill: var(--card); }
+.fx-agent .fx-pupil { fill: var(--text); }
+.fx-agent .fx-smile { fill: none; stroke: var(--card); stroke-width: 1.8; stroke-linecap: round; }
+.fx-agent .fx-limb { fill: none; stroke: var(--info); stroke-width: 4.5; stroke-linecap: round; }
+.fx-agent .fx-leg-a, .fx-agent .fx-leg-b { transform-box: view-box; transform-origin: 28px 54px; }
+.fx-agent .fx-sparkle { transform-box: fill-box; transform-origin: center; }
+.fx-agent .fx-sparkle path { fill: none; stroke: var(--accent-2); stroke-width: 2.6; stroke-linecap: round; }
+.fx-agent .fx-handle, .fx-agent .fx-leg { fill: none; stroke: var(--muted); stroke-width: 3; stroke-linecap: round; }
+.fx-agent .fx-tray { fill: var(--accent-2); stroke: var(--info); stroke-width: 1.8; stroke-linejoin: round; }
+.fx-agent .fx-parcel rect { fill: var(--card); stroke: var(--info); stroke-width: 1.6; }
+.fx-agent .fx-parcel path { fill: none; stroke: var(--accent); stroke-width: 2; }
+.fx-agent .fx-wheel { transform-box: fill-box; transform-origin: center; }
+.fx-agent .fx-tire { fill: var(--card); stroke: var(--text); stroke-width: 2.6; }
+.fx-agent .fx-spoke { fill: none; stroke: var(--muted); stroke-width: 1.4; }
+.fx-agent .fx-hub { fill: var(--text); }
+.fx-ring { position: fixed; z-index: 999; border-radius: 50%; border: 2px solid var(--accent); pointer-events: none; }
+.jobs-btn { will-change: transform; }
+.jitem.new { animation: fx-flash 2.6s ease-out; }
+@keyframes fx-flash { 0% { background: color-mix(in srgb, var(--accent-2) 38%, transparent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-2) 45%, transparent); } 100% { background: transparent; box-shadow: 0 0 0 3px transparent; } }
+@media (prefers-reduced-motion: reduce) { .jitem.new { animation: none; } }
+/* Page défilée : le menu « Activité » reste visible, épinglé en haut à droite */
+body.hdr-off .jobs { position: fixed; top: 10px; right: 12px; z-index: 60; padding: 3px; background: var(--card); border: 1px solid var(--line-strong); border-radius: 999px; box-shadow: var(--shadow-3); }
