@@ -106,7 +106,7 @@ export function registerRoutes(router, app) {
   router.get('/u/:email/:token', async ({ res, params }) => {
     const valid = verifyUnsubToken(cfg.secretKey, params.email, params.token);
     html(res, unsubPage({ email: params.email, valid, done: false }), valid ? 200 : 400);
-  }, { public: true });
+  }, { public: true, limit: 'unsub' });
   router.post('/u/:email/:token', async ({ res, params }) => {
     const email = params.email.toLowerCase();
     const valid = verifyUnsubToken(cfg.secretKey, email, params.token);
@@ -115,7 +115,7 @@ export function registerRoutes(router, app) {
       await db.prepare("UPDATE prospects SET status = 'refused' WHERE email = ? AND status IN ('new','sent')").run(email);
     }
     html(res, unsubPage({ email, valid, done: valid }), valid ? 200 : 400);
-  }, { public: true });
+  }, { public: true, limit: 'unsub' });
 
   // ---------- Privé ----------
   router.post('/logout', async ({ req, res }) => { await destroySession(db, req, res); redirect(res, '/login'); });
