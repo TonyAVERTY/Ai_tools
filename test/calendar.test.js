@@ -94,3 +94,21 @@ test('page Calendrier : mois, actions et posts, navigation, échappement, isolat
   assert.match(await (await html(a, '/calendar?m=2099-99')).text(), new RegExp(String(p.year)));
   assert.equal((await s.anon.get('/calendar', { headers: { accept: 'text/html' } })).status, 303);
 });
+
+test('petit « i » : tutoriel iPhone, Android et ordinateur, avec le lien webcal:// seulement quand le lien existe', async () => {
+  const u = await s.newUser();
+  const page = async () => (await html(u, '/account')).text();
+  let p = await page();
+  assert.match(p, /class="tip-i"[^>]*>i</);
+  assert.match(p, /iPhone \(et iPad\)/);
+  assert.match(p, /Ajouter un calendrier avec abonnement/);
+  assert.match(p, /Android/);
+  assert.match(p, /Autres agendas<\/b> → <b>\+<\/b> → <b>À partir de l'URL/);
+  assert.match(p, /ICSx/);
+  assert.doesNotMatch(p, /webcal:/, 'pas de lien sans lien d\'agenda');
+  await form(u, '/calendar/feed', { back: '/account' });
+  const token = await feedToken(s.app, u.id);
+  p = await page();
+  assert.ok(p.includes(`href="webcal://ai.tony-averty.dev/cal/${token}.ics"`), 'un appui ouvre l\'abonnement sur iPhone');
+  assert.match(await (await html(u, '/calendar')).text(), /Comment l'ajouter à mon agenda/, 'aussi sur la page Calendrier');
+});

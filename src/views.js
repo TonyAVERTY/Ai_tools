@@ -1,6 +1,7 @@
 import { esc } from './http.js';
 import { STATUSES } from './services/crm.js';
 import { icalBox } from './icalview.js';
+import { devLinks } from './devlinks.js';
 import { assetUrl, brandMark, iconLinks } from './assets.js';
 import { SPRITE, ic } from './icons.js';
 import { GIT_SERVER_TYPES, MAX_GIT_SERVERS } from './gitservers.js';
@@ -115,7 +116,7 @@ function linkSection(link, consent) {
 </section>`;
 }
 
-export function accountPage({ user, error, link = null, consent = null, notice = null, usage = null, developer = false, ical = null }) {
+export function accountPage({ user, error, link = null, consent = null, notice = null, usage = null, developer = false, ical = null, appUrl = '' }) {
   return layout({
     title: 'Mon compte', email: user.email,
     body: `<div class="narrow">
@@ -137,6 +138,7 @@ ${linkSection(link, consent)}
 <section class="card">
   <div class="card-h"><h2>Mode développeur</h2><p>L'API d'AiTools et le serveur MCP (relier Claude à ton panel) ne sont disponibles que si tu actives ce mode.</p></div>
   <div class="row"><span class="badge ${developer ? 'ok' : ''}">${developer ? 'Activé' : 'Désactivé'}</span><a class="btn small" href="/developer">${ic('key')}${developer ? 'Jetons et documentation' : 'Activer'}</a></div>
+  ${developer ? devLinks(appUrl) : `<p class="muted small">Une fois le mode activé, les adresses de l'API et du serveur MCP, leurs documentations et tes jetons s'affichent ici et sur la page Développeur.</p>`}
 </section>
 <section class="card danger">
   <div class="card-h"><h2>Zone de danger</h2></div>

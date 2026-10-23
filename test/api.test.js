@@ -289,3 +289,36 @@ test('documentation : chaque route de l\'API et chaque outil MCP est documenté'
   const mcp = readFileSync('docs/MCP.md', 'utf8');
   for (const t of TOOLS) assert.ok(mcp.includes(`\`${t.name}\``), `docs/MCP.md : ${t.name}`);
 });
+
+// ---------- Liens visibles ----------
+
+test('liens du mode développeur : visibles dans Mon compte et sur la page Développeur ; docs et fichier MCP servis seulement en mode développeur', async () => {
+  const u = await s.newUser();
+  const html = async (p) => (await u.get(p, { headers: { accept: 'text/html' } })).text();
+  const get = (p) => u.get(p, { headers: { accept: '*/*' } });
+  assert.doesNotMatch(await html('/account'), /developer\/mcp\.js/);
+  assert.match(await html('/account'), /Une fois le mode activé/);
+  for (const p of ['/developer/docs/api', '/developer/docs/mcp', '/developer/mcp.js']) assert.equal((await get(p)).status, 404, `${p} sans mode développeur`);
+
+  await setDeveloperMode(s.db, u.id, true);
+  const account = await html('/account');
+  assert.ok(account.includes(`${s.app.cfg.appUrl}/api/v1`), 'adresse de l\'API');
+  assert.ok(account.includes(`${s.app.cfg.appUrl}/developer/mcp.js`), 'adresse du serveur MCP');
+  assert.match(account, /href="\/developer\/docs\/api"/);
+  assert.match(account, /href="\/developer\/docs\/mcp"/);
+  assert.match(account, /claude mcp add aitools/);
+  const dev = await html('/developer');
+  assert.match(dev, /Adresses et documentation/);
+  assert.match(dev, /download="aitools-mcp\.js"/);
+
+  const api = await get('/developer/docs/api');
+  assert.equal(api.status, 200);
+  assert.match(api.headers.get('content-type'), /^text\/markdown/);
+  assert.equal(await api.text(), readFileSync('docs/API.md', 'utf8'));
+  assert.equal((await get('/developer/docs/inconnu')).status, 404);
+  const mcp = await get('/developer/mcp.js');
+  assert.match(mcp.headers.get('content-disposition'), /attachment; filename="aitools-mcp\.js"/);
+  assert.equal(await mcp.text(), readFileSync('mcp/aitools-mcp.js', 'utf8'));
+  assert.equal((await s.anon.get('/developer/mcp.js', { headers: { accept: '*/*' } })).status, 303, 'jamais sans connexion');
+  assert.ok(!account.includes('aitk_') || /aitk_…/.test(account), 'aucun vrai jeton dans les liens');
+});

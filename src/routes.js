@@ -283,7 +283,7 @@ export function registerRoutes(router, app) {
   router.get('/account', async ({ res, session, url }) => {
     const t = url.searchParams.get('t');
     html(res, accountPage({
-      user: session.user, error: url.searchParams.get('e'), link: await getLinkState(db, session.userId), developer: await developerMode(db, session.userId),
+      user: session.user, error: url.searchParams.get('e'), link: await getLinkState(db, session.userId), developer: await developerMode(db, session.userId), appUrl: cfg.appUrl,
       ical: await (async () => { const t = await feedToken(app, session.userId); return t ? feedUrl(cfg, t) : null; })(),
       consent: await lastConsent(db, session.userId), cliModeEnabled, usage: await usageView(db, await getUser(db, session.userId)),
       notice: t === 'unlinked' ? { ok: true, text: 'Liaison supprimée : le secret a été effacé et tes jobs IA en attente ont été annulés.' }

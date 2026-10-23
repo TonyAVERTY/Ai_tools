@@ -4,6 +4,7 @@ import { layout } from './views.js';
 import { ic } from './icons.js';
 import { SCOPES } from './apitokens.js';
 import { API_ENDPOINTS } from './apiv1.js';
+import { devLinks } from './devlinks.js';
 
 const day = (ts) => (ts ? new Date(ts * 1000).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' }) : 'jamais');
 
@@ -31,6 +32,10 @@ ${newToken ? `<section class="card" role="status">
     </div></fieldset>
     <div class="row"><button class="btn primary">${ic('key')}Créer un jeton</button></div>
   </form>` : ''}
+</section>
+<section class="card">
+  <div class="card-h"><h2>Adresses et documentation</h2><p>Tout ce qu'il faut pour brancher un script ou Claude à ton panel.</p></div>
+  ${devLinks(appUrl)}
 </section>
 <section class="card">
   <div class="card-h"><h2>API</h2><p>Base : <code>${esc(appUrl)}/api/v1</code>. Chaque requête porte <code>Authorization: Bearer aitk_…</code> ; les corps sont en JSON. Limite : 120 requêtes par minute et par compte.</p></div>
