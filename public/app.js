@@ -554,6 +554,45 @@
     });
   }
 
+  // ---------- Réglages : ajouter un serveur Git ----------
+  // GitHub est toujours là. Le « + » propose le type de serveur, puis ajoute une ligne URL + token (le formulaire reste un POST classique).
+  (() => {
+    const list = $('[data-gitlist]');
+    const tpl = $('#git-row-tpl');
+    if (!list || !tpl) return;
+    const add = $('[data-git-add]');
+    const pick = $('[data-git-type]');
+    const full = $('[data-git-max]');
+    let next = Number(list.dataset.next) || 0;
+    const rows = () => $$('[data-git-row]', list).length;
+
+    add.addEventListener('click', () => {
+      if (rows() >= Number(list.dataset.max)) { full.hidden = false; return; }
+      pick.hidden = !pick.hidden;
+      add.setAttribute('aria-expanded', String(!pick.hidden));
+      if (!pick.hidden) pick.focus();
+    });
+    pick.addEventListener('change', () => {
+      const opt = pick.selectedOptions[0];
+      if (!opt?.value) return;
+      const html = tpl.innerHTML.replaceAll('__I__', String(next++)).replaceAll('__TYPE__', esc(opt.value)).replaceAll('__LABEL__', esc(opt.dataset.label));
+      const row = document.createElement('div');
+      row.innerHTML = html;
+      const el = row.firstElementChild;
+      $('[data-git-hint]', el).textContent = opt.dataset.hint || '';
+      list.append(el);
+      pick.value = '';
+      pick.hidden = true;
+      add.setAttribute('aria-expanded', 'false');
+      $('input[name^="git_host_"]', el).focus();
+    });
+    list.addEventListener('click', (e) => {
+      if (!e.target.closest('[data-git-cancel]')) return;
+      e.target.closest('[data-git-row]').remove();
+      full.hidden = true;
+    });
+  })();
+
   // ---------- LinkedIn ----------
   // Section d'un projet : relier un compte, donner une direction (facultative), générer / régénérer un post, le relire et le publier.
   const liDay = (ts) => new Date(ts * 1000).toLocaleDateString('fr-FR', { dateStyle: 'medium', timeZone: 'Europe/Paris' });

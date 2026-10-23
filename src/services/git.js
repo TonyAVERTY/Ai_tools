@@ -32,7 +32,7 @@ export function validateGitUrl(url, allowedHosts) {
  * Environnement de git : liste blanche (aucun secret du serveur), https seulement, aucune configuration
  * globale ou système lue, aucune invite.
  */
-export function gitEnv(token, { parentEnv = process.env, scheme = 'token' } = {}) {
+export function gitEnv(token, { parentEnv = process.env, scheme = 'token', user = 'x-access-token' } = {}) {
   const env = {
     ...buildChildEnv(parentEnv, { home: tmpdir() }),
     GIT_TERMINAL_PROMPT: '0',
@@ -43,9 +43,9 @@ export function gitEnv(token, { parentEnv = process.env, scheme = 'token' } = {}
   if (token) {
     env.GIT_CONFIG_COUNT = '1';
     env.GIT_CONFIG_KEY_0 = 'http.extraHeader';
-    // GitHub n'accepte que l'authentification Basic sur ses points d'accès git (comme actions/checkout) ; Forgejo/Gitea acceptent « token »
+    // GitHub et GitLab veulent l'authentification Basic sur leurs points d'accès git (comme actions/checkout) ; Forgejo/Gitea acceptent « token »
     env.GIT_CONFIG_VALUE_0 = scheme === 'basic'
-      ? `Authorization: Basic ${Buffer.from(`x-access-token:${token}`).toString('base64')}`
+      ? `Authorization: Basic ${Buffer.from(`${user}:${token}`).toString('base64')}`
       : `Authorization: token ${token}`;
   }
   return env;
@@ -88,9 +88,9 @@ export function dirSize(dir, limit = Infinity) {
 }
 
 // Lance git avec délai et taille bornés : au-delà, le processus est tué et le dossier surveillé effacé par l'appelant
-function runGit(args, { token, scheme, cwd, watchDir, timeoutMs = GIT_TIMEOUT_MS, maxBytes = GIT_MAX_BYTES, gitBin = 'git' }) {
+function runGit(args, { token, scheme, user, cwd, watchDir, timeoutMs = GIT_TIMEOUT_MS, maxBytes = GIT_MAX_BYTES, gitBin = 'git' }) {
   return new Promise((resolve, reject) => {
-    const child = spawn(gitBin, args, { env: gitEnv(token, { scheme }), cwd, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(gitBin, args, { env: gitEnv(token, { scheme, user }), cwd, stdio: ['ignore', 'pipe', 'pipe'] });
     let stdout = '', stderr = '', killed = null;
     const kill = (why) => { killed = why; child.kill('SIGKILL'); };
     const timer = setTimeout(() => kill('Délai dépassé'), timeoutMs);
@@ -112,14 +112,16 @@ export async function syncRepo(url, dir, token, opts = {}) {
   try {
     // L'URL est relue en base : on revalide ici (pas de file://, ext::, ssh) quel que soit l'appelant
     url = validateGitUrl(url);
-    const scheme = new URL(url).hostname === 'github.com' ? 'basic' : 'token';
+    // `opts.scheme` / `opts.user` viennent du type de serveur ; à défaut, GitHub est en Basic et le reste en « token »
+    const scheme = opts.scheme ?? (new URL(url).hostname === 'github.com' ? 'basic' : 'token');
+    const { user } = opts;
     if (existsSync(`${dir}/.git`)) {
-      await runGit(fetchArgs(opts.pin), { token, scheme, cwd: dir, watchDir: dir, ...opts });
-      await runGit([...GIT_HARDENING, 'reset', '--hard', 'FETCH_HEAD'], { token, scheme, cwd: dir, ...opts });
+      await runGit(fetchArgs(opts.pin), { token, scheme, user, cwd: dir, watchDir: dir, ...opts });
+      await runGit([...GIT_HARDENING, 'reset', '--hard', 'FETCH_HEAD'], { token, scheme, user, cwd: dir, ...opts });
     } else {
       rmSync(dir, { recursive: true, force: true });
       mkdirSync(dirname(dir), { recursive: true });
-      try { await runGit(cloneArgs(url, dir, opts.pin), { token, scheme, watchDir: dir, ...opts }); }
+      try { await runGit(cloneArgs(url, dir, opts.pin), { token, scheme, user, watchDir: dir, ...opts }); }
       catch (e) { rmSync(dir, { recursive: true, force: true }); throw e; }
     }
     const { stdout } = await runGit([...GIT_HARDENING, 'rev-parse', 'HEAD'], { cwd: dir, ...opts });

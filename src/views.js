@@ -1,6 +1,7 @@
 import { esc } from './http.js';
 import { STATUSES } from './services/crm.js';
 import { assetUrl, brandMark, iconLinks } from './assets.js';
+import { GIT_SERVER_TYPES, MAX_GIT_SERVERS } from './gitservers.js';
 import { MODE_LABELS, CONSENT_TEXT, CONSENT_CHECKBOX, CONSENT_VERSION } from './claudelink.js';
 
 const fmtDate = (ts) => (ts ? new Date(ts * 1000).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' }) : '—');
@@ -386,7 +387,7 @@ function projectItem(p, smtp, dbCfg, imap) {
 </details>`;
 }
 
-export function dashboardPage({ email, projects, forgejoHost, usage = null, pauseMessage = null }) {
+export function dashboardPage({ email, projects, gitHosts = [], usage = null, pauseMessage = null }) {
   return layout({
     title: 'Projets', email,
     body: `<div class="row head">
@@ -399,7 +400,7 @@ ${usagePanel(usage)}
   <form data-action="create" class="cfg">
     <label>Nom<input name="name" required maxlength="80"></label>
     <label>Dépôt Git<input name="gitUrl" required placeholder="https://github.com/utilisateur/projet.git"></label>
-    <p class="muted small">${forgejoHost ? `GitHub et ${esc(forgejoHost)} sont acceptés.` : 'GitHub est accepté.'} Dépôt privé ou autre serveur Git : ajoute un token dans <a href="/settings">Réglages</a>. Le lien ne pourra plus être modifié. Le projet est cloné et analysé une fois (Sonnet).</p>
+    <p class="muted small">${gitHosts.length ? `GitHub et ${gitHosts.map(esc).join(', ')} sont acceptés.` : 'GitHub est accepté.'} Dépôt privé ou autre serveur Git : ajoute un token dans <a href="/settings">Réglages</a>. Le lien ne pourra plus être modifié. Le projet est cloné et analysé une fois (Sonnet).</p>
     <button class="btn primary">Créer et analyser</button>
   </form>
 </details>
@@ -409,6 +410,23 @@ ${projects.length ? projects.map((x) => projectItem(x.project, x.smtp, x.dbCfg, 
 </div>
 ${projects.length ? '<aside class="todo" id="todo" aria-label="Mise en route du projet" hidden></aside>' : ''}`,
   });
+}
+
+/** Une ligne « serveur Git » : URL et token. `i` : numéro de la ligne (champs git_*_i) ; `fresh` : ligne qui vient d'être ajoutée (gabarit). */
+function gitRow(i, srv, { fresh = false } = {}) {
+  const hint = GIT_SERVER_TYPES[srv.type]?.hint ?? '';
+  return `<div class="gitrow" data-git-row>
+      <input type="hidden" name="git_type_${i}" value="${esc(srv.type)}">
+      <input type="hidden" name="git_id_${i}" value="${esc(srv.id)}">
+      <div class="gitrow-head"><strong>${esc(srv.label)}</strong>${fresh ? ' <button type="button" class="linklike small" data-git-cancel>Annuler</button>' : ''}</div>
+      <div class="grid2">
+        <label>URL du serveur<input name="git_host_${i}" value="${esc(srv.host)}" placeholder="https://git.mon-serveur.fr" autocomplete="off" spellcheck="false"></label>
+        <label>Token (lecture repo)<input name="git_token_${i}" type="password" placeholder="${srv.hasToken ? '•••••• (inchangé)' : ''}" autocomplete="new-password"></label>
+      </div>
+      <p class="muted small" data-git-hint>${esc(hint)}</p>
+      ${fresh ? '' : `${srv.hasToken ? `<label class="check"><input type="checkbox" name="git_token_clear_${i}" value="1"> Supprimer le token enregistré</label>` : ''}
+      <label class="check"><input type="checkbox" name="git_del_${i}" value="1"> Retirer ce serveur</label>`}
+    </div>`;
 }
 
 export function settingsPage({ email, s, saved }) {
@@ -423,15 +441,25 @@ ${saved ? '<p class="ok">Enregistré.</p>' : ''}
   <button type="button" class="btn small" data-report-send>Envoyer le rapport maintenant</button>
 
   <h4>Dépôts Git</h4>
-  <p class="muted small">GitHub est toujours accepté. Chaque token ne sert qu'à son hôte : celui de GitHub n'est envoyé qu'à github.com, celui de ton serveur qu'à ton serveur.</p>
-  <label>Token GitHub (dépôts privés, lecture seule)<input name="github_token" type="password" placeholder="${s.github_token_set ? '•••••• (inchangé)' : 'github_pat_…'}" autocomplete="new-password"></label>
-  <p class="muted small">Inutile pour un dépôt public. Crée un <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer">token à portée limitée</a> : <em>Only select repositories</em> (tes dépôts) et la permission <em>Contents : Read-only</em>, rien d'autre.</p>
-  ${s.github_token_set ? '<label class="check"><input type="checkbox" name="github_token_clear" value="1"> Supprimer le token GitHub enregistré</label>' : ''}
-  <div class="grid2">
-    <label>Mon serveur Git (facultatif)<input name="forgejo_host" value="${esc(s.forgejo_host)}" placeholder="git.mon-serveur.fr"></label>
-    <label>Token d'accès à ce serveur (lecture repo)<input name="forgejo_token" type="password" placeholder="${s.forgejo_token_set ? '•••••• (inchangé)' : ''}" autocomplete="new-password"></label>
+  <p class="muted small">GitHub est toujours accepté. Chaque token ne sert qu'à son serveur : il n'est jamais envoyé ailleurs, et jamais réaffiché.</p>
+  <div class="gitlist" data-gitlist data-next="${s.git_servers.length}" data-max="${MAX_GIT_SERVERS}">
+    <div class="gitrow">
+      <div class="gitrow-head"><strong>GitHub</strong> <span class="badge">github.com</span></div>
+      <label>Token (dépôts privés, lecture seule)<input name="github_token" type="password" placeholder="${s.github_token_set ? '•••••• (inchangé)' : 'github_pat_…'}" autocomplete="new-password"></label>
+      <p class="muted small">Inutile pour un dépôt public. Crée un <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer">token à portée limitée</a> : <em>Only select repositories</em> (tes dépôts) et la permission <em>Contents : Read-only</em>, rien d'autre.</p>
+      ${s.github_token_set ? '<label class="check"><input type="checkbox" name="github_token_clear" value="1"> Supprimer le token GitHub enregistré</label>' : ''}
+    </div>
+    ${s.git_servers.map((srv, i) => gitRow(i, srv)).join('\n    ')}
   </div>
-  ${s.forgejo_token_set ? '<label class="check"><input type="checkbox" name="forgejo_token_clear" value="1"> Supprimer le token du serveur enregistré</label>' : ''}
+  <template id="git-row-tpl">${gitRow('__I__', { type: '__TYPE__', label: '__LABEL__', host: '', hasToken: false, id: '' }, { fresh: true })}</template>
+  <div class="gitadd">
+    <button type="button" class="btn small" data-git-add aria-expanded="false" aria-controls="git-type">+ Ajouter un serveur Git</button>
+    <select id="git-type" data-git-type hidden aria-label="Type de serveur Git">
+      <option value="">Quel type de serveur ?</option>
+      ${Object.entries(GIT_SERVER_TYPES).map(([k, t]) => `<option value="${k}" data-label="${esc(t.label)}" data-hint="${esc(t.hint)}">${esc(t.label)}</option>`).join('')}
+    </select>
+    <span class="muted small" data-git-max hidden>${MAX_GIT_SERVERS} serveurs au plus.</span>
+  </div>
 
   <h4>SMTP global (mails vers toi)</h4>
   <div class="grid3">

@@ -18,10 +18,11 @@ import { registerTeamRoutes } from './teamroutes.js';
 import { registerLinkedinRoutes } from './linkedinroutes.js';
 import { dashboardPage, settingsPage, unsubPage, accountPage, linkPage } from './views.js';
 import { enqueue, latestJobs, cancelJob, usageSummary } from './services/jobs.js';
-import { validateGitUrl, removeRepo, DEFAULT_GIT_HOSTS } from './services/git.js';
+import { validateGitUrl, removeRepo } from './services/git.js';
 import { fetchRecap, clearRecapCache, validateSelect } from './services/recap.js';
 import { sendPause, pauseMessage as pauseMessageOf } from './services/abuse.js';
-import { guardTarget, pinDb, pinGit, checkForgejoHost } from './netguard.js';
+import { guardTarget, pinDb, pinGit } from './netguard.js';
+import { listGitServers, publicGitServers, allowedGitHosts, saveGitServers, saveGithubToken } from './gitservers.js';
 import { allowedToSend, EMAIL_RE } from './services/mailer.js';
 import { cpuTemp } from './services/thermal.js';
 import { checkInbox } from './services/inbox.js';
@@ -125,7 +126,7 @@ export function registerRoutes(router, app) {
       projects.push({ project: p, smtp: publicConfig(full.smtp, 'pass'), dbCfg: publicConfig(full.dbCfg, 'password'), imap: publicConfig(full.imapCfg, 'pass') });
     }
     html(res, dashboardPage({
-      email: session.email, projects, forgejoHost: await getSetting(db, userId, 'forgejo_host'), usage: await usageView(db, await getUser(db, userId)),
+      email: session.email, projects, gitHosts: (await listGitServers(db, userId)).map((x) => x.host), usage: await usageView(db, await getUser(db, userId)),
       pauseMessage: await sendPause(db, userId).then((p) => (p ? pauseMessageOf(p) : null)),
     }));
   });
@@ -135,8 +136,7 @@ export function registerRoutes(router, app) {
     const discord = await notifyConfig(app, userId);
     const s = {
       notify_email: await getSetting(db, userId, 'notify_email', ''),
-      forgejo_host: await getSetting(db, userId, 'forgejo_host', ''),
-      forgejo_token_set: !!await getSetting(db, userId, 'forgejo_token_enc'),
+      git_servers: publicGitServers(await listGitServers(db, userId)),
       github_token_set: !!await getSetting(db, userId, 'github_token_enc'),
       smtp: publicConfig(await globalSmtp(app, userId), 'pass'),
       global_daily_cap: await getSetting(db, userId, 'global_daily_cap', '100'),
@@ -161,14 +161,9 @@ export function registerRoutes(router, app) {
     const b = await readBody(req);
     if (b.notify_email && !EMAIL_RE.test(b.notify_email)) throw new HttpError(400, 'Email de réception invalide');
     await set('notify_email', (b.notify_email || '').trim());
-    const forgejoHost = (b.forgejo_host || '').trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
-    if (forgejoHost) await checkForgejoHost(app, userId, forgejoHost);
-    await set('forgejo_host', forgejoHost);
-    // Un token saisi remplace l'ancien ; la case « supprimer » l'efface (sans quoi il restait chiffré en base sans moyen de le retirer)
-    for (const [field, key] of [['forgejo', 'forgejo_token_enc'], ['github', 'github_token_enc']]) {
-      if (b[`${field}_token`]?.trim()) await set(key, encrypt(cfg.secretKey, b[`${field}_token`].trim()));
-      else if (b[`${field}_token_clear`]) await set(key, null);
-    }
+    // Dépôts Git : le token GitHub, puis la liste des serveurs ajoutés (chacun avec son URL et son token)
+    await saveGithubToken(app, userId, { typed: b.github_token, clear: b.github_token_clear });
+    await saveGitServers(app, userId, b);
     const cap = int(b.global_daily_cap, 1, 300, 100);
     const dmin = int(b.send_delay_min, 5, 3600, 20);
     const dmax = Math.max(dmin, int(b.send_delay_max, 5, 3600, 60));
@@ -321,10 +316,9 @@ export function registerRoutes(router, app) {
     const b = await readBody(req);
     const name = String(b.name || '').trim().slice(0, 80);
     if (!name) throw new HttpError(400, 'Nom requis');
-    // GitHub est accepté d'office ; le serveur Git personnel des Réglages (facultatif) s'y ajoute
-    const host = await getSetting(db, userId, 'forgejo_host');
+    // GitHub est accepté d'office ; les serveurs ajoutés dans les Réglages s'y ajoutent
     let gitUrl;
-    try { gitUrl = validateGitUrl(String(b.gitUrl || '').trim(), [...DEFAULT_GIT_HOSTS, host]); }
+    try { gitUrl = validateGitUrl(String(b.gitUrl || '').trim(), await allowedGitHosts(db, userId)); }
     catch (e) { throw new HttpError(400, e.message); }
     await pinGit(app, userId, gitUrl); // hôte public et port autorisé, sinon refus immédiat
     // Un même dépôt peut être un projet pour deux comptes différents : l'unicité est par utilisateur

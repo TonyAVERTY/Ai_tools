@@ -452,3 +452,13 @@ input.copy { width: 100%; font-family: ui-monospace, SFMono-Regular, Menlo, mono
 .flash { animation: flash-ring 1.8s ease-out 1; }
 @keyframes flash-ring { 0%, 30% { box-shadow: 0 0 0 3px var(--accent); } 100% { box-shadow: 0 0 0 3px transparent; } }
 @media (max-width: 700px) { .todo { left: 8px; bottom: 8px; width: calc(100vw - 16px); } .toast { bottom: 76px; } }
+
+/* ---------- Réglages : dépôts Git (GitHub + serveurs ajoutés) ---------- */
+.gitlist { display: grid; gap: 12px; }
+.gitrow { border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; display: grid; gap: 8px; background: color-mix(in srgb, var(--card) 70%, transparent); }
+.gitrow-head { display: flex; align-items: center; gap: 8px; }
+.gitrow .grid2 { margin: 0; }
+.gitrow p { margin: 0; }
+[data-git-type][hidden], [data-git-max][hidden] { display: none; } /* sans cette règle, le style des champs écrase l'attribut hidden */
+.gitadd { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 10px 0 4px; }
+.linklike { border: 0; background: transparent; padding: 0; color: var(--accent); cursor: pointer; text-decoration: underline; font: inherit; }
