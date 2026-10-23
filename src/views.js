@@ -399,7 +399,7 @@ ${usagePanel(usage)}
   <form data-action="create" class="cfg">
     <label>Nom<input name="name" required maxlength="80"></label>
     <label>Dépôt Git<input name="gitUrl" required placeholder="https://github.com/utilisateur/projet.git"></label>
-    <p class="muted small">${forgejoHost ? `GitHub (dépôts publics) et ${esc(forgejoHost)} sont acceptés.` : 'GitHub est accepté (dépôts publics). Pour un autre serveur Git, ajoute-le dans <a href="/settings">Réglages</a>.'} Le lien ne pourra plus être modifié. Le projet est cloné et analysé une fois (Sonnet).</p>
+    <p class="muted small">${forgejoHost ? `GitHub et ${esc(forgejoHost)} sont acceptés.` : 'GitHub est accepté.'} Dépôt privé ou autre serveur Git : ajoute un token dans <a href="/settings">Réglages</a>. Le lien ne pourra plus être modifié. Le projet est cloné et analysé une fois (Sonnet).</p>
     <button class="btn primary">Créer et analyser</button>
   </form>
 </details>
@@ -423,11 +423,15 @@ ${saved ? '<p class="ok">Enregistré.</p>' : ''}
   <button type="button" class="btn small" data-report-send>Envoyer le rapport maintenant</button>
 
   <h4>Dépôts Git</h4>
-  <p class="muted small">GitHub (dépôts publics) est toujours accepté, sans rien configurer. Pour utiliser aussi ton propre serveur Git (Forgejo, Gitea), même privé, renseigne-le ici : le token ne sert qu'à cet hôte et n'est jamais envoyé à GitHub.</p>
+  <p class="muted small">GitHub est toujours accepté. Chaque token ne sert qu'à son hôte : celui de GitHub n'est envoyé qu'à github.com, celui de ton serveur qu'à ton serveur.</p>
+  <label>Token GitHub (dépôts privés, lecture seule)<input name="github_token" type="password" placeholder="${s.github_token_set ? '•••••• (inchangé)' : 'github_pat_…'}" autocomplete="new-password"></label>
+  <p class="muted small">Inutile pour un dépôt public. Crée un <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer">token à portée limitée</a> : <em>Only select repositories</em> (tes dépôts) et la permission <em>Contents : Read-only</em>, rien d'autre.</p>
+  ${s.github_token_set ? '<label class="check"><input type="checkbox" name="github_token_clear" value="1"> Supprimer le token GitHub enregistré</label>' : ''}
   <div class="grid2">
     <label>Mon serveur Git (facultatif)<input name="forgejo_host" value="${esc(s.forgejo_host)}" placeholder="git.mon-serveur.fr"></label>
     <label>Token d'accès à ce serveur (lecture repo)<input name="forgejo_token" type="password" placeholder="${s.forgejo_token_set ? '•••••• (inchangé)' : ''}" autocomplete="new-password"></label>
   </div>
+  ${s.forgejo_token_set ? '<label class="check"><input type="checkbox" name="forgejo_token_clear" value="1"> Supprimer le token du serveur enregistré</label>' : ''}
 
   <h4>SMTP global (mails vers toi)</h4>
   <div class="grid3">

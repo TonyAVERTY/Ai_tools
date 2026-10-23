@@ -137,6 +137,7 @@ export function registerRoutes(router, app) {
       notify_email: await getSetting(db, userId, 'notify_email', ''),
       forgejo_host: await getSetting(db, userId, 'forgejo_host', ''),
       forgejo_token_set: !!await getSetting(db, userId, 'forgejo_token_enc'),
+      github_token_set: !!await getSetting(db, userId, 'github_token_enc'),
       smtp: publicConfig(await globalSmtp(app, userId), 'pass'),
       global_daily_cap: await getSetting(db, userId, 'global_daily_cap', '100'),
       send_delay_min: await getSetting(db, userId, 'send_delay_min', '20'),
@@ -163,7 +164,11 @@ export function registerRoutes(router, app) {
     const forgejoHost = (b.forgejo_host || '').trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
     if (forgejoHost) await checkForgejoHost(app, userId, forgejoHost);
     await set('forgejo_host', forgejoHost);
-    if (b.forgejo_token) await set('forgejo_token_enc', encrypt(cfg.secretKey, b.forgejo_token.trim()));
+    // Un token saisi remplace l'ancien ; la case « supprimer » l'efface (sans quoi il restait chiffré en base sans moyen de le retirer)
+    for (const [field, key] of [['forgejo', 'forgejo_token_enc'], ['github', 'github_token_enc']]) {
+      if (b[`${field}_token`]?.trim()) await set(key, encrypt(cfg.secretKey, b[`${field}_token`].trim()));
+      else if (b[`${field}_token_clear`]) await set(key, null);
+    }
     const cap = int(b.global_daily_cap, 1, 300, 100);
     const dmin = int(b.send_delay_min, 5, 3600, 20);
     const dmax = Math.max(dmin, int(b.send_delay_max, 5, 3600, 60));
