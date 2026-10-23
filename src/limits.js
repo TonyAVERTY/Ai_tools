@@ -15,6 +15,7 @@ export const RATE_LIMITS = {
   // Événements de l'agenda (ajout, suppression)
   event: { user: { max: 60, windowMs: 10 * MIN } },
   chat: { user: { max: 40, windowMs: 10 * MIN } },
+  chat_upload: { user: { max: 60, windowMs: 10 * MIN } },
   // Abonnement iCal (lien secret) : un agenda interroge au plus quelques fois par heure
   ical: { ip: { max: 60, windowMs: 10 * MIN } },
   // API (mode développeur) : par adresse avant authentification, par compte ensuite

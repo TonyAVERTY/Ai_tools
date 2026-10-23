@@ -1,5 +1,6 @@
-// Lancement d'une tâche : le bouton « s'enfonce », puis un petit agent Claude pousse une brouette jusqu'au menu « Activité » (en haut à droite),
-// qui s'ouvre un instant sur la liste des tâches en cours et à venir, comme la bulle de téléchargement de Chrome.
+// Lancement d'une tâche : le bouton « s'enfonce », puis deux traits pointillés bleus (un vertical, un horizontal) le relient au menu « Activité »
+// (en haut à droite), qui s'ouvre sur la liste des tâches en cours et à venir comme la bulle de téléchargement de Chrome ; un petit agent Claude
+// marche le long des traits en poussant une brouette jusqu'à la ligne de la nouvelle tâche.
 // Tout est dessiné en SVG et animé avec l'API Web Animations : aucun attribut de style dans le balisage (CSP). Aucun écouteur global : le module ne fait rien tant qu'on ne l'appelle pas.
 (() => {
   const calm = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -32,6 +33,8 @@
 
   const center = (el) => { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, w: r.width, h: r.height }; };
   const visible = (el) => !!el && !el.hidden && !el.closest('[hidden]') && el.getBoundingClientRect().width > 0;
+  const HOP = 80; // distance parcourue par saut (px)
+  const HOP_H = 16; // hauteur d'un saut (px)
   const ease = (t) => (t < 0.5 ? 2 * t * t : 1 - ((-2 * t + 2) ** 2) / 2);
   const wait = (anim) => anim.finished.catch(() => {});
 
@@ -56,52 +59,89 @@
   }
 
   /**
-   * L'agent part du bouton `from` et pousse sa brouette jusqu'au menu « Activité » (ou, à défaut, le coin du haut). Résolu à son arrivée.
+   * Deux traits pointillés bleus (un vertical, un horizontal) relient le bouton `from` à la destination `to` (la ligne de la tâche dans le menu
+   * « Activité », à défaut le bouton Activité) ; l'agent marche le long du trait en poussant sa brouette, puis y dépose son colis. Résolu à son arrivée.
+   * @param {HTMLElement} from
+   * @param {HTMLElement|null} [to]
    * @returns {Promise<void>}
    */
-  async function launch(from) {
-    const target = [document.querySelector('#jobs .jobs-btn'), document.querySelector('.top-r')].find(visible);
+  async function launch(from, to = null) {
+    const target = [to, document.querySelector('#jobs .jobs-btn'), document.querySelector('.top-r')].find(visible);
     if (!target) return;
-    if (calm() || !from || !from.isConnected) { bump(target); return; }
-    const a = center(from);
-    const b = center(target);
-    const dx = b.x - a.x;
-    const dy = b.y - a.y;
-    const dist = Math.hypot(dx, dy);
-    const dur = Math.round(Math.min(1700, Math.max(950, 650 + dist * 0.8)));
-    const flip = dx < 0 ? -1 : 1;
-    // Arc : le point de contrôle est au-dessus du milieu du trajet, pour que l'agent « monte » vers la barre du haut
-    const c = { x: (a.x + b.x) / 2, y: Math.min(a.y, b.y) - Math.min(150, 40 + dist * 0.25) };
-    const at = (t) => ({
-      x: (1 - t) ** 2 * a.x + 2 * (1 - t) * t * c.x + t ** 2 * b.x,
-      y: (1 - t) ** 2 * a.y + 2 * (1 - t) * t * c.y + t ** 2 * b.y,
-    });
+    if (calm() || !from || !from.isConnected) { bump(document.querySelector('#jobs .jobs-btn') || target); return; }
+    const fr = from.getBoundingClientRect();
+    const tr = target.getBoundingClientRect();
+    const end = { x: tr.left + tr.width / 2 < fr.left + fr.width / 2 ? tr.right : tr.left, y: tr.top + tr.height / 2 }; // bord de la cible tourné vers le bouton
+    const goesUp = end.y < fr.top + fr.height / 2;
+    const a0 = { x: fr.left + fr.width / 2, y: goesUp ? fr.top : fr.bottom };
+    const sy = end.y < a0.y ? -1 : 1;
+    const sx = end.x < a0.x ? -1 : 1;
+    const lv = Math.abs(end.y - a0.y); // trait vertical : du bouton jusqu'à la hauteur de la cible
+    const lh = Math.abs(end.x - a0.x); // trait horizontal : jusqu'à la cible
+    const total = lv + lh;
+    if (total < 8) { bump(target); return; }
+    const dur = Math.round(Math.min(3600, Math.max(1800, 900 + total * 2.2)));
+
+    const svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('class', 'fx-trail');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.setAttribute('width', String(innerWidth));
+    svg.setAttribute('height', String(innerHeight));
+    const path = document.createElementNS(NS, 'path');
+    path.setAttribute('class', 'fx-dash');
+    const dotA = document.createElementNS(NS, 'circle');
+    dotA.setAttribute('class', 'fx-dot');
+    dotA.setAttribute('r', '5');
+    dotA.setAttribute('cx', String(a0.x));
+    dotA.setAttribute('cy', String(a0.y));
+    const dotB = document.createElementNS(NS, 'circle');
+    dotB.setAttribute('class', 'fx-dot');
+    dotB.setAttribute('r', '5');
+    dotB.setAttribute('cx', String(end.x));
+    dotB.setAttribute('cy', String(end.y));
+    dotB.style.opacity = '0';
+    svg.append(path, dotA, dotB);
     const node = document.createElement('div');
     node.className = 'fx-agent';
     node.setAttribute('aria-hidden', 'true');
     node.innerHTML = AGENT;
-    document.body.append(node);
-    const place = (p, s, extra = '') => `translate(${(p.x - W / 2).toFixed(1)}px, ${(p.y - H / 2).toFixed(1)}px) scaleX(${flip}) scale(${s})${extra}`;
+    document.body.append(svg, node);
 
     // Marche : la roue tourne, les jambes alternent, le personnage rebondit
-    const cycle = { duration: 380, iterations: Infinity };
-    const wheel = node.querySelector('.fx-wheel').animate([{ transform: 'rotate(0)' }, { transform: 'rotate(360deg)' }], { duration: 520, iterations: Infinity });
-    const legA = node.querySelector('.fx-leg-a').animate([{ transform: 'rotate(-24deg)' }, { transform: 'rotate(24deg)' }], { ...cycle, direction: 'alternate', easing: 'ease-in-out' });
-    const legB = node.querySelector('.fx-leg-b').animate([{ transform: 'rotate(24deg)' }, { transform: 'rotate(-24deg)' }], { ...cycle, direction: 'alternate', easing: 'ease-in-out' });
-    const hop = node.querySelector('.fx-guy').animate([{ transform: 'translateY(0)' }, { transform: 'translateY(-3px)' }], { ...cycle, direction: 'alternate', easing: 'ease-in-out' });
-    node.querySelector('.fx-sparkle').animate([{ transform: 'rotate(-10deg)' }, { transform: 'rotate(10deg)' }], { duration: 760, iterations: Infinity, direction: 'alternate', easing: 'ease-in-out' });
+    const cycle = { duration: 520, iterations: Infinity };
+    const loops = [
+      node.querySelector('.fx-wheel').animate([{ transform: 'rotate(0)' }, { transform: 'rotate(360deg)' }], { duration: 520, iterations: Infinity }),
+      node.querySelector('.fx-leg-a').animate([{ transform: 'rotate(-24deg)' }, { transform: 'rotate(24deg)' }], { ...cycle, direction: 'alternate', easing: 'ease-in-out' }),
+      node.querySelector('.fx-leg-b').animate([{ transform: 'rotate(24deg)' }, { transform: 'rotate(-24deg)' }], { ...cycle, direction: 'alternate', easing: 'ease-in-out' }),
+      node.querySelector('.fx-guy').animate([{ transform: 'translateY(0)' }, { transform: 'translateY(-3px)' }], { ...cycle, direction: 'alternate', easing: 'ease-in-out' }),
+      node.querySelector('.fx-sparkle').animate([{ transform: 'rotate(-10deg)' }, { transform: 'rotate(10deg)' }], { duration: 760, iterations: Infinity, direction: 'alternate', easing: 'ease-in-out' }),
+    ];
 
-    const steps = 30;
-    const frames = [];
-    for (let i = 0; i <= steps; i++) {
-      const t = i / steps;
-      const s = t < 0.08 ? 0.5 + (t / 0.08) * 0.5 : t > 0.9 ? 1 - ((t - 0.9) / 0.1) * 0.55 : 1; // apparition au départ, rétrécit en arrivant
-      frames.push({ transform: place(at(ease(t)), s), opacity: t < 0.05 ? t / 0.05 : t > 0.93 ? 1 - (t - 0.93) / 0.07 : 1, offset: t });
-    }
-    await wait(node.animate(frames, { duration: dur, fill: 'forwards' }));
-    bump(target);
-    for (const x of [wheel, legA, legB, hop]) x.cancel();
+    // Une seule horloge pour le trait et l'agent : le trait s'allonge exactement jusqu'où l'agent est arrivé
+    await new Promise((resolve) => {
+      const t0 = performance.now();
+      const frame = (now) => {
+        const t = Math.min(1, (now - t0) / dur);
+        const d = ease(t) * total;
+        const x = d <= lv ? a0.x : a0.x + sx * (d - lv);
+        const y = d <= lv ? a0.y + sy * d : end.y;
+        path.setAttribute('d', d <= lv ? `M${a0.x} ${a0.y} V${y}` : `M${a0.x} ${a0.y} V${end.y} H${x}`);
+        const p = (d % HOP) / HOP; // un saut tous les HOP pixels parcourus : l'agent sautille, d'un rythme tranquille
+        const hop = -HOP_H * 4 * p * (1 - p);
+        const scale = t < 0.06 ? 0.5 + (t / 0.06) * 0.5 : t > 0.92 ? 1 - ((t - 0.92) / 0.08) * 0.6 : 1; // apparaît au départ, rétrécit en arrivant
+        node.style.transform = `translate(${(x - W / 2).toFixed(1)}px, ${(y - H / 2 + hop).toFixed(1)}px) scaleX(${d > lv ? sx : 1}) scale(${scale.toFixed(3)})`;
+        node.style.opacity = String(t > 0.95 ? (1 - t) / 0.05 : 1);
+        if (t < 1) requestAnimationFrame(frame); else resolve();
+      };
+      requestAnimationFrame(frame);
+    });
+    dotB.style.opacity = '1';
+    for (const l of loops) l.cancel();
     node.remove();
+    bump(target);
+    // Les traits restent un instant, puis s'effacent
+    await wait(svg.animate([{ opacity: 1 }, { opacity: 1, offset: 0.45 }, { opacity: 0 }], { duration: 900, fill: 'forwards' }));
+    svg.remove();
   }
 
   window.AiFx = { press, launch, bump };

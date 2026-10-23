@@ -12,8 +12,19 @@ const SUGGESTIONS = [
   'Comment relancer sans être insistant ?',
 ];
 
+const mo = (n) => (n >= 1048576 ? `${(n / 1048576).toFixed(1).replace('.', ',')} Mo` : `${Math.max(1, Math.round(n / 1024))} Ko`);
+const ICON = { pdf: 'file', text: 'file', video: 'film', project: 'folder', image: 'file' };
+
+/** Une pièce jointe dans le fil : aperçu pour une image ou une vidéo, pastille pour le reste. public/chat.js construit les mêmes éléments. */
+export const attachmentHtml = (a) => {
+  if (a.kind === 'image') return `<a class="att att-img" href="/api/chat/files/${a.id}" target="_blank" rel="noopener" data-noajax><img src="/api/chat/files/${a.id}" alt="${esc(a.name)}" loading="lazy"></a>`;
+  if (a.kind === 'video') return `<video class="att att-video" controls preload="metadata" src="/api/chat/files/${a.id}" aria-label="${esc(a.name)}"></video>`;
+  if (a.kind === 'project') return `<span class="att att-chip att-project">${ic('folder')}<span>${esc(a.name)}</span></span>`;
+  return `<a class="att att-chip" href="/api/chat/files/${a.id}" target="_blank" rel="noopener" data-noajax>${ic(ICON[a.kind] || 'file')}<span>${esc(a.name)}</span><small>${mo(a.size)}</small></a>`;
+};
+
 const bubble = (m) => (m.role === 'user'
-  ? `<article class="msg user" data-id="${m.id}"><div class="bubble">${esc(m.content)}</div></article>`
+  ? `<article class="msg user" data-id="${m.id}">${m.attachments?.length ? `<div class="atts">${m.attachments.map(attachmentHtml).join('')}</div>` : ''}<div class="bubble">${esc(m.content)}</div></article>`
   : `<article class="msg bot" data-id="${m.id}"><div class="bubble md">${m.html}</div>
       <div class="msg-actions"><button type="button" class="link small" data-chat-copy data-md="${esc(m.content)}">${ic('copy')}Copier</button></div></article>`);
 
@@ -25,12 +36,12 @@ function modelSelect(model) {
   </select>${ic('down')}</span>`;
 }
 
-export function chatPage({ email, conversations, current, messages, model, max }) {
+export function chatPage({ email, conversations, current, messages, model, max, project = null, limits = { files: 6, maxMb: {} } }) {
   const list = conversations.map((c) => `<li class="${current?.id === c.id ? 'on' : ''}" data-conv="${c.id}">
       <a href="/chat/${c.id}"${current?.id === c.id ? ' aria-current="page"' : ''}>${esc(c.title)}</a>
       <button type="button" class="chat-del" data-chat-del="${c.id}" aria-label="Supprimer la conversation « ${esc(c.title)} »">${ic('trash')}</button>
     </li>`).join('');
-  const body = `<div class="chat" id="chat" data-conv="${current ? current.id : ''}" data-max="${max}">
+  const body = `<div class="chat" id="chat" data-conv="${current ? current.id : ''}" data-max="${max}" data-files="${limits.files}" data-mb="${esc(JSON.stringify(limits.maxMb))}"${project ? ` data-project="${project.id}" data-project-name="${esc(project.name)}"` : ''}>
   <aside class="chat-side" aria-label="Conversations">
     <a class="btn primary chat-new" href="/chat">${ic('plus')}Nouvelle conversation</a>
     <ul class="chat-list" data-chat-list>${list}</ul>
@@ -51,12 +62,21 @@ export function chatPage({ email, conversations, current, messages, model, max }
     </div>
     <p class="chat-err" role="alert" data-chat-error hidden></p>
     <form class="chat-form" data-chat-form>
-      <label class="sr-only" for="chat-input">Ton message</label>
-      <textarea id="chat-input" name="message" rows="1" maxlength="${max}" placeholder="Écris à Claude…  (Entrée pour envoyer, Maj+Entrée pour un retour à la ligne)" data-chat-input></textarea>
-      <button class="btn primary" data-chat-send>${ic('send')}<span>Envoyer</span></button>
-      <button type="button" class="btn" data-chat-stop hidden>${ic('stop')}<span>Arrêter</span></button>
+      <div class="chat-tray" data-chat-tray hidden></div>
+      <div class="chat-row">
+        <input type="file" data-chat-file multiple hidden accept="image/png,image/jpeg,image/gif,image/webp,application/pdf,video/mp4,video/quicktime,video/webm,.txt,.md,.csv,.json,.log,.xml,.yml,.yaml,.html,.css,.js,.ts,.php,.py,.sql">
+        <button type="button" class="btn icon-btn" data-chat-attach aria-label="Joindre une photo, une vidéo ou un fichier" title="Joindre une photo, une vidéo ou un fichier">${ic('clip')}</button>
+        <details class="chat-proj" data-chat-projmenu>
+          <summary class="btn icon-btn" aria-label="Joindre un projet AiTools" title="Joindre un projet AiTools">${ic('folder')}</summary>
+          <div class="chat-projlist" data-chat-projlist role="menu" aria-label="Projets AiTools"><p class="muted small">Chargement…</p></div>
+        </details>
+        <label class="sr-only" for="chat-input">Ton message</label>
+        <textarea id="chat-input" name="message" rows="1" maxlength="${max}" placeholder="Écris à Claude…  (Entrée pour envoyer, Maj+Entrée pour un retour à la ligne)" data-chat-input></textarea>
+        <button class="btn primary" data-chat-send>${ic('send')}<span>Envoyer</span></button>
+        <button type="button" class="btn" data-chat-stop hidden>${ic('stop')}<span>Arrêter</span></button>
+      </div>
     </form>
-    <p class="chat-note muted small">Claude n'a accès à aucune donnée d'AiTools (projets, prospects, mails) ni à Internet : il ne voit que cette conversation. Il peut se tromper, vérifie avant d'envoyer.</p>
+    <p class="chat-note muted small">Claude ne voit que cette conversation, et ce que tu joins : un projet AiTools (son code, en lecture seule), des photos, des PDF, des fichiers texte ou des vidéos (quelques images en sont tirées, sans le son). Il peut se tromper, vérifie avant d'envoyer.</p>
   </section>
 </div>`;
   return layout({ title: 'IA', email, body, scripts: ['/static/chat.js'] });

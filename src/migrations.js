@@ -802,4 +802,41 @@ export const MIGRATIONS = [
       ) ${T}`,
     ],
   },
+  {
+    // Page IA : pièces jointes (images, PDF, fichiers texte, vidéos) et projets joints. Les fichiers sont sur le disque (dossier de l'utilisateur,
+    // supprimé avec son compte) ; `file` est le nom du fichier, jamais un chemin. Un projet supprimé laisse la ligne (project_id passe à NULL).
+    name: 'chat_attachments',
+    sqlite: [
+      `CREATE TABLE chat_attachments (
+        id INTEGER PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        conversation_id INTEGER REFERENCES chat_conversations(id) ON DELETE CASCADE,
+        message_id INTEGER REFERENCES chat_messages(id) ON DELETE CASCADE,
+        kind TEXT NOT NULL, name TEXT NOT NULL, mime TEXT, size INTEGER NOT NULL DEFAULT 0,
+        file TEXT, project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL, meta TEXT,
+        created_at INTEGER NOT NULL
+      )`,
+      'CREATE INDEX chat_attachments_user ON chat_attachments(user_id, created_at)',
+      'CREATE INDEX chat_attachments_message ON chat_attachments(message_id)',
+      'CREATE INDEX chat_attachments_conv ON chat_attachments(conversation_id)',
+    ],
+    mysql: [
+      `CREATE TABLE IF NOT EXISTS chat_attachments (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        user_id BIGINT NOT NULL,
+        conversation_id BIGINT NULL,
+        message_id BIGINT NULL,
+        kind VARCHAR(12) NOT NULL, name VARCHAR(255) NOT NULL, mime VARCHAR(100) NULL, size BIGINT NOT NULL DEFAULT 0,
+        file VARCHAR(100) NULL, project_id BIGINT NULL, meta TEXT NULL,
+        created_at BIGINT NOT NULL,
+        KEY chat_attachments_user (user_id, created_at),
+        KEY chat_attachments_message (message_id),
+        KEY chat_attachments_conv (conversation_id),
+        CONSTRAINT chat_attachments_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        CONSTRAINT chat_attachments_conv_fk FOREIGN KEY (conversation_id) REFERENCES chat_conversations(id) ON DELETE CASCADE,
+        CONSTRAINT chat_attachments_msg_fk FOREIGN KEY (message_id) REFERENCES chat_messages(id) ON DELETE CASCADE,
+        CONSTRAINT chat_attachments_project_fk FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL
+      ) ${T}`,
+    ],
+  },
 ];

@@ -11,7 +11,7 @@ import { followupCandidates, followupSubject, isBusinessHours } from './services
 import { EMAIL_RE, createTransport, buildProspectMail, allowedToSend, makeMessageId } from './services/mailer.js';
 import { unsubToken } from './crypto.js';
 import { resolveCredentials } from './claudelink.js';
-import { userRepoRoot } from './users.js';
+import { userRepoRoot, userChatRoot } from './users.js';
 import { quotaAlerts } from './services/budget.js';
 import { notify } from './services/notify.js';
 import { quotaFor, recordUsage, planLimitMessage } from './services/plans.js';
@@ -94,7 +94,10 @@ export function makeClaude(app) {
     const r = await runClaude({
       bin: cfg.claudeBin, ...o,
       sandbox: cfg.sandbox, secretEnv: cred.secretEnv,
-      allowedRoot: userRepoRoot(cfg, userId),
+      // Les clones lus sont ceux du propriétaire du projet (page IA : projet d'équipe joint, accès vérifié par l'appelant) ;
+      // les pièces jointes lues en plus sont toujours dans le dossier de CET utilisateur.
+      allowedRoot: o.allowedRoot ?? userRepoRoot(cfg, o.repoOwnerId ?? userId),
+      extraRoot: userChatRoot(cfg, userId),
     });
     if (!r.ok) console.warn(claudeDiagnostic({ userId, cred, cfg, cwd: o.cwd, r }));
     // État du quota d'abonnement (session 5h + semaine), affiché dans la barre système. Une clé API n'en a pas.
@@ -114,14 +117,19 @@ export function makeClaude(app) {
   };
 }
 
+/** Clone ou met à jour le dépôt d'un projet avec le jeton git de SON propriétaire (jamais celui d'un autre). */
+export function makeSync(app) {
+  return async (userId, url, dir) => {
+    const cred = await gitCredentialFor(app, userId, url); // le token de SON hôte seulement, jamais celui d'un autre
+    return (app.syncRepo || syncRepo)(url, dir, cred?.token ?? null, { pin: await pinGit(app, userId, url), scheme: cred?.scheme, user: cred?.user });
+  };
+}
+
 export function makeHandlers(app) {
   const { db, cfg } = app;
   const claude = makeClaude(app);
   // Dépôts Git (GitHub ou serveur perso) : l'hôte est revérifié à chaque synchronisation, git se connecte à l'adresse vérifiée
-  const sync = async (userId, url, dir) => {
-    const cred = await gitCredentialFor(app, userId, url); // le token de SON hôte seulement, jamais celui d'un autre
-    return (app.syncRepo || syncRepo)(url, dir, cred?.token ?? null, { pin: await pinGit(app, userId, url), scheme: cred?.scheme, user: cred?.user });
-  };
+  const sync = makeSync(app);
   // Consignes modifiées par l'utilisateur (Réglages) : celles du compte qui lance le job
   const custom = async (userId) => parseCustomPrompts(await getSetting(db, userId, 'prompts_json'));
   // Modèles choisis dans les Réglages (liste de services/models.js ; toute autre valeur retombe sur Haiku)
