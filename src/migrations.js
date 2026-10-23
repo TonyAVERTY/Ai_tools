@@ -656,6 +656,32 @@ export const MIGRATIONS = [
     ],
   },
   {
+    // Agenda : lien iCal secret par compte ; posts LinkedIn programmés (publiés par le planificateur à l'heure choisie).
+    name: 'calendar',
+    sqlite: [
+      `CREATE TABLE ical_feeds (
+        user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+        token_hash TEXT NOT NULL UNIQUE,
+        token_enc TEXT NOT NULL,     -- le lien d'un agenda doit pouvoir être réaffiché : chiffré, jamais en clair
+        created_at INTEGER NOT NULL
+      )`,
+      'ALTER TABLE linkedin_posts ADD COLUMN scheduled_at INTEGER',
+      'ALTER TABLE linkedin_posts ADD COLUMN schedule_error TEXT',
+    ],
+    mysql: [
+      `CREATE TABLE IF NOT EXISTS ical_feeds (
+        user_id BIGINT NOT NULL PRIMARY KEY,
+        token_hash VARCHAR(64) NOT NULL,
+        token_enc TEXT NOT NULL,
+        created_at BIGINT NOT NULL,
+        UNIQUE KEY ical_feeds_hash (token_hash),
+        CONSTRAINT ical_feeds_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      ) ${T}`,
+      { sql: 'ALTER TABLE linkedin_posts ADD COLUMN scheduled_at BIGINT NULL', when: colMissing('linkedin_posts', 'scheduled_at') },
+      { sql: 'ALTER TABLE linkedin_posts ADD COLUMN schedule_error VARCHAR(500) NULL', when: colMissing('linkedin_posts', 'schedule_error') },
+    ],
+  },
+  {
     // Jetons d'API (mode développeur) : seul le SHA-256 du jeton est gardé, jamais le jeton lui-même.
     name: 'api_tokens',
     sqlite: [

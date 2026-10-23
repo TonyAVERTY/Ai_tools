@@ -1,5 +1,6 @@
 import { esc } from './http.js';
 import { STATUSES } from './services/crm.js';
+import { icalBox } from './icalview.js';
 import { assetUrl, brandMark, iconLinks } from './assets.js';
 import { SPRITE, ic } from './icons.js';
 import { GIT_SERVER_TYPES, MAX_GIT_SERVERS } from './gitservers.js';
@@ -18,7 +19,7 @@ function acc(key, icon, title, sub, body, { open = false, cls = '' } = {}) {
 </details>`;
 }
 
-const NAV = [['/', 'folder', 'Projets'], ['/mails', 'mail', 'Mails'], ['/team', 'users', 'Équipe']];
+const NAV = [['/', 'folder', 'Projets'], ['/mails', 'mail', 'Mails'], ['/calendar', 'clock', 'Calendrier'], ['/team', 'users', 'Équipe']];
 
 export function layout({ title, body, email }) {
   return `<!doctype html>
@@ -114,7 +115,7 @@ function linkSection(link, consent) {
 </section>`;
 }
 
-export function accountPage({ user, error, link = null, consent = null, notice = null, usage = null, developer = false }) {
+export function accountPage({ user, error, link = null, consent = null, notice = null, usage = null, developer = false, ical = null }) {
   return layout({
     title: 'Mon compte', email: user.email,
     body: `<div class="narrow">
@@ -129,6 +130,10 @@ export function accountPage({ user, error, link = null, consent = null, notice =
 ${notice ? `<p class="${notice.ok ? 'msg msg-ok' : 'msg msg-err'}" role="status">${esc(notice.text)}</p>` : ''}
 ${usagePanel(usage)}
 ${linkSection(link, consent)}
+<section class="card">
+  <div class="card-h"><h2>Agenda</h2><p>Connecte ton agenda (Google, Apple, Outlook) : tes prochaines actions et tes posts LinkedIn programmés s'y affichent. <a href="/calendar">Voir le calendrier</a></p></div>
+  ${icalBox(ical, '/account')}
+</section>
 <section class="card">
   <div class="card-h"><h2>Mode développeur</h2><p>L'API d'AiTools et le serveur MCP (relier Claude à ton panel) ne sont disponibles que si tu actives ce mode.</p></div>
   <div class="row"><span class="badge ${developer ? 'ok' : ''}">${developer ? 'Activé' : 'Désactivé'}</span><a class="btn small" href="/developer">${ic('key')}${developer ? 'Jetons et documentation' : 'Activer'}</a></div>

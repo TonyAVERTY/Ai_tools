@@ -8,7 +8,7 @@ import { assertCanRunAi } from './claudelink.js';
 import { budgetState } from './services/budget.js';
 import {
   linkedinAvailable, linkedinAccount, disconnectLinkedin, startLinkedin, finishLinkedin, listPosts, editDraft, publishPost, NOT_CONFIGURED, MAX_POST,
-  listLinkedinPages, setLinkedinTarget,
+  listLinkedinPages, setLinkedinTarget, schedulePost, unschedulePost,
 } from './linkedin.js';
 
 export function registerLinkedinRoutes(router, app, { project, aiOpts }) {
@@ -86,6 +86,23 @@ export function registerLinkedinRoutes(router, app, { project, aiOpts }) {
     if (b.confirm !== true && b.confirm !== 'on') throw new HttpError(400, 'Confirmation requise : le post sera public sur LinkedIn', { expose: true });
     if (b.body !== undefined) await editDraft(db, p.id, b.postId, b.body); // le texte affiché est celui qui part
     json(ctx.res, { ok: true, ...(await publishPost(app, p.id, b.postId)) });
+  }, LIMIT);
+
+  // Programmer la publication : le post part tout seul à l'heure choisie (réservé aux administrateurs, comme « Publier »)
+  router.post('/api/projects/:id/linkedin/schedule', async (ctx) => {
+    const p = await project(ctx, { need: 'admin' });
+    const b = await readBody(ctx.req);
+    if (b.confirm !== true && b.confirm !== 'on') throw new HttpError(400, 'Confirmation requise : le post sera publié automatiquement et sera public sur LinkedIn', { expose: true });
+    if (!(await linkedinAccount(db, p.id))) throw new HttpError(400, "Connecte LinkedIn à ce projet d'abord", { expose: true });
+    if (b.body !== undefined) await editDraft(db, p.id, b.postId, b.body); // le texte affiché est celui qui partira
+    json(ctx.res, { ok: true, at: await schedulePost(db, p.id, b.postId, b.at) });
+  }, LIMIT);
+
+  router.post('/api/projects/:id/linkedin/unschedule', async (ctx) => {
+    const p = await project(ctx, { need: 'admin' });
+    const b = await readBody(ctx.req);
+    await unschedulePost(db, p.id, b.postId);
+    json(ctx.res, { ok: true });
   }, LIMIT);
 
   router.post('/api/projects/:id/linkedin/disconnect', async (ctx) => {

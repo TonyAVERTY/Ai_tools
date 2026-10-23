@@ -820,19 +820,28 @@
         <label>De quoi doit parler le post ? <span class="muted small">(facultatif)</span>
           <textarea name="direction" rows="3" maxlength="500" data-li-direction placeholder="Ex. : le lancement de la nouvelle offre, un retour d'expérience, un conseil pour mes clients… Laisse vide : Claude choisit le sujet.">${esc(direction)}</textarea></label>
         <button type="button" class="btn primary" data-li-generate="${id}">${draft ? 'Régénérer un autre post' : 'Générer un post'}</button></div>`;
-    const draftHtml = draft ? `<div class="li-draft"><label>Brouillon (modifiable)
-        <textarea rows="11" maxlength="${s.maxLength}" data-li-body="${draft.id}">${esc(draft.body)}</textarea></label>
+    const liWhen = (ts) => new Date(ts * 1000).toLocaleString('fr-FR', { dateStyle: 'full', timeStyle: 'short', timeZone: 'Europe/Paris' });
+    const scheduled = draft?.status === 'scheduled';
+    const publishBtn = s.canManage && !acc.expired
+      ? `<button type="button" class="btn${scheduled ? '' : ' primary'}" data-li-publish="${id}" data-where="${esc(where || 'LinkedIn')}"${where ? '' : ' disabled'}>${scheduled ? 'Publier maintenant' : `Publier sur ${esc(acc.target ? acc.target.name : 'LinkedIn')}`}</button>` : '<span class="muted small">Un administrateur du projet publie.</span>';
+    const scheduleBox = !draft || scheduled || !s.canManage || acc.expired ? '' : `<div class="li-schedule"><label>Programmer la publication
+          <input type="datetime-local" data-li-when></label>
+        <button type="button" class="btn" data-li-schedule="${id}"${where ? '' : ' disabled'}>Programmer</button></div>`;
+    const draftHtml = draft ? `<div class="li-draft"><label>${scheduled ? 'Post programmé (annule la programmation pour le modifier)' : 'Brouillon (modifiable)'}
+        <textarea rows="11" maxlength="${s.maxLength}" data-li-body="${draft.id}"${scheduled ? ' readonly' : ''}>${esc(draft.body)}</textarea></label>
         <p class="muted small"><span data-li-count>${draft.body.length}</span> / ${s.maxLength} caractères${draft.direction ? ` · direction : « ${esc(draft.direction)} »` : ' · sujet choisi par Claude'}</p>
-        <div class="row-actions"><button type="button" class="btn" data-li-save="${id}">Enregistrer</button>
+        ${scheduled ? `<p class="ok small">Programmé : ${esc(liWhen(draft.scheduledAt))} (heure de Paris). Il part tout seul, dans les 15 minutes qui suivent l'heure choisie.</p>` : ''}
+        ${draft.scheduleError ? `<p class="error small">La dernière publication programmée a échoué : ${esc(draft.scheduleError)}</p>` : ''}
+        <div class="row-actions">${scheduled ? `<button type="button" class="btn" data-li-unschedule="${id}">Annuler la programmation</button>` : `<button type="button" class="btn" data-li-save="${id}">Enregistrer</button>`}
           <button type="button" class="btn" data-li-copy>Copier</button>
-          ${s.canManage && !acc.expired ? `<button type="button" class="btn primary" data-li-publish="${id}" data-where="${esc(where || 'LinkedIn')}"${where ? '' : ' disabled'}>Publier sur ${esc(acc.target ? acc.target.name : 'LinkedIn')}</button>` : '<span class="muted small">Un administrateur du projet publie.</span>'}</div></div>` : '';
+          ${publishBtn}</div>${scheduleBox}</div>` : '';
     const history = posts.filter((x) => x !== draft && x.status === 'published');
     const hist = history.length ? `<details class="li-history"><summary>Posts publiés (${history.length})</summary>${history.map((x) => `<article class="card"><p class="muted small">Publié le ${esc(liDay(x.publishedAt))}${x.publishedOn ? ` sur ${esc(x.publishedOn)}` : ''}</p><p class="li-text">${esc(x.body)}</p></article>`).join('')}</details>` : '';
     box.innerHTML = `${head}${targetHtml}${gen}${draftHtml}${hist}`;
   }
 
   document.addEventListener('click', async (e) => {
-    const t = e.target.closest('[data-li-generate],[data-li-save],[data-li-copy],[data-li-publish],[data-li-disconnect],[data-li-pages],[data-li-target-save],[data-li-pages-refresh]');
+    const t = e.target.closest('[data-li-generate],[data-li-save],[data-li-copy],[data-li-publish],[data-li-schedule],[data-li-unschedule],[data-li-disconnect],[data-li-pages],[data-li-target-save],[data-li-pages-refresh]');
     if (!t) return;
     const proj = t.closest('.project');
     const id = proj?.dataset.id;
@@ -849,6 +858,20 @@
       } else if (t.matches('[data-li-copy]')) {
         await navigator.clipboard.writeText(body().value);
         toast('Post copié');
+      } else if (t.matches('[data-li-schedule]')) {
+        const when = $('[data-li-when]', proj).value;
+        if (!when) { toast('Choisis la date et l\'heure de publication', 'error'); return; }
+        const at = Math.floor(new Date(when).getTime() / 1000); // l'heure saisie est celle de ton navigateur
+        if (!confirm(`Programmer la publication le ${new Date(at * 1000).toLocaleString('fr-FR', { dateStyle: 'full', timeStyle: 'short' })} ?\nLe post sera publié automatiquement et sera visible publiquement par tout le monde.`)) return;
+        t.disabled = true;
+        await api(`/api/projects/${id}/linkedin/schedule`, { postId: Number(body().dataset.liBody), body: body().value, at, confirm: true });
+        toast('Publication programmée');
+        loadLinkedin(proj);
+      } else if (t.matches('[data-li-unschedule]')) {
+        t.disabled = true;
+        await api(`/api/projects/${id}/linkedin/unschedule`, { postId: Number(body().dataset.liBody) });
+        toast('Programmation annulée');
+        loadLinkedin(proj);
       } else if (t.matches('[data-li-publish]')) {
         if (!confirm(`Publier ce post sur ${t.dataset.where || 'LinkedIn'} ? Il sera visible publiquement par tout le monde.`)) return;
         t.disabled = true;
