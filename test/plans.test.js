@@ -25,6 +25,7 @@ async function world() {
   const app = { resolveHost: async () => [{ address: '93.184.216.34', family: 4 }],
     db, cfg: { dataDir: '/tmp/x', appUrl: 'https://ai.test', secretKey: TEST_SECRET_KEY, sandbox: { enabled: false } },
     createTransport: () => ({ verify: async () => true, sendMail: async (m) => { sent.push(m); }, close() {} }),
+    resolveMx: async () => [{ exchange: 'mx.test', priority: 10 }], // pas de DNS réel
   };
   return { db, app, sent };
 }

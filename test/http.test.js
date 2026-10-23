@@ -9,7 +9,7 @@ import { testDb } from './helpers/db.js';
 import { createApp } from '../src/server.js';
 import { unsubToken, hashSid } from '../src/crypto.js';
 import { addUser, TEST_SECRET_KEY } from './helpers/users.js';
-import { PUBLIC_DNS } from './helpers/server.js';
+import { PUBLIC_DNS, FAKE_MX } from './helpers/server.js';
 
 const APP_URL = 'https://ai.tony-averty.dev';
 let app, base, cookie, tmp, uid;
@@ -20,7 +20,7 @@ before(async () => {
     appUrl: APP_URL, google: { clientId: 'cid', clientSecret: 'cs' }, apple: null, adminEmails: ['me@gmail.com'],
     secretKey: TEST_SECRET_KEY, dataDir: tmp, claudeBin: 'claude', sandbox: { enabled: false, production: false },
   };
-  app = await createApp(cfg, { db: await testDb(), worker: false, resolveHost: PUBLIC_DNS }); // DNS injecté : le test ne dépend pas du réseau
+  app = await createApp(cfg, { db: await testDb(), worker: false, resolveHost: PUBLIC_DNS, resolveMx: FAKE_MX }); // DNS injecté : le test ne dépend pas du réseau
   await new Promise((r) => app.server.listen(0, '127.0.0.1', r));
   base = `http://127.0.0.1:${app.server.address().port}`;
   uid = await addUser(app.db, { email: 'me@gmail.com' });

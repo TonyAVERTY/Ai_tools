@@ -17,6 +17,7 @@ import { quotaFor, recordUsage, planLimitMessage } from './services/plans.js';
 import { getUser } from './users.js';
 import { pinSmtp, pinGit } from './netguard.js';
 import { sendPause, pauseMessage, evaluateSending } from './services/abuse.js';
+import { verifyAddress, defaultMx } from './services/verify.js';
 import { evolutionMail } from './services/mailhtml.js';
 import { gitCredentialFor } from './gitservers.js';
 import { getProject, repoDir, sentSince, getTemplate, saveTemplate, pickVariant } from './projects.js';
@@ -165,10 +166,14 @@ export function makeHandlers(app) {
     const markBounced = db.prepare("UPDATE prospects SET status = 'bounced' WHERE id = ?");
     const original = db.prepare("SELECT subject, message_id FROM mail_log WHERE prospect_id = ? AND kind = 'initial' AND error IS NULL ORDER BY id LIMIT 1");
     const current = db.prepare('SELECT status, followup_at FROM prospects WHERE id = ?');
-    let sent = 0, failed = 0;
+    const markInvalid = db.prepare("UPDATE prospects SET status = 'invalid' WHERE id = ? AND status = 'new'");
+    const mxCache = new Map();
+    let sent = 0, failed = 0, invalid = 0;
     await ctx.progress({ sent, failed, total: n, message: `0/${n} ${kind === 'followup' ? 'relances envoyées' : 'envoyés'}`, pct: 0 });
 
-    for (const p of candidates.slice(0, n)) {
+    // Les adresses refusées par la vérification ne comptent pas dans le lot : on continue dans la liste jusqu'à `n` envois tentés
+    for (const p of candidates) {
+      if (sent + failed >= n) break;
       if (await ctx.cancelled()) break;
       if (kind === 'followup' && !inHours()) break; // le reste repartira au prochain créneau
       // Re-vérifie juste avant l'envoi : désinscription, réponse arrivée pendant le batch…
@@ -176,6 +181,16 @@ export function makeHandlers(app) {
       if (kind === 'followup') {
         const c = await current.get(p.id);
         if (c.status !== 'sent' || c.followup_at) continue;
+      }
+      if (kind === 'initial') {
+        // Adresse mal formée, jetable ou sans serveur de réception : on ne l'essaie pas (un rejet abîme la réputation d'envoi)
+        const v = await verifyAddress(p.email, { resolveMx: app.resolveMx || defaultMx, cache: mxCache });
+        if (!v.ok) {
+          await markInvalid.run(p.id);
+          await log.run(project.id, p.id, p.email, now(), `Adresse non envoyée : ${v.reason}`, kind, null, null, null);
+          invalid++;
+          continue;
+        }
       }
       const unsubUrl = `${cfg.appUrl}/u/${encodeURIComponent(p.email)}/${unsubToken(cfg.secretKey, p.email)}`;
       let variant = null, subject, inReplyTo;
@@ -209,7 +224,7 @@ export function makeHandlers(app) {
     }
     transport.close();
     await evaluateSending(app, userId); // trop de rejets : le compte passe en pause d'envoi
-    return { sent, failed, total: n };
+    return { sent, failed, total: n, ...(invalid ? { invalid } : {}) };
   }
 
   return {

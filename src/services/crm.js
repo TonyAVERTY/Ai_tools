@@ -3,7 +3,7 @@ import { now } from '../db.js';
 import { parisTime, parisParts } from './paris-time.js';
 
 export const STATUSES = {
-  new: 'À contacter', sent: 'Contacté', replied: 'A répondu', client: 'Client', refused: 'Refus', bounced: 'Rejeté',
+  new: 'À contacter', sent: 'Contacté', replied: 'A répondu', client: 'Client', refused: 'Refus', bounced: 'Rejeté', invalid: 'Adresse invalide',
 };
 
 const SORTS = {

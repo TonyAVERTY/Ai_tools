@@ -27,7 +27,7 @@ async function setup() {
   execFileSync('git', ['-C', src, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'readme']);
   const db = await testDb();
   const sentMails = [];
-  const app = { resolveHost: async () => [{ address: '93.184.216.34', family: 4 }],
+  const app = { resolveHost: async () => [{ address: '93.184.216.34', family: 4 }], resolveMx: async () => [{ exchange: 'mx.test', priority: 10 }],
     db,
     cfg: { dataDir: tmp, claudeBin: resolve('test/fixtures/fake-claude.js'), sandbox: { enabled: false, production: false }, secretKey: TEST_SECRET_KEY, appUrl: 'https://ai.test',
       systemSmtp: { host: 'smtp.serveur', port: 587, user: 'srv', pass: 'p', fromEmail: 'aitools@serveur.test' } }, // mails d'AiTools (évolutions…)

@@ -4,6 +4,11 @@
   const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
+  // Montée en charge : un conseil (jamais un blocage) pendant la première semaine d'envois d'un projet
+  const warmupLine = (w) => (w?.active ? ` · conseil : ${w.perDay / 2} à ${w.perDay} par jour cette première semaine` : '');
+  const warmupNotice = (w, count) => (!w?.active || (w.sentToday || 0) + count <= w.perDay ? null
+    : `Conseil : ${w.perDay / 2} à ${w.perDay} mails par jour pendant la première semaine protègent la réputation de ton adresse d'envoi (encore ${w.daysLeft} jour${w.daysLeft > 1 ? 's' : ''}). Tu peux quand même envoyer plus.`);
+
   async function api(path, body) {
     const r = await fetch(path, body === undefined ? { headers: { Accept: 'application/json' } } : {
       method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(body),
@@ -474,10 +479,11 @@
     if (!s.sendMax) blockers.push(s.stats.new ? 'plafond du jour atteint' : 'aucun prospect à contacter');
     $('button', sendForm).disabled = blockers.length > 0;
     sendForm.count.max = s.sendMax || 1;
+    sendForm.dataset.warmup = JSON.stringify(s.warmup || {});
     if (Number(sendForm.count.value) > s.sendMax && s.sendMax) sendForm.count.value = s.sendMax;
     $('[data-send-info]', sendForm).textContent = blockers.length
       ? `Bloqué : ${blockers.join(', ')}`
-      : `${s.stats.new} prospect(s) en attente · max ${s.sendMax} maintenant`;
+      : `${s.stats.new} prospect(s) en attente · max ${s.sendMax} maintenant${warmupLine(s.warmup)}`;
     $('[data-count]', el).textContent = `(${s.stats.total || 0})`;
 
     // Boîte de réception + test A/B
@@ -997,7 +1003,8 @@
         }
         case 'send': {
           const n = Number(data.count);
-          if (!confirm(`Envoyer ${n} mail(s) de prospection maintenant ?\nIls partiront espacés de quelques dizaines de secondes.`)) break;
+          const advice = warmupNotice(JSON.parse(form.dataset.warmup || '{}'), n);
+          if (!confirm(`Envoyer ${n} mail(s) de prospection maintenant ?\nIls partiront espacés de quelques dizaines de secondes.${advice ? `\n\n${advice}` : ''}`)) break;
           await api(`/api/projects/${id}/send`, { count: n, confirm: true });
           toast('Envoi lancé');
           break;
@@ -1204,7 +1211,7 @@
   }
 
   // ---------- Liste des prospects (mini CRM) ----------
-  const STATUS = { new: 'À contacter', sent: 'Contacté', replied: 'A répondu', client: 'Client', refused: 'Refus', bounced: 'Rejeté' };
+  const STATUS = { new: 'À contacter', sent: 'Contacté', replied: 'A répondu', client: 'Client', refused: 'Refus', bounced: 'Rejeté', invalid: 'Adresse invalide' };
   // Seuls les liens http(s) sont cliquables : un "javascript:" venu d'une page web scrapée ne doit jamais s'exécuter ici
   const safeUrl = (u) => (/^https?:\/\//i.test(String(u || '')) ? String(u) : '');
   const fmtDate = (ts) => new Date(ts * 1000).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' });
@@ -1363,6 +1370,69 @@
     try { await api(`/api/prospects/${sel.dataset.prospect}/status`, { status: sel.value }); sel.className = `st-${sel.value}`; toast('Statut mis à jour'); }
     catch (err) { toast(err.message, 'error'); }
   });
+
+  // ---------- Réponses des prospects : popup d'arrivée, page « Mails » ----------
+  // La popup ne s'affiche que pour les réponses non lues ; tout le texte vient de la base et passe par textContent.
+  const popHost = (() => {
+    let host = $('.reply-pops');
+    if (!host) { host = document.createElement('div'); host.className = 'reply-pops'; host.setAttribute('aria-live', 'polite'); document.body.append(host); }
+    return host;
+  })();
+  const shownReplies = new Set();
+  const copyText = async (text, btn) => {
+    try { await navigator.clipboard.writeText(text); toast('Réponse copiée'); } catch { const ta = $('textarea', btn.closest('details')); ta?.select(); toast('Sélectionnée : copie-la avec Ctrl+C', 'error'); }
+  };
+  const markSeen = async (id) => { try { await api(`/api/replies/${id}/seen`, {}); } catch { /* sera réessayé au prochain passage */ } };
+  function replyPopup(r) {
+    const el = document.createElement('details');
+    el.className = 'reply-pop';
+    const sum = document.createElement('summary');
+    const who = document.createElement('strong'); who.textContent = r.from;
+    sum.append(who, ' vous a apporté une réponse');
+    const badge = document.createElement('span'); badge.className = 'badge'; badge.textContent = r.intentLabel; sum.append(' ', badge);
+    const close = document.createElement('button'); close.type = 'button'; close.className = 'reply-x'; close.setAttribute('aria-label', 'Fermer'); close.textContent = '×';
+    close.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); markSeen(r.id); el.remove(); });
+    sum.append(close);
+    const body = document.createElement('div'); body.className = 'reply-body';
+    const sub = document.createElement('p'); sub.className = 'muted small'; sub.textContent = `${r.project}${r.subject ? ` · ${r.subject}` : ''}`;
+    const txt = document.createElement('p'); txt.className = 'reply-text'; txt.textContent = r.text || '(texte non disponible)';
+    const lbl = document.createElement('p'); lbl.className = 'lbl'; lbl.textContent = 'Voici une réponse toute rédigée :';
+    const ta = document.createElement('textarea'); ta.readOnly = true; ta.rows = 8; ta.value = r.draft;
+    const acts = document.createElement('div'); acts.className = 'row-actions';
+    const copy = document.createElement('button'); copy.type = 'button'; copy.className = 'btn small'; copy.textContent = 'Copier la réponse';
+    copy.addEventListener('click', () => copyText(ta.value, copy));
+    const read = document.createElement('button'); read.type = 'button'; read.className = 'btn small'; read.textContent = 'Marquer comme lu';
+    read.addEventListener('click', () => { markSeen(r.id); el.remove(); });
+    const all = document.createElement('a'); all.className = 'btn small'; all.href = '/mails?v=replies'; all.textContent = 'Toutes les réponses';
+    acts.append(copy, read, all);
+    body.append(sub, txt, lbl, ta, acts);
+    el.append(sum, body);
+    popHost.append(el);
+  }
+  function paintUnseen(n) {
+    for (const a of $$('.pill[href="/mails"]')) {
+      let b = $('.pill-n', a);
+      if (!n) { b?.remove(); continue; }
+      if (!b) { b = document.createElement('span'); b.className = 'pill-n'; a.append(b); }
+      b.textContent = n > 9 ? '9+' : String(n);
+    }
+  }
+  async function pollReplies() {
+    if (document.hidden || !$('.top')) return;
+    try {
+      const d = await api('/api/replies?unseen=1&limit=5');
+      paintUnseen(d.unseen);
+      for (const r of d.replies) if (!shownReplies.has(r.id)) { shownReplies.add(r.id); replyPopup(r); }
+    } catch { /* hors ligne ou session expirée : la prochaine requête le dira */ }
+  }
+  if ($('.top')) { pollReplies(); setInterval(pollReplies, 45_000); document.addEventListener('visibilitychange', () => { if (!document.hidden) pollReplies(); }); }
+  document.addEventListener('click', async (e) => {
+    const c = e.target.closest('[data-copy-draft]');
+    if (c) { copyText($('[data-draft]', c.closest('.reply-body')).value, c); return; }
+    const s = e.target.closest('[data-reply-seen]');
+    if (s) { await markSeen(s.dataset.replySeen); s.closest('.reply-row')?.classList.remove('unseen'); s.remove(); pollReplies(); }
+  });
+  document.addEventListener('change', (e) => { if (e.target.matches('[data-autosubmit]')) e.target.form.submit(); });
 
   // ---------- Fond : constellation de particules qui fuient la souris ----------
   // Canvas 2D, ~90 points max : léger. Coupé quand l'onglet est caché, figé si l'OS demande moins d'animations.
