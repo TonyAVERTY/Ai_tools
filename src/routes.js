@@ -1,3 +1,4 @@
+import { projectChecklist } from './checklist.js';
 import { now, getSetting, setSetting } from './db.js';
 import { encrypt, encryptJson, decryptJson, verifyUnsubToken } from './crypto.js';
 import { html, json, redirect, readBody, HttpError } from './http.js';
@@ -342,6 +343,9 @@ export function registerRoutes(router, app) {
     json(ctx.res, { ok: true });
   });
 
+  // Mise en route : ce qui est configuré et ce qui reste à faire (aussi inclus dans /status pour le rafraîchissement)
+  router.get('/api/projects/:id/checklist', async (ctx) => json(ctx.res, await projectChecklist(app, await project(ctx))));
+
   router.get('/api/projects/:id/status', async (ctx) => {
     const { res } = ctx;
     const p = await project(ctx);
@@ -362,7 +366,7 @@ export function registerRoutes(router, app) {
       jobs, templates, stats, sendMax,
       followup: { enabled: p.followupEnabled, days: p.followupDays, ...(await followupPlan(db, p)) },
       targetValidated: p.targetValidated, hasProfile: !!p.profile, hasSmtp: p.hasSmtp, smtpSource: p.smtpSource, access: p.access,
-      hasImap: p.hasImap, inbox: p.inbox, ab: await abStats(db, p.id),
+      hasImap: p.hasImap, inbox: p.inbox, ab: await abStats(db, p.id), checklist: await projectChecklist(app, p),
     });
   });
 

@@ -39,6 +39,15 @@ Le site (`ai.tony-averty.dev`) est servi par la même application, dans `src/sit
 - **Ajouter une page** : une fonction dans `pages.js` qui appelle `siteLayout`, une route dans `src/site/routes.js`, et son chemin dans `INDEXABLE_PATHS` (`src/site/seo.js`) si elle doit être référencée.
 - **Essayer en local** : `APP_URL=http://localhost:3199 PORT=3199 SECRET_KEY=<64 hexa> GOOGLE_CLIENT_ID=x GOOGLE_CLIENT_SECRET=y DB_DRIVER=sqlite SANDBOX=off node src/server.js` (base SQLite en mémoire, perdue à l'arrêt).
 
+## Liste de mise en route
+
+Sur le tableau de bord, dès qu'un projet existe, une liste en bas à gauche guide la configuration : analyser le projet, valider la cible, chercher des prospects, SMTP, modèle de mail, premier envoi, puis le facultatif (boîte IMAP, relance automatique, idées d'évolution, compte LinkedIn relié, premier post publié).
+
+- **Calculée à chaque lecture** à partir de l'état réel du projet (`src/checklist.js`, route `GET /api/projects/:id/checklist`, aussi incluse dans `/status`). Rien n'est stocké : elle ne peut pas se désynchroniser, et une étape défaite (jeton LinkedIn expiré, par exemple) redevient à faire.
+- **Chaque ligne ouvre la bonne section** du projet et y fait défiler la page. Les sections terminées reçoivent une coche, et le projet une pastille « config 5/11 ».
+- **Selon les droits et la configuration** : un membre d'équipe ne voit pas le SMTP ni l'IMAP (il ne peut pas les régler), et les étapes LinkedIn disparaissent si `LINKEDIN_CLIENT_ID` n'est pas défini.
+- **Côté navigateur** (localStorage) : la liste peut être réduite, ou masquée pour un projet (la pastille la rappelle). Réduite par défaut sous 1700 px de large, pour ne pas recouvrir le contenu. Elle disparaît toute seule quand tout est fait.
+
 ## Suivi des réponses, relances et test A/B
 
 - **Détection des réponses** : la boîte de réception du projet est lue en IMAP toutes les 15 minutes, et à la demande avec « Vérifier maintenant ».
