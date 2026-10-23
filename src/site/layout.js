@@ -3,6 +3,9 @@
 // servis par l'application ; un seul script, site.js, pour les petits plus (période des tarifs, sommaire légal).
 import { esc } from '../http.js';
 import { assetUrl, brandMark, iconLinks } from '../assets.js';
+import { SPRITE, ic } from '../icons.js';
+
+export { ic };
 
 export const SITE_NAME = 'AiTools';
 const OG_IMAGE = '/static/img/share_img.jpg'; // 1024 x 541, aperçu des liens partagés
@@ -12,39 +15,6 @@ const NAV = [
   ['/fonctionnement', 'Fonctionnement'],
   ['/tarifs', 'Tarifs'],
 ];
-
-// Icônes du design (tracé au trait, 24 x 24). Une seule fois par page, appelées par <use>.
-const SYMBOLS = {
-  mail: '<rect x="3" y="5" width="18" height="14" rx="3"></rect><path d="m4 8 8 6 8-6"></path>',
-  reply: '<path d="M9 14 4 9l5-5"></path><path d="M4 9h10a6 6 0 0 1 6 6v3"></path>',
-  check: '<path d="m5 12.5 4.5 4.5L19 7.5"></path>',
-  clock: '<circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path>',
-  pen: '<path d="M4 20l1-4L16.5 4.5a2.1 2.1 0 0 1 3 3L8 19z"></path>',
-  eye: '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"></path><circle cx="12" cy="12" r="3"></circle>',
-  arrow: '<path d="M5 12h14M13 6l6 6-6 6"></path>',
-  down: '<path d="M12 5v14M6 13l6 6 6-6"></path>',
-  shield: '<path d="M12 3 4.5 6v6c0 4.5 3.2 7.6 7.5 9 4.3-1.4 7.5-4.5 7.5-9V6z"></path><path d="m9 12 2.2 2.2L15 10"></path>',
-  lock: '<rect x="5" y="11" width="14" height="9" rx="3"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path>',
-  box: '<rect x="4" y="4" width="16" height="16" rx="4"></rect><path d="M9 4v16M4 12h5"></path>',
-  user: '<circle cx="12" cy="8" r="4"></circle><path d="M4.5 20a7.5 7.5 0 0 1 15 0"></path>',
-  link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"></path><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"></path>',
-  git: '<circle cx="6" cy="5" r="2.2"></circle><circle cx="6" cy="19" r="2.2"></circle><circle cx="18" cy="8" r="2.2"></circle><path d="M6 7.2v9.6M18 10.2c0 4-6 3-12 6"></path>',
-  target: '<circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="4.5"></circle><path d="M12 12v.01"></path>',
-  send: '<path d="M21 3 10 14"></path><path d="m21 3-7 18-4-7-7-4z"></path>',
-  info: '<circle cx="12" cy="12" r="9"></circle><path d="M12 11v5M12 8v.01"></path>',
-  chev: '<path d="m6 9 6 6 6-6"></path>',
-  back: '<path d="M19 12H5M11 6l-6 6 6 6"></path>',
-};
-const SPRITE = `<svg class="defs" aria-hidden="true" focusable="false" viewBox="0 0 64 64">
-<defs>
-<linearGradient id="g-hero" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="800" y2="0"><stop offset="0" stop-color="#1288b7"></stop><stop offset="1" stop-color="#0db8c5"></stop></linearGradient>
-<linearGradient id="g-nf" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="160" y2="0"><stop offset="0" stop-color="#1288b7"></stop><stop offset="1" stop-color="#0db8c5"></stop></linearGradient>
-</defs>
-${Object.entries(SYMBOLS).map(([k, d]) => `<symbol id="i-${k}" viewBox="0 0 24 24">${d}</symbol>`).join('\n')}
-</svg>`;
-
-/** Icône du sprite : `ic('check')`. Décorative (le mot est toujours écrit à côté). */
-export const ic = (name) => `<svg class="ic" aria-hidden="true" viewBox="0 0 24 24"><use href="#i-${name}"></use></svg>`;
 
 const lockup = (label = true) => `<a class="lockup" href="/"${label ? ` aria-label="${SITE_NAME}, accueil"` : ''}>${brandMark()}<span class="wordmark">${SITE_NAME}</span></a>`;
 

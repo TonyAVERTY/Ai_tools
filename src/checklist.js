@@ -9,7 +9,7 @@ import { latestJobs } from './services/jobs.js';
  * l'outil (trouver des clients par mail) marche sans. `needsConfig` : réservé à ceux qui peuvent régler le projet.
  */
 const STEPS = [
-  { key: 'analyze', label: 'Analyser le projet', hint: 'Claude lit ton code et écrit la fiche du projet.', sel: '.profile', done: (f) => f.hasProfile },
+  { key: 'analyze', label: 'Analyser le projet', hint: 'Claude lit ton code et écrit la fiche du projet.', acc: 'header', sel: '.profile', done: (f) => f.hasProfile },
   { key: 'target', label: 'Valider la cible', hint: 'Qui veux-tu contacter ? Claude propose, tu ajustes.', acc: 'target', sel: '.profile', done: (f) => f.targetValidated },
   { key: 'prospects', label: 'Chercher des prospects', hint: 'Claude trouve des entreprises qui collent à ta cible.', acc: 'search', done: (f) => f.prospects > 0 },
   { key: 'smtp', label: "Configurer l'envoi des mails (SMTP)", hint: 'Sans SMTP, aucun mail ne peut partir.', acc: 'config', needsConfig: true, done: (f) => f.hasSmtp },
