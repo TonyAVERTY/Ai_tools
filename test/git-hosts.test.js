@@ -127,7 +127,9 @@ test('réglages : token GitHub enregistré chiffré, jamais réaffiché, rempla�
   let html = await page();
   assert.ok(!html.includes('SECRET123'), 'jamais réaffiché');
   assert.match(html, /placeholder="•••••• \(inchangé\)"/);
-  assert.match(html, /name="github_token_clear"/);
+  assert.match(html, /name="github_token_clear" value="" data-trash-input/);
+  assert.match(html, /class="trash txt" data-trash/, 'corbeille rouge, pas de case à cocher');
+  assert.doesNotMatch(html, /type="checkbox"[^>]*(_clear|_del)/);
 
   // enregistrer sans toucher au champ garde le token
   await save({});

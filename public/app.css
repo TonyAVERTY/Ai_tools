@@ -573,3 +573,13 @@ input.copy { font-family: var(--mono); font-size: .8125rem; }
   .bar > span { transition: width .7s var(--ease); }
   .pulse { animation: ring-pulse 1.6s ease-in-out infinite; box-shadow: none; }
 }
+
+/* ---------- Corbeille rouge (suppression marquée, effective à l'enregistrement) ---------- */
+.trash-wrap { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.trash { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-width: 44px; min-height: 44px; padding: 0; border: 1px solid var(--err); border-radius: var(--radius); background: transparent; color: var(--err); font: inherit; font-weight: 600; font-size: .9375rem; cursor: pointer; transition: background var(--t-fast) var(--ease), color var(--t-fast) var(--ease); }
+.trash.txt { padding: 0 14px; }
+.trash:hover { background: var(--err-bg); }
+.trash[aria-pressed="true"] { background: var(--err); color: var(--on-err); }
+.trash-note { font-size: .8125rem; font-weight: 600; color: var(--err); }
+.gitrow.to-delete > *:not(.gitrow-head) { opacity: .45; }
+.gitrow.to-delete { border-color: var(--err); }

@@ -285,7 +285,7 @@ function configForms(p, smtp, dbCfg, imap) {
   <button class="btn">Enregistrer BDD</button>
 </form>
 ${p.access === 'owner' ? `<form data-action="delete" data-id="${p.id}" data-confirm="Supprimer ${esc(p.name)} et tous ses prospects ?" class="cfg">
-  <button class="btn danger">Supprimer le projet</button>
+  <button class="btn danger">${ic('trash')}Supprimer le projet</button>
 </form>` : ''}`;
 }
 
@@ -442,16 +442,22 @@ function gitRow(i, srv, { fresh = false } = {}) {
   return `<div class="gitrow" data-git-row>
       <input type="hidden" name="git_type_${i}" value="${esc(srv.type)}">
       <input type="hidden" name="git_id_${i}" value="${esc(srv.id)}">
-      <div class="gitrow-head"><span class="srv-n">${ic('git')}<span class="badge">${esc(srv.label)}</span></span>${fresh ? ' <button type="button" class="linklike" data-git-cancel>Annuler</button>' : ''}</div>
+      <div class="gitrow-head"><span class="srv-n">${ic('git')}<span class="badge">${esc(srv.label)}</span></span>${fresh ? ' <button type="button" class="linklike" data-git-cancel>Annuler</button>' : trash(`git_del_${i}`, 'Retirer ce serveur')}</div>
       <div class="grid2">
         <label class="field"><span class="lbl">URL du serveur</span><input name="git_host_${i}" value="${esc(srv.host)}" placeholder="https://git.mon-serveur.fr" autocomplete="off" spellcheck="false"></label>
         <label class="field"><span class="lbl">Token (lecture repo)</span><input name="git_token_${i}" type="password" placeholder="${srv.hasToken ? '•••••• (inchangé)' : ''}" autocomplete="new-password"></label>
       </div>
       <p class="hint" data-git-hint>${esc(hint)}</p>
-      ${fresh ? '' : `${srv.hasToken ? check(`git_token_clear_${i}`, false, 'Supprimer le token enregistré', { value: '1' }) : ''}
-      ${check(`git_del_${i}`, false, 'Retirer ce serveur', { value: '1' })}`}
+      ${!fresh && srv.hasToken ? `<div class="row"><span class="hint">Un token est enregistré.</span>${trash(`git_token_clear_${i}`, 'Supprimer le token enregistré', { text: 'Supprimer le token' })}</div>` : ''}
     </div>`;
 }
+
+/**
+ * Corbeille rouge à la place d'une case « supprimer » : un clic marque l'élément « à retirer » (public/app.js), un second l'annule ;
+ * la suppression n'a lieu qu'à l'enregistrement du formulaire. L'état voyage dans un champ caché (vide = rien à supprimer).
+ * `text` : libellé affiché à côté de l'icône (sinon icône seule, nom accessible compris dans `label`).
+ */
+const trash = (name, label, { text = '' } = {}) => `<span class="trash-wrap"><input type="hidden" name="${name}" value="" data-trash-input><button type="button" class="trash${text ? ' txt' : ''}" data-trash aria-pressed="false" aria-label="${esc(label)}" title="${esc(label)}">${ic('trash')}${text ? `<span>${esc(text)}</span>` : ''}</button><span class="trash-note" hidden>Sera retiré à l'enregistrement</span></span>`;
 
 /** Case à cocher du design : le <input> natif reste là (clavier, lecteurs d'écran), la case dessinée suit son état. */
 const check = (name, checked, text, { value = '' } = {}) => `<label class="opt"><input type="checkbox" name="${name}"${value ? ` value="${value}"` : ''}${checked ? ' checked' : ''}><span class="box">${ic('check')}</span><span>${text}</span></label>`;
@@ -462,12 +468,11 @@ function hookRow(i, h, all, { fresh = false } = {}) {
   return `<div class="gitrow" data-discord-row>
       <input type="hidden" name="discord_id_${i}" value="${esc(h.id)}">
       <div class="gitrow-head"><span class="srv-n">${ic('send')}<span class="badge" data-discord-title>Webhook${n ? ` ${n}` : ''}</span></span>
-        ${fresh ? ' <button type="button" class="linklike" data-discord-cancel>Annuler</button>' : `<button type="button" class="btn" data-notify-test data-hook="${esc(h.id)}">Envoyer un test</button>`}</div>
+        ${fresh ? ' <button type="button" class="linklike" data-discord-cancel>Annuler</button>' : `<span class="row"><button type="button" class="btn" data-notify-test data-hook="${esc(h.id)}">Envoyer un test</button>${trash(`discord_del_${i}`, 'Retirer ce webhook')}</span>`}</div>
       <label class="field"><span class="lbl">URL du webhook</span><input name="discord_url_${i}" type="password" placeholder="${fresh ? 'https://discord.com/api/webhooks/…' : '•••••• (inchangé)'}" autocomplete="off"><span class="hint">Stocké chiffré.</span></label>
       <fieldset class="evs"><legend class="lbl">Ce webhook reçoit</legend>
         <div class="checks">${Object.entries(all).map(([k, label]) => check(`discord_ev_${i}_${k}`, h.events.includes(k), esc(label))).join('')}</div>
       </fieldset>
-      ${fresh ? '' : check(`discord_del_${i}`, false, 'Retirer ce webhook', { value: '1' })}
     </div>`;
 }
 
@@ -515,7 +520,7 @@ ${saved ? `<p class="ok-box" role="status">${ic('check')}<span><b>Réglages enre
       </div>
       <div class="gittest" data-github-result role="status" aria-live="polite" hidden></div>
       <p class="hint">Inutile pour un dépôt public. Crée un <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer">token à portée limitée</a> : <em>Only select repositories</em> (tes dépôts) et la permission <em>Contents : Read-only</em>, rien d'autre.</p>
-      ${s.github_token_set ? check('github_token_clear', false, 'Supprimer le token GitHub enregistré', { value: '1' }) : ''}
+      ${s.github_token_set ? `<div class="row"><span class="hint">Un token est enregistré.</span>${trash('github_token_clear', 'Supprimer le token GitHub enregistré', { text: 'Supprimer le token' })}</div>` : ''}
     </div>
     ${s.git_servers.map((srv, i) => gitRow(i, srv)).join('\n    ')}
   </div>
