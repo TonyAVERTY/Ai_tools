@@ -183,7 +183,7 @@ test('réglages : GitHub et son token d\'abord, puis le « + » avec le choix du
   const tpl = html.match(/<template id="git-row-tpl">([\s\S]*?)<\/template>/)[1];
   assert.match(tpl, /name="git_host___I__"/);
   assert.match(tpl, /name="git_token___I__" type="password"/);
-  assert.doesNotMatch(html.replace(/<template[\s\S]*?<\/template>/, ''), /git_host_/, 'aucune ligne tant qu\'on n\'a rien ajouté');
+  assert.doesNotMatch(html.replace(/<template[\s\S]*?<\/template>/g, ''), /git_host_/, 'aucune ligne tant qu\'on n\'a rien ajouté');
 });
 
 test('réglages : on ajoute plusieurs serveurs de types différents, chacun avec son URL et son token', async () => {

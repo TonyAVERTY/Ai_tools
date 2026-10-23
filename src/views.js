@@ -497,36 +497,40 @@ function hookRow(i, h, all, { fresh = false } = {}) {
   const n = typeof i === 'number' ? i + 1 : '';
   return `<div class="gitrow" data-discord-row>
       <input type="hidden" name="discord_id_${i}" value="${esc(h.id)}">
-      <div class="gitrow-head"><span class="srv-n">${ic('send')}<span class="badge" data-discord-title>Webhook${n ? ` ${n}` : ''}</span></span>
+      <div class="gitrow-head"><span class="srv-n">${ic('send')}<span class="badge" data-discord-title>Discord${n ? ` ${n}` : ''}</span></span>
         ${fresh ? ' <button type="button" class="linklike" data-discord-cancel>Annuler</button>' : `<span class="row"><button type="button" class="btn" data-notify-test data-hook="${esc(h.id)}">Envoyer un test</button>${trash(`discord_del_${i}`, 'Retirer ce webhook')}</span>`}</div>
-      <label class="field"><span class="lbl">URL du webhook</span><input name="discord_url_${i}" type="password" placeholder="${fresh ? 'https://discord.com/api/webhooks/…' : '•••••• (inchangé)'}" autocomplete="off"><span class="hint">Stocké chiffré.</span></label>
-      <fieldset class="evs"><legend class="lbl">Ce webhook reçoit</legend>
-        <div class="checks">${Object.entries(all).map(([k, label]) => check(`discord_ev_${i}_${k}`, h.events.includes(k), esc(label))).join('')}</div>
+      <fieldset class="evs"><legend class="lbl">${fresh ? '1. Quelles notifications veux-tu y recevoir ?' : 'Ce webhook reçoit'}</legend>
+        <div class="checks">${Object.entries(all).map(([k, label]) => check(`discord_ev_${i}_${k}`, fresh ? CHANNEL_DEFAULT_EVENTS.includes(k) : h.events.includes(k), esc(label))).join('')}</div>
       </fieldset>
+      <label class="field"><span class="lbl">${fresh ? '2. ' : ''}Lien du webhook Discord</span><input name="discord_url_${i}" type="password" placeholder="${fresh ? 'https://discord.com/api/webhooks/…' : '•••••• (inchangé)'}" autocomplete="off"><span class="hint">Discord : salon › Modifier › Intégrations › Webhooks › Nouveau webhook › Copier l'URL. Stocké chiffré.</span></label>
     </div>`;
 }
 
-/** Carte d'un canal (Slack, Telegram, e-mail) : champs propres au canal, événements reçus, test, retrait. */
+// Notifications cochées d'office pour un nouveau canal : celles qu'on ne veut pas rater
+const CHANNEL_DEFAULT_EVENTS = ['reply', 'job_error', 'abuse'];
+
+/** Carte d'un canal (Slack, Telegram, e-mail) : notifications reçues, puis champs propres au canal. Masquée tant que le canal n'est pas ajouté avec « + ». */
 function channelCard(type, label, s, fields) {
   const c = s.channels[type];
-  return `<div class="gitrow" data-channel="${type}">
+  return `<div class="gitrow" data-channel="${type}"${c ? '' : ' hidden'}>
       <div class="gitrow-head"><span class="srv-n">${ic('send')}<span class="badge">${label}</span></span>
-        ${c ? `<span class="row"><button type="button" class="btn" data-notify-test data-channel="${type}">Envoyer un test</button>${trash(`${type}_del`, `Retirer ${label}`)}</span>` : ''}</div>
-      ${fields}
-      <fieldset class="evs"><legend class="lbl">${label} reçoit</legend>
-        <div class="checks">${Object.entries(s.discord.all).map(([k, l]) => check(`${type}_ev_${k}`, c ? c.events.includes(k) : ['reply', 'job_error', 'abuse'].includes(k), esc(l))).join('')}</div>
+        ${c ? `<span class="row"><button type="button" class="btn" data-notify-test data-channel="${type}">Envoyer un test</button>${trash(`${type}_del`, `Retirer ${label}`)}</span>` : '<button type="button" class="linklike" data-chan-cancel>Annuler</button>'}</div>
+      <fieldset class="evs"><legend class="lbl">${c ? `${label} reçoit` : '1. Quelles notifications veux-tu y recevoir ?'}</legend>
+        <div class="checks">${Object.entries(s.discord.all).map(([k, l]) => check(`${type}_ev_${k}`, c ? c.events.includes(k) : CHANNEL_DEFAULT_EVENTS.includes(k), esc(l))).join('')}</div>
       </fieldset>
+      ${fields}
     </div>`;
 }
 
-/** Événements que plus aucun webhook ne reçoit : de quoi penser à en ajouter un. */
-function uncovered(d) {
-  if (!d.hooks.length) return '';
-  const missing = Object.entries(d.all).filter(([k]) => !d.hooks.some((h) => h.events.includes(k))).map(([, l]) => esc(l));
-  return missing.length ? `<p class="hint">Aucun webhook ne reçoit pour l'instant : ${missing.join(' · ')}.</p>` : '';
+/** Notifications que plus aucun canal ne reçoit : de quoi penser à en ajouter un. */
+function uncovered(d, channels = {}) {
+  const all = [...d.hooks, ...Object.values(channels)];
+  if (!all.length) return '';
+  const missing = Object.entries(d.all).filter(([k]) => !all.some((h) => h.events.includes(k))).map(([, l]) => esc(l));
+  return missing.length ? `<p class="hint">Aucun canal ne reçoit pour l'instant : ${missing.join(' · ')}.</p>` : '';
 }
 
-const SETTINGS_TOC = [['notif', 'Notifications'], ['git', 'Dépôts Git'], ['discord', 'Discord'], ['canaux', 'Slack, Telegram, e-mail'], ['garde', 'Garde-fous'], ['budget', 'Budget et modèles IA'], ['prompts', 'Prompts IA'], ['opposition', "Liste d'opposition"]];
+const SETTINGS_TOC = [['notif', 'Notifications'], ['git', 'Dépôts Git'], ['garde', 'Garde-fous'], ['budget', 'Budget et modèles IA'], ['prompts', 'Prompts IA'], ['opposition', "Liste d'opposition"]];
 
 export function settingsPage({ email, s, saved }) {
   const model = (name, v) => `<span class="sel"><select name="${name}">
@@ -545,10 +549,38 @@ ${saved ? `<p class="ok-box" role="status">${ic('check')}<span><b>Réglages enre
 <form method="post" action="/settings" class="settings-form">
 
 <section class="card" id="notif" aria-labelledby="t-notif">
-  <div class="card-h"><h2 id="t-notif">Notifications</h2><p>Où et quand AiTools te prévient. Ces mails partent de l'adresse d'AiTools (SMTP du serveur), jamais de celle d'un projet.</p></div>
-  <label class="field"><span class="lbl">Email de réception (évolutions, rapport hebdo)</span><input name="notify_email" type="email" value="${esc(s.notify_email)}" placeholder="toi@exemple.fr"></label>
-  ${check('weekly_report', s.weekly_report, 'Rapport hebdo le lundi à 8h (mail + Discord)')}
+  <div class="card-h"><h2 id="t-notif">Notifications</h2><p>Où et quand AiTools te prévient : réponses de prospects, jobs terminés ou en erreur, alertes. Les liens et jetons sont stockés chiffrés et ne sont jamais réaffichés.</p></div>
+  <label class="field"><span class="lbl">Email de réception (évolutions, rapport hebdo)</span><input name="notify_email" type="email" value="${esc(s.notify_email)}" placeholder="toi@exemple.fr"><span class="hint">Ces mails partent de l'adresse d'AiTools (SMTP du serveur), jamais de celle d'un projet.</span></label>
+  ${check('weekly_report', s.weekly_report, 'Rapport hebdo le lundi à 8h (mail + canaux ci-dessous)')}
   <div class="save"><button type="button" class="btn" data-report-send>${ic('send')}Envoyer le rapport maintenant</button></div>
+
+  <h3 class="sub">Canaux</h3>
+  <p class="hint">Reçois les notifications dans l'outil de ton choix. Ajoute un canal avec « + » : tu choisis le service, les notifications voulues, puis tu colles le lien du webhook. Plusieurs canaux Discord sont possibles pour séparer ce qui est dit ou fait (réponses d'un côté, erreurs de l'autre).</p>
+  <div class="chanlist" data-chanlist>
+    <div class="gitlist" data-discordlist data-next="${s.discord.hooks.length}" data-max="${s.discord.max}">
+      ${s.discord.hooks.map((h, i) => hookRow(i, h, s.discord.all)).join('\n      ')}
+    </div>
+    ${channelCard('slack', 'Slack', s, `<label class="field"><span class="lbl">Lien du webhook Slack</span><input name="slack_url" type="password" placeholder="${s.channels.slack ? '•••••• (inchangé)' : 'https://hooks.slack.com/services/…'}" autocomplete="off"><span class="hint">Slack : Apps → Incoming Webhooks.</span></label>`)}
+    ${channelCard('telegram', 'Telegram', s, `<label class="field"><span class="lbl">Jeton du bot</span><input name="telegram_token" type="password" placeholder="${s.channels.telegram ? '•••••• (inchangé)' : '123456789:AA…'}" autocomplete="off"><span class="hint">Crée un bot avec @BotFather.</span></label>
+      <label class="field"><span class="lbl">Identifiant de la conversation</span><input name="telegram_chat" value="${esc(s.channels.telegram?.chat || '')}" placeholder="123456789 ou @mon_canal" autocomplete="off"><span class="hint">Écris d'abord à ton bot, puis lis l'identifiant avec @userinfobot.</span></label>`)}
+    ${channelCard('email', 'E-mail', s, `<label class="field"><span class="lbl">Adresse de réception</span><input name="email_to" type="email" value="${esc(s.channels.email?.to || '')}" placeholder="toi@exemple.fr" autocomplete="off"><span class="hint">${s.canEmail ? "Envoyé depuis l'adresse d'AiTools. Au plus 20 notifications par heure." : "Le SMTP du serveur n'est pas configuré : aucun mail ne peut partir pour l'instant."}</span></label>`)}
+  </div>
+  <template id="discord-row-tpl">${hookRow('__I__', { id: '', events: [] }, s.discord.all, { fresh: true })}</template>
+  <p class="hint" data-chan-empty${s.discord.hooks.length || Object.keys(s.channels).length ? ' hidden' : ''}>Aucun canal pour l'instant.</p>
+  ${uncovered(s.discord, s.channels)}
+  <div class="gitadd">
+    <details class="addmenu" data-addmenu>
+      <summary class="btn">${ic('plus')}Ajouter un canal</summary>
+      <div class="menu" role="menu" aria-label="Service de notification">
+        <button type="button" role="menuitem" data-chan-pick="discord">${ic('send')}<span><b>Discord</b><small>Un webhook par salon</small></span></button>
+        <button type="button" role="menuitem" data-chan-pick="slack"${s.channels.slack ? ' hidden' : ''}>${ic('send')}<span><b>Slack</b><small>Webhook entrant</small></span></button>
+        <button type="button" role="menuitem" data-chan-pick="telegram"${s.channels.telegram ? ' hidden' : ''}>${ic('send')}<span><b>Telegram</b><small>Bot et conversation</small></span></button>
+        <button type="button" role="menuitem" data-chan-pick="email"${s.channels.email ? ' hidden' : ''}>${ic('mail')}<span><b>E-mail</b><small>Une adresse de réception</small></span></button>
+      </div>
+    </details>
+    <span class="hint" data-discord-max hidden>${s.discord.max} webhooks Discord au plus.</span>
+  </div>
+  <div class="save"><button class="btn primary">Enregistrer les réglages</button></div>
 </section>
 
 <section class="card" id="git" aria-labelledby="t-git">
@@ -576,28 +608,6 @@ ${saved ? `<p class="ok-box" role="status">${ic('check')}<span><b>Réglages enre
     </select>${ic('down')}</span>
     <span class="hint" data-git-max hidden>${MAX_GIT_SERVERS} serveurs au plus.</span>
   </div>
-</section>
-
-<section class="card" id="discord" aria-labelledby="t-discord">
-  <div class="card-h"><h2 id="t-discord">Discord</h2><p>Reçois les réponses et les alertes dans un salon. Salon Discord › Modifier › Intégrations › Webhooks › Nouveau webhook › Copier l'URL. Un webhook par salon : ajoute-en un autre avec « + » pour séparer ce qui est dit ou fait (réponses d'un côté, erreurs de l'autre).</p></div>
-  <div class="gitlist" data-discordlist data-next="${s.discord.hooks.length}" data-max="${s.discord.max}">
-    ${s.discord.hooks.map((h, i) => hookRow(i, h, s.discord.all)).join('\n    ')}
-  </div>
-  <template id="discord-row-tpl">${hookRow('__I__', { id: '', events: [] }, s.discord.all, { fresh: true })}</template>
-  ${uncovered(s.discord)}
-  <div class="gitadd">
-    <button type="button" class="btn" data-discord-add>${ic('plus')}${s.discord.hooks.length ? 'Ajouter un autre webhook' : 'Ajouter un webhook'}</button>
-    <span class="hint" data-discord-max hidden>${s.discord.max} webhooks au plus.</span>
-  </div>
-</section>
-
-<section class="card" id="canaux" aria-labelledby="t-canaux">
-  <div class="card-h"><h2 id="t-canaux">Slack, Telegram, e-mail</h2><p>Les mêmes notifications que Discord, sur d'autres canaux (un de chaque). Les adresses et jetons sont stockés chiffrés et ne sont jamais réaffichés.</p></div>
-  ${channelCard('slack', 'Slack', s, `<label class="field"><span class="lbl">URL du webhook entrant</span><input name="slack_url" type="password" placeholder="${s.channels.slack ? '•••••• (inchangé)' : 'https://hooks.slack.com/services/…'}" autocomplete="off"><span class="hint">Slack : Apps → Incoming Webhooks.</span></label>`)}
-  ${channelCard('telegram', 'Telegram', s, `<label class="field"><span class="lbl">Jeton du bot</span><input name="telegram_token" type="password" placeholder="${s.channels.telegram ? '•••••• (inchangé)' : '123456789:AA…'}" autocomplete="off"><span class="hint">Crée un bot avec @BotFather.</span></label>
-    <label class="field"><span class="lbl">Identifiant de la conversation</span><input name="telegram_chat" value="${esc(s.channels.telegram?.chat || '')}" placeholder="123456789 ou @mon_canal" autocomplete="off"><span class="hint">Écris d'abord à ton bot, puis lis l'identifiant avec @userinfobot.</span></label>`)}
-  ${channelCard('email', 'E-mail', s, `<label class="field"><span class="lbl">Adresse de réception</span><input name="email_to" type="email" value="${esc(s.channels.email?.to || '')}" placeholder="toi@exemple.fr" autocomplete="off"><span class="hint">${s.canEmail ? "Envoyé depuis l'adresse d'AiTools. Au plus 20 notifications par heure." : "Le SMTP du serveur n'est pas configuré : aucun mail ne peut partir pour l'instant."}</span></label>`)}
-  <div class="save"><button class="btn primary">Enregistrer les réglages</button></div>
 </section>
 
 <section class="card" id="garde" aria-labelledby="t-garde">

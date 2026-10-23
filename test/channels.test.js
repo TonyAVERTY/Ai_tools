@@ -37,7 +37,8 @@ test('enregistrement : adresses et jetons validés, chiffrés en base, jamais r�
   assert.ok(!raw.includes('hooks.slack.com') && !raw.includes(TG_TOKEN) && !raw.includes('AbC_dEf'), 'secrets chiffrés en base');
   const html = await page(u);
   assert.ok(!html.includes(SLACK) && !html.includes(TG_TOKEN), 'jamais réaffichés');
-  assert.match(html, /id="canaux"/);
+  assert.match(html, /data-chanlist/, 'une seule section Notifications, avec le menu +');
+  assert.doesNotMatch(html, /id="canaux"|id="discord"/, 'plus de sections séparées');
   assert.match(html, /value="moi@exemple\.fr"/);
   assert.match(html, /value="987654"/);
   // un enregistrement sans retaper les secrets les conserve ; les événements suivent le formulaire

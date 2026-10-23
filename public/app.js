@@ -707,32 +707,66 @@
     ta.focus();
   });
 
-  // ---------- Réglages : plusieurs webhooks Discord ----------
-  // Le « + » ajoute une ligne (adresse + événements reçus) : on sépare ainsi ce qui est dit ou fait, salon par salon.
+  // ---------- Réglages : notifications, le « + » ouvre le menu des services ----------
+  // Service → notifications voulues → lien du webhook. Discord peut avoir plusieurs lignes (un webhook par salon) ;
+  // Slack, Telegram et e-mail une seule carte chacun, déjà dans la page mais masquée jusqu'au choix.
   (() => {
+    const menu = $('[data-addmenu]');
     const list = $('[data-discordlist]');
     const tpl = $('#discord-row-tpl');
-    if (!list || !tpl) return;
-    const add = $('[data-discord-add]');
+    if (!menu || !list || !tpl) return;
     const full = $('[data-discord-max]');
+    const empty = $('[data-chan-empty]');
     let next = Number(list.dataset.next) || 0;
     const rows = () => $$('[data-discord-row]', list);
-    const renumber = () => rows().forEach((r, i) => { $('[data-discord-title]', r).textContent = `Webhook ${i + 1}`; });
-    add.addEventListener('click', () => {
-      if (rows().length >= Number(list.dataset.max)) { full.hidden = false; return; }
-      const holder = document.createElement('div');
-      holder.innerHTML = tpl.innerHTML.replaceAll('__I__', String(next++));
-      const el = holder.firstElementChild;
-      list.append(el);
-      renumber();
-      $('input[name^="discord_url_"]', el).focus();
+    const renumber = () => rows().forEach((r, i) => { $('[data-discord-title]', r).textContent = `Discord ${i + 1}`; });
+    const sync = () => {
+      const any = rows().length || $$('[data-channel]:not([hidden])').length;
+      if (empty) empty.hidden = !!any;
+      full.hidden = rows().length < Number(list.dataset.max);
+    };
+    const focusIn = (el) => { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); $('input:not([type="hidden"]):not([type="checkbox"])', el)?.focus({ preventScroll: true }); };
+
+    document.addEventListener('click', (e) => {
+      const pick = e.target.closest('[data-chan-pick]');
+      if (pick) {
+        menu.open = false;
+        const type = pick.dataset.chanPick;
+        if (type === 'discord') {
+          if (rows().length >= Number(list.dataset.max)) { full.hidden = false; return; }
+          const holder = document.createElement('div');
+          holder.innerHTML = tpl.innerHTML.replaceAll('__I__', String(next++));
+          const el = holder.firstElementChild;
+          list.append(el);
+          renumber();
+          focusIn(el);
+        } else {
+          const card = $(`[data-channel="${type}"]`);
+          card.hidden = false;
+          pick.hidden = true;
+          focusIn(card);
+        }
+        sync();
+        return;
+      }
+      if (e.target.closest('[data-discord-cancel]')) {
+        e.target.closest('[data-discord-row]').remove();
+        renumber(); sync();
+        return;
+      }
+      const cancel = e.target.closest('[data-chan-cancel]');
+      if (cancel) {
+        const card = cancel.closest('[data-channel]');
+        card.hidden = true;
+        for (const f of $$('input[type="password"], input[type="text"], input[type="email"]', card)) f.value = '';
+        $(`[data-chan-pick="${card.dataset.channel}"]`).hidden = false;
+        sync();
+        return;
+      }
+      // un clic ailleurs referme le menu
+      if (menu.open && !e.target.closest('[data-addmenu]')) menu.open = false;
     });
-    list.addEventListener('click', (e) => {
-      if (!e.target.closest('[data-discord-cancel]')) return;
-      e.target.closest('[data-discord-row]').remove();
-      full.hidden = true;
-      renumber();
-    });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && menu.open) { menu.open = false; $('summary', menu).focus(); } });
   })();
 
   // ---------- Réglages : tester le token GitHub ----------
