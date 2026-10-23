@@ -337,15 +337,16 @@ test('Mon compte : Tester — succès, refus (liaison invalidée, onboarding de 
   assert.equal(await aiRefusal(s.db, u.id), null);
 });
 
-test('Mon compte : état de la liaison, boutons Tester, Changer de mode, Délier', async () => {
+test('Mon compte : état de la liaison, limites d\'utilisation, un seul bouton (Déconnecter)', async () => {
   const u = await s.newUser({ admin: false });
   await u.post('/link/api-key', { apiKey: KEY_A });
   const page = await (await u.get('/account', { headers: { accept: 'text/html' } })).text();
   assert.match(page, /Clé API Anthropic/);
   assert.match(page, /Valide/);
-  assert.match(page, /action="\/link\/test"/);
-  assert.match(page, /href="\/link\?change=1"/);
-  assert.match(page, /action="\/link\/unlink"/);
+  assert.match(page, /Limites d'utilisation[\s\S]*pas de limite de session ni de semaine/, 'clé API : pas de quota d\'abonnement');
+  assert.doesNotMatch(page, /action="\/link\/test"|href="\/link\?change=1"|>Tester<|Changer de mode/);
+  assert.match(page, /action="\/link\/unlink"><button class="btn danger">Déconnecter<\/button>/);
+  assert.equal((page.match(/<form method="post" action="\/link\//g) || []).length, 1, 'plus que le bouton Déconnecter');
   // changer de mode : la page de liaison reste accessible et le nouvel accès remplace l'ancien
   s.app.validateToken = async () => {};
   try { assert.equal((await u.post('/link/subscription', { token: TOKEN, accept: true })).status, 200); } finally { delete s.app.validateToken; }
@@ -577,4 +578,21 @@ test('connexion guidée : un jeton refusé à la vérification n\'est jamais ran
     assert.match((await r.json()).error, /Jeton refusé/);
     assert.equal((await orow(o, u.id)).claude_link_json, null);
   } finally { await o.close(); rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('Mon compte, abonnement : session de 5 h et semaine affichées avec leur remise à zéro, 80 % en alerte', async () => {
+  const u = await s.newUser({ admin: false });
+  s.app.validateToken = async () => {};
+  try { await u.post('/link/subscription', { token: TOKEN, accept: true }); } finally { delete s.app.validateToken; }
+  const at = Math.floor(Date.now() / 1000);
+  await setSetting(s.db, u.id, 'claude_rate_limit_json', JSON.stringify({ at, source: 'jobs', fiveHour: { utilization: 0.85, resetsAt: at + 3600 }, sevenDay: { utilization: 0.2, resetsAt: at + 86400 } }));
+  s.app.fetch = async () => new Response('{}', { status: 403 }); // aucun relevé en direct : on garde la dernière mesure
+  try {
+    const page = await (await u.get('/account', { headers: { accept: 'text/html' } })).text();
+    assert.match(page, /Session de 5 h<\/span><span class="g-v">85 %/);
+    assert.match(page, /class="bar usage warn"[^>]*aria-valuenow="85"><span class="w-85">/);
+    assert.match(page, /Semaine de 7 jours<\/span><span class="g-v">20 %/);
+    assert.match(page, /Remise à zéro/);
+    assert.match(page, /Dernière mesure faite pendant un job/);
+  } finally { delete s.app.fetch; }
 });
