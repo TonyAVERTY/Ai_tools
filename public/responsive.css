@@ -40,23 +40,23 @@ td:has(> select), td:has(> .badge) { min-width: 7.5rem; }
 [data-prospects], .table-wrap, .cal, .art .tw { container: rc / inline-size; }
 @container rc (max-width: 700px) {
   /* ---- Tableaux : une carte par ligne, chaque cellule avec son titre (public/responsive.js pose data-label) ---- */
-  table.stack, table.stack tbody, table.stack tr, table.stack td { display: block; width: 100%; min-width: 0; }
-  table.stack thead { display: none; }
-  table.stack tr { margin: 0 0 10px; padding: 8px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); }
-  table.stack td { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 0; border: 0; text-align: right; }
-  table.stack td[data-label]::before { content: attr(data-label); flex: 0 0 34%; max-width: 40%; text-align: left; font-weight: 600; font-size: .8125rem; color: var(--muted); }
-  table.stack td[data-label=""]::before { display: none; }
-  table.stack td, table.flow td { white-space: normal; }
-  table.stack td, table.stack td * { overflow-wrap: anywhere; }
-  .art table.stack, .art table.flow { min-width: 0; }
-  table.stack td > .cv { flex: 1 1 0; min-width: 0; text-align: right; }
-  table.stack td > * { min-width: 0; max-width: 100%; }
-  table.stack .badge { white-space: normal; text-align: left; }
-  table.stack td select { width: auto; max-width: 62%; }
-  table.stack td form { margin: 0; }
-  table.flow, table.flow tbody { display: block; width: 100%; }
-  table.flow tr { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 8px 0; border-bottom: 1px solid var(--line); }
-  table.flow td { display: block; padding: 0; border: 0; }
+  table.rt-stack, table.rt-stack tbody, table.rt-stack tr, table.rt-stack td { display: block; width: 100%; min-width: 0; }
+  table.rt-stack thead { display: none; }
+  table.rt-stack tr { margin: 0 0 10px; padding: 8px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); }
+  table.rt-stack td { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 0; border: 0; text-align: right; }
+  table.rt-stack td[data-label]::before { content: attr(data-label); flex: 0 0 34%; max-width: 40%; text-align: left; font-weight: 600; font-size: .8125rem; color: var(--muted); }
+  table.rt-stack td[data-label=""]::before { display: none; }
+  table.rt-stack td, table.rt-flow td { white-space: normal; }
+  table.rt-stack td, table.rt-stack td * { overflow-wrap: anywhere; }
+  .art table.rt-stack, .art table.rt-flow { min-width: 0; }
+  table.rt-stack td > .cv { flex: 1 1 0; min-width: 0; text-align: right; }
+  table.rt-stack td > * { min-width: 0; max-width: 100%; }
+  table.rt-stack .badge { white-space: normal; text-align: left; }
+  table.rt-stack td select { width: auto; max-width: 62%; }
+  table.rt-stack td form { margin: 0; }
+  table.rt-flow, table.rt-flow tbody { display: block; width: 100%; }
+  table.rt-flow tr { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  table.rt-flow td { display: block; padding: 0; border: 0; }
 
   /* ---- Calendrier : une liste de jours avec leurs rendez-vous, au lieu d'une grille de 7 colonnes ---- */
   .cal { overflow: visible; }

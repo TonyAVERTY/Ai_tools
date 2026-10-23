@@ -4,7 +4,7 @@
   const mark = (table) => {
     if (table.dataset.rt) return;
     const heads = [...table.querySelectorAll('thead th')].map((th) => th.textContent.trim());
-    if (!heads.length) { table.classList.add('flow'); table.dataset.rt = '1'; return; }
+    if (!heads.length) { table.classList.add('rt-flow'); table.dataset.rt = '1'; return; }
     for (const tr of table.querySelectorAll('tbody tr')) {
       [...tr.children].forEach((td, i) => {
         if (td.tagName !== 'TD') return;
@@ -16,7 +16,7 @@
         td.append(cv);
       });
     }
-    table.classList.add('stack');
+    table.classList.add('rt-stack');
     table.dataset.rt = '1';
   };
   const scan = (root = document) => root.querySelectorAll('.table-wrap table, .art .tw table').forEach(mark);
