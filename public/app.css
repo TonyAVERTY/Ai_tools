@@ -478,3 +478,8 @@ input.copy { width: 100%; font-family: ui-monospace, SFMono-Regular, Menlo, mono
 .gitprojects li.ok, .gitprojects li.error { color: var(--text); }
 .gitprojects li.ok > span:first-child { color: var(--ok); font-weight: 700; }
 .gitprojects li.error > span:first-child { color: var(--err); font-weight: 700; }
+
+/* LinkedIn : où publier (profil ou page) */
+.li-target { display: grid; gap: 6px; margin: 8px 0; }
+.li-target p { margin: 0; }
+.li-target select { max-width: 100%; }
