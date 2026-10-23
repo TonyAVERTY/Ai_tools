@@ -378,3 +378,21 @@ test('connexion : la pastille flottante reCAPTCHA est masquée, la mention de pr
     assert.match(h, /policies\.google\.com\/terms/);
   } finally { await withCaptcha.close(); }
 });
+
+test('ruban de page sur toutes les pages du site (pas sur le dashboard), vrais logos Google et Apple, vérification discrète', async () => {
+  const apple = await startApp({ cfg: { apple: { teamId: 't', keyId: 'k', clientId: 'c', privateKey: 'p' } } });
+  try {
+    for (const p of [...PUBLIC_PAGES, '/login', '/inexistant']) {
+      const h = await (await apple.anon.get(p, { headers: { accept: 'text/html' } })).text();
+      assert.match(h, /<div class="page-ribbon" aria-hidden="true">/, `${p} : ruban`);
+    }
+    const login = await (await apple.anon.get('/login', { headers: { accept: 'text/html' } })).text();
+    assert.ok(login.includes('fill="#4285F4"') && login.includes('fill="#EA4335"') && login.includes('fill="#FBBC05"') && login.includes('fill="#34A853"'), 'logo Google : les quatre couleurs');
+    assert.match(login, /<svg class="prov"[^>]*><path fill="currentColor" d="M12\.152/, 'logo Apple');
+    assert.doesNotMatch(login, /class="brand"/, 'plus de lettre à la place du logo');
+    // dashboard : jamais de ruban
+    const u = await apple.newUser({ email: 'rib@x.fr' });
+    assert.doesNotMatch(await (await u.get('/', { headers: { accept: 'text/html' } })).text(), /page-ribbon/);
+  } finally { await apple.close(); }
+  assert.match(read('public/site.css'), /\[hidden\] \{ display: none !important; \}/, 'un bouton « hidden » (réessayer la vérification) ne s\'affiche jamais par erreur');
+});

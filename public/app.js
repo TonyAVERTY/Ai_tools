@@ -225,7 +225,8 @@
     if (mode === 'api_key') return '';
     if (!rl) return '<span class="muted" title="Le relevé en direct se fait avec ton abonnement Claude">Claude : pas encore mesuré</span>';
     if (!rl.fiveHour && !rl.sevenDay) return `<span class="muted" title="${esc(WHY[rl.error] || 'relevé indisponible')}">Claude : relevé indisponible</span>`;
-    return `${claudeBit('session 5h', rl.fiveHour, rl)} ${claudeBit('semaine', rl.sevenDay, rl)}`.trim();
+    const why = rl.error ? ` <span class="warn" title="${esc(WHY[rl.error] || 'relevé indisponible')}">· relevé en direct impossible</span>` : '';
+    return `${claudeBit('session 5h', rl.fiveHour, rl)} ${claudeBit('semaine', rl.sevenDay, rl)}${why}`.trim();
   }
 
   // ---------- Menu « jobs » : détail de ce qui tourne, avec l'avancement ----------
