@@ -511,3 +511,36 @@ export function chatPrompt({ history = [], message, custom, model = null }) {
       : message,
   };
 }
+
+const mo = (n) => (n >= 1048576 ? `${(n / 1048576).toFixed(1).replace('.', ',')} Mo` : `${Math.max(1, Math.round(n / 1024))} Ko`);
+
+/**
+ * Ce que Claude peut lire en plus pendant ce tour, ajouté à ses consignes (partie fixe : l'utilisateur ne la modifie pas) : le projet joint
+ * et les fichiers joints, avec leurs chemins. Chaîne vide quand il n'y a rien de joint (Claude n'a alors aucun outil).
+ * @param {{project?: {name: string, profile?: object}|null, files?: Array<{att: object, paths: string[]}>}} o
+ */
+export function chatContext({ project = null, files = [] } = {}) {
+  if (!project && !files.length) return '';
+  const lines = ['', '', "Accès exceptionnel pour cette conversation, en lecture seule, avec les outils Read, Glob et Grep :"];
+  if (project) {
+    const p = project.profile || {};
+    lines.push(`- Projet joint « ${project.name} » : son dépôt est dans le dossier de travail. Explore-le (Glob, Grep, Read) avant de répondre sur son code ; cite les fichiers que tu as réellement lus. Tu ne peux rien modifier.`);
+    if (p.resume) lines.push(`  Fiche du projet : ${String(p.resume).slice(0, 400)}${p.stack ? ` (stack : ${String(p.stack).slice(0, 80)})` : ''}`);
+  }
+  if (files.length) {
+    lines.push('- Fichiers joints par l\'utilisateur, à ouvrir avec Read (chemins absolus) :');
+    for (const { att, paths } of files) {
+      if (att.kind === 'video') {
+        const m = att.meta || {};
+        const step = m.duration && m.frames ? m.duration / m.frames : 0;
+        lines.push(`  · vidéo « ${att.name} » (${m.duration ?? '?'} s) : ${paths.length} images extraites à intervalles réguliers, sans le son :`);
+        paths.forEach((p, i) => lines.push(`      ${p}  (image ${i + 1}, vers ${Math.round(i * step)} s)`));
+      } else {
+        const kind = { image: 'image', pdf: 'PDF', text: 'fichier texte' }[att.kind] || 'fichier';
+        lines.push(`  · ${paths[0]} : ${kind} « ${att.name} » (${mo(att.size)})`);
+      }
+    }
+  }
+  lines.push("Rien d'autre n'est accessible. Pour une image ou une vidéo, décris ce que tu vois réellement et signale ce qui n'est pas lisible. Si une vidéo n'a que quelques images, dis-le quand cela limite ta réponse.");
+  return lines.join('\n');
+}
