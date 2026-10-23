@@ -45,7 +45,7 @@ test('import : en-têtes souples, doublons, opposition, invalides, origine RGPD'
     "Formule;f@x.fr;;'=1+1;;99;",
   ].join('\r\n');
   const r = await importProspects(db, 1, csv, { at: Date.parse('2026-10-21T10:00:00Z') / 1000 });
-  assert.deepEqual({ ...r, invalid: r.invalid.map((x) => x.line) }, { total: 7, imported: 3, duplicates: 2, blacklisted: 1, invalid: [7] });
+  assert.deepEqual({ ...r, invalid: r.invalid.map((x) => x.line) }, { total: 7, imported: 3, skipped: 3, invalid: [7] });
   const get = async (email) => db.prepare('SELECT * FROM prospects WHERE project_id = 1 AND email = ?').get(email);
   const ty = await get('contact@tybreizh.bzh');
   assert.deepEqual([ty.company, ty.website, ty.city, ty.sector, ty.score, ty.source, ty.status], ['Crêperie Ty Breizh', 'https://tybreizh.bzh', 'Quimper', 'crêperie', 8, 'annuaire CCI', 'new']);

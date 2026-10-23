@@ -73,11 +73,44 @@
     if (!newForm.hidden) $('input', newForm)?.focus();
   }));
 
-  // ---------- Menu du compte (avatar) : se ferme au clic ailleurs ou avec Échap ----------
+  // ---------- Menu du compte (avatar) : s'ouvre au survol, se ferme quand on le quitte ----------
+  // Avec une souris : survol (le clic sur l'avatar ne le referme pas). Au doigt ou au clavier : clic / Entrée, comme un menu ordinaire.
   const userMenu = $('details.user');
   if (userMenu) {
-    document.addEventListener('click', (e) => { if (userMenu.open && !userMenu.contains(e.target)) userMenu.open = false; });
-    userMenu.addEventListener('keydown', (e) => { if (e.key === 'Escape' && userMenu.open) { userMenu.open = false; $('summary', userMenu).focus(); } });
+    const hover = matchMedia('(hover: hover) and (pointer: fine)');
+    const summary = $('summary', userMenu);
+    let closeTimer;
+    const open = (v) => { clearTimeout(closeTimer); userMenu.open = v; };
+    userMenu.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse' && hover.matches) open(true); });
+    userMenu.addEventListener('pointerleave', (e) => {
+      if (e.pointerType !== 'mouse' || !hover.matches) return;
+      clearTimeout(closeTimer);
+      closeTimer = setTimeout(() => { userMenu.open = false; }, 220);
+    });
+    summary.addEventListener('click', (e) => { if (e.detail > 0 && hover.matches) e.preventDefault(); }); // clic souris : le survol l'a déjà ouvert
+    document.addEventListener('click', (e) => { if (userMenu.open && !userMenu.contains(e.target)) open(false); });
+    userMenu.addEventListener('keydown', (e) => { if (e.key === 'Escape' && userMenu.open) { open(false); summary.focus(); } });
+  }
+
+  // ---------- Réglages : le sommaire suit la lecture (la section en cours est surlignée en direct) ----------
+  const tocLinks = $$('.settings .toc a[href^="#"]');
+  if (tocLinks.length) {
+    const sections = tocLinks.map((a) => document.getElementById(a.getAttribute('href').slice(1))).filter(Boolean);
+    let queued = false;
+    const mark = (id) => tocLinks.forEach((a) => { if (a.getAttribute('href') === `#${id}`) a.setAttribute('aria-current', 'true'); else a.removeAttribute('aria-current'); });
+    const update = () => {
+      queued = false;
+      const atEnd = innerHeight + scrollY >= document.documentElement.scrollHeight - 4;
+      // La section en cours : la dernière dont le haut a passé le tiers supérieur de l'écran (la dernière, tout en bas de la page)
+      let cur = sections[0];
+      for (const sec of sections) if (sec.getBoundingClientRect().top <= innerHeight * 0.33) cur = sec;
+      mark((atEnd ? sections.at(-1) : cur).id);
+    };
+    const schedule = () => { if (!queued) { queued = true; requestAnimationFrame(update); } };
+    addEventListener('scroll', schedule, { passive: true });
+    addEventListener('resize', schedule);
+    tocLinks.forEach((a) => a.addEventListener('click', () => mark(a.getAttribute('href').slice(1))));
+    update();
   }
 
   // ---------- Liaison Claude : fenêtre d'avertissement du mode abonnement ----------
@@ -225,7 +258,8 @@
     if (mode === 'api_key') return '';
     if (!rl) return '<span class="muted" title="Le relevé en direct se fait avec ton abonnement Claude">Claude : pas encore mesuré</span>';
     if (!rl.fiveHour && !rl.sevenDay) return `<span class="muted" title="${esc(WHY[rl.error] || 'relevé indisponible')}">Claude : relevé indisponible</span>`;
-    return `${claudeBit('session 5h', rl.fiveHour, rl)} ${claudeBit('semaine', rl.sevenDay, rl)}`.trim();
+    const why = rl.error ? ` <span class="warn" title="${esc(WHY[rl.error] || 'relevé indisponible')}">· relevé en direct impossible</span>` : '';
+    return `${claudeBit('session 5h', rl.fiveHour, rl)} ${claudeBit('semaine', rl.sevenDay, rl)}${why}`.trim();
   }
 
   // ---------- Menu « jobs » : détail de ce qui tourne, avec l'avancement ----------
@@ -623,6 +657,34 @@
     });
   })();
 
+  // ---------- Réglages : plusieurs webhooks Discord ----------
+  // Le « + » ajoute une ligne (adresse + événements reçus) : on sépare ainsi ce qui est dit ou fait, salon par salon.
+  (() => {
+    const list = $('[data-discordlist]');
+    const tpl = $('#discord-row-tpl');
+    if (!list || !tpl) return;
+    const add = $('[data-discord-add]');
+    const full = $('[data-discord-max]');
+    let next = Number(list.dataset.next) || 0;
+    const rows = () => $$('[data-discord-row]', list);
+    const renumber = () => rows().forEach((r, i) => { $('[data-discord-title]', r).textContent = `Webhook ${i + 1}`; });
+    add.addEventListener('click', () => {
+      if (rows().length >= Number(list.dataset.max)) { full.hidden = false; return; }
+      const holder = document.createElement('div');
+      holder.innerHTML = tpl.innerHTML.replaceAll('__I__', String(next++));
+      const el = holder.firstElementChild;
+      list.append(el);
+      renumber();
+      $('input[name^="discord_url_"]', el).focus();
+    });
+    list.addEventListener('click', (e) => {
+      if (!e.target.closest('[data-discord-cancel]')) return;
+      e.target.closest('[data-discord-row]').remove();
+      full.hidden = true;
+      renumber();
+    });
+  })();
+
   // ---------- Réglages : tester le token GitHub ----------
   // Dit à qui appartient le token, à quels dépôts il donne accès, et lesquels de tes projets en font partie. Ne modifie rien.
   (() => {
@@ -860,8 +922,9 @@
       return;
     }
 
-    if (e.target.closest('[data-notify-test]')) {
-      try { await api('/api/notify/test', {}); toast('Notification envoyée sur Discord'); }
+    const hookTest = e.target.closest('[data-notify-test]');
+    if (hookTest) {
+      try { await api('/api/notify/test', hookTest.dataset.hook ? { hook: hookTest.dataset.hook } : {}); toast('Notification envoyée sur Discord'); }
       catch (err) { toast(err.message, 'error'); }
       return;
     }
@@ -1225,7 +1288,7 @@
     try {
       const r = await api(`/api/projects/${input.dataset.import}/prospects/import`, { csv });
       report.innerHTML = `<p class="small"><span class="ok">${r.imported} importé(s)</span> sur ${r.total} ·
-        ${r.duplicates} déjà présent(s) · ${r.blacklisted} sur liste d'opposition · ${r.invalid.length} invalide(s)</p>
+        ${r.skipped} ignoré(s) (déjà présents ou à ne pas contacter) · ${r.invalid.length} invalide(s)</p>
         ${r.invalid.length ? `<details class="small"><summary>Lignes ignorées</summary><ul>${r.invalid.map((x) => `<li>Ligne ${x.line} : ${esc(x.reason)}</li>`).join('')}</ul></details>` : ''}`;
       toast(`${r.imported} prospect(s) importé(s)`);
       loadProspects(d);

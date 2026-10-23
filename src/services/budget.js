@@ -1,6 +1,7 @@
 // Budget IA : plafonds glissants 24 h / 30 j, en équivalent $ API remonté par Claude Code.
 // Avec un abonnement Pro rien n'est facturé en plus : c'est un garde-fou pour ne pas épuiser le quota.
 import { getSetting, setSetting, now } from '../db.js';
+import { getLinkState, MODES } from '../claudelink.js';
 
 // Jobs qui appellent Claude (les envois et relances n'en consomment pas)
 export const AI_JOBS = new Set(['analyze', 'prospect', 'template', 'followup_template', 'evolution', 'linkedin_post']);
@@ -19,8 +20,11 @@ async function limit(db, userId, key) {
 
 /** @returns {{day: {used:number, limit:number|null}, month: {used:number, limit:number|null}, blocked: boolean, reason: string|null}} */
 export async function budgetState(db, userId, { at = now() } = {}) {
-  const day = { used: await spentSince(db, userId, at - 86400), limit: await limit(db, userId, 'budget_day_usd') };
-  const month = { used: await spentSince(db, userId, at - 30 * 86400), limit: await limit(db, userId, 'budget_month_usd') };
+  // Un plafond en $ n'a de sens qu'avec une clé API (c'est elle qui est facturée à l'usage) : avec un abonnement, rien n'est
+  // facturé en plus, le garde-fou est le quota Claude. Un ancien plafond resté en base ne bloque donc jamais un abonnement.
+  const priced = (await getLinkState(db, userId))?.mode === MODES.api_key;
+  const day = { used: await spentSince(db, userId, at - 86400), limit: priced ? await limit(db, userId, 'budget_day_usd') : null };
+  const month = { used: await spentSince(db, userId, at - 30 * 86400), limit: priced ? await limit(db, userId, 'budget_month_usd') : null };
   const over = (x) => x.limit != null && x.used >= x.limit;
   const reason = over(day) ? `budget IA des dernières 24 h atteint (${usd(day.used)} / ${usd(day.limit)})`
     : over(month) ? `budget IA des 30 derniers jours atteint (${usd(month.used)} / ${usd(month.limit)})`

@@ -29,7 +29,8 @@ async function setup() {
   const sentMails = [];
   const app = { resolveHost: async () => [{ address: '93.184.216.34', family: 4 }],
     db,
-    cfg: { dataDir: tmp, claudeBin: resolve('test/fixtures/fake-claude.js'), sandbox: { enabled: false, production: false }, secretKey: TEST_SECRET_KEY, appUrl: 'https://ai.test' },
+    cfg: { dataDir: tmp, claudeBin: resolve('test/fixtures/fake-claude.js'), sandbox: { enabled: false, production: false }, secretKey: TEST_SECRET_KEY, appUrl: 'https://ai.test',
+      systemSmtp: { host: 'smtp.serveur', port: 587, user: 'srv', pass: 'p', fromEmail: 'aitools@serveur.test' } }, // mails d'AiTools (évolutions…)
     // syncRepo refuse file:// (clones d'URL fournies par l'utilisateur : https seulement) : le test clone le dépôt local à la place
     syncRepo: async (url, dir) => {
       if (existsSync(join(dir, '.git'))) execFileSync('git', ['-C', dir, 'pull', '-q']);
@@ -105,6 +106,7 @@ test('flux complet : analyse → cible → prospection → modèle → envoi →
     const ev = await run(s, 'evolution', { count: 3, level: 'rapide' });
     assert.equal(ev.status, 'done', ev.error);
     assert.equal(s.sentMails.at(-1).to, 'moi@x.fr');
+    assert.equal(s.sentMails.at(-1).from, 'aitools@serveur.test', 'les mails d\'AiTools partent du SMTP du serveur, pas de celui du projet');
     assert.match(s.sentMails.at(-1).text, /Export CSV/);
     assert.match(s.sentMails.at(-1).html, /class|style/, 'version HTML mise en forme');
     assert.match(s.sentMails.at(-1).html, /Export CSV/);
@@ -197,54 +199,40 @@ test('envoi : Message-ID journalisé et objets A/B alternés équitablement', as
   } finally { rmSync(s.tmp, { recursive: true, force: true }); }
 });
 
-// SMTP : celui du projet, sinon celui des Réglages du propriétaire, sinon un refus clair
-test('SMTP par projet avec repli sur les Réglages', async () => {
+// SMTP d'un projet : le sien, et rien d'autre (un projet n'envoie jamais depuis l'adresse d'un autre ni depuis celle du serveur)
+test('SMTP par projet, sans repli sur un SMTP commun', async () => {
   const s = await setup();
   try {
     await s.db.prepare(`INSERT INTO templates(project_id, kind, subject, body, status, updated_at) VALUES(?, 'initial', 'Salut {{entreprise}}', 'Bonjour', 'validated', ?)`).run(s.id, now());
     const addProspect = (n) => s.db.prepare('INSERT INTO prospects(project_id, company, email, score, created_at) VALUES(?, ?, ?, 5, ?)').run(s.id, `E${n}`, `c${n}@e${n}.fr`, now());
-    const settingsSmtp = { host: 'smtp.reglages', port: 587, user: 'r', pass: 'p', fromEmail: 'reglages@codebzh.fr' };
     const asSource = async () => (await getProject(s.app, s.id, { userId: s.userId })).smtpSource;
 
-    // Aucun SMTP nulle part : refus clair, rien ne part
+    // Aucun SMTP de projet : refus clair, rien ne part (même si le serveur a le sien)
     assert.equal(await asSource(), null);
     assert.equal((await getProject(s.app, s.id, { userId: s.userId })).hasSmtp, false);
     await addProspect(1);
     let job = await run(s, 'send', { count: 1 });
     assert.equal(job.status, 'error');
-    assert.match(job.error, /Aucun SMTP.*Réglages/);
+    assert.match(job.error, /Aucun SMTP/);
     assert.equal(s.sentMails.length, 0);
 
-    // SMTP des Réglages seulement : le projet l'utilise
-    await setSetting(s.db, s.userId, 'smtp_enc', encryptJson(s.app.cfg.secretKey, settingsSmtp));
-    assert.equal(await asSource(), 'settings');
-    const p = await getProject(s.app, s.id, { userId: s.userId, secrets: true });
-    assert.equal(p.hasSmtp, true);
-    assert.equal(p.hasOwnSmtp, false);
-    assert.equal(p.smtp.fromEmail, 'reglages@codebzh.fr');
+    // Un ancien réglage « SMTP global » restant en base n'est plus lu
+    await setSetting(s.db, s.userId, 'smtp_enc', encryptJson(s.app.cfg.secretKey, { host: 'smtp.reglages', port: 587, user: 'r', pass: 'p', fromEmail: 'reglages@codebzh.fr' }));
+    assert.equal(await asSource(), null);
     job = await run(s, 'send', { count: 1 });
-    assert.equal(job.status, 'done', job.error);
-    assert.equal(s.sentMails.at(-1).from, 'reglages@codebzh.fr');
+    assert.equal(job.status, 'error');
+    assert.equal(s.sentMails.length, 0);
 
-    // SMTP propre au projet : il prend le dessus
+    // SMTP propre au projet : les mails du projet partent de son adresse
     await saveSecretConfig(s.app, s.id, 'smtp_enc', { host: 'smtp.projet', port: 587, user: 'u', pass: 'p', fromEmail: 'projet@codebzh.fr' }, 'pass');
     assert.equal(await asSource(), 'project');
-    await addProspect(2);
     job = await run(s, 'send', { count: 1 });
     assert.equal(job.status, 'done', job.error);
     assert.equal(s.sentMails.at(-1).from, 'projet@codebzh.fr');
-
-    // Le SMTP d'un autre compte n'est jamais utilisé
-    const other = await addUser(s.db);
-    await setSetting(s.db, other, 'smtp_enc', encryptJson(s.app.cfg.secretKey, { ...settingsSmtp, fromEmail: 'autre@codebzh.fr' }));
-    await s.db.prepare('UPDATE projects SET smtp_enc = NULL WHERE id = ?').run(s.id);
-    await addProspect(3);
-    await run(s, 'send', { count: 1 });
-    assert.equal(s.sentMails.at(-1).from, 'reglages@codebzh.fr');
-    // L'IMAP réutilise les identifiants du SMTP effectif (repli compris)
+    // L'IMAP réutilise les identifiants du SMTP du projet
     await saveSecretConfig(s.app, s.id, 'imap_enc', { host: 'imap.x', port: 993, user: '', pass: '' }, 'pass');
     const q = await getProject(s.app, s.id, { userId: s.userId, secrets: true });
-    assert.equal(q.imap.user, 'r');
+    assert.equal(q.imap.user, 'u');
   } finally { rmSync(s.tmp, { recursive: true, force: true }); }
 });
 

@@ -66,6 +66,10 @@ ${iconLinks()}
 ${['/static/site.js', ...scripts].map((src) => `<script src="${esc(assetUrl(src))}" defer></script>\n`).join('')}${jsonLd ? `<script type="application/ld+json">${JSON.stringify(jsonLd).replace(/</g, '\\u003c')}</script>\n` : ''}</head>
 <body class="site">
 <a class="skip" href="#contenu">Aller au contenu</a>
+<div class="page-ribbon" aria-hidden="true"><svg viewBox="0 0 100 1000" preserveAspectRatio="none" focusable="false">
+<defs><linearGradient id="g-page" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="100" y2="1000"><stop offset="0" stop-color="#1288b7"></stop><stop offset="1" stop-color="#0db8c5"></stop></linearGradient></defs>
+<path d="M108 -20 C90 40 62 30 58 130 S20 200 4 300 S-2 420 4 480 S40 540 96 620 S102 700 96 760 S60 830 4 900 S-2 960 20 1030"></path>
+</svg></div>
 ${SPRITE}
 <header class="top">
   <div class="wrap top-in">

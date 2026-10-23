@@ -29,7 +29,7 @@ import { cpuTemp } from './services/thermal.js';
 import { checkInbox } from './services/inbox.js';
 import { followupPlan } from './services/followup.js';
 import { nextNightSlot } from './services/paris-time.js';
-import { notify, notifyConfig, EVENTS, WEBHOOK_RE } from './services/notify.js';
+import { notify, notifyConfig, saveDiscordHooks, publicHooks, EVENTS, MAX_HOOKS } from './services/notify.js';
 import { budgetState, AI_JOBS } from './services/budget.js';
 import { currentClaudeQuota } from './services/usagelive.js';
 import { sendWeeklyReport } from './services/report.js';
@@ -41,7 +41,7 @@ import {
   listProspects, parseFilters, STATUSES as PROSPECT_STATUSES, prospectDetail, addNote, deleteNote, setNextAction,
 } from './services/crm.js';
 import {
-  getProject, listProjects, createProject, saveSecretConfig, publicConfig, globalSmtp,
+  getProject, listProjects, createProject, saveSecretConfig, publicConfig,
   prospectStats, sentSince, repoDir, getTemplate, saveTemplate, abStats,
 } from './projects.js';
 
@@ -140,19 +140,16 @@ export function registerRoutes(router, app) {
       notify_email: await getSetting(db, userId, 'notify_email', ''),
       git_servers: publicGitServers(await listGitServers(db, userId)),
       github_token_set: !!await getSetting(db, userId, 'github_token_enc'),
-      smtp: publicConfig(await globalSmtp(app, userId), 'pass'),
       global_daily_cap: await getSetting(db, userId, 'global_daily_cap', '100'),
       send_delay_min: await getSetting(db, userId, 'send_delay_min', '20'),
       send_delay_max: await getSetting(db, userId, 'send_delay_max', '60'),
       prospect_model: await getSetting(db, userId, 'prospect_model', 'haiku'),
       analyze_model: await getSetting(db, userId, 'analyze_model', 'haiku'),
-      // La liste d'opposition est commune à tous les comptes : on n'en montre que ce qui touche SES prospects
-      blacklist_count: (await db.prepare(`SELECT COUNT(DISTINCT x.email) n FROM prospects x JOIN projects p ON p.id = x.project_id
-        WHERE p.user_id = ? AND x.email IN (SELECT email FROM blacklist)`).get(userId)).n,
       weekly_report: await getSetting(db, userId, 'weekly_report', '0') === '1',
       budget_day_usd: await getSetting(db, userId, 'budget_day_usd', ''),
       budget_month_usd: await getSetting(db, userId, 'budget_month_usd', ''),
-      discord: { set: !!discord.url, events: discord.events, all: EVENTS },
+      priced: (await getLinkState(db, userId))?.mode === MODES.api_key, // plafonds en $ : seulement avec une clé API
+      discord: { hooks: publicHooks(discord.hooks), all: EVENTS, max: MAX_HOOKS },
     };
     html(res, settingsPage({ email: session.email, s, saved: url.searchParams.has('ok') }));
   });
@@ -176,19 +173,11 @@ export function registerRoutes(router, app) {
     await set('analyze_model', b.analyze_model === 'sonnet' ? 'sonnet' : 'haiku');
     const money = (v) => { const n = Number(String(v || '').replace(',', '.')); return Number.isFinite(n) && n > 0 ? String(Math.round(n * 100) / 100) : ''; };
     await set('weekly_report', b.weekly_report === 'on' ? '1' : '0');
-    await set('budget_day_usd', money(b.budget_day_usd));
-    await set('budget_month_usd', money(b.budget_month_usd));
+    // Champs absents du formulaire (compte en abonnement : pas de plafond en $) : les valeurs enregistrées ne bougent pas
+    if (b.budget_day_usd !== undefined) await set('budget_day_usd', money(b.budget_day_usd));
+    if (b.budget_month_usd !== undefined) await set('budget_month_usd', money(b.budget_month_usd));
 
-    const hook = String(b.discord_webhook || '').trim();
-    if (hook && !WEBHOOK_RE.test(hook)) throw new HttpError(400, 'URL de webhook Discord invalide (https://discord.com/api/webhooks/…)');
-    if (hook) await set('discord_webhook_enc', encrypt(cfg.secretKey, hook));
-    if (b.discord_remove === 'on') await set('discord_webhook_enc', null);
-    await set('discord_events', JSON.stringify(Object.keys(EVENTS).filter((k) => b[`ev_${k}`] === 'on')));
-
-    if (b.smtp_host) await guardTarget(app, userId, 'smtp', String(b.smtp_host).trim(), b.smtp_port || 587, { lenient: true });
-    const prev = await globalSmtp(app, userId) || {};
-    const smtp = { host: b.smtp_host, port: b.smtp_port, user: b.smtp_user, pass: b.smtp_pass || prev.pass, fromEmail: b.smtp_fromEmail };
-    await set('smtp_enc', smtp.host ? encryptJson(cfg.secretKey, smtp) : null);
+    await saveDiscordHooks(app, userId, b);
     redirect(res, '/settings?ok');
   });
 
@@ -288,13 +277,17 @@ export function registerRoutes(router, app) {
   // ---------- API JSON ----------
   router.post('/api/report/send', async ({ res, session }) => {
     const r = await sendWeeklyReport(app, session.userId);
-    if (!r.channels.length) throw new HttpError(400, 'Configure le SMTP global + l\'email de réception, ou un webhook Discord');
+    if (!r.channels.length) throw new HttpError(400, app.cfg.systemSmtp ? 'Configure ton email de réception, ou un webhook Discord' : "Le serveur n'a pas de SMTP (SYSTEM_SMTP_*) : configure un webhook Discord, ou demande à l'administrateur");
     json(res, { ok: true, channels: r.channels });
   }, { limit: 'mail_send' });
 
-  router.post('/api/notify/test', async ({ res, session }) => {
-    if (!(await notifyConfig(app, session.userId)).url) throw new HttpError(400, 'Aucun webhook Discord configuré');
-    const ok = await notify(app, session.userId, 'test', { title: 'Notification de test', description: 'Les notifications AiTools arrivent bien ici.', level: 'ok' }, { force: true });
+  router.post('/api/notify/test', async ({ req, res, session }) => {
+    const b = await readBody(req);
+    const { hooks } = await notifyConfig(app, session.userId);
+    if (!hooks.length) throw new HttpError(400, 'Aucun webhook Discord configuré');
+    const hookId = b.hook ? String(b.hook) : null;
+    if (hookId && !hooks.some((h) => h.id === hookId)) throw new HttpError(404, 'Webhook introuvable');
+    const ok = await notify(app, session.userId, 'test', { title: 'Notification de test', description: 'Les notifications AiTools arrivent bien ici.', level: 'ok' }, { force: true, hookId });
     if (!ok) throw new HttpError(502, 'Discord a refusé la notification (webhook supprimé ?)');
     json(res, { ok: true });
   }, { limit: 'mail_send' });
@@ -466,7 +459,7 @@ export function registerRoutes(router, app) {
     const { req, res } = ctx;
     const p = await project(ctx, { need: 'admin' });
     const b = await readBody(req);
-    // Hôte vide = « utiliser le SMTP des Réglages » : on efface celui du projet (le plafond quotidien reste réglable)
+    // Hôte vide = on efface le SMTP du projet (le plafond quotidien reste réglable) ; le projet ne peut plus envoyer tant qu'il n'en a pas
     if (!String(b.host || '').trim() || b.reset === true || b.reset === 'on') {
       await db.prepare('UPDATE projects SET smtp_enc = NULL WHERE id = ?').run(p.id);
       if (b.dailyCap !== undefined) await db.prepare('UPDATE projects SET daily_mail_cap = ? WHERE id = ?').run(int(b.dailyCap, 1, 200, 30), p.id);
@@ -594,6 +587,8 @@ export function registerRoutes(router, app) {
     await db.prepare('UPDATE prospects SET status = ? WHERE id = ?').run(b.status, row.id);
     if (b.status === 'refused') {
       await db.prepare("INSERT OR IGNORE INTO blacklist(email, reason, created_at) VALUES(?, 'refused', ?)").run(row.email, now());
+      // Le refus vaut pour tous les comptes : chez les autres, l'adresse n'est plus proposée ni contactée (sans dire qui ni pourquoi)
+      await db.prepare("UPDATE prospects SET status = 'refused' WHERE email = ? AND status IN ('new','sent')").run(row.email);
     }
     json(res, { ok: true });
   });

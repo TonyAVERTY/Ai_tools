@@ -19,7 +19,7 @@ import { pinSmtp, pinGit } from './netguard.js';
 import { sendPause, pauseMessage, evaluateSending } from './services/abuse.js';
 import { evolutionMail } from './services/mailhtml.js';
 import { gitCredentialFor } from './gitservers.js';
-import { getProject, repoDir, globalSmtp, sentSince, getTemplate, saveTemplate, pickVariant } from './projects.js';
+import { getProject, repoDir, sentSince, getTemplate, saveTemplate, pickVariant } from './projects.js';
 
 const sleep = (ms, signal) => new Promise((resolve, reject) => {
   const t = setTimeout(resolve, ms);
@@ -367,9 +367,9 @@ export function makeHandlers(app) {
       const count = Math.max(1, Math.min(20, Math.floor(Number(ctx.params.count) || 5)));
       const level = LEVELS[ctx.params.level] ? ctx.params.level : 'normal';
       const to = await getSetting(db, userId, 'notify_email');
-      const smtp = (await globalSmtp(app, userId)) || project.smtp;
+      const smtp = cfg.systemSmtp; // le résultat part de l'adresse d'AiTools (SMTP du serveur), pas de celle du projet
       if (!to) throw new Error('Adresse de réception non configurée (Réglages)');
-      if (!smtp) throw new Error('Aucun SMTP configuré (Réglages ou projet)');
+      if (!smtp) throw new Error("Le serveur ne peut pas envoyer de mail (SMTP du serveur non configuré) : demande à l'administrateur");
 
       await ctx.progress({ message: 'Mise à jour du repo…', pct: 3 });
       const dir = repoDir(cfg, userId, project.id);
@@ -388,7 +388,7 @@ export function makeHandlers(app) {
       if (!r.text?.trim()) throw new Error(`Pas de résultat (${r.subtype})`);
 
       await ctx.progress({ message: 'Envoi par mail…', pct: 95 });
-      const transport = (app.createTransport || createTransport)(await pinSmtp(app, userId, smtp));
+      const transport = (app.createTransport || createTransport)(await pinSmtp(app, null, smtp));
       await transport.sendMail({
         from: smtp.fromEmail, to,
         subject: `[AiTools] ${count} évolutions pour ${project.name}`,

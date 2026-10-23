@@ -199,8 +199,6 @@ test('enregistrement : SMTP, IMAP, base du récap, Forgejo et dépôt vers des a
       assert.equal(r.status, 400, host);
       assert.match((await r.json()).error, re, host);
     }
-    const sm = await u.post('/settings', { git_type_0: 'forgejo', git_host_0: 'ok.exemple.fr', smtp_host: 'prive.exemple.fr', smtp_port: '587' }, { form: true });
-    assert.equal(sm.status, 400);
     assert.equal((await u.post('/settings', { git_type_0: 'forgejo', git_host_0: 'ok.exemple.fr' }, { form: true })).status, 303);
 
     // Création de projet : le dépôt doit être sur un serveur Git enregistré, et cet hôte est revérifié

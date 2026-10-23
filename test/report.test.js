@@ -12,7 +12,7 @@ async function setup() {
   const db = await testDb();
   const mails = [], hooks = [];
   const app = { resolveHost: async () => [{ address: '93.184.216.34', family: 4 }],
-    db, cfg: { secretKey: TEST_SECRET_KEY, appUrl: 'https://ai.test' },
+    db, cfg: { secretKey: TEST_SECRET_KEY, appUrl: 'https://ai.test', systemSmtp: { host: 'smtp.serveur', port: 587, user: 'srv', pass: 'p', fromEmail: 'aitools@serveur.test' } },
     createTransport: () => ({ sendMail: async (m) => { mails.push(m); }, close() {} }),
     fetch: async (url, o) => { hooks.push(JSON.parse(o.body)); return { ok: true }; },
   };
@@ -55,7 +55,6 @@ const MON_0830 = new Date('2026-10-26T08:30:00+01:00');
 test('envoi automatique : lundi 8h, une seule fois par semaine, désactivé par défaut', async () => {
   const s = await setup();
   await setSetting(s.db, s.userId, 'notify_email', 'moi@x.fr');
-  await setSetting(s.db, s.userId, 'smtp_enc', encryptJson(s.app.cfg.secretKey, { host: 'h', user: 'u', pass: 'p', fromEmail: 'aitools@x.fr' }));
   await setSetting(s.db, s.userId, 'discord_webhook_enc', encrypt(s.app.cfg.secretKey, 'https://discord.com/api/webhooks/123456789012345678/abcdefghijklmnopqrstuvwxyz'));
 
   assert.equal(await maybeSendWeekly(s.app, s.userId, { date: MON_0830 }), null, 'désactivé par défaut');
@@ -66,6 +65,7 @@ test('envoi automatique : lundi 8h, une seule fois par semaine, désactivé par 
   const r = await maybeSendWeekly(s.app, s.userId, { date: MON_0830 });
   assert.deepEqual(r.channels, ['mail', 'discord']);
   assert.equal(s.mails[0].to, 'moi@x.fr');
+  assert.equal(s.mails[0].from, 'aitools@serveur.test', 'le rapport part du SMTP du serveur');
   assert.match(s.mails[0].subject, /^\[AiTools\] Rapport du/);
   const field = s.hooks[0].embeds[0].fields.find((f) => f.name === '📁 MonEspacePro');
   assert.match(field.value, /20 trouvés · ✉️ 20 envoyés · 💬 6 réponses \(30 %\)/);

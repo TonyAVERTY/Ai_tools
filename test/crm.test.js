@@ -59,6 +59,7 @@ test('fiche : historique des mails, réponse, opposition', async () => {
   await db.prepare("INSERT INTO mail_log(project_id, prospect_id, email, sent_at, kind, variant, subject) VALUES(1, 1, 'contact@fournil.fr', 100, 'initial', 'B', 'Objet B')").run();
   await db.prepare("INSERT INTO mail_log(project_id, prospect_id, email, sent_at, kind, subject, error) VALUES(1, 1, 'contact@fournil.fr', 200, 'followup', 'Re: Objet B', '421 retry')").run();
   await db.prepare("INSERT INTO blacklist(email, reason, created_at) VALUES('contact@fournil.fr', 'unsubscribe', 300)").run();
+  await db.prepare("UPDATE prospects SET status = 'refused' WHERE id = 1").run(); // la désinscription a mis le prospect en « refus »
   const d = await prospectDetail(db, 1);
   assert.equal(d.prospect.company, 'Le Fournil');
   assert.deepEqual(d.mails.map((m) => [m.kind, m.variant, m.error]), [['initial', 'B', null], ['followup', null, '421 retry']]);
@@ -92,4 +93,23 @@ test('prochaine action : 9h heure de Paris, dates impossibles refusées, filtre 
   assert.deepEqual(await todo(Date.parse('2027-01-01T00:00:00Z') / 1000), ['Le Fournil', 'Coiffure Zen']);
   assert.equal(await setNextAction(db, 1, '', ''), null);
   assert.deepEqual(await todo(Date.parse('2027-01-01T00:00:00Z') / 1000), ['Coiffure Zen'], 'action effacée');
+});
+
+test('opposition : un refus marqué par un compte met l\'adresse en « refus » chez les autres, sans rien révéler', async () => {
+  const { startApp } = await import('./helpers/server.js');
+  const { addProject } = await import('./helpers/users.js');
+  const s = await startApp();
+  try {
+    const A = await s.newUser({ admin: false, link: { v: 1, mode: 'api_key', valid: true } });
+    const B = await s.newUser({ admin: false, link: { v: 1, mode: 'api_key', valid: true } });
+    const pa = await addProject(s.db, A.id), pb = await addProject(s.db, B.id);
+    const add = async (p, status = 'new') => Number((await s.db.prepare("INSERT INTO prospects(project_id, company, email, status, created_at) VALUES(?, 'X', 'stop@ferme.fr', ?, 1)").run(p, status)).lastInsertRowid);
+    const ia = await add(pa), ib = await add(pb, 'sent');
+    assert.equal((await A.post(`/api/prospects/${ia}/status`, { status: 'refused' })).status, 200);
+    assert.equal((await s.db.prepare("SELECT reason FROM blacklist WHERE email = 'stop@ferme.fr'").get()).reason, 'refused', 'ajouté à la liste commune');
+    assert.equal((await s.db.prepare('SELECT status FROM prospects WHERE id = ?').get(ib)).status, 'refused', 'plus jamais contacté chez B non plus');
+    const d = await (await B.get(`/api/prospects/${ib}`)).json();
+    assert.deepEqual(d.optOut, { reason: 'refused' }, 'motif générique');
+    assert.doesNotMatch(JSON.stringify(d), new RegExp(`user${A.id}|${A.email}`), 'aucune trace du compte à l\'origine');
+  } finally { await s.close(); }
 });
