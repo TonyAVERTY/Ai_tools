@@ -30,7 +30,7 @@ test('règles essentielles : menu sans défilement, champs à 16 px, tableaux en
   assert.match(css, /\.pills \{ overflow: visible;/, 'menu du haut : plus de défilement latéral');
   assert.match(css, /font-size: 16px !important/, 'champs : pas de zoom iOS');
   assert.match(css, /@container rc \(max-width: 700px\)/, 'tableaux, calendrier, Kanban : selon la place réelle');
-  assert.match(css, /table\.stack td\[data-label\]::before \{ content: attr\(data-label\)/);
+  assert.match(css, /table\.rt-stack td\[data-label\]::before \{ content: attr\(data-label\)/);
   assert.match(css, /\.cal-cell:not\(\.has\):not\(\.today\) \{ display: none; \}/);
   assert.match(css, /\.kanban \{ display: flex; flex-direction: column;/);
   assert.match(css, /\.reply-pops \{ right: 8px; left: 8px;/);
@@ -52,4 +52,12 @@ test('calendrier : chaque jour porte son nom (affiché sur téléphone) et la cl
 test('tableaux : aucun nowrap forcé sur les cellules (le texte long passe à la ligne), en-têtes seuls sur une ligne', () => {
   const css = readFileSync('public/responsive.css', 'utf8');
   assert.match(css, /td \{ white-space: normal; overflow-wrap: break-word; \}/);
+});
+
+test('classes ajoutées aux tableaux : préfixées rt-, jamais « stack » ni « flow » (.stack est un utilitaire flex de app.css : il casserait tous les tableaux)', () => {
+  const js = readFileSync(new URL('../public/responsive.js', import.meta.url), 'utf8');
+  const added = [...js.matchAll(/classList\.add\('([\w-]+)'\)/g)].map((m) => m[1]).filter((c) => /stack|flow/.test(c));
+  assert.deepEqual(added.sort(), ['rt-flow', 'rt-stack']);
+  const css = readFileSync(new URL('../public/responsive.css', import.meta.url), 'utf8');
+  assert.doesNotMatch(css, /table\.(stack|flow)\b/);
 });
