@@ -100,11 +100,14 @@
     const mark = (id) => tocLinks.forEach((a) => { if (a.getAttribute('href') === `#${id}`) a.setAttribute('aria-current', 'true'); else a.removeAttribute('aria-current'); });
     const update = () => {
       queued = false;
-      const atEnd = innerHeight + scrollY >= document.documentElement.scrollHeight - 4;
-      // La section en cours : la dernière dont le haut a passé le tiers supérieur de l'écran (la dernière, tout en bas de la page)
+      // La ligne de lecture descend du tiers de l'écran (haut de page) jusqu'au bas de l'écran (bas de page) : ainsi les dernières
+      // sections, trop courtes pour jamais atteindre le tiers supérieur, sont elles aussi repérées, chacune à son tour.
+      const range = document.documentElement.scrollHeight - innerHeight;
+      const progress = range > 0 ? Math.min(1, Math.max(0, scrollY / range)) : 0;
+      const line = innerHeight * (0.33 + 0.67 * progress);
       let cur = sections[0];
-      for (const sec of sections) if (sec.getBoundingClientRect().top <= innerHeight * 0.33) cur = sec;
-      mark((atEnd ? sections.at(-1) : cur).id);
+      for (const sec of sections) if (sec.getBoundingClientRect().top <= line) cur = sec;
+      mark(cur.id);
     };
     const schedule = () => { if (!queued) { queued = true; requestAnimationFrame(update); } };
     addEventListener('scroll', schedule, { passive: true });
@@ -656,6 +659,20 @@
       full.hidden = true;
     });
   })();
+
+  // ---------- Corbeilles : marquer un élément « à retirer » (annulable), retiré à l'enregistrement ----------
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-trash]');
+    if (!btn) return;
+    const wrap = btn.closest('.trash-wrap');
+    const on = btn.getAttribute('aria-pressed') !== 'true';
+    $('[data-trash-input]', wrap).value = on ? '1' : '';
+    btn.setAttribute('aria-pressed', String(on));
+    $('.trash-note', wrap).hidden = !on;
+    // Une ligne entière (serveur Git, webhook) s'estompe tant qu'elle est marquée ; un simple token ne marque que son bouton
+    const row = btn.closest('.gitrow');
+    if (row && !btn.classList.contains('txt')) row.classList.toggle('to-delete', on);
+  });
 
   // ---------- Réglages : plusieurs webhooks Discord ----------
   // Le « + » ajoute une ligne (adresse + événements reçus) : on sépare ainsi ce qui est dit ou fait, salon par salon.
