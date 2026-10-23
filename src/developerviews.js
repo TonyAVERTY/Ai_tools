@@ -46,11 +46,14 @@ ${newToken ? `<section class="card" role="status">
   <p class="muted small">Réponses d'erreur : <code>{ "error": "message", "code": "…" }</code>. Référence complète, exemples et erreurs : <a href="/docs/api">documentation de l'API</a>.</p>
 </section>
 <section class="card">
-  <div class="card-h"><h2>Serveur MCP (Claude)</h2><p>Le serveur MCP relie Claude à ton panel avec ces mêmes jetons : tu peux lui demander « quelles réponses sont arrivées ? » ou « ajoute une note à ce prospect ».</p></div>
+  <div class="card-h"><h2>Serveur MCP (Claude)</h2><p>Le serveur MCP relie Claude à ton panel avec ces mêmes jetons : tu peux lui demander « quelles réponses sont arrivées ? » ou « ajoute une note à ce prospect ». Il tourne sur ton ordinateur (il a besoin de Node.js) et parle à ce panel par internet, avec ton jeton.</p></div>
+  <p class="small"><b>1.</b> Télécharge le fichier et range-le où tu veux sur ton ordinateur (par exemple dans ton dossier personnel).</p>
+  <div class="row"><a class="btn small" href="/developer/mcp.js" download="aitools-mcp.js">${ic('dl')}Télécharger aitools-mcp.js</a></div>
+  <p class="small"><b>2.</b> Dans un terminal, ouvre le dossier où tu l'as rangé et lance la commande (remplace <code>aitk_…</code> par ton jeton) :</p>
   <pre class="md">claude mcp add aitools \\
   -e AITOOLS_URL=${esc(appUrl)} \\
   -e AITOOLS_TOKEN=aitk_… \\
-  -- node /chemin/vers/aitools/mcp/aitools-mcp.js</pre>
+  -- node "$(pwd)/aitools-mcp.js"</pre>
   <p class="muted small">Installation et outils : <a href="/docs/mcp">documentation du serveur MCP</a>. Le serveur n'a aucun droit propre : il ne peut faire que ce que son jeton autorise.</p>
 </section>
 <section class="card">
