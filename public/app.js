@@ -34,7 +34,7 @@
 
   // Lancement d'une tâche (analyse, recherche, envoi, audit…) : le bouton s'enfonce, puis un petit agent apporte la tâche au menu « Activité »
   // (public/fx.js). Un seul point d'accroche, ici : toute route qui met un job en file passe par api().
-  const LAUNCH = /^\/api\/(projects\/\d+\/(analyze|template|followup_template|prospect|evolution|code-review|send|linkedin\/generate)|prospects\/\d+\/hook)$/;
+  const LAUNCH = /^\/api\/(projects\/\d+\/(analyze|template|followup_template|prospect|evolution|code-review|send|linkedin\/generate|promo\/generate)|prospects\/\d+\/hook)$/;
   let lastTrigger = null; // le bouton cliqué (ou validé au clavier) juste avant
   listen(document, 'click', (e) => { const t = e.target.closest?.('button, a.btn, label.btn'); if (t) lastTrigger = t; }, true);
   listen(document, 'submit', (e) => { lastTrigger = e.submitter || $('button:not([type=button])', e.target) || lastTrigger; }, true);
@@ -95,7 +95,7 @@
   const ACTIVE = ['queued', 'running'];
   const LABELS = {
     analyze: 'Analyse', prospect: 'Recherche', template: 'Modèle', send: 'Envoi', evolution: 'Évolutions',
-    followup_template: 'Modèle de relance', followup: 'Relances', linkedin_post: 'Post LinkedIn', audit: 'Audit', hook: 'Accroche',
+    followup_template: 'Modèle de relance', followup: 'Relances', linkedin_post: 'Post LinkedIn', promo_video: 'Vidéo de promotion', audit: 'Audit', hook: 'Accroche',
   };
 
   // Champs en lecture seule à copier (lien d'invitation) : un clic sélectionne tout
@@ -495,7 +495,7 @@
     try { s = await api(`/api/projects/${id}/status`); } catch (e) { return schedule(el, 30_000); }
     const st = state.get(id) || {};
     const jobs = s.jobs;
-    for (const type of ['prospect', 'template', 'send', 'evolution', 'audit', 'followup_template', 'followup', 'linkedin_post']) renderJob($(`[data-job="${type}"]`, el), jobs[type], type);
+    for (const type of ['prospect', 'template', 'send', 'evolution', 'audit', 'followup_template', 'followup', 'linkedin_post', 'promo_video']) renderJob($(`[data-job="${type}"]`, el), jobs[type], type);
 
     const running = Object.entries(jobs).filter(([, j]) => ACTIVE.includes(j.status)).map(([t]) => LABELS[t]);
     $('[data-state]', el).innerHTML = running.length
@@ -506,6 +506,11 @@
     const li = jobs.linkedin_post;
     if (li && ACTIVE.includes(li.status)) st.liRunning = true;
     else if (st.liRunning && li) { st.liRunning = false; loadLinkedin(el); }
+
+    // Fin d'une vidéo de promotion → on recharge la liste
+    const pv = jobs.promo_video;
+    if (pv && ACTIVE.includes(pv.status)) st.promoRunning = true;
+    else if (st.promoRunning && pv) { st.promoRunning = false; loadPromo(el); if (pv.status === 'done') toast('Vidéo de promotion prête'); }
 
     // Fin d'analyse → recharge la page pour afficher fiche + cible
     const an = jobs.analyze;
@@ -1033,6 +1038,90 @@
     if (area) $('[data-li-count]', area.closest('.project')).textContent = area.value.length;
   });
   $$('details[data-acc="linkedin"]').forEach((d) => d.addEventListener('toggle', () => { if (d.open) loadLinkedin(d.closest('.project')); }));
+
+  // ---------- Promotion ----------
+  // Section d'un projet : choisir le sujet (facultatif), le nombre d'images par seconde et la durée, lancer la production, revoir et télécharger les vidéos.
+  const icon = (name) => `<svg class="ic" aria-hidden="true" viewBox="0 0 24 24"><use href="#i-${name}"></use></svg>`;
+  const mo = (n) => (n >= 1048576 ? `${(n / 1048576).toFixed(1).replace('.', ',')} Mo` : `${Math.max(1, Math.round(n / 1024))} Ko`);
+
+  async function loadPromo(proj) {
+    const box = $('[data-promo]', proj);
+    if (!box) return;
+    try { renderPromo(box, await api(`/api/projects/${proj.dataset.id}/promo`), proj.dataset.id); }
+    catch (e) { box.innerHTML = `<p class="error small">${esc(e.message)}</p>`; }
+  }
+
+  function promoVideoCard(v, s, id) {
+    const dim = v.width === v.height ? 'carré' : v.width > v.height ? 'paysage' : 'vertical';
+    return `<article class="pv" data-pv="${v.id}">
+      <video class="pv-video pv-${dim}" controls preload="metadata" playsinline src="/api/promo/${v.id}/file" aria-label="Vidéo de promotion"></video>
+      <div class="pv-meta">
+        <p class="pv-title">${v.subject ? esc(v.subject) : '<span class="muted">Présentation du projet</span>'}</p>
+        <p class="muted small">${v.seconds} s · ${v.fps} images/s · ${dim} · ${mo(v.size)} · ${esc(liDay(v.createdAt))}</p>
+        <p class="row"><a class="btn small" href="/api/promo/${v.id}/file?download=1" download data-noajax>Télécharger</a>
+        ${s.canDelete ? `<button type="button" class="btn small danger" data-pv-delete="${v.id}" data-id="${id}">Supprimer</button>` : ''}</p>
+      </div></article>`;
+  }
+
+  function renderPromo(box, s, id) {
+    // Ne pas écraser ce que l'utilisateur est en train de saisir
+    if (box.contains(document.activeElement) && document.activeElement.matches('input, select')) return;
+    if (!s.supported) { box.innerHTML = `<p class="muted">${esc(s.reason)} La vidéo de promotion n'est pas disponible sur ce serveur.</p>`; return; }
+    const L = s.limits;
+    const form = s.hasProfile ? `<form class="promo-form" data-promo-form data-max-frames="${L.maxFrames}">
+        <label class="field"><span class="lbl">Sujet <span class="muted small">(facultatif)</span></span>
+          <input name="subject" maxlength="${L.maxSubject}" placeholder="Laisse vide : Claude présente le projet" autocomplete="off"></label>
+        <div class="grid3">
+          <label class="field"><span class="lbl">Images par seconde</span><input name="fps" type="number" inputmode="numeric" min="${L.fps.min}" max="${L.fps.max}" value="${L.fps.def}" required></label>
+          <label class="field"><span class="lbl">Durée (secondes)</span><input name="seconds" type="number" inputmode="numeric" min="${L.seconds.min}" max="${L.seconds.max}" value="${L.seconds.def}" required></label>
+          <label class="field"><span class="lbl">Format</span><span class="sel"><select name="format">${s.formats.map((f) => `<option value="${esc(f.id)}">${esc(f.label)}</option>`).join('')}</select>${icon('down')}</span></label>
+        </div>
+        <p class="hint" data-promo-count></p>
+        <div class="row"><button class="btn primary" data-promo-go>${icon('film')}Générer la vidéo</button></div>
+      </form>
+      <p class="muted small">Claude écrit la scène, elle est ensuite dessinée image par image sur le serveur : compte quelques minutes selon la durée et le nombre d'images par seconde. Les consignes se modifient dans les Réglages (« Vidéo de promotion »).</p>`
+      : '<p class="muted">Analyse d\'abord le projet : Claude s\'appuie sur sa fiche pour concevoir la vidéo.</p>';
+    box.innerHTML = `${form}${s.videos.length ? `<div class="pv-list">${s.videos.map((v) => promoVideoCard(v, s, id)).join('')}</div>` : (s.hasProfile ? '<p class="muted small">Aucune vidéo pour l\'instant.</p>' : '')}`;
+    promoCount(box);
+  }
+
+  // Nombre d'images à produire, et message clair si la limite est dépassée (le serveur la contrôle aussi)
+  function promoCount(box) {
+    const f = $('[data-promo-form]', box);
+    if (!f) return;
+    const fps = Number(f.fps.value), sec = Number(f.seconds.value), n = fps * sec, max = Number(f.dataset.maxFrames);
+    const out = $('[data-promo-count]', f);
+    const bad = !Number.isFinite(n) || n > max;
+    out.textContent = bad ? `Trop d'images (${n || 0}) : le maximum est ${max} (images par seconde × durée). Réduis la durée ou le nombre d'images par seconde.` : `${n} images à produire.`;
+    out.classList.toggle('error', bad);
+    $('[data-promo-go]', f).disabled = bad;
+  }
+
+  listen(document, 'input', (e) => { const b = e.target.closest('[data-promo-form]'); if (b) promoCount(b.closest('[data-promo]')); });
+  listen(document, 'submit', async (e) => {
+    const f = e.target.closest('[data-promo-form]');
+    if (!f) return;
+    e.preventDefault();
+    const proj = f.closest('.project');
+    const btn = $('[data-promo-go]', f);
+    btn.disabled = true;
+    try {
+      const r = await api(`/api/projects/${proj.dataset.id}/promo/generate`, { subject: f.subject.value, fps: Number(f.fps.value), seconds: Number(f.seconds.value), format: f.format.value });
+      toast(r.budgetBlocked ? `En file, mais ${r.budgetBlocked}` : r.existing ? 'Une vidéo est déjà en cours de production' : 'Claude conçoit la vidéo…', r.budgetBlocked ? 'error' : 'ok');
+      refreshProject(proj);
+    } catch (err) { toast(err.message, 'error'); }
+    promoCount(f.closest('[data-promo]'));
+  });
+  listen(document, 'click', async (e) => {
+    const t = e.target.closest('[data-pv-delete]');
+    if (!t) return;
+    if (!confirm('Supprimer cette vidéo ? Le fichier sera effacé.')) return;
+    try {
+      await api(`/api/projects/${t.dataset.id}/promo/${t.dataset.pvDelete}/delete`, {});
+      loadPromo(t.closest('.project'));
+    } catch (err) { toast(err.message, 'error'); }
+  });
+  $$('details[data-acc="promo"]').forEach((d) => d.addEventListener('toggle', () => { if (d.open) loadPromo(d.closest('.project')); }));
 
   // Retour de LinkedIn : message, puis on rouvre le projet concerné
   (() => {
