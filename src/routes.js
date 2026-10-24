@@ -25,6 +25,8 @@ import { feedToken, feedUrl } from './services/ical.js';
 import { developerMode } from './apitokens.js';
 import { registerLinkedinRoutes } from './linkedinroutes.js';
 import { registerPromoRoutes, removeProjectVideos } from './promo.js';
+import { registerPosteRoutes } from './posteroutes.js';
+import { isRoleJob, roleTaskByJob } from './services/roles.js';
 import { registerProspectRoutes } from './prospectroutes.js';
 import { dashboardPage, settingsPage, unsubPage, accountPage, linkPage } from './views.js';
 import { enqueue, latestJobs, cancelJob, usageSummary } from './services/jobs.js';
@@ -78,6 +80,7 @@ export function registerRoutes(router, app) {
   registerMailRoutes(router, app);
   registerLinkedinRoutes(router, app, { project, aiOpts });
   registerPromoRoutes(router, app, { project, aiOpts });
+  registerPosteRoutes(router, app, { project, aiOpts });
   registerProspectRoutes(router, app, { project });
   registerApiV1(router, app, { aiOpts });
   registerDeveloperRoutes(router, app);
@@ -375,7 +378,7 @@ export function registerRoutes(router, app) {
       FROM jobs j LEFT JOIN projects p ON p.id = j.project_id
       WHERE ${mine} AND j.status IN ('queued','running')
       ORDER BY j.status = 'running' DESC, COALESCE(j.run_after, 0), j.id LIMIT 20`).all(...mineArgs)).map((r) => ({
-      id: r.id, type: r.type, status: r.status, projectId: r.pid, project: r.project,
+      id: r.id, type: r.type, label: roleTaskByJob(r.type)?.label, status: r.status, projectId: r.pid, project: r.project,
       progress: r.progress_json ? JSON.parse(r.progress_json) : null,
       runAfter: r.run_after, startedAt: r.started_at, createdAt: r.created_at,
     }));
@@ -428,6 +431,8 @@ export function registerRoutes(router, app) {
     // Rendu côté serveur (échappé) : le front n'injecte jamais le Markdown brut de Claude
     if (jobs.evolution?.result?.markdown) jobs.evolution.result.html = evolutionHtml(jobs.evolution.result.markdown);
     if (jobs.audit?.result?.markdown) jobs.audit.result.html = evolutionHtml(jobs.audit.result.markdown);
+    // Tâches des postes : le texte se lit à la demande (GET /api/projects/:id/poste/:task), pas à chaque rafraîchissement
+    for (const [type, j] of Object.entries(jobs)) if (isRoleJob(type) && j.result) j.result = { size: String(j.result.markdown || '').length };
     const tplOut = (row) => (row ? { subject: row.subject, subjectB: row.subject_b, body: row.body, status: row.status, updated_at: row.updated_at } : null);
     const templates = { initial: tplOut(await getTemplate(db, p.id, 'initial')), followup: tplOut(await getTemplate(db, p.id, 'followup')) };
     const stats = await prospectStats(db, p.id);

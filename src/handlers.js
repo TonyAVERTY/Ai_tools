@@ -5,7 +5,7 @@ import { runClaude, extractJson, rateLimitWindows } from './services/claude.js';
 import { addUsage } from './services/jobs.js';
 import { syncRepo } from './services/git.js';
 import { normalizeModel } from './services/models.js';
-import { analyzePrompt, prospectPrompt, templatePrompt, followupTemplatePrompt, evolutionPrompt, linkedinPostPrompt, hookPrompt, auditPrompt, promoPrompt, parseCustomPrompts, LEVELS } from './services/prompts.js';
+import { analyzePrompt, prospectPrompt, templatePrompt, followupTemplatePrompt, evolutionPrompt, linkedinPostPrompt, hookPrompt, auditPrompt, promoPrompt, rolePrompt, parseCustomPrompts, LEVELS } from './services/prompts.js';
 import { PROMO, FORMATS, SceneError, parsePromoParams, extractScene, promoSupported, renderPromo } from './services/promovideo.js';
 import { reserveVideo, finishVideo, removeVideo, countVideos } from './promo.js';
 import { linkedinAccount, saveDraft, recentDrafts } from './linkedin.js';
@@ -23,6 +23,7 @@ import { sendPause, pauseMessage, evaluateSending } from './services/abuse.js';
 import { verifyAddress, defaultMx } from './services/verify.js';
 import { evolutionMail } from './services/mailhtml.js';
 import { gitCredentialFor } from './gitservers.js';
+import { ROLE_TASKS, roleById, MAX_NOTES } from './services/roles.js';
 import { getProject, repoDir, sentSince, getTemplate, saveTemplate, pickVariant } from './projects.js';
 
 const sleep = (ms, signal) => new Promise((resolve, reject) => {
@@ -245,7 +246,39 @@ export function makeHandlers(app) {
     return { sent, failed, total: n, ...(invalid ? { invalid } : {}) };
   }
 
+  // Tâche d'un poste (Commerce, Communication, Finance…) : un livrable Markdown écrit à partir de la fiche du projet.
+  // `repo` : lecture du dépôt (Read / Glob / Grep) ; `web` : recherche et lecture de pages ; sinon un seul tour, sans outil.
+  const roleTask = (task) => async (ctx) => {
+    const userId = ctx.job.user_id;
+    const project = await getProject(app, ctx.job.project_id, { userId });
+    if (!project.profile) throw new Error("Analyse le projet d'abord");
+    const role = roleById(task.role);
+    const notes = String(ctx.params.notes ?? '').replace(/\r\n?/g, '\n').trim().slice(0, MAX_NOTES);
+    const model = await writeModel(userId, await modelOf(userId, 'analyze_model'));
+    let dir = null;
+    if (task.repo) {
+      await ctx.progress({ message: 'Mise à jour du repo…', pct: 3 });
+      dir = repoDir(cfg, userId, project.id);
+      await sync(userId, project.gitUrl, dir);
+    }
+    await ctx.progress({ message: `${task.label} : Claude rédige…`, pct: 10 });
+    const { prompt, system } = rolePrompt({ role, task, projectName: project.name, profile: project.profile, target: project.target || {}, notes, custom: await custom(userId), model });
+    const maxTurns = task.repo ? 14 : task.web ? 10 : 1;
+    const sink = makeSink();
+    const r = await claude(userId, {
+      prompt, system, model, maxTurns, signal: ctx.signal,
+      ...(dir ? { cwd: dir } : {}),
+      tools: task.repo ? ['Read', 'Glob', 'Grep'] : task.web ? ['WebSearch', 'WebFetch'] : [],
+      onTurn: (n) => sink.push(() => ctx.progress({ message: `${task.label} · étape ${n}…`, pct: turnPct(10, 95, n, maxTurns) })),
+    });
+    await sink.flush();
+    addUsage(ctx, r);
+    if (!r.text?.trim()) throw new Error(`Pas de résultat (${r.subtype})`);
+    return { markdown: r.text.trim(), task: task.id, role: task.role, notes };
+  };
+
   return {
+    ...Object.fromEntries(ROLE_TASKS.map((t) => [t.job, roleTask(t)])),
     async analyze(ctx) {
       const userId = ctx.job.user_id;
       const project = await getProject(app, ctx.job.project_id, { userId });
