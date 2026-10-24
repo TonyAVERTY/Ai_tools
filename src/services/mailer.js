@@ -30,7 +30,11 @@ export function makeMessageId(fromEmail) {
   return `<${Date.now().toString(36)}.${randomBytes(9).toString('base64url')}@${domain}>`;
 }
 
-export function buildProspectMail({ template, prospect, smtp, unsubUrl, subject = template.subject, messageId, inReplyTo, readReceipt = false }) {
+/**
+ * `footer: false` : l'utilisateur a retiré le pied de page (Réglages → Garde-fous, avec avertissement). Seul le texte visible disparaît :
+ * les en-têtes « List-Unsubscribe » restent, pour que la messagerie du destinataire propose quand même le désabonnement.
+ */
+export function buildProspectMail({ template, prospect, smtp, unsubUrl, subject = template.subject, messageId, inReplyTo, readReceipt = false, footer: withFooter = true }) {
   const vars = {
     entreprise: prospect.company,
     ville: prospect.city || '',
@@ -44,8 +48,8 @@ export function buildProspectMail({ template, prospect, smtp, unsubUrl, subject 
     from: smtp.fromName ? `"${smtp.fromName.replace(/"/g, '')}" <${smtp.fromEmail}>` : smtp.fromEmail,
     to: prospect.email,
     subject: fillTemplate(subject, vars).trim(),
-    text: body + '\n' + footer,
-    html: prospectHtml({ body, notice, unsubUrl }),
+    text: withFooter ? body + '\n' + footer : body,
+    html: prospectHtml({ body, notice, unsubUrl, footer: withFooter }),
     ...(messageId ? { messageId } : {}),
     ...(inReplyTo ? { inReplyTo, references: [inReplyTo] } : {}),
     headers: {

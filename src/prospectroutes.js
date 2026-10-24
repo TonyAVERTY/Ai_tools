@@ -2,7 +2,7 @@
 // Accès : le propriétaire du projet ou un membre de l'équipe qui le partage (même règle que les notes et les statuts). Un prospect d'un autre compte est « introuvable ».
 import { randomBytes } from 'node:crypto';
 import { HttpError, json, readBody } from './http.js';
-import { now } from './db.js';
+import { now, getSetting } from './db.js';
 import { accessOn } from './teams.js';
 import { getProject, getTemplate } from './projects.js';
 import { getUser } from './users.js';
@@ -163,7 +163,8 @@ export function registerProspectRoutes(router, app, { project }) {
       subject = followupSubject(template, { subject: fillTemplate(first?.subject || '', { entreprise: person.company, ville: person.city || '', accroche: person.hook || '', expediteur: smtp.fromName }) });
     }
     const unsubUrl = prospect ? `${cfg.appUrl}/u/${encodeURIComponent(person.email)}/${unsubToken(cfg.secretKey, person.email)}` : `${cfg.appUrl}/u/exemple`;
-    const mail = buildProspectMail({ template: { ...template, subject }, prospect: person, smtp, unsubUrl, subject, readReceipt: false });
+    const footer = (await getSetting(db, p.userId, 'mail_footer', '1')) !== '0'; // l'aperçu montre ce qui partira, pied de page compris ou non
+    const mail = buildProspectMail({ template: { ...template, subject }, prospect: person, smtp, unsubUrl, subject, readReceipt: false, footer });
     // Points d'attention : ce qu'on ne voit pas toujours à la relecture
     const warnings = [];
     const used = [...String(template.subject + ' ' + body).matchAll(/\{\{\s*(\w+)\s*\}\}/g)].map((m) => m[1]);
@@ -173,8 +174,9 @@ export function registerProspectRoutes(router, app, { project }) {
     if (used.includes('expediteur') && !smtp.fromName) warnings.push("Le nom d'expéditeur n'est pas réglé (Configuration du projet) : {{expediteur}} restera vide.");
     if (!p.smtp?.fromEmail) warnings.push("Aucune adresse d'envoi n'est réglée pour ce projet : l'expéditeur affiché est un exemple.");
     if (!mail.subject) warnings.push("L'objet est vide.");
+    if (!footer) warnings.push('Le pied de page est retiré (Réglages → Garde-fous) : ce mail part sans lien « Ne plus recevoir de messages » ni origine de l\'adresse.');
     json(ctx.res, {
-      ok: true, kind, variant, sample, hasB: !!String(b.subjectB ?? '').trim() && kind === 'initial',
+      ok: true, kind, variant, sample, footer, hasB: !!String(b.subjectB ?? '').trim() && kind === 'initial',
       from: mail.from, to: mail.to, subject: mail.subject, text: mail.text, warnings,
       url: `/api/preview/${keep(ctx.session.userId, mail.html)}`,
       note: sample ? 'Exemple fictif : choisis un de tes prospects pour voir le mail réel.' : null,

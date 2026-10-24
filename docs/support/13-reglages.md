@@ -18,6 +18,11 @@ GitHub est toujours accepté. Pour un **dépôt privé** : champ **Token (dépô
 - **Plafond global mails / 24 h** (300 au maximum), tous projets confondus.
 - **Délai min** et **Délai max entre 2 mails** (secondes, aléatoire entre les deux).
 - Case **Demander un accusé de lecture dans les mails de prospection**.
+- **Pied de page des mails de prospection** : par défaut, chaque mail se termine par « Vous recevez ce message car l'adresse … est publiée publiquement (source) » et un lien **Ne plus recevoir de messages**. Le bouton **Retirer le pied de page des mails** les supprime de tous tes mails (premiers mails et relances, tous tes projets). Un message d'**attention** est affiché dans la page et une **confirmation** est demandée avant le retrait, car :
+  - **Légal** : en prospection par e-mail, le RGPD et la CNIL demandent d'informer la personne de l'origine de son adresse et de lui offrir un moyen simple et gratuit de refuser les messages ; la responsabilité est la tienne (sanctions possibles) ;
+  - **Réputation** : sans lien de désinscription, les destinataires cliquent « Spam », et Gmail ou Outlook peuvent bloquer l'adresse et le domaine d'envoi ;
+  - seul l'en-tête invisible « List-Unsubscribe » reste ajouté (la page de désinscription et la liste d'opposition continuent de fonctionner), mais toutes les messageries ne l'affichent pas.
+  Une fois retiré, le bouton **Remettre le pied de page** le rétablit tout de suite (sans confirmation). Le réglage est immédiat : il n'a pas besoin du bouton « Enregistrer les réglages ». L'**Aperçu** d'un mail montre toujours ce qui partira, avec un avertissement quand le pied de page est retiré.
 Voir aussi le plafond par projet dans « Configuration du projet ».
 
 ## Budget et modèles IA

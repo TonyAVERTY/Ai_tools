@@ -1346,6 +1346,34 @@
     v.disabled = false;
   });
 
+  // ---------- Réglages : pied de page des mails (retrait confirmé, retour libre) ----------
+  const FOOTER_RISK = "Retirer le pied de page de tes mails de prospection ?\n\n"
+    + "• Légal : le RGPD et la CNIL exigent d'informer la personne de l'origine de son adresse et de lui offrir un moyen simple et gratuit de refuser tes messages. C'est toi qui en portes la responsabilité.\n"
+    + "• Réputation : sans lien de désinscription, les destinataires cliquent « Spam » et Gmail ou Outlook peuvent bloquer ton adresse et ton domaine d'envoi.\n"
+    + "• Seul l'en-tête invisible « List-Unsubscribe » reste, et toutes les messageries ne l'affichent pas.\n\n"
+    + "Tu peux le remettre à tout moment. Confirmer le retrait ?";
+  listen(document, 'click', async (e) => {
+    const off = e.target.closest('[data-footer-off]');
+    const on = e.target.closest('[data-footer-on]');
+    if (!off && !on) return;
+    if (off && !confirm(FOOTER_RISK)) return;
+    const box = (off || on).closest('[data-footer-opt]');
+    const btn = off || on;
+    btn.disabled = true;
+    try {
+      const r = await api('/api/settings/mail-footer', { enabled: !!on, confirmed: !!off });
+      $('[data-footer-off]', box).hidden = !r.enabled;
+      $('[data-footer-on]', box).hidden = r.enabled;
+      const st = $('[data-footer-state]', box);
+      st.className = `state ${r.enabled ? 'ok' : 'warn'}`;
+      st.textContent = r.enabled
+        ? 'Actif : chaque mail se termine par « Vous recevez ce message car l\'adresse … est publiée publiquement (source) » et un lien « Ne plus recevoir de messages ».'
+        : 'Retiré : tes mails partent sans lien « Ne plus recevoir de messages » ni origine de l\'adresse (seul l\'en-tête invisible « List-Unsubscribe » reste).';
+      toast(r.enabled ? 'Pied de page remis' : 'Pied de page retiré', r.enabled ? 'ok' : 'error');
+    } catch (err) { toast(err.message, 'error'); }
+    btn.disabled = false;
+  });
+
   // ---------- Formulaires ----------
   listen(document, 'submit', async (e) => {
     const form = e.target.closest('form[data-action]');
@@ -1772,7 +1800,7 @@
       ${pv.tab === 'html'
     ? `<iframe class="pv-frame" sandbox title="Aperçu du mail" src="${esc(r.url)}"></iframe>`
     : `<pre class="pv-text">${esc(r.text)}</pre>`}
-      <p class="muted small">Le lien « Ne plus recevoir de messages » ${r.sample ? 'est un lien d\'exemple' : 'est le vrai lien de ce prospect'} ; il est ajouté automatiquement à chaque mail, avec l'origine de l'adresse.</p>`;
+      <p class="muted small">${r.footer ? `Le lien « Ne plus recevoir de messages » ${r.sample ? 'est un lien d\'exemple' : 'est le vrai lien de ce prospect'} ; il est ajouté automatiquement à chaque mail, avec l'origine de l'adresse.` : 'Le pied de page est retiré dans Réglages → Garde-fous : le mail part tel quel, sans lien de désinscription visible.'}</p>`;
     if (!pvDlg.open) pvDlg.showModal();
   }
 
