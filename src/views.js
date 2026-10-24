@@ -352,9 +352,9 @@ function templateForm(p, kind) {
     <div class="job" data-job="${job}"></div>`;
 }
 
-function projectItem(p, smtp, dbCfg, imap) {
+function projectItem(p, smtp, dbCfg, imap, { open = false } = {}) {
   const profile = p.profile;
-  return `<details class="project anim" data-id="${p.id}">
+  return `<details class="project anim" data-id="${p.id}"${open ? ' open' : ''}>
 <summary><span class="pname">${esc(p.name)}</span>${p.access !== 'owner' ? `<span class="badge" title="Projet partagé par ${esc(p.ownerEmail || '')}">équipe de ${esc(p.ownerEmail || '')}</span>` : p.teamId ? '<span class="badge ok">partagé</span>' : ''}<span class="pcfg badge" data-cfg title="Afficher la liste de mise en route" hidden></span><span class="pstate" data-state></span></summary>
 <div class="pbody"><div class="pcard">
   ${acc('header', 'git', 'En-tête', 'Dépôt Git et fiche projet', `
@@ -489,7 +489,7 @@ export function dashboardPage({ email, projects, gitHosts = [], usage = null, pa
   </form>
   <dialog class="prospect-dialog" id="prospect-dialog" aria-label="Fiche prospect"><div data-dialog-body></div></dialog>
   <div class="projects">
-  ${projects.length ? projects.map((x) => projectItem(x.project, x.smtp, x.dbCfg, x.imap)).join('\n') : `<div class="empty">
+  ${projects.length ? projects.map((x) => projectItem(x.project, x.smtp, x.dbCfg, x.imap, { open: projects.length === 1 })).join('\n') : `<div class="empty">
     <span class="empty-i">${ic('folder')}</span>
     <h3>Aucun projet pour l'instant</h3>
     <p>Crée ton premier projet : donne-lui un nom et l'adresse de son dépôt Git, Claude s'occupe de l'analyser.</p>

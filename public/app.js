@@ -597,6 +597,8 @@
   // Rouvre le dernier projet consulté après un reload
   const last = sessionStorageGet('openProject');
   if (last) { const el = $(`details.project[data-id="${last}"]`); if (el) el.open = true; }
+  // Projet unique : ouvert dès l'affichage de la page (attribut `open` du serveur), on lance son suivi sans attendre un clic
+  $$('details.project[open]').forEach((el) => refreshProject(el));
   function sessionStorageGet(k) { try { return sessionStorage.getItem(k); } catch { return null; } }
   function sessionStorageSet(k, v) { try { sessionStorage.setItem(k, v); } catch { /* ignore */ } }
   $$('details.project').forEach((el) => el.addEventListener('toggle', () => { if (el.open) sessionStorageSet('openProject', el.dataset.id); }));
