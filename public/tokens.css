@@ -77,6 +77,10 @@
   }
 }
 
+/* Site public : le texte secondaire se lit parfois par-dessus le ruban de page. Il est donc un cran plus contrasté que dans l'application. */
+body.site { --muted: #3f4c70; }
+@media (prefers-color-scheme: dark) { body.site { --muted: #b9c5e0; } }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation: none !important;

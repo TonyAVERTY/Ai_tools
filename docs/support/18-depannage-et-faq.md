@@ -16,6 +16,17 @@ Vérifier dans l'ordre : 1) SMTP enregistré (« Configuration du projet ») ; 2
 ## Mes mails arrivent en spam
 Configurer SPF, DKIM et DMARC pour le domaine d'envoi ; envoyer de petits lots au début et augmenter progressivement ; garder des délais entre les mails ; éviter les liens et pièces jointes dans le premier mail ; soigner l'accroche. AiTools ajoute déjà un lien de désinscription et les en-têtes « List-Unsubscribe ».
 
+## « Cette adresse ne peut pas être ajoutée » en ajoutant ou modifiant un prospect
+L'adresse existe déjà dans ce projet (cherche-la dans la liste, avec la recherche) ou elle ne doit pas être contactée (désinscription ou refus enregistrés, tous comptes confondus). Le message est le même dans les deux cas : AiTools ne dit pas lequel. Autres refus : « Adresse email invalide », « Score : un nombre de 1 à 10 », « Adresse du site invalide » (attendu : https://exemple.fr), plafond de prospects de l'offre atteint (voir « Offres, plafonds et limites »).
+
+## Je ne peux pas modifier l'adresse email d'un prospect
+Elle est verrouillée dès que le prospect a été contacté (statut autre que « À contacter ») : les mails, relances et réponses y sont rattachés. Ajoute un nouveau prospect avec la bonne adresse. Les autres informations restent modifiables.
+
+## L'aperçu du mail ne s'affiche pas ou affiche une alerte
+- « Le corps du mail est vide » : écris le modèle ou clique « Générer avec l'IA » avant de cliquer **Aperçu**.
+- « Aperçu expiré » : relance l'aperçu (il se garde 15 minutes).
+- Les alertes jaunes (variable inconnue, accroche vide, nom d'expéditeur ou adresse d'envoi non réglés) montrent ce que le prospect verrait en moins bien : corrige le modèle ou la configuration du projet. Le lien de désinscription d'un exemple fictif est un lien d'exemple, il ne fonctionne pas.
+
 ## Les réponses n'apparaissent pas
 Configurer la **Boîte de réception (IMAP)** (« Enregistrer et tester ») et cliquer **Vérifier maintenant** dans la section Envoi (lecture automatique toutes les 15 minutes). Sans IMAP, les réponses ne sont pas détectées et les relances automatiques ne partent pas.
 

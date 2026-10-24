@@ -16,6 +16,9 @@ export const RATE_LIMITS = {
   event: { user: { max: 60, windowMs: 10 * MIN } },
   chat: { user: { max: 40, windowMs: 10 * MIN } },
   chat_upload: { user: { max: 60, windowMs: 10 * MIN } },
+  // Ajout, modification et suppression de prospects ; aperçu d'un mail (rendu sans envoi)
+  prospect_write: { user: { max: 120, windowMs: 10 * MIN } },
+  preview: { user: { max: 120, windowMs: 10 * MIN } },
   // Vidéos de promotion : un rendu coûte un appel Claude et plusieurs minutes de processeur
   promo: { user: { max: 20, windowMs: HOUR } },
   // Abonnement iCal (lien secret) : un agenda interroge au plus quelques fois par heure
