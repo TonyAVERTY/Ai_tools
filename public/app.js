@@ -411,7 +411,8 @@
           : usageRow(label, pct(w.utilization), { ratio: w.utilization, tip, cls: w.utilization >= 1 ? 'error' : w.utilization >= 0.8 ? 'warn' : '' }));
       }
     }
-    for (const [label, x] of [['IA via AiTools 24 h', s.budget.day], ['IA via AiTools 30 j', s.budget.month]]) {
+    // Montants en $ : seulement avec une clé API (c'est elle qui est facturée à l'usage). Avec un abonnement, rien n'est facturé en plus : on n'affiche aucun prix.
+    for (const [label, x] of s.linkMode === 'api_key' ? [['IA via AiTools 24 h', s.budget.day], ['IA via AiTools 30 j', s.budget.month]] : []) {
       const r = x.limit ? x.used / x.limit : null;
       rows.push(usageRow(label, `${x.used.toFixed(2)} $${x.limit ? ` / ${x.limit} $` : ''}`, { ratio: r, tip: GAUGE_TIP, cls: r >= 1 ? 'error' : r >= 0.8 ? 'warn' : '' }));
     }
@@ -429,8 +430,8 @@
       const hot = s.temp !== null && s.temp >= 70;
       el.innerHTML = `${s.temp !== null ? `<span class="${hot ? 'warn' : ''}">${s.temp} °C</span>` : ''}
         ${claudeQuota(s.claudeRateLimit, s.linkMode)}
-        ${gauge('24 h', s.budget.day)} ${gauge('30 j', s.budget.month)}
-        ${s.budget.blocked ? '<span class="error">Budget IA atteint : jobs IA en attente</span>' : ''}`;
+        ${s.linkMode === 'api_key' ? `${gauge('24 h', s.budget.day)} ${gauge('30 j', s.budget.month)}` : ''}
+        ${s.budget.blocked && s.linkMode === 'api_key' ? '<span class="error">Budget IA atteint : jobs IA en attente</span>' : ''}`;
       for (const box of $$('[data-usage-claude]')) { box.innerHTML = usageClaude(s); box.hidden = false; }
       renderJobsMenu(s);
       busy = s.queue > 0;
@@ -1625,7 +1626,7 @@
           <div class="kpi"><span>Réponses</span><strong>${(s.replied || 0) + (s.client || 0)}</strong></div>
           <div class="kpi"><span>Convertis</span><strong>${s.client || 0}</strong></div>
         </div>
-        <p class="muted small">Coût IA du projet (équivalent API) : $${r.aiCostUsd.toFixed(2)}${b?.cached ? ' · chiffres en cache (10 min)' : ''}
+        <p class="muted small">${r.priced ? `Coût IA du projet (équivalent API) : $${r.aiCostUsd.toFixed(2)}${b?.cached ? ' · chiffres en cache (10 min)' : ''}` : (b?.cached ? 'Chiffres en cache (10 min)' : '')}
         <button class="btn small" data-recap-refresh>Rafraîchir</button></p>
         <div data-charts></div>`;
       loadHistory(proj);
