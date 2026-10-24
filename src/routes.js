@@ -24,6 +24,7 @@ import { registerEventRoutes } from './events.js';
 import { feedToken, feedUrl } from './services/ical.js';
 import { developerMode } from './apitokens.js';
 import { registerLinkedinRoutes } from './linkedinroutes.js';
+import { registerPromoRoutes, removeProjectVideos } from './promo.js';
 import { dashboardPage, settingsPage, unsubPage, accountPage, linkPage } from './views.js';
 import { enqueue, latestJobs, cancelJob, usageSummary } from './services/jobs.js';
 import { validateGitUrl, removeRepo } from './services/git.js';
@@ -75,6 +76,7 @@ export function registerRoutes(router, app) {
   registerTeamRoutes(router, app);
   registerMailRoutes(router, app);
   registerLinkedinRoutes(router, app, { project, aiOpts });
+  registerPromoRoutes(router, app, { project, aiOpts });
   registerApiV1(router, app, { aiOpts });
   registerDeveloperRoutes(router, app);
   registerCalendarRoutes(router, app);
@@ -406,6 +408,7 @@ export function registerRoutes(router, app) {
 
   router.post('/api/projects/:id/delete', async (ctx) => {
     const p = await project(ctx, { need: 'owner' });
+    await removeProjectVideos(app, p.id); // les fichiers d'abord : les lignes partent avec le projet
     await db.prepare('DELETE FROM projects WHERE id = ? AND user_id = ?').run(p.id, p.userId);
     removeRepo(repoDir(cfg, p.userId, p.id));
     clearRecapCache(p.id);

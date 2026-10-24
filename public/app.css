@@ -884,3 +884,15 @@ html.nav-busy { cursor: progress; }
 
 /* Téléphone : la liste des projets de la page IA s'ouvre sur toute la largeur du formulaire, pas depuis le bouton */
 @media (max-width: 600px) { .chat-form { position: relative; } .chat-proj { position: static; } .chat-projlist { left: 12px; right: 12px; min-width: 0; max-width: none; } }
+
+/* ---------- Promotion : formulaire et vidéos produites ---------- */
+.promo-form { display: flex; flex-direction: column; gap: var(--s-3); margin-bottom: var(--s-3); }
+.pv-list { display: grid; gap: var(--s-4); grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); margin-top: var(--s-4); }
+.pv { display: flex; flex-direction: column; gap: var(--s-2); padding: var(--s-3); border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--card); min-width: 0; }
+.pv-video { display: block; width: 100%; max-height: 420px; border-radius: var(--radius); background: var(--code-bg); object-fit: contain; }
+.pv-vertical { aspect-ratio: 9 / 16; max-height: 460px; }
+.pv-carre { aspect-ratio: 1 / 1; }
+.pv-paysage { aspect-ratio: 16 / 9; }
+.pv-title { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.pv-meta p { margin: 0; }
+.pv-meta .row { margin-top: var(--s-2); }
