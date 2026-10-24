@@ -8,7 +8,7 @@ Toute tâche lourde (analyse, recherche de prospects, envoi, relances, évolutio
 - Le plafond mensuel de **jobs IA** de l'offre s'applique (voir « Offres, plafonds et limites ») ; les envois de mails ont leur propre plafond.
 
 ## Le menu « Activité » (barre du haut)
-Il apparaît dès qu'un job est en cours, en attente ou programmé : la liste détaille chaque job, son projet, son état (« Démarré il y a… », « En file d'attente », « Programmé » suivi du jour et de l'heure), son avancement en pourcentage et un message (« Rendu de la vidéo : image 120/450 »…). Boutons **Voir** (ouvre le projet) et **Annuler**. Quand on lance une tâche, une petite animation conduit à ce menu.
+Il apparaît dès qu'un job est en cours, en attente ou programmé : la liste détaille chaque job, son projet, son état (« Démarré il y a… », « En file d'attente », « Programmé » suivi du jour et de l'heure), son avancement en pourcentage avec sa barre, et un message (« Rendu de la vidéo : image 120/450 »…). Une tâche qui n'a pas encore démarré (en file d'attente, retenue par le quota Claude ou programmée) affiche **0 %** et une barre vide ; le message dit pourquoi elle attend (par exemple « En attente : quota de la session Claude (5 h) à 95 % »). Le même pourcentage s'affiche dans la zone de la tâche, dans le projet. Boutons **Voir** (ouvre le projet) et **Annuler**. Quand on lance une tâche, une petite animation conduit à ce menu.
 Quand un job est « En attente : … », la raison est écrite : budget IA atteint, quota Claude serré, charge élevée du serveur, ou plafond du plan.
 
 ## Jobs de nuit (« Cette nuit (1h-6h) »)
