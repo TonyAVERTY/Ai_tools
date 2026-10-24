@@ -36,7 +36,7 @@
 
   // Lancement d'une tâche (analyse, recherche, envoi, audit…) : le bouton s'enfonce, puis un petit agent apporte la tâche au menu « Activité »
   // (public/fx.js). Un seul point d'accroche, ici : toute route qui met un job en file passe par api().
-  const LAUNCH = /^\/api\/(projects\/\d+\/(analyze|template|followup_template|prospect|evolution|code-review|send|linkedin\/generate|promo\/generate)|prospects\/\d+\/hook)$/;
+  const LAUNCH = /^\/api\/(projects\/\d+\/(analyze|template|followup_template|prospect|evolution|code-review|send|linkedin\/generate|promo\/generate|poste\/\w+)|prospects\/\d+\/hook)$/;
   let lastTrigger = null; // le bouton cliqué (ou validé au clavier) juste avant
   listen(document, 'click', (e) => { const t = e.target.closest?.('button, a.btn, label.btn'); if (t) lastTrigger = t; }, true);
   listen(document, 'submit', (e) => { lastTrigger = e.submitter || $('button:not([type=button])', e.target) || lastTrigger; }, true);
@@ -326,7 +326,7 @@
     const msg = p.message || (running ? 'En cours…' : '');
     return `<div class="jitem j-${scheduled ? 'scheduled' : j.status}${isNew ? ' new' : ''}">
       <div class="jrow">${scheduled ? '<span class="moon" aria-hidden="true"></span>' : running ? '<span class="pulse" aria-hidden="true"></span>' : '<span class="dot-wait" aria-hidden="true"></span>'}
-        <strong>${esc(LABELS[j.type] || j.type)}</strong><span class="jproj">${j.project ? esc(j.project) : ''}</span>${v !== null ? `<span class="jpct">${v} %</span>` : ''}</div>
+        <strong>${esc(LABELS[j.type] || j.label || j.type)}</strong><span class="jproj">${j.project ? esc(j.project) : ''}</span>${v !== null ? `<span class="jpct">${v} %</span>` : ''}</div>
       ${msg ? `<div class="jmsg small muted">${esc(msg)}</div>` : ''}
       ${running ? progressBar(j) : ''}
       <div class="jmeta small muted"><span>${esc(state)}</span>
@@ -430,6 +430,7 @@
   // ---------- Rendu d'un job ----------
   function renderJob(box, job, type) {
     if (!box) return;
+    const name = LABELS[type] || box.dataset.label || 'Tâche';
     if (!job) { box.innerHTML = ''; box._sig = ''; return; }
     const p = job.progress || {};
     const later = job.status === 'queued' && job.runAfter && job.runAfter * 1000 > Date.now();
@@ -440,7 +441,7 @@
     if (later) {
       const at = new Date(job.runAfter * 1000).toLocaleString('fr-FR', { weekday: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
       box.innerHTML = `<div class="running scheduled"><span class="moon" aria-hidden="true"></span>
-        <div><div>${LABELS[type]} programmé(e) : ${esc(at)}</div><div class="small muted">Démarrage la nuit, quand ton quota Claude est libre.</div></div>
+        <div><div>${name} programmé(e) : ${esc(at)}</div><div class="small muted">Démarrage la nuit, quand ton quota Claude est libre.</div></div>
         <button class="btn small" data-cancel="${job.id}">Annuler</button></div>`;
       return;
     }
@@ -455,12 +456,12 @@
         <button class="btn small" data-cancel="${job.id}">Annuler</button></div>`;
       paintBars(box);
     } else if (job.status === 'error') {
-      box.innerHTML = `<p class="error small">${LABELS[type]} en échec : ${esc(job.error)}</p>`;
+      box.innerHTML = `<p class="error small">${name} en échec : ${esc(job.error)}</p>`;
     } else if (job.status === 'cancelled') {
-      box.innerHTML = `<p class="muted small">${LABELS[type]} annulé(e).</p>`;
+      box.innerHTML = `<p class="muted small">${name} annulé(e).</p>`;
     } else if (job.status === 'done') {
       const r = job.result || {};
-      let txt = `${LABELS[type]} terminé(e).`;
+      let txt = `${name} terminé(e).`;
       if (type === 'prospect') txt = `Recherche terminée : ${r.found} nouveau(x) prospect(s) sur ${r.requested} demandés.`;
       if (type === 'send') txt = `Envoi terminé : ${r.sent} envoyé(s), ${r.failed} échec(s).`;
       if (type === 'followup') txt = r.postponed ? 'Relances reportées au prochain créneau (lun-ven 9h-18h).' : `Relances terminées : ${r.sent} envoyée(s), ${r.failed} échec(s).`;
@@ -482,6 +483,12 @@
         box._markdown = r.markdown;
         return;
       }
+      if (type.startsWith('poste_')) {
+        const when = job.finishedAt ? new Date(job.finishedAt * 1000).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' }) : '';
+        box.innerHTML = `<div class="evo-done"><p class="ok small">Terminé${when ? ` · ${esc(when)}` : ''}</p>
+          <button type="button" class="btn small" data-poste-view="${esc(type.slice(6))}">${icon('eye')}Voir le résultat</button></div>`;
+        return;
+      }
       box.innerHTML = `<p class="ok small">${esc(txt)}</p>`;
     }
   }
@@ -496,8 +503,9 @@
     const st = state.get(id) || {};
     const jobs = s.jobs;
     for (const type of ['prospect', 'template', 'send', 'evolution', 'audit', 'followup_template', 'followup', 'linkedin_post', 'promo_video']) renderJob($(`[data-job="${type}"]`, el), jobs[type], type);
+    for (const box of $$('[data-job^="poste_"]', el)) renderJob(box, jobs[box.dataset.job], box.dataset.job);
 
-    const running = Object.entries(jobs).filter(([, j]) => ACTIVE.includes(j.status)).map(([t]) => LABELS[t]);
+    const running = Object.entries(jobs).filter(([, j]) => ACTIVE.includes(j.status)).map(([t]) => LABELS[t] || $(`[data-job="${t}"]`, el)?.dataset.label || 'Tâche');
     $('[data-state]', el).innerHTML = running.length
       ? `<span class="spin-inline"></span>${esc(running.join(', '))}`
       : `<span class="muted small">${s.stats.total || 0} prospect(s)</span>`;
@@ -1230,6 +1238,63 @@
     }
   });
 
+  // ---------- Postes : filtre par poste et résultat d'une tâche ----------
+  const ROLE_KEY = 'aitools.role';
+  const savedRole = () => { try { return localStorage.getItem(ROLE_KEY) || ''; } catch { return ''; } };
+  function applyRole(role) {
+    for (const proj of $$('.project')) {
+      for (const d of $$('details.acc[data-roles]', proj)) d.hidden = !!role && !d.dataset.roles.split(' ').includes(role);
+      for (const d of $$('details.role', proj)) {
+        d.hidden = !!role && d.dataset.role !== role;
+        if (role && d.dataset.role === role) d.open = true;
+      }
+      const postes = $('details.acc[data-acc="postes"]', proj);
+      if (postes && role) postes.open = true;
+      for (const b of $$('[data-role-filter]', proj)) b.setAttribute('aria-pressed', String(b.dataset.roleFilter === role));
+    }
+  }
+  if (!$$('[data-role-filter]').some((b) => b.dataset.roleFilter === savedRole())) { try { localStorage.removeItem(ROLE_KEY); } catch { /* ignore */ } }
+  applyRole(savedRole());
+  listen(document, 'click', (e) => {
+    const b = e.target.closest('[data-role-filter]');
+    if (!b) return;
+    const role = b.dataset.roleFilter;
+    try { if (role) localStorage.setItem(ROLE_KEY, role); else localStorage.removeItem(ROLE_KEY); } catch { /* le filtre fonctionne sans mémoire */ }
+    applyRole(role);
+  });
+
+  let posteMd = '';
+  listen(document, 'click', async (e) => {
+    const v = e.target.closest('[data-poste-view]');
+    if (!v) return;
+    v.disabled = true;
+    try {
+      const r = await api(`/api/projects/${v.closest('.project').dataset.id}/poste/${v.dataset.posteView}`);
+      let dlg = $('dialog.posteview');
+      if (!dlg) {
+        dlg = document.createElement('dialog');
+        dlg.className = 'prospect-dialog posteview';
+        document.body.append(dlg);
+        dlg.addEventListener('click', async (ev) => {
+          if (ev.target === dlg || ev.target.closest('[data-close]')) { dlg.close(); return; }
+          if (ev.target.closest('[data-poste-copy]')) {
+            try { await navigator.clipboard.writeText(posteMd); toast('Markdown copié'); } catch { toast('Copie impossible dans ce navigateur', 'error'); }
+          }
+        });
+      }
+      posteMd = r.markdown;
+      const when = r.finishedAt ? new Date(r.finishedAt * 1000).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' }) : '';
+      // r.html est rendu et échappé par le serveur (src/services/markdown.js)
+      dlg.setAttribute('aria-label', r.label);
+      dlg.innerHTML = `<div class="dlg-head"><div><h3>${esc(r.label)}</h3><p class="muted small">${esc(r.role)}${when ? ` · ${esc(when)}` : ''}${r.notes ? ` · précisions : ${esc(r.notes)}` : ''}</p></div>
+        <button type="button" class="btn small" data-close>Fermer</button></div>
+        <div class="poste-md">${r.html}</div>
+        <div class="row"><button type="button" class="btn small" data-poste-copy>Copier le livrable (Markdown)</button></div>`;
+      if (!dlg.open) dlg.showModal();
+    } catch (err) { toast(err.message, 'error'); }
+    v.disabled = false;
+  });
+
   // ---------- Formulaires ----------
   listen(document, 'submit', async (e) => {
     const form = e.target.closest('form[data-action]');
@@ -1266,6 +1331,11 @@
           if (data.level === 'approfondi' && !confirm('Le niveau approfondi utilise Opus et consomme beaucoup de quota. Continuer ?')) break;
           const r = await api(`/api/projects/${id}/code-review`, data);
           toast(r.budgetBlocked ? `En file, mais ${r.budgetBlocked}` : r.existing ? 'Un audit est déjà prévu ou en cours' : 'Audit lancé', r.budgetBlocked ? 'error' : 'ok');
+          break;
+        }
+        case 'poste': {
+          const r = await api(`/api/projects/${id}/poste/${form.dataset.task}`, data);
+          toast(r.budgetBlocked ? `En file, mais ${r.budgetBlocked}` : r.existing ? 'Cette tâche est déjà prévue ou en cours' : 'Tâche lancée', r.budgetBlocked ? 'error' : 'ok');
           break;
         }
         case 'template': {

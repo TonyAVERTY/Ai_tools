@@ -11,6 +11,7 @@ Bouton **Nouveau projet** → champs **Nom** et **Dépôt Git** → **Créer et 
 Clique sur son nom. Avec **un seul projet**, il est ouvert par défaut ; avec **plusieurs projets**, ils sont tous fermés à chaque arrivée sur la page (même si on en avait ouvert un avant). Quand l'application recharge la page toute seule (fin d'une analyse, cible validée), le projet en cours reste ouvert. Le bouton **Voir** du menu « Activité » ouvre le projet concerné.
 
 ## Les sections d'un projet (dans l'ordre)
+Tout en haut du projet, une rangée de boutons **Tous les postes**, **Commerce**, **Communication**… filtre les sections par poste (voir « Postes et filtre par poste : les tâches IA d'une entreprise »).
 - **En-tête** : « Dépôt Git et fiche projet ». Le dépôt (lecture seule) et la **Fiche projet** avec le bouton **Réanalyser** (refait l'analyse ; consomme un job IA et du quota Claude).
 - **Cible** (badge « à valider » ou « validée ») : description, zone, taille, décideur, secteurs (1 par ligne), requêtes de recherche (1 par ligne) ; bouton **Valider la cible**.
 - **Prospecter** : regroupe quatre sous-sections : **Recherche de prospects**, **Modèle de mail**, **Envoi**, **Relance automatique**, puis **Prospects** (liste, Kanban, fiches, import/export CSV). Voir les fichiers sur la prospection, les mails et le CRM.
@@ -19,6 +20,7 @@ Clique sur son nom. Avec **un seul projet**, il est ouvert par défaut ; avec **
 - **LinkedIn** : relier un compte, faire écrire des posts, relire, programmer, publier.
 - **Promotion** : générer une vidéo de design motion.
 - **Récapitulatif** : chiffres business et courbes (réservé aux propriétaires et administrateurs).
+- **Postes et tâches IA** : les postes d'une entreprise (Commerce, Communication, Finance…) et les tâches que Claude y fait. Voir « Postes et filtre par poste : les tâches IA d'une entreprise ».
 - **Configuration du projet** : SMTP, boîte de réception (IMAP) et base de données du récapitulatif, plus le bouton **Supprimer le projet** (réservé aux propriétaires et administrateurs).
 
 ## Supprimer un projet

@@ -2,9 +2,10 @@
 // Avec un abonnement Pro rien n'est facturé en plus : c'est un garde-fou pour ne pas épuiser le quota.
 import { getSetting, setSetting, now } from '../db.js';
 import { getLinkState, MODES } from '../claudelink.js';
+import { ROLE_TASKS } from './roles.js';
 
 // Jobs qui appellent Claude (les envois et relances n'en consomment pas)
-export const AI_JOBS = new Set(['analyze', 'prospect', 'template', 'followup_template', 'evolution', 'linkedin_post', 'promo_video', 'audit', 'hook']);
+export const AI_JOBS = new Set(['analyze', 'prospect', 'template', 'followup_template', 'evolution', 'linkedin_post', 'promo_video', 'audit', 'hook', ...ROLE_TASKS.map((t) => t.job)]);
 
 const usd = (n) => `${n.toFixed(2)} $`;
 
@@ -37,7 +38,7 @@ export async function budgetState(db, userId, { at = now() } = {}) {
 
 // Jobs IA non urgents : on peut les retarder sans perdre une occasion commerciale.
 // La prospection et l'envoi (y compris les relances) continuent même quota serré.
-const QUOTA_SENSITIVE_JOBS = new Set(['analyze', 'evolution', 'audit']);
+const QUOTA_SENSITIVE_JOBS = new Set(['analyze', 'evolution', 'audit', ...ROLE_TASKS.map((t) => t.job)]);
 export const isQuotaSensitive = (type) => QUOTA_SENSITIVE_JOBS.has(type);
 
 // Palier à partir duquel on reporte : garde de la marge sur le quota du compte Claude
