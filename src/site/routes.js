@@ -17,6 +17,8 @@ export function registerSiteRoutes(router, { cfg, db }) {
     html(res, withViewer(page, !!(await getSession(db, req))));
   };
 
+  // Le site d'accueil pour un compte connecté (sa racine « / » mène au tableau de bord) ; même page, adresse canonique « / »
+  router.get('/accueil', async ({ req, res }) => show(req, res, homePage(ctx)), open);
   router.get('/fonctionnement', async ({ req, res }) => show(req, res, howPage(ctx)), open);
   router.get('/tarifs', async ({ req, res }) => show(req, res, pricingPage(ctx)), open);
   router.get('/mentions-legales', async ({ req, res }) => show(req, res, mentionsPage(ctx)), open);
