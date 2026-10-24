@@ -31,6 +31,7 @@ const SYMBOLS = {
   inbox: '<path d="M3 13h5l1 3h6l1-3h5M5 5h14l2 8v6H3v-6z"></path>',
   info: '<circle cx="12" cy="12" r="9"></circle><path d="M12 11v5M12 8v.01"></path>',
   key: '<circle cx="8" cy="15" r="4"></circle><path d="m11 12 9-9M16 7l3 3"></path>',
+  help: '<circle cx="12" cy="12" r="9"></circle><path d="M9.5 9.6a2.6 2.6 0 1 1 3.7 2.3c-.8.4-1.2 1-1.2 1.9"></path><path d="M12 17h.01"></path>',
   globe: '<circle cx="12" cy="12" r="9"></circle><path d="M3 12h18"></path><path d="M12 3c2.5 2.6 3.8 5.6 3.8 9S14.5 18.4 12 21c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"></path>',
   link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"></path><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"></path>',
   load: '<path d="M12 3a9 9 0 1 0 9 9"></path>',

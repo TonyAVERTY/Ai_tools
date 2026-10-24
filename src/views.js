@@ -61,7 +61,13 @@ ${email ? `<header class="top">
         </div>
       </div>
       <a class="ia-link site-link" href="/accueil" data-noajax aria-label="Accès au site internet" title="Accès au site internet">${ic('globe')}<span>Site internet</span></a>
-      <a class="ia-link" href="/chat" aria-label="Assistant IA">${ic('spark')}<span>IA</span></a>
+      <details class="ia-menu">
+        <summary class="ia-link" aria-label="Assistant IA : Claude ou Support">${ic('spark')}<span>IA</span></summary>
+        <div class="user-pop ia-pop">
+          <a href="/chat">${ic('spark')}<span class="pop-t">Claude<small>Discute avec ton Claude</small></span></a>
+          <a href="/support">${ic('help')}<span class="pop-t">Support<small>Une question sur AiTools ?</small></span></a>
+        </div>
+      </details>
       <details class="user">
         <summary aria-label="Menu du compte : ${esc(email)}"><span class="avatar" aria-hidden="true">${esc(String(email).trim().charAt(0).toUpperCase())}</span></summary>
         <div class="user-pop">

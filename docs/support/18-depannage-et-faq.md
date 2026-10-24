@@ -1,0 +1,58 @@
+# Dépannage et questions fréquentes
+Résumé : les problèmes les plus fréquents (liaison Claude, jobs bloqués, mails qui ne partent pas ou arrivent en spam, prospects, LinkedIn, vidéo, agenda) avec cause et solution, plus une FAQ.
+
+## Je ne peux rien lancer, la page me renvoie à « Relier Claude »
+La liaison Claude est absente ou invalide. Relier un accès (voir « Relier, tester et déconnecter son accès Claude »). État « À revalider » : Déconnecter puis relier de nouveau.
+
+## Mon job reste « En attente »
+Lire le message « En attente : … » dans le menu **Activité**. Raisons possibles : budget IA atteint (clé API) ; quota Claude serré (au-delà de 85 %) ; charge élevée du serveur ; job programmé « Cette nuit » ; déjà un job IA en cours pour le compte. Il repart seul. On peut l'**Annuler** depuis Activité.
+
+## « Plafond atteint » ou refus de création
+Un plafond mensuel de l'offre (projets, prospects, mails, jobs IA, places d'équipe) est atteint. Le compteur est dans « Mon compte → Usage du mois » ; les plafonds se renouvellent le 1er du mois. Voir « Offres, plafonds et limites » et la page Tarifs.
+
+## Le bouton Envoyer refuse ou rien ne part
+Vérifier dans l'ordre : 1) SMTP enregistré (« Configuration du projet ») ; 2) modèle de mail **validé** (« Valider le modèle ») ; 3) des prospects au statut « À contacter » ; 4) pas de bandeau rouge de pause d'envoi sur la page Projets ; 5) plafond de mails du projet (24 h), plafond global (Réglages → Garde-fous) et plafond mensuel de l'offre ; 6) pas de job d'envoi déjà en cours ; 7) le message d'erreur du job dans Activité (erreur SMTP : identifiants, port).
+
+## Mes mails arrivent en spam
+Configurer SPF, DKIM et DMARC pour le domaine d'envoi ; envoyer de petits lots au début et augmenter progressivement ; garder des délais entre les mails ; éviter les liens et pièces jointes dans le premier mail ; soigner l'accroche. AiTools ajoute déjà un lien de désinscription et les en-têtes « List-Unsubscribe ».
+
+## Les réponses n'apparaissent pas
+Configurer la **Boîte de réception (IMAP)** (« Enregistrer et tester ») et cliquer **Vérifier maintenant** dans la section Envoi (lecture automatique toutes les 15 minutes). Sans IMAP, les réponses ne sont pas détectées et les relances automatiques ne partent pas.
+
+## La relance automatique ne part pas
+Elle exige : modèle de relance validé ; IMAP lu avec succès il y a moins de 2 heures ; heures ouvrées (lundi-vendredi 9h-18h, heure de Paris) ; plafonds non atteints ; case « Relancer une fois… » cochée.
+
+## La recherche ne trouve rien ou peu de prospects
+Cible trop étroite ou requêtes de recherche trop vagues : revoir la section **Cible** (secteurs, zone, requêtes, une par ligne), valider, relancer. Vérifier aussi le plafond de prospects de l'offre.
+
+## Le dépôt ne se clone pas
+Dépôt privé : ajouter un token dans **Réglages → Dépôts Git** (lecture seule). Autre serveur Git que GitHub : l'ajouter d'abord (URL du serveur et token). L'adresse doit être publique (les adresses internes sont refusées).
+
+## L'analyse a échoué ou la fiche est incomplète
+Relancer avec **Réanalyser**. Vérifier la liaison Claude, le quota Claude, et l'accès au dépôt.
+
+## Je ne vois pas certaines sections ou certains boutons
+Ils dépendent du rôle dans le projet : Configuration du projet, Audit, Récapitulatif, connexion LinkedIn et publication sont réservés aux administrateurs et au propriétaire ; supprimer un projet est réservé au propriétaire (voir le fichier sur les projets). Un membre d'équipe ne voit pas le SMTP ni l'IMAP.
+
+## LinkedIn : « connexion expirée » ou Publier grisé
+Cliquer **Reconnecter**. Publier grisé : aucune page choisie alors que le compte ne peut pas publier sur le profil (**Choisir une page**). Voir le fichier sur LinkedIn.
+
+## La vidéo de promotion échoue
+Lire le message du job : outils manquants sur le serveur (Chromium, ffmpeg), plafond de 20 vidéos, scène refusée après correction (relancer ou changer de modèle). Voir le fichier sur la Promotion.
+
+## L'agenda externe ne se met pas à jour
+Les agendas se rafraîchissent tout seuls mais lentement (Google : 12 à 24 heures). Pour voir un changement tout de suite, retirer puis rajouter l'abonnement, ou régénérer le lien (Créer mon lien d'agenda).
+
+## Une question hors du cadre d'AiTools
+Pour rédiger un mail, trouver des idées de posts, réfléchir à une stratégie commerciale : menu **IA → Claude**.
+
+## FAQ rapide
+- **Qui paie l'IA ?** La personne, directement chez Anthropic (clé API : à l'usage ; abonnement : son abonnement Claude). AiTools facture seulement son offre.
+- **AiTools modifie-t-il mon code ?** Non : le dépôt est cloné et lu en lecture seule.
+- **Puis-je changer le dépôt d'un projet ?** Non : créer un nouveau projet.
+- **Combien de temps dure une recherche ou une vidéo ?** Quelques minutes ; l'avancement est dans Activité.
+- **Où voir ce que j'ai consommé ?** « Mon compte → Usage du mois », la ligne d'état sous la barre du haut et « Mon compte → Liaison Claude → Limites d'utilisation ».
+- **Comment arrêter les notifications ?** Réglages → Notifications : décocher les événements ou retirer le canal.
+- **Comment supprimer mes données ?** « Mon compte → Zone de danger → Supprimer mon compte et mes données ».
+- **Y a-t-il une application mobile ?** Non : le site s'adapte aux téléphones.
+- **Qui contacter si la documentation ne répond pas ?** L'administrateur du service d'AiTools.
