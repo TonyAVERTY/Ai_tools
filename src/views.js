@@ -95,7 +95,36 @@ const PROVIDER_NAMES = { google: 'Google', apple: 'Apple' };
 
 // Section « Liaison Claude » de Mon compte : état, test, changement de mode, déliaison. Jamais le secret, ni même un masque
 // plus long que les 4 derniers caractères de la clé API.
-function linkSection(link, consent) {
+const QUOTA_WHY = {
+  denied: "Anthropic refuse le relevé en direct avec ce jeton (relie-toi avec « Se connecter avec Claude »).",
+  rate: 'Anthropic limite les relevés : nouvel essai dans une minute.',
+  network: 'Anthropic ne répond pas.',
+  unavailable: 'Le relevé en direct est indisponible chez Anthropic.',
+  format: 'Réponse inattendue du relevé en direct.',
+};
+const fmtReset = (ts) => new Date(ts * 1000).toLocaleString('fr-FR', { weekday: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
+
+// Limites d'utilisation du compte Claude : session glissante de 5 h et semaine de 7 j (abonnement seulement ; une clé API n'a pas ces limites).
+function claudeLimits(quota, mode) {
+  const head = '<h3 class="sub-h">Limites d\'utilisation</h3>';
+  if (mode === 'api_key') return `${head}<p class="hint">Avec une clé API, il n'y a pas de limite de session ni de semaine : Anthropic facture ce que tu consommes.</p>`;
+  const row = (label, w) => {
+    if (!w) return '';
+    if (w.expired) return `<li class="g"><div class="g-h"><span>${label}</span><span class="g-v muted">remise à zéro</span></div></li>`;
+    const pct = Math.round(w.utilization * 100);
+    const cls = w.utilization >= 1 ? ' full' : w.utilization >= 0.8 ? ' warn' : '';
+    return `<li class="g"><div class="g-h"><span>${label}</span><span class="g-v">${pct} %</span></div>
+      <div class="bar usage${cls}" role="progressbar" aria-label="${label}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><span class="w-${Math.round(Math.min(100, pct) / 5) * 5}"></span></div>
+      ${w.resetsAt ? `<p class="hint">Remise à zéro ${esc(fmtReset(w.resetsAt))}</p>` : ''}</li>`;
+  };
+  const rows = quota ? row('Session de 5 h', quota.fiveHour) + row('Semaine de 7 jours', quota.sevenDay) : '';
+  if (!rows) return `${head}<p class="hint">${quota?.error ? esc(QUOTA_WHY[quota.error] || 'Relevé indisponible.') : 'Pas encore mesuré.'}</p>`;
+  const live = quota.source === 'live' && !quota.error;
+  return `${head}<ul class="usage-list">${rows}</ul>
+  <p class="hint">${live ? 'Relevé en direct chez Anthropic : il compte tout ton usage de Claude, y compris hors AiTools.' : `Dernière mesure faite pendant un job AiTools${quota.error ? ` (${esc((QUOTA_WHY[quota.error] || 'relevé en direct indisponible').replace(/\.$/, ''))})` : ''}.`}</p>`;
+}
+
+function linkSection(link, consent, quota = null) {
   if (!link) {
     return `<section class="card">
   <div class="card-h"><h2>Liaison Claude</h2></div>
@@ -108,22 +137,20 @@ function linkSection(link, consent) {
   <p class="card-d">Ton accès à Claude est facturé à part, par Anthropic.</p>
   <dl class="account">
     <dt>Mode</dt><dd>${esc(link.label)}</dd>
-    <dt>État</dt><dd>${link.valid ? '<span class="ok">Valide</span>' : '<span class="error">À revalider (teste ou relie de nouveau)</span>'}</dd>
+    <dt>État</dt><dd>${link.valid ? '<span class="ok">Valide</span>' : '<span class="error">À revalider (déconnecte puis relie Claude)</span>'}</dd>
     ${link.last4 ? `<dt>Clé API</dt><dd>sk-ant-…${esc(link.last4)}</dd>` : ''}
     <dt>Reliée le</dt><dd>${fmtDate(link.linkedAt)}</dd>
-    <dt>Dernier test</dt><dd>${fmtDate(link.lastTestAt)}</dd>
     ${link.consentAt ? `<dt>Risque accepté</dt><dd>${fmtDate(link.consentAt)} (texte ${esc(link.consentVersion)})</dd>` : ''}
   </dl>
+  ${claudeLimits(quota, link.mode)}
   <div class="row-actions">
-    <form method="post" action="/link/test"><button class="btn">Tester</button></form>
-    <a class="btn" href="/link?change=1">Changer de mode</a>
-    <form method="post" action="/link/unlink"><button class="btn danger">Délier</button></form>
+    <form method="post" action="/link/unlink"><button class="btn danger">Déconnecter</button></form>
   </div>
-  <p class="hint">Délier efface le secret chiffré et annule tes jobs IA en attente ou en cours.${consent && !link.consentAt ? ` Dernier consentement au mode abonnement : ${fmtDate(consent.at)}.` : ''}</p>
+  <p class="hint">Déconnecter efface le secret chiffré et annule tes jobs IA en attente ou en cours.${consent && !link.consentAt ? ` Dernier consentement au mode abonnement : ${fmtDate(consent.at)}.` : ''}</p>
 </section>`;
 }
 
-export function accountPage({ user, error, link = null, consent = null, notice = null, usage = null, developer = false, ical = null, appUrl = '' }) {
+export function accountPage({ user, error, link = null, consent = null, notice = null, usage = null, developer = false, ical = null, appUrl = '', quota = null }) {
   return layout({
     title: 'Mon compte', email: user.email,
     body: `<div class="narrow">
@@ -137,7 +164,7 @@ export function accountPage({ user, error, link = null, consent = null, notice =
 </section>
 ${notice ? `<p class="${notice.ok ? 'msg msg-ok' : 'msg msg-err'}" role="status">${esc(notice.text)}</p>` : ''}
 ${usagePanel(usage)}
-${linkSection(link, consent)}
+${linkSection(link, consent, quota)}
 <section class="card">
   <div class="card-h"><h2>Agenda</h2><p>Connecte ton agenda (Google, Apple, Outlook) : tes prochaines actions et tes posts LinkedIn programmés s'y affichent. <a href="/calendar">Voir le calendrier</a></p></div>
   ${icalBox(ical, '/account')}
