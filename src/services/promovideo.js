@@ -24,9 +24,9 @@ export const PROMO = {
 
 /** Formats proposés (pixels, toujours pairs : exigé par H.264). */
 export const FORMATS = {
-  paysage: { label: 'Paysage 16:9 (1280 × 720)', width: 1280, height: 720 },
-  vertical: { label: 'Vertical 9:16 (720 × 1280), pour les réseaux', width: 720, height: 1280 },
-  carre: { label: 'Carré 1:1 (720 × 720)', width: 720, height: 720 },
+  paysage: { label: 'Paysage 16:9', width: 1280, height: 720 },
+  vertical: { label: 'Vertical 9:16 (réseaux)', width: 720, height: 1280 },
+  carre: { label: 'Carré 1:1', width: 720, height: 720 },
 };
 
 export class SceneError extends Error {
@@ -179,13 +179,18 @@ async function openBrowser(cfg, { width, height, signal }) {
   const child = spawn(launch.command, launch.args, { cwd: launch.cwd, env: launch.env, stdio: ['ignore', 'ignore', 'pipe'] });
   let stderr = '';
   let cdp = null;
-  const stop = () => {
+  let exited = false;
+  child.on('exit', () => { exited = true; });
+  // Arrêt : on tue Chromium, on attend qu'il soit vraiment parti (il écrit dans son profil jusqu'au bout), puis on efface le profil.
+  // Le nettoyage ne doit jamais faire échouer un rendu réussi : toute erreur y est ignorée.
+  const stop = async () => {
     try { cdp?.close(); } catch { /* rien */ }
     try { child.kill('SIGKILL'); } catch { /* déjà arrêté */ }
-    launch.cleanup();
-    if (!sandboxed) rmSync(profile, { recursive: true, force: true });
+    for (let i = 0; i < 50 && !exited; i++) await new Promise((r) => setTimeout(r, 100));
+    try { launch.cleanup(); } catch { /* rien */ }
+    if (!sandboxed) { try { rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 }); } catch { /* sera effacé avec /tmp */ } }
   };
-  signal?.addEventListener('abort', stop, { once: true });
+  signal?.addEventListener('abort', () => { stop(); }, { once: true });
   try {
     const wsUrl = await new Promise((resolve, reject) => {
       const timer = setTimeout(() => reject(new Error(`Chromium ne démarre pas. ${stderr.slice(-300)}`)), 25_000);
@@ -203,7 +208,7 @@ async function openBrowser(cfg, { width, height, signal }) {
     cdp = new Cdp(page.webSocketDebuggerUrl);
     await cdp.ready;
     return { cdp, stop };
-  } catch (e) { stop(); throw e; }
+  } catch (e) { await stop(); throw e; }
 }
 
 /** Charge la scène dans la page. Lève une SceneError si elle ne définit pas renderFrame ou si elle plante au chargement. */
@@ -263,7 +268,7 @@ export async function renderPromo({ cfg, html, fps, seconds, width, height, out,
   const ffmpegBin = cfg.ffmpegBin || 'ffmpeg';
   const { cdp, stop } = await openBrowser(cfg, { width, height, signal });
   let ff = null;
-  const deadline = setTimeout(stop, PROMO.renderTimeoutMs);
+  const deadline = setTimeout(() => { stop(); }, PROMO.renderTimeoutMs);
   const aborted = () => { if (signal?.aborted) throw new Error('Annulé'); };
   try {
     await loadScene(cdp, doc, { width, height });
@@ -297,7 +302,7 @@ export async function renderPromo({ cfg, html, fps, seconds, width, height, out,
     try { ff?.kill('SIGKILL'); } catch { /* déjà arrêté */ }
     rmSync(out, { force: true });
     throw e;
-  } finally { clearTimeout(deadline); stop(); }
+  } finally { clearTimeout(deadline); await stop(); }
 }
 
 /** Dossier de travail laissé par un rendu interrompu : rien à faire (le profil Chromium est dans /tmp), gardé pour les tests. */

@@ -839,4 +839,35 @@ export const MIGRATIONS = [
       ) ${T}`,
     ],
   },
+  {
+    // Onglet Promotion : vidéos de design motion générées pour un projet. Le fichier MP4 est sur le disque (dossier de l'utilisateur, supprimé avec son
+    // compte) ; `file` est un nom de fichier, jamais un chemin. Supprimer le projet supprime les lignes (les fichiers sont retirés par le code).
+    name: 'promo_videos',
+    sqlite: [
+      `CREATE TABLE promo_videos (
+        id INTEGER PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        subject TEXT NOT NULL DEFAULT '', fps INTEGER NOT NULL, seconds INTEGER NOT NULL, format TEXT NOT NULL,
+        width INTEGER NOT NULL, height INTEGER NOT NULL, size INTEGER NOT NULL DEFAULT 0, file TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+      )`,
+      'CREATE INDEX promo_videos_project ON promo_videos(project_id, id)',
+      'CREATE INDEX promo_videos_user ON promo_videos(user_id, id)',
+    ],
+    mysql: [
+      `CREATE TABLE IF NOT EXISTS promo_videos (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        user_id BIGINT NOT NULL,
+        project_id BIGINT NOT NULL,
+        subject VARCHAR(600) NOT NULL DEFAULT '', fps INT NOT NULL, seconds INT NOT NULL, format VARCHAR(12) NOT NULL,
+        width INT NOT NULL, height INT NOT NULL, size BIGINT NOT NULL DEFAULT 0, file VARCHAR(100) NOT NULL,
+        created_at BIGINT NOT NULL,
+        KEY promo_videos_project (project_id, id),
+        KEY promo_videos_user (user_id, id),
+        CONSTRAINT promo_videos_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        CONSTRAINT promo_videos_project_fk FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+      ) ${T}`,
+    ],
+  },
 ];

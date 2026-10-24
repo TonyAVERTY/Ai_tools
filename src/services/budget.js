@@ -4,7 +4,7 @@ import { getSetting, setSetting, now } from '../db.js';
 import { getLinkState, MODES } from '../claudelink.js';
 
 // Jobs qui appellent Claude (les envois et relances n'en consomment pas)
-export const AI_JOBS = new Set(['analyze', 'prospect', 'template', 'followup_template', 'evolution', 'linkedin_post', 'audit', 'hook']);
+export const AI_JOBS = new Set(['analyze', 'prospect', 'template', 'followup_template', 'evolution', 'linkedin_post', 'promo_video', 'audit', 'hook']);
 
 const usd = (n) => `${n.toFixed(2)} $`;
 

@@ -5,7 +5,9 @@ import { runClaude, extractJson, rateLimitWindows } from './services/claude.js';
 import { addUsage } from './services/jobs.js';
 import { syncRepo } from './services/git.js';
 import { normalizeModel } from './services/models.js';
-import { analyzePrompt, prospectPrompt, templatePrompt, followupTemplatePrompt, evolutionPrompt, linkedinPostPrompt, hookPrompt, auditPrompt, parseCustomPrompts, LEVELS } from './services/prompts.js';
+import { analyzePrompt, prospectPrompt, templatePrompt, followupTemplatePrompt, evolutionPrompt, linkedinPostPrompt, hookPrompt, auditPrompt, promoPrompt, parseCustomPrompts, LEVELS } from './services/prompts.js';
+import { PROMO, FORMATS, SceneError, parsePromoParams, extractScene, promoSupported, renderPromo } from './services/promovideo.js';
+import { reserveVideo, finishVideo, removeVideo, countVideos } from './promo.js';
 import { linkedinAccount, saveDraft, recentDrafts } from './linkedin.js';
 import { followupCandidates, followupSubject, isBusinessHours } from './services/followup.js';
 import { EMAIL_RE, createTransport, buildProspectMail, allowedToSend, makeMessageId } from './services/mailer.js';
@@ -389,6 +391,53 @@ export function makeHandlers(app) {
       body = body.replace(/\r\n/g, '\n').trim().slice(0, 3000);
       if (body.length < 50) throw new Error('Claude n\'a pas produit de post exploitable : réessaie');
       return { ok: true, postId: await saveDraft(db, project.id, { body, direction }) };
+    },
+
+    // Vidéo de promotion : Claude écrit une scène animée, Chromium la rend image par image, ffmpeg produit le MP4.
+    // Une scène refusée au rendu (erreur de code, rien qui bouge…) est renvoyée une fois à Claude avec le message d'erreur.
+    async promo_video(ctx) {
+      const userId = ctx.job.user_id;
+      const project = await getProject(app, ctx.job.project_id, { userId });
+      if (!project.profile) throw new Error("Analyse le projet d'abord");
+      const sup = (app.promoSupported || promoSupported)(cfg);
+      if (!sup.ok) throw new Error(sup.reason);
+      const params = parsePromoParams(ctx.params);
+      if (params.error) throw new Error(params.error);
+      if ((await countVideos(db, userId)) >= PROMO.maxVideos) throw new Error(`Tu as déjà ${PROMO.maxVideos} vidéos : supprime-en une avant d'en produire une autre.`);
+      const fmt = FORMATS[params.format];
+      const model = await writeModel(userId, await modelOf(userId, 'analyze_model'));
+      const video = await reserveVideo(app, { userId, projectId: project.id, subject: params.subject, fps: params.fps, seconds: params.seconds, format: params.format, width: fmt.width, height: fmt.height });
+      const sink = makeSink();
+      try {
+        let fix = null;
+        for (let attempt = 1; ; attempt++) {
+          await ctx.progress({ message: attempt === 1 ? (params.subject ? 'Claude conçoit la vidéo sur ton sujet…' : 'Claude conçoit la vidéo de présentation du projet…') : 'Claude corrige la scène…', pct: attempt === 1 ? 8 : 40 });
+          const { prompt, system } = promoPrompt({
+            projectName: project.name, profile: project.profile, target: project.target || {}, subject: params.subject,
+            seconds: params.seconds, fps: params.fps, format: params.format, width: fmt.width, height: fmt.height, custom: await custom(userId), model, fix,
+          });
+          const r = await claude(userId, { prompt, system, model, maxTurns: 1, tools: [], signal: ctx.signal });
+          addUsage(ctx, r);
+          if (!r.ok) throw new Error(`La vidéo n'a pas pu être conçue (${r.subtype})${r.text ? ` : ${String(r.text).replace(/\s+/g, ' ').trim().slice(0, 200)}` : ''}`);
+          try {
+            const out = await (app.renderPromo || renderPromo)({
+              cfg, html: extractScene(r.text), fps: params.fps, seconds: params.seconds, width: fmt.width, height: fmt.height, out: video.path, signal: ctx.signal,
+              onProgress: ({ done, total }) => sink.push(() => ctx.progress({ message: `Rendu de la vidéo : image ${done}/${total}`, pct: 45 + Math.round((done / total) * 53) })),
+            });
+            await sink.flush();
+            await finishVideo(db, video.id, out.bytes);
+            return { ok: true, videoId: video.id, frames: out.frames, attempts: attempt };
+          } catch (e) {
+            await sink.flush().catch(() => {});
+            if (!(e instanceof SceneError)) throw e;
+            if (attempt >= 2) throw new Error(`La scène écrite par Claude ne passe pas au rendu : ${e.message}`);
+            fix = e.message;
+          }
+        }
+      } catch (e) {
+        await removeVideo(app, { id: video.id, user_id: userId });
+        throw e;
+      }
     },
 
     send: (ctx) => sendMails(ctx, 'initial'),

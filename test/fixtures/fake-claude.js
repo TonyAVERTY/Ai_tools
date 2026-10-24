@@ -22,9 +22,19 @@ const profile = { resume: 'Cartes de fidélité digitales.', proposition_valeur:
 // Post LinkedIn : reprend la direction donnée (si elle existe) ; un 2e passage (brouillons déjà produits) donne un autre texte
 const liDirection = /Direction donnée par l'auteur \(le sujet du post\) : « (.*?) »/s.exec(prompt)?.[1];
 const liPost = () => JSON.stringify({ post: `${prompt.includes('Brouillons déjà produits') ? 'Autre angle' : 'Premier angle'} : ${liDirection ? `sur ${liDirection}` : 'sujet choisi par Claude'}. ${'Un texte de post assez long pour passer le contrôle de taille. '.repeat(2)}` });
+// Vidéo de promotion : une scène HTML. SCENEBAD (dans le sujet) = scène sans renderFrame au premier essai, bonne après la demande de correction ;
+// SCENEFOREVER = toujours fautive.
+const promoSubject = /Sujet demandé : « (.*?) »/s.exec(prompt)?.[1] || 'présentation';
+const promoScene = () => {
+  const fixed = prompt.includes('Ta version précédente a été refusée au rendu');
+  if (prompt.includes('SCENEFOREVER') || (prompt.includes('SCENEBAD') && !fixed)) return '<!doctype html><html><body>rien</body></html>';
+  return '```html\n<!doctype html><html><head><style>body{margin:0;background:#0b1020;overflow:hidden}#t{position:absolute;top:40%;left:10%;font:700 40px sans-serif;color:#fff}</style></head><body><div id="t"></div><script>'
+    + 'var S=' + JSON.stringify(promoSubject) + ';window.renderFrame=function(t){var e=document.getElementById("t");e.textContent=S;e.style.opacity=Math.min(1,t);e.style.left=(10+t*10)+"%";};</script></body></html>\n```';
+};
 // Page IA : « ECHO » renvoie le dernier message de l'utilisateur (la conversation envoyée contient les précédents)
 const lines = prompt.includes('ECHO') ? ['Écho : ' + prompt.split('Utilisateur : ').pop().trim()]
   : prompt.includes('UN post LinkedIn') ? [liPost()]
+  : prompt.includes('window.renderFrame') ? [promoScene()]
   : prompt.includes('Audite ce projet') ? ['## Résumé\nCode correct.\n## Constats\n**[FAIBLE]** Pas de tests — `src/a.js:1` — manque de couverture.']
   : prompt.includes('UNE accroche personnalisée') ? ['{"hook":"Boulangerie Le Fournil : des fournées de qualité à Rennes.","city":"Rennes","sector":"boulangerie"}']
   : prompt.includes('ENVDUMP') ? ['```json\n' + JSON.stringify({ env: process.env, cwd: process.cwd() }) + '\n```']
