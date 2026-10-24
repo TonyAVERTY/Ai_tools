@@ -1525,6 +1525,22 @@
       })()}
       ${source ? `<p class="small muted">Email trouvé sur : <a href="${esc(source)}" target="_blank" rel="noopener noreferrer">${esc(source)}</a></p>` : ''}
 
+      <h4>Informations</h4>
+      <form data-dlg="edit" class="pform">
+        <div class="grid2">
+          <label class="field"><span class="lbl">Entreprise</span><input name="company" required maxlength="200" value="${esc(p.company)}"></label>
+          <label class="field"><span class="lbl">Email</span><input name="email" type="email" required maxlength="200" value="${esc(p.email)}"${p.status === 'new' ? '' : ' readonly aria-describedby="email-lock"'}></label>
+          <label class="field"><span class="lbl">Site</span><input name="website" maxlength="300" value="${esc(p.website || '')}" placeholder="https://entreprise.fr"></label>
+          <label class="field"><span class="lbl">Ville</span><input name="city" maxlength="100" value="${esc(p.city || '')}"></label>
+          <label class="field"><span class="lbl">Secteur</span><input name="sector" maxlength="100" value="${esc(p.sector || '')}"></label>
+          <label class="field"><span class="lbl">Score (1 à 10)</span><input name="score" type="number" min="1" max="10" inputmode="numeric" value="${p.score ?? ''}"></label>
+        </div>
+        <label class="field"><span class="lbl">Accroche</span><input name="hook" maxlength="400" value="${esc(p.hook || '')}"></label>
+        <label class="field"><span class="lbl">Origine de l'adresse</span><input name="source" maxlength="300" value="${esc(p.source || '')}"></label>
+        ${p.status === 'new' ? '' : '<p class="muted small" id="email-lock">L\'adresse ne peut plus être modifiée : des mails y sont rattachés. Pour une autre adresse, ajoute un nouveau prospect.</p>'}
+        <div class="row"><button class="btn">Enregistrer les informations</button></div>
+      </form>
+
       <h4>Historique</h4>
       ${events.length ? `<ol class="timeline">${events.map((e) => `<li><time>${fmtDate(e.at)}</time><div>${e.html}</div></li>`).join('')}</ol>` : '<p class="muted small">Pas encore contacté.</p>'}
 
@@ -1541,6 +1557,8 @@
         <textarea name="body" rows="3" maxlength="2000" placeholder="Ce qu'il a dit, le contexte, ce qu'il faut retenir…"></textarea>
         <button class="btn">Ajouter la note</button>
       </form>
+      <div class="danger-zone"><button type="button" class="btn small danger" data-del-prospect>${icon('trash')}Supprimer ce prospect</button>
+        <span class="muted small">Ses notes sont supprimées. Les mails déjà envoyés restent dans la page Mails.</span></div>
       <ul class="notes">${d.notes.map((n) => `<li><div class="small muted">${fmtDate(n.created_at)} · <button type="button" class="link small" data-del-note="${n.id}">supprimer</button></div><div class="note-body">${esc(n.body)}</div></li>`).join('')}</ul>`;
     dlg.dataset.id = id;
     if (!dlg.open) dlg.showModal();
@@ -1571,6 +1589,13 @@
           }
         } catch (err) { toast(err.message, 'error'); regen.disabled = false; }
       }
+      if (e.target.closest('[data-del-prospect]')) {
+        const name = $('.dlg-head h3', dlg)?.textContent || 'ce prospect';
+        if (!confirm(`Supprimer définitivement « ${name} » ?\nSes notes seront supprimées. Les mails déjà envoyés restent dans la page Mails.`)) return;
+        try { await api(`/api/prospects/${id}/delete`, {}); dlg.close(); toast('Prospect supprimé'); refreshOpenLists(); }
+        catch (err) { toast(err.message, 'error'); }
+        return;
+      }
       if (e.target.closest('[data-clear-next]')) {
         await api(`/api/prospects/${id}/next`, { action: '' }).catch((err) => toast(err.message, 'error'));
         openProspect(id); refreshOpenLists();
@@ -1583,11 +1608,106 @@
       const id = dlg.dataset.id;
       try {
         if (form.dataset.dlg === 'note') { await api(`/api/prospects/${id}/notes`, formData(form)); toast('Note ajoutée'); }
+        else if (form.dataset.dlg === 'edit') { await api(`/api/prospects/${id}/update`, formData(form)); toast('Informations enregistrées'); refreshOpenLists(); }
         else { await api(`/api/prospects/${id}/next`, formData(form)); toast('Prochaine action enregistrée'); refreshOpenLists(); }
         openProspect(id);
       } catch (err) { toast(err.message, 'error'); }
     });
   }
+  // ---------- Aperçu du mail ----------
+  // Le serveur construit le mail avec le même code que l'envoi réel (rien n'est envoyé) ; le HTML s'affiche dans un cadre isolé (sans script ni réseau).
+  let pvDlg = null;
+  const pv = { form: null, prospectId: '', variant: 'A', tab: 'html', prospects: null };
+
+  async function renderPreview() {
+    const form = pv.form;
+    const id = form.closest('.project').dataset.id;
+    let r;
+    try {
+      r = await api(`/api/projects/${id}/template/preview`, {
+        kind: form.dataset.kind, subject: form.subject.value, subjectB: form.subjectB?.value || '', body: form.body.value, variant: pv.variant, prospectId: pv.prospectId,
+      });
+    } catch (err) { toast(err.message, 'error'); return; }
+    if (!pv.prospects) {
+      try { pv.prospects = (await api(`/api/projects/${id}/prospects`)).rows || []; } catch { pv.prospects = []; }
+    }
+    if (!r.hasB) pv.variant = 'A';
+    const opts = pv.prospects.map((p) => `<option value="${p.id}"${String(p.id) === String(pv.prospectId) ? ' selected' : ''}>${esc(p.company)} · ${esc(p.email)}</option>`).join('');
+    $('[data-dialog-body]', pvDlg).innerHTML = `
+      <div class="row dlg-head"><div><h3>${icon('eye')} Aperçu du ${r.kind === 'followup' ? 'mail de relance' : 'premier mail'}</h3>
+        <p class="muted small">Voilà ce que le prospect reçoit. Rien n'est envoyé.</p></div><button type="button" class="btn small" data-close>Fermer</button></div>
+      <div class="pv-controls">
+        <label class="field"><span class="lbl">Voir avec</span><span class="sel"><select data-pv-prospect><option value="">Un exemple fictif</option>${opts}</select>${icon('down')}</span></label>
+        ${r.hasB ? `<div class="seg" role="group" aria-label="Objet à afficher">
+          <button type="button" class="btn small" data-pv-variant="A" aria-pressed="${r.variant === 'A'}">Objet A</button>
+          <button type="button" class="btn small" data-pv-variant="B" aria-pressed="${r.variant === 'B'}">Objet B</button></div>` : ''}
+      </div>
+      ${r.note ? `<p class="muted small">${esc(r.note)}</p>` : ''}
+      <dl class="pv-head"><dt>De</dt><dd>${esc(r.from)}</dd><dt>À</dt><dd>${esc(r.to)}</dd><dt>Objet</dt><dd><strong>${esc(r.subject) || '<span class="error">(vide)</span>'}</strong></dd></dl>
+      ${r.warnings.length ? `<ul class="pv-warn" role="status">${r.warnings.map((w) => `<li>${icon('alert')}<span>${esc(w)}</span></li>`).join('')}</ul>` : ''}
+      <div class="seg" role="group" aria-label="Version du mail">
+        <button type="button" class="btn small" data-pv-tab="html" aria-pressed="${pv.tab === 'html'}">Mail</button>
+        <button type="button" class="btn small" data-pv-tab="text" aria-pressed="${pv.tab === 'text'}">Version texte</button></div>
+      ${pv.tab === 'html'
+    ? `<iframe class="pv-frame" sandbox title="Aperçu du mail" src="${esc(r.url)}"></iframe>`
+    : `<pre class="pv-text">${esc(r.text)}</pre>`}
+      <p class="muted small">Le lien « Ne plus recevoir de messages » ${r.sample ? 'est un lien d\'exemple' : 'est le vrai lien de ce prospect'} ; il est ajouté automatiquement à chaque mail, avec l'origine de l'adresse.</p>`;
+    if (!pvDlg.open) pvDlg.showModal();
+  }
+
+  listen(document, 'click', async (e) => {
+    const open = e.target.closest('[data-tpl-preview]');
+    if (open) {
+      if (!pvDlg) {
+        pvDlg = document.createElement('dialog');
+        pvDlg.className = 'prospect-dialog mailprev';
+        pvDlg.setAttribute('aria-label', 'Aperçu du mail');
+        pvDlg.innerHTML = '<div data-dialog-body></div>';
+        document.body.append(pvDlg);
+        pvDlg.addEventListener('click', (ev) => {
+          if (ev.target === pvDlg || ev.target.closest('[data-close]')) { pvDlg.close(); return; }
+          const v = ev.target.closest('[data-pv-variant]');
+          const t = ev.target.closest('[data-pv-tab]');
+          if (v) { pv.variant = v.dataset.pvVariant; renderPreview(); }
+          if (t) { pv.tab = t.dataset.pvTab; renderPreview(); }
+        });
+        pvDlg.addEventListener('change', (ev) => { if (ev.target.matches('[data-pv-prospect]')) { pv.prospectId = ev.target.value; renderPreview(); } });
+      }
+      Object.assign(pv, { form: open.closest('form'), prospectId: '', variant: 'A', tab: 'html', prospects: null });
+      open.disabled = true;
+      await renderPreview();
+      open.disabled = false;
+    }
+  });
+
+  // Ajouter un prospect à la main : le formulaire s'ouvre sous les boutons de la liste
+  listen(document, 'click', (e) => {
+    const t = e.target.closest('[data-pform-toggle],[data-pform-cancel]');
+    if (!t) return;
+    const d = t.closest('details.prospects');
+    const form = $('[data-pform]', d);
+    const open = t.matches('[data-pform-toggle]') ? form.hidden : false;
+    form.hidden = !open;
+    $('[data-pform-toggle]', d).setAttribute('aria-expanded', String(open));
+    if (open) $('input[name="email"]', form).focus();
+  });
+  listen(document, 'submit', async (e) => {
+    const form = e.target.closest('form[data-pform]');
+    if (!form) return;
+    e.preventDefault();
+    const d = form.closest('details.prospects');
+    const btn = $('button:not([type=button])', form);
+    btn.disabled = true;
+    try {
+      await api(`/api/projects/${form.dataset.id}/prospects`, formData(form));
+      toast('Prospect ajouté');
+      form.reset(); form.hidden = true;
+      $('[data-pform-toggle]', d).setAttribute('aria-expanded', 'false');
+      loadProspects(d);
+    } catch (err) { toast(err.message, 'error'); }
+    btn.disabled = false;
+  });
+
   // Import CSV : Excel enregistre souvent en Windows-1252, on détecte pour ne pas abîmer les accents
   listen(document, 'change', async (e) => {
     const input = e.target.closest('[data-import]');
