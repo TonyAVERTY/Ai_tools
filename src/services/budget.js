@@ -1,7 +1,8 @@
 // Budget IA : plafonds glissants 24 h / 30 j, en équivalent $ API remonté par Claude Code.
 // Avec un abonnement Pro rien n'est facturé en plus : c'est un garde-fou pour ne pas épuiser le quota.
 import { getSetting, setSetting, now } from '../db.js';
-import { getLinkState, MODES } from '../claudelink.js';
+import { getLinkState, MODES, isPriced } from '../claudelink.js';
+export { isPriced };
 import { ROLE_TASKS } from './roles.js';
 
 // Jobs qui appellent Claude (les envois et relances n'en consomment pas)

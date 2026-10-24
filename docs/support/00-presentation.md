@@ -30,7 +30,7 @@ Tout ce que fait l'IA passe par le compte Claude de la personne, jamais par un c
 - **Site internet** : ouvre le site public d'AiTools (page d'accueil du site). Sur téléphone, seule l'icône (un globe) s'affiche.
 - **IA** : un menu qui s'ouvre au survol (ou au clic sur téléphone) avec deux choix : **Claude** (l'assistant classique, pour discuter, rédiger, réfléchir) et **Support** (pose une question sur AiTools).
 - **Avatar** (la première lettre de l'email) : un menu au survol avec **Mon compte**, **Réglages** et **Déconnexion**.
-- Sous la barre : une ligne d'état avec le **quota Claude** (session de 5 h et semaine) et la consommation « IA via AiTools » sur 24 h et 30 jours.
+- Sous la barre : une ligne d'état avec le **quota Claude** (session de 5 h et semaine) et, avec une clé API seulement, la consommation « IA via AiTools » en $ sur 24 h et 30 jours (avec un abonnement Claude, aucun montant en dollars n'est affiché).
 - Pour un administrateur du service, la page « Administration » est accessible depuis « Mon compte ».
 
 ## Où trouver quoi

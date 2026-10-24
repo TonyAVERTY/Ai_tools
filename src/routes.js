@@ -8,6 +8,7 @@ import { deleteUser, normalizeEmail, getUser } from './users.js';
 import {
   assertCanRunAi, getLinkState, assertLoginConsent, linkLoginToken, validateSubscriptionToken, linkApiKey, linkSubscriptionToken, unlink, testLink, lastConsent,
   MODES,
+  isPriced,
 } from './claudelink.js';
 import { loginPage } from './site/pages.js';
 import { registerSiteRoutes } from './site/routes.js';
@@ -614,7 +615,7 @@ export function registerRoutes(router, app) {
       business = await fetchRecap(p.id, await pinDb(app, p.userId, p.dbCfg), { force: url.searchParams.has('force') });
       await saveSnapshot(db, p.id, business); // la consultation alimente aussi la courbe du jour
     } catch (e) { error = e.message; }
-    json(res, { business, error, stats, aiCostUsd: cost });
+    json(res, { business, error, stats, aiCostUsd: cost, priced: await isPriced(db, p.userId) });
   }, { limit: 'conn_test' });
 
   router.get('/api/projects/:id/prospects\\.csv', async (ctx) => {

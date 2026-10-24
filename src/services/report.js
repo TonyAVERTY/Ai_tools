@@ -6,6 +6,7 @@ import { pinSmtp } from '../netguard.js';
 import { notify } from './notify.js';
 import { weeklyMail } from './mailhtml.js';
 import { parisParts, parisTime } from './paris-time.js';
+import { isPriced } from '../claudelink.js';
 
 const pct = (a, b) => (b ? `${Math.round((a / b) * 100)} %` : '-');
 const usd = (n) => `${n.toFixed(2)} $`;
@@ -33,15 +34,17 @@ export async function weeklyStats(db, userId, { at = now() } = {}) {
   }
   const cost = (await db.prepare('SELECT COALESCE(SUM(cost_usd), 0) c FROM jobs WHERE user_id = ? AND COALESCE(finished_at, created_at) > ?').get(userId, from)).c;
   const sum = (k) => projects.reduce((t, p) => t + p[k], 0);
-  return { from, to: at, projects, totals: { found: sum('found'), sent: sum('sent'), followups: sum('followups'), replies: sum('replies'), cost } };
+  // `priced` : compte relié par clé API. Avec un abonnement Claude, aucun montant en $ n'apparaît dans le rapport.
+  return { from, to: at, priced: await isPriced(db, userId), projects, totals: { found: sum('found'), sent: sum('sent'), followups: sum('followups'), replies: sum('replies'), cost } };
 }
 
 export function weeklyText(st) {
   const lines = [`AiTools · semaine du ${day(st.from)} au ${day(st.to)}`, ''];
   const t = st.totals;
-  lines.push(`Total : ${t.found} prospect(s) trouvé(s), ${t.sent} mail(s) + ${t.followups} relance(s), ${t.replies} réponse(s) (${pct(t.replies, t.sent)}), IA ${usd(t.cost)}`, '');
+  const priced = st.priced !== false;
+  lines.push(`Total : ${t.found} prospect(s) trouvé(s), ${t.sent} mail(s) + ${t.followups} relance(s), ${t.replies} réponse(s) (${pct(t.replies, t.sent)})${priced ? `, IA ${usd(t.cost)}` : ''}`, '');
   for (const p of st.projects) {
-    const quiet = !p.found && !p.sent && !p.followups && !p.replies && !p.cost;
+    const quiet = !p.found && !p.sent && !p.followups && !p.replies && !(priced && p.cost);
     if (quiet) { lines.push(`${p.name} : rien cette semaine`, ''); continue; }
     lines.push(p.name);
     lines.push(`  Prospects trouvés : ${p.found}`);
@@ -50,7 +53,8 @@ export function weeklyText(st) {
     lines.push(`  Clients (total)   : ${p.clients}`);
     if (p.bounces) lines.push(`  Adresses invalides: ${p.bounces}`);
     if (p.bestSubject) lines.push(`  Test A/B          : l'objet ${p.bestSubject.variant} gagne (${pct(p.bestSubject.replied, p.bestSubject.sent)} de réponses)`);
-    lines.push(`  Coût IA           : ${usd(p.cost)}`, '');
+    if (priced) lines.push(`  Coût IA           : ${usd(p.cost)}`);
+    lines.push('');
   }
   return lines.join('\n').trimEnd() + '\n';
 }
@@ -82,7 +86,7 @@ export async function sendWeeklyReport(app, userId, { at = now() } = {}) {
     fields: [
       { name: '💬 Réponses', value: `**${t.replies}** (${pct(t.replies, t.sent)})` },
       { name: '🔁 Relances', value: String(t.followups) },
-      { name: '💳 Coût IA', value: usd(t.cost) },
+      ...(st.priced !== false ? [{ name: '💳 Coût IA', value: usd(t.cost) }] : []),
       ...active.slice(0, 21).map((p) => ({
         name: `📁 ${p.name}`, inline: false,
         value: `🔎 ${p.found} trouvés · ✉️ ${p.sent} envoyés · 💬 ${p.replies} réponses (${pct(p.replies, p.sent)})${p.bestSubject ? ` · 🏆 objet ${p.bestSubject.variant}` : ''}`,
