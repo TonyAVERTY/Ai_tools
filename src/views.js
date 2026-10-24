@@ -730,6 +730,21 @@ ${saved ? `<p class="ok-box" role="status">${ic('check')}<span><b>Réglages enre
   </div>
   ${check('read_receipt', s.read_receipt, 'Demander un accusé de lecture dans les mails de prospection')}
   <p class="hint">Alternative au suivi d'ouverture : aucun pixel espion, aucun lien traqué. La messagerie du destinataire lui demande s'il accepte d'envoyer un accusé ; beaucoup refusent ou l'ignorent, « Lu » est donc un minimum, jamais un « non lu ».</p>
+  <div class="footer-opt" data-footer-opt data-on="${s.mail_footer ? '1' : '0'}">
+    <h3>Pied de page des mails de prospection</h3>
+    <p class="state ${s.mail_footer ? 'ok' : 'warn'}" data-footer-state role="status">${s.mail_footer
+    ? 'Actif : chaque mail se termine par « Vous recevez ce message car l\'adresse … est publiée publiquement (source) » et un lien « Ne plus recevoir de messages ».'
+    : 'Retiré : tes mails partent sans lien « Ne plus recevoir de messages » ni origine de l\'adresse (seul l\'en-tête invisible « List-Unsubscribe » reste).'}</p>
+    <div class="ban ban-err" role="note">${ic('alert')}<span class="ban-t"><b>Attention, risques si tu le retires.</b>
+      <ul>
+        <li><strong>Légal</strong> : en prospection par e-mail, le RGPD et la CNIL demandent d'informer la personne de l'origine de son adresse et de lui offrir un moyen simple et gratuit de refuser tes messages ; c'est toi qui en portes la responsabilité (sanctions possibles).</li>
+        <li><strong>Réputation</strong> : sans lien de désinscription, les destinataires cliquent « Spam », et Gmail ou Outlook peuvent bloquer ton adresse et ton domaine d'envoi.</li>
+        <li><strong>Désinscriptions</strong> : l'en-tête invisible « List-Unsubscribe » reste ajouté, mais toutes les messageries ne l'affichent pas.</li>
+      </ul>
+      Tu peux remettre le pied de page à tout moment.</span></div>
+    <button type="button" class="btn danger" data-footer-off ${s.mail_footer ? '' : 'hidden'}>Retirer le pied de page des mails</button>
+    <button type="button" class="btn" data-footer-on ${s.mail_footer ? 'hidden' : ''}>Remettre le pied de page</button>
+  </div>
 </section>
 
 <section class="card" id="budget" aria-labelledby="t-budget">
