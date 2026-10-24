@@ -1,0 +1,20 @@
+# Mon compte et Équipe
+Résumé : la page Mon compte (connexion, usage du mois, liaison Claude, agenda, mode développeur, suppression) et les équipes (rôles, invitations, partage de projets, places).
+
+## Mon compte (avatar → Mon compte)
+- **Connexion** : l'email et le fournisseur (Google ou Apple), « sans mot de passe ». Un lien **Administration** apparaît pour les administrateurs du service.
+- **Usage du mois** : les compteurs Projets, Prospects, Mails ce mois-ci, Jobs IA ce mois-ci, avec l'offre et les plafonds ; un message « Plafond atteint » et un lien vers les tarifs apparaissent quand une limite est atteinte.
+- **Liaison Claude** : mode, état, limites d'utilisation, bouton **Déconnecter** (voir le fichier sur la liaison Claude).
+- **Agenda** : lien d'abonnement secret pour Google Agenda, Apple Calendrier, Outlook (bouton **Créer mon lien d'agenda**) ; voir le fichier sur le calendrier.
+- **Mode développeur** : activer pour utiliser l'API et le serveur MCP (voir le fichier sur le mode développeur).
+- **Zone de danger** : **Supprimer mon compte et mes données**, après avoir saisi son email pour confirmer. Efface définitivement le compte et toutes les données : projets, prospects, notes, modèles de mail, journaux d'envoi, jobs, réglages, clones du code, conversations IA et leurs pièces jointes, vidéos de promotion. Les adresses qui ont demandé à ne plus être contactées restent dans la liste d'opposition commune. Irréversible. Les comptes inactifs depuis longtemps sont supprimés automatiquement après un mail d'avertissement 30 jours avant.
+
+## Équipe (barre du haut → Équipe)
+Une équipe permet de **partager des projets avec des collègues, sans leur donner son accès**. Le nombre de places dépend de l'offre (voir « Offres, plafonds et limites ») ; sans place d'équipe, la page l'indique avec un lien vers les offres.
+- **Créer mon équipe** : champ **Nom de l'équipe** puis **Créer l'équipe**.
+- Rôles : **Membre** (travaille sur les projets partagés : modèles, contacts, recherches, envois, notes), **Administrateur** (en plus, règle les projets : SMTP, boîte de réception, base du récapitulatif, LinkedIn), **Propriétaire** (gère l'équipe, partage et supprime les projets).
+- **Inviter quelqu'un** : adresse email + rôle, bouton **Inviter**. L'invité reçoit un lien ; la page propose **Rejoindre l'équipe** ou **Pas maintenant**. Les **Invitations en attente** se voient avec leur date d'expiration.
+- Le tableau des membres permet de **Changer** un rôle ou de retirer quelqu'un ; un membre peut **Quitter** l'équipe. **Supprimer l'équipe** : les membres perdent tout accès tout de suite, les projets restent au propriétaire, intacts.
+- **Projets partagés** : liste des projets du propriétaire avec leur état (« partagé » ou « privé ») ; seuls les projets marqués « partagé » sont visibles par l'équipe. Ils apparaissent dans le tableau de bord des membres avec le nom du propriétaire (badge « équipe de … »).
+- Les jobs d'un projet partagé utilisent **l'accès Claude du propriétaire** : le membre n'a pas besoin de sa propre liaison, et c'est le quota du propriétaire qui est consommé.
+- Les mails d'un projet partent de **l'adresse SMTP de ce projet**.

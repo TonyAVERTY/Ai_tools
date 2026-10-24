@@ -15,7 +15,9 @@
   const modelSel = $('[data-chat-model]');
   const tray = $('[data-chat-tray]');
   const fileInput = $('[data-chat-file]');
-  const projMenu = $('[data-chat-projmenu]');
+  const mode = root.dataset.mode === 'support' ? 'support' : 'claude';
+  const base = mode === 'support' ? '/support' : '/chat';
+  const projMenu = $('[data-chat-projmenu]'); // absent en mode Support
   const projList = $('[data-chat-projlist]');
   const MAX_FILES = Number(root.dataset.files) || 6;
   const MAX_MB = JSON.parse(root.dataset.mb || '{}');
@@ -143,7 +145,7 @@
 
   // Projets dont on peut joindre le code (liste chargée à la première ouverture)
   let projectsLoaded = false;
-  projMenu.addEventListener('toggle', async () => {
+  projMenu?.addEventListener('toggle', async () => {
     if (!projMenu.open || projectsLoaded) return;
     projList.replaceChildren(el('p', 'muted small', 'Chargement…'));
     try {
@@ -161,7 +163,7 @@
       }
     } catch { projList.replaceChildren(el('p', 'muted small', 'Impossible de charger les projets.')); }
   });
-  projList.addEventListener('click', (e) => {
+  projList?.addEventListener('click', (e) => {
     const b = e.target.closest('[data-project-pick]');
     if (!b) return;
     project = { id: Number(b.dataset.projectPick), name: b.dataset.name };
@@ -196,12 +198,12 @@
   // Nouvelle conversation : elle apparaît en tête de la liste et l'adresse devient /chat/<id> (sans recharger la page)
   function registerConversation(id, title) {
     root.dataset.conv = String(id);
-    history.replaceState(null, '', `/chat/${id}`);
+    history.replaceState(null, '', `${base}/${id}`);
     for (const li of list.children) li.classList.remove('on');
     const li = el('li', 'on');
     li.dataset.conv = String(id);
     const a = el('a', '', title);
-    a.href = `/chat/${id}`;
+    a.href = `${base}/${id}`;
     a.setAttribute('aria-current', 'page');
     const del = el('button', 'chat-del');
     del.type = 'button';
@@ -239,7 +241,7 @@
       const r = await fetch('/api/chat/send', {
         method: 'POST', signal: ctrl.signal,
         headers: { 'Content-Type': 'application/json', Accept: 'application/x-ndjson' },
-        body: JSON.stringify({ message: text, conversationId: root.dataset.conv || null, model: modelSel?.value, projectId: project?.id ?? null, attachments: ready.map((f) => f.id) }),
+        body: JSON.stringify({ message: text, conversationId: root.dataset.conv || null, model: modelSel?.value, projectId: mode === 'support' ? null : project?.id ?? null, mode, attachments: ready.map((f) => f.id) }),
       });
       if (r.status === 401) { location.href = '/login'; return; }
       if (!r.ok) {
@@ -342,7 +344,7 @@
       } catch (err) { showError(err.message); return; }
       del.closest('li').remove();
       none.hidden = list.children.length > 0;
-      if (root.dataset.conv === id) { if (window.AiNav) window.AiNav.go('/chat'); else location.href = '/chat'; }
+      if (root.dataset.conv === id) { if (window.AiNav) window.AiNav.go(base); else location.href = base; }
     }
   });
 
