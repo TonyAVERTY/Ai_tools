@@ -33,15 +33,15 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   const visible = (sel) => p.locator(sel).first().isVisible();
 
   ok(await visible('details[data-acc="audit"]') && await visible('details[data-acc="prospect"]'), `${tag} sans filtre : toutes les sections sont visibles`);
-  await p.locator('[data-role-filter="commerce"]').click();
+  await p.selectOption('[data-role-select]', 'commerce');
   ok(await visible('details[data-acc="prospect"]') && !(await visible('details[data-acc="audit"]')) && !(await visible('details[data-acc="linkedin"]')), `${tag} Commerce : Prospecter reste, Audit et LinkedIn disparaissent`);
   ok(await visible('details[data-acc="header"]') && await visible('details[data-acc="config"]'), `${tag} En-tête et Configuration toujours visibles`);
   ok(await visible('details.role[data-role="commerce"]') && !(await visible('details.role[data-role="finance"]')), `${tag} Postes et tâches IA ne montre que le poste choisi`);
-  ok(await p.locator('[data-role-filter="commerce"]').getAttribute('aria-pressed') === 'true', `${tag} le bouton du poste est enfoncé`);
+  ok(await p.locator('[data-role-select]').inputValue() === 'commerce', `${tag} le filtre affiche le poste choisi`);
   await p.reload();
   await p.waitForSelector('html[data-nav="ready"]');
   ok(!(await visible('details[data-acc="audit"]')), `${tag} le filtre est mémorisé après rechargement`);
-  await p.locator('[data-role-filter="support"]').click();
+  await p.selectOption('[data-role-select]', 'support');
   ok(!(await visible('details[data-acc="prospect"]')) && await visible('details.role[data-role="support"]'), `${tag} Support client : aucune section de projet, seulement ses tâches`);
 
   // Lancer une tâche et lire le livrable
@@ -60,7 +60,7 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   await p.locator('dialog.posteview [data-close]').click();
   ok(!(await p.locator('dialog.posteview').evaluate((d) => d.open)), `${tag} la fenêtre se ferme`);
 
-  await p.locator('[data-role-filter=""]').click();
+  await p.selectOption('[data-role-select]', '');
   ok(await visible('details[data-acc="audit"]'), `${tag} « Tous les postes » réaffiche tout`);
   if (process.env.SHOT_DIR) await p.screenshot({ path: `${process.env.SHOT_DIR}/postes-${vp.width}.png`, fullPage: false }).catch(() => {});
   ok(!(await p.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)), `${tag} pas de défilement horizontal`);
