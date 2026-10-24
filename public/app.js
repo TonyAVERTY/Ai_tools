@@ -20,7 +20,9 @@
     dispose() { disposed = true; for (const f of cleanups.splice(0)) f(); for (const t of timers) clearTimeout(t); timers.clear(); },
   };
   // Rechargement et navigation sans quitter la page quand public/ajax.js est là ; navigation classique sinon
-  const reload = () => (window.AiNav ? window.AiNav.reload() : reload());
+  // Un rechargement voulu par l'application (fin d'analyse, cible validée…) garde le projet ouvert ; l'arrivée sur la page, elle, ne rouvre rien
+  const rememberOpen = () => { try { const d = document.querySelector('details.project[open]'); if (d) sessionStorage.setItem('reopenProject', d.dataset.id); } catch { /* stockage indisponible */ } };
+  const reload = () => { rememberOpen(); if (window.AiNav) window.AiNav.reload(); else location.reload(); };
   const go = (url) => (window.AiNav ? window.AiNav.go(url) : (location.href = url));
 
   const $ = (sel, el = document) => el.querySelector(sel);
@@ -377,11 +379,10 @@
   }
   listen(document, 'click', (e) => {
     if (jobsOpen() && !e.target.closest('#jobs')) toggleJobs(false);
-    const go = e.target.closest('[data-goto]');
-    if (!go) return;
-    sessionStorageSet('openProject', go.dataset.goto);
-    const d = $(`details.project[data-id="${go.dataset.goto}"]`);
-    if (!d) { go('/'); return; }
+    const link = e.target.closest('[data-goto]');
+    if (!link) return;
+    const d = $(`details.project[data-id="${link.dataset.goto}"]`);
+    if (!d) { sessionStorageSet('reopenProject', link.dataset.goto); go('/'); return; } // pas sur la page Projets : elle ouvrira ce projet à l'arrivée
     toggleJobs(false);
     d.open = true;
     d.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -593,14 +594,15 @@
   $$('details.project').forEach((el) => {
     el.addEventListener('toggle', () => { if (el.open) refreshProject(el); else schedule(el, 0); });
   });
-  // Rouvre le dernier projet consulté après un reload
-  const last = sessionStorageGet('openProject');
+  // Rouvre un projet une seule fois : après un rechargement voulu par l'application, ou depuis « Voir » du menu Activité. Sinon tout reste fermé
+  // (un seul projet : il est ouvert par le serveur).
+  const last = sessionStorageGet('reopenProject');
+  try { sessionStorage.removeItem('reopenProject'); } catch { /* stockage indisponible */ }
   if (last) { const el = $(`details.project[data-id="${last}"]`); if (el) el.open = true; }
   // Projet unique : ouvert dès l'affichage de la page (attribut `open` du serveur), on lance son suivi sans attendre un clic
   $$('details.project[open]').forEach((el) => refreshProject(el));
   function sessionStorageGet(k) { try { return sessionStorage.getItem(k); } catch { return null; } }
   function sessionStorageSet(k, v) { try { sessionStorage.setItem(k, v); } catch { /* ignore */ } }
-  $$('details.project').forEach((el) => el.addEventListener('toggle', () => { if (el.open) sessionStorageSet('openProject', el.dataset.id); }));
 
   // ---------- Mise en route (liste en bas à gauche) ----------
   // Montre ce qui est configuré et ce qui reste à faire sur un projet ; chaque ligne ouvre la bonne section. Recalculée côté
@@ -683,7 +685,7 @@
 
   if (todo) {
     const projects = $$('details.project');
-    const start = $(`details.project[data-id="${sessionStorageGet('openProject')}"]`) || projects[0];
+    const start = $('details.project[open]') || projects[0];
     if (start) focusTodo(start);
     projects.forEach((el) => el.addEventListener('toggle', () => { if (el.open) focusTodo(el); }));
     // La pastille « config » du projet rappelle la liste, même après l'avoir masquée
