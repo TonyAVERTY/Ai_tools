@@ -19,6 +19,8 @@ export const RATE_LIMITS = {
   // Ajout, modification et suppression de prospects ; aperçu d'un mail (rendu sans envoi)
   prospect_write: { user: { max: 120, windowMs: 10 * MIN } },
   preview: { user: { max: 120, windowMs: 10 * MIN } },
+  // Tâches des postes : chacune coûte un appel Claude
+  poste: { user: { max: 40, windowMs: HOUR } },
   // Vidéos de promotion : un rendu coûte un appel Claude et plusieurs minutes de processeur
   promo: { user: { max: 20, windowMs: HOUR } },
   // Abonnement iCal (lien secret) : un agenda interroge au plus quelques fois par heure

@@ -6,6 +6,7 @@ import { devLinks } from './devlinks.js';
 import { assetUrl, brandMark, iconLinks } from './assets.js';
 import { SPRITE, ic } from './icons.js';
 import { GIT_SERVER_TYPES, MAX_GIT_SERVERS } from './gitservers.js';
+import { ROLES, MAX_NOTES, rolesOfSection } from './services/roles.js';
 import { MODE_LABELS, CONSENT_TEXT, CONSENT_CHECKBOX, CONSENT_VERSION } from './claudelink.js';
 
 const fmtDate = (ts) => (ts ? new Date(ts * 1000).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' }) : '—');
@@ -15,7 +16,8 @@ const SECTION_ICONS = { target: 'target', search: 'search', spark: 'spark', char
 
 /** Section dépliable. `title` peut contenir du HTML de confiance (badges), jamais de donnée utilisateur brute. */
 function acc(key, icon, title, sub, body, { open = false, cls = '' } = {}) {
-  return `<details class="acc anim ${cls}" data-acc="${key}"${open ? ' open' : ''}>
+  const roles = rolesOfSection(key); // postes auxquels la section se rattache : le filtre par poste du projet la garde ou la cache
+  return `<details class="acc anim ${cls}" data-acc="${key}"${roles.length ? ` data-roles="${roles.join(' ')}"` : ''}${open ? ' open' : ''}>
   <summary><span class="acc-ico">${ic(SECTION_ICONS[icon])}</span><span class="acc-txt"><span class="acc-title">${title}</span>${sub ? `<span class="acc-sub">${sub}</span>` : ''}</span><span class="chev" aria-hidden="true"></span></summary>
   <div class="acc-body">${body}</div>
 </details>`;
@@ -360,11 +362,40 @@ function templateForm(p, kind) {
     <div class="job" data-job="${job}"></div>`;
 }
 
+/** Filtre par poste : un bouton par poste d'entreprise. « Tous les postes » = rien de caché. */
+const ROLE_BAR = `<div class="rolebar" role="group" aria-label="Filtrer par poste">
+    <button type="button" class="chip" data-role-filter="" aria-pressed="true">Tous les postes</button>
+    ${ROLES.map((r) => `<button type="button" class="chip" data-role-filter="${r.id}" aria-pressed="false">${esc(r.label)}</button>`).join('\n    ')}
+  </div>`;
+
+/** Section « Postes et tâches IA » : chaque poste avec ses tâches. Les tâches qui lisent le dépôt sont réservées aux administrateurs. */
+function postesBody(p) {
+  const member = p.access === 'member';
+  return `<p class="muted small">Chaque tâche fait écrire à Claude un livrable à partir de la fiche du projet (aucun envoi, rien n'est publié). Les précisions sont facultatives. Les chiffres, prix et références que la fiche ne donne pas restent « à compléter ».</p>
+  <div class="roles">${ROLES.map((r) => `
+    <details class="role" data-role="${r.id}">
+      <summary><b>${esc(r.label)}</b><span class="muted small">${esc(r.summary)}</span></summary>
+      <ul class="tasks">${r.tasks.map((t) => `
+        <li class="task" data-task="${t.id}">
+          <div class="task-h"><b>${esc(t.label)}</b>${t.web ? '<span class="badge">cherche sur le web</span>' : ''}${t.repo ? '<span class="badge">lit le dépôt</span>' : ''}</div>
+          <p class="muted small">${esc(t.brief)}</p>
+          ${t.repo && member ? '<p class="muted small">Réservé aux administrateurs du projet.</p>' : `<form data-action="poste" data-id="${p.id}" data-task="${t.id}" class="inline">
+            <label>Précisions <span class="muted small">(facultatif)</span><input name="notes" maxlength="${MAX_NOTES}" autocomplete="off"></label>
+            <button class="btn primary">${ic('spark')}Lancer la tâche</button>
+          </form>`}
+          <div class="job" data-job="poste_${t.id}" data-label="${esc(t.label)}"></div>
+        </li>`).join('')}
+      </ul>
+    </details>`).join('')}
+  </div>`;
+}
+
 function projectItem(p, smtp, dbCfg, imap, { open = false } = {}) {
   const profile = p.profile;
   return `<details class="project anim" data-id="${p.id}"${open ? ' open' : ''}>
 <summary><span class="pname">${esc(p.name)}</span>${p.access !== 'owner' ? `<span class="badge" title="Projet partagé par ${esc(p.ownerEmail || '')}">équipe de ${esc(p.ownerEmail || '')}</span>` : p.teamId ? '<span class="badge ok">partagé</span>' : ''}<span class="pcfg badge" data-cfg title="Afficher la liste de mise en route" hidden></span><span class="pstate" data-state></span></summary>
 <div class="pbody"><div class="pcard">
+  ${ROLE_BAR}
   ${acc('header', 'git', 'En-tête', 'Dépôt Git et fiche projet', `
   <div class="field"><span class="lbl">Dépôt Git</span><div class="ro">${ic('lock', 'ic-s')}<span>${esc(p.gitUrl)}</span><span class="badge">lecture seule</span></div></div>
   <section class="profile fiche">
@@ -488,6 +519,8 @@ function projectItem(p, smtp, dbCfg, imap, { open = false } = {}) {
 
   ${p.access !== 'member' ? acc('recap', 'chart', 'Récapitulatif', 'Chiffres business, prospection et courbes', `
     <div class="recap" data-recap><p class="muted">Chargement…</p></div>`, { cls: 'main' }) : ''}
+
+  ${acc('postes', 'users', 'Postes et tâches IA', 'Les postes d\'une entreprise, chacun avec ses tâches faites par l\'IA', postesBody(p), { cls: 'main' })}
   </div>
 
   ${p.access !== 'member' ? acc('config', 'gear', 'Configuration du projet', 'SMTP, boîte IMAP, base de données', configForms(p, smtp, dbCfg, imap), { cls: 'config' }) : ''}
