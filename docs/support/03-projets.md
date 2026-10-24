@@ -8,7 +8,7 @@ Elle liste les projets du compte (et ceux partagés par une équipe, avec le bad
 Bouton **Nouveau projet** → champs **Nom** et **Dépôt Git** → **Créer et analyser** (ou **Annuler**). GitHub est accepté ; les autres serveurs Git doivent d'abord être ajoutés dans **Réglages → Dépôts Git** (avec un token pour un dépôt privé). Le lien du dépôt ne peut plus être modifié après la création : pour changer de dépôt, créer un nouveau projet. Si le plafond de projets de l'offre est atteint, la création est refusée avec un message.
 
 ## Ouvrir un projet
-Clique sur son nom. Avec un seul projet, il est ouvert par défaut ; avec plusieurs, ils sont fermés. Le dernier projet consulté se rouvre après un rechargement de la page.
+Clique sur son nom. Avec **un seul projet**, il est ouvert par défaut ; avec **plusieurs projets**, ils sont tous fermés à chaque arrivée sur la page (même si on en avait ouvert un avant). Quand l'application recharge la page toute seule (fin d'une analyse, cible validée), le projet en cours reste ouvert. Le bouton **Voir** du menu « Activité » ouvre le projet concerné.
 
 ## Les sections d'un projet (dans l'ordre)
 - **En-tête** : « Dépôt Git et fiche projet ». Le dépôt (lecture seule) et la **Fiche projet** avec le bouton **Réanalyser** (refait l'analyse ; consomme un job IA et du quota Claude).
