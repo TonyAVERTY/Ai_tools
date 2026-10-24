@@ -435,3 +435,11 @@ test('ruban animé (parallaxe + bulles) : seulement sur les pages de documentati
     assert.match(css, /\.rb-b[\s\S]*prefers-reduced-motion[\s\S]*animation: none/);
   } finally { await s.close(); }
 });
+
+test('confidentialité : les pièces jointes de la page IA sont déclarées (données, durée de conservation, destinataire)', async () => {
+  const conf = await (await page('/confidentialite')).text();
+  assert.equal((conf.match(/Pièces jointes de la page IA/g) || []).length, 2, 'une ligne dans les données, une dans les durées');
+  assert.match(conf, /vidéos que tu joins[\s\S]*Claude lit une copie de son code, en lecture seule/);
+  assert.match(conf, /jamais envoyée est supprimée au bout de 24 heures/);
+  assert.match(conf, /pièces jointes \(photos, PDF, textes, images tirées d'une vidéo, code d'un projet joint\)/);
+});
