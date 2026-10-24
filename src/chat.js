@@ -5,10 +5,11 @@
 // Les conversations sont privées : propres à chaque compte, supprimées avec lui (fichiers compris).
 import { existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { HttpError, json, readBody, html } from './http.js';
+import { HttpError, json, readBody, html, redirect } from './http.js';
 import { now, getSetting, setSetting } from './db.js';
 import { makeClaude, makeSync } from './handlers.js';
-import { chatPrompt, chatContext, parseCustomPrompts, CHAT_MAX_MESSAGE } from './services/prompts.js';
+import { chatPrompt, supportPrompt, chatContext, parseCustomPrompts, CHAT_MAX_MESSAGE } from './services/prompts.js';
+import { ensureSupportDocs } from './services/supportdocs.js';
 import { getProject, repoDir } from './projects.js';
 import { needAccess, accessOn } from './teams.js';
 import { accessibleProjects } from './mailroutes.js';
@@ -38,14 +39,15 @@ const titleOf = (text) => {
   return line.length > 60 ? `${line.slice(0, 57).trimEnd()}…` : line;
 };
 
-const shapeConv = (c) => ({ id: Number(c.id), title: c.title, model: c.model, updatedAt: Number(c.updated_at), createdAt: Number(c.created_at) });
+const shapeConv = (c) => ({ id: Number(c.id), title: c.title, model: c.model, mode: c.mode === 'support' ? 'support' : 'claude', updatedAt: Number(c.updated_at), createdAt: Number(c.created_at) });
 export const shapeMessage = (m) => ({
   id: Number(m.id), role: m.role, content: m.content, model: m.model || null, createdAt: Number(m.created_at),
   ...(m.role === 'assistant' ? { html: renderMarkdown(m.content) } : {}),
 });
 
-export async function listConversations(db, userId) {
-  return (await db.prepare('SELECT * FROM chat_conversations WHERE user_id = ? ORDER BY updated_at DESC, id DESC').all(userId)).map(shapeConv);
+/** Conversations d'un compte pour un mode : « claude » (assistant classique) ou « support » (aide sur AiTools). */
+export async function listConversations(db, userId, mode = 'claude') {
+  return (await db.prepare('SELECT * FROM chat_conversations WHERE user_id = ? AND mode = ? ORDER BY updated_at DESC, id DESC').all(userId, mode === 'support' ? 'support' : 'claude')).map(shapeConv);
 }
 
 export async function getConversation(db, userId, id) {
@@ -84,21 +86,26 @@ export function registerChatRoutes(router, app) {
   const busy = new Set(); // comptes avec une réponse en cours (une à la fois chacun)
   let running = 0;        // réponses en cours, tous comptes confondus
 
-  const page = async (res, session, current) => {
-    const conversations = await listConversations(db, session.userId);
+  const page = async (res, session, current, mode = 'claude') => {
+    const conversations = await listConversations(db, session.userId, mode);
     const messages = current ? await conversationMessages(db, current.id) : [];
     html(res, chatPage({
-      email: session.email, conversations, current, messages, model: current?.model ?? await chatModel(db, session.userId),
+      email: session.email, mode, conversations, current, messages, model: current?.model ?? await chatModel(db, session.userId),
       max: CHAT_MAX_MESSAGE, project: lastProject(messages), limits: { files: FILES.perMessage, maxMb: Object.fromEntries(Object.entries(FILES.maxBytes).map(([k, v]) => [k, Math.round(v / 1048576)])) },
     }));
   };
 
-  router.get('/chat', async ({ res, session }) => page(res, session, null));
-  router.get('/chat/:id', async ({ res, params, session }) => {
+  router.get('/chat', async ({ res, session }) => page(res, session, null, 'claude'));
+  router.get('/support', async ({ res, session }) => page(res, session, null, 'support'));
+  // Une conversation s'ouvre dans sa page : celle du Support sous /support, l'assistant classique sous /chat
+  const open = (mode) => async ({ res, params, session }) => {
     const current = await getConversation(db, session.userId, params.id);
     if (!current) throw new HttpError(404, 'Conversation introuvable');
-    await page(res, session, current);
-  });
+    if (current.mode !== mode) return redirect(res, `/${current.mode === 'support' ? 'support' : 'chat'}/${current.id}`);
+    await page(res, session, current, mode);
+  };
+  router.get('/chat/:id', open('claude'));
+  router.get('/support/:id', open('support'));
 
   // Projets dont l'utilisateur peut joindre le code : les siens, et ceux où il est administrateur de l'équipe
   router.get('/api/chat/projects', async ({ res, session }) => {
@@ -112,7 +119,7 @@ export function registerChatRoutes(router, app) {
   });
   registerChatFileRoutes(router, app);
 
-  router.get('/api/chat/conversations', async ({ res, session }) => json(res, { conversations: await listConversations(db, session.userId) }));
+  router.get('/api/chat/conversations', async ({ res, session, url }) => json(res, { conversations: await listConversations(db, session.userId, url.searchParams.get('mode')) }));
   router.get('/api/chat/conversations/:id', async ({ res, params, session }) => {
     const conversation = await getConversation(db, session.userId, params.id);
     if (!conversation) throw new HttpError(404, 'Conversation introuvable');
@@ -158,6 +165,9 @@ export function registerChatRoutes(router, app) {
       ? await db.prepare(`SELECT * FROM chat_attachments WHERE user_id = ? AND message_id IS NULL AND kind <> 'project' AND id IN (${ids.map(() => '?').join(',')})`).all(userId, ...ids)
       : [];
     if (pending.length !== ids.length) throw new HttpError(404, 'Pièce jointe introuvable : joins-la de nouveau.', { expose: true });
+    // Mode : celui de la conversation ; pour une nouvelle conversation, celui de la page d'où elle part
+    const mode = conv ? conv.mode : b.mode === 'support' ? 'support' : 'claude';
+    if (mode === 'support' && b.projectId != null && b.projectId !== '') throw new HttpError(400, 'Le Support ne lit pas le code d\'un projet : décris le problème, ou joins une capture d\'écran.', { expose: true });
     let project = null;
     if (b.projectId != null && b.projectId !== '') {
       project = await getProject(app, Number(b.projectId), { userId });
@@ -191,7 +201,7 @@ export function registerChatRoutes(router, app) {
             await db.prepare('DELETE FROM chat_conversations WHERE id = ?').run(o.id);
           }
         }
-        const id = Number((await db.prepare('INSERT INTO chat_conversations(user_id, title, model, created_at, updated_at) VALUES(?, ?, ?, ?, ?)').run(userId, titleOf(message), model, at, at)).lastInsertRowid);
+        const id = Number((await db.prepare('INSERT INTO chat_conversations(user_id, title, model, mode, created_at, updated_at) VALUES(?, ?, ?, ?, ?, ?)').run(userId, titleOf(message), model, mode, at, at)).lastInsertRowid);
         conv = await getConversation(db, userId, id);
       }
       const earlier = await conversationMessages(db, conv.id);
@@ -229,16 +239,19 @@ export function registerChatRoutes(router, app) {
         // Fichiers de TOUTE la conversation (les plus récents d'abord, bornés) : Claude peut y revenir d'un message à l'autre
         const files = (await conversationMessages(db, conv.id)).flatMap((m) => m.attachments).filter((a) => a.kind !== 'project').slice(-12);
         run = files.length ? prepareRunDir(cfg, userId, files) : null;
-        const tools = repo || run?.files.length ? ['Read', 'Glob', 'Grep'] : [];
+        // Support : Claude lit la documentation d'AiTools (dossier partagé, en lecture seule, sans donnée d'aucun compte)
+        const docs = mode === 'support' ? ensureSupportDocs(cfg, { chat: CHAT, files: FILES }) : null;
+        const tools = docs || repo || run?.files.length ? ['Read', 'Glob', 'Grep'] : [];
         const prompts = parseCustomPrompts(await getSetting(db, userId, 'prompts_json', ''));
-        const base = chatPrompt({ history, message: `${attachmentsNote(sent?.attachments)}${message}`, custom: prompts, model });
+        const text = `${attachmentsNote(sent?.attachments)}${message}`;
+        const base = docs ? supportPrompt({ history, message: text, custom: prompts, model, index: docs.index }) : chatPrompt({ history, message: text, custom: prompts, model });
         const system = `${base.system}${chatContext({ project: project && { name: project.name, profile: project.profile }, files: run?.files ?? [] })}`;
         const r = await claude(userId, {
           prompt: base.prompt, system, model, maxTurns: tools.length ? CHAT.toolTurns : 1, tools, chat: true, signal: ctrl.signal, timeoutMs: CHAT.timeoutMs,
           // Dossier de travail : le dépôt joint (celui de son propriétaire), sinon le dossier des fichiers joints ; l'un et l'autre en lecture seule
-          ...(repo ? { cwd: repo, repoOwnerId: project.userId, extraDirs: run ? [run.dir] : [] } : run ? { cwd: run.dir, allowedRoot: userChatRoot(cfg, userId) } : {}),
+          ...(docs ? { cwd: docs.dir, allowedRoot: docs.dir, extraDirs: run ? [run.dir] : [] } : repo ? { cwd: repo, repoOwnerId: project.userId, extraDirs: run ? [run.dir] : [] } : run ? { cwd: run.dir, allowedRoot: userChatRoot(cfg, userId) } : {}),
           onDelta: (text) => write({ type: 'delta', text }),
-          onTool: (name, input) => write({ type: 'status', text: toolLine(name, input, repo, run) }),
+          onTool: (name, input) => write({ type: 'status', text: toolLine(name, input, repo, run, docs) }),
         });
         const content = String(r.text ?? '').trim();
         if (ctrl.signal.aborted) return;
@@ -275,12 +288,14 @@ function friendly(r, text) {
 }
 
 /** Ce que Claude est en train de lire, en une ligne pour l'utilisateur (chemins du dépôt joint ou des fichiers joints, jamais ceux du serveur). */
-function toolLine(name, input, repo, run) {
+function toolLine(name, input, repo, run, docs = null) {
   const rel = (p) => {
     const v = String(p ?? '');
-    for (const root of [repo, run?.dir]) if (root && v.startsWith(root)) return v.slice(root.length).replace(/^\/+/, '');
+    for (const root of [repo, run?.dir, docs?.dir]) if (root && v.startsWith(root)) return v.slice(root.length).replace(/^\/+/, '');
     return v.split('/').pop();
   };
+  if (docs && name === 'Read') return `Consulte la documentation : ${rel(input.file_path)}`;
+  if (docs) return 'Cherche dans la documentation…';
   if (name === 'Read') return `Lit ${rel(input.file_path)}`;
   if (name === 'Glob') return `Cherche les fichiers « ${String(input.pattern ?? '').slice(0, 60)} »`;
   if (name === 'Grep') return `Cherche « ${String(input.pattern ?? '').slice(0, 60)} » dans le code`;

@@ -112,8 +112,8 @@ test('page : conversations à gauche, fil rendu (réponses en Markdown échappé
   const page = await (await html(u, `/chat/${id}`)).text();
   assert.match(page, /id="chat"[^>]*data-conv="\d+"/);
   assert.match(page, /\/static\/chat\.js/);
-  assert.match(page, /class="ia-link" href="\/chat"/, 'lien IA à côté de l\'avatar');
-  assert.ok(page.indexOf('class="ia-link"') < page.indexOf('<details class="user">'), 'avant le menu du compte');
+  assert.match(page, /<details class="ia-menu">[\s\S]*<summary class="ia-link"[\s\S]*href="\/chat"[\s\S]*Claude[\s\S]*href="\/support"[\s\S]*Support/, 'menu IA : Claude et Support');
+  assert.ok(page.indexOf('class="ia-menu"') < page.indexOf('<details class="user">'), 'avant le menu du compte');
   assert.doesNotMatch(page, /<script>alert/, 'tout est échappé');
   assert.match(page, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
   assert.match(page, /<strong>gras<\/strong>/, 'Markdown rendu dans la réponse');
@@ -121,7 +121,7 @@ test('page : conversations à gauche, fil rendu (réponses en Markdown échappé
   assert.match(page, /Recommandés[\s\S]*Autres modèles/);
   const fresh = await (await html(u, '/chat')).text();
   assert.match(fresh, /data-chat-empty/, 'nouvelle conversation : écran d\'accueil avec des idées');
-  assert.match(await (await html(u, '/settings')).text(), /class="ia-link"/, 'le lien est sur toutes les pages de l\'application');
+  assert.match(await (await html(u, '/settings')).text(), /class="ia-menu"/, 'le menu est sur toutes les pages de l\'application');
 });
 
 test('Claude en erreur (quota atteint) : message lisible, rien d\'enregistré côté assistant, la question reste dans l\'historique', async () => {

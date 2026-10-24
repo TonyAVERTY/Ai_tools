@@ -870,4 +870,13 @@ export const MIGRATIONS = [
       ) ${T}`,
     ],
   },
+  {
+    // Page IA, mode Support : une conversation est soit « claude » (assistant classique), soit « support » (aide sur l'application, Claude lit la documentation).
+    // Les anciennes conversations restent « claude ».
+    name: 'chat_mode',
+    sqlite: ["ALTER TABLE chat_conversations ADD COLUMN mode TEXT NOT NULL DEFAULT 'claude'"],
+    mysql: [
+      { sql: "ALTER TABLE chat_conversations ADD COLUMN mode VARCHAR(12) NOT NULL DEFAULT 'claude'", when: colMissing('chat_conversations', 'mode') },
+    ],
+  },
 ];
