@@ -59,8 +59,10 @@
   }
 
   /**
-   * Deux traits pointillés bleus (un vertical, un horizontal) relient le bouton `from` à la destination `to` (la ligne de la tâche dans le menu
-   * « Activité », à défaut le bouton Activité) ; l'agent marche le long du trait en poussant sa brouette, puis y dépose son colis. Résolu à son arrivée.
+   * Deux traits pointillés bleus relient le bouton `from` à la destination `to` (la ligne de la tâche dans le menu « Activité », à défaut le bouton
+   * Activité) : d'abord un trait HORIZONTAL qui part du côté du bouton tourné vers la cible (dans la marge, sans traverser le contenu de la page),
+   * puis un trait VERTICAL qui monte (ou descend) jusqu'à elle. L'agent marche le long du trait en poussant sa brouette, puis y dépose son colis.
+   * Résolu à son arrivée.
    * @param {HTMLElement} from
    * @param {HTMLElement|null} [to]
    * @returns {Promise<void>}
@@ -71,14 +73,20 @@
     if (calm() || !from || !from.isConnected) { bump(document.querySelector('#jobs .jobs-btn') || target); return; }
     const fr = from.getBoundingClientRect();
     const tr = target.getBoundingClientRect();
-    const end = { x: tr.left + tr.width / 2 < fr.left + fr.width / 2 ? tr.right : tr.left, y: tr.top + tr.height / 2 }; // bord de la cible tourné vers le bouton
-    const goesUp = end.y < fr.top + fr.height / 2;
-    const a0 = { x: fr.left + fr.width / 2, y: goesUp ? fr.top : fr.bottom };
-    const sy = end.y < a0.y ? -1 : 1;
+    const tc = { x: tr.left + tr.width / 2, y: tr.top + tr.height / 2 };
+    const goesRight = tc.x >= fr.left + fr.width / 2;
+    // Départ : côté du bouton tourné vers la cible, à mi-hauteur. Si la cible est à l'aplomb du bouton (téléphone), le trait monte directement depuis son bord,
+    // sans repasser sur le bouton.
+    const above = tc.y < fr.top + fr.height / 2;
+    const a0 = tc.x >= fr.left && tc.x <= fr.right
+      ? { x: tc.x, y: above ? fr.top : fr.bottom }
+      : { x: goesRight ? fr.right : fr.left, y: fr.top + fr.height / 2 };
+    const end = { x: tc.x, y: tc.y < a0.y ? tr.bottom : tr.top }; // arrivée : bord de la cible tourné vers le trait vertical
     const sx = end.x < a0.x ? -1 : 1;
-    const lv = Math.abs(end.y - a0.y); // trait vertical : du bouton jusqu'à la hauteur de la cible
-    const lh = Math.abs(end.x - a0.x); // trait horizontal : jusqu'à la cible
-    const total = lv + lh;
+    const sy = end.y < a0.y ? -1 : 1;
+    const lh = Math.abs(end.x - a0.x); // trait horizontal : du bouton jusqu'à l'aplomb de la cible
+    const lv = Math.abs(end.y - a0.y); // trait vertical : jusqu'à la cible
+    const total = lh + lv;
     if (total < 8) { bump(target); return; }
     const dur = Math.round(Math.min(3600, Math.max(1800, 900 + total * 2.2)));
 
@@ -123,13 +131,13 @@
       const frame = (now) => {
         const t = Math.min(1, (now - t0) / dur);
         const d = ease(t) * total;
-        const x = d <= lv ? a0.x : a0.x + sx * (d - lv);
-        const y = d <= lv ? a0.y + sy * d : end.y;
-        path.setAttribute('d', d <= lv ? `M${a0.x} ${a0.y} V${y}` : `M${a0.x} ${a0.y} V${end.y} H${x}`);
+        const x = d <= lh ? a0.x + sx * d : end.x;
+        const y = d <= lh ? a0.y : a0.y + sy * (d - lh);
+        path.setAttribute('d', d <= lh ? `M${a0.x} ${a0.y} H${x}` : `M${a0.x} ${a0.y} H${end.x} V${y}`);
         const p = (d % HOP) / HOP; // un saut tous les HOP pixels parcourus : l'agent sautille, d'un rythme tranquille
         const hop = -HOP_H * 4 * p * (1 - p);
         const scale = t < 0.06 ? 0.5 + (t / 0.06) * 0.5 : t > 0.92 ? 1 - ((t - 0.92) / 0.08) * 0.6 : 1; // apparaît au départ, rétrécit en arrivant
-        node.style.transform = `translate(${(x - W / 2).toFixed(1)}px, ${(y - H / 2 + hop).toFixed(1)}px) scaleX(${d > lv ? sx : 1}) scale(${scale.toFixed(3)})`;
+        node.style.transform = `translate(${(x - W / 2).toFixed(1)}px, ${(y - H / 2 + hop).toFixed(1)}px) scaleX(${d <= lh ? sx : 1}) scale(${scale.toFixed(3)})`;
         node.style.opacity = String(t > 0.95 ? (1 - t) / 0.05 : 1);
         if (t < 1) requestAnimationFrame(frame); else resolve();
       };
