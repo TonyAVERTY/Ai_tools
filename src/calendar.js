@@ -56,7 +56,8 @@ export function calendarPage({ email, year, month, byDay, feed, today, upcoming 
   const feedBox = icalBox(feed.url, '/calendar');
   return layout({
     title: 'Calendrier', email,
-    body: `<section class="card">
+    body: `<div class="cal-page">
+<section class="card">
   <div class="row-between"><h1>${ic('clock')}Calendrier</h1>
     <nav class="row" aria-label="Mois"><a class="btn small" href="/calendar?m=${prev[0]}-${pad(prev[1])}">← ${MONTHS[prev[1] - 1]}</a><strong>${MONTHS[month - 1]} ${year}</strong><a class="btn small" href="/calendar?m=${next[0]}-${pad(next[1])}">${MONTHS[next[1] - 1]} →</a></nav></div>
   <div class="cal"><div class="cal-head">${DAYS.map((d) => `<span>${d}</span>`).join('')}</div><div class="cal-grid">${grid}</div></div>
@@ -85,7 +86,8 @@ export function calendarPage({ email, year, month, byDay, feed, today, upcoming 
 <section class="card">
   <div class="card-h"><h2>Agenda externe</h2></div>
   ${feedBox}
-</section>`,
+</section>
+</div>`,
   });
 }
 

@@ -698,7 +698,21 @@ input.copy { font-family: var(--mono); font-size: .8125rem; }
 
 /* ---------- Événements de l'agenda et propositions ---------- */
 .cal-ev.event { background: var(--info-bg); color: var(--info); }
-.evform { margin-top: 8px; }
+.evform { margin-top: 0; }
+/* Page Calendrier : des cartes séparées et aérées (le reste de l'application garde l'espacement standard) */
+.cal-page { display: flex; flex-direction: column; gap: 24px; }
+.cal-page .card { gap: 20px; }
+.cal-page .card-h { gap: 8px; }
+.cal-page .card-h p { margin-top: 0; line-height: 1.5; }
+.cal-page .evform { gap: 20px; }
+.cal-page .evform .grid2 { gap: 20px; }
+.cal-page .field { gap: 8px; }
+.cal-page .cal-head, .cal-page .cal-grid { gap: 8px; }
+.cal-page .cal-cell { min-height: 104px; padding: 8px; gap: 6px; }
+.cal-page .sub { margin: 28px 0 4px; }
+.cal-page .evlist { gap: 12px; margin-top: 12px; }
+.cal-page .evlist li { padding: 14px 16px; }
+@media (min-width: 640px) { .cal-page .card { padding: 28px; gap: 24px; } .cal-page .evform { gap: 24px; } .cal-page .evform .grid2 { gap: 24px; } }
 .evlist { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 .evlist li { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); }
 .suggest { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border: 1px solid var(--accent); border-radius: var(--radius); background: var(--info-bg); }
