@@ -432,7 +432,9 @@ test('ruban animé (parallaxe + bulles) : seulement sur les pages de documentati
     const js = readFileSync(new URL('../public/site.js', import.meta.url), 'utf8');
     assert.match(js, /prefers-reduced-motion/, 'animations coupées si le système le demande');
     const css = readFileSync(new URL('../public/site.css', import.meta.url), 'utf8');
-    assert.match(css, /\.rb-b[\s\S]*prefers-reduced-motion[\s\S]*animation: none/);
+    assert.match(css, /\.rb-b \{[\s\S]*radial-gradient[\s\S]*prefers-reduced-motion/, 'bulle transparente à reflets ; ruban immobile si le système le demande');
+    assert.match(js, /requestAnimationFrame\(tick\)/, 'les bulles montent le long du tracé');
+    assert.match(css, /\.toc \{[^}]*background: color-mix\(in srgb, var\(--card\) 96%/, 'le sommaire a un fond plein : le ruban passe derrière');
   } finally { await s.close(); }
 });
 

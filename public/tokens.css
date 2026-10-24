@@ -38,6 +38,7 @@
   --err: #b4233a; --err-bg: #fde7eb;
   --info: #0b6f96; --info-bg: #e1f1f8;
   --on-err: #ffffff;
+  --glass: #ffffff; /* reflets des bulles du ruban : blanc dans les deux thèmes (elles sont dans le trait coloré) */
   /* documentation : blocs de code (toujours sombres) et méthodes HTTP */
   --code-bg: #0f1a33; --code-fg: #e6edf9; --code-muted: #9fb0d0; --code-line: #2a3a5e; --code-hover: #1b2b4d;
   --tk-k: #7cc4ff; --tk-s: #a5e3a1; --tk-n: #ffcb7b; --tk-b: #f59ad4; --tk-c: #8c9bbd;

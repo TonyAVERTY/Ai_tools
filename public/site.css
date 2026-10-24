@@ -233,7 +233,7 @@ body.site {
 .toc summary .ic { transition: transform var(--t) var(--ease); }
 .toc[open] summary .ic { transform: rotate(180deg); }
 .toc ol { list-style: none; margin: 0; padding: 0 8px 8px; display: flex; flex-direction: column; }
-.toc a { display: flex; gap: 10px; align-items: center; min-height: 44px; padding: 0 10px; border-radius: var(--radius-sm); color: var(--muted); text-decoration: none; font-size: .9375rem; font-weight: 500; }
+.toc a { display: flex; gap: 10px; align-items: center; min-height: 44px; padding: 0 10px; border-radius: var(--radius-sm); color: color-mix(in srgb, var(--text) 82%, var(--card)); text-decoration: none; font-size: .9375rem; font-weight: 500; }
 .toc a:hover { background: var(--bg-sunk); color: var(--text); }
 .toc a[aria-current="true"] { color: var(--text); font-weight: 600; box-shadow: inset 3px 0 0 var(--accent); background: var(--bg-sunk); }
 .toc a span { font-variant-numeric: tabular-nums; color: var(--muted); min-width: 1.5em; }
@@ -305,7 +305,7 @@ body.site {
   .lg-head { padding: 64px 0 32px; }
   .lg-body { grid-template-columns: 260px minmax(0, 1fr); gap: 72px; padding: 48px 0 96px; align-items: start; }
   .toc summary { pointer-events: none; min-height: 40px; padding: 0 10px; font-size: .75rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
-  .toc { border: 0; background: transparent; border-left: 1px solid var(--line); border-radius: 0; position: sticky; top: 24px; }
+  .toc { border: 1px solid var(--line); background: color-mix(in srgb, var(--card) 96%, transparent); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); border-radius: var(--radius-lg); box-shadow: var(--shadow-1); position: sticky; top: 24px; padding: 6px 0 2px; }
   .toc .ic { display: none; }
   .foot-g { grid-template-columns: 1.4fr 1fr 1fr 1fr; }
 }
@@ -411,18 +411,18 @@ body.site {
 /* Repère des contenus réservés aux visiteurs (remplacé pour un compte connecté) : sans effet sur la mise en page */
 x-guest { display: contents; }
 
-/* ---------- Documentation : le ruban défile plus lentement que le texte (parallaxe) et porte des bulles ---------- */
+/* ---------- Documentation : le ruban défile plus lentement que le texte (parallaxe) et pétille de bulles ---------- */
 .fx .page-ribbon svg { position: absolute; left: 0; top: 0; height: calc(100% - var(--par, 0px)); transform: translate3d(0, var(--py, 0px), 0); will-change: transform; }
 .rb-bubbles { position: absolute; left: 0; right: 0; top: 0; height: calc(100% - var(--par, 0px)); transform: translate3d(0, var(--py, 0px), 0); will-change: transform; }
+/* Une bulle de bière : centre presque transparent, anneau clair plus marqué sur les bords, petit reflet net en haut à gauche et reflet doux en bas à droite */
 .rb-b {
-  position: absolute; display: block; border-radius: 999px; translate: calc(-50% + var(--ox, 0px)) -50%;
-  background: radial-gradient(circle at 32% 28%, color-mix(in srgb, var(--bg) 90%, transparent), color-mix(in srgb, var(--accent-2) 30%, transparent) 55%, color-mix(in srgb, var(--accent) 40%, transparent));
-  border: 1px solid color-mix(in srgb, var(--bg) 70%, transparent);
-  animation: rb-float var(--d, 7s) ease-in-out var(--delay, 0s) infinite alternate;
+  position: absolute; left: 0; top: 0; display: block; border-radius: 50%; opacity: 0; will-change: transform, opacity;
+  background:
+    radial-gradient(circle at 30% 27%, color-mix(in srgb, var(--glass) 98%, transparent) 0 10%, color-mix(in srgb, var(--glass) 0%, transparent) 24%),
+    radial-gradient(circle at 70% 76%, color-mix(in srgb, var(--glass) 50%, transparent) 0 8%, color-mix(in srgb, var(--glass) 0%, transparent) 30%),
+    radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--glass) 6%, transparent) 0 50%, color-mix(in srgb, var(--glass) 30%, transparent) 72%, color-mix(in srgb, var(--glass) 85%, transparent) 90%, color-mix(in srgb, var(--glass) 25%, transparent) 100%);
+  box-shadow: inset 0 0 0 .75px color-mix(in srgb, var(--glass) 80%, transparent), 0 0 3px color-mix(in srgb, var(--glass) 35%, transparent);
 }
-@keyframes rb-float { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(var(--dx, 6px), var(--dy, -12px), 0); } }
-@media (max-width: 899px) { .rb-b { opacity: .6; } }
 @media (prefers-reduced-motion: reduce) {
   .fx .page-ribbon svg, .rb-bubbles { transform: none; will-change: auto; }
-  .rb-b { animation: none; }
 }
