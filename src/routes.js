@@ -25,6 +25,7 @@ import { feedToken, feedUrl } from './services/ical.js';
 import { developerMode } from './apitokens.js';
 import { registerLinkedinRoutes } from './linkedinroutes.js';
 import { registerPromoRoutes, removeProjectVideos } from './promo.js';
+import { registerProspectRoutes } from './prospectroutes.js';
 import { dashboardPage, settingsPage, unsubPage, accountPage, linkPage } from './views.js';
 import { enqueue, latestJobs, cancelJob, usageSummary } from './services/jobs.js';
 import { validateGitUrl, removeRepo } from './services/git.js';
@@ -77,6 +78,7 @@ export function registerRoutes(router, app) {
   registerMailRoutes(router, app);
   registerLinkedinRoutes(router, app, { project, aiOpts });
   registerPromoRoutes(router, app, { project, aiOpts });
+  registerProspectRoutes(router, app, { project });
   registerApiV1(router, app, { aiOpts });
   registerDeveloperRoutes(router, app);
   registerCalendarRoutes(router, app);
