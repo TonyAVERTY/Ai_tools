@@ -187,6 +187,7 @@ export function makeHandlers(app) {
     const markInvalid = db.prepare("UPDATE prospects SET status = 'invalid' WHERE id = ? AND status = 'new'");
     const mxCache = new Map();
     const readReceipt = (await getSetting(db, userId, 'read_receipt', '0')) === '1';
+    const footer = (await getSetting(db, userId, 'mail_footer', '1')) !== '0'; // pied de page : actif sauf retrait explicite dans les Réglages
     let sent = 0, failed = 0, invalid = 0;
     await ctx.progress({ sent, failed, total: n, message: `0/${n} ${kind === 'followup' ? 'relances envoyées' : 'envoyés'}`, pct: 0 });
 
@@ -223,7 +224,7 @@ export function makeHandlers(app) {
       }
       const mail = buildProspectMail({
         template, prospect: p, smtp: project.smtp, unsubUrl, subject, inReplyTo,
-        messageId: makeMessageId(project.smtp.fromEmail), readReceipt,
+        messageId: makeMessageId(project.smtp.fromEmail), readReceipt, footer,
       });
       try {
         await transport.sendMail(mail);
