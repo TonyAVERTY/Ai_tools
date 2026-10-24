@@ -67,8 +67,10 @@ test('sections : celles qui relèvent d\'un poste le déclarent, En-tête et Con
   assert.deepEqual(rolesOfSection('header'), []);
   const { u } = await setup();
   const html = await page(u);
-  for (const r of ROLES) assert.match(html, new RegExp(`data-role-filter="${r.id}"[^>]*>${r.label.replace(/[()]/g, '\\$&')}<`), `bouton ${r.label}`);
-  assert.match(html, /data-role-filter="" aria-pressed="true">Tous les postes</);
+  assert.match(html, /<div class="hd"><h1 id="h-projets">Projets<\/h1><div class="hd-tools"><label class="rolesel">/, 'le filtre est dans l\'en-tête de la page Projets');
+  assert.match(html, /<option value="">Tous les postes<\/option>/);
+  for (const r of ROLES) assert.ok(html.includes(`<option value="${r.id}">${r.label}</option>`), `poste ${r.label}`);
+  assert.equal((html.match(/data-role-select/g) || []).length, 1, 'un seul filtre pour tous les projets');
   assert.match(html, /data-acc="prospect" data-roles="commerce"/);
   assert.match(html, /data-acc="audit" data-roles="technique"/);
   assert.doesNotMatch(html, /data-acc="header" data-roles/);

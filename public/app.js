@@ -389,6 +389,35 @@
   });
   listen(document, 'keydown', (e) => { if (e.key === 'Escape' && jobsOpen()) { toggleJobs(false); jobsBtn.focus(); } });
 
+  // Carte « Usage du mois » : le quota Claude (session 5 h, semaine) et ce que les jobs d'AiTools ont consommé, mêmes données que la barre du haut
+  function usageRow(label, value, { ratio = null, tip = '', cls = '' } = {}) {
+    const w = ratio == null ? '' : `<div class="bar usage${ratio >= 1 ? ' full' : ''}" role="progressbar" aria-label="${esc(label)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.min(100, Math.round(ratio * 100))}"><span class="w-${Math.min(100, Math.round(ratio * 20) * 5)}"></span></div>`;
+    return `<li class="g"><div class="g-h" title="${esc(tip)}"><span>${esc(label)}</span><span class="g-v ${cls}">${value}</span></div>${w}</li>`;
+  }
+  function usageClaude(s) {
+    const rows = [];
+    const rl = s.claudeRateLimit;
+    if (s.linkMode !== 'api_key') {
+      if (!rl || (!rl.fiveHour && !rl.sevenDay)) {
+        const why = !rl ? 'pas encore mesuré' : 'relevé indisponible';
+        rows.push(usageRow('Quota Claude', why, { tip: rl ? (WHY[rl.error] || 'relevé indisponible') : 'Le relevé en direct se fait avec ton abonnement Claude', cls: 'muted' }));
+      }
+      for (const [label, w] of [['Claude session 5 h', rl?.fiveHour], ['Claude semaine', rl?.sevenDay]]) {
+        if (!w) continue;
+        const reset = resetLabel(w.resetsAt);
+        const live = rl.source === 'live' && !rl.error;
+        const tip = `${live ? 'Relevé en direct chez Anthropic, tout ton usage Claude compris (y compris hors AiTools).' : `Dernière mesure ${ago(rl.at)} (pendant un job AiTools).`}${reset ? ` Réinitialisation ${reset}.` : ''}`;
+        rows.push(w.expired ? usageRow(label, '– (remise à zéro)', { tip, cls: 'muted' })
+          : usageRow(label, pct(w.utilization), { ratio: w.utilization, tip, cls: w.utilization >= 1 ? 'error' : w.utilization >= 0.8 ? 'warn' : '' }));
+      }
+    }
+    for (const [label, x] of [['IA via AiTools 24 h', s.budget.day], ['IA via AiTools 30 j', s.budget.month]]) {
+      const r = x.limit ? x.used / x.limit : null;
+      rows.push(usageRow(label, `${x.used.toFixed(2)} $${x.limit ? ` / ${x.limit} $` : ''}`, { ratio: r, tip: GAUGE_TIP, cls: r >= 1 ? 'error' : r >= 0.8 ? 'warn' : '' }));
+    }
+    return rows.join('');
+  }
+
   let sysTimer;
   async function refreshSys() {
     clearTimeout(sysTimer);
@@ -402,6 +431,7 @@
         ${claudeQuota(s.claudeRateLimit, s.linkMode)}
         ${gauge('24 h', s.budget.day)} ${gauge('30 j', s.budget.month)}
         ${s.budget.blocked ? '<span class="error">Budget IA atteint : jobs IA en attente</span>' : ''}`;
+      for (const box of $$('[data-usage-claude]')) { box.innerHTML = usageClaude(s); box.hidden = false; }
       renderJobsMenu(s);
       busy = s.queue > 0;
     } catch { /* silencieux */ }
@@ -639,8 +669,11 @@
       if (sum) sum.classList.toggle('acc-done', list.every((s) => s.done));
     }
     const badge = $('[data-cfg]', el);
+    const off = lsGet(`todo-off-${el.dataset.id}`) === '1';
+    const restore = $('[data-todo-restore]', el);
+    if (restore) restore.hidden = !off || c.complete;
     if (!badge) return;
-    badge.hidden = false;
+    badge.hidden = off; // retirée par la croix : la pastille « config » part avec la liste
     badge.textContent = c.complete ? 'config ✓' : `config ${c.done}/${c.total}`;
     badge.classList.toggle('ok', c.complete);
     badge.classList.toggle('warn', !c.ready);
@@ -662,6 +695,7 @@
       <svg class="ring" viewBox="0 0 44 44" role="img" aria-label="${c.done} étapes sur ${c.total}"><circle class="ring-t" cx="22" cy="22" r="18"></circle><circle class="ring-v" cx="22" cy="22" r="18" stroke-dasharray="${((113.1 * c.done) / c.total).toFixed(2)} 113.1" transform="rotate(-90 22 22)"></circle><text class="ring-x" x="22" y="26" text-anchor="middle">${c.done}/${c.total}</text></svg>
       <span class="todo-title"><strong>${c.ready ? 'Prêt à prospecter' : 'Mise en route'}</strong><span class="muted small">${esc(name)}</span></span>
       <span class="chev" aria-hidden="true"></span></button>
+    <button type="button" class="todo-x" data-todo-close aria-label="Retirer la mise en route de ce projet" title="Retirer la mise en route (masque aussi « config »)"><span aria-hidden="true">×</span></button>
     <div class="todo-body">
       <ul>${c.steps.map((s) => `<li class="${s.done ? 'done' : ''}">${s.done ? TICK : DOT}<div>
         <button type="button" class="todo-go" data-todo-go="${esc(s.key)}">${esc(s.label)}</button>${s.optional ? '<span class="todo-opt">facultatif</span>' : ''}
@@ -691,6 +725,23 @@
     setTimeout(() => target.classList.remove('flash'), 1800);
   }
 
+  // Retirer la liste d'un projet (croix ou « Masquer ») : elle et la pastille « config » disparaissent ; « Afficher la mise en route » la rend
+  function hideTodo(id) {
+    lsSet(`todo-off-${id}`, '1');
+    if (todo) todo.hidden = true;
+    const el = $(`details.project[data-id="${id}"]`);
+    const c = checklists.get(String(id));
+    if (el && c) markChecklist(el, c);
+  }
+  function restoreTodo(el) {
+    lsSet(`todo-off-${el.dataset.id}`, '0');
+    lsSet('todo-min', '0');
+    const c = checklists.get(el.dataset.id);
+    if (c) markChecklist(el, c);
+    focusTodo(el);
+    renderTodo();
+  }
+
   if (todo) {
     const projects = $$('details.project');
     const start = $('details.project[open]') || projects[0];
@@ -702,16 +753,17 @@
       const el = badge?.closest('details.project');
       if (!el) return;
       e.preventDefault();
-      lsSet(`todo-off-${el.dataset.id}`, '0');
-      lsSet('todo-min', '0');
-      focusTodo(el);
-      renderTodo();
+      restoreTodo(el);
+    });
+    listen(document, 'click', (e) => {
+      const b = e.target.closest('[data-todo-restore-btn]');
+      if (b) restoreTodo(b.closest('details.project'));
     });
     todo.addEventListener('click', (e) => {
       const id = todo.dataset.project;
       const el = $(`details.project[data-id="${id}"]`);
       if (e.target.closest('[data-todo-toggle]')) { lsSet('todo-min', todo.classList.contains('min') ? '0' : '1'); renderTodo(); return; }
-      if (e.target.closest('[data-todo-hide]')) { lsSet(`todo-off-${id}`, '1'); todo.hidden = true; return; }
+      if (e.target.closest('[data-todo-hide],[data-todo-close]')) { hideTodo(id); return; }
       const go = e.target.closest('[data-todo-go]');
       const step = go && checklists.get(id)?.steps.find((s) => s.key === go.dataset.todoGo);
       if (step && el) todoGo(el, step);
@@ -1242,6 +1294,7 @@
   const ROLE_KEY = 'aitools.role';
   const savedRole = () => { try { return localStorage.getItem(ROLE_KEY) || ''; } catch { return ''; } };
   function applyRole(role) {
+    for (const sel of $$('[data-role-select]')) sel.value = role;
     for (const proj of $$('.project')) {
       for (const d of $$('details.acc[data-roles]', proj)) d.hidden = !!role && !d.dataset.roles.split(' ').includes(role);
       for (const d of $$('details.role', proj)) {
@@ -1250,17 +1303,15 @@
       }
       const postes = $('details.acc[data-acc="postes"]', proj);
       if (postes && role) postes.open = true;
-      for (const b of $$('[data-role-filter]', proj)) b.setAttribute('aria-pressed', String(b.dataset.roleFilter === role));
     }
   }
-  if (!$$('[data-role-filter]').some((b) => b.dataset.roleFilter === savedRole())) { try { localStorage.removeItem(ROLE_KEY); } catch { /* ignore */ } }
+  if (!$$('[data-role-select] option').some((o) => o.value === savedRole())) { try { localStorage.removeItem(ROLE_KEY); } catch { /* ignore */ } }
   applyRole(savedRole());
-  listen(document, 'click', (e) => {
-    const b = e.target.closest('[data-role-filter]');
-    if (!b) return;
-    const role = b.dataset.roleFilter;
-    try { if (role) localStorage.setItem(ROLE_KEY, role); else localStorage.removeItem(ROLE_KEY); } catch { /* le filtre fonctionne sans mémoire */ }
-    applyRole(role);
+  listen(document, 'change', (e) => {
+    const sel = e.target.closest('[data-role-select]');
+    if (!sel) return;
+    try { if (sel.value) localStorage.setItem(ROLE_KEY, sel.value); else localStorage.removeItem(ROLE_KEY); } catch { /* le filtre fonctionne sans mémoire */ }
+    applyRole(sel.value);
   });
 
   let posteMd = '';

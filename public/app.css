@@ -927,11 +927,23 @@ html.nav-busy { cursor: progress; }
 .pv-frame { display: block; width: 100%; height: min(420px, 55vh); border: 1px solid var(--line-strong); border-radius: var(--radius); background: #ffffff; }
 .pv-text { margin: 0; padding: var(--s-3); max-height: min(420px, 55vh); overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--card-2); font: inherit; font-size: .9375rem; }
 
+/* Mise en route : croix pour retirer la liste (au survol ou au clavier ; toujours là au doigt) */
+.todo-x { position: absolute; top: 6px; right: 6px; z-index: 1; width: 24px; height: 24px; padding: 0; border: 1px solid var(--line-strong); border-radius: 50%; background: var(--card); color: var(--muted); font: inherit; font-size: 1rem; line-height: 1; cursor: pointer; opacity: 0; transition: opacity var(--t-fast); }
+.todo:hover .todo-x, .todo:focus-within .todo-x, .todo-x:focus-visible { opacity: 1; }
+.todo-x:hover { color: var(--text); border-color: var(--accent); }
+@media (hover: none) { .todo-x { opacity: 1; } }
+@media (min-width: 900px) { .todo.min { overflow: visible; } .todo.min .todo-head { border-radius: 999px; } .todo.min .todo-x { top: -8px; right: -8px; } }
+
+/* Usage du mois : quota Claude et conso IA sous les plafonds du plan */
+.usage-claude { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.usage-claude[hidden] { display: none; }
+
 /* Postes : filtre du projet, liste des postes et de leurs tâches, résultat d'une tâche */
-.rolebar { display: flex; flex-wrap: wrap; gap: 8px; padding: 14px 14px 0; margin: 0 0 8px; }
-.rolebar .chip { border: 1px solid var(--line-strong); background: var(--card); color: var(--text); border-radius: 999px; padding: 6px 14px; font: inherit; font-size: .9rem; cursor: pointer; transition: background var(--t-fast), border-color var(--t-fast); }
-.rolebar .chip:hover { border-color: var(--accent); }
-.rolebar .chip[aria-pressed="true"] { background: var(--grad); border-color: transparent; color: var(--on-grad); font-weight: 600; }
+.hd-tools { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 12px; }
+.rolesel { display: flex; align-items: center; gap: 8px; margin: 0; }
+.rolesel .lbl { margin: 0; white-space: nowrap; }
+.rolesel .sel { min-width: 190px; }
+@media (max-width: 600px) { .hd { flex-wrap: wrap; } .hd-tools { width: 100%; justify-content: space-between; } .rolesel { flex: 1 1 auto; min-width: 0; } .rolesel .sel { min-width: 0; flex: 1; } }
 .roles { display: grid; gap: 10px; margin-top: 12px; }
 .role { border: 1px solid var(--line); border-radius: var(--radius); background: var(--card-2); }
 .role > summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding: 12px 14px; cursor: pointer; }
