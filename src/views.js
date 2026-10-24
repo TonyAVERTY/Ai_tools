@@ -352,6 +352,7 @@ function templateForm(p, kind) {
       ${initial ? '<label>Objet B <span class="muted small">(optionnel : test A/B, les envois alternent entre les deux objets)</span><input name="subjectB"></label>' : ''}
       <label>Corps<textarea name="body" rows="${initial ? 9 : 5}"></textarea></label>
       <div class="row">
+        <button type="button" class="btn" data-tpl-preview>${ic('eye')}Aperçu</button>
         <button class="btn" name="mode" value="save">Enregistrer</button>
         <button class="btn primary" name="mode" value="validate">Valider le modèle</button>
       </div>
@@ -426,10 +427,26 @@ function projectItem(p, smtp, dbCfg, imap, { open = false } = {}) {
         <select name="sort" aria-label="Tri"><option value="score">Tri : score</option><option value="recent">Plus récents</option><option value="contacted">Dernier contact</option><option value="company">Entreprise A → Z</option></select>
       </form>
       <div class="row csv">
+        <button type="button" class="btn small primary" data-pform-toggle aria-expanded="false">${ic('plus')}Ajouter un prospect</button>
         <a class="btn small" data-export href="/api/projects/${p.id}/prospects.csv" download>Exporter (CSV)</a>
         <label class="btn small file">Importer un CSV<input type="file" accept=".csv,text/csv" data-import="${p.id}" hidden></label>
         <span class="muted small">Colonnes reconnues : entreprise, email, site, ville, secteur, score, source, accroche.</span>
       </div>
+      <form class="pform panel" data-pform data-id="${p.id}" hidden>
+        <div class="panel-h"><h4>Ajouter un prospect</h4></div>
+        <p class="muted small">Pour un contact que tu as déjà : le prospect est ajouté avec le statut « À contacter ». Il est écarté s'il existe déjà dans ce projet ou s'il ne doit pas être contacté.</p>
+        <div class="grid2">
+          <label class="field"><span class="lbl">Email</span><input name="email" type="email" required maxlength="200" autocomplete="off" placeholder="contact@entreprise.fr"></label>
+          <label class="field"><span class="lbl">Entreprise</span><input name="company" maxlength="200" placeholder="Laisse vide : le domaine de l'adresse"></label>
+          <label class="field"><span class="lbl">Site</span><input name="website" maxlength="300" placeholder="https://entreprise.fr"></label>
+          <label class="field"><span class="lbl">Ville</span><input name="city" maxlength="100"></label>
+          <label class="field"><span class="lbl">Secteur</span><input name="sector" maxlength="100"></label>
+          <label class="field"><span class="lbl">Score (1 à 10)</span><input name="score" type="number" min="1" max="10" inputmode="numeric"></label>
+        </div>
+        <label class="field"><span class="lbl">Accroche <span class="muted small">(la phrase qui ouvre le mail, facultatif)</span></span><input name="hook" maxlength="400"></label>
+        <label class="field"><span class="lbl">Origine de l'adresse <span class="muted small">(facultatif : où tu l'as trouvée)</span></span><input name="source" maxlength="300" placeholder="Laisse vide : « Ajout manuel du … »"></label>
+        <div class="row"><button class="btn primary">Ajouter le prospect</button><button type="button" class="btn" data-pform-cancel>Annuler</button></div>
+      </form>
       <div data-import-report></div>
       <div data-prospects></div>
       <div class="pager" data-pager></div>`, { cls: 'sub prospects' })}

@@ -346,9 +346,9 @@ body.site {
 
 /* ---------- Ruban de page : il traverse toute la page, de haut en bas, et suit donc le défilement ---------- */
 .page-ribbon { position: absolute; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; }
-.page-ribbon svg { display: block; width: 100%; height: 100%; }
+.page-ribbon svg { display: block; width: 100%; height: 100%; opacity: .4; } /* le trait seul est atténué (le texte passe dessus) ; les bulles, elles, gardent leur éclat */
 .page-ribbon path { fill: none; stroke: url(#g-page); stroke-width: 26px; stroke-linecap: round; vector-effect: non-scaling-stroke; }
-@media (max-width: 899px) { .page-ribbon { opacity: .3; } }
+@media (max-width: 899px) { .page-ribbon svg { opacity: .25; } }
 .sec-alt { background: color-mix(in srgb, var(--bg-sunk) 70%, transparent); }
 .top { background: color-mix(in srgb, var(--bg) 92%, transparent); }
 .foot { background: color-mix(in srgb, var(--bg-sunk) 90%, transparent); }
@@ -421,7 +421,7 @@ x-guest { display: contents; }
     radial-gradient(circle at 30% 27%, color-mix(in srgb, var(--glass) 98%, transparent) 0 10%, color-mix(in srgb, var(--glass) 0%, transparent) 24%),
     radial-gradient(circle at 70% 76%, color-mix(in srgb, var(--glass) 50%, transparent) 0 8%, color-mix(in srgb, var(--glass) 0%, transparent) 30%),
     radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--glass) 6%, transparent) 0 50%, color-mix(in srgb, var(--glass) 30%, transparent) 72%, color-mix(in srgb, var(--glass) 85%, transparent) 90%, color-mix(in srgb, var(--glass) 25%, transparent) 100%);
-  box-shadow: inset 0 0 0 .75px color-mix(in srgb, var(--glass) 80%, transparent), 0 0 3px color-mix(in srgb, var(--glass) 35%, transparent);
+  box-shadow: inset 0 0 0 .75px color-mix(in srgb, var(--glass) 80%, transparent), 0 0 0 .6px color-mix(in srgb, var(--accent) 45%, transparent), 0 0 3px color-mix(in srgb, var(--glass) 35%, transparent);
 }
 @media (prefers-reduced-motion: reduce) {
   .fx .page-ribbon svg, .rb-bubbles { transform: none; will-change: auto; }
