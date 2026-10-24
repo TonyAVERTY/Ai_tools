@@ -1,15 +1,15 @@
 # Postes et filtre par poste : les tâches IA d'une entreprise
-Résumé : comment filtrer un projet par poste (Commerce, Communication, Finance…), lancer les tâches IA d'un poste depuis « Postes et tâches IA », lire et copier le livrable, droits et limites. La liste complète des postes et tâches est dans postes-et-taches-ia.md.
+Résumé : comment filtrer les projets par poste (Commerce, Communication, Finance…), lancer les tâches IA d'un poste depuis « Postes et tâches IA », lire et copier le livrable, droits et limites. La liste complète des postes et tâches est dans postes-et-taches-ia.md.
 
 ## À quoi ça sert
 Une entreprise est faite de postes : Direction, Commerce, Marketing, Communication, Produit, Développement, Support client, Finance, Juridique et conformité, Ressources humaines, Opérations et qualité. Dans un projet, chaque poste a ses tâches faites par Claude. Les fonctions qui existaient déjà (Prospecter, LinkedIn, Promotion, Évolution, Audit du projet, Récapitulatif, Cible) sont rattachées à leur poste ; les autres sont dans la section **Postes et tâches IA**.
 
 ## Filtrer par poste
-1. Ouvre un projet : tout en haut, une rangée de boutons : **Tous les postes**, **Direction**, **Commerce**, **Marketing**, **Communication**, **Produit**, **Développement**, **Support client**, **Finance**, **Juridique et conformité**, **Ressources humaines**, **Opérations et qualité**.
-2. Clique sur un poste : le projet n'affiche plus que les sections de ce poste (par exemple Commerce : Cible et Prospecter), et la section **Postes et tâches IA** s'ouvre sur ce poste seulement.
+1. Sur la page **Projets**, en haut à droite, à côté de **Nouveau projet**, la liste **Poste** propose : **Tous les postes**, **Direction**, **Commerce**, **Marketing**, **Communication**, **Produit**, **Développement**, **Support client**, **Finance**, **Juridique et conformité**, **Ressources humaines**, **Opérations et qualité**.
+2. Choisis un poste : **tous tes projets** n'affichent plus que les sections de ce poste (par exemple Commerce : Cible et Prospecter), et la section **Postes et tâches IA** s'ouvre sur ce poste seulement.
 3. **Tous les postes** réaffiche tout.
 - Les sections **En-tête** et **Configuration du projet** restent toujours visibles.
-- Le filtre choisi est mémorisé dans ton navigateur et s'applique à tous tes projets ; il ne change rien aux données ni pour les autres membres de l'équipe.
+- Le filtre choisi est mémorisé dans ton navigateur ; il ne change rien aux données ni pour les autres membres de l'équipe. La liste n'apparaît que lorsque tu as au moins un projet.
 - Un poste sans section dédiée (Support client, Finance, Juridique et conformité, Ressources humaines, Opérations et qualité) n'affiche que **Postes et tâches IA**.
 
 ## Lancer une tâche
