@@ -5,7 +5,7 @@ import { existsSync, rmSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { PROMO, FORMATS, SceneError, parsePromoParams, extractScene, prepareScene, findChromium, promoSupported, renderPromo } from '../src/services/promovideo.js';
+import { PROMO, FORMATS, SceneError, parsePromoParams, extractScene, prepareScene, findChromium, promoSupported, renderPromo, leftovers } from '../src/services/promovideo.js';
 
 const SCENE = `<!doctype html><html><head><style>body{margin:0;background:#0b1020;overflow:hidden}#t{position:absolute;top:40%;left:50%;font:700 60px sans-serif;color:#fff}</style></head><body><div id="t">AiTools</div><script>window.renderFrame=function(t){var e=document.getElementById('t');e.style.opacity=Math.min(1,t);e.style.left=(30+t*10)+'%';};</script></body></html>`;
 
@@ -53,11 +53,15 @@ test('findChromium : réglage explicite d\'abord, rien si introuvable', () => {
 
 test('rendu réel : MP4 H.264 de la bonne durée, progression, scènes fautives refusées', { skip: !supported.ok && supported.reason }, async () => {
   const dir = mkdtempSync(join(tmpdir(), 'promo-test-'));
+  const realTmp = process.env.TMPDIR;
+  process.env.TMPDIR = dir; // profils de Chromium dans un dossier à part : le contrôle de fuite ne voit pas les rendus des autres fichiers de test, lancés en parallèle
   try {
     const out = join(dir, 'a.mp4');
+    const profilesBefore = leftovers().length;
     const steps = [];
     const r = await renderPromo({ cfg, html: SCENE, fps: 10, seconds: 3, width: 320, height: 320, out, onProgress: (p) => steps.push(p) });
     assert.equal(r.frames, 30);
+    assert.equal(leftovers().length, profilesBefore, 'le profil de Chromium est effacé après le rendu');
     assert.ok(r.bytes > 1000 && existsSync(out));
     assert.deepEqual(steps.at(-1), { done: 30, total: 30 });
     const probe = JSON.parse(spawnSync('ffprobe', ['-v', 'error', '-show_entries', 'stream=codec_name,width,height,nb_frames:format=duration', '-of', 'json', out]).stdout.toString());
@@ -78,5 +82,5 @@ test('rendu réel : MP4 H.264 de la bonne durée, progression, scènes fautives 
     const p = renderPromo({ cfg, html: SCENE, fps: 30, seconds: 30, width: 160, height: 160, out: join(dir, 'c.mp4'), signal: ctl.signal, onProgress: ({ done }) => { if (done > 3) ctl.abort(); } });
     await assert.rejects(p);
     assert.equal(existsSync(join(dir, 'c.mp4')), false);
-  } finally { rmSync(dir, { recursive: true, force: true }); }
+  } finally { if (realTmp === undefined) delete process.env.TMPDIR; else process.env.TMPDIR = realTmp; rmSync(dir, { recursive: true, force: true }); }
 });
