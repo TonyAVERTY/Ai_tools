@@ -85,11 +85,29 @@
     }
   }
 
+  // Anime l'arrivée du contenu (classes de tokens.css). Le nettoyage se fait à la fin de l'animation, ou au bout d'un délai si elle n'a pas lieu (mouvement réduit).
+  function transition(move) {
+    const main = document.getElementById('contenu');
+    const page = main?.querySelector(':scope > .page');
+    if (!page) return;
+    main.classList.add('pt-run');
+    page.dataset.move = move;
+    const done = () => { delete page.dataset.move; main.classList.remove('pt-run'); };
+    setTimeout(done, 700);
+  }
+
   async function swap(doc, url, { push, keepScroll, y }) {
     const u = abs(url);
     const next = u.pathname + u.search;
     const snap = keepScroll ? snapshot() : null;
     mark('loading');
+    // Sens de la transition d'après l'ordre des onglets de la barre du haut : vers la droite, le contenu arrive par la droite ; vers la gauche, par la gauche.
+    // Hors des onglets (Réglages, Compte…) : simple fondu vers le haut. Rien lors d'un rechargement de la même page (formulaire enregistré).
+    const tabs = [...document.querySelectorAll('.pills a.pill')].map((a) => a.pathname);
+    const tabOf = (p) => tabs.findIndex((t) => (t === '/' ? p === '/' : p === t || p.startsWith(`${t}/`)));
+    const fromPath = abs(loaded).pathname;
+    const [a, z] = [tabOf(fromPath), tabOf(u.pathname)];
+    const move = keepScroll || fromPath === u.pathname ? null : a >= 0 && z >= 0 ? (z > a ? 'right' : 'left') : 'up';
     const savedY = scrollY; // le contenu est remplacé d'un coup : la page peut être raccourcie un instant, on garde la valeur d'avant
     const toasts = [...document.querySelectorAll('.toast')];
     // Fond animé et barre système restent tels quels pendant le remplacement : pas de clignotement, pas de saut de hauteur
@@ -114,6 +132,7 @@
     const target = u.hash && document.getElementById(decodeURIComponent(u.hash.slice(1)));
     const place = () => { if (target) target.scrollIntoView(); else scrollTo(0, keepScroll || y != null ? (y ?? savedY) : 0); };
     place();
+    if (move) transition(move);
     await boot(doc);
     if (snap) restore(snap);
     place();
