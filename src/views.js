@@ -60,6 +60,7 @@ ${email ? `<header class="top">
           <div data-jobs-list></div>
         </div>
       </div>
+      <a class="ia-link site-link" href="/accueil" data-noajax aria-label="Accès au site internet" title="Accès au site internet">${ic('globe')}<span>Site internet</span></a>
       <a class="ia-link" href="/chat" aria-label="Assistant IA">${ic('spark')}<span>IA</span></a>
       <details class="user">
         <summary aria-label="Menu du compte : ${esc(email)}"><span class="avatar" aria-hidden="true">${esc(String(email).trim().charAt(0).toUpperCase())}</span></summary>
