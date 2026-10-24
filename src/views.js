@@ -11,7 +11,7 @@ import { MODE_LABELS, CONSENT_TEXT, CONSENT_CHECKBOX, CONSENT_VERSION } from './
 const fmtDate = (ts) => (ts ? new Date(ts * 1000).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' }) : '—');
 
 // Icônes de la section : noms du sprite (src/icons.js), une seule fois par page
-const SECTION_ICONS = { target: 'target', search: 'search', spark: 'spark', chart: 'chart', mail: 'mail', linkedin: 'pen', send: 'send', repeat: 'repeat', users: 'users', gear: 'gear', git: 'git', computer: 'computer' };
+const SECTION_ICONS = { target: 'target', search: 'search', spark: 'spark', chart: 'chart', mail: 'mail', linkedin: 'pen', send: 'send', repeat: 'repeat', users: 'users', gear: 'gear', git: 'git', computer: 'computer', film: 'film' };
 
 /** Section dépliable. `title` peut contenir du HTML de confiance (badges), jamais de donnée utilisateur brute. */
 function acc(key, icon, title, sub, body, { open = false, cls = '' } = {}) {
@@ -457,6 +457,10 @@ function projectItem(p, smtp, dbCfg, imap) {
   ${acc('linkedin', 'linkedin', 'LinkedIn', 'Relie un compte, Claude écrit des posts, tu relis et publies', `
     <div class="linkedin" data-linkedin><p class="muted">Chargement…</p></div>
     <div class="job" data-job="linkedin_post"></div>`, { cls: 'main' })}
+
+  ${acc('promo', 'film', 'Promotion', 'Claude conçoit une vidéo de design motion pour présenter ton projet', `
+    <div class="promo" data-promo><p class="muted">Chargement…</p></div>
+    <div class="job" data-job="promo_video"></div>`, { cls: 'main' })}
 
   ${p.access !== 'member' ? acc('recap', 'chart', 'Récapitulatif', 'Chiffres business, prospection et courbes', `
     <div class="recap" data-recap><p class="muted">Chargement…</p></div>`, { cls: 'main' }) : ''}
