@@ -55,6 +55,11 @@ export function publicLink(link) {
   };
 }
 
+/** Compte relié par clé API : seul cas où les jobs sont facturés à l'usage (donc où un montant en $ a un sens). Avec un abonnement Claude, rien n'est facturé en plus. */
+export async function isPriced(db, userId) {
+  return (await getLinkState(db, userId))?.mode === MODES.api_key;
+}
+
 export async function getLinkState(db, userId) {
   return publicLink(await readLink(db, userId));
 }

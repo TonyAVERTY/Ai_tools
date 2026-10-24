@@ -5,6 +5,7 @@ import { encrypt, decrypt } from '../crypto.js';
 import { HttpError } from '../http.js';
 import { parseEvolutions, EFFORTS } from './markdown.js';
 import { notifyChannels } from './channels.js';
+import { isPriced } from '../claudelink.js';
 
 // Uniquement de vraies URLs de webhook Discord : jamais d'envoi vers une adresse arbitraire
 export const WEBHOOK_RE = /^https:\/\/(?:canary\.|ptb\.)?discord(?:app)?\.com\/api\/webhooks\/\d{5,25}\/[\w-]{20,120}$/;
@@ -179,7 +180,7 @@ async function jobMeta(app, job) {
   const row = await app.db.prepare('SELECT started_at, finished_at, cost_usd FROM jobs WHERE id = ? AND user_id = ?').get(job.id, job.user_id);
   const out = [];
   if (row?.started_at && row?.finished_at) out.push({ name: '⏱️ Durée', value: duration(row.finished_at - row.started_at) });
-  if (row?.cost_usd) out.push({ name: '💳 Coût IA', value: `${row.cost_usd.toFixed(2)} $` });
+  if (row?.cost_usd && await isPriced(app.db, job.user_id)) out.push({ name: '💳 Coût IA', value: `${row.cost_usd.toFixed(2)} $` });
   return out;
 }
 

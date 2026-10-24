@@ -139,8 +139,9 @@ function kpiCells(cells) {
 /** Rapport hebdo : totaux en tuiles, puis un tableau par projet actif. */
 export function weeklyMail(st, { period, appUrl }) {
   const t = st.totals;
+  const priced = st.priced !== false; // pas de montant en $ avec un abonnement Claude
   const usd = (n) => `${n.toFixed(2)} $`;
-  const active = st.projects.filter((p) => p.found || p.sent || p.followups || p.replies || p.cost);
+  const active = st.projects.filter((p) => p.found || p.sent || p.followups || p.replies || (priced && p.cost));
   const quiet = st.projects.filter((p) => !active.includes(p));
   const row = (label, value, strong = false) => `<tr>
     <td style="padding:7px 0;border-top:1px solid ${C.line};font-size:14px;color:${C.muted};">${esc(label)}</td>
@@ -154,13 +155,13 @@ export function weeklyMail(st, { period, appUrl }) {
     ${row('Clients (total)', String(p.clients))}
     ${p.bounces ? row('Adresses invalides', String(p.bounces)) : ''}
     ${p.bestSubject ? row('Test A/B', `objet ${p.bestSubject.variant} gagnant (${pct(p.bestSubject.replied, p.bestSubject.sent)})`) : ''}
-    ${row('Coût IA', usd(p.cost))}
+    ${priced ? row('Coût IA', usd(p.cost)) : ''}
   </table></div>`).join('');
   const content = `${kpiCells([
     ['Prospects', String(t.found), 'trouvés'],
     ['Mails', String(t.sent), t.followups ? `+ ${t.followups} relance(s)` : 'envoyés'],
     ['Réponses', String(t.replies), pct(t.replies, t.sent)],
-    ['Coût IA', usd(t.cost), 'équivalent API'],
+    ...(priced ? [['Coût IA', usd(t.cost), 'équivalent API']] : []),
   ])}
   ${projects || `<p style="${MD_STYLES.p}">Aucune activité cette semaine.</p>`}
   ${quiet.length ? `<p style="margin:0 0 16px;font-size:13px;color:${C.muted};">Sans activité : ${quiet.map((p) => esc(p.name)).join(', ')}.</p>` : ''}`;
