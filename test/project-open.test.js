@@ -1,6 +1,7 @@
 // Page des projets : un projet unique s'ouvre tout seul, dès qu'il y en a plusieurs les listes restent fermées.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { startApp } from './helpers/server.js';
 import { addProject } from './helpers/users.js';
 
@@ -33,4 +34,11 @@ test('aucun projet : pas de liste, état vide', async () => {
   const html = await page(u);
   assert.deepEqual(openOf(html), []);
   assert.match(html, /class="empty"/);
+});
+
+test('le navigateur ne rouvre pas le dernier projet consulté : seuls un rechargement voulu par l\'application et « Voir » le font, une seule fois', () => {
+  const js = readFileSync(new URL('../public/app.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(js, /sessionStorageSet\('openProject'/, 'plus de mémoire permanente du dernier projet ouvert');
+  assert.match(js, /sessionStorage\.removeItem\('reopenProject'\)/, 'la réouverture est à usage unique');
+  assert.match(js, /const reload = \(\) => \{ rememberOpen\(\);/, 'un rechargement voulu garde le projet ouvert');
 });
