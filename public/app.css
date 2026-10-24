@@ -906,3 +906,23 @@ html.nav-busy { cursor: progress; }
 .pv-title { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
 .pv-meta p { margin: 0; }
 .pv-meta .row { margin-top: var(--s-2); }
+
+/* ---------- Prospects : ajout manuel, fiche modifiable, aperçu du mail ---------- */
+.pform { display: flex; flex-direction: column; gap: var(--s-3); margin: var(--s-3) 0; }
+.pform[hidden] { display: none; }
+.pform.panel { padding: var(--s-4); border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--card); }
+.pform h4 { margin: 0; }
+.danger-zone { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3); margin: var(--s-4) 0; padding-top: var(--s-3); border-top: 1px solid var(--line); }
+.mailprev { width: min(780px, calc(100vw - 32px)); }
+.pv-controls { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--s-3); margin: var(--s-3) 0; }
+.pv-controls .field { flex: 1 1 260px; }
+.seg { display: inline-flex; gap: 6px; margin: var(--s-2) 0; }
+.seg .btn[aria-pressed="true"] { background: var(--nav-on-bg); color: var(--nav-on-text); border-color: var(--nav-on-bg); }
+.pv-head { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px var(--s-3); margin: var(--s-3) 0; padding: var(--s-3); border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg-sunk); }
+.pv-head dt { color: var(--muted); font-size: .8125rem; }
+.pv-head dd { margin: 0; overflow-wrap: anywhere; }
+.pv-warn { list-style: none; margin: var(--s-2) 0; padding: var(--s-3); border-radius: var(--radius); background: var(--warn-bg); color: var(--warn); display: flex; flex-direction: column; gap: 6px; font-size: .875rem; }
+.pv-warn li { display: flex; gap: 8px; align-items: flex-start; }
+.pv-warn .ic { flex: none; margin-top: 2px; }
+.pv-frame { display: block; width: 100%; height: min(420px, 55vh); border: 1px solid var(--line-strong); border-radius: var(--radius); background: #ffffff; }
+.pv-text { margin: 0; padding: var(--s-3); max-height: min(420px, 55vh); overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--card-2); font: inherit; font-size: .9375rem; }
