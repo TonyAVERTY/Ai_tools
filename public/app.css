@@ -747,7 +747,17 @@ input.copy { font-family: var(--mono); font-size: .8125rem; }
 /* ---------- Barre du haut : lien vers la page IA, à côté de l'avatar ---------- */
 .ia-link { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 12px; border: 1px solid var(--control); border-radius: 999px; background: var(--card); color: var(--text); font-weight: 600; text-decoration: none; }
 .ia-link:hover { border-color: var(--link); background: var(--info-bg); }
-.ia-link[aria-current="page"] { background: var(--info-bg); border-color: var(--link); }
+.ia-link[aria-current="page"], .ia-menu:has(.ia-pop a[aria-current="page"]) > .ia-link { background: var(--info-bg); border-color: var(--link); }
+.ia-menu { position: relative; }
+.ia-menu > summary { cursor: pointer; list-style: none; }
+.ia-menu > summary::-webkit-details-marker { display: none; }
+.ia-menu[open] > summary { border-color: var(--link); background: var(--info-bg); }
+.ia-pop { width: 250px; }
+.ia-pop a { min-height: 52px; }
+.ia-pop .pop-t { display: flex; flex-direction: column; line-height: 1.25; }
+.ia-pop .pop-t small { font-weight: 400; font-size: .75rem; color: var(--muted); }
+.ia-pop .ic { flex: none; color: var(--link); }
+.user-pop a[aria-current="page"] small { color: inherit; opacity: .8; }
 .ia-link .ic { width: 18px; height: 18px; color: var(--link); }
 
 /* ---------- Page IA (chat) ---------- */

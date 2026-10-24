@@ -5,6 +5,13 @@ import { ic } from './icons.js';
 import { layout } from './views.js';
 import { RECOMMENDED, OTHERS } from './services/models.js';
 
+const SUPPORT_SUGGESTIONS = [
+  'Comment relier mon compte Claude ?',
+  'Pourquoi mes mails ne partent pas ?',
+  'À quoi sert la liste de mise en route ?',
+  'Comment créer une vidéo de promotion ?',
+];
+
 const SUGGESTIONS = [
   'Rédige un mail de prospection pour un artisan, en 100 mots',
   'Aide-moi à répondre à un prospect qui trouve ça trop cher',
@@ -36,28 +43,32 @@ function modelSelect(model) {
   </select>${ic('down')}</span>`;
 }
 
-export function chatPage({ email, conversations, current, messages, model, max, project = null, limits = { files: 6, maxMb: {} } }) {
+export function chatPage({ email, mode = 'claude', conversations, current, messages, model, max, project = null, limits = { files: 6, maxMb: {} } }) {
+  const support = mode === 'support';
+  const base = support ? '/support' : '/chat';
   const list = conversations.map((c) => `<li class="${current?.id === c.id ? 'on' : ''}" data-conv="${c.id}">
-      <a href="/chat/${c.id}"${current?.id === c.id ? ' aria-current="page"' : ''}>${esc(c.title)}</a>
+      <a href="${base}/${c.id}"${current?.id === c.id ? ' aria-current="page"' : ''}>${esc(c.title)}</a>
       <button type="button" class="chat-del" data-chat-del="${c.id}" aria-label="Supprimer la conversation « ${esc(c.title)} »">${ic('trash')}</button>
     </li>`).join('');
-  const body = `<div class="chat" id="chat" data-conv="${current ? current.id : ''}" data-max="${max}" data-files="${limits.files}" data-mb="${esc(JSON.stringify(limits.maxMb))}"${project ? ` data-project="${project.id}" data-project-name="${esc(project.name)}"` : ''}>
+  const body = `<div class="chat" id="chat" data-mode="${mode}" data-conv="${current ? current.id : ''}" data-max="${max}" data-files="${limits.files}" data-mb="${esc(JSON.stringify(limits.maxMb))}"${project ? ` data-project="${project.id}" data-project-name="${esc(project.name)}"` : ''}>
   <aside class="chat-side" aria-label="Conversations">
-    <a class="btn primary chat-new" href="/chat">${ic('plus')}Nouvelle conversation</a>
+    <a class="btn primary chat-new" href="${base}">${ic('plus')}Nouvelle conversation</a>
     <ul class="chat-list" data-chat-list>${list}</ul>
     <p class="muted small chat-none"${conversations.length ? ' hidden' : ''} data-chat-none>Tes conversations apparaîtront ici.</p>
   </aside>
-  <section class="chat-main" aria-label="Conversation avec Claude">
+  <section class="chat-main" aria-label="${support ? 'Conversation avec le Support' : 'Conversation avec Claude'}">
     <header class="chat-head">
-      <h1>${ic('spark')}Assistant IA</h1>
+      <h1>${ic(support ? 'help' : 'spark')}${support ? 'Support' : 'Assistant IA'}</h1>
       ${modelSelect(model)}
     </header>
     <div class="chat-log" id="chat-log" data-chat-log tabindex="0" aria-live="polite" aria-label="Messages">
       ${messages.length ? messages.map(bubble).join('\n') : `<div class="chat-empty" data-chat-empty>
-        <div class="chat-empty-i">${ic('spark')}</div>
-        <h2>Discute avec Claude</h2>
-        <p class="muted">Rédaction de mails, réponses à tes prospects, idées de posts, stratégie… Chaque message est envoyé à Claude avec ton propre compte.</p>
-        <div class="chat-ideas">${SUGGESTIONS.map((s) => `<button type="button" class="chip" data-chat-idea>${esc(s)}</button>`).join('')}</div>
+        <div class="chat-empty-i">${ic(support ? 'help' : 'spark')}</div>
+        <h2>${support ? 'Une question sur AiTools ?' : 'Discute avec Claude'}</h2>
+        <p class="muted">${support
+    ? "Où cliquer, comment configurer, pourquoi quelque chose ne marche pas : Claude lit la documentation d'AiTools pour te répondre. Chaque message est envoyé à Claude avec ton propre compte."
+    : 'Rédaction de mails, réponses à tes prospects, idées de posts, stratégie… Chaque message est envoyé à Claude avec ton propre compte.'}</p>
+        <div class="chat-ideas">${(support ? SUPPORT_SUGGESTIONS : SUGGESTIONS).map((s) => `<button type="button" class="chip" data-chat-idea>${esc(s)}</button>`).join('')}</div>
       </div>`}
     </div>
     <p class="chat-err" role="alert" data-chat-error hidden></p>
@@ -66,18 +77,20 @@ export function chatPage({ email, conversations, current, messages, model, max, 
       <div class="chat-row">
         <input type="file" data-chat-file multiple hidden accept="image/png,image/jpeg,image/gif,image/webp,application/pdf,video/mp4,video/quicktime,video/webm,.txt,.md,.csv,.json,.log,.xml,.yml,.yaml,.html,.css,.js,.ts,.php,.py,.sql">
         <button type="button" class="btn icon-btn" data-chat-attach aria-label="Joindre une photo, une vidéo ou un fichier" title="Joindre une photo, une vidéo ou un fichier">${ic('clip')}</button>
-        <details class="chat-proj" data-chat-projmenu>
+        ${support ? '' : `<details class="chat-proj" data-chat-projmenu>
           <summary class="btn icon-btn" aria-label="Joindre un projet AiTools" title="Joindre un projet AiTools">${ic('folder')}</summary>
           <div class="chat-projlist" data-chat-projlist role="menu" aria-label="Projets AiTools"><p class="muted small">Chargement…</p></div>
-        </details>
+        </details>`}
         <label class="sr-only" for="chat-input">Ton message</label>
-        <textarea id="chat-input" name="message" rows="1" maxlength="${max}" placeholder="Écris à Claude…  (Entrée pour envoyer, Maj+Entrée pour un retour à la ligne)" data-chat-input></textarea>
+        <textarea id="chat-input" name="message" rows="1" maxlength="${max}" placeholder="${support ? 'Pose ta question sur AiTools…' : 'Écris à Claude…'}  (Entrée pour envoyer, Maj+Entrée pour un retour à la ligne)" data-chat-input></textarea>
         <button class="btn primary" data-chat-send>${ic('send')}<span>Envoyer</span></button>
         <button type="button" class="btn" data-chat-stop hidden>${ic('stop')}<span>Arrêter</span></button>
       </div>
     </form>
-    <p class="chat-note muted small">Claude ne voit que cette conversation, et ce que tu joins : un projet AiTools (son code, en lecture seule), des photos, des PDF, des fichiers texte ou des vidéos (quelques images en sont tirées, sans le son). Il peut se tromper, vérifie avant d'envoyer.</p>
+    <p class="chat-note muted small">${support
+    ? "Le Support répond d'après la documentation d'AiTools. Il ne voit ni tes projets, ni tes prospects, ni tes mails. Tu peux joindre une capture d'écran pour montrer un problème. Il peut se tromper : vérifie avant d'agir."
+    : "Claude ne voit que cette conversation, et ce que tu joins : un projet AiTools (son code, en lecture seule), des photos, des PDF, des fichiers texte ou des vidéos (quelques images en sont tirées, sans le son). Il peut se tromper, vérifie avant d'envoyer."}</p>
   </section>
 </div>`;
-  return layout({ title: 'IA', email, body, scripts: ['/static/chat.js'] });
+  return layout({ title: support ? 'Support' : 'IA', email, body, scripts: ['/static/chat.js'] });
 }

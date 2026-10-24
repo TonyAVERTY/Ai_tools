@@ -116,24 +116,23 @@
     if (!newForm.hidden) $('input', newForm)?.focus();
   }));
 
-  // ---------- Menu du compte (avatar) : s'ouvre au survol, se ferme quand on le quitte ----------
-  // Avec une souris : survol (le clic sur l'avatar ne le referme pas). Au doigt ou au clavier : clic / Entrée, comme un menu ordinaire.
-  const userMenu = $('details.user');
-  if (userMenu) {
-    const hover = matchMedia('(hover: hover) and (pointer: fine)');
-    const summary = $('summary', userMenu);
+  // ---------- Menus de la barre (avatar du compte, bouton IA) : s'ouvrent au survol, se ferment quand on les quitte ----------
+  // Avec une souris : survol (le clic sur le bouton ne le referme pas). Au doigt ou au clavier : clic / Entrée, comme un menu ordinaire.
+  const hover = matchMedia('(hover: hover) and (pointer: fine)');
+  $$('details.user, details.ia-menu').forEach((menu) => {
+    const summary = $('summary', menu);
     let closeTimer;
-    const open = (v) => { clearTimeout(closeTimer); userMenu.open = v; };
-    userMenu.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse' && hover.matches) open(true); });
-    userMenu.addEventListener('pointerleave', (e) => {
+    const open = (v) => { clearTimeout(closeTimer); menu.open = v; };
+    menu.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse' && hover.matches) { $$('details.user[open], details.ia-menu[open]').forEach((o) => { if (o !== menu) o.open = false; }); open(true); } });
+    menu.addEventListener('pointerleave', (e) => {
       if (e.pointerType !== 'mouse' || !hover.matches) return;
       clearTimeout(closeTimer);
-      closeTimer = setTimeout(() => { userMenu.open = false; }, 220);
+      closeTimer = setTimeout(() => { menu.open = false; }, 220);
     });
     summary.addEventListener('click', (e) => { if (e.detail > 0 && hover.matches) e.preventDefault(); }); // clic souris : le survol l'a déjà ouvert
-    listen(document, 'click', (e) => { if (userMenu.open && !userMenu.contains(e.target)) open(false); });
-    userMenu.addEventListener('keydown', (e) => { if (e.key === 'Escape' && userMenu.open) { open(false); summary.focus(); } });
-  }
+    listen(document, 'click', (e) => { if (menu.open && !menu.contains(e.target)) open(false); });
+    menu.addEventListener('keydown', (e) => { if (e.key === 'Escape' && menu.open) { open(false); summary.focus(); } });
+  });
 
   // ---------- Réglages : le sommaire suit la lecture (la section en cours est surlignée en direct) ----------
   const tocLinks = $$('.settings .toc a[href^="#"]');
