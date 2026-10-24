@@ -8,6 +8,7 @@
 // demande du recul et du jugement. L'utilisateur peut remplacer le texte pour tous les modèles ou pour une seule gamme.
 import { modelFamily, modelLabel, PROMPT_SCOPES, FAMILY_LABELS } from './models.js';
 
+const PROMO_HTML_MAX = 60000;
 const SYSTEM_FR = 'Tu travailles pour un outil interne. Réponds en français. Va droit au but : pas de politesse, pas de récapitulatif, pas de commentaire autour de la réponse demandée.';
 
 export const MAX_CUSTOM = 8000;
@@ -182,6 +183,31 @@ Si la ville ou le secteur sont lisibles sur le site, renvoie-les ; sinon, laisse
       sonnet: `Choisis le fait le plus parlant pour le produit proposé, pas le plus visible. Une seule idée, formulée naturellement.`,
       opus: `Cherche le détail qui montre que tu comprends leur situation (spécialisation, contrainte, changement récent) et reformule-le sans le recopier.`,
       fable: `L'accroche doit donner l'impression qu'un humain attentif a lu leur site : précise, discrète, sans effet de manche.`,
+    },
+  },
+  promo: {
+    label: 'Vidéo de promotion (design motion)',
+    fixed: "Le contrat technique (document HTML autonome, fonction renderFrame(t), dimensions, durée) est imposé, ainsi que les données du projet et le sujet demandé.",
+    vars: ['duree', 'fps', 'format', 'ton'],
+    text: `Conçois une vidéo de promotion en design motion de [[duree]] secondes, à [[fps]] images par seconde, au format [[format]]. Ton : [[ton]].
+
+Direction artistique :
+- Un seul message par vidéo, dit en peu de mots. Chaque plan tient quelques secondes et porte une idée : l'accroche (le problème, nommé avec les mots du public), la promesse (ce que le produit change), 2 ou 3 bénéfices concrets, puis un plan final avec le nom du produit et l'appel à l'action.
+- Textes courts : 8 mots au plus par ligne, 2 lignes au plus par plan, corps de texte lisible (jamais sous 5 % de la hauteur de l'image). Contraste fort entre texte et fond.
+- Palette restreinte : 1 fond, 1 couleur de texte, 1 ou 2 couleurs d'accent. Une police système en gras pour les titres. Beaucoup d'espace vide : mieux vaut peu d'éléments, bien placés.
+- Mouvement : chaque entrée et chaque sortie est animée avec une courbe d'accélération douce (ease-out à l'entrée, ease-in à la sortie), jamais un mouvement linéaire. Fais entrer les éléments l'un après l'autre avec un léger décalage (stagger) plutôt que tous ensemble. Amplitudes mesurées : un déplacement de 40 à 120 px, un zoom de 0,9 à 1,05, des fondus. Garde toujours quelque chose qui bouge doucement, jamais d'image figée.
+- Formes et illustrations en SVG ou CSS (cartes, pastilles, courbes, curseurs, interfaces simplifiées, icônes dessinées), pour montrer le produit sans copie d'écran.
+- Rythme : répartis la durée entre les plans, laisse 0,4 à 0,8 s de respiration entre deux idées et garde au moins 1,5 s pour le plan final.
+
+Contraintes :
+- N'invente RIEN : aucun chiffre, pourcentage, client, témoignage, prix, récompense ni fonctionnalité qui ne figure pas dans les informations fournies. Pas de promesse de résultat.
+- Pas de clignotement rapide : jamais plus de 3 changements brusques de luminosité par seconde.
+- Aucun son, aucune image externe : tout est dessiné dans le document.`,
+    byModel: {
+      haiku: `Procède par plans : écris d'abord la liste des plans avec leur début et leur fin en secondes (qui totalisent exactement [[duree]] secondes), puis programme chacun. Pour chaque élément : une position de départ, une position d'arrivée, un début et une fin, et une seule fonction d'accélération réutilisée partout. Reste simple : peu d'éléments, des animations de déplacement, de fondu et de zoom, rien de compliqué.`,
+      sonnet: `Pose une grille et des marges communes à tous les plans, puis fais bouger les éléments d'un plan à l'autre pour que la vidéo se lise comme un seul mouvement continu plutôt que comme une suite de diapositives. Soigne les transitions entre plans : un élément du plan qui finit devient l'entrée du suivant.`,
+      opus: `Cherche la métaphore visuelle qui rend le bénéfice évident en deux secondes (un chaos qui s'ordonne, un chemin qui raccourcit, une tâche qui se coche toute seule) et construis toute la vidéo autour d'elle. Donne du caractère au mouvement : légers dépassements (overshoot) à l'arrivée, ralentis sur les mots clés, synchronisation des éléments sur un même temps fort.`,
+      fable: `Vise la vidéo qu'un studio de motion design livrerait : une idée forte, un rythme musical même sans son, une typographie assumée, aucun détail décoratif gratuit. Chaque seconde doit gagner sa place ; si un plan n'apporte rien, retire-le plutôt que de l'allonger.`,
     },
   },
   chat: {
@@ -418,6 +444,36 @@ ${direction
     : "Aucune direction donnée : choisis toi-même un angle utile et crédible pour le public visé (un problème fréquent et comment l'aborder, un retour d'expérience plausible, les coulisses du produit, un conseil concret)."}
 ${previous.length ? `\nBrouillons déjà produits, à ne PAS reprendre (change l'angle, l'accroche et la structure) :\n${previous.map((p) => `---\n${String(p).slice(0, 400)}`).join('\n')}\n---\n` : ''}
 Réponds UNIQUEMENT avec : {"post":"..."}`,
+  };
+}
+
+/**
+ * Vidéo de promotion : Claude répond par UN document HTML. La partie technique (renderFrame, dimensions, durée, interdictions) reste dans le code ;
+ * seules les consignes de direction artistique se modifient dans les Réglages. `fix` : message d'erreur du rendu précédent, pour une correction.
+ */
+export function promoPrompt({ projectName, profile, target, subject = '', seconds, fps, format, width, height, custom, model = null, fix = null }) {
+  const subjectLine = subject
+    ? `Sujet demandé : « ${subject} ». La vidéo parle de ce sujet, en lien avec le produit.`
+    : 'Aucun sujet précisé : la vidéo présente le projet (ce qu\'il est, pour qui, ce qu\'il change).';
+  return {
+    system: SYSTEM_FR,
+    prompt: `Projet « ${projectName} »
+Produit : ${profile.resume}
+Valeur : ${profile.proposition_valeur}
+Arguments : ${(profile.arguments || []).join(' ; ')}
+Public visé : ${target?.description || 'professionnels susceptibles d\'en avoir besoin'}
+
+${subjectLine}
+
+${instructions('promo', custom, { duree: seconds, fps, format: `${format} (${width} × ${height} pixels)`, ton: profile.ton || 'direct et chaleureux' }, model)}
+
+Contrat technique (obligatoire, la vidéo est produite à partir de ton document) :
+- Réponds UNIQUEMENT avec UN document HTML complet (<!doctype html> … </html>), sans explication ni bloc de code Markdown.
+- La page fait exactement ${width} × ${height} pixels (body sans marge, overflow: hidden). Durée : ${seconds} s, ${fps} images par seconde.
+- Définis window.renderFrame = function (t) { … } où t est le temps en secondes (0 à ${seconds}). Elle est appelée une fois par image, dans l'ordre, et DOIT placer tous les éléments uniquement à partir de t (position, opacité, taille, texte visible) : fonction pure du temps. N'utilise NI setTimeout, NI setInterval, NI requestAnimationFrame, NI animation ou transition CSS, NI Date, NI Math.random sans graine.
+- Tout est dans le document : CSS et script en ligne, formes en SVG ou CSS, canvas 2D si besoin. Aucune adresse http(s), aucune police ni image externe, pas d'iframe, pas de <link>. Polices : font-family: system-ui, "Helvetica Neue", Arial, sans-serif.
+- Au plus ${PROMO_HTML_MAX} caractères. Le document doit rester sobre : pas de milliers de nœuds.
+${fix ? `\nTa version précédente a été refusée au rendu : ${String(fix).slice(0, 600)}\nCorrige ce problème précisément et renvoie le document complet corrigé.` : ''}`,
   };
 }
 
