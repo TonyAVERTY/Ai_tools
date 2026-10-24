@@ -445,3 +445,11 @@ test('confidentialité : les pièces jointes de la page IA sont déclarées (don
   assert.match(conf, /jamais envoyée est supprimée au bout de 24 heures/);
   assert.match(conf, /pièces jointes \(photos, PDF, textes, images tirées d'une vidéo, code d'un projet joint\)/);
 });
+
+test('confidentialité : les vidéos de promotion sont déclarées (données, durée de conservation, destinataire)', async () => {
+  const conf = await (await page('/confidentialite')).text();
+  assert.equal((conf.match(/Vidéos de promotion/g) || []).length, 2, 'une ligne dans les données, une dans les durées');
+  assert.match(conf, /onglet Promotion d'un projet[\s\S]*le sujet que tu as saisi/);
+  assert.match(conf, /Au plus 20 vidéos par compte/);
+  assert.match(conf, /sujet que tu donnes pour une vidéo de promotion[\s\S]*sans accès au réseau/);
+});
