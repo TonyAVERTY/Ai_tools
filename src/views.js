@@ -96,6 +96,7 @@ export function usagePanel(u) {
   return `<section class="panel usage-card" aria-labelledby="h-usage">
   <div class="panel-h"><h2 id="h-usage">Usage du mois</h2><span class="badge">plan ${esc(u.planLabel)}</span></div>
   <ul class="usage-list">${rows}</ul>
+  <ul class="usage-list usage-claude" data-usage-claude aria-label="Usage de Claude" hidden></ul>
   ${full.length ? `<p class="cap" role="alert">${ic('alert')}<span>Plafond atteint : ${full.map((i) => esc(i.label.toLowerCase())).join(', ')}. Rien n'est perdu. <a href="/tarifs">Voir les tarifs</a></span></p>` : u.plan === 'free' ? '<p class="foot-n">Les plafonds se renouvellent le 1er du mois (heure de Paris). <a href="/tarifs">Voir les tarifs</a></p>' : ''}
 </section>`;
 }
@@ -362,11 +363,11 @@ function templateForm(p, kind) {
     <div class="job" data-job="${job}"></div>`;
 }
 
-/** Filtre par poste : un bouton par poste d'entreprise. « Tous les postes » = rien de caché. */
-const ROLE_BAR = `<div class="rolebar" role="group" aria-label="Filtrer par poste">
-    <button type="button" class="chip" data-role-filter="" aria-pressed="true">Tous les postes</button>
-    ${ROLES.map((r) => `<button type="button" class="chip" data-role-filter="${r.id}" aria-pressed="false">${esc(r.label)}</button>`).join('\n    ')}
-  </div>`;
+/** Filtre par poste, dans l'en-tête de la page Projets : il s'applique à tous les projets. */
+const ROLE_SELECT = `<label class="rolesel"><span class="lbl">Poste</span><span class="sel"><select data-role-select aria-label="Filtrer les projets par poste">
+    <option value="">Tous les postes</option>
+    ${ROLES.map((r) => `<option value="${r.id}">${esc(r.label)}</option>`).join('\n    ')}
+  </select>${ic('down')}</span></label>`;
 
 /** Section « Postes et tâches IA » : chaque poste avec ses tâches. Les tâches qui lisent le dépôt sont réservées aux administrateurs. */
 function postesBody(p) {
@@ -395,9 +396,9 @@ function projectItem(p, smtp, dbCfg, imap, { open = false } = {}) {
   return `<details class="project anim" data-id="${p.id}"${open ? ' open' : ''}>
 <summary><span class="pname">${esc(p.name)}</span>${p.access !== 'owner' ? `<span class="badge" title="Projet partagé par ${esc(p.ownerEmail || '')}">équipe de ${esc(p.ownerEmail || '')}</span>` : p.teamId ? '<span class="badge ok">partagé</span>' : ''}<span class="pcfg badge" data-cfg title="Afficher la liste de mise en route" hidden></span><span class="pstate" data-state></span></summary>
 <div class="pbody"><div class="pcard">
-  ${ROLE_BAR}
   ${acc('header', 'git', 'En-tête', 'Dépôt Git et fiche projet', `
   <div class="field"><span class="lbl">Dépôt Git</span><div class="ro">${ic('lock', 'ic-s')}<span>${esc(p.gitUrl)}</span><span class="badge">lecture seule</span></div></div>
+  <p class="muted small" data-todo-restore hidden><button type="button" class="link" data-todo-restore-btn>Afficher la mise en route</button> (la liste « config » que tu as retirée de ce projet)</p>
   <section class="profile fiche">
     <div class="fiche-h">
       <b>Fiche projet</b>
@@ -533,7 +534,7 @@ export function dashboardPage({ email, projects, gitHosts = [], usage = null, pa
     title: 'Projets', email,
     body: `<div class="dash">
 <section class="col-p" aria-labelledby="h-projets">
-  <div class="hd"><h1 id="h-projets">Projets</h1><button type="button" class="btn primary" data-new-toggle aria-expanded="false" aria-controls="new-project">${ic('plus')}Nouveau projet</button></div>
+  <div class="hd"><h1 id="h-projets">Projets</h1><div class="hd-tools">${projects.length ? ROLE_SELECT : ''}<button type="button" class="btn primary" data-new-toggle aria-expanded="false" aria-controls="new-project">${ic('plus')}Nouveau projet</button></div></div>
   ${pauseMessage ? `<p class="ban ban-err" role="alert">${ic('alert')}<span class="ban-t"><b>${esc(pauseMessage)}</b></span></p>` : ''}
   <form data-action="create" class="panel cfg" id="new-project" aria-labelledby="h-new" hidden>
     <div class="panel-h"><h2 id="h-new">Nouveau projet</h2></div>

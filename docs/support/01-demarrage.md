@@ -33,7 +33,7 @@ Dès qu'un projet existe, une liste en bas à gauche de l'écran guide la config
 - Chaque ligne ouvre la bonne section du projet et y fait défiler la page.
 - Les étapes terminées reçoivent une coche ; le projet porte une pastille « config 4/11 » (par exemple) qui rappelle la liste.
 - La liste se calcule à chaque affichage d'après l'état réel du projet : une étape défaite (par exemple un jeton LinkedIn expiré) redevient « à faire ».
-- Elle peut être réduite, ou masquée pour un projet avec le bouton **Masquer pour ce projet** (la pastille « config » la rappelle), est réduite par défaut sur un écran étroit, et disparaît toute seule quand tout est fait.
+- Elle peut être réduite, ou retirée pour un projet : la petite croix **×** qui apparaît quand tu passes la souris sur la liste (toujours visible sur téléphone), ou le bouton **Masquer pour ce projet**. Retirer la liste **masque aussi la pastille « config X/11 »** du projet. Pour la récupérer, ouvre le projet : dans **En-tête**, le lien **Afficher la mise en route** la remet avec sa pastille. Le choix est mémorisé dans ton navigateur, projet par projet. Elle est réduite par défaut sur un écran étroit, et disparaît toute seule quand tout est fait.
 - Un membre d'équipe ne voit pas les étapes SMTP et IMAP (il ne peut pas les régler).
 
 ## Projet unique ou plusieurs projets
