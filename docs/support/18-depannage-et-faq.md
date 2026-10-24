@@ -16,6 +16,16 @@ Vérifier dans l'ordre : 1) SMTP enregistré (« Configuration du projet ») ; 2
 ## Mes mails arrivent en spam
 Configurer SPF, DKIM et DMARC pour le domaine d'envoi ; envoyer de petits lots au début et augmenter progressivement ; garder des délais entre les mails ; éviter les liens et pièces jointes dans le premier mail ; soigner l'accroche. AiTools ajoute déjà un lien de désinscription et les en-têtes « List-Unsubscribe ».
 
+## Le filtre par poste cache une section que je cherche
+Clique **Tous les postes** en haut du projet : le filtre choisi est mémorisé dans ton navigateur et s'applique à tous tes projets. Un poste ne montre que ses sections (Commerce : Cible et Prospecter ; Communication : LinkedIn et Promotion ; Produit : Évolution ; Développement : Audit du projet ; Direction : Récapitulatif) plus **Postes et tâches IA**. Voir « Postes et filtre par poste : les tâches IA d'une entreprise ».
+
+## Une tâche d'un poste ne démarre pas, échoue ou n'a pas de résultat
+- « Analyse le projet d'abord » : lance l'analyse du projet (la fiche sert de contexte à toutes les tâches).
+- « Cette tâche est déjà prévue ou en cours » : attends sa fin dans le menu **Activité**, ou **Annuler** puis relance.
+- La tâche reste « En attente » : un seul job IA tourne à la fois par compte, et les tâches des postes patientent quand le quota Claude est serré (voir « Mon job reste En attente »).
+- « Réservé aux administrateurs du projet » : les tâches qui lisent le dépôt (Développement, registre RGPD) ne sont pas ouvertes aux simples membres.
+- **Voir le résultat** n'apparaît qu'une fois la tâche terminée ; un échec affiche son message à la place. Le livrable est un brouillon : relis-le, surtout en juridique, finance et ressources humaines.
+
 ## « Cette adresse ne peut pas être ajoutée » en ajoutant ou modifiant un prospect
 L'adresse existe déjà dans ce projet (cherche-la dans la liste, avec la recherche) ou elle ne doit pas être contactée (désinscription ou refus enregistrés, tous comptes confondus). Le message est le même dans les deux cas : AiTools ne dit pas lequel. Autres refus : « Adresse email invalide », « Score : un nombre de 1 à 10 », « Adresse du site invalide » (attendu : https://exemple.fr), plafond de prospects de l'offre atteint (voir « Offres, plafonds et limites »).
 

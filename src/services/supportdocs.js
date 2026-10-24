@@ -11,8 +11,12 @@ import { PLAN_LIMITS, PLAN_LABELS, PLAN_PRICES, ANNUAL_FREE_MONTHS } from '../li
 import { RECOMMENDED, OTHERS, DEFAULT_MODEL } from './models.js';
 import { PROMPT_DEFS } from './prompts.js';
 import { PROMO, FORMATS } from './promovideo.js';
+import { ROLES, MAX_NOTES } from './roles.js';
 
 export const STATIC_DOCS_DIR = fileURLToPath(new URL('../../docs/support/', import.meta.url));
+
+// Titres des sections de projet, tels qu'ils s'affichent (les postes y renvoient)
+const SECTION_TITLES = { recap: 'Récapitulatif', target: 'Cible', prospect: 'Prospecter', linkedin: 'LinkedIn', promo: 'Promotion', evolution: 'Évolution', audit: 'Audit du projet' };
 
 const mo = (n) => `${Math.round(n / 1048576)} Mo`;
 const lim = (v) => (v == null ? 'illimité' : String(v));
@@ -100,6 +104,20 @@ Le contexte du projet et le format de réponse sont ajoutés automatiquement : u
 
 ## Les tâches
 ${defs}
+`,
+  });
+  const postes = ROLES.map((r) => `### ${r.label}
+${r.summary}
+${r.sections.length ? `- Déjà dans AiTools pour ce poste : ${r.sections.map((k) => SECTION_TITLES[k] || k).join(', ')}.` : '- Pas de section dédiée ailleurs dans le projet : les tâches ci-dessous sont sa seule entrée.'}
+${r.tasks.map((t) => `- **${t.label}**${t.web ? ' (cherche sur le web)' : ''}${t.repo ? ' (lit le dépôt, réservé aux administrateurs)' : ''} : ${t.brief} Rubriques : ${t.sections.join(' ; ')}.`).join('\n')}`).join('\n\n');
+  out.push({
+    name: 'postes-et-taches-ia.md',
+    content: `# Postes de l'entreprise et tâches IA
+Résumé : la liste de tous les postes (Direction, Commerce, Marketing, Communication, Produit, Développement, Support client, Finance, Juridique, Ressources humaines, Opérations) avec, pour chacun, les tâches que Claude fait et les rubriques du livrable. Fichier généré depuis le code.
+
+Comment les utiliser : voir « Postes et filtre par poste ». Chaque tâche écrit un livrable en Markdown à partir de la fiche du projet ; les précisions (jusqu'à ${MAX_NOTES} caractères) sont facultatives. Rien n'est envoyé ni publié.
+
+${postes}
 `,
   });
   return out;
