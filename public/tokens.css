@@ -81,6 +81,19 @@
 body.site { --muted: #3f4c70; }
 @media (prefers-color-scheme: dark) { body.site { --muted: #b9c5e0; } }
 
+/* Transitions de page (public/ajax.js) : le contenu arrive par la droite quand on va vers la droite dans la barre du haut, par la gauche vers la gauche,
+   et monte en fondu pour les pages hors onglets. Seuls les enfants directs sont animés : un transform sur .page déplacerait la liste « Mise en route »
+   (position fixe) et les fenêtres. Le mouvement réduit coupe toutes les animations (règle ci-dessous). */
+:root { --t-page: 380ms; }
+#contenu.pt-run { overflow-x: clip; }
+.page[data-move] > :not(.todo):not(dialog) { animation: var(--t-page) var(--ease) both; }
+.page[data-move="right"] > :not(.todo):not(dialog) { animation-name: page-from-right; }
+.page[data-move="left"] > :not(.todo):not(dialog) { animation-name: page-from-left; }
+.page[data-move="up"] > :not(.todo):not(dialog) { animation-name: page-from-below; }
+@keyframes page-from-right { from { opacity: 0; transform: translate3d(56px, 10px, 0); } }
+@keyframes page-from-left { from { opacity: 0; transform: translate3d(-56px, 10px, 0); } }
+@keyframes page-from-below { from { opacity: 0; transform: translate3d(0, 16px, 0); } }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation: none !important;
