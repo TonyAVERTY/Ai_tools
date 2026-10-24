@@ -56,6 +56,11 @@ const probe = (W) => {
   }
   // Champs en dessous de 16 px : iOS zoome au focus et la page se met à défiler de côté
   const small = [...document.querySelectorAll('input:not([type=hidden]):not([type=checkbox]):not([type=radio]), select, textarea')].filter((e) => e.getBoundingClientRect().width && parseFloat(getComputedStyle(e).fontSize) < 16).length;
+  // Un champ ne doit jamais dépasser de la carte qui le contient (date et heure natives de Safari iOS)
+  for (const el of document.querySelectorAll('input:not([type=hidden]):not([type=checkbox]):not([type=radio]), select, textarea')) {
+    const box = el.closest('.card, section, form'); const r = el.getBoundingClientRect();
+    if (box && r.width && r.right > box.getBoundingClientRect().right + 1) culprits.push(`${el.tagName.toLowerCase()}[${el.type || el.name}] sort de sa carte (+${Math.round(r.right - box.getBoundingClientRect().right)}px)`);
+  }
   return { over: Math.max(over, culprits.length ? 1 : 0), culprits: culprits.slice(0, 8), scrollers: scrollers.slice(0, 6), small };
 };
 for (const w of WIDTHS) {

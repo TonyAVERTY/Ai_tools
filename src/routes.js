@@ -301,8 +301,12 @@ export function registerRoutes(router, app) {
   // ---------- Mon compte ----------
   router.get('/account', async ({ res, session, url }) => {
     const t = url.searchParams.get('t');
+    const link = await getLinkState(db, session.userId);
+    // Le relevé des limites ne doit jamais empêcher d'afficher la page (Anthropic injoignable, réponse inattendue…)
+    const quota = link && link.mode !== MODES.api_key ? await currentClaudeQuota(app, session.userId).catch(() => null) : null;
+    const account = { link, quota };
     html(res, accountPage({
-      user: session.user, error: url.searchParams.get('e'), link: await getLinkState(db, session.userId), developer: await developerMode(db, session.userId), appUrl: cfg.appUrl,
+      user: session.user, error: url.searchParams.get('e'), link: account.link, quota: account.quota, developer: await developerMode(db, session.userId), appUrl: cfg.appUrl,
       ical: await (async () => { const t = await feedToken(app, session.userId); return t ? feedUrl(cfg, t) : null; })(),
       consent: await lastConsent(db, session.userId), cliModeEnabled, usage: await usageView(db, await getUser(db, session.userId)),
       notice: t === 'unlinked' ? { ok: true, text: 'Liaison supprimée : le secret a été effacé et tes jobs IA en attente ont été annulés.' }
