@@ -108,7 +108,8 @@ await p.unroute('**/settings');
 await p.locator('input[name="notify_email"]').fill('');
 
 // 6. page IA après des navigations douces : le script de la page est relancé et marche
-await p.locator('a.ia-link').click();
+await p.locator('details.ia-menu > summary').hover();
+await p.locator('details.ia-menu a[href="/chat"]').click();
 await p.waitForURL('**/chat'); await ready();
 await p.fill('[data-chat-input]', 'ECHO page IA en navigation douce');
 await p.keyboard.press('Enter');
@@ -116,7 +117,8 @@ await p.waitForSelector('.msg.bot .msg-actions', { timeout: 15000 }).catch(async
 check((await p.locator('.msg.bot .bubble').last().innerText()).includes('Écho'), 'page IA ouverte sans rechargement : envoi et réponse');
 await p.locator('.pills a.pill', { hasText: 'Mails' }).click();
 await p.waitForURL('**/mails'); await ready();
-await p.locator('a.ia-link').click();
+await p.locator('details.ia-menu > summary').hover();
+await p.locator('details.ia-menu a[href="/chat"]').click();
 await p.waitForURL('**/chat'); await ready();
 await p.fill('[data-chat-input]', 'ECHO deuxième visite');
 await p.keyboard.press('Enter');
@@ -126,7 +128,7 @@ check((await p.locator('.msg.bot .bubble').last().innerText()).includes('Écho :
 // 7. rechargement doux (remplace location.reload d'app.js) : défilement conservé
 await p.goto(`${s.base}/`);
 await p.evaluate(() => { window.__marker = 'vivante'; });
-await p.locator('details.project summary').first().click();
+if (!(await p.locator('details.project').first().evaluate((d) => d.open))) await p.locator('details.project summary').first().click(); // un seul projet : déjà ouvert
 await p.waitForTimeout(400);
 await p.evaluate(() => window.scrollBy(0, 120));
 const y1 = await p.evaluate(() => Math.round(scrollY));
