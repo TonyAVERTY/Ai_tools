@@ -18,8 +18,24 @@ Marquer un prospect en **Refus** ajoute son adresse à la liste d'opposition (un
 - Filtres : **statut**, **score minimum** (≥ 5, ≥ 7, ≥ 9), case **« Actions à faire »** (prospects dont la prochaine action est due), **tri** (score, plus récents, dernier contact, entreprise A → Z). Pagination par 100.
 - **Kanban** : une colonne par statut ; on glisse une carte pour changer son statut, ou on utilise le menu de statut de la carte (au clavier). Une carte montre l'entreprise, l'email, la ville, le score et la prochaine action.
 
+## Ajouter un prospect à la main
+Dans **Prospecter → Prospects**, bouton **Ajouter un prospect** : un formulaire s'ouvre sous les boutons de la liste. Champs : **Email** (obligatoire), **Entreprise** (si elle est vide, c'est le domaine de l'adresse qui est utilisé), **Site**, **Ville**, **Secteur**, **Score (1 à 10)**, **Accroche** (la phrase qui ouvre le mail) et **Origine de l'adresse** (où tu l'as trouvée ; si elle est vide, AiTools écrit « Ajout manuel du JJ/MM/AAAA » : l'origine d'un contact est toujours renseignée, pour le RGPD). Clique **Ajouter le prospect** (ou **Annuler** pour refermer le formulaire).
+- Le prospect est créé avec le statut **À contacter**. Il apparaît tout de suite dans la liste et le Kanban.
+- Il est refusé si l'adresse est invalide, si le site n'est pas une adresse web correcte, si le score n'est pas un nombre de 1 à 10, **si l'adresse existe déjà dans ce projet** ou **si elle ne doit pas être contactée** (liste d'opposition). Dans les deux derniers cas le message est volontairement le même : « Cette adresse ne peut pas être ajoutée » ; la liste d'opposition étant commune à tous les comptes, AiTools ne révèle jamais pourquoi.
+- Le plafond mensuel de **prospects** de l'offre s'applique (voir « Offres, plafonds et limites ») : une fois atteint, l'ajout est refusé avec un message.
+- Les membres d'une équipe peuvent ajouter des prospects sur les projets partagés.
+
 ## La fiche d'un prospect
-Un clic sur le nom de l'entreprise ouvre la fiche : accroche et origine de l'email (avec les boutons **Générer une accroche** / **Régénérer l'accroche**), **Historique** (premier mail avec sa variante A/B, relance, réponse, échecs d'envoi), **Prochaine action** (champs « Quoi » et « Quand », boutons **Enregistrer** et **Effacer**, un rappel à 9h heure de Paris alimente le filtre « Actions à faire ») et **Notes** libres (**Ajouter la note**). Bouton **Fermer** pour revenir.
+Un clic sur le nom de l'entreprise ouvre la fiche : accroche et origine de l'email (avec les boutons **Générer une accroche** / **Régénérer l'accroche**), **Informations** (voir ci-dessous), **Historique** (premier mail avec sa variante A/B, relance, réponse, échecs d'envoi), **Prochaine action** (champs « Quoi » et « Quand », boutons **Enregistrer** et **Effacer**, un rappel à 9h heure de Paris alimente le filtre « Actions à faire ») et **Notes** libres (**Ajouter la note**). Bouton **Fermer** pour revenir.
+
+### Modifier les informations d'un prospect
+Dans la fiche, la section **Informations** contient tous les champs : **Entreprise** (obligatoire), **Email**, **Site**, **Ville**, **Secteur**, **Score (1 à 10)**, **Accroche** et **Origine de l'adresse**. Modifie ce que tu veux puis clique **Enregistrer les informations** : la liste se met à jour. Un champ vidé est effacé.
+- **L'adresse email ne se change que tant que le prospect est « À contacter »** : une fois contacté, des mails, des relances et des réponses sont rattachés à cette adresse, elle est donc verrouillée (champ en lecture seule, avec une explication). Pour une autre adresse, ajoute un nouveau prospect.
+- La nouvelle adresse est refusée si elle existe déjà dans le projet ou si elle ne doit pas être contactée (même message que pour l'ajout).
+- Le statut se change depuis la liste ou le Kanban (menu de statut ou glisser-déposer), la prochaine action et les notes ont leurs propres blocs dans la fiche.
+
+### Supprimer un prospect
+Dans la fiche, en bas, bouton **Supprimer ce prospect** : une confirmation est demandée. Le prospect et ses **notes** sont supprimés définitivement. Les mails déjà envoyés **restent dans la page Mails** (journal d'envoi), simplement détachés du prospect. Supprimer ne met pas l'adresse en liste d'opposition : pour ne plus jamais la contacter, passe plutôt le prospect en **Refus**. Les membres d'une équipe peuvent supprimer des prospects sur les projets partagés.
 
 ## Exporter en CSV
 Lien **Exporter (CSV)** : format Excel français (séparateur `;`, UTF-8 avec BOM). L'export reprend les filtres affichés. Les cellules qui commencent par `=`, `+`, `-` ou `@` sont neutralisées pour qu'Excel ne les exécute pas.
