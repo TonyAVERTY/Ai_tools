@@ -176,6 +176,7 @@ export function registerRoutes(router, app) {
       write_model: models.write,
       weekly_report: await getSetting(db, userId, 'weekly_report', '0') === '1',
       read_receipt: await getSetting(db, userId, 'read_receipt', '0') === '1',
+      mail_footer: await getSetting(db, userId, 'mail_footer', '1') !== '0',
       budget_day_usd: await getSetting(db, userId, 'budget_day_usd', ''),
       budget_month_usd: await getSetting(db, userId, 'budget_month_usd', ''),
       priced: (await getLinkState(db, userId))?.mode === MODES.api_key, // plafonds en $ : seulement avec une clé API
@@ -186,6 +187,16 @@ export function registerRoutes(router, app) {
     };
     html(res, settingsPage({ email: session.email, s, saved: url.searchParams.has('ok') }));
   });
+
+  // Pied de page des mails de prospection (lien de désinscription + origine de l'adresse) : actif par défaut. Le retirer exige une
+  // confirmation explicite ({ "confirmed": true }) : l'interface montre d'abord l'avertissement sur les risques. Le remettre est libre.
+  router.post('/api/settings/mail-footer', async ({ req, res, session }) => {
+    const b = await readBody(req);
+    const enabled = b.enabled === true || b.enabled === 'true';
+    if (!enabled && b.confirmed !== true) throw new HttpError(400, 'Retirer le pied de page demande une confirmation explicite (risques légaux et de réputation).', { expose: true, code: 'confirmation_required' });
+    await setSetting(db, session.userId, 'mail_footer', enabled ? '1' : '0');
+    json(res, { ok: true, enabled });
+  }, { limit: 'prospect_write' });
 
   router.post('/settings', async ({ req, res, session }) => {
     const userId = session.userId;
