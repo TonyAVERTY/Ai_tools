@@ -55,6 +55,8 @@ export const RATE_LIMITS = {
  * Plafonds par plan. `null` = illimité.
  *  - `projects` et `prospects` : totaux du compte ;
  *  - `mails` et `aiJobs` : par mois calendaire, heure de Paris ;
+ *  - `parallelJobs` : jobs IA qu'un compte peut faire tourner EN MÊME TEMPS (multi jobs). 1 = un à la fois : c'est l'offre gratuite ; le multi jobs
+ *    est réservé aux offres payantes et grandit avec l'offre. Toujours dans la limite de la capacité du serveur (MAX_AI_JOBS) ;
  *  - `seats` : places d'équipe, propriétaire compris (1 = pas d'équipe). L'équipe utilise le plan et les plafonds de son propriétaire.
  * Le plan « pro » est un ancien plan illimité attribué à la main : il reste tel quel pour ne retirer l'accès à personne,
  * mais il n'est pas proposé sur la page Tarifs.
@@ -64,13 +66,13 @@ export const RATE_LIMITS = {
  *  - `aiJobs` couvre au moins `prospects / 50` recherches (une recherche ramène 50 contacts au plus), plus l'analyse et les modèles.
  */
 export const PLAN_LIMITS = {
-  free: { projects: 1, prospects: 50, mails: 100, aiJobs: 6, seats: 1 },
-  starter: { projects: 2, prospects: 300, mails: 500, aiJobs: 20, seats: 2 },
-  growth: { projects: 5, prospects: 1000, mails: 1500, aiJobs: 60, seats: 3 },
-  business: { projects: 10, prospects: 3000, mails: 4000, aiJobs: 150, seats: 10 },
-  intensive: { projects: 25, prospects: 10000, mails: 8000, aiJobs: 400, seats: 25 },
-  pro: { projects: null, prospects: null, mails: null, aiJobs: null, seats: null },
-  admin: { projects: null, prospects: null, mails: null, aiJobs: null, seats: null },
+  free: { projects: 1, prospects: 50, mails: 100, aiJobs: 6, parallelJobs: 1, seats: 1 },
+  starter: { projects: 2, prospects: 300, mails: 500, aiJobs: 20, parallelJobs: 2, seats: 2 },
+  growth: { projects: 5, prospects: 1000, mails: 1500, aiJobs: 60, parallelJobs: 3, seats: 3 },
+  business: { projects: 10, prospects: 3000, mails: 4000, aiJobs: 150, parallelJobs: 4, seats: 10 },
+  intensive: { projects: 25, prospects: 10000, mails: 8000, aiJobs: 400, parallelJobs: 6, seats: 25 },
+  pro: { projects: null, prospects: null, mails: null, aiJobs: null, parallelJobs: 6, seats: null },
+  admin: { projects: null, prospects: null, mails: null, aiJobs: null, parallelJobs: 6, seats: null },
 };
 export const PLAN_LABELS = {
   free: 'gratuit', starter: 'Démarrage', growth: 'Croissance', business: 'Business', intensive: 'Intensif',

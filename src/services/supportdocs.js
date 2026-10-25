@@ -28,7 +28,7 @@ export function generatedDocs(facts = {}) {
   const rows = plans.map((p) => {
     const l = PLAN_LIMITS[p];
     const price = PLAN_PRICES[p] ? `${PLAN_PRICES[p]} €/mois (${PLAN_PRICES[p] * (12 - ANNUAL_FREE_MONTHS)} €/an, ${ANNUAL_FREE_MONTHS} mois offerts)` : p === 'free' ? 'gratuit' : 'sur demande';
-    return `| ${PLAN_LABELS[p] || p} | ${price} | ${lim(l.projects)} | ${lim(l.prospects)} | ${lim(l.mails)} | ${lim(l.aiJobs)} | ${lim(l.seats)} |`;
+    return `| ${PLAN_LABELS[p] || p} | ${price} | ${lim(l.projects)} | ${lim(l.prospects)} | ${lim(l.mails)} | ${lim(l.aiJobs)} | ${lim(l.parallelJobs)} | ${lim(l.seats)} |`;
   });
   const { chat = {}, files = {} } = facts;
   out.push({
@@ -39,8 +39,10 @@ Résumé : prix des offres, plafonds mensuels (projets, prospects, mails, jobs I
 ## Offres
 Les plafonds se renouvellent le 1er de chaque mois (heure de Paris). Quand un plafond est atteint, rien n'est perdu : l'action est refusée avec un message clair et reprend le mois suivant ou après un changement d'offre. La page « Mon compte » et le tableau de bord montrent l'usage du mois (« Usage du mois »).
 
-| Offre | Prix | Projets | Prospects | Mails par mois | Jobs IA par mois | Places d'équipe |
-|---|---|---|---|---|---|---|
+**Jobs IA simultanés (multi jobs)** : combien de tâches IA ton compte fait tourner en même temps. L'offre gratuite en fait tourner **une seule à la fois** ; le multi jobs est réservé aux offres payantes, et plus l'offre est chère, plus il y en a. Les tâches en trop attendent leur tour dans « Activité » (« En attente : … »). Ce nombre est toujours borné par la capacité du serveur. Les envois de mails (premiers mails et relances) ne se chevauchent jamais, même avec le multi jobs.
+
+| Offre | Prix | Projets | Prospects | Mails par mois | Jobs IA par mois | Jobs IA simultanés | Places d'équipe |
+|---|---|---|---|---|---|---|---|
 ${rows.join('\n')}
 
 Les offres se voient aussi sur la page publique « Tarifs ». Un administrateur d'AiTools peut attribuer une offre à un compte. Le prix de l'abonnement Claude ou de la clé API Anthropic est à part : il se paie directement à Anthropic.

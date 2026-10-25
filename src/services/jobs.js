@@ -1,4 +1,4 @@
-// File de jobs en base : jobs IA simultanés (plafond global), un seul par utilisateur, tourniquet entre utilisateurs.
+// File de jobs en base : jobs IA simultanés (plafond global), plafond par utilisateur selon son offre (multi jobs), tourniquet entre utilisateurs.
 import { now } from '../db.js';
 import { HttpError } from '../http.js';
 import { AI_JOBS } from './budget.js';
@@ -94,7 +94,8 @@ export async function latestJobs(db, projectId) {
 /**
  * File de jobs équitable et simultanée.
  *  - jusqu'à `maxJobs` jobs en parallèle sur le serveur (MAX_AI_JOBS) ;
- *  - au plus UN job à la fois par utilisateur ;
+ *  - par utilisateur : autant de jobs en même temps que son offre le permet (`parallel(userId)` ; 1 par défaut = un seul à la fois, comme l'offre
+ *    gratuite). Les envois de mails (premiers mails, relances) ne se chevauchent jamais pour un même compte : les plafonds d'envoi se calculent au départ ;
  *  - prochain job choisi en tourniquet entre utilisateurs (le moins récemment servi d'abord), donc pas de famine ;
  *    à l'intérieur d'un utilisateur, l'ordre des jobs (par id) est conservé, y compris pour les jobs programmés la nuit ;
  *  - réservation atomique : UPDATE conditionnel dont on contrôle le nombre de lignes affectées ;
@@ -104,8 +105,9 @@ export async function latestJobs(db, projectId) {
 export class Worker {
   constructor(db, handlers, {
     maxJobs = 4, loadMax = LOAD.defaultMax, load = loadRatio, pollMs = 3000, log = console, clock = now, onFinish, onLoad,
-    budget, isAiJob, onBudget, quota, isQuotaSensitive, onQuotaHold, cliModeEnabled = true,
+    budget, isAiJob, onBudget, quota, isQuotaSensitive, onQuotaHold, cliModeEnabled = true, parallel,
   } = {}) {
+    this.parallel = parallel; // async (userId) => nombre de jobs simultanés permis à CET utilisateur (selon son offre) ; absent = 1
     this.cliModeEnabled = cliModeEnabled;
     this.clock = clock;
     this.maxJobs = Math.max(1, Math.floor(Number(maxJobs)) || 1);
@@ -128,7 +130,8 @@ export class Worker {
     this.pollMs = pollMs;
     this.log = log;
     this.running = new Map();   // id du job → { job, ctrl }
-    this.busyUsers = new Set(); // utilisateurs ayant un job réservé ou en cours (un seul à la fois chacun)
+    this.busyUsers = new Map(); // utilisateur → nombre de jobs réservés ou en cours (plafonné par son offre)
+    this.busyMail = new Set();  // utilisateurs ayant un envoi de mails réservé ou en cours (jamais deux à la fois)
     this.claiming = 0;          // réservations en cours (pour ne jamais dépasser maxJobs)
     this.served = new Map();    // utilisateur → rang de son dernier service (tourniquet)
     this.turn = 0;
@@ -215,6 +218,14 @@ export class Worker {
     return true;
   }
 
+  /** Nombre de jobs simultanés permis à cet utilisateur (au moins 1). Une erreur de lecture de l'offre retombe sur 1 : jamais plus que prévu. */
+  async capOf(userId) {
+    try {
+      const n = Math.floor(Number(await this.parallel?.(Number(userId))));
+      return Number.isFinite(n) && n >= 1 ? Math.min(n, 1000) : 1;
+    } catch { return 1; }
+  }
+
   /**
    * Choisit le prochain job et le réserve atomiquement. Renvoie le job réservé (déjà « running » en base), ou null.
    * Sûr si appelé en parallèle : un utilisateur n'a jamais deux jobs, le nombre total reste borné.
@@ -240,9 +251,17 @@ export class Worker {
       }
       const candidates = []; // un seul candidat par utilisateur : son premier job exécutable
       for (const [userId, jobs] of byUser) {
-        if (this.busyUsers.has(Number(userId))) continue; // déjà un job en cours : les suivants attendent
+        const cap = await this.capOf(userId);
+        if ((this.busyUsers.get(Number(userId)) || 0) >= cap) { // autant de jobs en cours que son offre le permet : les suivants attendent, et le disent
+          const why = cap === 1
+            ? "un job est déjà en cours (ton offre en fait tourner un seul à la fois ; les offres payantes en font tourner plusieurs en même temps)"
+            : `${cap} jobs sont déjà en cours (ton offre en permet ${cap} à la fois)`;
+          for (const j of jobs) await hold(j, why);
+          continue;
+        }
         let budgetReason = null, quotaReason = null, cand = null;
         for (const j of jobs) {
+          if (MAIL_JOBS.has(j.type) && this.busyMail.has(Number(userId))) continue; // un seul envoi de mails à la fois pour ce compte
           // Compte suspendu ou supprimé, job IA sans liaison Claude valide : refusé sans exécution
           const refusal = await jobRefusal(this.db, j, { cliModeEnabled: this.cliModeEnabled });
           if (refusal) {
@@ -281,10 +300,13 @@ export class Worker {
       // Tourniquet : le moins récemment servi d'abord (jamais servi = en tête), puis l'ordre des jobs
       candidates.sort((a, b) => (this.served.get(a.user_id) ?? -1) - (this.served.get(b.user_id) ?? -1) || a.id - b.id);
       for (const job of candidates) {
-        if (this.busyUsers.has(Number(job.user_id))) continue; // pris entre-temps par un claim concurrent
-        if (!(await this.reserve(job))) continue;
+        const cap = await this.capOf(job.user_id);
+        if ((this.busyUsers.get(Number(job.user_id)) || 0) >= cap) continue; // pris entre-temps par un claim concurrent
+        if (MAIL_JOBS.has(job.type) && this.busyMail.has(Number(job.user_id))) continue;
+        if (!(await this.reserve(job, cap))) continue;
         // Aucun await entre la réservation en base et ces lignes : l'état en mémoire suit toujours la base
-        this.busyUsers.add(Number(job.user_id));
+        this.busyUsers.set(Number(job.user_id), (this.busyUsers.get(Number(job.user_id)) || 0) + 1);
+        if (MAIL_JOBS.has(job.type)) this.busyMail.add(Number(job.user_id));
         this.served.set(job.user_id, ++this.turn);
         return job;
       }
@@ -293,12 +315,13 @@ export class Worker {
   }
 
   /**
-   * Passage atomique queued → running. Réussit seulement si le job est encore en file ET si son utilisateur n'a aucun
-   * autre job en cours (la sous-requête passe par une table dérivée : MySQL interdit de lire la table qu'on met à jour).
+   * Passage atomique queued → running. Réussit seulement si le job est encore en file ET si son utilisateur a moins de `cap` jobs en cours
+   * (la sous-requête passe par une table dérivée : MySQL interdit de lire la table qu'on met à jour). `cap` est un entier déjà borné par capOf().
    */
-  async reserve(job) {
+  async reserve(job, cap = 1) {
+    const n = Math.max(1, Math.floor(Number(cap)) || 1);
     const r = await this.db.prepare(`UPDATE jobs SET status = 'running', started_at = ? WHERE id = ? AND status = 'queued'
-      AND (SELECT COUNT(*) FROM (SELECT id FROM jobs WHERE user_id = ? AND status = 'running' LIMIT 1) busy) = 0`)
+      AND (SELECT COUNT(*) FROM (SELECT id FROM jobs WHERE user_id = ? AND status = 'running' LIMIT ${n}) busy) < ${n}`)
       .run(now(), job.id, job.user_id);
     return r.changes === 1;
   }
@@ -342,7 +365,9 @@ export class Worker {
     } finally {
       clearInterval(watch);
       this.running.delete(job.id);
-      this.busyUsers.delete(Number(job.user_id));
+      const left = (this.busyUsers.get(Number(job.user_id)) || 1) - 1;
+      if (left > 0) this.busyUsers.set(Number(job.user_id), left); else this.busyUsers.delete(Number(job.user_id));
+      if (MAIL_JOBS.has(job.type)) this.busyMail.delete(Number(job.user_id));
     }
   }
 }

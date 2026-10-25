@@ -3,12 +3,12 @@ Résumé : comprendre le menu Activité, la file de jobs (en attente, programmé
 
 ## Les jobs
 Toute tâche lourde (analyse, recherche de prospects, envoi, relances, évolutions, audit, post LinkedIn, vidéo de promotion, accroche) est un **job** : il tourne en arrière-plan, même si on ferme la page.
-- Un **seul job du même type à la fois par projet**, et **un seul job IA à la fois par compte** ; un plafond global limite le nombre de jobs simultanés sur tout le serveur, avec un tourniquet équitable entre les comptes.
+- Un **seul job du même type à la fois par projet**, et un nombre de jobs IA **simultanés par compte qui dépend de l'offre** (le « multi jobs ») : **un seul à la fois avec l'offre gratuite**, plusieurs avec les offres payantes, et plus l'offre est chère plus il y en a (voir « Offres, plafonds et limites », colonne « Jobs IA simultanés »). Les jobs en trop attendent dans « Activité » avec le message « En attente : … » qui dit pourquoi. Les envois de mails (premiers mails et relances) ne se chevauchent jamais. Un plafond global limite aussi le nombre de jobs simultanés sur tout le serveur, avec un tourniquet équitable entre les comptes : le nombre réel est donc le plus petit des deux.
 - Un job IA exige une **liaison Claude valide**.
 - Le plafond mensuel de **jobs IA** de l'offre s'applique (voir « Offres, plafonds et limites ») ; les envois de mails ont leur propre plafond.
 
 ## Le menu « Activité » (barre du haut)
-Il apparaît dès qu'un job est en cours, en attente ou programmé : la liste détaille chaque job, son projet, son état (« Démarré il y a… », « En file d'attente », « Programmé » suivi du jour et de l'heure), son avancement en pourcentage et un message (« Rendu de la vidéo : image 120/450 »…). Boutons **Voir** (ouvre le projet) et **Annuler**. Quand on lance une tâche, une petite animation conduit à ce menu.
+Il apparaît dès qu'un job est en cours, en attente ou programmé : la liste détaille chaque job, son projet, son état (« Démarré il y a… », « En file d'attente », « Programmé » suivi du jour et de l'heure), son avancement en pourcentage avec sa barre, et un message (« Rendu de la vidéo : image 120/450 »…). Une tâche qui n'a pas encore démarré (en file d'attente, retenue par le quota Claude ou programmée) affiche **0 %** et une barre vide ; le message dit pourquoi elle attend (par exemple « En attente : quota de la session Claude (5 h) à 95 % »). Le même pourcentage s'affiche dans la zone de la tâche, dans le projet. Boutons **Voir** (ouvre le projet) et **Annuler**. Quand on lance une tâche, une petite animation conduit à ce menu.
 Quand un job est « En attente : … », la raison est écrite : budget IA atteint, quota Claude serré, charge élevée du serveur, ou plafond du plan.
 
 ## Jobs de nuit (« Cette nuit (1h-6h) »)
