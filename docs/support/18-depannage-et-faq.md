@@ -22,7 +22,7 @@ Choisis **Tous les postes** dans la liste **Poste**, en haut de la page Projets 
 ## Une tâche d'un poste ne démarre pas, échoue ou n'a pas de résultat
 - « Analyse le projet d'abord » : lance l'analyse du projet (la fiche sert de contexte à toutes les tâches).
 - « Cette tâche est déjà prévue ou en cours » : attends sa fin dans le menu **Activité**, ou **Annuler** puis relance.
-- La tâche reste « En attente » : un seul job IA tourne à la fois par compte, et les tâches des postes patientent quand le quota Claude est serré (voir « Mon job reste En attente »).
+- La tâche reste « En attente » : ton offre fait tourner un nombre limité de jobs IA à la fois (un seul avec l'offre gratuite ; les offres payantes en font tourner plusieurs, voir « Offres, plafonds et limites »), et les tâches des postes patientent quand le quota Claude est serré (voir « Mon job reste En attente »).
 - « Réservé aux administrateurs du projet » : les tâches qui lisent le dépôt (Développement, registre RGPD) ne sont pas ouvertes aux simples membres.
 - **Voir le résultat** n'apparaît qu'une fois la tâche terminée ; un échec affiche son message à la place. Le livrable est un brouillon : relis-le, surtout en juridique, finance et ressources humaines.
 
