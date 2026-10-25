@@ -18,7 +18,7 @@ const PLAN_BLURBS = {
 };
 const fr = (n) => n.toLocaleString('fr-FR');
 const limitRows = (l) => [
-  ['Projets', l.projects], ['Contacts', fr(l.prospects)], ['Mails par mois', fr(l.mails)], ['Tâches IA par mois', l.aiJobs], ["Places d'équipe", l.seats],
+  ['Projets', l.projects], ['Contacts', fr(l.prospects)], ['Mails par mois', fr(l.mails)], ['Tâches IA par mois', l.aiJobs], ['Jobs IA simultanés', l.parallelJobs], ["Places d'équipe", l.seats],
 ].map(([label, v]) => `<li><span>${label}</span><b>${v}</b></li>`).join('\n          ');
 
 /** « Google » ou « Google ou Apple » selon la configuration réelle de la connexion. */
