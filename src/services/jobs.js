@@ -93,7 +93,7 @@ export async function latestJobs(db, projectId) {
 
 /**
  * File de jobs équitable et simultanée.
- *  - jusqu'à `maxJobs` jobs en parallèle sur le serveur (MAX_AI_JOBS) ;
+ *  - garde-fou global : jusqu'à `maxJobs` jobs en parallèle sur tout le serveur (MAX_AI_JOBS), tous comptes confondus ;
  *  - par utilisateur : autant de jobs en même temps que son offre le permet (`parallel(userId)` ; 1 par défaut = un seul à la fois, comme l'offre
  *    gratuite). Les envois de mails (premiers mails, relances) ne se chevauchent jamais pour un même compte : les plafonds d'envoi se calculent au départ ;
  *  - prochain job choisi en tourniquet entre utilisateurs (le moins récemment servi d'abord), donc pas de famine ;

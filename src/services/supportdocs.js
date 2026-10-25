@@ -39,7 +39,7 @@ Résumé : prix des offres, plafonds mensuels (projets, prospects, mails, jobs I
 ## Offres
 Les plafonds se renouvellent le 1er de chaque mois (heure de Paris). Quand un plafond est atteint, rien n'est perdu : l'action est refusée avec un message clair et reprend le mois suivant ou après un changement d'offre. La page « Mon compte » et le tableau de bord montrent l'usage du mois (« Usage du mois »).
 
-**Jobs IA simultanés (multi jobs)** : combien de tâches IA ton compte fait tourner en même temps. L'offre gratuite en fait tourner **une seule à la fois** ; le multi jobs est réservé aux offres payantes, et plus l'offre est chère, plus il y en a. Les tâches en trop attendent leur tour dans « Activité » (« En attente : … »). Ce nombre est toujours borné par la capacité du serveur. Les envois de mails (premiers mails et relances) ne se chevauchent jamais, même avec le multi jobs.
+**Jobs IA simultanés (multi jobs)** : combien de tâches IA ton compte fait tourner en même temps. L'offre gratuite en fait tourner **une seule à la fois** ; le multi jobs est réservé aux offres payantes, et plus l'offre est chère, plus il y en a. Les tâches en trop attendent leur tour dans « Activité » (« En attente : … »). Ce nombre est propre à chaque compte (un garde-fou global du serveur ne joue que si la machine est pleine). Les envois de mails (premiers mails et relances) ne se chevauchent jamais, même avec le multi jobs.
 
 | Offre | Prix | Projets | Prospects | Mails par mois | Jobs IA par mois | Jobs IA simultanés | Places d'équipe |
 |---|---|---|---|---|---|---|---|
