@@ -218,3 +218,19 @@ test('de bout en bout : le vrai serveur lit l\'offre du compte (gratuit = 1 job 
     assert.ok(maxPaid <= PLAN_LIMITS.business.parallelJobs);
   } finally { await s.close(); }
 });
+
+test('la limite par compte est celle de son offre : avec le garde-fou par défaut (12), un compte Intensif en fait bien tourner 6', async () => {
+  const { db, users } = await world(1);
+  const [u] = users;
+  const st = probe();
+  const types = ['prospect', 'evolution', 'audit', 'template', 'followup_template', 'analyze'];
+  const handlers = Object.fromEntries(types.map((t) => [t, st.handler]));
+  const w = new Worker(db, handlers, { maxJobs: 12, pollMs: 10, log, parallel: async () => PLAN_LIMITS.intensive.parallelJobs });
+  for (const t of types) await q(db, u, t);
+  for (const t of types.slice(0, 2)) await q(db, u, t, u.p2); // 8 jobs au total
+  await w.start();
+  await until(() => idle(db));
+  await w.stop();
+  assert.equal(st.perMax.get(u.id), 6, `6 jobs simultanés pour ce compte (${st.perMax.get(u.id)})`);
+  assert.equal(st.log.filter((x) => x[0] === '+').length, 8, 'les 8 jobs ont tourné');
+});
