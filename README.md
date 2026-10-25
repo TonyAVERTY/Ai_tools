@@ -9,7 +9,7 @@ la version publique cible un serveur CloudPanel avec une base MySQL/MariaDB (voi
 - **Node 22, zéro framework** : `node:http`. Dépendances : `nodemailer`, `imapflow`, `mysql2`, `pg`.
 - **Base MySQL / MariaDB** (`mysql2`, pool, utf8mb4, InnoDB), accès entièrement asynchrone via `src/db.js`. SQLite (`node:sqlite`, en mémoire) ne sert plus que pour les tests locaux et comme source du script de migration.
 - **Rendu serveur + JS vanilla**, pas de build.
-- **File de jobs équitable** (en base) : jobs en parallèle **par compte autant que son offre le permet**, avec un garde-fou global `MAX_AI_JOBS` (12 par défaut) pour tout le serveur (`parallelJobs` dans `src/limits.js` : 1 en gratuit, plus en payant), tourniquet entre utilisateurs. Le process Claude tourne en `nice 10`. Les nouveaux jobs attendent si la charge du serveur dépasse `LOAD_MAX` (voir « Anti-abus, plafonds et administration »).
+- **File de jobs équitable** (en base) : jobs en parallèle **par compte autant que son offre le permet**, **sans limite globale sur le serveur** (`parallelJobs` dans `src/limits.js` : 1 en gratuit, plus en payant), tourniquet entre utilisateurs. Le process Claude tourne en `nice 10`. Les nouveaux jobs attendent si la charge du serveur dépasse `LOAD_MAX` (voir « Anti-abus, plafonds et administration »).
 - **Économie de tokens** :
   - outils Claude restreints à chaque job (lecture seule pour le code, WebSearch/WebFetch pour la prospection) ;
   - `--max-turns` borné ;
@@ -220,7 +220,7 @@ Le produit « Share on LinkedIn » ne donne que `w_member_social` : publier sur 
 
 ### File de jobs
 
-jobs en parallèle **par utilisateur** : `parallelJobs` de son offre. `MAX_AI_JOBS` (12 par défaut) est un garde-fou global, tous comptes confondus, qui ne limite que si le serveur est plein ; **par utilisateur : `parallelJobs` de son offre (1 en gratuit)**, jamais deux envois de mails en même temps, deux synchronisations du même dépôt jamais en même temps, prochain job choisi en tourniquet entre utilisateurs. Réservation atomique en base. L'arrêt attend tous les jobs en cours. Les nouveaux jobs attendent quand la charge du serveur dépasse `LOAD_MAX` (charge moyenne sur 1 minute divisée par le nombre de cœurs, 0,9 par défaut, reprise 0,1 plus bas) ; les jobs en cours continuent. `nice 10` est conservé. Budget IA et quota Claude restent par utilisateur.
+jobs en parallèle **selon l'offre de chaque compte** (`parallelJobs` : 1 en gratuit), **aucune limite globale de jobs sur le serveur** (l'ancien `MAX_AI_JOBS` n'existe plus), jamais deux envois de mails en même temps, deux synchronisations du même dépôt jamais en même temps, prochain job choisi en tourniquet entre utilisateurs. Réservation atomique en base. L'arrêt attend tous les jobs en cours. Les nouveaux jobs attendent quand la charge du serveur dépasse `LOAD_MAX` (charge moyenne sur 1 minute divisée par le nombre de cœurs, 0,9 par défaut, reprise 0,1 plus bas) ; les jobs en cours continuent. `nice 10` est conservé. Budget IA et quota Claude restent par utilisateur.
 
 ### Hôtes saisis par l'utilisateur (SSRF)
 
