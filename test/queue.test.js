@@ -192,7 +192,7 @@ test('suppression d\'un compte et déliaison n\'interrompent que les jobs de ce 
   await w.stop();
 });
 
-test('configuration : MAX_AI_JOBS (12 par défaut, garde-fou global) et LOAD_MAX validés', () => {
+test('configuration : plus de limite globale de jobs (MAX_AI_JOBS supprimé), LOAD_MAX validé', () => {
   const base = { APP_URL: 'https://x.fr', SECRET_KEY: 'a'.repeat(64), GOOGLE_CLIENT_ID: 'g', GOOGLE_CLIENT_SECRET: 's', DB_DRIVER: 'sqlite' };
   const keep = { ...process.env };
   const withEnv = (extra, fn) => {
@@ -203,11 +203,10 @@ test('configuration : MAX_AI_JOBS (12 par défaut, garde-fou global) et LOAD_MAX
       Object.assign(process.env, keep);
     }
   };
-  assert.equal(withEnv({}, () => loadConfig().maxAiJobs), 12);
+  assert.equal(withEnv({}, () => loadConfig().maxAiJobs), undefined, 'aucune limite globale par défaut');
+  assert.equal(withEnv({ MAX_AI_JOBS: '2' }, () => loadConfig().maxAiJobs), undefined, 'un ancien MAX_AI_JOBS du .env est ignoré');
   assert.equal(withEnv({}, () => loadConfig().loadMax), 0.9);
-  assert.equal(withEnv({ MAX_AI_JOBS: '2', LOAD_MAX: '1.2' }, () => loadConfig().maxAiJobs), 2);
-  assert.throws(() => withEnv({ MAX_AI_JOBS: '0' }, loadConfig), /MAX_AI_JOBS/);
-  assert.throws(() => withEnv({ MAX_AI_JOBS: 'beaucoup' }, loadConfig), /MAX_AI_JOBS/);
+  assert.equal(withEnv({ LOAD_MAX: '1.2' }, () => loadConfig().loadMax), 1.2);
   assert.throws(() => withEnv({ LOAD_MAX: '0' }, loadConfig), /LOAD_MAX/);
 });
 

@@ -93,7 +93,7 @@ export async function latestJobs(db, projectId) {
 
 /**
  * File de jobs équitable et simultanée.
- *  - garde-fou global : jusqu'à `maxJobs` jobs en parallèle sur tout le serveur (MAX_AI_JOBS), tous comptes confondus ;
+ *  - aucune limite globale de jobs : seule l'offre de chaque compte compte (`maxJobs` n'existe que pour les tests) ;
  *  - par utilisateur : autant de jobs en même temps que son offre le permet (`parallel(userId)` ; 1 par défaut = un seul à la fois, comme l'offre
  *    gratuite). Les envois de mails (premiers mails, relances) ne se chevauchent jamais pour un même compte : les plafonds d'envoi se calculent au départ ;
  *  - prochain job choisi en tourniquet entre utilisateurs (le moins récemment servi d'abord), donc pas de famine ;
@@ -104,13 +104,13 @@ export async function latestJobs(db, projectId) {
  */
 export class Worker {
   constructor(db, handlers, {
-    maxJobs = 4, loadMax = LOAD.defaultMax, load = loadRatio, pollMs = 3000, log = console, clock = now, onFinish, onLoad,
+    maxJobs = Infinity, loadMax = LOAD.defaultMax, load = loadRatio, pollMs = 3000, log = console, clock = now, onFinish, onLoad,
     budget, isAiJob, onBudget, quota, isQuotaSensitive, onQuotaHold, cliModeEnabled = true, parallel,
   } = {}) {
     this.parallel = parallel; // async (userId) => nombre de jobs simultanés permis à CET utilisateur (selon son offre) ; absent = 1
     this.cliModeEnabled = cliModeEnabled;
     this.clock = clock;
-    this.maxJobs = Math.max(1, Math.floor(Number(maxJobs)) || 1);
+    this.maxJobs = maxJobs === Infinity ? Infinity : Math.max(1, Math.floor(Number(maxJobs)) || 1); // Infinity = pas de plafond global
     this.loadMax = loadMax;
     this.load = load;
     this.loadPaused = false;
@@ -132,7 +132,7 @@ export class Worker {
     this.running = new Map();   // id du job → { job, ctrl }
     this.busyUsers = new Map(); // utilisateur → nombre de jobs réservés ou en cours (plafonné par son offre)
     this.busyMail = new Set();  // utilisateurs ayant un envoi de mails réservé ou en cours (jamais deux à la fois)
-    this.claiming = 0;          // réservations en cours (pour ne jamais dépasser maxJobs)
+    this.claiming = 0;          // réservations en cours (pour ne jamais dépasser maxJobs, s'il est fixé)
     this.served = new Map();    // utilisateur → rang de son dernier service (tourniquet)
     this.turn = 0;
     this.stopped = false;

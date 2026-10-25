@@ -163,7 +163,7 @@ export async function createApp(cfg, { db, worker = true, createTransport, fetch
   let scheduler = null;
   if (worker) {
     w = new Worker(db, makeHandlers(app), {
-      maxJobs: cfg.maxAiJobs ?? 12, loadMax: cfg.loadMax, cliModeEnabled: cfg.cliModeEnabled !== false,
+      loadMax: cfg.loadMax, cliModeEnabled: cfg.cliModeEnabled !== false,
       // Multi jobs : combien de jobs en même temps pour CE compte, selon son offre (1 pour la gratuite)
       parallel: async (userId) => { const u = await getUser(db, userId); return u ? limitsFor(u).parallelJobs : 1; },
       onFinish: (job, r) => notifyJob(app, job, r),

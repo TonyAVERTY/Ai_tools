@@ -145,9 +145,8 @@ export function loadConfig() {
     // Mode « abonnement » (jeton claude setup-token) : désactivable globalement
     cliModeEnabled: flag(env.CLAUDE_CLI_MODE_ENABLED, true),
     sandbox: sandboxConfig(),
-    // Garde-fou global : jobs IA simultanés sur TOUT le serveur, tous comptes confondus. La limite par compte vient de son offre (parallelJobs dans
-    // limits.js) ; celle-ci ne sert qu'à protéger la machine, avec la charge (charge/cœurs) au-delà de laquelle les nouveaux jobs attendent.
-    maxAiJobs: positive(env.MAX_AI_JOBS, 12, 'MAX_AI_JOBS'),
+    // Aucune limite globale de jobs IA : la limite vient de l'offre de chaque compte (parallelJobs dans limits.js). Reste la charge (charge/cœurs)
+    // au-delà de laquelle les nouveaux jobs attendent (LOAD_MAX).
     loadMax: ratio(env.LOAD_MAX, 0.9, 'LOAD_MAX'),
     // Derrière Nginx/CloudPanel : lire X-Forwarded-For, mais seulement depuis un proxy de confiance (voir ratelimit.js)
     trustProxy: parseTrustProxy(env.TRUST_PROXY),
