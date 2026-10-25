@@ -32,7 +32,7 @@ async function world() {
 const proj = async (w, userId, n = 1) => Number((await w.db.prepare('INSERT INTO projects(user_id, name, git_url, created_at) VALUES(?, ?, ?, ?)').run(userId, `p${n}`, `https://git.test/u${userId}/r${n}.git`, now())).lastInsertRowid);
 
 test('les limites viennent d\'un seul module et reprennent le cadrage', () => {
-  assert.deepEqual(PLAN_LIMITS.free, { projects: 1, prospects: 50, mails: 100, aiJobs: 6, seats: 1 });
+  assert.deepEqual(PLAN_LIMITS.free, { projects: 1, prospects: 50, mails: 100, aiJobs: 6, parallelJobs: 1, seats: 1 });
 });
 
 test('mois calendaire à l\'heure de Paris, changement d\'heure compris', () => {

@@ -10,7 +10,8 @@ import { Router, json, redirect, html, esc, HttpError } from './http.js';
 import { RateLimiter, clientIp } from './ratelimit.js';
 import { getSession, checkOrigin, purgeExpired } from './auth.js';
 import { authenticateApi } from './apitokens.js';
-import { syncAdmins } from './users.js';
+import { syncAdmins, getUser } from './users.js';
+import { limitsFor } from './services/plans.js';
 import { registerRoutes } from './routes.js';
 import { Worker } from './services/jobs.js';
 import { makeHandlers } from './handlers.js';
@@ -163,6 +164,8 @@ export async function createApp(cfg, { db, worker = true, createTransport, fetch
   if (worker) {
     w = new Worker(db, makeHandlers(app), {
       maxJobs: cfg.maxAiJobs ?? 4, loadMax: cfg.loadMax, cliModeEnabled: cfg.cliModeEnabled !== false,
+      // Multi jobs : combien de jobs en même temps pour CE compte, selon son offre (1 pour la gratuite)
+      parallel: async (userId) => { const u = await getUser(db, userId); return u ? limitsFor(u).parallelJobs : 1; },
       onFinish: (job, r) => notifyJob(app, job, r),
       budget: (userId) => budgetState(db, userId),
       isAiJob: (type) => AI_JOBS.has(type),
