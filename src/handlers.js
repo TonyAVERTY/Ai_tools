@@ -121,10 +121,19 @@ export function makeClaude(app) {
 }
 
 /** Clone ou met à jour le dépôt d'un projet avec le jeton git de SON propriétaire (jamais celui d'un autre). */
+// Plusieurs jobs d'un même compte peuvent tourner en même temps (multi jobs) : deux synchronisations du même dépôt ne se chevauchent jamais.
+const syncing = new Map(); // dossier du dépôt → fin de la synchronisation en cours
+
 export function makeSync(app) {
   return async (userId, url, dir) => {
     const cred = await gitCredentialFor(app, userId, url); // le token de SON hôte seulement, jamais celui d'un autre
-    return (app.syncRepo || syncRepo)(url, dir, cred?.token ?? null, { pin: await pinGit(app, userId, url), scheme: cred?.scheme, user: cred?.user });
+    const run = async () => (app.syncRepo || syncRepo)(url, dir, cred?.token ?? null, { pin: await pinGit(app, userId, url), scheme: cred?.scheme, user: cred?.user });
+    const before = syncing.get(dir) || Promise.resolve();
+    const mine = before.catch(() => {}).then(run);
+    const tail = mine.catch(() => {});
+    syncing.set(dir, tail);
+    tail.then(() => { if (syncing.get(dir) === tail) syncing.delete(dir); });
+    return mine;
   };
 }
 
