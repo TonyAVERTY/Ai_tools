@@ -49,7 +49,7 @@ export function mailsPage(d) {
 
   let list;
   if (!d.rows.length) {
-    list = `<p class="muted">${d.view === 'replies' ? "Aucune réponse pour l'instant. Elles apparaissent ici dès que la boîte de réception du projet (IMAP) en détecte une." : 'Aucun mail envoyé pour l\'instant.'}</p>`;
+    list = `<p class="muted">${d.view === 'replies' ? "Aucune réponse pour l'instant. Elles apparaissent ici dès que la boîte de réception du projet (IMAP) en détecte une." : 'Aucun mail envoyé pour l\'instant. Ils apparaissent ici dès que tu confirmes un envoi depuis un projet.'}</p>`;
   } else if (d.view === 'replies') {
     list = d.rows.map((r) => `<details class="reply-row${r.seen ? '' : ' unseen'}">
       <summary><span class="badge ${INTENT_BADGE[r.intent]}">${esc(r.intentLabel)}</span>

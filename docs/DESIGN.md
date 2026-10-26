@@ -92,7 +92,7 @@ et les compteurs ; texte aligné à gauche partout (aucun bloc marketing centré
 - **Rythme vertical** : 96 px entre sections sur bureau, 64 px sur tablette, 48 px sur téléphone ; le texte courant respire à l'intérieur
   d'une section (16 à 24 px entre paragraphes).
 - **Alternance de densité** : une section sur trois change de fond (bureau, feuille, bloc indigo) ; un seul bloc inversé par page.
-- **Rayons** : 6 px (champs, boutons), 10 px (panneaux), 999 px uniquement pour une pastille d'état. Un panneau n'a pas le même rayon
+- **Rayons** : 6 px (champs, boutons), 10 px (panneaux), 999 px uniquement pour une pastille d'état, un avatar et les nœuds du fil. Un panneau n'a pas le même rayon
   qu'un bouton.
 - **Ombres** : aucune sur les panneaux (la bordure suffit) ; une ombre portée uniquement sous les fenêtres flottantes (menus, dialogues,
   notifications).
@@ -107,7 +107,7 @@ et les compteurs ; texte aligné à gauche partout (aucun bloc marketing centré
 | Bouton secondaire | fond feuille, bordure, texte encre ; survol : bordure indigo |
 | Lien | bleu soulignement décalé de 3 px ; survol : soulignement épaissi |
 | Champ | fond feuille, bordure `--control`, 44 px de haut, focus : anneau bleu de 2 px décalé |
-| Pastille d'état | un mot, couleur de l'état en fond clair ; rien d'autre n'est arrondi à 999 px |
+| Pastille d'état | un mot, couleur de l'état en fond clair ; avec l'avatar et les nœuds du fil, seul élément arrondi à 999 px |
 | Panneau | feuille blanche, bordure fine, rayon 10 px, titre en Source Serif 4 |
 | Liste de sections (projet) | lignes séparées par un filet : titre, sous-titre en marge, chevron ; coche verte quand tout est fait ; pas d'icône |
 | Onglets de navigation | texte, soulignement indigo de 2 px pour la page courante ; même principe sur le site et dans l'application |
@@ -145,3 +145,20 @@ quoi faire, sans s'excuser. Un bouton a le même nom que la notification qu'il d
 - `npm run lint && npm test` ; `test/site.test.js` contrôle les contrastes, l'absence de couleur en dur dans `site.css`, les liens.
 - `scripts/design-shots.mjs` photographie toutes les pages à trois tailles (avant/après) ; `scripts/responsive-audit.mjs` cherche les
   débordements ; les scripts `scripts/*-check.mjs` rejouent les parcours dans Chromium.
+
+## 11. Audit anti-« générique » (relu à la fin de la refonte)
+
+Dix questions posées aux pages réelles, avec ce qui a été corrigé :
+
+1. *Un fond décoratif ?* Non : surface unie (le canvas de particules, le ruban plein page et les bulles ont été retirés).
+2. *Des dégradés partout ?* Non : un trait de logo (le fil) et les barres de progression.
+3. *Des cartes identiques répétées ?* Non sur le site (liste typographique, fil, colonnes) ; les panneaux de l'application portent une donnée.
+4. *Des ombres et des survols qui soulèvent ?* Non : aucun `translateY` au survol ; ombre seulement sous les fenêtres flottantes.
+5. *Des icônes dans des pastilles ?* Non : retirées des sections, des états vides et des titres de page.
+6. *Des capitales espacées ?* Non : plus aucun `text-transform: uppercase`.
+7. *Un titre marketing interchangeable ?* « Claude écrit tes mails de prospection. Toi, tu les relis et tu les signes. » dit ce que fait l'outil et où est la main.
+8. *Un texte creux ou inventé ?* Aucun chiffre ni témoignage ; la lettre d'exemple est signalée « fictive ».
+9. *Du mouvement gratuit ?* Un seul moment orchestré (l'accroche surlignée) ; transitions de page et menus répondent à une action ; tout est coupé avec `prefers-reduced-motion`.
+10. *Un site qui pourrait être celui d'un autre produit ?* La lettre, le serif d'édition et le fil du logo sont propres à AiTools.
+
+Contrôles faits : `axe-core` (WCAG 2.1 AA + bonnes pratiques) sur 18 pages en clair et en sombre : aucune violation après correction des listes, de l'ordre des titres, d'un contraste de lien et des onglets de la page Mails.
