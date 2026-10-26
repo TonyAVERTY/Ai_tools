@@ -7,11 +7,16 @@ import { ROLES, ROLE_LABELS } from './teams.js';
 const fmt = (ts) => (ts ? new Date(ts * 1000).toLocaleDateString('fr-FR', { dateStyle: 'medium', timeZone: 'Europe/Paris' }) : '—');
 const roleSelect = (value, name = 'role') => `<select name="${name}">${ROLES.map((r) => `<option value="${r}"${r === value ? ' selected' : ''}>${ROLE_LABELS[r]}</option>`).join('')}</select>`;
 
-const RIGHTS = `<ul class="muted small">
-  <li><strong>Membre</strong> : travaille sur les projets partagés (modèles, contacts, recherches, envois, notes).</li>
-  <li><strong>Administrateur</strong> : en plus, règle les projets (SMTP, boîte de réception, base du récap, LinkedIn).</li>
-  <li><strong>Propriétaire</strong> (toi) : gère l'équipe, partage et supprime les projets.</li>
-</ul>`;
+// Rôles et droits réels (voir src/teams.js, needAccess) : un tableau plutôt qu'une liste, pour comparer d'un coup d'œil
+const RIGHTS = `<div class="table-wrap"><table class="rights" data-rt="skip">
+  <caption class="sr-only">Ce que chaque rôle peut faire</caption>
+  <thead><tr><th scope="col">Rôle</th><th scope="col">Ce qu'il peut faire</th></tr></thead>
+  <tbody>
+    <tr><th scope="row">Membre</th><td>Travaille sur les projets partagés : modèles, contacts, recherches, envois, notes.</td></tr>
+    <tr><th scope="row">Administrateur</th><td>Comme un membre, et règle les projets : SMTP, boîte de réception, base du récap, LinkedIn.</td></tr>
+    <tr><th scope="row">Propriétaire (toi)</th><td>Gère l'équipe, partage et supprime les projets.</td></tr>
+  </tbody></table></div>
+  <p class="muted small">L'équipe utilise ton offre : tes plafonds, ton SMTP et ton accès Claude servent à tous sur les projets partagés. Les membres n'ont pas besoin d'abonnement.</p>`;
 
 function ownerSection(d) {
   const seats = d.seats;
@@ -57,12 +62,12 @@ function ownerSection(d) {
 
 function createSection(canTeam) {
   return canTeam
-    ? `<section class="card"><h2>Créer mon équipe</h2>
-  <p class="muted small">Une équipe te permet de partager des projets avec des collègues, sans leur donner ton accès.</p>
-  ${RIGHTS}
-  <form method="post" action="/team/create" class="cfg"><label>Nom de l'équipe<input name="name" required maxlength="80" autocomplete="off"></label><button class="btn primary">Créer l'équipe</button></form>
+    ? `<section class="card team-new" aria-labelledby="h-tc">
+  <div class="card-h"><h2 id="h-tc">Créer mon équipe</h2><p>Une équipe te permet de partager des projets avec des collègues, sans leur donner ton accès.</p></div>
+  <form method="post" action="/team/create" class="cfg team-form"><label class="field"><span class="lbl">Nom de l'équipe</span><input name="name" required maxlength="80" autocomplete="off" placeholder="ex. Atelier Exemple"></label><button class="btn primary">Créer l'équipe</button></form>
+  <div class="team-roles"><h3 class="sub-h">Rôles et droits</h3>${RIGHTS}</div>
 </section>`
-    : `<section class="card"><h2>Équipe</h2>
+    : `<section class="card" aria-labelledby="h-tc"><h2 id="h-tc">Équipe</h2>
   <p class="muted">Ton offre actuelle ne comprend pas de place d'équipe. <a href="/tarifs">Voir les offres qui en proposent</a>.</p></section>`;
 }
 

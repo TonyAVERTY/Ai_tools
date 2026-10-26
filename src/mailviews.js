@@ -38,8 +38,9 @@ function link(base, over) {
 export function mailsPage(d) {
   const labels = d.view === 'replies' ? INTENTS : STATE_LABELS;
   const total = Object.values(d.counts).reduce((a, b) => a + b, 0);
-  const chips = [['', 'Tous', total], ...Object.entries(labels).map(([k, l]) => [k, l, d.counts[k] || 0])]
-    .map(([k, l, n]) => `<a class="chip${(d.filter || '') === k ? ' on' : ''}" href="${esc(link(d, { filter: k }))}"${(d.filter || '') === k ? ' aria-current="true"' : ''}>${esc(l)} <span class="n">${n}</span></a>`).join('');
+  const BAD = new Set(['bounced', 'refused', 'failed']);
+  const stats = [['', 'Tous', total], ...Object.entries(labels).map(([k, l]) => [k, l, d.counts[k] || 0])]
+    .map(([k, l, n]) => `<a class="mstat${(d.filter || '') === k ? ' on' : ''}${BAD.has(k) && n ? ' bad' : ''}" href="${esc(link(d, { filter: k }))}"${(d.filter || '') === k ? ' aria-current="true"' : ''}><b>${n.toLocaleString('fr-FR')}</b><span>${esc(l)}</span></a>`).join('');
 
   const projectSelect = d.projects.length > 1 ? `<form class="inline-form" method="get" action="/mails">
       ${d.view === 'replies' ? '<input type="hidden" name="v" value="replies">' : ''}
@@ -49,7 +50,9 @@ export function mailsPage(d) {
 
   let list;
   if (!d.rows.length) {
-    list = `<p class="muted">${d.view === 'replies' ? "Aucune réponse pour l'instant. Elles apparaissent ici dès que la boîte de réception du projet (IMAP) en détecte une." : 'Aucun mail envoyé pour l\'instant. Ils apparaissent ici dès que tu confirmes un envoi depuis un projet.'}</p>`;
+    if (d.filter) list = `<div class="empty-s"><p>${d.view === 'replies' ? 'Aucune réponse avec cette intention.' : 'Aucun mail dans cet état.'}</p><a class="btn small" href="${esc(link(d, { filter: '' }))}">Voir tous</a></div>`;
+    else if (d.view === 'replies') list = `<div class="empty-s"><p><b>Aucune réponse pour l'instant.</b> Elles s'affichent ici dès que la boîte de réception du projet (IMAP) en détecte une.</p><a class="btn small" href="/">Régler la boîte de réception</a></div>`;
+    else list = `<div class="empty-s"><p><b>Aucun mail envoyé pour l'instant.</b> Les mails partent depuis un projet, section « Prospecter », après ta confirmation.</p><a class="btn small" href="/">Ouvrir mes projets</a></div>`;
   } else if (d.view === 'replies') {
     list = d.rows.map((r) => `<details class="reply-row${r.seen ? '' : ' unseen'}">
       <summary><span class="badge ${INTENT_BADGE[r.intent]}">${esc(r.intentLabel)}</span>
@@ -65,12 +68,13 @@ export function mailsPage(d) {
           ${r.seen ? '' : `<button type="button" class="btn small" data-reply-seen="${r.id}">${ic('check')}Marquer comme lu</button>`}</div>
       </div></details>`).join('');
   } else {
-    list = `<div class="table-wrap"><table>
-      <thead><tr><th>Date</th><th>Destinataire</th><th>Objet</th><th>Projet</th><th>Type</th><th>État</th></tr></thead><tbody>
-      ${d.rows.map((r) => `<tr><td>${esc(when(r.sent_at))}</td>
-        <td>${esc(r.company ? `${r.company} · ` : '')}${esc(r.email)}</td>
-        <td>${esc(r.subject || '—')}</td><td>${esc(r.project)}</td><td>${esc(KIND[r.kind] || r.kind)}</td>
-        <td><span class="badge ${STATE_BADGE[r.state]}"${r.error ? ` title="${esc(r.error)}"` : ''}>${esc(STATE_LABELS[r.state])}</span></td></tr>`).join('')}
+    const solo = d.project || d.projects.length < 2;
+    list = `<div class="table-wrap"><table class="mtable">
+      <thead><tr><th>Date</th><th>Destinataire</th><th>Objet</th><th>État</th></tr></thead><tbody>
+      ${d.rows.map((r) => `<tr><td class="nowrap">${esc(when(r.sent_at))}</td>
+        <td>${r.company ? `<b>${esc(r.company)}</b><span class="td-s">${esc(r.email)}</span>` : esc(r.email)}</td>
+        <td>${esc(r.subject || '—')}<span class="td-s">${esc(solo ? KIND[r.kind] || r.kind : `${r.project} · ${KIND[r.kind] || r.kind}`)}</span></td>
+        <td><span class="badge ${STATE_BADGE[r.state]}"${r.error ? ` title="${esc(r.error)}"` : ''}>${esc(STATE_LABELS[r.state])}</span>${r.error ? `<span class="td-s">${esc(String(r.error).slice(0, 80))}</span>` : ''}</td></tr>`).join('')}
       </tbody></table></div>`;
   }
 
@@ -82,14 +86,15 @@ export function mailsPage(d) {
   return layout({
     title: 'Mails', email: d.email,
     body: `<section class="card">
-  <div class="row-between"><h1>${ic('mail')}Mails</h1>${projectSelect}</div>
+  <div class="row-between"><h1>Mails</h1>${projectSelect}</div>
   <nav class="tabs" aria-label="Affichage">
     <a class="tab${d.view === 'sent' ? ' on' : ''}" href="${esc(link({ ...d, view: 'sent', filter: '' }, {}))}"${d.view === 'sent' ? ' aria-current="page"' : ''}>${ic('send')}Envoyés</a>
     <a class="tab${d.view === 'replies' ? ' on' : ''}" href="${esc(link({ ...d, view: 'replies', filter: '' }, {}))}"${d.view === 'replies' ? ' aria-current="page"' : ''}>${ic('reply')}Réponses</a>
   </nav>
-  <div class="chips" role="group" aria-label="${d.view === 'replies' ? 'Intention' : 'État'}">${chips}</div>
+  <nav class="mstats" aria-label="${d.view === 'replies' ? 'Filtrer par intention' : 'Filtrer par état'}">${stats}</nav>
   ${list}${pager}
-  ${d.view === 'sent' ? `<p class="muted small">Pas de suivi d'ouverture espion (pixel, lien traqué) : il abîme la délivrabilité et pose un problème de consentement (RGPD). Alternative : l'accusé de lecture standard, que le destinataire accepte ou non d'envoyer (option dans Réglages → Garde-fous). « Lu » est donc un minimum, jamais un « non lu ». « Répondu » vient de la boîte de réception du projet (IMAP).</p>` : ''}
+  ${d.view === 'sent' ? `<details class="tip"><summary><span class="tip-i" aria-hidden="true">i</span><span class="tip-t">Comment sont comptés « Lu » et « Répondu » ?</span></summary>
+    <div class="tip-body"><p>Pas de suivi d'ouverture espion (pixel, lien traqué) : il abîme la délivrabilité et pose un problème de consentement (RGPD). Alternative : l'accusé de lecture standard, que le destinataire accepte ou non d'envoyer (option dans Réglages → Garde-fous). « Lu » est donc un minimum, jamais un « non lu ». « Répondu » vient de la boîte de réception du projet (IMAP).</p></div></details>` : ''}
 </section>`,
   });
 }

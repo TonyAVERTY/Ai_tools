@@ -28,7 +28,7 @@ test('menu IA : deux choix, Claude et Support, dans la barre du haut de chaque p
   const u = await s.newUser();
   for (const p of ['/', '/settings', '/chat', '/support']) {
     const page = await (await html(u, p)).text();
-    assert.match(page, /<details class="ia-menu">\s*<summary class="ia-link" aria-label="Assistant IA : Claude ou Support">/, p);
+    assert.match(page, /<details class="ia-menu">\s*<summary class="ia-link" aria-label="Assistant : discuter avec Claude ou demander de l'aide sur AiTools">/, p);
     assert.match(page, /<a href="\/chat">[\s\S]*?Claude<small>Discute avec ton Claude<\/small>/, p);
     assert.match(page, /<a href="\/support">[\s\S]*?Support<small>Une question sur AiTools \?<\/small>/, p);
   }

@@ -27,11 +27,12 @@ for (const vp of [{ width: 1280, height: 800, touch: false }, { width: 390, heig
   await p.waitForSelector('[data-cfg]:not([hidden])');
   ok(true, `${tag} la liste « Mise en route » et la pastille « config » sont là`);
 
-  // Carte d'usage : quota Claude et conso IA
-  await p.waitForSelector('[data-usage-claude]:not([hidden]) .g');
-  const card = await p.locator('[data-usage-claude]').innerText();
-  ok(/Quota Claude/.test(card) && !/\$/.test(card), `${tag} « Usage du mois » montre le quota Claude, sans montant en dollars (compte par abonnement)`);
-  ok(/Claude|Quota Claude/.test(card), `${tag} « Usage du mois » montre le quota Claude (${card.replace(/\s+/g, ' ').slice(0, 60)}…)`);
+  // Indicateurs du plan en tête de page ; la carte « Consommation Claude » reste masquée tant qu'aucune mesure n'existe (la barre du haut le dit déjà)
+  ok((await p.locator('.ukpi-c').count()) === 4, `${tag} quatre indicateurs en tête de la page Projets`);
+  await p.waitForFunction(() => document.querySelector('#sys')?.textContent.trim().length > 0);
+  const bar = await p.locator('#sys').innerText();
+  ok(/Claude/.test(bar) && !/\$/.test(bar), `${tag} la barre du haut parle de Claude, sans montant en dollars (compte par abonnement)`);
+  ok(await p.locator('[data-claude-card]').evaluate((e) => e.hidden), `${tag} pas de carte « Consommation Claude » sans mesure`);
 
   const x = p.locator('#todo [data-todo-close]');
   if (!vp.touch) {
