@@ -6,8 +6,11 @@ const fmt = (ts) => (ts ? new Date(ts * 1000).toLocaleString('fr-FR', { dateStyl
 const PROVIDERS = { google: 'Google', apple: 'Apple' };
 const PLANS = { free: 'gratuit', pro: 'pro', admin: 'administrateur' };
 
-const cap = (used, limit) => (limit == null ? `${used}` : `${used}/${limit}`);
-const usageCell = (u) => `<span title="Projets">P ${cap(u.projects, u.limits.projects)}</span> · <span title="Prospects">Pr ${cap(u.prospects, u.limits.prospects)}</span> · <span title="Mails ce mois-ci">M ${cap(u.mails, u.limits.mails)}</span> · <span title="Jobs IA ce mois-ci">IA ${cap(u.aiJobs, u.limits.aiJobs)}</span>`;
+// Usage du mois : une colonne par plafond, « utilisé / plafond » (ou le seul nombre quand il n'y a pas de plafond), chiffres alignés à droite
+const cap = (used, limit) => (limit == null ? `${used}` : `${used} / ${limit}`);
+const USAGE_COLS = [['projects', 'Projets'], ['prospects', 'Prospects'], ['mails', 'Mails'], ['aiJobs', 'Tâches IA']];
+const full = (u, k) => u.limits[k] != null && u[k] >= u.limits[k];
+const usageCells = (u) => USAGE_COLS.map(([k, label]) => `<td class="num${full(u, k) ? ' error' : ''}" data-label="${label}">${cap(u[k], u.limits[k])}</td>`).join('');
 
 function actions(a, page, q, selfId) {
   if (a.id === selfId) return '<span class="muted small">Ton compte</span>';
@@ -30,37 +33,36 @@ export function adminPage({ user, list, audit, q = '', notice = null, error = nu
     <td>${esc(a.email)}${a.isAdmin ? ' <span class="badge">admin</span>' : ''}</td>
     <td>${esc(PROVIDERS[a.provider] || '—')}</td>
     <td>${esc(PLANS[a.plan] || a.plan)}</td>
-    <td>${a.status === 'active' ? '<span class="ok">actif</span>' : '<span class="error">suspendu</span>'}${a.sendPause ? '<br><span class="error small">envois en pause</span>' : ''}</td>
-    <td>${fmt(a.createdAt)}</td>
-    <td>${fmt(a.lastLoginAt)}</td>
+    <td>${a.status === 'active' ? '<span class="badge ok">actif</span>' : '<span class="badge err">suspendu</span>'}${a.sendPause ? ' <span class="badge warn">envois en pause</span>' : ''}</td>
+    <td>${fmt(a.createdAt)}<span class="td-s">dernière connexion : ${fmt(a.lastLoginAt)}</span></td>
     <td>${a.link ? `${esc(a.link.mode)}${a.link.valid ? '' : ' <span class="error small">invalide</span>'}` : '—'}</td>
-    <td class="small">${usageCell(a.usage)}</td>
+    ${usageCells(a.usage)}
     <td>${actions(a, list.page, q, user.id)}</td>
   </tr>`).join('');
   const auditRows = audit.map((r) => `<tr><td>${fmt(r.at)}</td><td>${esc(r.admin)}</td><td>${esc(r.label)}</td><td>${esc(r.target || '—')}</td><td class="small">${esc(r.detail || '')}</td></tr>`).join('');
   return layout({
     title: 'Administration', email: user.email,
     body: `<div class="stack"><h1>Administration</h1>
-<p class="muted small">Comptes et compteurs d'usage uniquement : aucun accès aux prospects, mails ni notes des utilisateurs.</p>
+<p class="muted">Comptes et compteurs d'usage uniquement : aucun accès aux prospects, mails ni notes des utilisateurs.</p>
 ${notice ? `<p class="ok" role="status">${esc(notice)}</p>` : ''}
 ${error ? `<p class="error" role="alert">${esc(error)}</p>` : ''}
 <section class="card">
-  <form method="get" action="/admin" class="inline"><label>Rechercher un email<input name="q" value="${esc(q)}" maxlength="100"></label> <button class="btn small">Chercher</button></form>
-  <p class="muted small">${list.total} compte(s) · page ${list.page} / ${list.pages}</p>
+  <form method="get" action="/admin" class="inline admin-search"><label class="field"><span class="lbl">Rechercher un email</span><input name="q" type="search" value="${esc(q)}" maxlength="100" placeholder="nom@exemple.fr"></label> <button class="btn small">Chercher</button></form>
+  <p class="muted small">${list.total} compte${list.total > 1 ? 's' : ''}${list.pages > 1 ? `, page ${list.page} sur ${list.pages}` : ''}</p>
   <div class="table-wrap"><table class="admin-table">
-    <thead><tr><th>Email</th><th>Connexion</th><th>Plan</th><th>Statut</th><th>Créé</th><th>Dernière connexion</th><th>Liaison</th><th>Usage du mois</th><th>Actions</th></tr></thead>
-    <tbody>${rows || '<tr><td colspan="9">Aucun compte.</td></tr>'}</tbody>
+    <thead><tr><th>Email</th><th>Connexion</th><th>Plan</th><th>Statut</th><th>Créé le</th><th>Liaison</th>${USAGE_COLS.map(([, l]) => `<th class="num" scope="col">${l}</th>`).join('')}<th>Actions</th></tr></thead>
+    <tbody>${rows || '<tr><td colspan="11">Aucun compte ne correspond.</td></tr>'}</tbody>
   </table></div>
   <p class="admin-pager">${list.page > 1 ? `<a class="btn small" href="${nav(list.page - 1)}">Précédent</a>` : ''} ${list.page < list.pages ? `<a class="btn small" href="${nav(list.page + 1)}">Suivant</a>` : ''}</p>
-  <p class="muted small">Usage : P projets, Pr prospects, M mails du mois, IA jobs IA du mois (utilisé/plafond).</p>
+  <p class="muted small">Les quatre colonnes de droite comptent l'usage du mois, en cours (heure de Paris), sur le plafond de l'offre. Un nombre en rouge : plafond atteint.</p>
 </section>
 <section class="card">
-  <h4>Journal d'audit</h4>
+  <h2>Journal d'audit</h2>
   <p class="muted small">Actions d'administration et décisions automatiques. Lecture seule ; les adresses sont masquées ; conservé 12 mois.</p>
-  <div class="table-wrap"><table>
+  ${auditRows ? `<div class="table-wrap"><table>
     <thead><tr><th>Date</th><th>Par</th><th>Action</th><th>Compte</th><th>Détail</th></tr></thead>
-    <tbody>${auditRows || '<tr><td colspan="5">Rien pour le moment.</td></tr>'}</tbody>
-  </table></div>
+    <tbody>${auditRows}</tbody>
+  </table></div>` : '<p class="muted">Rien pour le moment : les actions d\'administration et les décisions automatiques apparaîtront ici.</p>'}
 </section></div>`,
   });
 }

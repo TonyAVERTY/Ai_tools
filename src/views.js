@@ -732,7 +732,6 @@ ${saved ? `<p class="ok-box" role="status">${ic('check')}<span><b>Réglages enre
     </details>
     <span class="hint" data-discord-max hidden>${s.discord.max} webhooks Discord au plus.</span>
   </div>
-  <div class="save"><button class="btn primary">Enregistrer les réglages</button></div>
 </section>
 
 <section class="card" id="git" aria-labelledby="t-git">
@@ -802,7 +801,6 @@ ${saved ? `<p class="ok-box" role="status">${ic('check')}<span><b>Réglages enre
   <p class="hint">Haiku suffit pour la plupart des projets : passe à Sonnet ou Opus seulement si les fiches ou les textes manquent de précision. Les estimations (économe, intermédiaire, plus cher) sont relatives : avec ton abonnement elles se voient dans ton quota Claude, avec une clé API dans le prix. Chaque modèle a ses propres prompts, réglables plus bas.</p>
 </section>
 
-<div class="save"><button class="btn primary">Enregistrer</button></div>
 
 <section class="card" id="prompts" aria-labelledby="t-prompts" data-prompts data-pscope="*">
   <div class="card-h"><h2 id="t-prompts">Prompts IA</h2><p>Les consignes que Claude reçoit pour chaque tâche. Modifie-les pour changer le style, le ton ou les règles. Le contexte du projet et le format de réponse restent ajoutés automatiquement : un prompt modifié ne peut pas casser la lecture de la réponse.</p></div>
@@ -819,8 +817,8 @@ ${saved ? `<p class="ok-box" role="status">${ic('check')}<span><b>Réglages enre
     </div>`).join('\n    ')}
     <p class="muted small">${esc(t.fixed)}${t.vars.length ? ` Valeurs insérées automatiquement : ${t.vars.map((v) => `<code>[[${v}]]</code>`).join(', ')}.` : ''}</p>
   </details>`).join('\n  ')}
-  <div class="save"><button class="btn primary">Enregistrer les réglages</button></div>
 </section>
+<div class="savebar"><p>Notifications, dépôts Git, garde-fous, modèles et prompts s'enregistrent ensemble.</p><button class="btn primary">Enregistrer les réglages</button></div>
 </form>
 
 <section class="card" id="opposition" aria-labelledby="t-opp">
