@@ -295,8 +295,10 @@ test('contrastes AA (4,5:1) des couples texte/fond du design, thèmes clair et s
       ['text/bg', t.text, t.bg], ['text/card', t.text, t.card], ['text/bg-sunk', t.text, t['bg-sunk']],
       ['muted/bg', t.muted, t.bg], ['muted/card', t.muted, t.card], ['muted/bg-sunk', t.muted, t['bg-sunk']],
       ['link/bg', t.link, t.bg], ['link/card', t.link, t.card],
-      ['bouton principal (début du dégradé)', t['on-grad'], t.accent], ['bouton principal (fin du dégradé)', t['on-grad'], t['accent-2']],
+      ['texte sur le début du dégradé (barres)', t['on-grad'], t.accent], ['texte sur la fin du dégradé (barres)', t['on-grad'], t['accent-2']],
       ['ok', t.ok, t['ok-bg']], ['warn', t.warn, t['warn-bg']], ['err', t.err, t['err-bg']], ['info', t.info, t['info-bg']],
+      ['bouton principal (indigo)', t['on-primary'], t.primary], ['bouton principal au survol', t['on-primary'], t['primary-hover']],
+      ['accroche surlignée', t['on-mark'], t.mark], ['lien sur le fond du bureau creux', t.link, t['bg-sunk']],
       ['barre active', t['nav-on-text'], t['nav-on-bg']],
     ];
     for (const [label, fg, bg] of pairs) assert.ok(ratio(fg, bg) >= 4.5, `${name} : ${label} = ${ratio(fg, bg).toFixed(2)}`);
@@ -330,8 +332,10 @@ test('liens entre pages : chaque lien et chaque image du site mène quelque part
   const tarifs = html['/tarifs'];
   assert.match(tarifs, /href="\/link\?start=claude"/);
   assert.doesNotMatch(tarifs, /setup-token/);
-  // Le design : maquette du tableau de bord sur l'accueil, quatre étapes détaillées sur Fonctionnement
-  assert.match(html['/'], /class="mock"/);
+  // Le design : la lettre d'exemple (signalée comme fictive) sur l'accueil, quatre étapes détaillées sur Fonctionnement
+  assert.match(html['/'], /<figure class="letter"/);
+  assert.match(html['/'], /Exemple fictif/);
+  assert.match(html['/'], /<mark>/, "l'accroche est surlignée");
   assert.equal((html['/fonctionnement'].match(/<section class="stp/g) || []).length, 4);
   assert.match(html['/'], /<picture class="brand-mark/, 'le vrai logo, pas un espace réservé');
   // Le logo (monogramme) est décoratif : son nom est écrit à côté, donc alt vide et aria-hidden
@@ -379,20 +383,22 @@ test('connexion : la pastille flottante reCAPTCHA est masquée, la mention de pr
   } finally { await withCaptcha.close(); }
 });
 
-test('ruban de page sur toutes les pages du site (pas sur le dashboard), vrais logos Google et Apple, vérification discrète', async () => {
+test('plus de ruban ni de décor animé sur le site, vrais logos Google et Apple, vérification discrète', async () => {
   const apple = await startApp({ cfg: { apple: { teamId: 't', keyId: 'k', clientId: 'c', privateKey: 'p' } } });
   try {
     for (const p of [...PUBLIC_PAGES, '/login', '/inexistant']) {
       const h = await (await apple.anon.get(p, { headers: { accept: 'text/html' } })).text();
-      assert.match(h, /<div class="page-ribbon" aria-hidden="true">/, `${p} : ruban`);
+      assert.doesNotMatch(h, /page-ribbon|rb-bubbles|class="reveal/, `${p} : ni ruban plein page ni bulles`);
+      assert.match(h, /<body class="site">/, p);
     }
     const login = await (await apple.anon.get('/login', { headers: { accept: 'text/html' } })).text();
     assert.ok(login.includes('fill="#4285F4"') && login.includes('fill="#EA4335"') && login.includes('fill="#FBBC05"') && login.includes('fill="#34A853"'), 'logo Google : les quatre couleurs');
     assert.match(login, /<svg class="prov"[^>]*><path fill="currentColor" d="M12\.152/, 'logo Apple');
     assert.doesNotMatch(login, /class="brand"/, 'plus de lettre à la place du logo');
-    // dashboard : jamais de ruban
+    // dashboard : ni ruban ni fond animé
     const u = await apple.newUser({ email: 'rib@x.fr' });
-    assert.doesNotMatch(await (await u.get('/', { headers: { accept: 'text/html' } })).text(), /page-ribbon/);
+    const dash = await (await u.get('/', { headers: { accept: 'text/html' } })).text();
+    assert.doesNotMatch(dash, /page-ribbon|id="bg"/);
   } finally { await apple.close(); }
   assert.match(read('public/site.css'), /\[hidden\] \{ display: none !important; \}/, 'un bouton « hidden » (réessayer la vérification) ne s\'affiche jamais par erreur');
 });
@@ -413,28 +419,25 @@ test('connecté : « Connexion » et « Créer mon compte » deviennent « Dashb
       assert.doesNotMatch(page, /x-guest/, `${path} repères retirés`);
       assert.match(page, /<a class="btn btn-primary" href="\/">Dashboard<\/a>/, `${path} bouton`);
     }
-    assert.match(await (await s.anon.get('/tarifs', { headers: { accept: 'text/html' } })).text(), /<x-guest data-k="cta">/, 'repères présents côté visiteur');
+    assert.match(await (await s.anon.get('/tarifs', { headers: { accept: 'text/html' } })).text(), /<x-guest data-k="cta" role="none">/, 'repères présents côté visiteur');
   } finally { await s.close(); }
 });
 
-test('ruban animé (parallaxe + bulles) : seulement sur les pages de documentation, avec son script et sans style en ligne', async () => {
+test('un seul moment animé hors action : l\'accroche de la lettre ; pages de documentation sans style en ligne, mouvement coupé si demandé', async () => {
   const s = await startApp();
   try {
     for (const path of ['/docs', '/docs/api', '/docs/mcp']) {
       const page = await (await s.anon.get(path, { headers: { accept: 'text/html' } })).text();
-      assert.match(page, /<body class="site fx">/, path);
+      assert.match(page, /<body class="site">/, path);
       assert.match(page, /\/static\/site\.js/, path);
       assert.doesNotMatch(page, /\sstyle="/, `${path} : la CSP interdit style=""`);
     }
-    for (const path of ['/', '/tarifs', '/fonctionnement', '/cgu']) {
-      assert.match(await (await s.anon.get(path, { headers: { accept: 'text/html' } })).text(), /<body class="site">/, `${path} : ruban fixe`);
-    }
     const js = readFileSync(new URL('../public/site.js', import.meta.url), 'utf8');
-    assert.match(js, /prefers-reduced-motion/, 'animations coupées si le système le demande');
+    assert.doesNotMatch(js, /requestAnimationFrame|IntersectionObserver\(\(entries\) => \{\s*for \(const e of entries\) if \(e\.isIntersecting\) \{\s*const el/, 'plus de bulles ni d\'apparition au défilement');
     const css = readFileSync(new URL('../public/site.css', import.meta.url), 'utf8');
-    assert.match(css, /\.rb-b \{[\s\S]*radial-gradient[\s\S]*prefers-reduced-motion/, 'bulle transparente à reflets ; ruban immobile si le système le demande');
-    assert.match(js, /requestAnimationFrame\(tick\)/, 'les bulles montent le long du tracé');
-    assert.match(css, /\.toc \{[^}]*background: color-mix\(in srgb, var\(--card\) 96%/, 'le sommaire a un fond plein : le ruban passe derrière');
+    assert.match(css, /@media \(prefers-reduced-motion: no-preference\) \{\s*\.letter-body mark \{ animation: hook/, 'l\'accroche ne s\'anime que si le système l\'autorise');
+    assert.doesNotMatch(css, /translateY|\.reveal|float|\.rb-b/, 'aucun soulèvement, aucune apparition au défilement, aucune bulle');
+    assert.match(css, /\.toc \{[^}]*position: sticky/, 'le sommaire légal reste visible');
   } finally { await s.close(); }
 });
 

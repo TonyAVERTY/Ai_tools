@@ -1,6 +1,6 @@
 // Gabarit du site public (design Claude Design) : balisage sémantique, métadonnées (title, description, canonical, Open Graph),
 // lien d'évitement, en-tête, pied de page. Aucune ressource externe : CSS, images, icônes (sprite SVG en ligne) et favicon sont
-// servis par l'application ; un seul script, site.js, pour les petits plus (période des tarifs, sommaire légal).
+// servis par l'application ; un seul script, site.js, pour les petits plus (période des tarifs, sommaire légal, onglets de code).
 import { esc } from '../http.js';
 import { assetUrl, brandMark, iconLinks } from '../assets.js';
 import { SPRITE, ic } from '../icons.js';
@@ -33,25 +33,24 @@ export function absoluteUrl(appUrl, path) {
  * @param {string} o.body        contenu de <main>, déjà échappé
  * @param {boolean} [o.noindex]  page à ne pas indexer (connexion, 404)
  * @param {object} [o.jsonLd]    données structurées (bloc de données, non exécuté : compatible avec la CSP)
- * @param {boolean} [o.fx]       ruban animé (parallaxe + bulles, voir public/site.js) : pages de documentation
  * @param {string[]} [o.scripts] scripts de l'application (chemins /static/…) ; aucun par défaut
  */
 // Contenu réservé aux visiteurs : entouré de repères, que withViewer() remplace pour quelqu'un déjà connecté
-export const guest = (key, markup) => `<x-guest data-k="${key}">${markup}</x-guest>`;
+export const guest = (key, markup) => `<x-guest data-k="${key}" role="none">${markup}</x-guest>`;
 const MEMBER = {
   cta: '<a class="btn btn-primary" href="/">Dashboard</a>',
-  foot: '<li><a href="/">Dashboard</a></li>',
+  foot: '<a href="/">Dashboard</a>',
   plan: '<a class="btn btn-primary" href="/">Ouvrir le dashboard</a>',
-  big: `<a class="btn btn-primary btn-lg" href="/">Dashboard${ic('arrow')}</a>`,
+  big: '<a class="btn btn-primary btn-lg" href="/">Dashboard</a>',
 };
 
 /** Page du site public vue par un compte connecté : « Connexion » et « Créer mon compte » deviennent « Dashboard ». */
 export function withViewer(page, signedIn) {
   if (!signedIn) return page;
-  return page.replace(/<x-guest data-k="(\w+)">[\s\S]*?<\/x-guest>/g, (_, key) => MEMBER[key] ?? '');
+  return page.replace(/<x-guest data-k="(\w+)" role="none">[\s\S]*?<\/x-guest>/g, (_, key) => MEMBER[key] ?? '');
 }
 
-export function siteLayout({ appUrl, path, title, description, body, noindex = false, jsonLd = null, scripts = [], fx = false }) {
+export function siteLayout({ appUrl, path, title, description, body, noindex = false, jsonLd = null, scripts = [] }) {
   const url = absoluteUrl(appUrl, path === '/' ? '/' : path);
   const year = new Date().getFullYear();
   const here = (href) => (href === path ? ' aria-current="page"' : '');
@@ -64,7 +63,7 @@ export function siteLayout({ appUrl, path, title, description, body, noindex = f
 <meta name="description" content="${esc(description)}">
 <meta name="robots" content="${noindex ? 'noindex, follow' : 'index, follow'}">
 ${noindex ? '' : `<link rel="canonical" href="${esc(url)}">\n`}<meta name="color-scheme" content="light dark">
-<meta name="theme-color" content="#f4f7fc" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#f1f3f9" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#0b1224" media="(prefers-color-scheme: dark)">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="${SITE_NAME}">
@@ -82,12 +81,8 @@ ${iconLinks()}
 <link rel="stylesheet" href="${assetUrl('/static/site.css')}">
 <link rel="stylesheet" href="${assetUrl('/static/responsive.css')}">
 ${['/static/site.js', '/static/responsive.js', ...scripts].map((src) => `<script src="${esc(assetUrl(src))}" defer></script>\n`).join('')}${jsonLd ? `<script type="application/ld+json">${JSON.stringify(jsonLd).replace(/</g, '\\u003c')}</script>\n` : ''}</head>
-<body class="site${fx ? ' fx' : ''}">
+<body class="site">
 <a class="skip" href="#contenu">Aller au contenu</a>
-<div class="page-ribbon" aria-hidden="true"><svg viewBox="0 0 100 1000" preserveAspectRatio="none" focusable="false">
-<defs><linearGradient id="g-page" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="100" y2="1000"><stop offset="0" stop-color="#1288b7"></stop><stop offset="1" stop-color="#0db8c5"></stop></linearGradient></defs>
-<path d="M108 -20 C90 40 62 30 58 130 S20 200 4 300 S-2 420 4 480 S40 540 96 620 S102 700 96 760 S60 830 4 900 S-2 960 20 1030"></path>
-</svg></div>
 ${SPRITE}
 <header class="top">
   <div class="wrap top-in">
@@ -108,12 +103,12 @@ ${body}
   <div class="wrap">
     <div class="foot-g">
       <div>${lockup()}<p class="foot-n">Prospection, relances et posts LinkedIn pilotés par Claude.</p></div>
-      <nav aria-label="Produit"><h3>Produit</h3><ul>
+      <nav aria-label="Produit"><p class="foot-h">Produit</p><ul>
         <li><a href="/">Accueil</a></li>
         ${NAV.map(([href, label]) => `<li><a href="${href}"${here(href)}>${esc(label)}</a></li>`).join('\n        ')}
-        ${guest('foot', '<li><a href="/login">Connexion</a></li>')}
+        <li>${guest('foot', '<a href="/login">Connexion</a>')}</li>
       </ul></nav>
-      <nav aria-label="Informations"><h3>Infos</h3><ul>
+      <nav aria-label="Informations"><p class="foot-h">Infos</p><ul>
         <li><a href="/mentions-legales"${here('/mentions-legales')}>Mentions légales</a></li>
         <li><a href="/confidentialite"${here('/confidentialite')}>Confidentialité</a></li>
         <li><a href="/cgu"${here('/cgu')}>CGU</a></li>
