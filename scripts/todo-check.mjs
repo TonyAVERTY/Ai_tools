@@ -30,7 +30,7 @@ for (const vp of [{ width: 1280, height: 800, touch: false }, { width: 390, heig
   // Carte d'usage : quota Claude et conso IA
   await p.waitForSelector('[data-usage-claude]:not([hidden]) .g');
   const card = await p.locator('[data-usage-claude]').innerText();
-  ok(/IA via AiTools 24 h/.test(card) && /IA via AiTools 30 j/.test(card), `${tag} « Usage du mois » montre la conso IA via AiTools`);
+  ok(/Quota Claude/.test(card) && !/\$/.test(card), `${tag} « Usage du mois » montre le quota Claude, sans montant en dollars (compte par abonnement)`);
   ok(/Claude|Quota Claude/.test(card), `${tag} « Usage du mois » montre le quota Claude (${card.replace(/\s+/g, ' ').slice(0, 60)}…)`);
 
   const x = p.locator('#todo [data-todo-close]');
