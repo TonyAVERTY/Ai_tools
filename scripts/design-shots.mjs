@@ -1,5 +1,5 @@
 // Captures d'écran de toutes les pages (site public et application) à trois tailles, sur une base de test peuplée de données réalistes.
-// Sert au contrôle visuel avant/après d'une refonte. Usage : OUT=/chemin PLAYWRIGHT_MODULE=… PLAYWRIGHT_CHROMIUM=… node scripts/design-shots.mjs [filtre]
+// Sert au contrôle visuel avant/après d'une refonte (SCHEME=dark pour le thème sombre, TOP=1 pour le haut de page seulement, ELEMENT=<sélecteur> pour un bloc, CLOSED=1 pour laisser les projets repliés). Usage : OUT=/chemin PLAYWRIGHT_MODULE=… PLAYWRIGHT_CHROMIUM=… node scripts/design-shots.mjs [filtre]
 import { mkdirSync } from 'node:fs';
 import { startApp, APP_URL } from '../test/helpers/server.js';
 import { addProject } from '../test/helpers/users.js';
@@ -23,8 +23,16 @@ for (const [company, city, status, score] of names) {
   await s.db.prepare("INSERT INTO prospects(project_id, company, email, website, city, sector, score, status, source, hook, created_at) VALUES(?, ?, ?, ?, ?, 'Kinésithérapie', ?, ?, 'https://exemple.fr/contact', ?, ?)")
     .run(p1, company, `contact${++i}@exemple.fr`, 'https://exemple.fr', city, score, status, `Votre cabinet à ${city} propose des séances à domicile, un détail utile pour un agenda partagé.`, now() - i * day);
 }
+// Historique d'envois (mail_log) pour que la page Mails ait de quoi se montrer : un mail par prospect déjà contacté, dont un en échec
+const sentRows = await s.db.prepare("SELECT id, email, status FROM prospects WHERE project_id = ? AND status IN ('sent', 'replied', 'client')").all(p1);
+let k = 0;
+for (const r of sentRows) {
+  await s.db.prepare("INSERT INTO mail_log(project_id, prospect_id, email, sent_at, error, kind, subject) VALUES(?, ?, ?, ?, NULL, 'initial', ?)").run(p1, r.id, r.email, now() - (++k) * day, 'Un agenda partagé pour votre cabinet');
+}
+await s.db.prepare("INSERT INTO mail_log(project_id, prospect_id, email, sent_at, error, kind, subject) VALUES(?, NULL, 'erreur@exemple.fr', ?, 'SMTP : connexion refusée', 'initial', 'Un agenda partagé pour votre cabinet')").run(p1, now() - 5 * day);
 await s.db.prepare("INSERT INTO jobs(project_id, user_id, type, status, progress_json, created_at, started_at) VALUES(?, ?, 'prospect', 'running', ?, ?, ?)").run(p1, u.id, JSON.stringify({ message: 'Lecture du site de Cabinet Morvan…', pct: 42, found: 3, target: 10 }), now(), now());
 await s.db.prepare("INSERT INTO jobs(project_id, user_id, type, status, progress_json, created_at) VALUES(?, ?, 'audit', 'queued', ?, ?)").run(p1, u.id, JSON.stringify({ message: 'En attente : quota de la session Claude (5 h) à 95 %' }), now());
+await s.db.prepare("UPDATE prospects SET next_action = 'Relancer par téléphone', next_action_at = ? WHERE project_id = ? AND company = 'Cabinet Le Gall'").run(now() + 3 * day, p1);
 try { await s.db.prepare("INSERT INTO calendar_events(user_id, title, starts_at, minutes, notes, created_at) VALUES(?, 'Appel avec Cabinet Morvan', ?, 30, 'Démo agenda partagé', ?)").run(u.id, now() + 2 * day, now()); } catch { /* table absente : ignoré */ }
 
 const PUBLIC = ['/accueil', '/fonctionnement', '/tarifs', '/docs', '/docs/api', '/docs/mcp', '/mentions-legales', '/confidentialite', '/cgu', '/login', '/page-inconnue'];
@@ -34,7 +42,7 @@ const b = await chromium.launch(process.env.PLAYWRIGHT_CHROMIUM ? { executablePa
 const slug = (p) => (p === '/' ? 'projets' : p.replace(/^\//, '').replace(/\//g, '-'));
 async function run(label, paths, cookie) {
   for (const sz of SIZES) {
-    const ctx = await b.newContext({ viewport: { width: sz.width, height: sz.height }, deviceScaleFactor: 1 });
+    const ctx = await b.newContext({ viewport: { width: sz.width, height: sz.height }, deviceScaleFactor: 1, colorScheme: process.env.SCHEME === 'dark' ? 'dark' : 'light' });
     if (cookie) { const [name, value] = u.cookie.split('='); await ctx.addCookies([{ name, value, url: s.base }]); }
     await ctx.route('**/*', (route) => { const r = route.request(); const h = { ...r.headers() }; if (r.method() === 'POST') h.origin = APP_URL; route.continue({ headers: h }); });
     const page = await ctx.newPage();
@@ -43,10 +51,13 @@ async function run(label, paths, cookie) {
       try {
         await page.goto(`${s.base}${path}`, { waitUntil: 'load' });
         await page.waitForTimeout(700);
-        if (path === '/' && cookie) { const d = page.locator('details.project').first(); if (!(await d.evaluate((e) => e.open))) await d.locator('> summary').click(); await page.waitForTimeout(400); }
+        if (path === '/' && cookie && !process.env.CLOSED) { const d = page.locator('details.project').first(); if (!(await d.evaluate((e) => e.open))) await d.locator('> summary').click(); await page.waitForTimeout(400); }
         // Fait défiler la page : les apparitions au défilement (IntersectionObserver) se déclenchent comme pour un visiteur
         await page.evaluate(async () => { const h = document.documentElement.scrollHeight; for (let y = 0; y < h; y += 400) { scrollTo(0, y); await new Promise((r) => setTimeout(r, 60)); } scrollTo(0, 0); await new Promise((r) => setTimeout(r, 500)); });
-        await page.screenshot({ path: `${out}/${label}-${slug(path)}-${sz.name}.png`, fullPage: true });
+        if (process.env.ELEMENT) { // capture d'un bloc seulement (ex. ELEMENT=.dash), sans la mise en route flottante
+          await page.evaluate(() => document.querySelector('.todo')?.remove());
+          await page.locator(process.env.ELEMENT).first().screenshot({ path: `${out}/${label}-${slug(path)}-${sz.name}.png` });
+        } else await page.screenshot({ path: `${out}/${label}-${slug(path)}-${sz.name}.png`, fullPage: !process.env.TOP });
       } catch (e) { console.log('échec', path, sz.name, e.message.split('\n')[0]); }
     }
     await ctx.close();

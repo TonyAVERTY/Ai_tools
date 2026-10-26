@@ -222,17 +222,24 @@ test('Mon compte et tableau de bord : barres d\'usage du mois, plafond atteint s
     const u = await s.newUser({ admin: false, link: LINK });
     const pid = await proj({ db: s.db }, u.id);
     for (let i = 0; i < 100; i++) await recordUsage(s.db, u.id, 'mail');
-    for (const page of ['/account', '/']) {
-      const h = await (await u.get(page, { headers: { accept: 'text/html' } })).text();
-      assert.match(h, /Usage du mois/, page);
-      assert.match(h, /plan gratuit/, page);
-      assert.match(h, /Mails ce mois-ci<\/span><span class="g-v">100 \/ 100/, page);
-      assert.match(h, /<div class="bar usage full"[^>]*><span class="w-100">/, page);
-      assert.match(h, /<span class="w-100">/);
-      assert.match(h, /Plafond atteint : .*mails ce mois-ci/, page);
-      assert.match(h, /Projets<\/span><span class="g-v">1 \/ 1/, page);
-      assert.doesNotMatch(h, /style="/, 'pas de style en ligne (CSP)');
-    }
+    // Mon compte : le détail, une barre par plafond
+    const acc = await (await u.get('/account', { headers: { accept: 'text/html' } })).text();
+    assert.match(acc, /Usage du mois/);
+    assert.match(acc, /plan gratuit/);
+    assert.match(acc, /Mails ce mois-ci<\/span><span class="g-v">100 \/ 100/);
+    assert.match(acc, /<div class="bar usage full"[^>]*><span class="w-100">/);
+    assert.match(acc, /Plafond atteint : .*mails ce mois-ci/);
+    assert.match(acc, /Projets<\/span><span class="g-v">1 \/ 1/);
+    assert.doesNotMatch(acc, /style="/, 'pas de style en ligne (CSP)');
+    // Projets : quatre indicateurs en tête, mêmes chiffres, plafond atteint signalé ; plus de panneau « Usage du mois » en doublon
+    const dash = await (await u.get('/', { headers: { accept: 'text/html' } })).text();
+    assert.equal((dash.match(/class="ukpi-c/g) || []).length, 4);
+    assert.match(dash, /<div class="ukpi-c full"><dt>[^]*?Mails envoyés<\/dt><dd><b>100<\/b><span>ce mois-ci · sur 100 · plafond atteint<\/span>/);
+    assert.match(dash, /<dt>[^]*?Projets<\/dt><dd><b>1<\/b><span>sur 1 · plafond atteint<\/span>/);
+    assert.match(dash, /Plafond atteint : .*mails ce mois-ci/);
+    assert.doesNotMatch(dash, /Usage du mois/, 'les chiffres sont dans les indicateurs, pas dans un second panneau');
+    assert.match(dash, /data-claude-card hidden/, 'la consommation Claude reste dans un panneau secondaire, masqué tant qu\'il est vide');
+    assert.doesNotMatch(dash, /style="/, 'pas de style en ligne (CSP)');
     assert.ok(pid);
     const a = await s.newUser({ admin: true });
     const h = await (await a.get('/account', { headers: { accept: 'text/html' } })).text();

@@ -55,6 +55,24 @@ export async function getProject(app, id, { userId, secrets = false, need = null
   return out;
 }
 
+/**
+ * Chiffres réels d'une liste de projets, pour les lignes du tableau de bord : prospects, à contacter (statut « new »),
+ * réponses (« replied » ou « client ») et date du dernier envoi (sent_at des prospects). Rien n'est estimé : un projet sans prospect renvoie des zéros.
+ * @returns {Promise<Map<number, {prospects:number, toContact:number, replies:number, lastSentAt:number|null}>>}
+ */
+export async function projectStats(db, ids) {
+  const out = new Map(ids.map((id) => [Number(id), { prospects: 0, toContact: 0, replies: 0, lastSentAt: null }]));
+  if (!ids.length) return out;
+  const rows = await db.prepare(`SELECT project_id,
+      COUNT(*) n,
+      SUM(CASE WHEN status = 'new' THEN 1 ELSE 0 END) fresh,
+      SUM(CASE WHEN status IN ('replied', 'client') THEN 1 ELSE 0 END) replies,
+      MAX(sent_at) last
+    FROM prospects WHERE project_id IN (${ids.map(() => '?').join(',')}) GROUP BY project_id`).all(...ids.map(Number));
+  for (const r of rows) out.set(Number(r.project_id), { prospects: Number(r.n), toContact: Number(r.fresh || 0), replies: Number(r.replies || 0), lastSentAt: r.last == null ? null : Number(r.last) });
+  return out;
+}
+
 /** Les projets de l'utilisateur, puis ceux que des équipes ont partagés avec lui. */
 export async function listProjects(app, userId) {
   const teamIds = await memberTeamIds(app.db, userId);

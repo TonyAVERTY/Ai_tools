@@ -10,6 +10,7 @@ Résumé : la page Mon compte (connexion, usage du mois, liaison Claude, agenda,
 - **Zone de danger** : **Supprimer mon compte et mes données**, après avoir saisi son email pour confirmer. Efface définitivement le compte et toutes les données : projets, prospects, notes, modèles de mail, journaux d'envoi, jobs, réglages, clones du code, conversations IA et leurs pièces jointes, vidéos de promotion. Les adresses qui ont demandé à ne plus être contactées restent dans la liste d'opposition commune. Irréversible. Les comptes inactifs depuis longtemps sont supprimés automatiquement après un mail d'avertissement 30 jours avant.
 
 ## Équipe (barre du haut → Équipe)
+Sans équipe, la page propose le champ **Nom de l'équipe** et le bouton **Créer l'équipe**, avec à côté le tableau **Rôles et droits** (Membre, Administrateur, Propriétaire) : l'équipe utilise ton offre, tes plafonds, ton SMTP et ton accès Claude, donc ses membres n'ont pas besoin d'abonnement.
 Une équipe permet de **partager des projets avec des collègues, sans leur donner son accès**. Le nombre de places dépend de l'offre (voir « Offres, plafonds et limites ») ; sans place d'équipe, la page l'indique avec un lien vers les offres.
 - **Créer mon équipe** : champ **Nom de l'équipe** puis **Créer l'équipe**.
 - Rôles : **Membre** (travaille sur les projets partagés : modèles, contacts, recherches, envois, notes), **Administrateur** (en plus, règle les projets : SMTP, boîte de réception, base du récapitulatif, LinkedIn), **Propriétaire** (gère l'équipe, partage et supprime les projets).

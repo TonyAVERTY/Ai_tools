@@ -59,7 +59,7 @@ import {
 } from './services/crm.js';
 import {
   getProject, listProjects, createProject, saveSecretConfig, publicConfig,
-  prospectStats, sentSince, repoDir, getTemplate, saveTemplate, abStats,
+  prospectStats, projectStats, sentSince, repoDir, getTemplate, saveTemplate, abStats,
 } from './projects.js';
 
 const lines = (s) => String(s || '').split('\n').map((x) => x.trim()).filter(Boolean).slice(0, 20);
@@ -153,8 +153,9 @@ export function registerRoutes(router, app) {
       const full = await getProject(app, p.id, { userId, secrets: true });
       projects.push({ project: p, smtp: publicConfig(full.smtp, 'pass'), dbCfg: publicConfig(full.dbCfg, 'password'), imap: publicConfig(full.imapCfg, 'pass') });
     }
+    const stats = await projectStats(db, projects.map((x) => x.project.id));
     html(res, dashboardPage({
-      email: session.email, projects, gitHosts: (await listGitServers(db, userId)).map((x) => x.host), usage: await usageView(db, await getUser(db, userId)),
+      email: session.email, projects, stats, gitHosts: (await listGitServers(db, userId)).map((x) => x.host), usage: await usageView(db, await getUser(db, userId)),
       pauseMessage: await sendPause(db, userId).then((p) => (p ? pauseMessageOf(p) : null)),
     }));
   });
