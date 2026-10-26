@@ -401,7 +401,8 @@
     if (s.linkMode !== 'api_key') {
       if (!rl || (!rl.fiveHour && !rl.sevenDay)) {
         const why = !rl ? 'pas encore mesuré' : 'relevé indisponible';
-        rows.push(usageRow('Quota Claude', why, { tip: rl ? (WHY[rl.error] || 'relevé indisponible') : 'Le relevé en direct se fait avec ton abonnement Claude', cls: 'muted' }));
+        // Pas de mesure : la barre du haut le dit déjà, la carte « Consommation Claude » de la page Projets reste masquée (elle n'apparaît que pour de vraies valeurs)
+        if (!document.querySelector('[data-claude-card]')) rows.push(usageRow('Quota Claude', why, { tip: rl ? (WHY[rl.error] || 'relevé indisponible') : 'Le relevé en direct se fait avec ton abonnement Claude', cls: 'muted' }));
       }
       for (const [label, w] of [['Claude session 5 h', rl?.fiveHour], ['Claude semaine', rl?.sevenDay]]) {
         if (!w) continue;
@@ -433,7 +434,7 @@
         ${claudeQuota(s.claudeRateLimit, s.linkMode)}
         ${s.linkMode === 'api_key' ? `${gauge('24 h', s.budget.day)} ${gauge('30 j', s.budget.month)}` : ''}
         ${s.budget.blocked && s.linkMode === 'api_key' ? '<span class="error">Budget IA atteint : jobs IA en attente</span>' : ''}`;
-      for (const box of $$('[data-usage-claude]')) { box.innerHTML = usageClaude(s); box.hidden = false; }
+      for (const box of $$('[data-usage-claude]')) { box.innerHTML = usageClaude(s); box.hidden = false; const card = box.closest('[data-claude-card]'); if (card) card.hidden = !box.innerHTML.trim(); }
       renderJobsMenu(s);
       busy = s.queue > 0;
     } catch { /* silencieux */ }

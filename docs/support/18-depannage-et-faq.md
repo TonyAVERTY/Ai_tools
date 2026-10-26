@@ -68,7 +68,7 @@ Lire le message du job : outils manquants sur le serveur (Chromium, ffmpeg), pla
 Les agendas se rafraîchissent tout seuls mais lentement (Google : 12 à 24 heures). Pour voir un changement tout de suite, retirer puis rajouter l'abonnement, ou régénérer le lien (Créer mon lien d'agenda).
 
 ## Une question hors du cadre d'AiTools
-Pour rédiger un mail, trouver des idées de posts, réfléchir à une stratégie commerciale : menu **IA → Claude**.
+Pour rédiger un mail, trouver des idées de posts, réfléchir à une stratégie commerciale : menu **Assistant → Claude**.
 
 ## FAQ rapide
 - **Qui paie l'IA ?** La personne, directement chez Anthropic (clé API : à l'usage ; abonnement : son abonnement Claude). AiTools facture seulement son offre.

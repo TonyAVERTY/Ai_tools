@@ -87,7 +87,8 @@ test('page Calendrier : mois, actions et posts, navigation, échappement, isolat
   assert.match(page, /14:30<\/span> Post du mercredi/);
   assert.match(page, /href="\/calendar\?m=2026-10"[^>]*>← octobre/);
   assert.match(page, /href="\/calendar\?m=2026-12"/);
-  assert.doesNotMatch(await (await html(a, '/calendar?m=2026-12')).text(), /Atelier|Post du mercredi/);
+  // Décembre : rien dans la grille (le panneau « À venir » dépend de l'heure réelle, il n'est pas comparé ici)
+  assert.doesNotMatch(await (await html(a, '/calendar?m=2026-12')).text(), /class="cal-ev[^"]*"[^>]*><span class="cal-t">[^<]*<\/span> (Rappeler|Post du mercredi)/);
   assert.doesNotMatch(await (await html(b, '/calendar?m=2026-11')).text(), /Atelier|Post du mercredi/, 'isolation');
   assert.equal((await html(a, '/calendar?m=pas-un-mois')).status, 200);
   const p = parisParts(new Date());
