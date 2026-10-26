@@ -422,10 +422,13 @@
   }
 
   let sysTimer;
+  // Page « Relier Claude » sans accès utilisable : le serveur refuse ces relevés (403). On ne les demande pas, et on réessaie vite (la page change une fois Claude relié).
+  const unlinked = () => !!document.querySelector('[data-nolink]');
   async function refreshSys() {
     clearTimeout(sysTimer);
     const el = $('#sys');
     if (!el) return;
+    if (unlinked()) { sysTimer = later(refreshSys, 4000); return; }
     let busy = false;
     try {
       const s = await api('/api/system');
@@ -2105,7 +2108,7 @@
     }
   }
   async function pollReplies() {
-    if (document.hidden || !$('.top')) return;
+    if (document.hidden || !$('.top') || unlinked()) return;
     try {
       const d = await api('/api/replies?unseen=1&limit=10');
       paintUnseen(d.unseen);
