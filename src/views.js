@@ -45,7 +45,6 @@ ${iconLinks()}
 ${scripts.map((src) => `<script src="${assetUrl(src)}" defer></script>`).join('\n')}
 </head>
 <body class="app">
-<canvas id="bg" aria-hidden="true"></canvas>
 ${SPRITE}
 <a class="skip" href="#contenu">Aller au contenu</a>
 ${email ? `<header class="top">
@@ -212,13 +211,13 @@ export function linkPage({ user, link, cliModeEnabled, error, start = false }) {
   const cards = cliModeEnabled ? `
 <article class="optc">
   <div class="optc-h"><span class="optc-i">${ic('link')}</span></div>
-  <h3>Se connecter avec Claude</h3>
+  <h2>Se connecter avec Claude</h2>
   <p>Utilise ton abonnement Claude (Pro, Max) au lieu d'une clé API. Cette option comporte un risque pour ton compte Claude : une fenêtre d'avertissement s'affiche avant de continuer.</p>
   <button type="button" class="btn" data-open-dialog="consent-dialog">Se connecter avec Claude</button>
 </article>
 <article class="optc">
   <div class="optc-h"><span class="optc-i">${ic('paste')}</span></div>
-  <h3>Jeton collé à la main</h3>
+  <h2>Jeton collé à la main</h2>
   <p>Colle un jeton d'abonnement Claude. Pour les cas où la connexion directe ne passe pas.</p>
   <details class="manual"><summary class="btn">Coller un jeton</summary>
     <form method="post" action="/link/subscription" class="cfg" data-consent-form>
@@ -264,7 +263,7 @@ ${error ? `<p class="msg msg-err" role="alert">${esc(error)}</p>` : ''}
 <div class="opts">
 <article class="optc optc-rec">
   <div class="optc-h"><span class="optc-i">${ic('key')}</span><span class="badge ok">${ic('check')}Recommandée</span></div>
-  <h3>Clé API Anthropic</h3>
+  <h2>Clé API Anthropic</h2>
   <p>Crée une clé sur console.anthropic.com puis colle-la ici. Elle est vérifiée sans consommer de tokens, chiffrée, et ne sera plus jamais affichée (seuls ses 4 derniers caractères le seront). Tu paies à l'usage, directement chez Anthropic.</p>
   <form method="post" action="/link/api-key" class="cfg">
     <label class="field"><span class="lbl">Clé API</span><input name="apiKey" type="password" autocomplete="new-password" spellcheck="false" required placeholder="sk-ant-…"></label>

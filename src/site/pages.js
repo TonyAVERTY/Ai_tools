@@ -1,4 +1,4 @@
-// Pages publiques du site, d'après le design Claude Design (rendu serveur ; scripts : public/site.js pour les tarifs et le
+// Pages publiques du site (direction artistique : docs/DESIGN.md) (rendu serveur ; scripts : public/site.js pour les tarifs et le
 // sommaire légal, plus la vérification anti-robot de la connexion). Les textes sont écrits en mots de tous les jours :
 // rien ici ne promet un résultat, rien n'est chiffré au-delà de ce que le code fait réellement.
 import { esc } from '../http.js';
@@ -24,7 +24,7 @@ const limitRows = (l) => [
 /** « Google » ou « Google ou Apple » selon la configuration réelle de la connexion. */
 export const providersText = (apple) => (apple ? 'Google ou Apple' : 'Google');
 
-const btnArrow = (cls, href, label) => `<a class="btn ${cls}" href="${href}">${label}${ic('arrow')}</a>`;
+const btn = (cls, href, label) => `<a class="btn ${cls}" href="${href}">${label}</a>`;
 
 // ---------- Connexion ----------
 // Avec reCAPTCHA (clés configurées), la vérification se fait toute seule : public/captcha.js charge le script de Google
@@ -81,11 +81,9 @@ export function notFoundPage({ appUrl }) {
     description: "Cette page n'existe pas ou a changé d'adresse.",
     body: `<div class="stage-p"><div class="wrap">
 <section class="nf" aria-labelledby="n-h">
-  <p class="code">Erreur 404</p>
-  <svg class="rib" aria-hidden="true" focusable="false" viewBox="0 0 160 24"><path d="M8 16 C40 2 70 26 100 12 S140 8 152 6" fill="none" stroke="url(#g-nf)" stroke-width="10" stroke-linecap="round"></path></svg>
   <h1 id="n-h">Cette page n'existe pas</h1>
-  <p>Le lien est peut-être cassé, ou la page a été déplacée.</p>
-  <div class="btns"><a class="btn btn-primary btn-lg" href="/">${ic('back')}Retour à l'accueil</a></div>
+  <p>Le lien est peut-être cassé, ou la page a changé d'adresse. Voilà où aller :</p>
+  <ul class="nf-links"><li><a href="/">Accueil</a></li><li><a href="/fonctionnement">Comment ça marche</a></li><li><a href="/tarifs">Tarifs</a></li><li><a href="/docs">Documentation</a></li></ul>
 </section>
 </div></div>`,
   });
@@ -110,35 +108,30 @@ const HOME_JSON_LD = (appUrl) => ({
 
 const badge = (cls, icon, text) => `<span class="badge${cls ? ` ${cls}` : ''}">${icon ? ic(icon) : ''}${text}</span>`;
 
-// Maquette du tableau de bord : données d'exemple, clairement signalées comme telles
-const HERO_MOCK = `<div class="art-hero">
-  <div class="mock" role="img" aria-label="Maquette du tableau de bord : projet Atelier Exemple, cible validée, recherche de contacts à 64 %, trois contacts avec leurs statuts">
-    <div class="mock-h">
-      <div><p class="mock-t">Atelier Exemple</p><p class="mock-s">Menuiserie · Bretagne</p></div>
-      ${badge('b-ok', 'check', 'Cible validée')}
-    </div>
-    <div>
-      <div class="prog-h"><span>Recherche de contacts</span><span>64 %</span></div>
-      <div class="track"><div class="bar"></div></div>
-    </div>
-    <div class="tw">
-      <table>
-        <thead><tr><th scope="col">Contact</th><th scope="col">Statut</th></tr></thead>
-        <tbody>
-          <tr><td>Boulangerie Exemple<span class="td-s">Rennes</span></td><td>${badge('b-info', 'mail', 'À contacter')}</td></tr>
-          <tr><td>Cabinet Exemple<span class="td-s">Vannes</span></td><td>${badge('b-warn', 'clock', 'Contacté')}</td></tr>
-          <tr><td>Garage Exemple<span class="td-s">Lorient</span></td><td>${badge('b-ok', 'reply', 'A répondu')}</td></tr>
-        </tbody>
-      </table>
-    </div>
+// La lettre d'exemple : le produit réel (un mail préparé pour un prospect, l'accroche tirée de son site, la validation avant l'envoi).
+// Entreprise, adresse et contenu sont fictifs et signalés comme tels.
+const LETTER = `<figure class="letter" aria-labelledby="lt-cap">
+  <figcaption class="letter-cap" id="lt-cap">Exemple fictif : un mail préparé pour un cabinet de kinésithérapie.</figcaption>
+  <dl class="letter-head">
+    <dt>À</dt><dd class="mono">accueil@cabinet-exemple.fr</dd>
+    <dt>Objet</dt><dd>Vos patients qui appellent pour décaler un rendez-vous</dd>
+  </dl>
+  <div class="letter-body">
+    <p>Bonjour,</p>
+    <p><mark>Sur votre site, vous demandez de téléphoner pour déplacer un rendez-vous.</mark> Agenda Kiné laisse vos patients le faire seuls, et leur envoie le rappel à votre place.</p>
+    <p>Je peux vous montrer ça en dix minutes ?</p>
+    <p class="letter-sign">Tony</p>
   </div>
-</div>`;
+  <p class="margin-note"><b>Accroche tirée de leur site.</b> Claude cite une phrase de la page « Contact » du cabinet pour que le mail ne ressemble pas à un envoi en masse.</p>
+  <div class="letter-foot">${badge('b-warn', 'clock', 'À valider')}<span>Rien ne part tant que tu n'as pas relu et confirmé.</span></div>
+</figure>`;
 
-const BENEFITS = [
-  ['mail', 'Prospection par mail avec ton propre Claude', 'Il trouve des entreprises qui te correspondent et prépare chaque mail.'],
-  ['reply', 'Relance automatique dans le même fil', "Pas de réponse ? Si tu l'as activée, une seule relance arrive dans la même conversation."],
-  ['eye', 'Suivi des réponses', "Tu vois en un coup d'œil qui a répondu, qui attend, qui reste à contacter."],
-  ['pen', 'Posts LinkedIn écrits par Claude', 'Il rédige, tu relis et tu publies quand ça te va.'],
+const FACTS = [
+  ['Il cherche des entreprises', "À partir de ton projet, il repère celles qui pourraient avoir besoin de toi et ne garde que des adresses professionnelles publiées au grand jour."],
+  ['Il écrit chaque mail', "Un mail court par entreprise, avec une accroche tirée de son site. Tu relis, tu corriges, tu valides."],
+  ['Il relance une fois', "Pas de réponse ? Si tu l'as activée, une seule relance part dans la même conversation."],
+  ['Il suit les réponses', "Tu vois qui a répondu, qui attend et qui reste à contacter, sans ouvrir ta boîte pour le savoir."],
+  ['Il écrit tes posts LinkedIn', "Il rédige, tu relis et tu publies quand ça te va."],
 ];
 const STEPS = [
   ['Relie ton accès Claude', "Tu connectes ta propre clé Anthropic ou ton abonnement Claude. C'est ton accès qui travaille, pas celui d'AiTools."],
@@ -147,10 +140,10 @@ const STEPS = [
   ['Lance la recherche', "Il trouve les contacts et écrit les mails. Tu les relis et tu confirmes l'envoi."],
 ];
 const TRUST = (apple) => [
-  ['shield', 'Rien ne part sans ton accord', "Le premier envoi attend ta confirmation, chaque post attend ton clic. La relance, c'est toi qui l'actives."],
-  ['box', 'Tes données restent cloisonnées par compte', "Personne d'autre ne voit tes prospects ni tes brouillons. Un clic dans Mon compte et tout est effacé."],
-  ['lock', 'Tes secrets sont chiffrés', 'Tes accès sont stockés chiffrés, jamais en clair.'],
-  ['user', 'Aucun mot de passe', `Tu te connectes avec ${providersText(apple)}.`],
+  ['Rien ne part sans ton accord', "Le premier envoi attend ta confirmation, chaque post attend ton clic. La relance, c'est toi qui l'actives."],
+  ['Tes données restent cloisonnées', "Personne d'autre ne voit tes prospects ni tes brouillons. Un clic dans Mon compte et tout est effacé."],
+  ['Tes secrets sont chiffrés', 'Tes accès sont stockés chiffrés, jamais affichés en clair.'],
+  ['Pas de mot de passe', `Tu te connectes avec ${providersText(apple)}.`],
 ];
 
 export function homePage({ appUrl, apple = false }) {
@@ -162,47 +155,49 @@ export function homePage({ appUrl, apple = false }) {
     body: `<section class="hero" aria-labelledby="h1">
   <div class="wrap hero-in">
     <div>
-      <span class="eyebrow">${ic('check')}Tu valides avant le premier envoi</span>
-      <h1 class="h1" id="h1">Trouve de nouveaux clients, sans y passer tes soirées</h1>
-      <p class="lead">Claude cherche des entreprises, écrit les mails et suit les réponses pendant que toi, tu valides. Les mails partent de ta propre boîte.</p>
+      <h1 class="h1" id="h1">Claude écrit tes mails de prospection. Toi, tu les relis et tu les signes.</h1>
+      <p class="lead">AiTools lit ton projet, cherche des entreprises qui pourraient avoir besoin de toi et prépare un mail pour chacune. Les mails partent de ta propre boîte, et jamais sans ton accord.</p>
       <div class="hero-btns">
-        ${guest('big', btnArrow('btn-primary btn-lg', '/login', 'Créer mon compte'))}
-        <a class="btn btn-secondary btn-lg" href="/fonctionnement">${ic('down')}Voir comment ça marche</a>
+        ${guest('big', btn('btn-primary btn-lg', '/login', 'Créer mon compte'))}
+        <a class="btn btn-secondary btn-lg" href="/fonctionnement">Voir comment ça marche</a>
       </div>
       <p class="hero-note">Gratuit pour commencer, sans carte bancaire. Connexion avec ${providersText(apple)}.</p>
     </div>
-    ${HERO_MOCK}
+    ${LETTER}
   </div>
 </section>
 
-<section class="sec sec-alt" aria-labelledby="h-b">
-  <div class="wrap">
-    <h2 class="h2" id="h-b">Ce que Claude fait pour toi</h2>
-    <div class="grid g4">
-      ${BENEFITS.map(([i, t, p]) => `<article class="card"><span class="card-i">${ic(i)}</span><h3>${esc(t)}</h3><p>${esc(p)}</p></article>`).join('\n      ')}
+<section class="sec sec-edge" aria-labelledby="h-b">
+  <div class="wrap split">
+    <div class="split-h">
+      <h2 class="h2" id="h-b">Ce que Claude fait pour toi</h2>
+      <p class="sec-lead">Il travaille avec ton propre accès Claude, pendant que tu fais autre chose.</p>
     </div>
+    <dl class="facts">
+      ${FACTS.map(([t, p]) => `<div><dt>${esc(t)}</dt><dd>${esc(p)}</dd></div>`).join('\n      ')}
+    </dl>
   </div>
 </section>
 
-<section class="sec" id="etapes" aria-labelledby="h-e">
+<section class="sec sec-edge" id="etapes" aria-labelledby="h-e">
   <div class="wrap">
     <h2 class="h2" id="h-e">Comment ça marche</h2>
     <p class="sec-lead">Quatre étapes, et la main reste chez toi du début à la fin.</p>
-    <ol class="steps">
-      ${STEPS.map(([t, p], i) => `<li><span class="num">${i + 1}</span><h3>${esc(t)}</h3><p>${esc(p)}</p></li>`).join('\n      ')}
+    <ol class="fil">
+      ${STEPS.map(([t, p], i) => `<li><span class="num" aria-hidden="true">${i + 1}</span><h3>${esc(t)}</h3><p>${esc(p)}</p></li>`).join('\n      ')}
     </ol>
-    <a class="lnk" href="/fonctionnement">Voir chaque étape en détail${ic('arrow')}</a>
+    <a class="lnk" href="/fonctionnement">Voir chaque étape en détail</a>
   </div>
 </section>
 
-<section class="sec sec-alt" aria-labelledby="h-c">
+<section class="inv" aria-labelledby="h-c">
   <div class="wrap">
     <h2 class="h2" id="h-c">Tu gardes la main</h2>
-    <p class="sec-lead">Rien ne part dans ton dos. Claude peut se tromper : relis les fiches avant d'envoyer, et n'écris qu'à des professionnels.</p>
-    <div class="trust">
-      ${TRUST(apple).map(([i, t, p]) => `<div class="tr"><span class="card-i">${ic(i)}</span><div><h3>${esc(t)}</h3><p>${esc(p)}</p></div></div>`).join('\n      ')}
+    <p class="sec-lead">Claude peut se tromper : relis les fiches avant d'envoyer, et n'écris qu'à des professionnels.</p>
+    <div class="inv-g">
+      ${TRUST(apple).map(([t, p]) => `<div><h3>${esc(t)}</h3><p>${esc(p)}</p></div>`).join('\n      ')}
     </div>
-    <a class="lnk" href="/fonctionnement#envois">Voir comment les envois sont encadrés${ic('arrow')}</a>
+    <a class="lnk" href="/fonctionnement#envois">Voir comment les envois sont encadrés</a>
   </div>
 </section>
 
@@ -210,21 +205,21 @@ export function homePage({ appUrl, apple = false }) {
   <div class="wrap">
     <h2 class="h2" id="h-t">Des tarifs simples</h2>
     <p class="sec-lead">Tu commences gratuitement, tu passes à un plan payant quand ça te rapporte.</p>
-    <div class="price-g">
-      <article class="card"><div class="ph"><h3>Gratuit</h3>${badge('b-ok', 'check', 'Disponible')}</div><p class="price">0 €</p>
-        <ul class="list"><li>${ic('check')}${FREE.projects} projet, ${fr(FREE.prospects)} contacts, ${fr(FREE.mails)} mails et ${FREE.aiJobs} tâches IA par mois</li><li>${ic('check')}Sans carte bancaire, sans limite de durée</li></ul></article>
-      <article class="card"><div class="ph"><h3>Plans payants</h3>${badge('', 'clock', 'Bientôt')}</div><p class="price">${PLAN_PRICES.starter} à ${PLAN_PRICES.intensive} € <small>TTC par mois</small></p>
-        <ul class="list"><li>${ic('check')}${['Un', 'Deux', 'Trois', 'Quatre', 'Cinq', 'Six'][PAID.length - 1] ?? PAID.length} plans, de ${PLAN_LABELS[PAID[0]]} à ${PLAN_LABELS[PAID.at(-1)]}</li><li>${ic('check')}En annuel, ${ANNUAL_FREE_MONTHS} mois offerts</li></ul></article>
+    <div class="rates">
+      <div><div class="ph"><h3>Gratuit</h3>${badge('b-ok', 'check', 'Disponible')}</div><p class="price">0 €</p>
+        <ul class="list"><li>${ic('check')}${FREE.projects} projet, ${fr(FREE.prospects)} contacts, ${fr(FREE.mails)} mails et ${FREE.aiJobs} tâches IA par mois</li><li>${ic('check')}Sans carte bancaire, sans limite de durée</li></ul></div>
+      <div><div class="ph"><h3>Plans payants</h3>${badge('', 'clock', 'Bientôt')}</div><p class="price">${PLAN_PRICES.starter} à ${PLAN_PRICES.intensive} € <small>TTC par mois</small></p>
+        <ul class="list"><li>${ic('check')}${['Un', 'Deux', 'Trois', 'Quatre', 'Cinq', 'Six'][PAID.length - 1] ?? PAID.length} plans, de ${PLAN_LABELS[PAID[0]]} à ${PLAN_LABELS[PAID.at(-1)]}</li><li>${ic('check')}En annuel, ${ANNUAL_FREE_MONTHS} mois offerts</li></ul></div>
     </div>
     <p class="price-n">Ton accès à Claude est facturé à part, par Anthropic : AiTools n'achète pas de Claude à ta place.</p>
-    <a class="lnk" href="/tarifs">Voir tous les tarifs${ic('arrow')}</a>
+    <a class="lnk" href="/tarifs">Voir tous les tarifs</a>
   </div>
 </section>
 
 <div class="wrap">
-  <section class="cta" aria-labelledby="h-f">
+  <section class="end" aria-labelledby="h-f">
     <div><h2 id="h-f">Prêt à remplir ton agenda ?</h2><p>Crée ton compte en une minute, avec ${providersText(apple)}.</p></div>
-    ${guest('big', btnArrow('btn-primary btn-lg', '/login', 'Créer mon compte'))}
+    ${guest('big', btn('btn-primary btn-lg', '/login', 'Créer mon compte'))}
   </section>
 </div>`,
   });
@@ -234,7 +229,7 @@ export function homePage({ appUrl, apple = false }) {
 const shot = (label, inner) => `<div class="shot" role="img" aria-label="${esc(label)}">${inner}</div>`;
 const how = ({ icon, title, tip, rev = false, n, text, mock }) => `<section class="stp${rev ? ' rev' : ''}" id="etape-${n}" aria-labelledby="e${n}">
   <div class="stp-t">
-    <span class="num">${n}</span>
+    <span class="num" aria-hidden="true">${n}</span>
     <h2 id="e${n}">${esc(title)}</h2>
     ${text}
     ${tip ? `<p class="tip">${ic(icon)}${esc(tip)}</p>` : ''}
@@ -296,15 +291,15 @@ export function howPage({ appUrl, apple = false }) {
 ${steps}
 
   <section class="guard" id="envois" aria-labelledby="h-g">
-    <h2 class="h2 block-h" id="h-g">Pour ne pas te faire déborder</h2>
+    <h2 class="block-h" id="h-g">Pour ne pas te faire déborder</h2>
     <div class="grid g2">
       ${guards.map(([t, p]) => `<article class="card"><h3>${esc(t)}</h3><p>${p}</p></article>`).join('\n      ')}
     </div>
   </section>
 
-  <section class="cta" aria-labelledby="h-f">
+  <section class="end" aria-labelledby="h-f">
     <div><h2 id="h-f">Prêt à essayer ?</h2><p>Le plan Gratuit te laisse tout tester, sans carte bancaire.</p></div>
-    <div class="cta-b">${guest('big', btnArrow('btn-primary btn-lg', '/login', 'Créer mon compte'))}<a class="btn btn-secondary btn-lg" href="/tarifs">Voir les tarifs</a></div>
+    <div class="end-b">${guest('big', btn('btn-primary btn-lg', '/login', 'Créer mon compte'))}<a class="btn btn-secondary btn-lg" href="/tarifs">Voir les tarifs</a></div>
   </section>
 </div>
 </div>`,
@@ -380,7 +375,7 @@ export function pricingPage({ appUrl }) {
   </div>
 
   <section class="more" id="acces-claude" aria-labelledby="h-claude">
-    <h2 class="h2 block-h" id="h-claude">Ton accès à Claude : deux façons, deux coûts</h2>
+    <h2 class="block-h" id="h-claude">Ton accès à Claude : deux façons, deux coûts</h2>
     <div class="grid g2">
       <article class="card">
         <h3>Une clé Anthropic (recommandé)</h3>
@@ -397,7 +392,7 @@ export function pricingPage({ appUrl }) {
   </section>
 
   <section class="more" id="envois" aria-labelledby="h-envois">
-    <h2 class="h2 block-h" id="h-envois">Tu restes responsable de tes envois</h2>
+    <h2 class="block-h" id="h-envois">Tu restes responsable de tes envois</h2>
     <p class="sec-lead">AiTools t'aide à rester dans les clous. Il ne remplace pas ta responsabilité d'expéditeur.</p>
     <div class="grid g3">
       <article class="card">
