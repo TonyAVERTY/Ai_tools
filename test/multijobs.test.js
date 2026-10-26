@@ -92,7 +92,7 @@ test('sans réglage d\'offre, un seul job à la fois (comportement d\'origine) ;
   }
 });
 
-test('la capacité du serveur borne toujours : un compte à 6 sur un serveur à 2', async () => {
+test('plafond global : il n\'existe plus par défaut ; l\'option maxJobs (tests) le fixe seulement si on la donne', async () => {
   const { db, users } = await world(1);
   const [u] = users;
   const st = probe();
@@ -187,7 +187,7 @@ test('de bout en bout : le vrai serveur lit l\'offre du compte (gratuit = 1 job 
   const { join } = await import('node:path');
   const { makeClaudeBin } = await import('./helpers/claude-bin.js');
   const { testTokenLink } = await import('./helpers/users.js');
-  const s = await startApp({ worker: true, cfg: { maxAiJobs: 4 } });
+  const s = await startApp({ worker: true });
   try {
     const logFile = join(s.tmp, 'multi.log');
     s.app.cfg.claudeBin = makeClaudeBin(s.tmp, { fixture: 'fake-claude.js', env: { FAKE_DELAY_MS: '700', FAKE_LOG: logFile } });
@@ -217,4 +217,32 @@ test('de bout en bout : le vrai serveur lit l\'offre du compte (gratuit = 1 job 
     assert.ok(maxPaid >= 2, `compte Business : plusieurs jobs en même temps (${maxPaid})`);
     assert.ok(maxPaid <= PLAN_LIMITS.business.parallelJobs);
   } finally { await s.close(); }
+});
+
+test('la limite par compte est celle de son offre : avec le garde-fou par défaut (12), un compte Intensif en fait bien tourner 6', async () => {
+  const { db, users } = await world(1);
+  const [u] = users;
+  const st = probe();
+  const types = ['prospect', 'evolution', 'audit', 'template', 'followup_template', 'analyze'];
+  const handlers = Object.fromEntries(types.map((t) => [t, st.handler]));
+  const w = new Worker(db, handlers, { maxJobs: 12, pollMs: 10, log, parallel: async () => PLAN_LIMITS.intensive.parallelJobs });
+  for (const t of types) await q(db, u, t);
+  for (const t of types.slice(0, 2)) await q(db, u, t, u.p2); // 8 jobs au total
+  await w.start();
+  await until(() => idle(db));
+  await w.stop();
+  assert.equal(st.perMax.get(u.id), 6, `6 jobs simultanés pour ce compte (${st.perMax.get(u.id)})`);
+  assert.equal(st.log.filter((x) => x[0] === '+').length, 8, 'les 8 jobs ont tourné');
+});
+
+test('aucune limite globale : 10 comptes à 1 job chacun tournent tous en même temps, sans réglage de plafond', async () => {
+  const { db, users } = await world(10);
+  const st = probe();
+  const w = new Worker(db, { prospect: st.handler }, { pollMs: 10, log, parallel: async () => 1 });
+  assert.equal(w.maxJobs, Infinity);
+  for (const u of users) await q(db, u, 'prospect');
+  await w.start();
+  await until(() => idle(db));
+  await w.stop();
+  assert.equal(st.max, 10, `les 10 jobs tournent ensemble (${st.max})`);
 });
