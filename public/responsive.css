@@ -17,7 +17,7 @@ td:has(> select), td:has(> .badge) { min-width: 7.5rem; }
   .tw td, .tw th { padding-left: 10px; padding-right: 10px; } /* la maquette de l'accueil tient dans 320 px */
   /* ---- Menu du haut : tout tient sur la largeur, sans défilement, avec des icônes au-dessus des mots ---- */
   .pills { overflow: visible; justify-content: stretch; gap: 2px; padding-bottom: 0; }
-  .pill { flex: 1 1 0; min-width: 0; flex-direction: column; justify-content: center; gap: 2px; min-height: 52px; padding: 6px 2px; border-radius: 12px; font-size: .6875rem; line-height: 1.15; text-align: center; }
+  .pill { flex: 1 1 0; min-width: 0; flex-direction: column; justify-content: center; gap: 2px; min-height: 52px; padding: 6px 2px; border-radius: 0; font-size: .6875rem; line-height: 1.15; text-align: center; }
   .pill .ic { width: 22px; height: 22px; }
   .top-in { gap: 6px 12px; padding: 8px 12px 6px; }
 
