@@ -19,7 +19,7 @@ const inline = (t) => esc(t).replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\
 
 /** Bloc de code avec coloration et bouton « Copier » (site.js). */
 export function codeBlock(code, lang, label = '') {
-  return `<div class="code"><div class="code-h"><span>${esc(label || lang)}</span><button type="button" class="code-copy" data-copy>${ic('copy')}<span>Copier</span></button></div><pre><code>${highlight(code, lang)}</code></pre></div>`;
+  return `<div class="code"><div class="code-h"><span>${esc(label || lang)}</span><button type="button" class="code-copy" data-copy>${ic('copy')}<span>Copier</span></button></div><pre tabindex="0"><code>${highlight(code, lang)}</code></pre></div>`;
 }
 
 /** Onglets de code : sans JavaScript, tous les blocs sont affichés à la suite. */
@@ -82,7 +82,7 @@ function docPage({ appUrl, path, title, description, h1, lead, sections }) {
   const toc = sections.map((s) => `<li><a href="#${s.id}">${esc(s.title)}</a>${s.sub?.length ? `<ol>${s.sub.map(([id, label]) => `<li><a href="#${id}">${esc(label)}</a></li>`).join('')}</ol>` : ''}</li>`).join('\n        ');
   const body = sections.map((s) => `<section id="${s.id}" class="doc-s"><h2>${esc(s.title)}</h2>\n${s.html}</section>`).join('\n\n');
   return siteLayout({
-    appUrl, path, title, description, fx: true,
+    appUrl, path, title, description,
     body: `<div class="wrap">
   <div class="lg-head">
     <nav class="pills" aria-label="Documentation">
