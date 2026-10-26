@@ -4,7 +4,7 @@ Résumé : les pages du site public (accueil, Fonctionnement, Tarifs, Docs, ment
 ## Les pages
 - **Accueil** : présentation d'AiTools (« Trouve de nouveaux clients, sans y passer tes soirées »).
 - **Fonctionnement** : « Comment ça marche, pas à pas ».
-- **Tarifs** : les offres et leurs plafonds, avec un sélecteur **Au mois** / **À l'année** (l'année offre 2 mois). Les chiffres viennent du code : ils sont les mêmes que dans « Offres, plafonds et limites ».
+- **Tarifs** : un tableau des offres (une ligne par offre, une colonne par plafond ; chaque ligne devient un bloc sur téléphone), avec un sélecteur **Au mois** / **À l'année** (l'année offre 2 mois). Les chiffres viennent du code : ils sont les mêmes que dans « Offres, plafonds et limites ».
 - **Docs** (menu « Docs ») : la documentation développeur (**Documentation** : démarrage, API REST, serveur MCP). Voir « Mode développeur : API, jetons et serveur MCP ».
 - **Mentions légales**, **Confidentialité** (politique de confidentialité), **CGU** : pages légales, accessibles depuis le pied de page, avec un sommaire « Sur cette page ».
 - **Connexion** : connexion avec **Google** (ou Apple quand il est proposé). Pas de mot de passe. Une vérification anti-robot silencieuse peut s'exécuter. Un compte est créé à la première connexion.

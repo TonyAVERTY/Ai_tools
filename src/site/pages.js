@@ -2,7 +2,7 @@
 // sommaire légal, plus la vérification anti-robot de la connexion). Les textes sont écrits en mots de tous les jours :
 // rien ici ne promet un résultat, rien n'est chiffré au-delà de ce que le code fait réellement.
 import { esc } from '../http.js';
-import { brandMark } from '../assets.js';
+import { brandMark, assetUrl } from '../assets.js';
 import { siteLayout, ic, guest, CONTACT_EMAIL } from './layout.js';
 import { PLAN_LIMITS, PLAN_PRICES, PLAN_LABELS, ANNUAL_FREE_MONTHS, annualPrice } from '../limits.js';
 
@@ -17,9 +17,8 @@ const PLAN_BLURBS = {
   intensive: 'Pour le plus gros volume que le service permet.',
 };
 const fr = (n) => n.toLocaleString('fr-FR');
-const limitRows = (l) => [
-  ['Projets', l.projects], ['Contacts', fr(l.prospects)], ['Mails par mois', fr(l.mails)], ['Tâches IA par mois', l.aiJobs], ['Jobs IA simultanés', l.parallelJobs], ["Places d'équipe", l.seats],
-].map(([label, v]) => `<li><span>${label}</span><b>${v}</b></li>`).join('\n          ');
+const LIMIT_COLS = [['Projets', (l) => l.projects], ['Contacts', (l) => fr(l.prospects)], ['Mails par mois', (l) => fr(l.mails)], ['Tâches IA par mois', (l) => l.aiJobs], ['Jobs IA simultanés', (l) => l.parallelJobs], ["Places d'équipe", (l) => l.seats]];
+const limitCells = (l) => LIMIT_COLS.map(([label, f]) => `<td data-label="${label}"><b>${f(l)}</b></td>`).join('');
 
 /** « Google » ou « Google ou Apple » selon la configuration réelle de la connexion. */
 export const providersText = (apple) => (apple ? 'Google ou Apple' : 'Google');
@@ -127,7 +126,7 @@ const LETTER = `<figure class="letter" aria-labelledby="lt-cap">
 </figure>`;
 
 const FACTS = [
-  ['Il cherche des entreprises', "À partir de ton projet, il repère celles qui pourraient avoir besoin de toi et ne garde que des adresses professionnelles publiées au grand jour."],
+  ['Il cherche des entreprises', "À partir de ton dépôt, il repère celles qui pourraient avoir besoin de ton projet, ne garde que des adresses professionnelles publiées au grand jour, et note la page d'où vient chacune pour que tu puisses la vérifier."],
   ['Il écrit chaque mail', "Un mail court par entreprise, avec une accroche tirée de son site. Tu relis, tu corriges, tu valides."],
   ['Il relance une fois', "Pas de réponse ? Si tu l'as activée, une seule relance part dans la même conversation."],
   ['Il suit les réponses', "Tu vois qui a répondu, qui attend et qui reste à contacter, sans ouvrir ta boîte pour le savoir."],
@@ -156,7 +155,7 @@ export function homePage({ appUrl, apple = false }) {
   <div class="wrap hero-in">
     <div>
       <h1 class="h1" id="h1">Claude écrit tes mails de prospection. Toi, tu les relis et tu les signes.</h1>
-      <p class="lead">AiTools lit ton projet, cherche des entreprises qui pourraient avoir besoin de toi et prépare un mail pour chacune. Les mails partent de ta propre boîte, et jamais sans ton accord.</p>
+      <p class="lead">Pour les développeurs et les indépendants. AiTools part de ton dépôt Git, cherche des entreprises qui pourraient avoir besoin de ton projet et prépare un mail pour chacune. Les mails partent de ta propre boîte, et jamais sans ton accord.</p>
       <div class="hero-btns">
         ${guest('big', btn('btn-primary btn-lg', '/login', 'Créer mon compte'))}
         <a class="btn btn-secondary btn-lg" href="/fonctionnement">Voir comment ça marche</a>
@@ -176,6 +175,22 @@ export function homePage({ appUrl, apple = false }) {
     <dl class="facts">
       ${FACTS.map(([t, p]) => `<div><dt>${esc(t)}</dt><dd>${esc(p)}</dd></div>`).join('\n      ')}
     </dl>
+  </div>
+</section>
+
+<section class="sec sec-edge" aria-labelledby="h-s">
+  <div class="wrap split">
+    <div class="split-h">
+      <h2 class="h2" id="h-s">Le suivi des envois</h2>
+      <p class="sec-lead">Chaque mail a un état : envoyé, lu, répondu, rejeté ou non envoyé, avec la cause quand l'envoi échoue. Un clic sur un chiffre filtre la liste.</p>
+    </div>
+    <figure class="real">
+      <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="${assetUrl('/static/img/capture-mails-sombre.png')}">
+        <img src="${assetUrl('/static/img/capture-mails-clair.png')}" width="1132" height="710" loading="lazy" alt="Page Mails de l'application : une barre de chiffres par état (Tous 5, Envoyé 2, Répondu 2, Non envoyé 1) et un tableau avec la date, le destinataire, l'objet et l'état de chaque mail ; le mail non envoyé indique « SMTP : connexion refusée ».">
+      </picture>
+      <figcaption>Capture de la page Mails. Le projet et les contacts sont des exemples.</figcaption>
+    </figure>
   </div>
 </section>
 
@@ -218,7 +233,7 @@ export function homePage({ appUrl, apple = false }) {
 
 <div class="wrap">
   <section class="end" aria-labelledby="h-f">
-    <div><h2 id="h-f">Prêt à remplir ton agenda ?</h2><p>Crée ton compte en une minute, avec ${providersText(apple)}.</p></div>
+    <div><h2 id="h-f">Essaie sur un de tes projets</h2><p>Crée ton compte avec ${providersText(apple)}, ajoute un dépôt et regarde ce que Claude prépare. Rien ne part sans ta validation.</p></div>
     ${guest('big', btn('btn-primary btn-lg', '/login', 'Créer mon compte'))}
   </section>
 </div>`,
@@ -320,20 +335,14 @@ const FAQ = [
 ];
 
 export function pricingPage({ appUrl }) {
-  const paidPlan = (k) => `<article class="plan" aria-labelledby="plan-${k}">
-        <div class="ph"><h2 id="plan-${k}">${PLAN_LABELS[k]}</h2>${badge('b-info', 'clock', 'Bientôt')}</div>
-        <p class="tag">${PLAN_BLURBS[k]}</p>
-        <div>
-          <p class="price when-month">${euros(PLAN_PRICES[k])} <small>par mois, TTC</small></p>
-          <p class="price when-year">${euros(annualPrice(k))} <small>par an, TTC</small></p>
-          <p class="sub when-month">ou ${euros(annualPrice(k))} par an, ${ANNUAL_FREE_MONTHS} mois offerts</p>
-          <p class="sub when-year">soit ${euros(annualPrice(k) / 12)} par mois, ${ANNUAL_FREE_MONTHS} mois offerts</p>
-        </div>
-        <ul class="lim">
-          ${limitRows(PLAN_LIMITS[k])}
-        </ul>
-        <a class="btn btn-secondary" href="mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(`Me prévenir : offre ${PLAN_LABELS[k]}`)}">Me prévenir à l'ouverture</a>
-      </article>`;
+  // Une ligne par offre, une colonne par plafond : on compare d'un coup d'œil. Sur téléphone, chaque ligne devient un bloc libellé par plafond.
+  const paidRow = (k) => `<tr class="plan-row" aria-labelledby="plan-${k}">
+        <th scope="row"><h2 id="plan-${k}">${PLAN_LABELS[k]}</h2>${badge('b-info', 'clock', 'Bientôt')}<p class="tag">${PLAN_BLURBS[k]}</p></th>
+        <td data-label="Prix"><span class="price when-month">${euros(PLAN_PRICES[k])} <small>par mois, TTC</small></span><span class="price when-year">${euros(annualPrice(k))} <small>par an, TTC</small></span>
+          <small class="sub when-month">ou ${euros(annualPrice(k))} par an, ${ANNUAL_FREE_MONTHS} mois offerts</small><small class="sub when-year">soit ${euros(annualPrice(k) / 12)} par mois, ${ANNUAL_FREE_MONTHS} mois offerts</small></td>
+        ${limitCells(PLAN_LIMITS[k])}
+        <td class="plan-act"><a class="btn btn-secondary" href="mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(`Me prévenir : offre ${PLAN_LABELS[k]}`)}">Me prévenir à l'ouverture</a></td>
+      </tr>`;
   return siteLayout({
     appUrl, path: '/tarifs',
     title: 'Tarifs : gratuit, puis 10 à 100 € par mois · AiTools',
@@ -341,7 +350,7 @@ export function pricingPage({ appUrl }) {
     body: `<div class="page">
 <div class="wrap">
   <h1 class="h1">Des tarifs simples, sans surprise</h1>
-  <p class="lead">Un plan gratuit pour tout tester. Les plans payants arrivent bientôt, de ${euros(PLAN_PRICES.starter)} à ${euros(PLAN_PRICES.intensive)} TTC par mois.</p>
+  <p class="lead">Seul le plan Gratuit est ouvert aujourd'hui, sans carte bancaire. Les plans payants, de ${euros(PLAN_PRICES.starter)} à ${euros(PLAN_PRICES.intensive)} TTC par mois, ne sont pas encore ouverts : rien n'est facturé.</p>
 
   <div class="claude-n" role="note">
     ${ic('info')}
@@ -357,16 +366,19 @@ export function pricingPage({ appUrl }) {
   </div>
 
   <div class="plans" data-billing="month">
-      <article class="plan plan-free" aria-labelledby="plan-gratuit">
-        <div class="ph"><h2 id="plan-gratuit">Gratuit</h2>${badge('b-ok', 'check', 'Disponible')}</div>
-        <p class="tag">Pour tout tester, sans carte bancaire.</p>
-        <div><p class="price">0 €</p><p class="sub">Sans limite de durée</p></div>
-        <ul class="lim">
-          ${limitRows(FREE)}
-        </ul>
-        ${guest('plan', '<a class="btn btn-primary" href="/login">Créer mon compte</a>')}
-      </article>
-      ${PAID.map(paidPlan).join('\n      ')}
+    <div class="tw"><table class="plan-table">
+      <caption class="sr-only">Offres et plafonds</caption>
+      <thead><tr><th scope="col">Offre</th><th scope="col">Prix</th>${LIMIT_COLS.map(([label]) => `<th scope="col">${label}</th>`).join('')}<th scope="col"><span class="sr-only">Action</span></th></tr></thead>
+      <tbody>
+      <tr class="plan-row plan-free" aria-labelledby="plan-gratuit">
+        <th scope="row"><h2 id="plan-gratuit">Gratuit</h2>${badge('b-ok', 'check', 'Disponible')}<p class="tag">Pour tout tester, sans carte bancaire.</p></th>
+        <td data-label="Prix"><span class="price">0 €</span><small class="sub">Sans limite de durée</small></td>
+        ${limitCells(FREE)}
+        <td class="plan-act">${guest('plan', '<a class="btn btn-primary" href="/login">Créer mon compte</a>')}</td>
+      </tr>
+      ${PAID.map(paidRow).join('\n      ')}
+      </tbody>
+    </table></div>
   </div>
 
   <div class="mentions">
