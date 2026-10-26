@@ -53,7 +53,7 @@ Une seule palette, deux thèmes (clair par défaut, sombre selon le système). T
 | Feuille | `--card` | `#ffffff` | panneaux, champs, fenêtres |
 | Encre | `--text` | `#0e1535` | texte |
 | Marge | `--muted` | `#4a5782` | texte secondaire, annotations |
-| Indigo | `--indigo`, `--primary` | `#1e296a` | action principale, onglet actif, bloc inversé |
+| Indigo | `--indigo`, `--primary` | `#1e296a` (sombre : `#4356c9`) | action principale, onglet actif, bloc inversé |
 | Bleu | `--accent`, `--link` | `#1288b7`, `#0b6f96` | liens, focus, sélection |
 | Cyan | `--accent-2` | `#0db8c5` | seulement le fil et la fin du dégradé |
 | Filets | `--line`, `--line-strong`, `--control` | `#d5dbeb`, `#b4bed8`, `#6f7ea5` | bordures, séparateurs, contour des champs |
@@ -65,10 +65,11 @@ Contrastes : chaque couple texte/fond est vérifié à 4,5:1 (clair et sombre) p
 
 Deux familles, libres (SIL OFL), **servies par l'application** (`public/fonts/`, `font-display: swap`, sous-ensemble latin) :
 
-- **Source Serif 4** (variable, graisses 200 à 900) : titres, chiffres de prix, noms de page. Un serif d'édition à fort dessin, qui donne
-  au site son ton de courrier posé, loin des grotesques par défaut.
-- **Hanken Grotesk** (variable, 100 à 900) : interface et texte courant. Humaniste, très lisible en petits corps et avec les accents
-  français.
+- **Source Serif 4** (variable, graisses 200 à 900) : **le site public et la marque** (logo, titres du site, prix, lettre d'exemple).
+  Un serif d'édition à fort dessin, qui donne au site son ton de courrier posé, loin des grotesques par défaut.
+- **Hanken Grotesk** (variable, 100 à 900) : **toute l'application** (titres de page, panneaux, indicateurs, tableaux, formulaires) et le
+  texte courant du site. Humaniste, très lisible en petits corps et avec les accents français. Un écran d'exploitation n'a pas le ton
+  d'une page d'accueil : pas de serif dans le tableau de bord, sauf le mot « AiTools » du logo.
 - Données techniques (adresses, URL, code) : `ui-monospace` du système, aucun fichier de plus.
 
 Échelle (rem ; les titres du site sont fluides) :
@@ -108,7 +109,12 @@ et les compteurs ; texte aligné à gauche partout (aucun bloc marketing centré
 | Lien | bleu soulignement décalé de 3 px ; survol : soulignement épaissi |
 | Champ | fond feuille, bordure `--control`, 44 px de haut, focus : anneau bleu de 2 px décalé |
 | Pastille d'état | un mot, couleur de l'état en fond clair ; avec l'avatar et les nœuds du fil, seul élément arrondi à 999 px |
-| Panneau | feuille blanche, bordure fine, rayon 10 px, titre en Source Serif 4 |
+| Panneau | feuille blanche, bordure fine, rayon 10 px ; titre en Hanken Grotesk 600 dans l'application, en Source Serif 4 sur le site |
+| Indicateur du plan | quatre cellules en tête de la page Projets (libellé, valeur en chiffres tabulaires, plafond) ; mêmes données que `usageView`, jamais d'estimation ; attention à 80 %, erreur à 100 % |
+| Filtre en chiffres (Mails) | une barre de cellules « nombre + état » qui sert aussi de filtre ; les états d'échec passent en rouge dès qu'il y en a |
+| Panneau « À venir » (Calendrier) | liste des prochains éléments réels, regroupés par jour ; vide, il le dit sans rien inventer |
+| Tableau des offres (Tarifs) | une ligne par offre, une colonne par plafond ; chaque ligne devient un bloc libellé sur téléphone |
+| Capture réelle | image de l'application avec ses données d'exemple, signalée dans la légende, clair et sombre (`<picture>`) |
 | Liste de sections (projet) | lignes séparées par un filet : titre, sous-titre en marge, chevron ; coche verte quand tout est fait ; pas d'icône |
 | Onglets de navigation | texte, soulignement indigo de 2 px pour la page courante ; même principe sur le site et dans l'application |
 | Tableau | en-têtes en casse normale, graisse 600, filets horizontaux seulement |
@@ -146,7 +152,7 @@ quoi faire, sans s'excuser. Un bouton a le même nom que la notification qu'il d
 - `scripts/design-shots.mjs` photographie toutes les pages à trois tailles (avant/après) ; `scripts/responsive-audit.mjs` cherche les
   débordements ; les scripts `scripts/*-check.mjs` rejouent les parcours dans Chromium.
 
-## 11. Audit anti-« générique » (relu à la fin de la refonte)
+## 11. Audit anti-« générique » (relu à la fin des deux passes de refonte)
 
 Dix questions posées aux pages réelles, avec ce qui a été corrigé :
 
@@ -162,3 +168,14 @@ Dix questions posées aux pages réelles, avec ce qui a été corrigé :
 10. *Un site qui pourrait être celui d'un autre produit ?* La lettre, le serif d'édition et le fil du logo sont propres à AiTools.
 
 Contrôles faits : `axe-core` (WCAG 2.1 AA + bonnes pratiques) sur 18 pages en clair et en sombre : aucune violation après correction des listes, de l'ordre des titres, d'un contraste de lien et des onglets de la page Mails.
+
+### Deuxième passe : application et lecture des skills
+
+- **Sources lues** : `frontend-design` (plugin installé), et, lus mais non installés (lecture seule, aucun script exécuté), `frontend-design-deslop`
+  de samber (MIT) et sa liste de signes de « slop » ; le dépôt `Leonxlnx/taste-skill` a été examiné sans être installé (il exécute des scripts locaux).
+  Les principes retenus : décider d'un seul élément mémorable, pas de carte à bandeau coloré sur un côté, pas de pastille d'icône, pas de
+  serif décoratif dans un écran d'exploitation, états complets, dark mode dessiné et non inversé.
+- **Corrigé** : le bandeau coloré sur le côté des messages, avis, notifications et états vides est devenu une bordure complète ; le tableau de bord
+  passe en sans-serif ; les titres de page n'ont plus d'icône ; le bouton d'action en thème sombre reste indigo (`#4356c9`, 6:1 avec du blanc).
+- **Données** : aucun indicateur sans source. Projets (prospects, à contacter, réponses, dernier envoi) vient de `projectStats` ; Mails de `mail_log`
+  et `prospects` ; Calendrier de `monthEvents` ; un compteur sans valeur n'est pas affiché.
