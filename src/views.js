@@ -63,7 +63,7 @@ ${email ? `<header class="top">
       </div>
       <a class="ia-link site-link" href="/accueil" data-noajax aria-label="Accès au site internet" title="Accès au site internet">${ic('globe')}<span>Site internet</span></a>
       <details class="ia-menu">
-        <summary class="ia-link" aria-label="Assistant IA : Claude ou Support">${ic('spark')}<span>IA</span></summary>
+        <summary class="ia-link" aria-label="Assistant : discuter avec Claude ou demander de l'aide sur AiTools">${ic('spark')}<span>Assistant</span></summary>
         <div class="user-pop ia-pop">
           <a href="/chat">${ic('spark')}<span class="pop-t">Claude<small>Discute avec ton Claude</small></span></a>
           <a href="/support">${ic('help')}<span class="pop-t">Support<small>Une question sur AiTools ?</small></span></a>
@@ -85,6 +85,35 @@ ${email ? `<header class="top">
 <main id="contenu" tabindex="-1"><div class="page">${body}</div></main>
 </body>
 </html>`;
+}
+
+// Rangée de quatre indicateurs en haut de la page Projets : mêmes chiffres que les plafonds du plan (usageView), rien d'inventé.
+// Un indicateur passe en « attention » à 80 % du plafond et en « atteint » à 100 %.
+const KPI_SUB = { projects: '', prospects: '', mails: 'ce mois-ci', aiJobs: 'ce mois-ci' };
+const KPI_LABEL = { projects: 'Projets', prospects: 'Prospects', mails: 'Mails envoyés', aiJobs: 'Tâches IA' };
+const KPI_ICON = { projects: 'folder', prospects: 'users', mails: 'send', aiJobs: 'spark' };
+export function usageKpis(u) {
+  if (!u) return '';
+  const cell = (i) => {
+    const level = i.full ? ' full' : i.limit != null && i.used / i.limit >= 0.8 ? ' warn' : '';
+    const sub = [KPI_SUB[i.kind], i.limit == null ? '' : `sur ${i.limit.toLocaleString('fr-FR')}`].filter(Boolean).join(' · ');
+    return `<div class="ukpi-c${level}"><dt>${ic(KPI_ICON[i.kind] || 'chart', 'ic-s')}${esc(KPI_LABEL[i.kind] || i.label)}</dt><dd><b>${i.used.toLocaleString('fr-FR')}</b><span>${esc(sub)}${i.full ? ' · plafond atteint' : ''}</span></dd></div>`;
+  };
+  const full = u.items.filter((i) => i.full);
+  return `<section class="ukpis" aria-labelledby="h-kpis">
+  <h2 class="sr-only" id="h-kpis">Utilisation du plan ${esc(u.planLabel)}</h2>
+  <dl class="ukpi-r">${u.items.map(cell).join('')}</dl>
+  ${full.length ? `<p class="cap" role="alert">${ic('alert')}<span>Plafond atteint : ${full.map((i) => esc(i.label.toLowerCase())).join(', ')}. Rien n'est perdu. <a href="/tarifs">Voir les tarifs</a></span></p>`
+    : `<p class="ukpi-n">Plan ${esc(u.planLabel)}. Les plafonds mensuels repartent de zéro le 1er (heure de Paris).${u.plan === 'free' ? ' <a href="/tarifs">Voir les tarifs</a>' : ''}</p>`}
+</section>`;
+}
+
+// Consommation de Claude (quota de l'abonnement ou budget d'une clé API) : rempli par public/app.js à partir de /api/system, masqué tant qu'il est vide
+export function claudePanel() {
+  return `<section class="panel claude-card" aria-labelledby="h-claude-use" data-claude-card hidden>
+  <div class="panel-h"><h2 id="h-claude-use">Consommation Claude</h2></div>
+  <ul class="usage-list usage-claude" data-usage-claude aria-label="Consommation de Claude"></ul>
+</section>`;
 }
 
 // Usage du mois : une barre par plafond du plan (largeurs par classes w-N, la CSP interdit le style en ligne)
@@ -390,10 +419,22 @@ function postesBody(p) {
   </div>`;
 }
 
-function projectItem(p, smtp, dbCfg, imap, { open = false } = {}) {
+const shortDay = (ts) => new Date(ts * 1000).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', timeZone: 'Europe/Paris' });
+/** Chiffres réels d'un projet dans sa ligne repliée (voir projectStats) : seuls les compteurs non nuls s'ajoutent à « prospects ». */
+function projectFacts(st) {
+  if (!st) return '';
+  if (!st.prospects) return '<span class="pfacts"><span class="muted">aucun prospect</span></span>';
+  const parts = [`<span><b>${st.prospects.toLocaleString('fr-FR')}</b> prospect${st.prospects > 1 ? 's' : ''}</span>`];
+  if (st.toContact) parts.push(`<span><b>${st.toContact.toLocaleString('fr-FR')}</b> à contacter</span>`);
+  if (st.replies) parts.push(`<span class="ok"><b>${st.replies.toLocaleString('fr-FR')}</b> réponse${st.replies > 1 ? 's' : ''}</span>`);
+  if (st.lastSentAt) parts.push(`<span>dernier envoi le ${esc(shortDay(st.lastSentAt))}</span>`);
+  return `<span class="pfacts">${parts.join('')}</span>`;
+}
+
+function projectItem(p, smtp, dbCfg, imap, { open = false, stats = null } = {}) {
   const profile = p.profile;
   return `<details class="project anim" data-id="${p.id}"${open ? ' open' : ''}>
-<summary><span class="pname">${esc(p.name)}</span>${p.access !== 'owner' ? `<span class="badge" title="Projet partagé par ${esc(p.ownerEmail || '')}">équipe de ${esc(p.ownerEmail || '')}</span>` : p.teamId ? '<span class="badge ok">partagé</span>' : ''}<span class="pcfg badge" data-cfg title="Afficher la liste de mise en route" hidden></span><span class="pstate" data-state></span></summary>
+<summary><span class="pname">${esc(p.name)}</span>${p.access !== 'owner' ? `<span class="badge" title="Projet partagé par ${esc(p.ownerEmail || '')}">équipe de ${esc(p.ownerEmail || '')}</span>` : p.teamId ? '<span class="badge ok">partagé</span>' : ''}<span class="pcfg badge" data-cfg title="Afficher la liste de mise en route" hidden></span><span class="pstate" data-state></span>${projectFacts(stats)}</summary>
 <div class="pbody"><div class="pcard">
   ${acc('header', 'git', 'En-tête', 'Dépôt Git et fiche projet', `
   <div class="field"><span class="lbl">Dépôt Git</span><div class="ro">${ic('lock', 'ic-s')}<span>${esc(p.gitUrl)}</span><span class="badge">lecture seule</span></div></div>
@@ -528,12 +569,13 @@ function projectItem(p, smtp, dbCfg, imap, { open = false } = {}) {
 </details>`;
 }
 
-export function dashboardPage({ email, projects, gitHosts = [], usage = null, pauseMessage = null }) {
+export function dashboardPage({ email, projects, stats = new Map(), gitHosts = [], usage = null, pauseMessage = null }) {
   return layout({
     title: 'Projets', email,
     body: `<div class="dash">
-<section class="col-p" aria-labelledby="h-projets">
-  <div class="hd"><h1 id="h-projets">Projets</h1><div class="hd-tools">${projects.length ? ROLE_SELECT : ''}<button type="button" class="btn primary" data-new-toggle aria-expanded="false" aria-controls="new-project">${ic('plus')}Nouveau projet</button></div></div>
+<div class="hd dash-hd"><h1 id="h-projets">Projets</h1><div class="hd-tools">${projects.length ? ROLE_SELECT : ''}<button type="button" class="btn primary" data-new-toggle aria-expanded="false" aria-controls="new-project">${ic('plus')}Nouveau projet</button></div></div>
+${usageKpis(usage)}
+<section class="col-p" aria-label="Liste des projets">
   ${pauseMessage ? `<p class="ban ban-err" role="alert">${ic('alert')}<span class="ban-t"><b>${esc(pauseMessage)}</b></span></p>` : ''}
   <form data-action="create" class="panel cfg" id="new-project" aria-labelledby="h-new" hidden>
     <div class="panel-h"><h2 id="h-new">Nouveau projet</h2></div>
@@ -546,14 +588,14 @@ export function dashboardPage({ email, projects, gitHosts = [], usage = null, pa
   </form>
   <dialog class="prospect-dialog" id="prospect-dialog" aria-label="Fiche prospect"><div data-dialog-body></div></dialog>
   <div class="projects">
-  ${projects.length ? projects.map((x) => projectItem(x.project, x.smtp, x.dbCfg, x.imap, { open: projects.length === 1 })).join('\n') : `<div class="empty">
+  ${projects.length ? projects.map((x) => projectItem(x.project, x.smtp, x.dbCfg, x.imap, { open: projects.length === 1, stats: stats.get(Number(x.project.id)) })).join('\n') : `<div class="empty">
     <span class="empty-i">${ic('folder')}</span>
     <h3>Aucun projet pour l'instant</h3>
     <p>Crée ton premier projet : donne-lui un nom et l'adresse de son dépôt Git, Claude s'occupe de l'analyser.</p>
   </div>`}
   </div>
 </section>
-${usagePanel(usage)}
+<aside class="col-s">${claudePanel()}</aside>
 </div>
 ${projects.length ? '<aside class="todo" id="todo" aria-label="Mise en route du projet" hidden></aside>' : ''}`,
   });

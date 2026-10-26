@@ -1,8 +1,8 @@
 # La page IA : Claude (assistant) et Support
-Résumé : le menu IA, la différence entre Claude (assistant classique) et Support (aide sur AiTools), conversations, modèles, pièces jointes, projet joint, limites et confidentialité.
+Résumé : le menu Assistant, la différence entre Claude (assistant classique) et Support (aide sur AiTools), conversations, modèles, pièces jointes, projet joint, limites et confidentialité.
 
-## Le menu IA
-Dans la barre du haut, le bouton **IA** s'ouvre au survol de la souris (ou au toucher sur téléphone) avec deux choix :
+## Le menu Assistant
+Dans la barre du haut, le bouton **Assistant** s'ouvre au survol de la souris (ou au toucher sur téléphone) avec deux choix :
 - **Claude** (« Discute avec ton Claude ») : l'assistant classique, page `/chat`.
 - **Support** (« Une question sur AiTools ? ») : l'aide sur l'application, page `/support`.
 Les deux utilisent **le compte Claude de la personne** (chaque message est envoyé à Claude avec sa propre liaison) et ont leurs **conversations séparées** : la liste de gauche ne montre que celles du mode en cours.
