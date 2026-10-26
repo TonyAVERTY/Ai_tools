@@ -132,8 +132,15 @@ test('réglages : un sélecteur de modèle en deux listes (recommandés avec co�
     assert.match(box, /Recommandés/);
     void box;
   }
+  // Sans clé API (abonnement ou rien de relié) : la gamme en mots, aucun « $ »
   const rec = html.slice(html.indexOf('mp-h">Recommandés'), html.indexOf('mp-sep'));
-  assert.match(rec, /économe[\s\S]*<i>\$<\/i>[\s\S]*intermédiaire[\s\S]*<i>\$\$<\/i>[\s\S]*plus cher[\s\S]*<i>\$\$\$<\/i>/);
+  assert.match(rec, /économe[\s\S]*intermédiaire[\s\S]*plus cher/);
+  assert.doesNotMatch(rec, /<i>\$|\$\$/, 'aucun symbole de prix hors clé API');
+  // Avec une clé API (facturée à l'usage) : le coût relatif $ / $$ / $$$ apparaît
+  const api = await s.newUser({ link: { v: 1, mode: 'api_key', valid: true } });
+  const apiHtml = await page(api);
+  const apiRec = apiHtml.slice(apiHtml.indexOf('mp-h">Recommandés'), apiHtml.indexOf('mp-sep'));
+  assert.match(apiRec, /économe[\s\S]*<i>\$<\/i>[\s\S]*intermédiaire[\s\S]*<i>\$\$<\/i>[\s\S]*plus cher[\s\S]*<i>\$\$\$<\/i>/);
   const others = html.slice(html.indexOf('mp-h mp-h-s">Autres modèles'), html.indexOf('</details>', html.indexOf('mp-h mp-h-s')));
   assert.match(others, /Fable 5\.1/);
   assert.doesNotMatch(others, /économe|intermédiaire|plus cher|<i>\$/, 'aucune estimation dans la liste des autres modèles');
