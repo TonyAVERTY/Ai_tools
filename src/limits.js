@@ -56,7 +56,7 @@ export const RATE_LIMITS = {
  *  - `projects` et `prospects` : totaux du compte ;
  *  - `mails` et `aiJobs` : par mois calendaire, heure de Paris ;
  *  - `parallelJobs` : jobs IA qu'un compte peut faire tourner EN MÊME TEMPS (multi jobs). 1 = un à la fois : c'est l'offre gratuite ; le multi jobs
- *    est réservé aux offres payantes et grandit avec l'offre. Toujours dans la limite de la capacité du serveur (MAX_AI_JOBS) ;
+ *    est réservé aux offres payantes et grandit avec l'offre. Aucune limite globale sur le serveur : seule l'offre compte ;
  *  - `seats` : places d'équipe, propriétaire compris (1 = pas d'équipe). L'équipe utilise le plan et les plafonds de son propriétaire.
  * Le plan « pro » est un ancien plan illimité attribué à la main : il reste tel quel pour ne retirer l'accès à personne,
  * mais il n'est pas proposé sur la page Tarifs.
