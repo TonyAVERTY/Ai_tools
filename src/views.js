@@ -124,7 +124,7 @@ export function usagePanel(u) {
   return `<section class="panel usage-card" aria-labelledby="h-usage">
   <div class="panel-h"><h2 id="h-usage">Usage du mois</h2><span class="badge">plan ${esc(u.planLabel)}</span></div>
   <ul class="usage-list">${rows}</ul>
-  <ul class="usage-list usage-claude" data-usage-claude aria-label="Usage de Claude" hidden></ul>
+  <div data-claude-card hidden><ul class="usage-list usage-claude" data-usage-claude aria-label="Usage de Claude"></ul></div>
   ${full.length ? `<p class="cap" role="alert">${ic('alert')}<span>Plafond atteint : ${full.map((i) => esc(i.label.toLowerCase())).join(', ')}. Rien n'est perdu. <a href="/tarifs">Voir les tarifs</a></span></p>` : u.plan === 'free' ? '<p class="foot-n">Les plafonds se renouvellent le 1er du mois (heure de Paris). <a href="/tarifs">Voir les tarifs</a></p>' : ''}
 </section>`;
 }
@@ -204,7 +204,7 @@ ${notice ? `<p class="${notice.ok ? 'msg msg-ok' : 'msg msg-err'}" role="status"
 ${usagePanel(usage)}
 ${linkSection(link, consent, quota)}
 <section class="card">
-  <div class="card-h"><h2>Agenda</h2><p>Connecte ton agenda (Google, Apple, Outlook) : tes prochaines actions et tes posts LinkedIn programmés s'y affichent. <a href="/calendar">Voir le calendrier</a></p></div>
+  <div class="card-h"><h2>Agenda</h2><p><a href="/calendar">Voir le calendrier</a></p></div>
   ${icalBox(ical, '/account')}
 </section>
 <section class="card">
@@ -669,7 +669,8 @@ const SETTINGS_TOC = [['notif', 'Notifications'], ['git', 'Dépôts Git'], ['gar
 
 export function settingsPage({ email, s, saved }) {
   // Sélecteur de modèle en deux listes : les recommandés (avec une estimation relative du coût), puis tous les autres, plus compacts et sans estimation
-  const recTier = (m) => `${m.tier} · ${m.cost}`;
+  const priced = !!s.priced; // le « $ » relatif n'a de sens qu'avec une clé API (facturée à l'usage)
+  const recTier = (m) => (priced ? `${m.tier} · ${m.cost}` : m.tier);
   const model = (name, v, title) => {
     const cur = RECOMMENDED.find((m) => m.id === v);
     const radio = (m, extra = '') => `<input type="radio" name="${name}" value="${m.id}"${m.id === v ? ' checked' : ''} data-mp-label="${esc(m.label)}" data-mp-tier="${esc(extra)}">`;
@@ -679,7 +680,7 @@ export function settingsPage({ email, s, saved }) {
         <summary aria-labelledby="${name}-l"><span class="mp-cur"><b data-mp-name>${esc(cur ? cur.label : modelLabel(v))}</b> <em data-mp-tier-out>${cur ? esc(recTier(cur)) : ''}</em></span>${ic('down')}</summary>
         <div class="mp-pop" role="radiogroup" aria-labelledby="${name}-l">
           <p class="mp-h">Recommandés</p>
-          ${RECOMMENDED.map((m) => `<label class="mp-rec">${radio(m, recTier(m))}<span class="mp-n"><b>${esc(m.label)}</b><small>${esc(m.note)}</small></span><span class="mp-t">${esc(m.tier)} <i>${esc(m.cost)}</i></span></label>`).join('\n          ')}
+          ${RECOMMENDED.map((m) => `<label class="mp-rec">${radio(m, recTier(m))}<span class="mp-n"><b>${esc(m.label)}</b><small>${esc(m.note)}</small></span><span class="mp-t">${esc(m.tier)}${priced ? ` <i>${esc(m.cost)}</i>` : ''}</span></label>`).join('\n          ')}
           <hr class="mp-sep">
           <p class="mp-h mp-h-s">Autres modèles</p>
           <div class="mp-others">

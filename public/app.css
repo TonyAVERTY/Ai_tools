@@ -1031,3 +1031,8 @@ html.nav-busy { cursor: progress; }
 .admin-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 15rem; }
 .admin-actions form { display: inline-flex; align-items: center; gap: 6px; margin: 0; }
 .admin-actions .del { flex-basis: 100%; }
+
+/* ---------- Compte et Support ---------- */
+.narrow .usage-card, .narrow .usage-card.panel { padding: 24px; }
+.chat-ideas { justify-content: flex-start; }
+.chat-empty .chat-ideas { margin-top: 12px; }
