@@ -1,5 +1,5 @@
 // Captures d'écran de toutes les pages (site public et application) à trois tailles, sur une base de test peuplée de données réalistes.
-// Sert au contrôle visuel avant/après d'une refonte (SCHEME=dark pour le thème sombre, TOP=1 pour le haut de page seulement, ELEMENT=<sélecteur> pour un bloc, CLOSED=1 pour laisser les projets repliés). Usage : OUT=/chemin PLAYWRIGHT_MODULE=… PLAYWRIGHT_CHROMIUM=… node scripts/design-shots.mjs [filtre]
+// Sert au contrôle visuel avant/après d'une refonte (SCHEME=dark pour le thème sombre, TOP=1 pour le haut de page seulement, ELEMENT=<sélecteur> pour un bloc, DEV=1 pour le mode développeur actif, CLOSED=1 pour laisser les projets repliés). Usage : OUT=/chemin PLAYWRIGHT_MODULE=… PLAYWRIGHT_CHROMIUM=… node scripts/design-shots.mjs [filtre]
 import { mkdirSync } from 'node:fs';
 import { startApp, APP_URL } from '../test/helpers/server.js';
 import { addProject } from '../test/helpers/users.js';
@@ -13,6 +13,11 @@ const s = await startApp();
 const u = await s.newUser({ admin: true });
 const others = [await s.newUser({ admin: false }), await s.newUser({ admin: false })]; // d'autres comptes pour la page Administration
 await s.db.prepare("UPDATE users SET status = 'suspended' WHERE id = ?").run(others[1].id).catch(() => {});
+if (process.env.DEV) { // mode développeur actif avec deux jetons (pour photographier la page Développeur)
+  await u.post('/account/developer', { enabled: 'on' }, { form: true });
+  await u.post('/developer/tokens', { name: 'Claude Desktop', scope_read: 'on' }, { form: true });
+  await u.post('/developer/tokens', { name: 'Script de relance', scope_read: 'on', scope_write: 'on' }, { form: true });
+}
 const day = 86400;
 const profile = { resume: "Un outil de prise de rendez-vous pour les kinésithérapeutes libéraux : agenda partagé, rappels par SMS, paiement en ligne.", proposition_valeur: 'Moins d\'appels manqués, un agenda qui se remplit seul.', fonctionnalites: ['Agenda partagé', 'Rappels SMS', 'Paiement en ligne', 'Facturation'], arguments: ['Installé en 10 minutes', 'Sans engagement'], stack: 'Node.js', ton: 'direct et chaleureux' };
 const target = { description: 'Kinésithérapeutes libéraux en cabinet', secteurs: ['Kinésithérapie'], zone: 'Bretagne', taille: 'TPE', decideur: 'Le kiné titulaire', requetes: ['kinésithérapeute Rennes', 'cabinet de kinésithérapie Vannes'] };

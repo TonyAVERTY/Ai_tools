@@ -99,3 +99,21 @@ test('Assistant et Réglages : le « $ » relatif des modèles seulement avec un
   assert.match(account, /<div data-claude-card hidden><ul class="usage-list usage-claude" data-usage-claude/, 'la liste Claude est masquée tant qu\'elle est vide');
   assert.equal((account.match(/Affiche tes prochaines actions et tes posts LinkedIn/g) || []).length, 1, "le texte d'introduction de l'agenda n'est pas répété");
 });
+
+test('page Développeur : adresse et commande écrites une seule fois et copiables, routes repliées, suppression d\'un jeton confirmée', async () => {
+  const u = await s.newUser();
+  assert.match(await html(u, '/developer'), /Active le mode développeur/, 'mode éteint : on explique, on propose de l\'activer');
+  assert.equal((await u.post('/account/developer', { enabled: 'on' }, { form: true })).status, 303);
+  await u.post('/developer/tokens', { name: 'Jeton-Prive-42', scope_read: 'on' }, { form: true });
+  const page = await html(u, '/developer');
+  assert.equal((page.match(/claude mcp add/g) || []).length, 1, 'la commande MCP n\'est écrite qu\'une fois');
+  assert.equal((page.match(/\/api\/v1<\/code>/g) || []).length, 1, 'l\'adresse de l\'API n\'est écrite qu\'une fois');
+  assert.equal((page.match(/data-copy-cmd/g) || []).length, 3, 'adresse, exemple et commande : un bouton Copier chacun');
+  assert.match(page, /<details class="routes"><summary>Les \d+ routes et le droit qu'elles demandent<\/summary>/);
+  assert.match(page, /data-confirm="Supprimer le jeton « Jeton-Prive-42 » \?/);
+  assert.match(page, /<div class="scopelist">/);
+  assert.doesNotMatch(page, /style="/, 'pas de style en ligne (CSP)');
+  const other = await s.newUser();
+  await other.post('/account/developer', { enabled: 'on' }, { form: true });
+  assert.doesNotMatch(await html(other, '/developer'), /Jeton-Prive-42/, 'isolation : les jetons d\'un autre compte ne sont jamais listés');
+});
