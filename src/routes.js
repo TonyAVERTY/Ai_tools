@@ -167,6 +167,7 @@ export function registerRoutes(router, app) {
     const analyze = normalizeModel(await getSetting(db, userId, 'analyze_model', 'haiku'));
     const models = { chat: normalizeModel(await getSetting(db, userId, 'chat_model', 'sonnet'), 'sonnet'), analyze, prospect: normalizeModel(await getSetting(db, userId, 'prospect_model', 'haiku')), write: normalizeModel(await getSetting(db, userId, 'write_model', ''), analyze) };
     const s = {
+      priced: await isPriced(db, userId),
       notify_email: await getSetting(db, userId, 'notify_email', ''),
       git_servers: publicGitServers(await listGitServers(db, userId)),
       github_token_set: !!await getSetting(db, userId, 'github_token_enc'),

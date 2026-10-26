@@ -21,7 +21,7 @@ Pour poser une question sur l'application : où cliquer, comment configurer, pou
 ## Utiliser la page
 - **Nouvelle conversation** (en haut à gauche) ; la liste montre les conversations, la poubelle d'une ligne **supprime** la conversation (et ses pièces jointes).
 - Zone de saisie : **Entrée** envoie, **Maj+Entrée** passe à la ligne. Bouton **Envoyer** ; pendant la réponse, **Arrêter** l'interrompt. La réponse s'écrit au fil de l'eau ; sous une réponse, **Copier** copie le texte.
-- **Modèle** : la liste déroulante en haut change le modèle de la conversation (recommandés avec estimation de coût, autres modèles). Le choix devient le modèle par défaut de la page.
+- **Modèle** : la liste déroulante en haut change le modèle de la conversation (recommandés avec la gamme, économe, intermédiaire ou plus cher, et le symbole $ seulement avec une clé API ; puis les autres modèles). Le choix devient le modèle par défaut de la page.
 - Les conversations sont **privées** : propres à chaque compte, supprimées avec lui.
 
 ## Pièces jointes (Claude et Support)

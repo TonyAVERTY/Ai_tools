@@ -85,3 +85,17 @@ test('Calendrier : « À venir » liste ce qui est réellement prévu, aujourd\'
   assert.doesNotMatch(page, /Rien de prévu pour l'instant\./);
   assert.doesNotMatch(await html(await s.newUser(), '/calendar'), /Appel &lt;b&gt;Exemple/, 'isolation');
 });
+
+test('Assistant et Réglages : le « $ » relatif des modèles seulement avec une clé API ; Mon compte sans doublon', async () => {
+  const sub = await s.newUser();
+  const api = await s.newUser({ link: { v: 1, mode: 'api_key', valid: true } });
+  const chatSub = await html(sub, '/chat');
+  assert.match(chatSub, /Sonnet[^<]*· intermédiaire<\/option>/);
+  assert.doesNotMatch(chatSub, /\$\$/, 'abonnement : aucun symbole de prix');
+  assert.match(await html(api, '/chat'), /· intermédiaire \$\$<\/option>/);
+  assert.match(await html(api, '/support'), /· économe \$<\/option>/);
+
+  const account = await html(sub, '/account');
+  assert.match(account, /<div data-claude-card hidden><ul class="usage-list usage-claude" data-usage-claude/, 'la liste Claude est masquée tant qu\'elle est vide');
+  assert.equal((account.match(/Affiche tes prochaines actions et tes posts LinkedIn/g) || []).length, 1, "le texte d'introduction de l'agenda n'est pas répété");
+});
