@@ -83,10 +83,10 @@ export function mailsPage(d) {
     title: 'Mails', email: d.email,
     body: `<section class="card">
   <div class="row-between"><h1>${ic('mail')}Mails</h1>${projectSelect}</div>
-  <div class="tabs" role="tablist" aria-label="Affichage">
+  <nav class="tabs" aria-label="Affichage">
     <a class="tab${d.view === 'sent' ? ' on' : ''}" href="${esc(link({ ...d, view: 'sent', filter: '' }, {}))}"${d.view === 'sent' ? ' aria-current="page"' : ''}>${ic('send')}Envoyés</a>
     <a class="tab${d.view === 'replies' ? ' on' : ''}" href="${esc(link({ ...d, view: 'replies', filter: '' }, {}))}"${d.view === 'replies' ? ' aria-current="page"' : ''}>${ic('reply')}Réponses</a>
-  </div>
+  </nav>
   <div class="chips" role="group" aria-label="${d.view === 'replies' ? 'Intention' : 'État'}">${chips}</div>
   ${list}${pager}
   ${d.view === 'sent' ? `<p class="muted small">Pas de suivi d'ouverture espion (pixel, lien traqué) : il abîme la délivrabilité et pose un problème de consentement (RGPD). Alternative : l'accusé de lecture standard, que le destinataire accepte ou non d'envoyer (option dans Réglages → Garde-fous). « Lu » est donc un minimum, jamais un « non lu ». « Répondu » vient de la boîte de réception du projet (IMAP).</p>` : ''}

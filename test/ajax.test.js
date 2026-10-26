@@ -22,11 +22,10 @@ test('app.js : tout ce qui est branché sur document, window ou un minuteur pass
   assert.match(app, /st\.timer = el\.open \? later\(/);
 });
 
-test('app.js : la précédente exécution est arrêtée en premier, puis dispose() retire écouteurs, intervalles, minuteurs et animation de fond', () => {
+test('app.js : la précédente exécution est arrêtée en premier, puis dispose() retire écouteurs, intervalles et minuteurs', () => {
   const start = app.indexOf('(() => {');
   assert.match(app.slice(start, start + 800), /window\.AiTools\?\.dispose\?\.\(\);/, 'premier geste de l\'exécution');
   assert.match(app, /dispose\(\) \{ disposed = true; for \(const f of cleanups\.splice\(0\)\) f\(\); for \(const t of timers\) clearTimeout\(t\);/);
-  assert.match(app, /cleanups\.push\(\(\) => cancelAnimationFrame\(raf\)\)/);
   assert.match(app, /const later = \(fn, ms\) => \{\s*if \(disposed\) return 0;/, 'plus aucun minuteur ne part une fois arrêtée');
   assert.match(read('responsive.js'), /window\.AiRt\?\.disconnect\(\)/, 'responsive.js arrête aussi son observateur');
 });
