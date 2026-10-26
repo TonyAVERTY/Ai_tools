@@ -2,7 +2,7 @@
 Résumé : la page Mon compte (connexion, usage du mois, liaison Claude, agenda, mode développeur, suppression) et les équipes (rôles, invitations, partage de projets, places).
 
 ## Mon compte (avatar → Mon compte)
-- **Connexion** : l'email et le fournisseur (Google ou Apple), « sans mot de passe ». Un lien **Administration** apparaît pour les administrateurs du service.
+- **Connexion** : l'email et le fournisseur (Google ou Apple), « sans mot de passe ». Un lien **Administration** apparaît pour les administrateurs du service : la page liste les comptes (recherche par email) avec leur connexion, leur plan, leur statut (**actif**, **suspendu**, **envois en pause**), la date de création et de dernière connexion, la liaison Claude, puis quatre colonnes d'usage du mois, **Projets**, **Prospects**, **Mails** et **Tâches IA**, en « utilisé / plafond » (en rouge quand le plafond est atteint). Elle n'affiche aucune donnée métier. Les actions (**Suspendre** ou **Réactiver**, changement de plan, **Rétablir les envois**, **Supprimer**) ne s'appliquent pas aux comptes administrateurs, et le **Journal d'audit** en dessous garde 12 mois d'actions, adresses masquées.
 - **Usage du mois** : les compteurs Projets, Prospects, Mails ce mois-ci, Jobs IA ce mois-ci, avec l'offre et les plafonds ; un message « Plafond atteint » et un lien vers les tarifs apparaissent quand une limite est atteinte.
 - **Liaison Claude** : mode, état, limites d'utilisation, bouton **Déconnecter** (voir le fichier sur la liaison Claude).
 - **Agenda** : lien d'abonnement secret pour Google Agenda, Apple Calendrier, Outlook (bouton **Créer mon lien d'agenda**) ; voir le fichier sur le calendrier.
