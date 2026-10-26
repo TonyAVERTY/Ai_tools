@@ -65,7 +65,7 @@ body.site {
 /* ---------- Accueil : la lettre ---------- */
 .hero { padding: 40px 0 56px; }
 .hero-in { display: grid; gap: 40px; grid-template-columns: minmax(0, 1fr); }
-.h1 { font-size: clamp(2.25rem, 5.2vw, 3.875rem); line-height: 1.05; letter-spacing: -.02em; }
+.h1 { font-size: clamp(2.25rem, 4.6vw, 3.5rem); line-height: 1.05; letter-spacing: -.02em; }
 .lead { margin-top: 20px; font-size: 1.125rem; line-height: 1.6; color: var(--muted); max-width: 33em; }
 .hero-btns { display: flex; flex-direction: column; gap: 12px; margin-top: 28px; }
 .hero-note { margin-top: 16px; font-size: .875rem; color: var(--muted); }

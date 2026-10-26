@@ -11,6 +11,7 @@ body {
 }
 h1, h2, h3, h4, h5, p { margin: 0; }
 h1, h2 { font-family: var(--serif); }
+.page h1 > .ic, .card h1 > .ic { display: none; } /* un titre de page n'a pas besoin d'icône : le mot suffit */
 a { color: var(--link); text-underline-offset: 3px; }
 a:hover { text-decoration: none; }
 code { font-family: var(--mono); font-size: .875rem; background: var(--bg-sunk); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; }
