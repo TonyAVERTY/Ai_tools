@@ -35,15 +35,16 @@ const bubble = (m) => (m.role === 'user'
   : `<article class="msg bot" data-id="${m.id}"><div class="bubble md">${m.html}</div>
       <div class="msg-actions"><button type="button" class="link small" data-chat-copy data-md="${esc(m.content)}">${ic('copy')}Copier</button></div></article>`);
 
-function modelSelect(model) {
-  const opt = (m) => `<option value="${m.id}"${m.id === model ? ' selected' : ''}>${esc(m.label)}${m.tier ? ` · ${esc(m.tier)} ${m.cost}` : ''}</option>`;
+// Le « $ » relatif n'apparaît qu'avec une clé API (facturée à l'usage) : avec un abonnement, on ne montre que la gamme (économe, intermédiaire…)
+function modelSelect(model, priced = false) {
+  const opt = (m) => `<option value="${m.id}"${m.id === model ? ' selected' : ''}>${esc(m.label)}${m.tier ? ` · ${esc(m.tier)}${priced ? ` ${m.cost}` : ''}` : ''}</option>`;
   return `<span class="sel chat-model"><select name="model" aria-label="Modèle Claude" data-chat-model>
     <optgroup label="Recommandés">${RECOMMENDED.map(opt).join('')}</optgroup>
     <optgroup label="Autres modèles">${OTHERS.map(opt).join('')}</optgroup>
   </select>${ic('down')}</span>`;
 }
 
-export function chatPage({ email, mode = 'claude', conversations, current, messages, model, max, project = null, limits = { files: 6, maxMb: {} } }) {
+export function chatPage({ email, mode = 'claude', priced = false, conversations, current, messages, model, max, project = null, limits = { files: 6, maxMb: {} } }) {
   const support = mode === 'support';
   const base = support ? '/support' : '/chat';
   const list = conversations.map((c) => `<li class="${current?.id === c.id ? 'on' : ''}" data-conv="${c.id}">
@@ -59,7 +60,7 @@ export function chatPage({ email, mode = 'claude', conversations, current, messa
   <section class="chat-main" aria-label="${support ? 'Conversation avec le Support' : 'Conversation avec Claude'}">
     <header class="chat-head">
       <h1>${ic(support ? 'help' : 'spark')}${support ? 'Support' : 'Assistant IA'}</h1>
-      ${modelSelect(model)}
+      ${modelSelect(model, priced)}
     </header>
     <div class="chat-log" id="chat-log" data-chat-log tabindex="0" aria-live="polite" aria-label="Messages">
       ${messages.length ? messages.map(bubble).join('\n') : `<div class="chat-empty" data-chat-empty>

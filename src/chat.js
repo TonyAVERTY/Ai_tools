@@ -17,7 +17,7 @@ import { userChatRoot } from './users.js';
 import { FILES, shapeAttachment, removeAttachmentFiles, conversationAttachments, prepareRunDir, registerChatFileRoutes } from './chatfiles.js';
 import { normalizeModel } from './services/models.js';
 import { renderMarkdown } from './services/markdown.js';
-import { budgetState } from './services/budget.js';
+import { budgetState, isPriced } from './services/budget.js';
 import { loadRatio } from './services/load.js';
 import { reportError } from './services/errormail.js';
 import { chatPage } from './chatviews.js';
@@ -90,7 +90,7 @@ export function registerChatRoutes(router, app) {
     const conversations = await listConversations(db, session.userId, mode);
     const messages = current ? await conversationMessages(db, current.id) : [];
     html(res, chatPage({
-      email: session.email, mode, conversations, current, messages, model: current?.model ?? await chatModel(db, session.userId),
+      email: session.email, mode, priced: await isPriced(db, session.userId), conversations, current, messages, model: current?.model ?? await chatModel(db, session.userId),
       max: CHAT_MAX_MESSAGE, project: lastProject(messages), limits: { files: FILES.perMessage, maxMb: Object.fromEntries(Object.entries(FILES.maxBytes).map(([k, v]) => [k, Math.round(v / 1048576)])) },
     }));
   };
