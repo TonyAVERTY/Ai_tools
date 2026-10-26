@@ -835,6 +835,20 @@
     catch { const r = document.createRange(); r.selectNodeContents(code); getSelection().removeAllRanges(); getSelection().addRange(r); toast('Sélectionné : copie-le avec Ctrl+C', 'error'); }
   });
 
+  // ---------- Développeur : copier une adresse ou une commande ----------
+  listen(document, 'click', async (e) => {
+    const b = e.target.closest('[data-copy-cmd]');
+    if (!b) return;
+    const code = $('code', b.closest('.cmd'));
+    try { await navigator.clipboard.writeText(code.textContent); toast('Copié'); }
+    catch { const r = document.createRange(); r.selectNodeContents(code); getSelection().removeAllRanges(); getSelection().addRange(r); toast('Sélectionné : copie-le avec Ctrl+C', 'error'); }
+  });
+  // Action définitive : un formulaire qui porte data-confirm demande confirmation avant de partir
+  listen(document, 'submit', (e) => {
+    const msg = e.target.dataset?.confirm;
+    if (msg && !confirm(msg)) e.preventDefault();
+  });
+
   // ---------- Réglages : prompts par gamme de modèle ----------
   // Onglets « Tous les modèles / Haiku / Sonnet / Opus / Fable » : un seul texte visible par tâche (les autres restent dans le formulaire).
   listen(document, 'click', (e) => {
