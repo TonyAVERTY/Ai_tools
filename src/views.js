@@ -673,7 +673,7 @@ function uncovered(d, channels = {}) {
   const all = [...d.hooks, ...Object.values(channels)];
   if (!all.length) return '';
   const missing = Object.entries(d.all).filter(([k]) => !all.some((h) => h.events.includes(k))).map(([, l]) => esc(l));
-  return missing.length ? `<p class="hint">Aucun canal ne reçoit pour l'instant : ${missing.join(' · ')}.</p>` : '';
+  return missing.length ? `<p class="hint">Ajoute un canal pour recevoir aussi : ${missing.join(' · ')}.</p>` : '';
 }
 
 const SETTINGS_TOC = [['notif', 'Notifications'], ['git', 'Dépôts Git'], ['garde', 'Garde-fous'], ['budget', 'Budget et modèles IA'], ['prompts', 'Prompts IA'], ['opposition', "Liste d'opposition"]];
@@ -714,7 +714,7 @@ ${saved ? `<p class="ok-box" role="status">${ic('check')}<span><b>Réglages enre
 
 <section class="card" id="notif" aria-labelledby="t-notif">
   <div class="card-h"><h2 id="t-notif">Notifications</h2><p>Où et quand AiTools te prévient : réponses de prospects, jobs terminés ou en erreur, alertes. Les liens et jetons sont stockés chiffrés et ne sont jamais réaffichés.</p></div>
-  <label class="field"><span class="lbl">Email de réception (évolutions, rapport hebdo)</span><input name="notify_email" type="email" value="${esc(s.notify_email)}" placeholder="toi@exemple.fr"><span class="hint">Ces mails partent de l'adresse d'AiTools (SMTP du serveur), jamais de celle d'un projet.</span></label>
+  <label class="field"><span class="lbl">Email de réception (évolutions, rapport hebdo)</span><input name="notify_email" type="email" value="${esc(s.notify_email)}" placeholder="toi@exemple.fr"><span class="hint">Ces mails partent de l'adresse d'AiTools (SMTP du serveur).</span></label>
   ${check('weekly_report', s.weekly_report, 'Rapport hebdo le lundi à 8h (mail + canaux ci-dessous)')}
   <div class="save"><button type="button" class="btn" data-report-send>${ic('send')}Envoyer le rapport maintenant</button></div>
 
@@ -727,10 +727,10 @@ ${saved ? `<p class="ok-box" role="status">${ic('check')}<span><b>Réglages enre
     ${channelCard('slack', 'Slack', s, `<label class="field"><span class="lbl">Lien du webhook Slack</span><input name="slack_url" type="password" placeholder="${s.channels.slack ? '•••••• (inchangé)' : 'https://hooks.slack.com/services/…'}" autocomplete="off"><span class="hint">Slack : Apps → Incoming Webhooks.</span></label>`)}
     ${channelCard('telegram', 'Telegram', s, `<label class="field"><span class="lbl">Jeton du bot</span><input name="telegram_token" type="password" placeholder="${s.channels.telegram ? '•••••• (inchangé)' : '123456789:AA…'}" autocomplete="off"><span class="hint">Crée un bot avec @BotFather.</span></label>
       <label class="field"><span class="lbl">Identifiant de la conversation</span><input name="telegram_chat" value="${esc(s.channels.telegram?.chat || '')}" placeholder="123456789 ou @mon_canal" autocomplete="off"><span class="hint">Écris d'abord à ton bot, puis lis l'identifiant avec @userinfobot.</span></label>`)}
-    ${channelCard('email', 'E-mail', s, `<label class="field"><span class="lbl">Adresse de réception</span><input name="email_to" type="email" value="${esc(s.channels.email?.to || '')}" placeholder="toi@exemple.fr" autocomplete="off"><span class="hint">${s.canEmail ? "Envoyé depuis l'adresse d'AiTools. Au plus 20 notifications par heure." : "Le SMTP du serveur n'est pas configuré : aucun mail ne peut partir pour l'instant."}</span></label>`)}
+    ${channelCard('email', 'E-mail', s, `<label class="field"><span class="lbl">Adresse de réception</span><input name="email_to" type="email" value="${esc(s.channels.email?.to || '')}" placeholder="toi@exemple.fr" autocomplete="off"><span class="hint">${s.canEmail ? "Envoyé depuis l'adresse d'AiTools. Au plus 20 notifications par heure." : "Ce canal s'active dès que l'administrateur a réglé le SMTP du serveur."}</span></label>`)}
   </div>
   <template id="discord-row-tpl">${hookRow('__I__', { id: '', events: [] }, s.discord.all, { fresh: true })}</template>
-  <p class="hint" data-chan-empty${s.discord.hooks.length || Object.keys(s.channels).length ? ' hidden' : ''}>Aucun canal pour l'instant.</p>
+  <p class="hint" data-chan-empty${s.discord.hooks.length || Object.keys(s.channels).length ? ' hidden' : ''}>Ajoute un canal ci-dessus pour recevoir les notifications.</p>
   ${uncovered(s.discord, s.channels)}
   <div class="gitadd">
     <details class="addmenu" data-addmenu>
@@ -801,7 +801,7 @@ ${saved ? `<p class="ok-box" role="status">${ic('check')}<span><b>Réglages enre
 
 <section class="card" id="budget" aria-labelledby="t-budget">
   <div class="card-h"><h2 id="t-budget">${s.priced ? 'Budget IA' : 'Modèles IA'}</h2>${s.priced
-    ? "<p>Avec ta clé API, chaque job est facturé par Anthropic : en équivalent $ API remonté par Claude Code. Au-delà d'un plafond, les jobs IA attendent sans être perdus ; envois et relances continuent. Vide = pas de limite.</p>"
+    ? "<p>Avec ta clé API, chaque job est facturé par Anthropic : en équivalent $ API remonté par Claude Code. Au-delà d'un plafond, les jobs IA attendent sans être perdus ; envois et relances continuent. Renseigne un montant pour activer un plafond.</p>"
     : "<p>Avec ton abonnement Claude rien n'est facturé en plus : le garde-fou est ton quota Claude (affiché en haut), pas un budget en $.</p>"}</div>
   <div class="grid2">
     ${s.priced ? `<label class="field"><span class="lbl">Plafond sur 24 h glissantes</span><span class="unit"><input name="budget_day_usd" inputmode="decimal" value="${esc(s.budget_day_usd)}" placeholder="ex. 2"><span>$</span></span></label>
