@@ -6,7 +6,7 @@ export { isPriced };
 import { ROLE_TASKS } from './roles.js';
 
 // Jobs qui appellent Claude (les envois et relances n'en consomment pas)
-export const AI_JOBS = new Set(['analyze', 'prospect', 'template', 'followup_template', 'evolution', 'linkedin_post', 'promo_video', 'audit', 'hook', ...ROLE_TASKS.map((t) => t.job)]);
+export const AI_JOBS = new Set(['analyze', 'prospect', 'template', 'followup_template', 'evolution', 'linkedin_post', 'promo_video', 'audit', 'hook', 'billing_quotes', 'billing_refine', 'billing_docs', ...ROLE_TASKS.map((t) => t.job)]);
 
 const usd = (n) => `${n.toFixed(2)} $`;
 
