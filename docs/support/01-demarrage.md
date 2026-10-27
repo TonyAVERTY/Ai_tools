@@ -12,8 +12,9 @@ Sans liaison Claude valide, l'application affiche la page « Relier Claude » et
 Les questions s'affichent **une à la fois** (7 au total) :
 1. Choisis une réponse puis clique **Continuer**. Sans choix, **Continuer** passe simplement la question. **Retour** revient à la question précédente en gardant ta réponse.
 2. En haut, « Question 3 sur 7 » et un pourcentage avec sa barre indiquent combien de questions sont déjà passées (0 % à la première, 14 % à la deuxième, 86 % à la dernière).
-3. À la dernière question, le bouton devient **Terminer** : il enregistre ton profil. À tout moment, **Passer le questionnaire** ferme tout sans rien enregistrer.
-4. La page ne revient plus d'elle-même. Tu peux la rouvrir et la modifier à tout moment : avatar → Mon compte → **Modifier mon profil** (toutes les questions s'affichent alors sur une seule page, avec **Enregistrer mon profil** et **Annuler**).
+3. Quand tu valides une réponse, une pastille verte « Pris en compte » apparaît un instant pour confirmer qu'elle est bien enregistrée, puis la question suivante glisse à sa place. Sous la barre, une rangée de 7 pastilles se remplit : verte avec une coche pour chaque question à laquelle tu as répondu, vide pour une question passée sans réponse. Si ton système demande moins d'animations, le passage est immédiat, sans mouvement.
+4. À la dernière question, le bouton devient **Terminer** : il enregistre ton profil. À tout moment, **Passer le questionnaire** ferme tout sans rien enregistrer.
+5. La page ne revient plus d'elle-même. Tu peux la rouvrir et la modifier à tout moment : avatar → Mon compte → **Modifier mon profil** (toutes les questions s'affichent alors sur une seule page, avec **Enregistrer mon profil** et **Annuler**).
 Pourquoi : Claude adapte son vocabulaire, ses exemples et son niveau de détail à ton métier. Les réponses restent dans ton compte.
 
 ## 3. Créer le premier projet

@@ -184,22 +184,63 @@
     const back = $('[data-wiz-back]', wiz);
     const next = $('[data-wiz-next]', wiz);
     const barBox = $('[role=progressbar]', wiz);
+    const dots = $$('[data-dot]', wiz);
+    const validated = new Set(); // questions auxquelles une réponse a été validée (pastille verte)
     let at = 0;
+    let moving = false;
+    const calm = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const wait = (ms) => new Promise((r) => setTimeout(r, calm() ? 0 : ms));
     const setBar = (p) => { $('[data-wiz-bar]', wiz).className = `w-${Math.floor(p / 5) * 5}`; $('[data-wiz-pct]', wiz).textContent = `${p} %`; barBox.setAttribute('aria-valuenow', String(p)); };
-    const show = (i, focus = true) => {
+    // Une réponse = un choix coché, ou un texte écrit
+    const answered = (i) => !!$('input:checked', steps[i]) || ($('textarea', steps[i])?.value.trim() ?? '') !== '';
+    const paint = () => dots.forEach((d, k) => { d.classList.toggle('on', k === at); d.classList.toggle('done', validated.has(k)); });
+    const show = (i, { focus = true, dir = 0 } = {}) => {
       at = i;
-      steps.forEach((s, k) => { s.hidden = k !== i; });
+      steps.forEach((s, k) => {
+        s.hidden = k !== i;
+        s.classList.remove('wiz-out', 'wiz-out-back', 'wiz-in', 'wiz-in-back');
+        if (k === i && dir) s.classList.add(dir > 0 ? 'wiz-in' : 'wiz-in-back');
+      });
       $('[data-wiz-count]', wiz).textContent = `Question ${i + 1} sur ${steps.length}`;
       setBar(Math.round((100 * i) / steps.length)); // questions déjà passées
       back.hidden = i === 0;
       next.textContent = i === steps.length - 1 ? 'Terminer' : 'Continuer';
-      if (focus) ($('input:checked, input, textarea', steps[i]))?.focus();
+      paint();
+      if (focus) ($('input:checked, input, textarea', steps[i]))?.focus({ preventScroll: true });
     };
-    const forward = () => { if (at < steps.length - 1) show(at + 1); else { setBar(100); wiz.requestSubmit?.() ?? wiz.submit(); } };
-    back.addEventListener('click', () => show(Math.max(0, at - 1)));
+    // Avancer : si une réponse est donnée, la pastille verte « Pris en compte » la confirme un instant, puis la question sort et la suivante entre
+    async function forward() {
+      if (moving) return;
+      moving = true;
+      const here = steps[at];
+      if (answered(at)) {
+        validated.add(at);
+        $('[data-wiz-ok]', here).classList.add('show');
+        paint();
+        await wait(650);
+      } else validated.delete(at);
+      if (at === steps.length - 1) { setBar(100); paint(); wiz.submit(); return; } // submit() n'émet pas l'événement « submit » : pas de boucle
+      here.classList.add('wiz-out');
+      await wait(190);
+      show(at + 1, { dir: 1 });
+      moving = false;
+    }
+    async function previous() {
+      if (moving || at === 0) return;
+      moving = true;
+      steps[at].classList.add('wiz-out-back');
+      await wait(190);
+      show(at - 1, { dir: -1 });
+      moving = false;
+    }
+    back.addEventListener('click', previous);
     // « Passer le questionnaire » (formaction) part tel quel ; « Continuer » avance tant qu'il reste des questions
-    wiz.addEventListener('submit', (e) => { if (!e.submitter?.hasAttribute('formaction') && at < steps.length - 1) { e.preventDefault(); forward(); } });
-    show(0, false);
+    wiz.addEventListener('submit', (e) => {
+      if (e.submitter?.hasAttribute('formaction')) return;
+      e.preventDefault();
+      forward();
+    });
+    show(0, { focus: false });
   }
 
   // Attente dont la durée dépend d'un tiers (Claude) : un pourcentage ESTIMÉ monte vers 95 % selon la durée habituelle et ne passe à 100 % qu'avec la

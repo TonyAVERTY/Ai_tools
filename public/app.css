@@ -1088,3 +1088,29 @@ html.nav-busy { cursor: progress; }
 .dl-pct .bar { margin-top: 0; }
 .dl-pct-t { display: flex; justify-content: space-between; margin: 6px 0 0; font-size: .875rem; color: var(--muted); }
 .dl-pct-t b { color: var(--text); font-variant-numeric: tabular-nums; }
+
+/* Questionnaire : confirmation de chaque réponse (pastille verte) et passage animé à la question suivante */
+.wiz-dots { display: flex; gap: 6px; list-style: none; margin: 10px 0 0; padding: 0; }
+.wiz-dots li { width: 22px; height: 22px; border-radius: 999px; border: 1.5px solid var(--control); display: grid; place-items: center; transition: background var(--t) var(--ease), border-color var(--t) var(--ease); }
+.wiz-dots li .ic { width: 13px; height: 13px; stroke-width: 3; color: var(--card); opacity: 0; transform: scale(.4); transition: opacity var(--t) var(--ease), transform var(--t) var(--ease); }
+.wiz-dots li.on { border-color: var(--primary); }
+.wiz-dots li.done { background: var(--ok); border-color: var(--ok); }
+.wiz-dots li.done .ic { opacity: 1; transform: none; }
+.wiz-step { position: relative; }
+.wiz-ok { display: flex; align-items: center; gap: 8px; margin: 14px 0 0; font-size: .9375rem; font-weight: 600; color: var(--ok); visibility: hidden; }
+.wiz-pill { width: 24px; height: 24px; border-radius: 999px; background: var(--ok); display: grid; place-items: center; }
+.wiz-pill .ic { width: 15px; height: 15px; stroke-width: 3; color: var(--card); }
+.wiz-ok.show { visibility: visible; animation: wiz-pop .42s var(--ease) both; }
+@keyframes wiz-pop { 0% { transform: scale(.6); opacity: 0; } 60% { transform: scale(1.08); opacity: 1; } 100% { transform: none; opacity: 1; } }
+@keyframes wiz-in { from { opacity: 0; transform: translateX(32px); } to { opacity: 1; transform: none; } }
+@keyframes wiz-in-back { from { opacity: 0; transform: translateX(-32px); } to { opacity: 1; transform: none; } }
+.wiz-step.wiz-in { animation: wiz-in .32s var(--ease) both; }
+.wiz-step.wiz-in-back { animation: wiz-in-back .32s var(--ease) both; }
+.wiz-step.wiz-out, .wiz-step.wiz-out-back { opacity: 0; transition: opacity .18s var(--ease), transform .18s var(--ease); }
+.wiz-step.wiz-out { transform: translateX(-32px); }
+.wiz-step.wiz-out-back { transform: translateX(32px); }
+@media (prefers-reduced-motion: reduce) {
+  .wiz-ok.show, .wiz-step.wiz-in, .wiz-step.wiz-in-back { animation: none; }
+  .wiz-step.wiz-out, .wiz-step.wiz-out-back { transition: none; transform: none; }
+  .wiz-dots li, .wiz-dots li .ic { transition: none; }
+}

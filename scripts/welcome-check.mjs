@@ -11,8 +11,8 @@ const s = await startApp();
 const b = await chromium.launch(exe ? { executablePath: exe } : {});
 let bad = 0;
 const ok = (c, m) => { console.log(`${c ? 'OK ' : 'KO '} ${m}`); if (!c) bad++; };
-const open = async (u, vp, scheme = 'dark') => {
-  const ctx = await b.newContext({ viewport: vp, colorScheme: scheme });
+const open = async (u, vp, scheme = 'dark', extra = {}) => {
+  const ctx = await b.newContext({ viewport: vp, colorScheme: scheme, ...extra });
   const [name, value] = u.cookie.split('=');
   await ctx.addCookies([{ name, value, url: s.base }]);
   await ctx.route('**/*', (route) => { const r = route.request(); const h = { ...r.headers() }; if (r.method() === 'POST') h.origin = APP_URL; route.continue({ headers: h }); });
@@ -39,22 +39,42 @@ for (const [vp, scheme] of [[{ width: 1280, height: 800 }, 'dark'], [{ width: 39
   ok(box && box.width >= 20, `${tag} les pastilles de choix sont visibles`);
   if (process.env.SHOTS) await p.screenshot({ path: `${process.env.SHOTS}/welcome-1-${vp.width}-${scheme}.png` });
 
+  const adv = async (sel = '[data-wiz-next]') => { // clique puis attend que la question affichée change (la transition est animée)
+    const before = await p.locator('[data-wiz-count]').innerText();
+    await p.locator(sel).click();
+    await p.waitForFunction((b) => document.querySelector('[data-wiz-count]').textContent !== b, before, { timeout: 5000 });
+  };
   await p.locator('[data-step]:not([hidden]) label.opt').nth(1).click(); // « Indépendant ou freelance »
   await p.locator('[data-wiz-next]').click();
+  await p.waitForSelector('[data-step]:not([hidden]) .wiz-ok.show');
+  ok(/Pris en compte/.test(await p.locator('[data-step]:not([hidden]) .wiz-ok').innerText()), `${tag} réponse validée : la pastille verte « Pris en compte » s'affiche`);
+  const pill = { width: await p.locator('[data-step]:not([hidden]) .wiz-pill').evaluate((e) => e.offsetWidth) }; // taille de mise en page (la boîte visuelle varie pendant l'animation d'apparition)
+  const pillBg = await p.locator('[data-step]:not([hidden]) .wiz-pill').evaluate((e) => getComputedStyle(e).backgroundColor);
+  ok(pill && pill.width >= 20 && /rgb\(/.test(pillBg), `${tag} la pastille est visible et colorée (${pillBg})`);
+  ok(await p.locator('[data-dot].done').count() === 1, `${tag} la pastille de progression de la question 1 passe au vert`);
+  if (process.env.SHOTS) await p.screenshot({ path: `${process.env.SHOTS}/welcome-ok-${vp.width}-${scheme}.png` });
+  await p.waitForFunction(() => document.querySelector('[data-wiz-count]').textContent !== 'Question 1 sur 7', null, { timeout: 5000 });
+  const anim = await p.locator('[data-step]:not([hidden])').evaluate((e) => getComputedStyle(e).animationName);
+  ok(anim === 'wiz-in', `${tag} la question suivante entre avec une animation (${anim})`);
   ok(/Question 2 sur 7/.test(await p.locator('[data-wiz-count]').innerText()) && (await pct(p)) === '14 %', `${tag} après « Continuer » : question 2, 14 %`);
-  await p.locator('[data-wiz-back]').click();
+  await adv('[data-wiz-back]');
+  const back = await p.locator('[data-step]:not([hidden])').evaluate((e) => getComputedStyle(e).animationName);
+  ok(back === 'wiz-in-back', `${tag} « Retour » ramène la question par la gauche (${back})`);
   ok((await pct(p)) === '0 %' && await p.locator('input[name=job]:checked').count() === 1, `${tag} « Retour » revient à la question 1 en gardant le choix`);
-  await p.locator('[data-wiz-next]').click();
-  await p.locator('[data-wiz-next]').click(); // question 2 passée sans choix
-  ok((await pct(p)) === '29 %', `${tag} une question passée sans réponse compte aussi (29 %)`);
-  for (let i = 0; i < 3; i++) await p.locator("[data-wiz-next]").click(); // de la question 3 aux objectifs (question 6)
+  await adv(); // question 1 revalidée
+  const none = await p.locator('[data-step]:not([hidden]) .wiz-ok.show').count();
+  ok(none === 0 && await p.locator('[data-dot].done').count() === 1, `${tag} question 2 : pas de pastille verte tant qu'on n'a pas répondu`);
+  await adv(); // question 2 passée sans choix
+  ok((await pct(p)) === '29 %' && await p.locator('[data-dot].done').count() === 1, `${tag} une question passée sans réponse compte dans le pourcentage mais pas de pastille verte (29 %)`);
+  for (let i = 0; i < 3; i++) await adv(); // de la question 3 aux objectifs (question 6)
   ok(/Question 6 sur 7/.test(await p.locator('[data-wiz-count]').innerText()), `${tag} question 6 : objectifs`);
   const cb = await p.locator('[data-step]:not([hidden]) .box').first().boundingBox();
   ok(cb && cb.width >= 20, `${tag} les cases à cocher des objectifs sont visibles`);
   if (process.env.SHOTS) await p.screenshot({ path: `${process.env.SHOTS}/welcome-6-${vp.width}-${scheme}.png` });
   await p.locator('[data-step]:not([hidden]) label.opt').first().click();
-  await p.locator('[data-wiz-next]').click();
+  await adv();
   ok(/Question 7 sur 7/.test(await p.locator('[data-wiz-count]').innerText()) && (await pct(p)) === '86 %' && (await p.locator('[data-wiz-next]').innerText()) === 'Terminer', `${tag} dernière question : 86 %, bouton « Terminer »`);
+  ok(await p.locator('[data-dot].done').count() === 2, `${tag} deux réponses validées = deux pastilles vertes`);
   await p.locator('textarea').fill('Un exemple concret à chaque conseil');
   ok(!(await p.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)), `${tag} pas de défilement horizontal`);
   await Promise.all([p.waitForURL((x) => x.pathname !== '/welcome'), p.locator('[data-wiz-next]').click()]);
@@ -70,6 +90,24 @@ for (const [vp, scheme] of [[{ width: 1280, height: 800 }, 'dark'], [{ width: 39
   await Promise.all([w.p.waitForURL((x) => x.pathname !== '/welcome'), w.p.getByText('Passer le questionnaire').click()]);
   ok((await getProfile(s.db, v.id)).job === '' && new URL(w.p.url()).pathname === '/', `${tag} « Passer le questionnaire » ne demande plus rien`);
   await w.ctx.close();
+}
+
+// ---------- Mouvement réduit : la confirmation reste, les animations et les délais disparaissent ----------
+{
+  const u = await s.newUser({ firstLogin: true });
+  const { ctx, p, errs } = await open(u, { width: 1280, height: 800 }, 'dark', { reducedMotion: 'reduce' });
+  await p.goto(`${s.base}/welcome`);
+  await p.waitForSelector('html[data-nav="ready"]');
+  await p.locator('[data-step]:not([hidden]) label.opt').first().click();
+  const t0 = Date.now();
+  await p.locator('[data-wiz-next]').click();
+  await p.waitForFunction(() => document.querySelector('[data-wiz-count]').textContent === 'Question 2 sur 7', null, { timeout: 3000 });
+  const ms = Date.now() - t0;
+  const anim = await p.locator('[data-step]:not([hidden])').evaluate((e) => getComputedStyle(e).animationName);
+  ok(ms < 500 && anim === 'none', `mouvement réduit : passage immédiat (${ms} ms) et sans animation (${anim})`);
+  ok(await p.locator('[data-dot].done').count() === 1, 'mouvement réduit : la pastille verte de progression est bien là');
+  ok(errs.length === 0, 'mouvement réduit : aucune erreur console');
+  await ctx.close();
 }
 
 // ---------- Récupération du jeton : pourcentage estimé ----------
