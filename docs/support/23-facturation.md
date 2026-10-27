@@ -44,5 +44,14 @@ Après la validation du devis, Claude prépare les quatre documents avec **la m�
 - **Recommencer depuis le début** (avec confirmation) efface les exemples et les documents du projet ; tes informations légales sont conservées.
 Si tu modifies tes informations légales plus tard, les mentions légales des documents suivent automatiquement.
 
+## 5. Les documents en PDF et l'émission
+Tous les documents sortent en **PDF** (format A4, avec la mise en page choisie et tes mentions légales).
+- **Modèle en PDF** (sur chaque carte de document) télécharge le modèle : les informations qui changent à chaque fois (numéro, date, client…) restent sous forme de variables `{{…}}`. Il faut avoir rempli tes informations légales.
+- **Émettre en PDF : …** (sous un document **validé**, par exemple « Émettre en PDF : facture finale ») ouvre un formulaire : « Nom du client », « SIRET du client » (vide pour un particulier), « Adresse du client », « Date d'émission » (jamais dans le futur), et selon le document « Date de la prestation » (facture finale) ou « N° de la facture corrigée » et « Motif de l'avoir » (avoir). Clique **Générer le PDF** : le document reçoit un **numéro automatique** (« F-2026-0001 » pour une facture finale, « AC- » pour un acompte, « AV- » pour un avoir, « D- » pour un devis, un compteur par année), l'échéance (ou la validité du devis) est calculée d'après tes informations légales et le PDF est prêt. Les montants viennent du document validé : pour les changer, « Affiner » le document et valide-le de nouveau.
+- La section **4. Documents émis** liste tout ce que tu as émis (numéro, client, date, montant, état) avec le bouton **PDF** pour le télécharger de nouveau.
+**Joindre à la Comptabilité.** Pour un acompte, une facture finale ou un avoir, le formulaire propose la case **« Joindre automatiquement à la comptabilité »** (cochée par défaut ; elle n'existe pas pour un devis, qui n'entre jamais en comptabilité).
+- **Cochée** : la facture est ajoutée toute seule à la page « Comptabilité », avec son PDF comme justificatif, dans la carte « Factures émises, à encaisser » (état « À encaisser », ou « À rembourser » pour un avoir). Elle **ne compte dans tes chiffres, ta déclaration et tes exports qu'une fois marquée payée** (bouton **Marquer payée** de la Comptabilité) : un chiffre d'affaires se déclare à l'encaissement, pas à l'émission.
+- **Décochée** : le PDF reste dans « Documents émis » (état « Non jointe à la comptabilité ») et **rien n'est ajouté** à la Comptabilité.
+
 ## Si ça ne marche pas
 Voir « Facturation » dans « Dépannage et FAQ ».
