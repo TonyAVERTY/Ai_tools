@@ -154,7 +154,7 @@ test('page Mails : envoyés avec leur état, réponses par intention, échappeme
   assert.match(sent, /Bonjour Atelier/);
   assert.match(sent, /Répondu/);
   assert.match(sent, /Non envoyé/);
-  assert.match(sent, /Pas de suivi d'ouverture/);
+  assert.match(sent, /« Lu » vient de l'accusé de lecture standard/);
   const failedOnly = await (await get(u1, '/mails?filter=failed')).text();
   assert.match(failedOnly, /x@y\.fr/);
   assert.doesNotMatch(failedOnly, /Bonjour Atelier/);
@@ -241,7 +241,7 @@ test('page Mails : état « Lu (accusé) », filtre, et mention honnête (minimu
   const get = async (p) => (await u.get(p, { headers: { accept: 'text/html' } })).text();
   const all = await get('/mails');
   assert.match(all, /Lu \(accusé\)/);
-  assert.match(all, /jamais un « non lu »/);
+  assert.match(all, /« Lu » est donc un minimum/);
   const read = await get('/mails?filter=read');
   assert.match(read, /Lu celui-ci/);
   assert.doesNotMatch(read, /Pas d&#39;accusé/);

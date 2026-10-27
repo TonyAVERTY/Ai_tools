@@ -68,7 +68,7 @@ function createSection(canTeam) {
   <div class="team-roles"><h3 class="sub-h">Rôles et droits</h3>${RIGHTS}</div>
 </section>`
     : `<section class="card" aria-labelledby="h-tc"><h2 id="h-tc">Équipe</h2>
-  <p class="muted">Ton offre actuelle ne comprend pas de place d'équipe. <a href="/tarifs">Voir les offres qui en proposent</a>.</p></section>`;
+  <p class="muted">Les places d'équipe sont incluses dans certaines offres. <a href="/tarifs">Voir les offres avec une équipe</a>.</p></section>`;
 }
 
 export function teamPage({ user, owned = null, memberOf = [], canTeam = false, error = null, notice = null }) {

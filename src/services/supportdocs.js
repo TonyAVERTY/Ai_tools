@@ -145,7 +145,7 @@ ${k.summary}
 - Appliquée à : ${k.tasks.map((t) => labels[t] || t).join(' ; ')}.`).join('\n\n')}
 
 ## Fiches de développement (page IA avec un projet joint)
-Quand tu joins un projet à la conversation ou que tu poses une question de code, AiTools choisit seul, sans appeler Claude, la méthode (rapide, structurée ou approfondie) et au plus quelques fiches, d'après ta demande et le profil du dépôt (langages, commandes de test et de build, tests, intégration continue, base de données, zones sensibles). Une question simple reçoit presque rien ; un changement risqué reçoit la méthode complète. Claude lit le dépôt mais n'exécute rien : il propose les changements et les commandes à lancer, et distingue ce qu'il a lu de ce qu'il suppose.
+Quand tu joins un projet à la conversation ou que tu poses une question de code, AiTools choisit seul, sans appeler Claude, la méthode (rapide, structurée ou approfondie) et au plus quelques fiches, d'après ta demande et le profil du dépôt (langages, commandes de test et de build, tests, intégration continue, base de données, zones sensibles). Une question simple reçoit presque rien ; un changement risqué reçoit la méthode complète. Claude lit le dépôt, propose les changements et les commandes à lancer, et distingue ce qu'il a lu de ce qu'il suppose.
 
 ${['base', 'specialise', 'workflow'].map((lvl) => `### ${LEVEL_TITLES[lvl]}\n\n${devSkills(lvl)}`).join('\n\n')}
 `,
