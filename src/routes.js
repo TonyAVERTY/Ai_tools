@@ -24,6 +24,7 @@ import { registerDeveloperRoutes } from './developerroutes.js';
 import { registerCalendarRoutes } from './calendar.js';
 import { registerAccountingRoutes } from './accountingroutes.js';
 import { registerBillingRoutes } from './billingroutes.js';
+import { registerClientsRoutes } from './clientsroutes.js';
 import { registerChatRoutes } from './chat.js';
 import { registerEventRoutes } from './events.js';
 import { feedToken, feedUrl } from './services/ical.js';
@@ -94,6 +95,7 @@ export function registerRoutes(router, app) {
   registerCalendarRoutes(router, app);
   registerAccountingRoutes(router, app);
   registerBillingRoutes(router, app, { aiOpts });
+  registerClientsRoutes(router, app);
   registerEventRoutes(router, app);
   registerChatRoutes(router, app);
   // Déjà connecté : la page de connexion n'a rien à offrir, on va au tableau de bord

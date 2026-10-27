@@ -1099,4 +1099,40 @@ export const MIGRATIONS = [
       ) ${T}`,
     ],
   },
+  {
+    // Page Clients : un client garde ses coordonnées, une note, et le lien vers le prospect dont il vient ; un document émis se rattache à son client.
+    name: 'clients_page',
+    sqlite: [
+      "ALTER TABLE billing_clients ADD COLUMN email TEXT NOT NULL DEFAULT ''",
+      "ALTER TABLE billing_clients ADD COLUMN phone TEXT NOT NULL DEFAULT ''",
+      "ALTER TABLE billing_clients ADD COLUMN contact TEXT NOT NULL DEFAULT ''",
+      "ALTER TABLE billing_clients ADD COLUMN notes TEXT NOT NULL DEFAULT ''",
+      'ALTER TABLE billing_clients ADD COLUMN prospect_id INTEGER',
+      'ALTER TABLE billing_invoices ADD COLUMN client_id INTEGER',
+    ],
+    mysql: [
+      { sql: "ALTER TABLE billing_clients ADD COLUMN email VARCHAR(255) NOT NULL DEFAULT ''", when: colMissing('billing_clients', 'email') },
+      { sql: "ALTER TABLE billing_clients ADD COLUMN phone VARCHAR(40) NOT NULL DEFAULT ''", when: colMissing('billing_clients', 'phone') },
+      { sql: "ALTER TABLE billing_clients ADD COLUMN contact VARCHAR(120) NOT NULL DEFAULT ''", when: colMissing('billing_clients', 'contact') },
+      { sql: 'ALTER TABLE billing_clients ADD COLUMN notes TEXT NULL', when: colMissing('billing_clients', 'notes') },
+      { sql: 'ALTER TABLE billing_clients ADD COLUMN prospect_id BIGINT NULL', when: colMissing('billing_clients', 'prospect_id') },
+      { sql: 'ALTER TABLE billing_invoices ADD COLUMN client_id BIGINT NULL', when: colMissing('billing_invoices', 'client_id') },
+    ],
+  },
+  {
+    // Un document émis garde les lignes réellement saisies (devis) et sa référence : acompte, facture finale et avoir se rattachent à un devis émis.
+    name: 'billing_refs',
+    sqlite: [
+      'ALTER TABLE billing_invoices ADD COLUMN devis_id INTEGER',
+      'ALTER TABLE billing_invoices ADD COLUMN ref_id INTEGER',
+      'ALTER TABLE billing_invoices ADD COLUMN lines_json TEXT',
+      'ALTER TABLE billing_invoices ADD COLUMN meta_json TEXT',
+    ],
+    mysql: [
+      { sql: 'ALTER TABLE billing_invoices ADD COLUMN devis_id BIGINT NULL', when: colMissing('billing_invoices', 'devis_id') },
+      { sql: 'ALTER TABLE billing_invoices ADD COLUMN ref_id BIGINT NULL', when: colMissing('billing_invoices', 'ref_id') },
+      { sql: 'ALTER TABLE billing_invoices ADD COLUMN lines_json MEDIUMTEXT NULL', when: colMissing('billing_invoices', 'lines_json') },
+      { sql: 'ALTER TABLE billing_invoices ADD COLUMN meta_json TEXT NULL', when: colMissing('billing_invoices', 'meta_json') },
+    ],
+  },
 ];
