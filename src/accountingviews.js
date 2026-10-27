@@ -85,6 +85,7 @@ function guideBlock(g, d) {
     <ol class="cmp-steps">${g.steps.map((s) => `<li>${esc(s)}</li>`).join('')}</ol>
     ${where ? `<div class="row-actions">${where}</div>` : ''}
     ${amounts}
+    <p class="muted small">Ce guide vient de ta situation : ${esc(summaryLine(d.settings))}. <a href="/compta?situation=1">Modifier mes réponses</a></p>
     ${g.notes.length ? `<ul class="cmp-notes">${g.notes.map((n) => `<li>${ic('info')}<span>${esc(n)}</span></li>`).join('')}</ul>` : ''}
     <div class="row-actions">
       <a class="btn small" href="/compta?periode=${esc(g.period)}#journal">Voir les lignes de cette période</a>
@@ -193,12 +194,12 @@ export function accountingPage(d) {
   const pager = d.pages > 1 ? `<nav class="pager" aria-label="Pages">${d.page > 1 ? `<a class="btn small" href="/compta?${esc(qs({ page: String(d.page - 1) }))}#journal">Précédent</a>` : ''}
       <span class="muted small">Page ${d.page} / ${d.pages}</span>${d.page < d.pages ? `<a class="btn small" href="/compta?${esc(qs({ page: String(d.page + 1) }))}#journal">Suivant</a>` : ''}</nav>` : '';
 
-  // Première visite : seules les questions s'affichent ; le reste de la page apparaît une fois la situation enregistrée
-  if (!s.complete) {
+  // Première visite (ou modification demandée depuis le guide de déclaration) : seules les questions s'affichent ; le reste de la page apparaît une fois la situation enregistrée
+  if (!s.complete || d.editSituation) {
     const first = `<div data-compta data-today="${esc(d.today)}">
   ${flash}
-  <section class="card" id="situation" aria-labelledby="t-sit"><h1 id="t-sit">Comptabilité : dis-nous où tu en es</h1>
-    <p class="muted">Quatre questions, une seule fois. Elles servent à te dire quoi déclarer, où et quand. Ensuite ta comptabilité s'ouvre : tes lignes, tes chiffres, ta déclaration. Tu pourras modifier tes réponses à tout moment.</p>${situationForm(s)}</section>
+  <section class="card" id="situation" aria-labelledby="t-sit"><h1 id="t-sit">${s.complete ? 'Comptabilité : modifie ta situation' : 'Comptabilité : dis-nous où tu en es'}</h1>
+    <p class="muted">${s.complete ? 'Tes réponses actuelles sont cochées : change ce qui doit l\'être, puis termine. Tes lignes et tes justificatifs ne bougent pas.' : 'Quatre questions, une seule fois. Elles servent à te dire quoi déclarer, où et quand. Ensuite ta comptabilité s\'ouvre : tes lignes, tes chiffres, ta déclaration. Tu pourras modifier tes réponses plus tard, depuis « Faire ma déclaration ».'}</p>${situationForm(s)}</section>
 </div>`;
     return layout({ title: 'Comptabilité', email: d.email, body: first, scripts: ['/static/compta.js'] });
   }
@@ -216,8 +217,6 @@ export function accountingPage(d) {
     ${hasAny ? `<p class="muted small">« Tout exporter » crée une archive avec tous les justificatifs de la période (${esc(d.periodLabel)}), classés par projet, et le journal pour ton comptable.</p>` : ''}
     ${flash}
   </section>
-
-  <details class="tip" id="situation"><summary><span class="tip-i" aria-hidden="true">i</span><span class="tip-t">Ma situation : ${esc(summaryLine(s))}</span></summary><div class="tip-body">${situationForm(s)}</div></details>
 
   ${nextCard}
   ${d.guide ? guideBlock(d.guide, d) : ''}

@@ -63,7 +63,7 @@ for (const [vp, scheme, tag] of [[{ width: 1280, height: 900 }, 'light', '1280px
   await p.waitForSelector('.wiz-end', { state: 'detached' }); // … laisse la place à la page
   await p.waitForSelector('.cmp-flash.ok');
   await p.waitForSelector('html[data-nav="ready"]');
-  ok(await p.locator('details#situation').count() === 1 && await p.getByRole('heading', { name: 'Tes chiffres' }).isVisible(), `${tag} la situation est enregistrée : le reste de la page apparaît, la situation est repliée`);
+  ok(await p.getByRole('heading', { name: 'Tes chiffres' }).isVisible() && await p.getByText('Ma situation').count() === 0, `${tag} la situation est enregistrée : le reste de la page apparaît, sans ligne « Ma situation »`);
 
   // ---------- ajout : fichier obligatoire, TVA masquée en franchise ----------
   await p.getByRole('button', { name: 'Ajouter une ligne' }).first().click();
@@ -88,9 +88,12 @@ for (const [vp, scheme, tag] of [[{ width: 1280, height: 900 }, 'light', '1280px
   ok((await p.locator('tr', { hasText: 'Facture 2026-001' }).locator('a.cmp-doc').innerText()).includes('facture.pdf'), `${tag} le justificatif est relié à la ligne`);
 
   // ---------- dépense avec TVA calculée en direct (compte assujetti simulé via la situation) ----------
-  await p.locator('details#situation > summary').click();
-  ok(await p.locator('details#situation [data-step]:not([hidden]) input:checked').count() === 1, `${tag} en modification, la réponse actuelle est cochée`);
-  await wizard(p.locator('details#situation'), ['', '', 'Je facture la TVA', '']);
+  await p.goto(`${s.base}/compta?declarer=1`);
+  await p.waitForSelector('html[data-nav="ready"]');
+  await p.getByRole('link', { name: 'Modifier mes réponses' }).click();
+  await p.waitForSelector('[data-wizard]');
+  ok(await p.locator('[data-step]:not([hidden]) input:checked').count() === 1, `${tag} en modification, la réponse actuelle est cochée`);
+  await wizard(p, ['', '', 'Je facture la TVA', '']);
   await p.waitForSelector('.wiz-end.show'); // la scène de fin « Ta situation est enregistrée »…
   await p.waitForSelector('.wiz-end', { state: 'detached' }); // … laisse la place à la page
   await p.waitForSelector('.cmp-flash.ok');

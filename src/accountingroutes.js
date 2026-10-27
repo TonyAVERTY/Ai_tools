@@ -141,7 +141,7 @@ export function registerAccountingRoutes(router, app) {
       email: session.email, today, settings, projects, periodValue, periodOptions: periodOptions(today), periodLabel: periodValue === 'tout' ? 'toute la période' : periodRange(periodValue).label,
       filters: { projet: projectFilter, type: kindFilter, q: String(q.get('q') || '').slice(0, 80) },
       totals, projectRows, rows, total: list.length, count: all.length, page, pages, alerts, next, guide, declOptions,
-      usedBytes: await used(userId), limits: LIMITS, error: q.get('e'), saved: q.get('ok'),
+      editSituation: q.get('situation') === '1', usedBytes: await used(userId), limits: LIMITS, error: q.get('e'), saved: q.get('ok'),
     }));
   });
 
@@ -170,7 +170,7 @@ export function registerAccountingRoutes(router, app) {
     const r = periodRange(b.period);
     if (!r || r.kind === 'year') throw refuse(400, 'Période inconnue.');
     if (b.done === '0' || b.done === 0) await db.prepare('DELETE FROM accounting_declarations WHERE user_id = ? AND period = ?').run(session.userId, b.period);
-    else await db.prepare('INSERT INTO accounting_declarations(user_id, period, done_at) VALUES(?, ?, ?) ON CONFLICT(user_id, period) DO NOTHING').run(session.userId, b.period, now());
+    else await db.prepare('INSERT OR IGNORE INTO accounting_declarations(user_id, period, done_at) VALUES(?, ?, ?)').run(session.userId, b.period, now());
     redirect(res, `/compta?declarer=${encodeURIComponent(b.period)}&ok=declaration#declaration`);
   }, { limit: 'compta' });
 

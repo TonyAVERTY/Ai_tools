@@ -126,3 +126,13 @@ test('migrations idempotentes : rouvrir une base déjà migrée ne casse rien (S
     await b.close();
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('SQL canonique : jamais de « DO NOTHING » (MySQL ne le comprend pas), on écrit INSERT OR IGNORE', async () => {
+  const { readdirSync, readFileSync, statSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const walk = (d) => readdirSync(d).flatMap((f) => (statSync(join(d, f)).isDirectory() ? walk(join(d, f)) : f.endsWith('.js') ? [join(d, f)] : []));
+  for (const f of walk(new URL('../src', import.meta.url).pathname)) {
+    assert.doesNotMatch(readFileSync(f, 'utf8'), /ON\s+CONFLICT[^`'"]*DO\s+NOTHING/i, `${f} : utilise INSERT OR IGNORE (traduit pour MySQL par db.js)`);
+  }
+  assert.equal(translate('INSERT OR IGNORE INTO accounting_declarations(user_id, period, done_at) VALUES(?, ?, ?)', 'mysql'), 'INSERT IGNORE INTO accounting_declarations(user_id, period, done_at) VALUES(?, ?, ?)');
+});

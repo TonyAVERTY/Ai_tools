@@ -183,7 +183,7 @@ test('la page s\'ouvre pour un compte connecté seulement : d\'abord les questio
   let h = await page(u);
   assert.match(h, /Comptabilité : dis-nous où tu en es/);
   assert.match(h, /Question 1 sur 4/);
-  for (const absent of [/Ajouter une ligne/, /Faire ma déclaration/, /Tes chiffres/, /Journal des lignes/, /Petit guide/, /data-compta-dlg/]) assert.doesNotMatch(h, absent, `${absent} : caché tant que la situation n'est pas donnée`);
+  for (const absent of [/Ajouter une ligne/, /href="\/compta\?declarer/, /Tes chiffres/, /Journal des lignes/, /Petit guide/, /data-compta-dlg/]) assert.doesNotMatch(h, absent, `${absent} : caché tant que la situation n'est pas donnée`);
   assert.equal((await situation(u)).status, 303);
   h = await page(u);
   assert.match(h, /<h1>Comptabilité<\/h1>/);
@@ -367,6 +367,14 @@ test('situation : l\'assistant l\'enregistre en JSON (statut obligatoire), la pa
   assert.deepEqual(await r.json(), { ok: true });
   const again = await page(u);
   assert.doesNotMatch(again, /Commence ici/);
-  assert.match(again, /Ma situation : Société ou entreprise au réel · Profession libérale · Je facture la TVA · déclaration chaque mois/);
-  assert.match(again, /name="regime" value="reel" checked/, 'en modification, les réponses actuelles sont cochées');
+  assert.doesNotMatch(again, /Ma situation/, 'plus de ligne « Ma situation » sur la page');
+  assert.doesNotMatch(again, /data-wizard/);
+  // La modification se fait depuis le guide de déclaration : les questions seules, réponses actuelles cochées
+  const guide = await page(u, '/compta?declarer=1');
+  assert.match(guide, /Ce guide vient de ta situation : Société ou entreprise au réel · Profession libérale · Je facture la TVA · déclaration chaque mois/);
+  assert.match(guide, /href="\/compta\?situation=1">Modifier mes réponses/);
+  const edit = await page(u, '/compta?situation=1');
+  assert.match(edit, /Comptabilité : modifie ta situation/);
+  assert.match(edit, /name="regime" value="reel" checked/, 'en modification, les réponses actuelles sont cochées');
+  assert.doesNotMatch(edit, /Tes chiffres|Journal des lignes/, 'seules les questions');
 });
