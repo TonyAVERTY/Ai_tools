@@ -55,9 +55,9 @@ test('création : refusée sans place d\'équipe, acceptée avec, une seule par 
   const free = await s.newUser({ admin: false, link: LINK });
   let r = await form(free, '/team/create', { name: 'X' });
   assert.equal(r.status, 400);
-  assert.match(await body(r), /ne comprend pas d'équipe/);
+  assert.match(await body(r), /L'équipe est incluse dans les offres avec des places d'équipe/);
   assert.equal(await ownedTeam(s.db, free.id), null);
-  assert.match(await text(free, '/team'), /ne comprend pas de place d'équipe/);
+  assert.match(await text(free, '/team'), /Les places d'équipe sont incluses dans certaines offres/);
 
   const paid = await s.newUser({ admin: false, link: LINK });
   await setPlan(paid, 'starter');

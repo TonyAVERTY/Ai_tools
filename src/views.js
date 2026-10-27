@@ -7,6 +7,7 @@ import { assetUrl, brandMark, iconLinks } from './assets.js';
 import { SPRITE, ic } from './icons.js';
 import { GIT_SERVER_TYPES, MAX_GIT_SERVERS } from './gitservers.js';
 import { ROLES, MAX_NOTES, rolesOfSection } from './services/roles.js';
+import { tourJson } from './tour.js';
 import { MODE_LABELS, CONSENT_TEXT, CONSENT_CHECKBOX, CONSENT_VERSION } from './claudelink.js';
 
 const fmtDate = (ts) => (ts ? new Date(ts * 1000).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' }) : '—');
@@ -38,6 +39,7 @@ ${iconLinks()}
 <link rel="stylesheet" href="${assetUrl('/static/tokens.css')}">
 <link rel="stylesheet" href="${assetUrl('/static/app.css')}">
 <link rel="stylesheet" href="${assetUrl('/static/responsive.css')}">
+<script src="${assetUrl('/static/tour.js')}" defer></script>
 <script src="${assetUrl('/static/app.js')}" defer></script>
 <script src="${assetUrl('/static/responsive.js')}" defer></script>
 <script src="${assetUrl('/static/fx.js')}" defer></script>
@@ -75,6 +77,7 @@ ${email ? `<header class="top">
           <p class="user-mail">${esc(email)}</p>
           <a href="/account">${ic('user')}Mon compte</a>
           <a href="/settings">${ic('gear')}Réglages</a>
+          <a href="/?tour=1">${ic('help')}Visite guidée</a>
           <form method="post" action="/logout"><button>${ic('out')}Déconnexion</button></form>
         </div>
       </details>
@@ -145,7 +148,7 @@ const fmtReset = (ts) => new Date(ts * 1000).toLocaleString('fr-FR', { weekday: 
 // Limites d'utilisation du compte Claude : session glissante de 5 h et semaine de 7 j (abonnement seulement ; une clé API n'a pas ces limites).
 function claudeLimits(quota, mode) {
   const head = '<h3 class="sub-h">Limites d\'utilisation</h3>';
-  if (mode === 'api_key') return `${head}<p class="hint">Avec une clé API, il n'y a pas de limite de session ni de semaine : Anthropic facture ce que tu consommes.</p>`;
+  if (mode === 'api_key') return `${head}<p class="hint">Avec une clé API, Anthropic facture ce que tu consommes, à l'usage.</p>`;
   const row = (label, w) => {
     if (!w) return '';
     if (w.expired) return `<li class="g"><div class="g-h"><span>${label}</span><span class="g-v muted">remise à zéro</span></div></li>`;
@@ -166,7 +169,7 @@ function linkSection(link, consent, quota = null) {
   if (!link) {
     return `<section class="card">
   <div class="card-h"><h2>Liaison Claude</h2></div>
-  <p class="card-d">Aucun accès Claude n'est relié : l'application reste bloquée sur la page de liaison.</p>
+  <p class="card-d">Relie un accès Claude pour utiliser l'application : tant qu'il manque, cette page de liaison reste affichée.</p>
   <div class="row"><a class="btn primary" href="/link">Relier Claude</a></div>
 </section>`;
   }
@@ -191,7 +194,7 @@ function linkSection(link, consent, quota = null) {
 // Barre de chargement avec pourcentage ESTIMÉ (public/app.js, track) : montée vers 95 % selon la durée habituelle, 100 % à la réponse
 const pctBlock = (label) => `<div class="dl-pct" data-pct hidden><div class="bar" role="progressbar" aria-label="${esc(label)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="w-0" data-pct-bar></span></div><p class="dl-pct-t"><span>${esc(label)} · estimation</span><b data-pct-text>0 %</b></p></div>`;
 
-export function accountPage({ user, error, link = null, consent = null, notice = null, usage = null, developer = false, ical = null, appUrl = '', quota = null }) {
+export function accountPage({ user, error, link = null, consent = null, notice = null, usage = null, developer = false, ical = null, appUrl = '', quota = null, profileSet = false }) {
   return layout({
     title: 'Mon compte', email: user.email,
     body: `<div class="narrow">
@@ -199,19 +202,18 @@ export function accountPage({ user, error, link = null, consent = null, notice =
 <section class="card">
   <div class="card-h"><h2>Connexion</h2></div>
   <div class="ident"><span class="avatar" aria-hidden="true">${esc(String(user.email).trim().charAt(0).toUpperCase())}</span>
-    <span class="sp"><b>${esc(user.email)}</b><span class="hint">Connecté avec ${esc(PROVIDER_NAMES[user.provider] || '—')}, sans mot de passe</span></span>
-    <span class="badge">${esc(PROVIDER_NAMES[user.provider] || '—')}</span></div>
+    <span class="sp"><b>${esc(user.email)}</b><span class="hint">Connecté avec ${esc(PROVIDER_NAMES[user.provider] || '—')}, sans mot de passe</span></span></div>
   ${user.isAdmin ? '<div class="row"><a class="btn small" href="/admin">Administration</a></div>' : ''}
 </section>
 ${notice ? `<p class="${notice.ok ? 'msg msg-ok' : 'msg msg-err'}" role="status">${esc(notice.text)}</p>` : ''}
 ${usagePanel(usage)}
 ${linkSection(link, consent, quota)}
 <section class="card">
-  <div class="card-h"><h2>Mon profil</h2><p>Ton secteur, ta fonction et ton niveau technique : Claude s'en sert pour adapter son vocabulaire et ses exemples. Rien n'est partagé avec un autre compte.</p></div>
-  <div class="row"><a class="btn small" href="/welcome?edit=1">${ic('user')}Modifier mon profil</a></div>
+  <div class="card-h"><h2>Mon profil</h2><span class="badge ${profileSet ? 'ok' : ''}">${profileSet ? `${ic('check')}Renseigné` : 'Non renseigné'}</span><p>Ta fonction, ton niveau technique, le niveau de détail et le tutoiement que tu préfères : Claude s'en sert pour te répondre. Valable pour tous tes projets, rien n'est partagé avec un autre compte.</p></div>
+  <div class="row"><a class="btn small" href="/welcome?edit=1">${ic('user')}${profileSet ? 'Modifier mon profil' : 'Renseigner mon profil'}</a></div>
 </section>
 <section class="card">
-  <div class="card-h"><h2>Agenda</h2><p><a href="/calendar">Voir le calendrier</a></p></div>
+  <div class="card-h"><h2>Agenda</h2><a class="btn small" href="/calendar">${ic('clock')}Voir le calendrier</a></div>
   ${icalBox(ical, '/account')}
 </section>
 <section class="card">
@@ -408,7 +410,7 @@ const ROLE_SELECT = `<label class="rolesel"><span class="lbl">Poste</span><span 
 /** Section « Postes et tâches IA » : chaque poste avec ses tâches. Les tâches qui lisent le dépôt sont réservées aux administrateurs. */
 function postesBody(p) {
   const member = p.access === 'member';
-  return `<p class="muted small">Chaque tâche fait écrire à Claude un livrable à partir de la fiche du projet (aucun envoi, rien n'est publié). Les précisions sont facultatives. Les chiffres, prix et références que la fiche ne donne pas restent « à compléter ».</p>
+  return `<p class="muted small">Chaque tâche fait écrire à Claude un livrable à partir de la fiche du projet : le livrable reste dans AiTools, à toi de l'utiliser. Les précisions sont facultatives. Les chiffres, prix et références que la fiche ne donne pas restent « à compléter ».</p>
   <div class="roles">${ROLES.map((r) => `
     <details class="role" data-role="${r.id}">
       <summary><b>${esc(r.label)}</b><span class="muted small">${esc(r.summary)}</span></summary>
@@ -577,7 +579,7 @@ function projectItem(p, smtp, dbCfg, imap, { open = false, stats = null } = {}) 
 </details>`;
 }
 
-export function dashboardPage({ email, projects, stats = new Map(), gitHosts = [], usage = null, pauseMessage = null }) {
+export function dashboardPage({ email, projects, stats = new Map(), gitHosts = [], usage = null, pauseMessage = null, tour = null }) {
   return layout({
     title: 'Projets', email,
     body: `<div class="dash">
@@ -605,7 +607,8 @@ ${usageKpis(usage)}
 </section>
 <aside class="col-s">${claudePanel()}</aside>
 </div>
-${projects.length ? '<aside class="todo" id="todo" aria-label="Mise en route du projet" hidden></aside>' : ''}`,
+${projects.length ? '<aside class="todo" id="todo" aria-label="Mise en route du projet" hidden></aside>' : ''}
+${tour ? `<script type="application/json" id="tour-data" data-mode="${esc(tour)}">${tourJson()}</script>` : ''}`,
   });
 }
 
@@ -778,7 +781,7 @@ ${saved ? `<p class="ok-box" role="status">${ic('check')}<span><b>Réglages enre
     <label class="field"><span class="lbl">Délai max entre 2 mails</span><span class="unit"><input name="send_delay_max" type="number" min="5" value="${esc(s.send_delay_max)}"><span>secondes</span></span></label>
   </div>
   ${check('read_receipt', s.read_receipt, 'Demander un accusé de lecture dans les mails de prospection')}
-  <p class="hint">Alternative au suivi d'ouverture : aucun pixel espion, aucun lien traqué. La messagerie du destinataire lui demande s'il accepte d'envoyer un accusé ; beaucoup refusent ou l'ignorent, « Lu » est donc un minimum, jamais un « non lu ».</p>
+  <p class="hint">« Lu » repose sur l'accusé de lecture standard : la messagerie du destinataire lui demande s'il accepte de l'envoyer. « Lu » est donc un minimum ; « Répondu » vient de la boîte de réception du projet.</p>
   <div class="footer-opt" data-footer-opt data-on="${s.mail_footer ? '1' : '0'}">
     <h3>Pied de page des mails de prospection</h3>
     <p class="state ${s.mail_footer ? 'ok' : 'warn'}" data-footer-state role="status">${s.mail_footer

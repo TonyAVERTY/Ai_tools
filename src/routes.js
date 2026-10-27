@@ -16,7 +16,8 @@ import { registerAdminRoutes } from './adminroutes.js';
 import { loginsOf } from './claudelogin.js';
 import { accessOn, memberTeamIds, needAccess } from './teams.js';
 import { registerTeamRoutes } from './teamroutes.js';
-import { registerProfileRoutes } from './userprofile.js';
+import { registerProfileRoutes, getProfile, isEmpty } from './userprofile.js';
+import { registerTourRoutes, needsTour } from './tour.js';
 import { registerMailRoutes } from './mailroutes.js';
 import { registerApiV1 } from './apiv1.js';
 import { registerDeveloperRoutes } from './developerroutes.js';
@@ -80,6 +81,7 @@ export function registerRoutes(router, app) {
   registerAdminRoutes(router, app);
   registerTeamRoutes(router, app);
   registerProfileRoutes(router, app);
+  registerTourRoutes(router, app);
   registerMailRoutes(router, app);
   registerLinkedinRoutes(router, app, { project, aiOpts });
   registerPromoRoutes(router, app, { project, aiOpts });
@@ -148,7 +150,7 @@ export function registerRoutes(router, app) {
   // ---------- Privé ----------
   router.post('/logout', async ({ req, res }) => { await destroySession(db, req, res); redirect(res, '/login'); });
 
-  router.get('/', async ({ res, session }) => {
+  router.get('/', async ({ res, session, url }) => {
     const userId = session.userId;
     const projects = [];
     for (const p of await listProjects(app, userId)) {
@@ -159,6 +161,8 @@ export function registerRoutes(router, app) {
     html(res, dashboardPage({
       email: session.email, projects, stats, gitHosts: (await listGitServers(db, userId)).map((x) => x.host), usage: await usageView(db, await getUser(db, userId)),
       pauseMessage: await sendPause(db, userId).then((p) => (p ? pauseMessageOf(p) : null)),
+      // Visite guidée : relancée à la demande (?tour=1), ou toute seule une fois après les questions de bienvenue
+      tour: url.searchParams.get('tour') === '1' ? 'replay' : (await needsTour(db, userId)) ? 'auto' : null,
     }));
   });
 
@@ -331,7 +335,7 @@ export function registerRoutes(router, app) {
     html(res, accountPage({
       user: session.user, error: url.searchParams.get('e'), link: account.link, quota: account.quota, developer: await developerMode(db, session.userId), appUrl: cfg.appUrl,
       ical: await (async () => { const t = await feedToken(app, session.userId); return t ? feedUrl(cfg, t) : null; })(),
-      consent: await lastConsent(db, session.userId), cliModeEnabled, usage: await usageView(db, await getUser(db, session.userId)),
+      consent: await lastConsent(db, session.userId), profileSet: !isEmpty(await getProfile(db, session.userId)), cliModeEnabled, usage: await usageView(db, await getUser(db, session.userId)),
       notice: t === 'unlinked' ? { ok: true, text: 'Liaison supprimée : le secret a été effacé et tes jobs IA en attente ont été annulés.' }
         : t === 'ok' || t === 'ko' ? { ok: t === 'ok', text: String(url.searchParams.get('m') || '').slice(0, 300) } : null,
     }));

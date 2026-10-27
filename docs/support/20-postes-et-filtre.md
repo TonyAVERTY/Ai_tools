@@ -31,5 +31,5 @@ Une entreprise est faite de postes : Direction, Commerce, Marketing, Communicati
 ## Modifier les consignes
 Les consignes communes à toutes ces tâches se modifient dans **Réglages → Prompts IA**, rubrique « Tâches des postes (Commerce, Communication, Finance…) » (un texte par gamme de modèle). Le poste, la mission et les rubriques de chaque tâche sont imposés par l'application.
 
-## Ce qui n'existe pas encore
-Les tâches des postes ne sont pas lançables par l'API ni par le serveur MCP, ne se programment pas « Cette nuit » et gardent seulement le dernier résultat de chaque tâche.
+## Lancement et résultat
+Les tâches des postes se lancent depuis l'application, partent tout de suite, et chaque tâche garde le dernier résultat produit.

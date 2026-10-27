@@ -75,7 +75,7 @@ export async function createTeam(db, userId, name) {
   const label = String(name ?? '').trim().slice(0, 80);
   if (!label) throw new HttpError(400, "Donne un nom à l'équipe");
   const seats = limitsFor(user).seats;
-  if (seats != null && seats < 2) throw forbidden("Ton offre ne comprend pas d'équipe : voir les tarifs (/tarifs).");
+  if (seats != null && seats < 2) throw forbidden("L'équipe est incluse dans les offres avec des places d'équipe : voir les tarifs (/tarifs).");
   if (await ownedTeam(db, userId)) throw new HttpError(409, 'Tu as déjà une équipe');
   try { await db.prepare('INSERT INTO teams(owner_id, name, created_at) VALUES(?, ?, ?)').run(user.id, label, now()); }
   catch (e) { if (await ownedTeam(db, userId)) throw new HttpError(409, 'Tu as déjà une équipe'); throw e; }

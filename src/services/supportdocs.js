@@ -13,6 +13,7 @@ import { PROMPT_DEFS } from './prompts.js';
 import { PROMO, FORMATS } from './promovideo.js';
 import { ROLES, MAX_NOTES } from './roles.js';
 import { loadSkills, SKILLS_MAX_CHARS } from './skills.js';
+import { TOUR_STEPS } from '../tour.js';
 
 export const STATIC_DOCS_DIR = fileURLToPath(new URL('../../docs/support/', import.meta.url));
 
@@ -144,9 +145,26 @@ ${k.summary}
 - Appliquée à : ${k.tasks.map((t) => labels[t] || t).join(' ; ')}.`).join('\n\n')}
 
 ## Fiches de développement (page IA avec un projet joint)
-Quand tu joins un projet à la conversation ou que tu poses une question de code, AiTools choisit seul, sans appeler Claude, la méthode (rapide, structurée ou approfondie) et au plus quelques fiches, d'après ta demande et le profil du dépôt (langages, commandes de test et de build, tests, intégration continue, base de données, zones sensibles). Une question simple reçoit presque rien ; un changement risqué reçoit la méthode complète. Claude lit le dépôt mais n'exécute rien : il propose les changements et les commandes à lancer, et distingue ce qu'il a lu de ce qu'il suppose.
+Quand tu joins un projet à la conversation ou que tu poses une question de code, AiTools choisit seul, sans appeler Claude, la méthode (rapide, structurée ou approfondie) et au plus quelques fiches, d'après ta demande et le profil du dépôt (langages, commandes de test et de build, tests, intégration continue, base de données, zones sensibles). Une question simple reçoit presque rien ; un changement risqué reçoit la méthode complète. Claude lit le dépôt, propose les changements et les commandes à lancer, et distingue ce qu'il a lu de ce qu'il suppose.
 
 ${['base', 'specialise', 'workflow'].map((lvl) => `### ${LEVEL_TITLES[lvl]}\n\n${devSkills(lvl)}`).join('\n\n')}
+`,
+  });
+  out.push({
+    name: 'visite-guidee.md',
+    content: `# Visite guidée du tableau de bord
+Résumé : la visite guidée d'AiTools (étape par étape, ce qui est éclairé et expliqué), comment elle démarre, comment la quitter ou la relancer. Fichier généré depuis le code.
+
+## Comment elle fonctionne
+- Elle démarre **toute seule une fois**, juste après les questions « Faisons connaissance » (répondues ou passées), sur le tableau de bord.
+- Pendant la visite, la page est assombrie : seul l'élément présenté reste éclairé, entouré d'un liseré, avec une carte qui l'explique. Les clics ne touchent pas la page derrière.
+- En haut de la carte : « Étape 3 sur ${TOUR_STEPS.length} » et un pourcentage avec sa barre. Boutons **Précédent** et **Suivant** (**Commencer** au début, **Terminer** à la fin) ; **Passer la visite** l'arrête. Au clavier : flèche droite et gauche pour avancer et reculer, **Échap** pour quitter.
+- **Passer la visite** ou **Terminer** : elle ne redémarre plus d'elle-même. Pour la revoir : avatar → **Visite guidée** (ouvre le tableau de bord avec la visite).
+- Une étape dont l'élément n'est pas à l'écran est sautée. Sur téléphone, la carte se place en bas de l'écran.
+- Si ton système demande moins d'animations, le projecteur change d'endroit sans glisser.
+
+## Les étapes
+${TOUR_STEPS.map((t, i) => `${i + 1}. **${t.title}** — ${t.text}`).join('\n')}
 `,
   });
   return out;
