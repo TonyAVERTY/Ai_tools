@@ -128,6 +128,9 @@ test('page Relier Claude : la clé API recommandée d\'abord, le risque annoncé
   assert.match(page, /<h3>Jeton collé à la main<\/h3>[^]*?action="\/link\/subscription"/);
   assert.doesNotMatch(page, /optc|TON accès/, 'plus de cartes à pastille d\'icône ni de « TON » en capitales');
   assert.match(page, /<div class="narrow" data-nolink>/, 'sans accès utilisable, la page demande à ne pas interroger les relevés (403)');
+  assert.equal((page.match(/data-pct hidden/g) || []).length, 2, 'une barre de pourcentage pour la préparation du lien, une pour la récupération du jeton');
+  assert.match(page, /Récupération de ton jeton · estimation/);
+  assert.match(page, /role="progressbar"[^>]*aria-valuenow="0"/);
   const linked = await s.newUser({ link: { v: 1, mode: 'api_key', valid: true } });
   assert.doesNotMatch(await html(linked, '/link'), /data-nolink/, 'avec un accès valide, les relevés continuent');
 });
