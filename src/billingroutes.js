@@ -8,7 +8,7 @@ import { getBilling, saveLegal, listDocs, getDoc, setChosen, validateDoc, resetD
 import { LEGAL_KEYS, normalizeLegal, legalComplete, legalMissing, billingStage, renderDocument, suggestFromRepo, buildSuggestions } from './services/billing.js';
 import { billingOverviewPage, billingProjectPage } from './billingviews.js';
 import { renderDocumentPdf } from './services/billingpdf.js';
-import { issueDocument, listInvoices, getInvoice, invoiceDir, IssueError } from './billingissue.js';
+import { issueDocument, listInvoices, listClients, deleteClient, getInvoice, invoiceDir, IssueError } from './billingissue.js';
 import { DOC_BY_KEY } from './services/billing.js';
 import { slug } from './services/accounting.js';
 import { existsSync, readFileSync } from 'node:fs';
@@ -73,7 +73,7 @@ export function registerBillingRoutes(router, app, { aiOpts = {} } = {}) {
     const stage = billingStage({ legal: billing.legal, docs, chosen: billing.chosen, jobs });
     html(res, billingProjectPage({
       email: session.email, project: { id: p.id, name: p.name, gitUrl: p.gitUrl }, legal: billing.legal, saved: billing.exists, errors: verify || billing.exists ? errors : {}, suggestions,
-      docs, invoices: await listInvoices(db, userId, p.id), chosen: billing.chosen, stage, jobs, flash: { ok: url.searchParams.get('ok'), error: url.searchParams.get('e') },
+      docs, invoices: await listInvoices(db, userId, p.id), clients: await listClients(db, userId, p.id), selectedKind: url.searchParams.get('type') || '', chosen: billing.chosen, stage, jobs, flash: { ok: url.searchParams.get('ok'), error: url.searchParams.get('e') },
     }));
   });
 
@@ -197,8 +197,14 @@ export function registerBillingRoutes(router, app, { aiOpts = {} } = {}) {
       redirect(ctx.res, back(p.id, `?ok=${doc.kind === 'devis' ? 'emis_devis' : 'emis'}&n=${encodeURIComponent(r.number)}#emis`));
     } catch (e) {
       if (!(e instanceof IssueError)) throw e;
-      redirect(ctx.res, back(p.id, `?e=${encodeURIComponent(e.message)}#documents`));
+      redirect(ctx.res, back(p.id, `?e=${encodeURIComponent(e.message)}#generer`));
     }
+  }, { limit: 'compta' });
+
+  router.post('/facturation/projet/:id/clients/:cid/supprimer', async (ctx) => {
+    const p = await mine(ctx);
+    await deleteClient(db, ctx.session.userId, p.id, ctx.params.cid);
+    redirect(ctx.res, back(p.id, '?ok=client_retire#clients'));
   }, { limit: 'compta' });
 
   router.get('/facturation/factures/:id/pdf', async ({ res, params, session }) => {
