@@ -26,7 +26,7 @@ export function billingOverviewPage({ email, rows }) {
       <div class="row-actions"><a class="btn ${r.stage.stage === 'ready' ? '' : 'primary'}" href="/facturation/projet/${r.id}">${esc(CTA[r.stage.stage])}</a>
         ${r.stage.busy ? `<span class="muted small bill-busy">${ic('load')} Claude travaille…</span>` : ''}</div></article>`;
   }).join('') : `<div class="empty-s"><p><b>Aucun projet pour l'instant.</b> La facturation se prépare projet par projet : crée d'abord un projet.</p><a class="btn primary small" href="/">Ouvrir mes projets</a></div>`;
-  const body = `<div data-bill>
+  const body = `<div data-bill class="bill-page">
   <section class="card"><div class="row-between"><div><h1>Facturation</h1>
     <p class="muted">Pour chaque projet : tes informations légales, puis des modèles de devis, d'acompte, de facture finale et d'avoir écrits avec Claude, prêts à être utilisés dans AiTools.</p></div></div>
     ${rows.length ? `<p class="bill-sum"><b>${ready}</b> projet${ready > 1 ? 's' : ''} prêt${ready > 1 ? 's' : ''} sur <b>${rows.length}</b></p>
@@ -146,7 +146,7 @@ export function billingProjectPage({ email, project: p, legal, errors, suggestio
   const done = ready ? `<section class="card bill-ready" aria-labelledby="t-ready"><div>${ic('check')}</div><div><h2 id="t-ready">Tes documents sont prêts</h2>
     <p class="muted">Le devis, l'acompte, la facture finale et l'avoir de « ${esc(p.name)} » sont validés : ils peuvent être utilisés dans AiTools. Les mentions légales se mettent à jour d'après tes informations légales.</p></div></section>` : '';
   const reset = docs.length ? `<form method="post" action="/facturation/projet/${p.id}/recommencer" data-confirm="Effacer les exemples et les documents de ce projet et repartir du début ? Tes informations légales sont conservées."><button class="btn small danger">${ic('trash')}Recommencer depuis le début</button></form>` : '';
-  const body = `<div data-bill data-bill-project="${p.id}" data-busy="${stage.busy ? '1' : '0'}">
+  const body = `<div class="bill-page" data-bill data-bill-project="${p.id}" data-busy="${stage.busy ? '1' : '0'}">
   <section class="card"><p><a class="link" href="/facturation">${ic('back')} Tous les projets</a></p>
     <div class="row-between"><div><h1>Facturation : ${esc(p.name)}</h1><p class="muted small">${esc(host(p.gitUrl))}</p></div></div>
     ${stepper(stage.steps, stageStep[stage.stage])}${banner}</section>
