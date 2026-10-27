@@ -2,7 +2,11 @@
 // arrivent dans les consignes système de chaque tâche, et sont décrites dans la documentation du Support (générée).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { loadSkills, parseSkill, skillsFor, skillsBlock, SKILLS_MAX_CHARS } from '../src/services/skills.js';
+import { loadSkills, parseSkill, skillsFor, skillsBlock, contractGaps, SKILLS_MAX_CHARS } from '../src/services/skills.js';
+import { INTENT_RULES } from '../src/services/orchestrator.js';
+
+// Intentions comprises par l'orchestrateur, plus « vague » (ambiguïté détectée par la longueur et le vocabulaire)
+const INTENTS = [...INTENT_RULES.map(([i]) => i), 'vague'];
 import {
   PROMPT_DEFS, analyzePrompt, prospectPrompt, templatePrompt, followupTemplatePrompt, linkedinPostPrompt, promoPrompt, evolutionPrompt,
   hookPrompt, auditPrompt, rolePrompt, chatPrompt, supportPrompt,
@@ -20,9 +24,13 @@ test('chaque fiche a ses champs, un nom unique, et vise des tâches qui existent
   assert.equal(new Set(skills.map((s) => s.name)).size, skills.length, 'noms uniques');
   for (const s of skills) {
     assert.ok(s.body.length > 400, `${s.name} : trop court pour servir`);
-    assert.ok(s.tasks.length, `${s.name} : aucune tâche visée`);
+    assert.ok(s.tasks.length || s.intents.length, `${s.name} : ni tâche ni intention visée`);
     for (const t of s.tasks) assert.ok(PROMPT_DEFS[t], `${s.name} : tâche inconnue « ${t} »`);
+    assert.deepEqual(contractGaps(s), [], `${s.name} : contrat incomplet`);
+    if (s.level !== 'metier') for (const i of s.intents) assert.ok(INTENTS.includes(i), `${s.name} : intention inconnue « ${i} »`);
   }
+  assert.throws(() => parseSkill('---\nnom: a\ntitre: A\nresume: r\nniveau: bizarre\ntaches: chat\n---\ncorps', 'x.md'), /niveau inconnu/);
+  assert.throws(() => parseSkill('---\nnom: a\ntitre: A\nresume: r\nniveau: base\n---\ncorps', 'x.md'), /taches/);
   assert.throws(() => parseSkill('sans en-tête', 'x.md'), /en-tête/);
   assert.throws(() => parseSkill('---\nnom: a\n---\ncorps', 'x.md'), /titre/);
 });
@@ -33,7 +41,7 @@ test('chaque tâche IA (hors support) reçoit au moins une fiche, sans dépasser
     assert.ok(skillsFor(key).length > 0, `${key} : aucune fiche`);
     assert.ok(skillsBlock(key).length <= SKILLS_MAX_CHARS + 600, `${key} : bloc trop gros (${skillsBlock(key).length})`);
   }
-  const big = [{ name: 'a', title: 'A', summary: 's', tasks: ['chat'], body: 'x'.repeat(SKILLS_MAX_CHARS - 10) }, { name: 'b', title: 'B', summary: 's', tasks: ['chat'], body: 'y'.repeat(200) }];
+  const big = [{ name: 'a', title: 'A', summary: 's', level: 'metier', tasks: ['chat'], body: 'x'.repeat(SKILLS_MAX_CHARS - 10) }, { name: 'b', title: 'B', summary: 's', level: 'metier', tasks: ['chat'], body: 'y'.repeat(200) }];
   const block = skillsBlock('chat', big);
   assert.match(block, /## A/);
   assert.doesNotMatch(block, /## B/, 'une fiche qui ferait dépasser le plafond est écartée entière, jamais coupée');

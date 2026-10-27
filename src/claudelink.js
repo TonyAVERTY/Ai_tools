@@ -257,6 +257,7 @@ export async function lastConsent(db, userId) {
 export function isLinkExempt(method, pathname) {
   if (pathname === '/link' || pathname.startsWith('/link/')) return true;
   if (pathname === '/account' || pathname === '/account/delete') return true;
+  if (pathname === '/welcome' || pathname === '/welcome/skip') return true; // le profil ne demande pas d'accès Claude
   if (pathname.startsWith('/linkedin/')) return true; // un administrateur d'équipe relie LinkedIn avec l'accès Claude du propriétaire
   if (pathname === '/team' || pathname.startsWith('/team/')) return true; // on peut gérer son équipe ou accepter une invitation sans avoir relié Claude
   if (pathname === '/admin' || pathname.startsWith('/admin/')) return true; // les administrateurs gèrent les comptes même sans liaison
