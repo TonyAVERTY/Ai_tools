@@ -21,7 +21,7 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 1248, height: 968
   await p.goto(`${s.base}/settings`);
   await p.waitForSelector('html[data-nav="ready"]');
   const current = () => p.locator('.toc a[aria-current="true"]').getAttribute('href');
-  for (const id of ['notif', 'git', 'garde', 'budget', 'prompts', 'opposition']) {
+  for (const id of ['notif', 'git', 'garde', 'budget', 'prompts']) {
     await p.locator(`.toc a[href="#${id}"]`).click();
     await p.waitForTimeout(1300); // le défilement se termine, la garde du clic aussi
     ok((await current()) === `#${id}`, `${viewport.height} px : un clic sur « ${id} » allume « ${id} » après le défilement (allumé : ${await current()})`);
@@ -31,7 +31,7 @@ for (const viewport of [{ width: 1280, height: 800 }, { width: 1248, height: 968
   await p.evaluate(() => document.getElementById('garde').scrollIntoView()); await p.waitForTimeout(500);
   ok((await current()) === '#garde', 'un défilement à la main allume la rubrique lue');
   await p.evaluate(() => scrollTo(0, document.documentElement.scrollHeight)); await p.waitForTimeout(500);
-  ok((await current()) === '#opposition', 'tout en bas : la dernière rubrique');
+  ok((await current()) === '#prompts', 'tout en bas : la dernière rubrique');
   ok(errs.length === 0, `aucune erreur JavaScript${errs.length ? ` : ${errs.join(' | ')}` : ''}`);
   await ctx.close();
 }

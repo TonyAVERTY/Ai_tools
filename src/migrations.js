@@ -879,4 +879,12 @@ export const MIGRATIONS = [
       { sql: "ALTER TABLE chat_conversations ADD COLUMN mode VARCHAR(12) NOT NULL DEFAULT 'claude'", when: colMissing('chat_conversations', 'mode') },
     ],
   },
+  {
+    // Mails de prospection : texte simple par défaut ; l'utilisateur peut choisir le HTML en validant le modèle (case « Envoyer en HTML »).
+    name: 'template_html',
+    sqlite: ['ALTER TABLE templates ADD COLUMN html INTEGER NOT NULL DEFAULT 0'],
+    mysql: [
+      { sql: 'ALTER TABLE templates ADD COLUMN html TINYINT NOT NULL DEFAULT 0', when: colMissing('templates', 'html') },
+    ],
+  },
 ];

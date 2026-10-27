@@ -91,10 +91,11 @@ test('flux complet : analyse → cible → prospection → modèle → envoi →
     assert.equal(mail.subject, 'Idée pour Boulangerie Le Fournil');
     assert.match(mail.text, /Bonjour Boulangerie Le Fournil à Rennes/);
     assert.match(mail.text, /fournil\.fr\/contact/);
-    assert.match(mail.html, /Bonjour Boulangerie Le Fournil à Rennes/);
-    assert.match(mail.html, /Ne plus recevoir de messages/);
-    const unsub = /\/u\/([^/]+)\/(\S+)/.exec(mail.headers['List-Unsubscribe']);
-    assert.ok(verifyUnsubToken(s.app.cfg.secretKey, decodeURIComponent(unsub[1]), unsub[2].replace('>', '')));
+    assert.equal(mail.html, undefined, 'mail classique : texte seulement, sans HTML');
+    assert.equal(mail.headers['List-Unsubscribe'], undefined, 'aucun en-tête de désabonnement invisible');
+    assert.match(mail.text, /Pour ne plus être contacté/);
+    const unsub = /\/u\/([^/\s]+)\/(\S+)/.exec(mail.text);
+    assert.ok(verifyUnsubToken(s.app.cfg.secretKey, decodeURIComponent(unsub[1]), unsub[2]));
     assert.equal((await prospectStats(s.db, s.id)).sent, 1);
 
     const again = await run(s, 'send', { count: 5 });

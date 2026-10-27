@@ -145,12 +145,12 @@ export async function getTemplate(db, projectId, kind, { validatedOnly = false }
   return row;
 }
 
-export async function saveTemplate(db, projectId, kind, { subject = '', subjectB = null, body, status = 'draft' }) {
+export async function saveTemplate(db, projectId, kind, { subject = '', subjectB = null, body, status = 'draft', html = false }) {
   if (!TEMPLATE_KINDS.includes(kind)) throw new HttpError(400, 'Type de modèle inconnu');
-  await db.prepare(`INSERT INTO templates(project_id, kind, subject, subject_b, body, status, updated_at) VALUES(?, ?, ?, ?, ?, ?, ?)
+  await db.prepare(`INSERT INTO templates(project_id, kind, subject, subject_b, body, status, html, updated_at) VALUES(?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(project_id, kind) DO UPDATE SET subject = excluded.subject, subject_b = excluded.subject_b,
-      body = excluded.body, status = excluded.status, updated_at = excluded.updated_at`)
-    .run(projectId, kind, subject, kind === 'initial' ? (subjectB || null) : null, body, status, now());
+      body = excluded.body, status = excluded.status, html = excluded.html, updated_at = excluded.updated_at`)
+    .run(projectId, kind, subject, kind === 'initial' ? (subjectB || null) : null, body, status, html ? 1 : 0, now());
 }
 
 // Objet A ou B : on équilibre les envois (B seulement si un objet B est défini)

@@ -289,7 +289,7 @@ export function howPage({ appUrl, apple = false }) {
 
   const guards = [
     ['Un budget que tu fixes', "Tu peux limiter la dépense en IA sur 24 heures et sur 30 jours. Quand la limite est atteinte, les tâches IA attendent (elles ne sont pas perdues) et les envois continuent. Une tâche déjà commencée n'est jamais coupée."],
-    ['Un œil sur ton quota', "Avec un abonnement, la barre du haut montre le quota restant que Claude indique lui-même. Au-delà de 85 %, l'analyse et les idées d'évolution sont reportées pour garder de la marge à la recherche de contacts."],
+    ['Un œil sur ton quota', "Avec un abonnement, la carte « Consommation Claude » de la page Projets montre le quota restant que Claude indique lui-même. Au-delà de 85 %, l'analyse et les idées d'évolution sont reportées pour garder de la marge à la recherche de contacts."],
     ['Des envois encadrés', "Des professionnels uniquement, un lien de désinscription dans chaque mail, une liste d'opposition respectée pour tout le monde, des plafonds sur 24 heures par projet et pour tout ton compte. Les règles qui t'incombent sont rappelées sur la page <a href=\"/tarifs#envois\">Tarifs</a>."],
     ['Des modèles économes au départ', 'La recherche, l\'analyse et la rédaction utilisent Haiku par défaut (le plus léger). Dans les réglages, tu choisis un autre modèle Claude pour chacune, et tu adaptes les consignes à chaque modèle.'],
   ];
