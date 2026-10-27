@@ -26,7 +26,7 @@ test('chaque cible de la visite existe dans le tableau de bord rendu', async () 
   const u = await s.newUser();
   const html = await text(u, '/');
   const has = {
-    '.pills a[href="/"]': /<nav class="pills"[^]*?href="\/"/, '.pills a[href="/mails"]': /class="pill" href="\/mails"/, '.pills a[href="/calendar"]': /class="pill" href="\/calendar"/,
+    '.pills a[href="/"]': /<nav class="pills"[^]*?href="\/"/, '.pills a[href="/mails"]': /class="pill" href="\/mails"/, '.pills a[href="/calendar"]': /class="pill" href="\/calendar"/, '.pills a[href="/compta"]': /class="pill" href="\/compta"/,
     '.pills a[href="/team"]': /class="pill" href="\/team"/, '.ukpis': /class="ukpis"/, '[data-new-toggle]': /data-new-toggle/, '.ia-menu > summary': /<details class="ia-menu">\s*<summary/,
     '.ia-menu .ia-pop': /class="user-pop ia-pop"/, '[data-claude-card]': /data-claude-card/, 'details.user > summary': /<details class="user">\s*<summary/, 'details.user .user-pop': /<details class="user">[^]*?class="user-pop"/,
   };

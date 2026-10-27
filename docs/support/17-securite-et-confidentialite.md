@@ -19,6 +19,9 @@ Clé API ou jeton Claude, mots de passe SMTP/IMAP/base, tokens Git, liens de web
 - Le « Lu » d'un mail s'appuie sur l'accusé de lecture standard, que le destinataire choisit d'envoyer ou non.
 - Les mails de prospection ne visent que des **adresses professionnelles publiées** par l'entreprise.
 
+## Comptabilité
+Les justificatifs de la page « Comptabilité » sont des fichiers rangés dans un dossier propre à chaque compte : lisibles par leur auteur seul (même pour un projet partagé en équipe), reconnus à leur contenu (PDF ou image seulement), ouverts sans exécution, et supprimés avec la ligne ou avec le compte. Une ligne n'est jamais enregistrée sans justificatif. La page n'envoie rien aux impôts ni à l'URSSAF.
+
 ## Données personnelles
 La personne qui utilise AiTools est responsable des prospects qu'elle contacte (elle est responsable de traitement pour ces données) ; AiTools est responsable de traitement pour les données de son compte. La suppression du compte efface tout (sauf la liste d'opposition commune, conservée pour respecter les oppositions). La **Politique de confidentialité**, les **Mentions légales** et les **CGU** sont accessibles depuis le pied de page du site public ; elles détaillent les données collectées, leurs durées de conservation et les destinataires (dont Anthropic, via l'accès Claude de la personne).
 

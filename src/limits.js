@@ -47,6 +47,9 @@ export const RATE_LIMITS = {
   account_delete: { user: { max: 5, windowMs: HOUR }, ip: { max: 10, windowMs: HOUR } },
   // Tests de connexion vers les services de l'utilisateur (IMAP, base du récap, SMTP)
   conn_test: { user: { max: 20, windowMs: 10 * MIN } },
+  // Comptabilité : saisie, envoi des justificatifs ; export de l'archive (plusieurs Mo, lecture de tous les fichiers)
+  compta: { user: { max: 120, windowMs: 10 * MIN } },
+  compta_export: { user: { max: 10, windowMs: 10 * MIN } },
   // Back-office
   admin: { user: { max: 120, windowMs: MIN } },
 };

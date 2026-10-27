@@ -136,6 +136,7 @@ export function privacyPage({ appUrl, apple = false, captcha = false, inactiveMo
     <tr><th scope="row">Vidéos de promotion</th><td>Les vidéos que tu fais produire depuis l'onglet Promotion d'un projet : le fichier MP4, le sujet que tu as saisi, les réglages choisis (images par seconde, durée, format) et la date. Elles sont visibles de ton compte et des personnes qui ont accès au projet (équipe).</td><td>Te fournir la vidéo demandée. Exécution du contrat.</td></tr>
     <tr><th scope="row">Adresse IP</th><td>Ton adresse IP sert à limiter le nombre de requêtes (protection contre les abus). Elle reste en mémoire du serveur, quelques minutes à quelques heures, et n'est pas enregistrée en base de données.</td><td>Sécurité du service. Intérêt légitime.</td></tr>
     <tr><th scope="row">Modération</th><td>Actions d'administration sur un compte (suspension, plan, suppression) et pauses d'envoi décidées quand trop de mails sont rejetés : date, action, identifiant du compte et adresse masquée.</td><td>Sécurité du service et lutte contre les abus. Intérêt légitime.</td></tr>
+    <tr><th scope="row">Comptabilité</th><td>Les lignes que tu saisis (date, libellé, montant, TVA, client ou fournisseur, projet, note) et le justificatif que tu joins (PDF ou image), ainsi que ta situation (statut, activité, TVA, rythme de déclaration) et les périodes marquées « déclarées ». Visibles de toi seul.</td><td>Te permettre de ranger tes pièces et de préparer tes déclarations. Exécution du service que tu demandes.</td></tr>
     <tr><th scope="row">Liste d'opposition</th><td>Adresse email, motif (désinscription, refus, mail rejeté) et date.</td><td>Ne plus jamais contacter une personne qui s'y est opposée, pour tous les comptes. Obligation légale, intérêt légitime.</td></tr>
   </tbody>
 </table></div>
@@ -156,6 +157,7 @@ export function privacyPage({ appUrl, apple = false, captcha = false, inactiveMo
     <tr><th scope="row">Session</th><td>30 jours au plus, effacée à la déconnexion. Les états de connexion durent 10 minutes.</td></tr>
     <tr><th scope="row">Clé API ou jeton Claude</th><td>Jusqu'à ce que tu le délies ou supprimes ton compte.</td></tr>
     <tr><th scope="row">Prospects, notes et journaux d'envoi</th><td>Jusqu'à la suppression du projet ou du compte. En tant que responsable de traitement, ne garde pas une fiche plus de 3 ans après le dernier contact.</td></tr>
+    <tr><th scope="row">Comptabilité et justificatifs</th><td>Jusqu'à ce que tu supprimes la ligne ou ton compte. Les documents comptables se conservent en principe 10 ans : exporte-les avant de supprimer.</td></tr>
     <tr><th scope="row">Liste d'opposition</th><td>Conservée après la suppression d'un compte, tant qu'il faut respecter l'opposition de la personne.</td></tr>
     <tr><th scope="row">Sauvegardes</th><td>Environ 14 jours : une donnée effacée disparaît des sauvegardes à leur expiration.</td></tr>
     <tr><th scope="row">Journaux d'accès du serveur web</th><td>12 mois au plus (adresse IP, date, page demandée), pour la sécurité.</td></tr>

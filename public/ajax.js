@@ -110,17 +110,14 @@
     const move = keepScroll || fromPath === u.pathname ? null : a >= 0 && z >= 0 ? (z > a ? 'right' : 'left') : 'up';
     const savedY = scrollY; // le contenu est remplacé d'un coup : la page peut être raccourcie un instant, on garde la valeur d'avant
     const toasts = [...document.querySelectorAll('.toast')];
-    // Fond animé et barre système restent tels quels pendant le remplacement : pas de clignotement, pas de saut de hauteur
+    // Le fond animé reste tel quel pendant le remplacement : pas de clignotement
     const bg = document.getElementById('bg');
-    const sys = document.getElementById('sys')?.innerHTML;
     document.title = doc.title;
     const keep = document.body.classList.contains('hdr-off');
     document.body.className = doc.body.className;
     if (keep) document.body.classList.add('hdr-off');
     document.body.innerHTML = doc.body.innerHTML;
     if (bg && document.getElementById('bg')) document.getElementById('bg').replaceWith(bg);
-    const newSys = document.getElementById('sys');
-    if (newSys && sys) newSys.innerHTML = sys;
     for (const t of toasts) document.body.append(t);
     if (push) {
       history.replaceState({ ...history.state, y: scrollY }, '');
