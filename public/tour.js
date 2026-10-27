@@ -7,6 +7,41 @@
   const calm = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
   const PAD = 8; // marge claire autour de l'élément éclairé
 
+  /** Contour arrondi de la réunion de rectangles {l,t,r,b} : trace les bords d'une grille compressée, puis arrondit chaque angle (rayon k). */
+  function outline(rects, k) {
+    const xs = [...new Set(rects.flatMap((q) => [q.l, q.r]))].sort((m, n) => m - n);
+    const ys = [...new Set(rects.flatMap((q) => [q.t, q.b]))].sort((m, n) => m - n);
+    const inside = (i, j) => i >= 0 && j >= 0 && i < xs.length - 1 && j < ys.length - 1 && rects.some((q) => q.l <= xs[i] && xs[i + 1] <= q.r && q.t <= ys[j] && ys[j + 1] <= q.b);
+    const next = new Map();
+    const edge = (x1, y1, x2, y2) => next.set(`${x1},${y1}`, [x2, y2]);
+    for (let i = 0; i < xs.length - 1; i++) for (let j = 0; j < ys.length - 1; j++) {
+      if (!inside(i, j)) continue;
+      if (!inside(i, j - 1)) edge(xs[i], ys[j], xs[i + 1], ys[j]);
+      if (!inside(i + 1, j)) edge(xs[i + 1], ys[j], xs[i + 1], ys[j + 1]);
+      if (!inside(i, j + 1)) edge(xs[i + 1], ys[j + 1], xs[i], ys[j + 1]);
+      if (!inside(i - 1, j)) edge(xs[i], ys[j + 1], xs[i], ys[j]);
+    }
+    let out = '';
+    const seen = new Set();
+    for (const key of next.keys()) {
+      if (seen.has(key)) continue;
+      let pts = [];
+      for (let c = key; c && !seen.has(c); c = next.get(c)?.join(',')) { seen.add(c); pts.push(c.split(',').map(Number)); }
+      pts = pts.filter((q, i) => { const a = pts[(i + pts.length - 1) % pts.length]; const b = pts[(i + 1) % pts.length]; return (q[0] - a[0]) * (b[1] - q[1]) - (q[1] - a[1]) * (b[0] - q[0]) !== 0; }); // pas de sommet sur une ligne droite
+      const n = pts.length;
+      const len = (u, v) => Math.hypot(v[0] - u[0], v[1] - u[1]);
+      pts.forEach((q, i) => {
+        const a = pts[(i + n - 1) % n]; const b = pts[(i + 1) % n];
+        const r = Math.min(k, len(a, q) / 2, len(q, b) / 2);
+        const d1 = [(q[0] - a[0]) / len(a, q), (q[1] - a[1]) / len(a, q)]; const d2 = [(b[0] - q[0]) / len(q, b), (b[1] - q[1]) / len(q, b)];
+        const sweep = d1[0] * d2[1] - d1[1] * d2[0] > 0 ? 1 : 0;
+        out += `${i ? 'L' : 'M'}${q[0] - d1[0] * r} ${q[1] - d1[1] * r}A${r} ${r} 0 0 ${sweep} ${q[0] + d2[0] * r} ${q[1] + d2[1] * r}`;
+      });
+      out += 'Z';
+    }
+    return out;
+  }
+
   let live = null;
 
   function stop() {
@@ -27,7 +62,7 @@
     const opener = document.activeElement;
     const root = document.createElement('div');
     root.className = 'tour';
-    root.innerHTML = `<div class="tour-shield"></div><div class="tour-dim"></div><div class="tour-hole snap"></div><div class="tour-hole2 snap"></div>
+    root.innerHTML = `<div class="tour-shield"></div><div class="tour-dim"></div><div class="tour-hole snap"></div><svg class="tour-ring" aria-hidden="true"><path d=""/></svg>
       <section class="tour-card" role="dialog" aria-modal="true" aria-labelledby="tour-t" aria-describedby="tour-d" tabindex="-1">
         <p class="tour-n"><span data-tour-count></span><b data-tour-pct></b></p>
         <div class="bar" role="progressbar" aria-label="Progression de la visite" aria-valuemin="0" aria-valuemax="100"><span class="w-0" data-tour-bar></span></div>
@@ -41,7 +76,7 @@
     // Les clics dans la visite ne remontent pas au reste de la page (sinon le « clic en dehors » du menu déplié le refermerait aussitôt)
     for (const t of ['click', 'mousedown', 'pointerdown']) root.addEventListener(t, (e) => e.stopPropagation());
     const hole = $('.tour-hole', root);
-    const hole2 = $('.tour-hole2', root);
+    const ring = $('.tour-ring path', root);
     const dim = $('.tour-dim', root);
     const card = $('.tour-card', root);
     const prev = $('[data-tour-prev]', root);
@@ -78,13 +113,12 @@
       const multi = !!el2 && shown(el2);
       root.classList.toggle('tour-multi', multi);
       if (multi) {
-        // Deux éléments éclairés (bouton + menu déplié) : on contourne ce qui les sépare (ex. le bouton voisin), qui reste assombri
-        const box = (el) => { const b = el.getBoundingClientRect(); return { left: b.left - PAD, top: b.top - PAD, width: b.width + 2 * PAD, height: b.height + 2 * PAD }; };
-        const a = box(el1);
-        const b = box(el2);
-        const rr = (x) => { const k = 14; const R = x.left + x.width; const B = x.top + x.height; return `M${x.left + k} ${x.top}H${R - k}A${k} ${k} 0 0 1 ${R} ${x.top + k}V${B - k}A${k} ${k} 0 0 1 ${R - k} ${B}H${x.left + k}A${k} ${k} 0 0 1 ${x.left} ${B - k}V${x.top + k}A${k} ${k} 0 0 1 ${x.left + k} ${x.top}Z`; };
-        dim.style.clipPath = `path(evenodd, 'M0 0H${vw}V${vh}H0Z ${rr(a)} ${rr(b)}')`;
-        for (const [h, x] of [[hole, a], [hole2, b]]) Object.assign(h.style, { left: `${x.left}px`, top: `${x.top}px`, width: `${x.width}px`, height: `${x.height}px`, borderRadius: '14px' });
+        // Deux éléments éclairés (bouton + menu déplié) : une seule forme qui épouse leur réunion ; ce qui les entoure (ex. le bouton voisin) reste assombri
+        const box = (el) => { const b = el.getBoundingClientRect(); return { l: b.left - PAD, t: b.top - PAD, r: b.right + PAD, b: b.bottom + PAD }; };
+        const d = outline([box(el1), box(el2)], 14);
+        dim.style.clipPath = `path(evenodd, 'M0 0H${vw}V${vh}H0Z ${d}')`;
+        ring.setAttribute('d', d);
+        Object.assign(hole.style, { left: `${r.left - PAD}px`, top: `${r.top - PAD}px`, width: `${r.width + 2 * PAD}px`, height: `${r.height + 2 * PAD}px`, borderRadius: '14px' });
       } else {
         Object.assign(hole.style, { left: `${r.left - PAD}px`, top: `${r.top - PAD}px`, width: `${r.width + 2 * PAD}px`, height: `${r.height + 2 * PAD}px`, borderRadius: '14px' });
       }

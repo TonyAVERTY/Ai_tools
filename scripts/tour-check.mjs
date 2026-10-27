@@ -75,16 +75,10 @@ for (const [vp, scheme, tag] of [[{ width: 1280, height: 800 }, 'dark', '1280px 
       ok(covers, `${tag} étape ${n} « ${title} » : l'élément est dans la zone éclairée`);
       if (step.open) ok(await p.locator(step.open).evaluate((d) => d.open), `${tag} étape ${n} : le menu est bien déplié pendant l'étape`);
       if (also) {
-        const hole2 = await p.locator('.tour-hole2').boundingBox();
-        ok(hole2 && hole2.x <= also.x + 1 && hole2.y <= also.y + 1 && hole2.x + hole2.width >= also.x + also.width - 1 && hole2.y + hole2.height >= also.y + also.height - 1, `${tag} étape ${n} : le menu déplié est éclairé aussi`);
-        // Le bouton voisin (entre le bouton et le menu) reste assombri : on contourne
-        const between = await p.evaluate(([a, b]) => {
-          const ra = document.querySelector(a).getBoundingClientRect(); const rb = document.querySelector(b).getBoundingClientRect();
-          const x = (ra.left + ra.right) / 2; const out = [];
-          for (const y of [ra.top - 8, ra.top - 2]) out.push(document.querySelector('.tour-dim') && getComputedStyle(document.querySelector('.tour-dim')).clipPath !== 'none');
-          return { clipped: out[0], neighbor: !!document.querySelector('.tour-dim'), x, ya: ra.bottom, yb: rb.top };
-        }, [step.target, step.also]);
-        ok(between.clipped, `${tag} étape ${n} : l'ombre est découpée autour des deux éléments seulement`);
+        ok(hole.x <= also.x + 1 && hole.y <= also.y + 1 && hole.x + hole.width >= also.x + also.width - 1 && hole.y + hole.height >= also.y + also.height - 1, `${tag} étape ${n} : le menu déplié est éclairé aussi`);
+        // Une seule forme : un seul tracé de contour, et l'ombre est découpée autour (le bouton voisin reste assombri)
+        ok(await p.locator('.tour-ring path').evaluate((e) => (e.getAttribute('d').match(/M/g) || []).length === 1), `${tag} étape ${n} : un seul contour pour le bouton et son menu`);
+        ok(await p.locator('.tour-dim').evaluate((e) => /evenodd/.test(getComputedStyle(e).clipPath) || getComputedStyle(e).clipPath !== 'none'), `${tag} étape ${n} : l'ombre est découpée autour de cette forme`);
       }
       ok(inView, `${tag} étape ${n} : la carte reste dans l'écran`);
       ok(vp.width < 640 ? card.y >= hole.y + hole.height - 2 : !inter(card, hole), `${tag} étape ${n} : la carte ne recouvre pas l'élément éclairé`);
