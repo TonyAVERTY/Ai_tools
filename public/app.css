@@ -1170,7 +1170,6 @@ body.tour-active { padding-bottom: var(--tour-pad, 0px); }
 .cmp-alerts li.err > .ic { color: var(--err); }
 .cmp-next { display: flex; flex-flow: row wrap; align-items: center; justify-content: space-between; gap: 12px 20px; text-align: left; }
 .cmp-next > div { flex: 1 1 320px; }
-.cmp-faq .tip { margin: 2px 0; }
 .cmp-next h2, .cmp-next p { margin: 0; }
 .cmp-next p { margin-top: 4px; }
 .cmp-deadline { display: flex; gap: 10px; align-items: center; margin: 0; }
@@ -1213,8 +1212,6 @@ body.tour-active { padding-bottom: var(--tour-pad, 0px); }
 [data-compta] .cmp-alerts li { padding: 14px 18px; gap: 12px; }
 [data-compta] .cmp-steps { gap: 12px; margin-bottom: 20px; }
 [data-compta] .cmp-notes { gap: 12px; margin: 20px 0; }
-[data-compta] .cmp-faq .tip { margin: 4px 0; }
-[data-compta] .cmp-faq .tip-body { padding: 8px 20px 16px; }
 [data-compta] .empty-s { padding: 24px; }
 [data-compta] .tip-body { padding: 24px 28px 28px; }
 @media (max-width: 639px) {
@@ -1222,3 +1219,18 @@ body.tour-active { padding-bottom: var(--tour-pad, 0px); }
   [data-compta] > .card { padding: 20px 18px 22px; gap: 16px; }
   [data-compta] .tip-body { padding: 18px 16px 22px; }
 }
+
+/* Questions fréquentes : une liste de questions, une réponse qui s'ouvre sous chacune (Comptabilité) */
+.faq { border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden; background: var(--card); }
+.faq-i + .faq-i { border-top: 1px solid var(--line); }
+.faq-i > summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 60px; padding: 14px 20px; cursor: pointer; list-style: none; font-weight: 600; font-size: 1rem; line-height: 1.4; }
+.faq-i > summary::-webkit-details-marker { display: none; }
+.faq-i > summary:hover { background: var(--bg-sunk); }
+.faq-i > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.faq-i > summary .ic { flex: none; color: var(--muted); transition: transform var(--t) var(--ease); }
+.faq-i[open] > summary { background: var(--bg-sunk); }
+.faq-i[open] > summary .ic { transform: rotate(180deg); color: var(--text); }
+.faq-a { padding: 4px 20px 20px; background: var(--bg-sunk); }
+.faq-a p { margin: 8px 0 0; max-width: 70ch; }
+@media (prefers-reduced-motion: reduce) { .faq-i > summary .ic { transition: none; } }
+@media (max-width: 639px) { .faq-i > summary { padding: 12px 16px; } .faq-a { padding: 2px 16px 16px; } }
