@@ -3,6 +3,26 @@
 (() => {
   clearInterval(window.__billTimer);
   const root = document.querySelector('[data-bill-project]');
+
+  // « Générer un document » : le client choisi remplit ses champs, et seuls les champs utiles au type de document restent visibles
+  const form = root?.querySelector('[data-issue]');
+  if (form) {
+    const kindSel = form.querySelector('[data-issue-kind]');
+    const clientSel = form.querySelector('[data-issue-client]');
+    const sync = () => {
+      const kind = kindSel.selectedOptions[0]?.dataset.kind || '';
+      form.querySelectorAll('[data-for]').forEach((el) => { el.hidden = !el.dataset.for.split(' ').includes(kind); });
+      form.querySelectorAll('[data-for="avoir"] input[name="facture_numero"]').forEach((i) => { i.required = kind === 'avoir'; });
+    };
+    kindSel.addEventListener('change', sync);
+    clientSel.addEventListener('change', () => {
+      const o = clientSel.selectedOptions[0];
+      form.querySelector('[name="client_nom"]').value = o?.dataset.name || '';
+      form.querySelector('[name="client_adresse"]').value = o?.dataset.address || '';
+      form.querySelector('[name="client_siret"]').value = o?.dataset.siret || '';
+    });
+    sync();
+  }
   if (!root || root.dataset.busy !== '1') return;
   const id = root.dataset.billProject;
   let rev = null;
