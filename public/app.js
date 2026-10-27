@@ -143,21 +143,24 @@
     const sections = tocLinks.map((a) => document.getElementById(a.getAttribute('href').slice(1))).filter(Boolean);
     let queued = false;
     const mark = (id) => tocLinks.forEach((a) => { if (a.getAttribute('href') === `#${id}`) a.setAttribute('aria-current', 'true'); else a.removeAttribute('aria-current'); });
+    // Une section est « en cours » dès que son haut passe sous la ligne de lecture, fixée près du haut de l'écran : c'est la position où atterrit un clic
+    // sur le sommaire, donc la section cliquée est bien celle qui s'allume (même courte, avec la suivante déjà visible plus bas). Tout en bas de la page,
+    // la dernière section s'allume, puisqu'elle ne peut plus monter jusqu'à la ligne.
+    let lockUntil = 0;
     const update = () => {
       queued = false;
-      // La ligne de lecture descend du tiers de l'écran (haut de page) jusqu'au bas de l'écran (bas de page) : ainsi les dernières
-      // sections, trop courtes pour jamais atteindre le tiers supérieur, sont elles aussi repérées, chacune à son tour.
-      const range = document.documentElement.scrollHeight - innerHeight;
-      const progress = range > 0 ? Math.min(1, Math.max(0, scrollY / range)) : 0;
-      const line = innerHeight * (0.33 + 0.67 * progress);
+      if (Date.now() < lockUntil) return; // défilement déclenché par un clic : on garde la section cliquée
+      const line = 140;
+      const atEnd = document.documentElement.scrollHeight - innerHeight - scrollY < 4;
       let cur = sections[0];
-      for (const sec of sections) if (sec.getBoundingClientRect().top <= line) cur = sec;
+      if (atEnd) cur = sections[sections.length - 1];
+      else for (const sec of sections) if (sec.getBoundingClientRect().top <= line) cur = sec;
       mark(cur.id);
     };
     const schedule = () => { if (!queued) { queued = true; requestAnimationFrame(update); } };
     listen(window, 'scroll', schedule, { passive: true });
     listen(window, 'resize', schedule);
-    tocLinks.forEach((a) => a.addEventListener('click', () => mark(a.getAttribute('href').slice(1))));
+    tocLinks.forEach((a) => a.addEventListener('click', () => { lockUntil = Date.now() + 900; mark(a.getAttribute('href').slice(1)); setTimeout(schedule, 950); }));
     update();
   }
 
