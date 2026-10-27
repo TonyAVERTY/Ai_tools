@@ -5,6 +5,7 @@
   if (!root) return;
   const $ = (s, el = root) => el.querySelector(s);
   const dlg = $('[data-compta-dlg]');
+  if (!dlg) return; // première visite : seules les questions de la situation sont affichées
   const form = $('[data-compta-form]');
   const data = JSON.parse($('[data-compta-data]', dlg).textContent);
   const errBox = $('[data-compta-error]');

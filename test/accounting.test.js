@@ -173,19 +173,24 @@ const fields = (o = {}) => ({ kind: 'payment_in', date: today(), label: 'Facture
 const create = (u, body, f = fields(), { name = 'facture.pdf', type = 'application/pdf' } = {}) => fetch(`${s.base}/api/compta/entries`, {
   method: 'POST', body, headers: { cookie: u.cookie, origin: APP_URL, 'content-type': type, 'x-file-name': encodeURIComponent(name), 'x-entry': encodeURIComponent(JSON.stringify(f)), accept: 'application/json' },
 });
+// La page n'affiche d'abord que les questions de la situation : on les remplit pour voir le reste
+const situation = (u, o = {}) => u.post('/compta/situation', { regime: 'micro', activity: 'services', vat: 'franchise', freq: 'quarterly', ...o }, { form: true });
 const page = (u, p = '/compta') => u.get(p, { headers: { accept: 'text/html' } }).then((r) => r.text());
 
-test('la page s\'ouvre pour un compte connecté seulement, et guide un nouvel utilisateur', async () => {
+test('la page s\'ouvre pour un compte connecté seulement : d\'abord les questions seules, puis tout le contenu', async () => {
   assert.equal((await s.anon.get('/compta', { headers: { accept: 'text/html' } })).status, 303);
   const u = await s.newUser();
-  const h = await page(u);
+  let h = await page(u);
+  assert.match(h, /Comptabilité : dis-nous où tu en es/);
+  assert.match(h, /Question 1 sur 4/);
+  for (const absent of [/Ajouter une ligne/, /Faire ma déclaration/, /Tes chiffres/, /Journal des lignes/, /Petit guide/, /data-compta-dlg/]) assert.doesNotMatch(h, absent, `${absent} : caché tant que la situation n'est pas donnée`);
+  assert.equal((await situation(u)).status, 303);
+  h = await page(u);
   assert.match(h, /<h1>Comptabilité<\/h1>/);
-  assert.match(h, /Commence ici : dis-nous où tu en es/);
-  assert.match(h, /Ajouter une ligne/);
-  assert.match(h, /Faire ma déclaration/);
-  assert.match(h, /Aucune ligne pour l'instant/);
+  assert.doesNotMatch(h, /dis-nous où tu en es/);
+  for (const present of [/Ajouter une ligne/, /Faire ma déclaration/, /Tes chiffres/, /Journal des lignes/, /Petit guide de la comptabilité/, /Aucune ligne pour l'instant/]) assert.match(h, present);
   assert.doesNotMatch(h, /href="\/compta\/export/, 'rien à exporter sans ligne');
-  assert.match(h, /href="\/compta"[^>]*>[^<]*<svg[^]*?Comptabilité|Comptabilité<\/a>/, 'dans la barre du haut');
+  assert.match(h, /Comptabilité<\/a>/, 'dans la barre du haut');
 });
 
 test('une ligne exige un justificatif (PDF ou image reconnu à sa signature)', async () => {
@@ -212,6 +217,7 @@ test('une ligne exige un justificatif (PDF ou image reconnu à sa signature)', a
 test('ligne enregistrée : fichier sur le disque, relu par son auteur seulement, sans exécution', async () => {
   const u = await s.newUser();
   const v = await s.newUser();
+  await situation(u, { vat: 'assujetti' }); await situation(v);
   const pid = await addProject(s.db, u.id, { name: 'Alpha', gitUrl: 'https://github.com/u/a.git' });
   const r = await create(u, PDF, { ...fields({ kind: 'expense', category: 'software', label: 'Abonnement hébergement', amount: '59,90', vatRate: 2000 }), projectId: pid });
   assert.equal(r.status, 200);
@@ -265,8 +271,11 @@ test('situation et déclaration : le bouton dit où déclarer et quoi renseigner
   assert.equal((await create(u, PDF, fields({ date, amount: '2500', label: 'Gros contrat' }))).status, 200);
   assert.equal((await create(u, PDF, fields({ date, kind: 'expense', category: 'software', amount: '99', label: 'Outil' }))).status, 200);
   let h = await page(u, '/compta?declarer=1#declaration');
-  assert.match(h, /Trouver où déclarer/, 'sans situation : on explique comment la trouver');
-  const set = await u.post('/compta/situation', { regime: 'micro', activity: 'services', vat: 'franchise', freq: 'quarterly' }, { form: true });
+  assert.match(h, /dis-nous où tu en es/, 'sans situation : seules les questions');
+  assert.equal((await situation(u, { regime: 'unknown' })).status, 303);
+  h = await page(u, '/compta?declarer=1#declaration');
+  assert.match(h, /Trouver où déclarer/, '« Je ne sais pas encore » : on explique comment trouver son statut');
+  const set = await situation(u);
   assert.equal(set.status, 303);
   h = await page(u, `/compta?declarer=${py}-Q${pq}#declaration`);
   assert.match(h, /autoentrepreneur\.urssaf\.fr/);
@@ -316,6 +325,7 @@ test('exports : archive par projet et globale (justificatifs + journal), journal
 
 test('page : chiffres par période et par projet, filtres, projet supprimé (les lignes restent)', async () => {
   const u = await s.newUser();
+  await situation(u);
   const a = await addProject(s.db, u.id, { name: 'Projet temporaire', gitUrl: 'https://github.com/u/t.git' });
   await create(u, PDF, { ...fields({ label: 'Paiement A', amount: '1000' }), projectId: a });
   await create(u, PDF, fields({ kind: 'expense', category: 'software', label: 'Dépense B', amount: '200' }));
