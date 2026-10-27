@@ -1,7 +1,7 @@
 import { projectChecklist } from './checklist.js';
 import { now, getSetting, setSetting } from './db.js';
 import { encrypt, decrypt, encryptJson, decryptJson, verifyUnsubToken } from './crypto.js';
-import { html, json, redirect, readBody, HttpError } from './http.js';
+import { html, json, redirect, readBody, HttpError, asBool } from './http.js';
 import { startLogin, finishLogin, destroySession, getSession, checkOrigin } from './auth.js';
 import { verifyCaptcha } from './captcha.js';
 import { deleteUser, normalizeEmail, getUser } from './users.js';
@@ -453,7 +453,7 @@ export function registerRoutes(router, app) {
     if (jobs.audit?.result?.markdown) jobs.audit.result.html = evolutionHtml(jobs.audit.result.markdown);
     // Tâches des postes : le texte se lit à la demande (GET /api/projects/:id/poste/:task), pas à chaque rafraîchissement
     for (const [type, j] of Object.entries(jobs)) if (isRoleJob(type) && j.result) j.result = { size: String(j.result.markdown || '').length };
-    const tplOut = (row) => (row ? { subject: row.subject, subjectB: row.subject_b, body: row.body, status: row.status, updated_at: row.updated_at } : null);
+    const tplOut = (row) => (row ? { subject: row.subject, subjectB: row.subject_b, body: row.body, status: row.status, html: !!row.html, updated_at: row.updated_at } : null);
     const templates = { initial: tplOut(await getTemplate(db, p.id, 'initial')), followup: tplOut(await getTemplate(db, p.id, 'followup')) };
     const stats = await prospectStats(db, p.id);
     const day = now() - 86400;
@@ -546,7 +546,7 @@ export function registerRoutes(router, app) {
     // Relance : objet facultatif (vide = "Re: <objet du 1er mail>", même fil de discussion)
     if (!body || (kind === 'initial' && !subject)) throw new HttpError(400, kind === 'initial' ? 'Objet et corps requis' : 'Corps requis');
     const status = b.mode === 'validate' ? 'validated' : 'draft';
-    await saveTemplate(db, p.id, kind, { subject, subjectB, body, status });
+    await saveTemplate(db, p.id, kind, { subject, subjectB, body, status, html: asBool(b.html) });
     json(res, { ok: true, status });
   });
 

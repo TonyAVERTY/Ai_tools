@@ -80,6 +80,9 @@ export class HttpError extends Error {
   }
 }
 
+/** Case à cocher d'un formulaire (« on ») ou booléen JSON. */
+export const asBool = (v) => v === true || v === 'on' || v === '1' || v === 1;
+
 // Échappement HTML pour les templates
 export function esc(v) {
   return String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));

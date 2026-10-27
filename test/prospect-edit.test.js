@@ -119,7 +119,10 @@ const prev = (u, pid, b) => u.post(`/api/projects/${pid}/template/preview`, b);
 
 test('aperçu : le mail tel qu\'il part (De, À, objet, corps HTML et texte), exemple fictif sans prospect, rien n\'est envoyé ni enregistré', async () => {
   const { u, pid } = await setup();
-  const r = await prev(u, pid, { kind: 'initial', subject: 'Idée pour {{entreprise}}', body: 'Bonjour {{entreprise}} à {{ville}}.\n\n{{accroche}}\n\n{{expediteur}}' });
+  const plain = await (await prev(u, pid, { kind: 'initial', subject: 'S', body: 'Bonjour {{entreprise}}.' })).json();
+  assert.equal(plain.html, false, 'texte simple par défaut : pas de version HTML');
+  assert.equal(plain.url, null);
+  const r = await prev(u, pid, { kind: 'initial', subject: 'Idée pour {{entreprise}}', body: 'Bonjour {{entreprise}} à {{ville}}.\n\n{{accroche}}\n\n{{expediteur}}', html: 'on' });
   assert.equal(r.status, 200);
   const d = await r.json();
   assert.equal(d.sample, true);

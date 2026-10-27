@@ -207,8 +207,10 @@ test('accusé de lecture : en-tête demandé seulement si l\'option est active, 
   assert.equal(buildProspectMail(args).headers['Disposition-Notification-To'], undefined, 'désactivé par défaut');
   const mail = buildProspectMail({ ...args, readReceipt: true });
   assert.equal(mail.headers['Disposition-Notification-To'], 'moi@x.fr');
-  assert.doesNotMatch(mail.html, /<img/i, 'aucun pixel');
-  assert.deepEqual([...mail.html.matchAll(/href="([^"]+)"/g)].map((m) => m[1]).filter((u) => !u.includes('/u/')), [], 'aucun lien traqué');
+  assert.equal(mail.html, undefined, 'texte simple par défaut');
+  const html = buildProspectMail({ ...args, readReceipt: true, html: true }).html;
+  assert.doesNotMatch(html, /<img/i, 'aucun pixel');
+  assert.deepEqual([...html.matchAll(/href="([^"]+)"/g)].map((m) => m[1]).filter((u) => !u.includes('/u/')), [], 'aucun lien traqué');
 });
 
 test('accusé reçu dans la boîte : le mail passe en « Lu », jamais compté comme réponse ni comme rejet ; page et API', async () => {
