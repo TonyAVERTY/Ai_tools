@@ -18,17 +18,26 @@ function radios(name, list, current) {
       <span>${esc(label)}${help ? `<small class="muted cmp-help">${esc(help)}</small>` : ''}</span></label>`).join('');
 }
 
-/** Les quatre questions sur la situation de l'utilisateur, en langage simple. */
-function situationForm(s, { first }) {
-  return `<form method="post" action="/compta/situation" class="cmp-situation">
-    <fieldset><legend>Quel est ton statut ?</legend>${radios('regime', REGIMES, s.regime)}</fieldset>
-    <fieldset><legend>Que vends-tu ?</legend>${radios('activity', ACTIVITIES, s.activity)}</fieldset>
-    <fieldset><legend>Factures-tu la TVA ?</legend>${radios('vat', VAT_MODES, s.vat)}
-      <p class="hint muted">Un doute ? Regarde une de tes factures : si elle indique « TVA non applicable, art. 293 B du CGI », tu es en franchise de TVA.</p></fieldset>
-    <fieldset><legend>À quel rythme déclares-tu ?</legend>${radios('freq', FREQUENCIES.map(([k, l]) => [k, l, '']), s.freq)}
-      <p class="hint muted">Tu l'as choisi en créant ton activité. Pas sûr ? Le trimestre est le choix le plus courant ; tu le retrouves sur ton compte URSSAF.</p></fieldset>
-    <div class="row-actions"><button class="btn primary">Enregistrer ma situation</button></div>
-  </form>`;
+/** Les quatre questions sur la situation, posées une à une (même assistant que la page de bienvenue : public/app.js, data-wizard). */
+function situationForm(s) {
+  const known = s.complete; // à la première visite, rien n'est coché : une réponse est un vrai choix
+  const steps = [
+    { title: 'Quel est ton statut ?', hint: "Pas d'inquiétude : tu pourras changer ta réponse à tout moment.", required: true, body: radios('regime', REGIMES, s.regime) },
+    { title: 'Que vends-tu ?', hint: "Cela décide de la bonne case à remplir le jour de ta déclaration.", body: radios('activity', ACTIVITIES, s.activity) },
+    { title: 'Factures-tu la TVA ?', hint: 'Un doute ? Regarde une de tes factures : si elle indique « TVA non applicable, art. 293 B du CGI », tu es en franchise de TVA.', body: radios('vat', VAT_MODES, s.vat) },
+    { title: 'À quel rythme déclares-tu ?', hint: "Tu l'as choisi en créant ton activité. Sans réponse, on part sur le trimestre, le choix le plus courant ; tu le retrouves sur ton compte URSSAF.", body: radios('freq', FREQUENCIES.map(([k, l]) => [k, l, '']), known ? s.freq : '') },
+  ];
+  return `<div class="wiz"><form method="post" action="/compta/situation" class="cmp-situation" data-wizard data-wiz-json="/compta/situation?json=1" data-wiz-go="/compta?ok=situation" data-wiz-end-title="Ta situation est enregistrée" data-wiz-end-text="On prépare ta comptabilité.">
+    <div class="wiz-top">
+      <p class="wiz-n"><span data-wiz-count>Question 1 sur ${steps.length}</span><b data-wiz-pct>0 %</b></p>
+      <div class="bar" role="progressbar" aria-label="Questions répondues" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="w-0" data-wiz-bar></span></div>
+      <ol class="wiz-dots" aria-hidden="true">${steps.map(() => `<li data-dot>${ic('check')}</li>`).join('')}</ol>
+    </div>
+    ${steps.map((st, i) => `<fieldset class="wiz-step" data-step${st.required ? ' data-required' : ''}${i ? ' hidden' : ''}><legend>${esc(st.title)}</legend><p class="hint">${esc(st.hint)}</p>${st.body}${st.required ? '<p class="error small" role="alert" data-wiz-error hidden>Choisis une réponse pour continuer.</p>' : ''}</fieldset>`).join('\n    ')}
+    <div class="wiz-confirm" data-wiz-confirm aria-hidden="true"><span class="wiz-big">${ic('check')}</span></div>
+    <p class="sr-only" role="status" data-wiz-live></p>
+    <div class="wiz-f"><button type="button" class="btn" data-wiz-back hidden>Retour</button><button class="btn primary" data-wiz-next>Continuer</button></div>
+  </form></div>`;
 }
 
 function summaryLine(s) {
@@ -198,9 +207,9 @@ export function accountingPage(d) {
     ${flash}
   </section>
 
-  ${s.complete ? `<details class="tip" id="situation"><summary><span class="tip-i" aria-hidden="true">i</span><span class="tip-t">Ma situation : ${esc(summaryLine(s))}</span></summary><div class="tip-body">${situationForm(s, { first: false })}</div></details>`
+  ${s.complete ? `<details class="tip" id="situation"><summary><span class="tip-i" aria-hidden="true">i</span><span class="tip-t">Ma situation : ${esc(summaryLine(s))}</span></summary><div class="tip-body">${situationForm(s)}</div></details>`
     : `<section class="card" id="situation" aria-labelledby="t-sit"><h2 id="t-sit">Commence ici : dis-nous où tu en es</h2>
-      <p class="muted">Quatre questions, une seule fois. Elles servent à te dire quoi déclarer, où et quand. Tu pourras les modifier à tout moment.</p>${situationForm(s, { first: true })}</section>`}
+      <p class="muted">Quatre questions, une seule fois. Elles servent à te dire quoi déclarer, où et quand. Tu pourras les modifier à tout moment.</p>${situationForm(s)}</section>`}
 
   ${nextCard}
   ${d.guide ? guideBlock(d.guide, d) : ''}

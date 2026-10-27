@@ -6,12 +6,12 @@ Résumé : la page « Comptabilité » (barre du haut) : ta situation, ajouter u
 La comptabilité est **personnelle** : seules tes propres lignes s'affichent, même pour un projet partagé en équipe, et personne d'autre n'ouvre tes justificatifs.
 
 ## 1. Dire où tu en es (une seule fois)
-Tant que ce n'est pas fait, la page affiche **Commence ici : dis-nous où tu en es** avec quatre questions en langage simple :
+Tant que ce n'est pas fait, la page affiche **Commence ici : dis-nous où tu en es**. Les quatre questions, en langage simple, sont posées **une à une** comme sur la page « Faisons connaissance » : choisis une réponse puis clique **Continuer** (**Retour** revient en arrière), « Question 2 sur 4 » et un pourcentage montrent où tu en es, et un grand cercle vert confirme chaque réponse. Seul le statut est obligatoire : sans réponse, les autres questions sont passées. Les questions :
 1. **Quel est ton statut ?** « Micro-entrepreneur » (tu déclares ton chiffre d'affaires à l'URSSAF), « Société ou entreprise au réel » (tu déclares la TVA aux impôts et un comptable fait ton bilan) ou « Je ne sais pas encore » (la page t'explique comment le savoir).
 2. **Que vends-tu ?** « Prestations de services », « Profession libérale » ou « Vente de marchandises » : cela décide de la bonne case à remplir à l'URSSAF.
 3. **Factures-tu la TVA ?** « Je ne facture pas la TVA » (franchise en base : tes factures portent « TVA non applicable, art. 293 B du CGI ») ou « Je facture la TVA ».
 4. **À quel rythme déclares-tu ?** « Chaque mois » ou « Chaque trimestre ».
-Clique **Enregistrer ma situation**. Ensuite la ligne **Ma situation** reste en haut de la page, repliée : ouvre-la pour modifier tes réponses.
+À la dernière question, le bouton devient **Terminer** : ta situation est enregistrée (« Ta situation est enregistrée ») et revient sur la page. Ensuite la ligne **Ma situation** reste en haut, repliée : ouvre-la pour repasser les questions, tes réponses actuelles sont déjà cochées. Sans réponse au rythme de déclaration, le trimestre est choisi.
 
 ## 2. Ajouter une ligne
 1. Clique **Ajouter une ligne**. Une fenêtre s'ouvre.
