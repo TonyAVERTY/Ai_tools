@@ -887,4 +887,76 @@ export const MIGRATIONS = [
       { sql: 'ALTER TABLE templates ADD COLUMN html TINYINT NOT NULL DEFAULT 0', when: colMissing('templates', 'html') },
     ],
   },
+  {
+    // Comptabilité : une ligne par paiement, dépense, remboursement… avec son justificatif (fichier sur le disque, un dossier par ligne). Le nom du projet est
+    // recopié : supprimer un projet ne supprime pas la comptabilité (on garde les pièces), la ligne reste classée sous son ancien nom.
+    name: 'accounting',
+    sqlite: [
+      `CREATE TABLE accounting_entries (
+        id INTEGER PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL,
+        project_name TEXT NOT NULL DEFAULT '',
+        kind TEXT NOT NULL,
+        entry_date TEXT NOT NULL,
+        label TEXT NOT NULL,
+        party TEXT NOT NULL DEFAULT '',
+        category TEXT NOT NULL DEFAULT '',
+        amount_cents INTEGER NOT NULL,
+        vat_rate INTEGER NOT NULL DEFAULT 0,
+        vat_cents INTEGER NOT NULL DEFAULT 0,
+        method TEXT NOT NULL DEFAULT 'transfer',
+        notes TEXT NOT NULL DEFAULT '',
+        doc_name TEXT NOT NULL,
+        doc_mime TEXT NOT NULL,
+        doc_size INTEGER NOT NULL,
+        doc_file TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )`,
+      'CREATE INDEX accounting_user_date ON accounting_entries(user_id, entry_date)',
+      'CREATE INDEX accounting_project ON accounting_entries(project_id)',
+      `CREATE TABLE accounting_declarations (
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        period TEXT NOT NULL,
+        done_at INTEGER NOT NULL,
+        PRIMARY KEY (user_id, period)
+      )`,
+    ],
+    mysql: [
+      `CREATE TABLE IF NOT EXISTS accounting_entries (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        user_id BIGINT NOT NULL,
+        project_id BIGINT NULL,
+        project_name VARCHAR(200) NOT NULL DEFAULT '',
+        kind VARCHAR(20) NOT NULL,
+        entry_date VARCHAR(10) NOT NULL,
+        label VARCHAR(200) NOT NULL,
+        party VARCHAR(200) NOT NULL DEFAULT '',
+        category VARCHAR(30) NOT NULL DEFAULT '',
+        amount_cents BIGINT NOT NULL,
+        vat_rate INT NOT NULL DEFAULT 0,
+        vat_cents BIGINT NOT NULL DEFAULT 0,
+        method VARCHAR(20) NOT NULL DEFAULT 'transfer',
+        notes VARCHAR(600) NOT NULL DEFAULT '',
+        doc_name VARCHAR(200) NOT NULL,
+        doc_mime VARCHAR(60) NOT NULL,
+        doc_size BIGINT NOT NULL,
+        doc_file VARCHAR(60) NOT NULL,
+        created_at BIGINT NOT NULL,
+        updated_at BIGINT NOT NULL,
+        KEY accounting_user_date (user_id, entry_date),
+        KEY accounting_project (project_id),
+        CONSTRAINT accounting_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        CONSTRAINT accounting_project_fk FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL
+      ) ${T}`,
+      `CREATE TABLE IF NOT EXISTS accounting_declarations (
+        user_id BIGINT NOT NULL,
+        period VARCHAR(10) NOT NULL,
+        done_at BIGINT NOT NULL,
+        PRIMARY KEY (user_id, period),
+        CONSTRAINT accounting_decl_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      ) ${T}`,
+    ],
+  },
 ];

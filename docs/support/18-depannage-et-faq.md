@@ -86,3 +86,14 @@ Les fiches de méthode (voir « Savoir-faire de Claude dans AiTools ») sont des
 1. Vérifie la consigne de la tâche dans « Réglages → Prompts IA » : une consigne modifiée peut aller à l'encontre de la méthode.
 2. Clique « Revenir au texte par défaut » pour comparer.
 3. Choisis un modèle plus capable pour cette tâche dans « Réglages → Budget et modèles IA » si le résultat reste approximatif.
+
+## Comptabilité : une ligne ne s'enregistre pas, un export est vide
+- **« Joins le justificatif »** : chaque ligne exige une preuve. Joins un PDF ou une image (JPG, PNG, WebP, GIF) dans « Ajouter une ligne », puis **Enregistrer la ligne**.
+- **« Le justificatif doit être un PDF ou une image »** : le fichier est reconnu à son contenu, pas à son nom. Photographie ou exporte la facture en PDF.
+- **« Fichier trop gros » ou « Espace plein »** : réduis la photo, ou exporte puis supprime d'anciennes lignes (les limites sont dans « Offres, plafonds et limites »).
+- **« La date est dans le futur »** : ajoute la ligne le jour où l'argent est reçu ou payé.
+- **« Le montant est invalide »** : écris seulement des chiffres, avec une virgule pour les centimes (« 49,90 »).
+- **Je ne vois pas « Tout exporter » ni « Journal CSV »** : ces boutons apparaissent après la première ligne. L'archive contient les justificatifs de la période choisie dans « Tes chiffres » : choisis « Toute la période » pour tout exporter.
+- **Le montant à déclarer me semble faux** : le guide « Faire ma déclaration » ne compte que les « Paiement reçu » (moins les « Remboursement versé à un client ») dans la période. Vérifie la date des lignes (le jour de l'encaissement), le type et ta situation dans « Ma situation ».
+- **Je ne sais pas si je suis micro-entrepreneur ou en société** : choisis « Je ne sais pas encore » puis « Faire ma déclaration » : le guide explique comment retrouver ton statut.
+- **Les plafonds affichés ne sont pas les miens** : ce sont des valeurs de référence indiquées avec leur année ; vérifie sur service-public.fr.

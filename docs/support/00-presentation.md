@@ -25,6 +25,7 @@ Tout ce que fait l'IA passe par le compte Claude de la personne, jamais par un c
 - **Projets** : la page d'accueil de l'application (liste des projets). 
 - **Mails** : tous les mails envoyés et les réponses reçues.
 - **Calendrier** : le mois, les événements et l'agenda externe.
+- **Comptabilité** : tes paiements, dépenses et remboursements avec leurs justificatifs, tes chiffres, le guide « Faire ma déclaration » et les exports (voir « Comptabilité : lignes, justificatifs, déclaration et exports »).
 - **Équipe** : partager des projets avec des collègues.
 - **Activité** (apparaît quand une tâche tourne) : la liste des jobs en cours, en attente ou programmés, avec leur avancement.
 - **Site internet** : ouvre le site public d'AiTools (page d'accueil du site). Sur téléphone, seule l'icône (un globe) s'affiche.
