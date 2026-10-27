@@ -212,8 +212,15 @@
     // Avancer : si une réponse est donnée, la pastille verte « Pris en compte » la confirme un instant, puis la question sort et la suivante entre
     async function forward() {
       if (moving) return;
-      moving = true;
       const here = steps[at];
+      // Une question marquée data-required attend une réponse (les autres peuvent être passées)
+      if (here.hasAttribute('data-required') && !answered(at)) {
+        const err = $('[data-wiz-error]', here);
+        if (err) { err.hidden = false; }
+        $('input', here)?.focus({ preventScroll: true });
+        return;
+      }
+      moving = true;
       if (answered(at)) {
         validated.add(at);
         veil.classList.add('show'); // grand cercle vert au milieu, arrière-plan flouté
@@ -231,21 +238,23 @@
     // Fin : une scène plein écran apparaît en fondu (« Merci, ton espace est prêt »), le profil s'enregistre en arrière-plan, puis le tableau de bord
     // prend la place sans coupure. Si l'enregistrement échoue, on retombe sur l'envoi classique du formulaire.
     async function finishWizard() {
+      // Destination et textes de la scène de fin : propres à chaque assistant (profil de bienvenue, situation de la comptabilité…)
+      const cfg = { json: wiz.dataset.wizJson, go: wiz.dataset.wizGo || '/', title: wiz.dataset.wizEndTitle || 'Merci, ton espace est prêt', text: wiz.dataset.wizEndText || '' };
       const end = document.createElement('div');
       end.className = 'wiz-end';
       end.setAttribute('role', 'status');
       end.innerHTML = '<div class="wiz-end-in"></div>';
       const inner = $('.wiz-end-in', end);
       inner.append($('.wiz-big', wiz).cloneNode(true));
-      inner.insertAdjacentHTML('beforeend', '<h2>Merci, ton espace est prêt</h2><p>On te montre maintenant comment t\'y repérer.</p><div class="bar indet" aria-hidden="true"><span></span></div>');
+      inner.insertAdjacentHTML('beforeend', `<h2>${esc(cfg.title)}</h2>${cfg.text ? `<p>${esc(cfg.text)}</p>` : ''}<div class="bar indet" aria-hidden="true"><span></span></div>`);
       document.body.append(end);
       void end.offsetWidth;
       end.classList.add('show');
       let ok = true;
-      const saved = api('/welcome?json=1', Object.fromEntries(new FormData(wiz))).catch(() => { ok = false; });
+      const saved = api(cfg.json, Object.fromEntries(new FormData(wiz))).catch(() => { ok = false; });
       await Promise.all([saved, new Promise((r) => setTimeout(r, calm() ? 500 : 1600))]);
       if (!ok) { wiz.submit(); return; } // submit() n'émet pas l'événement « submit » : pas de boucle
-      go('/');
+      go(cfg.go);
     }
     async function previous() {
       if (moving || at === 0) return;
@@ -256,6 +265,7 @@
       moving = false;
     }
     back.addEventListener('click', previous);
+    wiz.addEventListener('change', () => { for (const e of $$('[data-wiz-error]', wiz)) e.hidden = true; });
     // « Passer le questionnaire » (formaction) part tel quel ; « Continuer » avance tant qu'il reste des questions
     wiz.addEventListener('submit', (e) => {
       if (e.submitter?.hasAttribute('formaction')) return;

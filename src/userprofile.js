@@ -83,7 +83,7 @@ export const STEPS = [
 /** Première connexion : une question à la fois, « Continuer », et le pourcentage de questions passées (public/app.js, data-wizard). */
 function wizard(p) {
   const n = STEPS.length;
-  return `<form method="post" action="/welcome" class="cfg" data-wizard>
+  return `<form method="post" action="/welcome" class="cfg" data-wizard data-wiz-json="/welcome?json=1" data-wiz-go="/" data-wiz-end-title="Merci, ton espace est prêt" data-wiz-end-text="On te montre maintenant comment t'y repérer.">
     <div class="wiz-top">
       <p class="wiz-n"><span data-wiz-count>Question 1 sur ${n}</span><b data-wiz-pct>0 %</b></p>
       <div class="bar" role="progressbar" aria-label="Questions répondues" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="w-0" data-wiz-bar></span></div>
