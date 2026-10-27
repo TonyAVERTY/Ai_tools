@@ -141,7 +141,7 @@ export function registerAccountingRoutes(router, app) {
       email: session.email, today, settings, projects, periodValue, periodOptions: periodOptions(today), periodLabel: periodValue === 'tout' ? 'toute la période' : periodRange(periodValue).label,
       filters: { projet: projectFilter, type: kindFilter, q: String(q.get('q') || '').slice(0, 80) },
       totals, projectRows, rows, total: list.length, count: all.length, page, pages, alerts, next, guide, declOptions,
-      usedBytes: await used(userId), limits: LIMITS, error: q.get('e'), saved: q.get('ok'),
+      editSituation: q.get('situation') === '1', usedBytes: await used(userId), limits: LIMITS, error: q.get('e'), saved: q.get('ok'),
     }));
   });
 
