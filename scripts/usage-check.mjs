@@ -1,4 +1,4 @@
-// Vérifie dans un vrai navigateur : aucun montant en $ avec un compte Claude relié par abonnement (barre du haut et carte « Usage du mois »),
+// Vérifie dans un vrai navigateur : aucun montant en $ avec un compte Claude relié par abonnement (carte « Consommation Claude » et carte « Usage du mois »),
 // les montants restent avec une clé API. Nécessite Playwright (PLAYWRIGHT_MODULE, PLAYWRIGHT_CHROMIUM). Sortie « TOUT EST BON » attendue.
 import { startApp, APP_URL } from '../test/helpers/server.js';
 import { testTokenLink } from '../test/helpers/users.js';
@@ -30,9 +30,7 @@ for (const [who, u, priced] of [['abonnement', sub, false], ['clé API', api, tr
     });
     await p.goto(`${s.base}/`);
     await p.waitForSelector('html[data-nav="ready"]');
-    await p.waitForFunction(() => document.querySelector('#sys')?.textContent.trim().length > 0);
-    const bar = await p.locator('#sys').innerText();
-    ok(/\$/.test(bar) === priced, `${tag} barre du haut : ${priced ? 'montants en $ présents' : 'aucun $'} (« ${bar.replace(/\s+/g, ' ').trim().slice(0, 70)} »)`);
+    ok(await p.locator('#sys, .strip').count() === 0, `${tag} plus de ligne d'état sous la barre du haut`);
     if (priced) {
       // Clé API : la carte « Consommation Claude » montre le budget en $ équivalent API
       await p.waitForSelector('[data-claude-card]:not([hidden]) [data-usage-claude]:not([hidden])');

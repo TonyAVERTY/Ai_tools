@@ -23,7 +23,7 @@ Avec un **abonnement**, la carte montre deux barres : **Session de 5 h** et **Se
 - « Relevé en direct chez Anthropic » : compte tout l'usage de Claude, y compris hors AiTools (claude.ai, Claude Code).
 - Sinon : « Dernière mesure faite pendant un job AiTools », avec la raison du repli (Anthropic limite les relevés, refuse le relevé avec ce jeton, ne répond pas, etc.).
 - Avec une **clé API** : il n'y a pas de limite de session ni de semaine, Anthropic facture ce qui est consommé.
-- La même mesure s'affiche dans la ligne d'état sous la barre du haut (« Claude session 5h », « Claude semaine »).
+- La même mesure s'affiche dans la carte « Consommation Claude » de la page Projets (« Claude session 5 h », « Claude semaine »).
 - Quand le quota est serré (au-delà de 85 %), les jobs non urgents (analyse, évolutions) attendent en file et repartent seuls ; la prospection et les envois continuent. Une alerte part à 80 % puis 95 % si un canal de notification est configuré.
 
 ## Erreurs courantes

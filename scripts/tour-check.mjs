@@ -17,6 +17,12 @@ const open = async (u, vp, scheme = 'dark', extra = {}) => {
   const [name, value] = u.cookie.split('=');
   await ctx.addCookies([{ name, value, url: s.base }]);
   await ctx.route('**/*', (route) => { const r = route.request(); const h = { ...r.headers() }; if (r.method() === 'POST') h.origin = APP_URL; route.continue({ headers: h }); });
+  // Un relevé du quota Claude (fictif) : la carte « Consommation Claude » n'existe qu'avec une mesure, l'étape qui l'éclaire en dépend
+  await ctx.route('**/api/system', async (route) => {
+    const j = await (await route.fetch()).json();
+    const t = Math.floor(Date.now() / 1000);
+    await route.fulfill({ json: { ...j, linkMode: 'subscription', claudeRateLimit: { source: 'live', at: t, fiveHour: { utilization: 0.76, resetsAt: t + 7200 }, sevenDay: { utilization: 0.38, resetsAt: t + 3 * 86400 } } } });
+  });
   const p = await ctx.newPage();
   const errs = [];
   p.on('pageerror', (e) => errs.push(e.message));
@@ -83,7 +89,7 @@ for (const [vp, scheme, tag] of [[{ width: 1280, height: 800 }, 'dark', '1280px 
       ok(inView, `${tag} étape ${n} : la carte reste dans l'écran`);
       ok(vp.width < 640 ? card.y >= hole.y + hole.height - 2 : !inter(card, hole), `${tag} étape ${n} : la carte ne recouvre pas l'élément éclairé`);
     }
-    if (i === 3 || i === 7 || i === total - 2) await shot(p, `tour-${n}-${vp.width}`);
+    if (i === 3 || i === 7 || i === total - 2 || title.startsWith('Ta consommation')) await shot(p, `tour-${n}-${vp.width}`);
   }
   const dim = await p.locator('.tour-hole').evaluate((e) => getComputedStyle(e).boxShadow);
   const spread = Number((dim.match(/(\d+)px\s*$/) || [])[1]);

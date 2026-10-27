@@ -1,7 +1,7 @@
-# Réglages : notifications, dépôts Git, garde-fous, modèles, prompts, liste d'opposition
-Résumé : toutes les sections de la page Réglages (Notifications et canaux Discord, Slack, Telegram, e-mail ; Dépôts Git ; Garde-fous ; Budget et modèles IA ; Prompts IA ; Liste d'opposition) et leurs champs.
+# Réglages : notifications, dépôts Git, garde-fous, modèles, prompts
+Résumé : toutes les sections de la page Réglages (Notifications et canaux Discord, Slack, Telegram, e-mail ; Dépôts Git ; Garde-fous ; Budget et modèles IA ; Prompts IA) et leurs champs.
 
-On y accède par l'avatar → **Réglages**. Un sommaire à gauche (« Notifications », « Dépôts Git », « Garde-fous », « Budget et modèles IA », « Prompts IA », « Liste d'opposition ») suit la lecture. Toutes les sections de la page forment un seul formulaire : le bouton **Enregistrer les réglages**, dans la barre fixée en bas de l'écran, enregistre d'un coup les notifications, les dépôts Git, les garde-fous, les modèles et les prompts (il n'y a plus de bouton d'enregistrement par section) ; les liens et jetons sont chiffrés et jamais réaffichés.
+On y accède par l'avatar → **Réglages**. Un sommaire à gauche (« Notifications », « Dépôts Git », « Garde-fous », « Budget et modèles IA », « Prompts IA ») suit la lecture. Toutes les sections de la page forment un seul formulaire : le bouton **Enregistrer les réglages**, dans la barre fixée en bas de l'écran, enregistre d'un coup les notifications, les dépôts Git, les garde-fous, les modèles et les prompts (il n'y a plus de bouton d'enregistrement par section) ; les liens et jetons sont chiffrés et jamais réaffichés.
 
 ## Notifications
 Où et quand AiTools prévient : réponses de prospects, jobs terminés ou en erreur, alertes.
@@ -21,7 +21,7 @@ GitHub est toujours accepté. Pour un **dépôt privé** : champ **Token (dépô
 - **Pied de page des mails de prospection** : par défaut, chaque mail se termine par « Vous recevez ce message car l'adresse … est publiée publiquement (source) » et un lien **Ne plus recevoir de messages**. Le bouton **Retirer le pied de page des mails** les supprime de tous tes mails (premiers mails et relances, tous tes projets). Un message d'**attention** est affiché dans la page et une **confirmation** est demandée avant le retrait, car :
   - **Légal** : en prospection par e-mail, le RGPD et la CNIL demandent d'informer la personne de l'origine de son adresse et de lui offrir un moyen simple et gratuit de refuser les messages ; la responsabilité est la tienne (sanctions possibles) ;
   - **Réputation** : sans lien de désinscription, les destinataires cliquent « Spam », et Gmail ou Outlook peuvent bloquer l'adresse et le domaine d'envoi ;
-  - seul l'en-tête invisible « List-Unsubscribe » reste ajouté (la page de désinscription et la liste d'opposition continuent de fonctionner), mais toutes les messageries ne l'affichent pas.
+  - **Désinscriptions** : sans le lien « Ne plus recevoir de messages », rien dans le mail ne permet de se désinscrire : la personne doit te répondre, et tu marques toi-même le prospect en « Refus ».
   Une fois retiré, le bouton **Remettre le pied de page** le rétablit tout de suite (sans confirmation). Le réglage est immédiat : il n'a pas besoin du bouton « Enregistrer les réglages ». L'**Aperçu** d'un mail montre toujours ce qui partira, avec un avertissement quand le pied de page est retiré.
 Voir aussi le plafond par projet dans « Configuration du projet ».
 
@@ -32,6 +32,3 @@ Voir aussi le plafond par projet dans « Configuration du projet ».
 
 ## Prompts IA
 Les consignes que Claude reçoit pour chaque tâche. Onglets **Tous les modèles**, **Haiku**, **Sonnet**, **Opus**, **Fable** ; bouton **Revenir au texte par défaut** par tâche. Le contexte du projet et le format de réponse restent ajoutés automatiquement. Voir « Tâches IA et consignes (prompts) modifiables » pour la liste.
-
-## Liste d'opposition
-Texte d'information : une personne désinscrite, en refus ou en adresse invalide n'est plus jamais contactée, tous comptes confondus ; la liste n'est consultable par personne.

@@ -83,7 +83,6 @@ ${email ? `<header class="top">
       </details>
     </div>
   </div>
-  <div class="strip" id="sys" aria-live="polite"></div>
 </header>` : ''}
 <main id="contenu" tabindex="-1"><div class="page">${body}</div></main>
 </body>
@@ -392,6 +391,7 @@ function templateForm(p, kind) {
       <label>Objet${initial ? '' : ' <span class="muted small">(vide = « Re: » + objet du premier mail, dans le même fil)</span>'}<input name="subject"></label>
       ${initial ? '<label>Objet B <span class="muted small">(optionnel : test A/B, les envois alternent entre les deux objets)</span><input name="subjectB"></label>' : ''}
       <label>Corps<textarea name="body" rows="${initial ? 9 : 5}"></textarea></label>
+      <label class="opt"><input type="checkbox" name="html"><span class="box">${ic('check')}</span><span>Envoyer en mail HTML<small class="muted"> Sans cette case, le mail part en texte simple, comme un mail écrit à la main.</small></span></label>
       <div class="row">
         <button type="button" class="btn" data-tpl-preview>${ic('eye')}Aperçu</button>
         <button class="btn" name="mode" value="save">Enregistrer</button>
@@ -676,7 +676,7 @@ function uncovered(d, channels = {}) {
   return missing.length ? `<p class="hint">Ajoute un canal pour recevoir aussi : ${missing.join(' · ')}.</p>` : '';
 }
 
-const SETTINGS_TOC = [['notif', 'Notifications'], ['git', 'Dépôts Git'], ['garde', 'Garde-fous'], ['budget', 'Budget et modèles IA'], ['prompts', 'Prompts IA'], ['opposition', "Liste d'opposition"]];
+const SETTINGS_TOC = [['notif', 'Notifications'], ['git', 'Dépôts Git'], ['garde', 'Garde-fous'], ['budget', 'Budget et modèles IA'], ['prompts', 'Prompts IA']];
 
 export function settingsPage({ email, s, saved }) {
   // Sélecteur de modèle en deux listes : les recommandés (avec une estimation relative du coût), puis tous les autres, plus compacts et sans estimation
@@ -786,12 +786,12 @@ ${saved ? `<p class="ok-box" role="status">${ic('check')}<span><b>Réglages enre
     <h3>Pied de page des mails de prospection</h3>
     <p class="state ${s.mail_footer ? 'ok' : 'warn'}" data-footer-state role="status">${s.mail_footer
     ? 'Actif : chaque mail se termine par « Vous recevez ce message car l\'adresse … est publiée publiquement (source) » et un lien « Ne plus recevoir de messages ».'
-    : 'Retiré : tes mails partent sans lien « Ne plus recevoir de messages » ni origine de l\'adresse (seul l\'en-tête invisible « List-Unsubscribe » reste).'}</p>
+    : 'Retiré : tes mails partent sans lien « Ne plus recevoir de messages » ni origine de l\'adresse.'}</p>
     <div class="ban ban-err" role="note">${ic('alert')}<span class="ban-t"><b>Attention, risques si tu le retires.</b>
       <ul>
         <li><strong>Légal</strong> : en prospection par e-mail, le RGPD et la CNIL demandent d'informer la personne de l'origine de son adresse et de lui offrir un moyen simple et gratuit de refuser tes messages ; c'est toi qui en portes la responsabilité (sanctions possibles).</li>
         <li><strong>Réputation</strong> : sans lien de désinscription, les destinataires cliquent « Spam », et Gmail ou Outlook peuvent bloquer ton adresse et ton domaine d'envoi.</li>
-        <li><strong>Désinscriptions</strong> : l'en-tête invisible « List-Unsubscribe » reste ajouté, mais toutes les messageries ne l'affichent pas.</li>
+        <li><strong>Désinscriptions</strong> : rien dans le mail ne permet de se désinscrire ; la personne doit te répondre, et tu la marques toi-même en « Refus ».</li>
       </ul>
       Tu peux remettre le pied de page à tout moment.</span></div>
     <button type="button" class="btn danger" data-footer-off ${s.mail_footer ? '' : 'hidden'}>Retirer le pied de page des mails</button>
@@ -833,10 +833,6 @@ ${saved ? `<p class="ok-box" role="status">${ic('check')}<span><b>Réglages enre
 <div class="savebar"><p>Notifications, dépôts Git, garde-fous, modèles et prompts s'enregistrent ensemble.</p><button class="btn primary">Enregistrer les réglages</button></div>
 </form>
 
-<section class="card" id="opposition" aria-labelledby="t-opp">
-  <div class="card-h"><h2 id="t-opp">Liste d'opposition</h2></div>
-  <p class="card-d">Une personne qui se désinscrit, refuse ou dont l'adresse est invalide n'est plus jamais contactée ni proposée, quel que soit le compte ou le projet. Cette liste est commune à tous les comptes et personne ne peut la consulter : tu ne vois que le statut de tes propres prospects.</p>
-</section>
 </div>
 </div>`,
   });

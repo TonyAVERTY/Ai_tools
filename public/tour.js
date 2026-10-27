@@ -131,7 +131,10 @@
       if (top + h > vh - 12) top = r.top - PAD - gap - h; // pas la place en dessous : au-dessus
       if (top < 12) top = Math.min(vh - h - 12, Math.max(12, r.top + r.height / 2 - h / 2)); // ni l'un ni l'autre : à côté, centrée
       let left = r.left + r.width / 2 - w / 2;
-      if (top > r.top - h - PAD && top < r.top + r.height + PAD) left = r.left + r.width + PAD + gap; // à côté de l'élément
+      if (top > r.top - h - PAD && top < r.top + r.height + PAD) { // à côté de l'élément : à droite, sinon à gauche
+        left = r.left + r.width + PAD + gap;
+        if (left + w > vw - 12) left = r.left - PAD - gap - w;
+      }
       left = Math.max(12, Math.min(vw - w - 12, left));
       Object.assign(card.style, { left: `${left}px`, top: `${top}px` });
     }
