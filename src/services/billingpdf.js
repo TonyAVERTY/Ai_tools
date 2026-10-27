@@ -25,10 +25,10 @@ export function filler(values = {}) {
  * @param {{ kind: string, content: object, legal: object, layout?: string, values?: object }} d
  * @returns {Buffer} le PDF
  */
-export function renderDocumentPdf({ kind, content, legal, layout = 'classique', values = {} }) {
+export function renderDocumentPdf({ kind, content, legal, layout = 'classique', values = {}, facts = {} }) {
   const th = THEMES[layout] || THEMES.classique;
   const c = content;
-  const f = documentFacts({ kind, content: c, legal });
+  const f = documentFacts({ kind, content: c, legal, ...facts });
   const v = filler(values);
   const doc = new Pdf({ serif: th.serif, title: `${c.title}${values.numero ? ` ${values.numero}` : ''}`, author: legal.legal_name });
   let y = M;
@@ -46,8 +46,8 @@ export function renderDocumentPdf({ kind, content, legal, layout = 'classique', 
   const left = [legal.legal_name, legal.address, `${legal.postal_code} ${legal.city}`.trim(), [legal.email, legal.phone, legal.website].filter(Boolean).join('  ·  ')].filter(Boolean);
   const meta = {
     devis: [`Devis n° ${v('numero')}`, `Date : ${v('date', frDate)}`, `Valable jusqu'au ${v('date_validite', frDate)}`],
-    acompte: [`Facture d'acompte n° ${v('numero')}`, `Date : ${v('date', frDate)}`, `Échéance : ${v('date_echeance', frDate)}`],
-    facture: [`Facture n° ${v('numero')}`, `Date : ${v('date', frDate)}`, `Échéance : ${v('date_echeance', frDate)}`, `Prestation réalisée le ${v('date_prestation', frDate)}`],
+    acompte: [`Facture d'acompte n° ${v('numero')}`, ...(values.devis_numero ? [`Devis n° ${values.devis_numero}`] : []), `Date : ${v('date', frDate)}`, `Échéance : ${v('date_echeance', frDate)}`],
+    facture: [`Facture n° ${v('numero')}`, ...(values.devis_numero ? [`Devis n° ${values.devis_numero}`] : []), `Date : ${v('date', frDate)}`, `Échéance : ${v('date_echeance', frDate)}`, `Prestation réalisée le ${v('date_prestation', frDate)}`],
     avoir: [`Avoir n° ${v('numero')}`, `Date : ${v('date', frDate)}`, `Sur la facture n° ${v('facture_numero')}`],
   }[kind] || [];
   let ly = y + 12;
@@ -119,7 +119,7 @@ export function renderDocumentPdf({ kind, content, legal, layout = 'classique', 
   y += 8;
 
   if (kind === 'avoir') {
-    const reason = c.reason || v('motif');
+    const reason = 'motif' in values ? values.motif : c.reason || v('motif');
     const lines = doc.wrap(`Motif de l'avoir : ${reason}`, W - 20, 10);
     ensure(lines.length * 13 + 16);
     doc.rect(M, y, W, lines.length * 13 + 12, { stroke: '#999999', width: 0.6 });

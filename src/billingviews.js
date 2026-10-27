@@ -104,53 +104,80 @@ function quoteSection(p, docs, chosen, stage, legal, busy) {
 
 const KIND_INVOICE = { acompte: true, facture: true, avoir: true };
 
-/** Section « Générer un document » : n'importe lequel des quatre types validés, pour un client déjà enregistré ou un nouveau. */
-function issueSection(p, docs, clients, selectedKind) {
+const LINE_ROWS = 3;
+const lineRow = (i) => `<div class="bill-line" data-line>
+    <label class="field" for="gen-l${i}-n"><span class="lbl">Désignation</span><input id="gen-l${i}-n" name="l${i}_label" maxlength="120" autocomplete="off" placeholder="Ex. : Développement de l'application"></label>
+    <label class="field" for="gen-l${i}-q"><span class="lbl">Quantité</span><input id="gen-l${i}-q" name="l${i}_qty" value="1" inputmode="decimal" maxlength="12" autocomplete="off"></label>
+    <label class="field" for="gen-l${i}-u"><span class="lbl">Unité</span><input id="gen-l${i}-u" name="l${i}_unit" value="forfait" maxlength="20" autocomplete="off" placeholder="jours, heures…"></label>
+    <label class="field" for="gen-l${i}-p"><span class="lbl">Prix unitaire HT (€)</span><input id="gen-l${i}-p" name="l${i}_price" inputmode="decimal" maxlength="14" autocomplete="off" placeholder="450,00"></label>
+    <label class="field bill-line-d" for="gen-l${i}-d"><span class="lbl">Description <span class="muted small">(facultatif)</span></span><input id="gen-l${i}-d" name="l${i}_description" maxlength="300" autocomplete="off"></label></div>`;
+
+/**
+ * Section « Générer un document » : le devis se remplit (client et lignes de ce que le client commande) ; acompte, facture finale et avoir se rattachent à un devis
+ * émis et en reprennent le client et les lignes. Les lignes des modèles ne sont que des exemples.
+ */
+function issueSection(p, docs, clients, invoices, selectedKind, selectedClientId) {
   const today = todayIso();
+  const sel = clients.find((c) => c.id === selectedClientId) || null;
   const finals = DOC_KINDS.map(({ key }) => docs.find((d) => d.kind === key)).filter(Boolean);
   if (!finals.some((d) => d.status === 'validated')) return '';
-  const first = finals.find((d) => d.status === 'validated' && d.kind === selectedKind) || finals.find((d) => d.status === 'validated');
+  const devisList = invoices.filter((i) => i.kind === 'devis' && i.lines.length);
+  const refs = invoices.filter((i) => (i.kind === 'acompte' || i.kind === 'facture') && i.devisId);
+  const usable = (d) => d.status === 'validated' && (d.kind === 'devis' || devisList.length > 0);
+  const first = finals.find((d) => usable(d) && d.kind === selectedKind) || finals.find((d) => usable(d));
+  const modelDeposit = docs.find((d) => d.kind === 'acompte')?.content.deposit_percent || 30;
+  const hint = (d) => (d.status !== 'validated' ? " (à valider d'abord)" : !usable(d) ? " (génère d'abord un devis)" : '');
   return `<section class="card bill-sec" id="generer" aria-labelledby="t-gen"><h2 id="t-gen">Générer un document</h2>
-    <p class="muted">Choisis le type de document et le client : le PDF est numéroté et prêt à envoyer. Tu peux en générer autant que tu veux, dans n'importe quel ordre. Les modèles validés ne changent pas.</p>
+    <p class="muted">Commence par le <b>devis</b> : tu y saisis ce que ton client t'a commandé (les lignes des modèles ne sont que des exemples). L'acompte, la facture finale et l'avoir se rattachent ensuite à un devis et en reprennent le client et les lignes. Les clients se gèrent dans la page <a class="link" href="/clients?projet=${p.id}">Clients</a>.</p>
     <form method="post" action="/facturation/projet/${p.id}/emettre" class="bill-issue-f" data-issue>
       <div class="grid2">
-        <label class="field" for="gen-doc"><span class="lbl">Type de document</span><span class="sel"><select id="gen-doc" name="doc" data-issue-kind>
-          ${finals.map((d) => `<option value="${d.id}" data-kind="${d.kind}"${d.id === first.id ? ' selected' : ''}${d.status === 'validated' ? '' : ' disabled'}>${esc(DOC_BY_KEY[d.kind].label)}${d.status === 'validated' ? '' : ' (à valider d\'abord)'}</option>`).join('')}
+        <label class="field wide" for="gen-doc"><span class="lbl">Type de document</span><span class="sel"><select id="gen-doc" name="doc" data-issue-kind>
+          ${finals.map((d) => `<option value="${d.id}" data-kind="${d.kind}"${first && d.id === first.id ? ' selected' : ''}${usable(d) ? '' : ' disabled'}>${esc(DOC_BY_KEY[d.kind].label)}${hint(d)}</option>`).join('')}
         </select>${ic('down')}</span></label>
+      </div>
+      <div class="grid2" data-for="devis">
         <label class="field" for="gen-client"><span class="lbl">Client</span><span class="sel"><select id="gen-client" name="client_id" data-issue-client>
           <option value="">${clients.length ? 'Nouveau client' : 'Nouveau client (aucun enregistré)'}</option>
-          ${clients.map((c) => `<option value="${c.id}" data-name="${esc(c.name)}" data-address="${esc(c.address)}" data-siret="${esc(c.siret)}">${esc(c.name)}</option>`).join('')}
+          ${clients.map((c) => `<option value="${c.id}" data-name="${esc(c.name)}" data-address="${esc(c.address)}" data-siret="${esc(c.siret)}"${sel && sel.id === c.id ? ' selected' : ''}>${esc(c.name)}</option>`).join('')}
         </select>${ic('down')}</span></label>
-        <label class="field" for="gen-n"><span class="lbl">Nom du client</span><input id="gen-n" name="client_nom" maxlength="120" required autocomplete="off"></label>
-        <label class="field" for="gen-s"><span class="lbl">SIRET du client <span class="muted small">(vide pour un particulier)</span></span><input id="gen-s" name="client_siret" inputmode="numeric" maxlength="20" autocomplete="off"></label>
-        <label class="field wide" for="gen-a"><span class="lbl">Adresse du client</span><input id="gen-a" name="client_adresse" maxlength="200" required autocomplete="off"></label>
-        <label class="field" for="gen-d"><span class="lbl">Date d'émission</span><input id="gen-d" type="date" name="issue_date" value="${today}" max="${today}" required></label>
-        <label class="field" for="gen-p" data-for="facture"><span class="lbl">Date de la prestation</span><input id="gen-p" type="date" name="date_prestation" value="${today}" max="${today}"></label>
-        <label class="field" for="gen-f" data-for="avoir"><span class="lbl">N° de la facture corrigée</span><input id="gen-f" name="facture_numero" maxlength="40" autocomplete="off"></label>
-        <label class="field wide" for="gen-m" data-for="avoir"><span class="lbl">Motif de l'avoir</span><input id="gen-m" name="motif" maxlength="300" autocomplete="off" value="${esc(docs.find((d) => d.kind === 'avoir')?.content.reason || '')}"></label>
+        <label class="field" for="gen-n"><span class="lbl">Nom du client</span><input id="gen-n" name="client_nom" maxlength="120" autocomplete="off" value="${esc(sel?.name || '')}"></label>
+        <label class="field wide" for="gen-a"><span class="lbl">Adresse du client</span><input id="gen-a" name="client_adresse" maxlength="200" autocomplete="off" value="${esc(sel?.address || '')}"></label>
+        <label class="field" for="gen-s"><span class="lbl">SIRET du client <span class="muted small">(vide pour un particulier)</span></span><input id="gen-s" name="client_siret" inputmode="numeric" maxlength="20" autocomplete="off" value="${esc(sel?.siret || '')}"></label>
       </div>
+      <fieldset class="bill-fs" data-for="devis"><legend>Ce que ton client commande</legend>
+        <p class="muted small">Une ligne par prestation ou produit. Les prix sont hors taxes : la TVA est calculée d'après tes informations légales.</p>
+        <div data-lines>${Array.from({ length: LINE_ROWS }, (_, i) => lineRow(i)).join('')}</div>
+        <div class="row-actions"><button type="button" class="btn small" data-add-line>${ic('plus')}Ajouter une ligne</button><span class="muted" data-lines-total aria-live="polite"></span></div>
+      </fieldset>
+      <div class="grid2" data-for="acompte facture avoir">
+        <label class="field wide" for="gen-devis"><span class="lbl">Devis de référence</span><span class="sel"><select id="gen-devis" name="devis_id" data-issue-devis>
+          <option value="">Choisis le devis…</option>
+          ${devisList.map((d) => `<option value="${d.id}">${esc(d.number)} — ${esc(d.client.name || '')} — ${esc(fmtEur(d.amount))} TTC</option>`).join('')}
+        </select>${ic('down')}</span></label>
+        <label class="field" for="gen-pct" data-for="acompte"><span class="lbl">Part de l'acompte (%)</span><input id="gen-pct" name="deposit_percent" value="${modelDeposit}" inputmode="numeric" maxlength="3" autocomplete="off"></label>
+        <label class="field wide" for="gen-ref" data-for="avoir"><span class="lbl">Facture corrigée par l'avoir</span><span class="sel"><select id="gen-ref" name="ref_id" data-issue-ref>
+          <option value="">Choisis la facture…</option>
+          ${refs.map((r) => `<option value="${r.id}" data-devis="${r.devisId}">${esc(r.number)} — ${esc(DOC_BY_KEY[r.kind].label)} — ${esc(fmtEur(r.amount))} TTC</option>`).join('')}
+        </select>${ic('down')}</span></label>
+        <label class="field" for="gen-cr" data-for="avoir"><span class="lbl">Montant à rembourser TTC (€) <span class="muted small">(vide : toute la facture)</span></span><input id="gen-cr" name="credit_ttc" inputmode="decimal" maxlength="14" autocomplete="off"></label>
+        <label class="field wide" for="gen-m" data-for="avoir"><span class="lbl">Motif de l'avoir</span><input id="gen-m" name="motif" maxlength="300" autocomplete="off" value="${esc(docs.find((d) => d.kind === 'avoir')?.content.reason || '')}"></label>
+        <label class="field" for="gen-p" data-for="facture"><span class="lbl">Date de la prestation</span><input id="gen-p" type="date" name="date_prestation" value="${today}" max="${today}"></label>
+      </div>
+      <div class="grid2"><label class="field" for="gen-d"><span class="lbl">Date d'émission</span><input id="gen-d" type="date" name="issue_date" value="${today}" max="${today}" required></label></div>
       <div data-for="acompte facture avoir"><label class="check" for="gen-c"><input id="gen-c" type="checkbox" name="to_accounting" value="1" checked><span>Joindre automatiquement à la comptabilité</span></label>
         <p class="muted small">Coché : la facture est ajoutée à ta Comptabilité, à encaisser (elle ne compte dans tes chiffres qu'une fois payée). Décoché : le PDF reste ici et rien n'est ajouté à la Comptabilité.</p></div>
       <div class="row-actions"><button class="btn primary">${ic('file')}Générer le PDF</button></div>
     </form></section>`;
 }
 
-function clientsSection(p, clients) {
-  if (!clients.length) return '';
-  return `<section class="card bill-sec" id="clients" aria-labelledby="t-cl"><h2 id="t-cl">Clients du projet</h2>
-    <p class="muted">Les clients de « ${esc(p.name)} » : leurs informations sont reprises quand tu génères un document. Un client se met à jour tout seul quand tu génères un document avec de nouvelles informations.</p>
-    <div class="table-wrap"><table class="mtable"><thead><tr><th>Client</th><th>Adresse</th><th>SIRET</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody>${clients.map((c) => `<tr>
-      <td><b>${esc(c.name)}</b></td><td>${esc(c.address)}</td><td>${esc(c.siret || '—')}</td>
-      <td><form method="post" action="/facturation/projet/${p.id}/clients/${c.id}/supprimer" data-confirm="Retirer ce client de la liste ? Les documents déjà émis ne changent pas."><button class="btn small danger" aria-label="Retirer le client ${esc(c.name)}">${ic('trash')}Retirer</button></form></td></tr>`).join('')}</tbody></table></div></section>`;
-}
-
 function invoicesSection(invoices) {
   if (!invoices?.length) return '';
+  const byId = new Map(invoices.map((x) => [x.id, x]));
   const label = { pending: ['À encaisser', 'warn'], paid: ['Payée', 'ok'], devis: ['Devis', ''], hors: ['Non jointe à la comptabilité', ''] };
   return `<section class="card bill-sec" id="emis" aria-labelledby="t-emis"><h2 id="t-emis">Documents émis</h2>
     <p class="muted">Les factures jointes à la <a class="link" href="/compta#a-encaisser">Comptabilité</a> s'y marquent payées à l'encaissement.</p>
     <div class="table-wrap"><table class="mtable"><thead><tr><th>Numéro</th><th>Client</th><th>Émis le</th><th class="num">Montant TTC</th><th>État</th><th><span class="sr-only">PDF</span></th></tr></thead><tbody>${invoices.map((i) => `<tr>
-      <td><b>${esc(i.number)}</b><span class="td-s">${esc(DOC_BY_KEY[i.kind]?.label || i.kind)}</span></td><td>${esc(i.client.name || '')}</td><td>${esc(i.issueDate.split('-').reverse().join('/'))}</td>
+      <td><b>${esc(i.number)}</b><span class="td-s">${esc(DOC_BY_KEY[i.kind]?.label || i.kind)}${i.devisId && byId.get(i.devisId) ? ` · devis ${esc(byId.get(i.devisId).number)}` : ''}</span></td><td>${esc(i.client.name || '')}</td><td>${esc(i.issueDate.split('-').reverse().join('/'))}</td>
       <td class="num">${esc(fmtEur(i.kind === 'avoir' ? -i.amount : i.amount))}</td>
       <td><span class="badge ${label[i.state][1]}">${label[i.state][0]}</span></td>
       <td><a class="btn small" href="/facturation/factures/${i.id}/pdf" data-noajax>${ic('file')}PDF</a>${i.entryId ? ` <a class="btn small" href="/compta/entries/${i.entryId}/file" target="_blank" rel="noopener noreferrer" data-noajax>Comptabilité</a>` : ''}</td></tr>`).join('')}</tbody></table></div></section>`;
@@ -180,11 +207,11 @@ function docsSection(p, docs, stage, busy, validatedCount) {
   return `<section class="card bill-sec" id="documents" aria-labelledby="t-docs"><h2 id="t-docs">3. Valide tes documents</h2>${inner}</section>`;
 }
 
-export function billingProjectPage({ email, project: p, legal, errors, suggestions, docs, invoices = [], clients = [], selectedKind = '', chosen, stage, jobs, flash }) {
+export function billingProjectPage({ email, project: p, legal, errors, suggestions, docs, invoices = [], clients = [], selectedKind = '', selectedClientId = null, chosen, stage, jobs, flash }) {
   const running = Object.values(jobs).find((j) => ['queued', 'running'].includes(j.status));
   const lastDoc = docs.reduce((m, d) => Math.max(m, d.updatedAt), 0);
   const failed = !running ? Object.values(jobs).filter((j) => j.status === 'error' && Number(j.finishedAt || 0) >= lastDoc).sort((a, b) => b.finishedAt - a.finishedAt)[0] : null;
-  const notes = { legal: 'Informations enregistrées.', legal_incomplet: 'Informations enregistrées : il en manque encore pour continuer.', quotes: 'Claude rédige tes trois exemples de devis…', refine: 'Claude affine le document selon ta demande…', docs: 'Devis validé : Claude prépare les documents…', valide: 'Document validé.', emis: 'Document émis : le PDF est prêt, et la facture est dans ta Comptabilité, à encaisser.', emis_devis: 'Devis émis : le PDF est prêt.', client_retire: 'Client retiré de la liste.', reset: 'Tout est effacé : tu repars du début (tes informations légales sont conservées).' };
+  const notes = { legal: 'Informations enregistrées.', legal_incomplet: 'Informations enregistrées : il en manque encore pour continuer.', quotes: 'Claude rédige tes trois exemples de devis…', refine: 'Claude affine le document selon ta demande…', docs: 'Devis validé : Claude prépare les documents…', valide: 'Document validé.', emis: 'Document émis : le PDF est prêt, et la facture est dans ta Comptabilité, à encaisser.', emis_devis: 'Devis émis : le PDF est prêt.',  reset: 'Tout est effacé : tu repars du début (tes informations légales sont conservées).' };
   const runPct = typeof running?.progress?.pct === 'number' ? Math.max(0, Math.min(100, Math.round(running.progress.pct))) : 0;
   const banner = running ? `<div class="bill-run" role="status">${ic('load')}<div class="bill-run-b"><div class="bill-run-h"><b>Claude travaille…</b><strong class="jpct" data-bill-pct>${runPct} %</strong></div>
     <span class="muted small" data-bill-msg>${esc(running.progress?.message || 'Cela prend une à deux minutes.')}</span>
@@ -201,7 +228,7 @@ export function billingProjectPage({ email, project: p, legal, errors, suggestio
       const q = docs.find((d) => d.kind === 'quote_option' && d.status === 'validated');
       if (q) sections.push(`<section class="card bill-sec" id="devis" aria-labelledby="t-devis"><h2 id="t-devis">2. Ton devis est validé</h2><p class="muted">Exemple ${q.variant} (${esc(LAYOUTS.find(([k]) => k === q.layout)?.[1] || '')}). Les documents suivants reprennent son style et ses lignes.</p></section>`);
       sections.push(docsSection(p, docs, stage, stage.busy, finalsCount));
-      if (!ready) sections.push(issueSection(p, docs, clients, selectedKind), invoicesSection(invoices), clientsSection(p, clients));
+      if (!ready) sections.push(issueSection(p, docs, clients, invoices, selectedKind, selectedClientId), invoicesSection(invoices));
     }
   }
   const done = ready ? `<section class="card bill-ready" aria-labelledby="t-ready"><div>${ic('check')}</div><div><h2 id="t-ready">Tes documents sont prêts</h2>
@@ -212,7 +239,7 @@ export function billingProjectPage({ email, project: p, legal, errors, suggestio
     <div class="row-between"><div><h1>Facturation : ${esc(p.name)}</h1><p class="muted small">${esc(host(p.gitUrl))}</p></div></div>
     ${stepper(stage.steps, stageStep[stage.stage])}${banner}</section>
   ${done}
-  ${ready ? [issueSection(p, docs, clients, selectedKind), invoicesSection(invoices), clientsSection(p, clients)].join('\n  ') : ''}
+  ${ready ? [issueSection(p, docs, clients, invoices, selectedKind, selectedClientId), invoicesSection(invoices)].join('\n  ') : ''}
   ${sections.join('\n  ')}
   ${reset ? `<div class="bill-foot">${reset}</div>` : ''}
   <p class="muted small bill-disc">Les documents suivent les usages entre professionnels en France. Les mentions légales sont rédigées par AiTools d'après tes informations, jamais par Claude : fais-les vérifier par un expert-comptable avant un usage particulier (client particulier, TVA sur les encaissements, marché public).</p>

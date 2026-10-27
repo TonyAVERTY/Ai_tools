@@ -342,33 +342,45 @@ ${c.closing ? para(c.closing) : ''}
  * Les chiffres d'un document, en centimes : lignes, totaux et montant à payer (ou à rembourser pour un avoir, en positif).
  * Une seule source pour l'aperçu, le PDF et la ligne de comptabilité.
  */
-export function documentFacts({ kind, content, legal }) {
+export function documentFacts({ kind, content, legal, lines = null, depositPercent = null, depositTtc = null, devisNumber = '', creditTtc = null, refNumber = '' }) {
   const c = content;
+  const items = lines || c.lines; // à l'émission : les lignes réellement saisies (les lignes du modèle ne sont que des exemples)
   const rate = rateOf(legal);
-  const t = totalsOf(c.lines, rate);
+  const t = totalsOf(items, rate);
   const assujetti = legal.vat_mode === 'assujetti';
   const vatLabel = assujetti ? `TVA ${rate / 100} %`.replace('.', ',') : 'TVA non applicable, art. 293 B du CGI';
-  const dep = c.deposit_percent;
+  const dep = depositPercent ?? c.deposit_percent;
   const depHt = Math.round((t.ht * dep) / 100);
   const depVat = rate > 0 ? Math.round((depHt * rate) / 10000) : 0;
   const depTtc = depHt + depVat;
-  const lineRows = c.lines.map((l) => ({ label: l.label, description: l.description || '', qty: `${String(l.qty).replace('.', ',')} ${l.unit || ''}`.trim(), unit: cents(l.unit_price), total: cents(l.qty * l.unit_price) }));
+  const lineRows = items.map((l) => ({ label: l.label, description: l.description || '', qty: `${String(l.qty).replace('.', ',')} ${l.unit || ''}`.trim(), unit: cents(l.unit_price), total: cents(l.qty * l.unit_price) }));
   let rows = lineRows;
   let totals;
   let due = t.ttc;
+  let paidDeposit = depTtc;
   if (kind === 'acompte') {
-    rows = [{ label: `Acompte de ${dep} % à la commande`, description: `Sur le devis : ${c.lines.map((l) => l.label).slice(0, 3).join(', ') || 'prestations convenues'}`, qty: '1', unit: depHt, total: depHt }];
+    rows = [{ label: `Acompte de ${dep} % à la commande`, description: `Sur le devis${devisNumber ? ` n° ${devisNumber}` : ''} : ${items.map((l) => l.label).slice(0, 3).join(', ') || 'prestations convenues'}`, qty: '1', unit: depHt, total: depHt }];
     totals = [['Total HT', depHt], [vatLabel, assujetti ? depVat : null], ['Total TTC à payer', depTtc, true]];
     due = depTtc;
   } else if (kind === 'facture') {
-    due = t.ttc - depTtc;
-    totals = [['Total HT', t.ht], [vatLabel, assujetti ? t.vat : null], ['Total TTC', t.ttc], [`Acompte déjà réglé (${dep} %)`, -depTtc], ['Reste à payer TTC', due, true]];
+    // Acomptes réellement facturés sur ce devis (émission) ; à défaut, la part prévue par le modèle
+    paidDeposit = depositTtc ?? depTtc;
+    due = t.ttc - paidDeposit;
+    totals = [['Total HT', t.ht], [vatLabel, assujetti ? t.vat : null], ['Total TTC', t.ttc]];
+    if (paidDeposit > 0 || depositTtc === null) totals.push([depositTtc === null ? `Acompte déjà réglé (${dep} %)` : 'Acomptes déjà facturés', -paidDeposit]);
+    totals.push(['Reste à payer TTC', due, true]);
+  } else if (kind === 'avoir' && creditTtc !== null) {
+    const ht = Math.round((creditTtc * 10000) / (10000 + rate));
+    const vat = creditTtc - ht;
+    rows = [{ label: `Avoir sur la facture${refNumber ? ` n° ${refNumber}` : ''}`, description: '', qty: '1', unit: ht, total: ht }];
+    totals = [['Total HT', -ht], [vatLabel, assujetti ? -vat : null], ["Total de l'avoir TTC", -creditTtc, true]];
+    due = creditTtc;
   } else if (kind === 'avoir') {
     totals = [['Total HT', -t.ht], [vatLabel, assujetti ? -t.vat : null], ["Total de l'avoir TTC", -t.ttc, true]];
   } else {
     totals = [['Total HT', t.ht], [vatLabel, assujetti ? t.vat : null], ['Total TTC', t.ttc, true]];
   }
-  return { rate, t, dep, depTtc, vatLabel, assujetti, rows: kind === 'avoir' ? rows.map((r) => ({ ...r, unit: -r.unit, total: -r.total })) : rows, totals, due };
+  return { rate, t, dep, depTtc: paidDeposit, vatLabel, assujetti, rows: kind === 'avoir' ? rows.map((r) => ({ ...r, unit: -r.unit, total: -r.total })) : rows, totals, due };
 }
 
 // ---------- Avancement d'un projet ----------
