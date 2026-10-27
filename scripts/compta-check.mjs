@@ -7,7 +7,8 @@ import { join } from 'node:path';
 import { startApp, APP_URL } from '../test/helpers/server.js';
 import { addProject } from '../test/helpers/users.js';
 
-const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright-core');
+const pw = await import(process.env.PLAYWRIGHT_MODULE || 'playwright-core');
+const chromium = pw.chromium || pw.default.chromium;
 const exe = process.env.PLAYWRIGHT_CHROMIUM;
 const s = await startApp();
 const b = await chromium.launch(exe ? { executablePath: exe } : {});

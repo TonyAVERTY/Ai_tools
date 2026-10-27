@@ -118,3 +118,10 @@ Les fiches de méthode (voir « Savoir-faire de Claude dans AiTools ») sont des
 - **« Les acomptes dépasseraient le total du devis »** / **« Ce devis est déjà entièrement facturé par les acomptes »** : la somme des acomptes (et de la facture finale) ne peut pas dépasser le devis. Baisse la « Part de l'acompte (%) ».
 - **« Un avoir ne peut pas dépasser la facture corrigée »** : baisse le « Montant à rembourser TTC (€) », ou laisse-le vide pour créditer toute la facture.
 
+## Clients
+- **Un client ou un prospect n'apparaît pas dans la liste** : ouvre le bon projet (les clients sont rangés par projet) et vide le champ « Rechercher un client ou un prospect ». Un prospect passé au statut « Client » apparaît dans « Clients ».
+- **Je ne vois aucun échange dans la fiche client** : les échanges sont retrouvés par le prospect dont le client vient ou par l'**adresse e-mail** du client. Renseigne « E-mail » dans « Informations » puis « Enregistrer ». Seuls les mails du même projet apparaissent.
+- **« Un client porte déjà ce nom dans ce projet. »** : change le nom, ou ouvre la fiche existante (cherche son nom).
+- **« L'adresse e-mail n'est pas valide. » / « Le SIRET compte 14 chiffres. »** : corrige le champ, ou laisse-le vide.
+- **J'ai retiré un client par erreur** : ajoute-le de nouveau (**Ajouter un client**). Ses documents n'ont pas été supprimés : ils sont dans « Facturation » (et dans la Comptabilité s'ils y avaient été joints).
+

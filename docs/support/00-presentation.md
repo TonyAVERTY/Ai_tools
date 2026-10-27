@@ -27,6 +27,7 @@ Tout ce que fait l'IA passe par le compte Claude de la personne, jamais par un c
 - **Calendrier** : le mois, les événements et l'agenda externe.
 - **Comptabilité** : tes paiements, dépenses et remboursements avec leurs justificatifs, tes chiffres, le guide « Faire ma déclaration » et les exports (voir « Comptabilité : lignes, justificatifs, déclaration et exports »).
 - **Facturation** : pour chaque projet, tes informations légales puis un devis, un acompte, une facture finale et un avoir écrits avec Claude, validés un par un, puis émis en PDF (les factures émises arrivent toutes seules dans la Comptabilité, à encaisser) (voir « Facturation : modèles de devis, d'acompte, de facture finale et d'avoir »).
+- **Clients** : pour chaque projet, tes clients et tes prospects (recherche, ajout, modification), la fiche client avec ses documents générés et ses échanges, le passage d'un prospect en client et l'export CSV (voir « Clients : liste par projet, fiches, documents et échanges »).
 - **Équipe** : partager des projets avec des collègues.
 - **Activité** (apparaît quand une tâche tourne) : la liste des jobs en cours, en attente ou programmés, avec leur avancement.
 - **Site internet** : ouvre le site public d'AiTools (page d'accueil du site). Sur téléphone, seule l'icône (un globe) s'affiche.
