@@ -1097,10 +1097,6 @@ html.nav-busy { cursor: progress; }
 .wiz-dots li.done { background: var(--ok); border-color: var(--ok); }
 .wiz-dots li.done .ic { opacity: 1; transform: none; }
 .wiz-step { position: relative; }
-.wiz-ok { display: flex; align-items: center; gap: 8px; margin: 14px 0 0; font-size: .9375rem; font-weight: 600; color: var(--ok); visibility: hidden; }
-.wiz-pill { width: 24px; height: 24px; border-radius: 999px; background: var(--ok); display: grid; place-items: center; }
-.wiz-pill .ic { width: 15px; height: 15px; stroke-width: 3; color: var(--card); }
-.wiz-ok.show { visibility: visible; animation: wiz-pop .42s var(--ease) both; }
 @keyframes wiz-pop { 0% { transform: scale(.6); opacity: 0; } 60% { transform: scale(1.08); opacity: 1; } 100% { transform: none; opacity: 1; } }
 @keyframes wiz-in { from { opacity: 0; transform: translateX(32px); } to { opacity: 1; transform: none; } }
 @keyframes wiz-in-back { from { opacity: 0; transform: translateX(-32px); } to { opacity: 1; transform: none; } }
@@ -1110,7 +1106,15 @@ html.nav-busy { cursor: progress; }
 .wiz-step.wiz-out { transform: translateX(-32px); }
 .wiz-step.wiz-out-back { transform: translateX(32px); }
 @media (prefers-reduced-motion: reduce) {
-  .wiz-ok.show, .wiz-step.wiz-in, .wiz-step.wiz-in-back { animation: none; }
+  .wiz-big, .wiz-step.wiz-in, .wiz-step.wiz-in-back { animation: none; }
   .wiz-step.wiz-out, .wiz-step.wiz-out-back { transition: none; transform: none; }
   .wiz-dots li, .wiz-dots li .ic { transition: none; }
 }
+
+/* Confirmation d'une réponse : grand cercle vert au milieu de la carte, arrière-plan flouté */
+.wiz { position: relative; }
+.wiz-confirm { position: absolute; inset: 0; z-index: 2; display: grid; place-items: center; border-radius: inherit; background: color-mix(in srgb, var(--card) 58%, transparent); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); opacity: 0; visibility: hidden; transition: opacity .18s var(--ease), visibility 0s .18s; pointer-events: none; }
+.wiz-confirm.show { opacity: 1; visibility: visible; transition: opacity .18s var(--ease); pointer-events: auto; }
+.wiz-big { width: 104px; height: 104px; border-radius: 999px; background: var(--ok); display: grid; place-items: center; }
+.wiz-big .ic { width: 60px; height: 60px; stroke-width: 3; color: var(--card); }
+.wiz-confirm.show .wiz-big { animation: wiz-pop .46s var(--ease) both; }
