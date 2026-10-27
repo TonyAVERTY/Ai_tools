@@ -99,6 +99,7 @@
   const LABELS = {
     analyze: 'Analyse', prospect: 'Recherche', template: 'Modèle', send: 'Envoi', evolution: 'Évolutions',
     followup_template: 'Modèle de relance', followup: 'Relances', linkedin_post: 'Post LinkedIn', promo_video: 'Vidéo de promotion', audit: 'Audit', hook: 'Accroche',
+    billing_quotes: 'Facturation : exemples de devis', billing_refine: 'Facturation : affinage', billing_docs: 'Facturation : documents',
   };
 
   // Champs en lecture seule à copier (lien d'invitation) : un clic sélectionne tout

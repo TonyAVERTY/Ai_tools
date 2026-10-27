@@ -103,6 +103,8 @@ const HELP = [
   ['Combien de temps garder les justificatifs ?', '<p>Les documents comptables et leurs pièces justificatives se conservent <b>10 ans</b> (à titre indicatif). AiTools garde les tiens tant que tu ne supprimes pas la ligne ou ton compte. Pense à exporter régulièrement : le bouton « Tout exporter » crée une archive à ranger de ton côté.</p>'],
   ['Que doit contenir une facture ?', '<p>La date et un numéro unique ; ton nom, ton adresse et ton SIREN ; le nom et l\'adresse du client ; la description et le prix HT ; le taux et le montant de TVA, ou la mention « TVA non applicable, art. 293 B du CGI » ; le total TTC ; les conditions de paiement (pénalités de retard et indemnité forfaitaire de 40 € entre professionnels).</p>'],
   ['Apport, prêt, retrait : pourquoi ces types ?', '<p>L\'argent que tu mets dans l\'activité ou que tu en retires pour toi n\'est ni un gain ni une dépense : il apparaît dans le journal mais n\'entre jamais dans ton chiffre d\'affaires ni dans le montant à déclarer.</p>'],
+  ["J'ai perdu un justificatif : que faire ?", '<p>Demande un <b>duplicata</b> à la personne qui l\'a émis : un fournisseur peut te renvoyer sa facture, et un service en ligne (hébergeur, Stripe, PayPal…) la garde dans ton espace client. Pour un paiement reçu, refais une copie de la facture que tu as envoyée.</p><p>Tant que tu n\'as pas la pièce, n\'ajoute pas la ligne : une ligne sans preuve ne sert à rien en cas de contrôle.</p>'],
+  ['Comment corriger une erreur ?', '<p>Dans le journal, clique <b>Modifier</b> sur la ligne : tu changes le montant, la date ou la catégorie, et tu peux remplacer le justificatif. <b>Supprimer</b> efface la ligne et son justificatif, définitivement.</p>'],
   ['Cette page remplace-t-elle un comptable ?', `<p>Non. Elle t'aide à ranger tes pièces, à suivre tes chiffres et à savoir quoi déclarer. Les plafonds affichés sont des valeurs de référence ${REFERENCE.year} : vérifie-les sur service-public.fr. Pour un cas particulier (société, TVA, investissement), demande conseil à un expert-comptable.</p>`],
 ];
 
@@ -243,8 +245,8 @@ export function accountingPage(d) {
     ${journal}${pager}
   </section>
 
-  <section class="card cmp-faq" aria-labelledby="t-help"><h2 id="t-help">Petit guide de la comptabilité</h2>
-    ${HELP.map(([q, a]) => `<details class="tip"><summary><span class="tip-i" aria-hidden="true">?</span><span class="tip-t">${esc(q)}</span></summary><div class="tip-body">${a}</div></details>`).join('')}
+  <section class="card cmp-faq" aria-labelledby="t-help"><div class="card-h"><h2 id="t-help">Questions fréquentes</h2><p>Les réponses aux questions que se pose tout le monde en débutant.</p></div>
+    <div class="faq">${HELP.map(([q, a]) => `<details class="faq-i"><summary><span>${esc(q)}</span>${ic('chev')}</summary><div class="faq-a">${a}</div></details>`).join('')}</div>
     <p class="muted small">Espace utilisé par tes justificatifs : ${(d.usedBytes / 1048576).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} Mo sur ${Math.round(d.limits.perUserBytes / 1048576)} Mo.</p>
   </section>
   ${dialog(d)}

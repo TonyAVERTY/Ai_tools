@@ -24,7 +24,7 @@ function acc(key, icon, title, sub, body, { open = false, cls = '' } = {}) {
 </details>`;
 }
 
-const NAV = [['/', 'folder', 'Projets'], ['/mails', 'mail', 'Mails'], ['/calendar', 'clock', 'Calendrier'], ['/compta', 'wallet', 'Comptabilité'], ['/team', 'users', 'Équipe']];
+const NAV = [['/', 'folder', 'Projets'], ['/mails', 'mail', 'Mails'], ['/calendar', 'clock', 'Calendrier'], ['/compta', 'wallet', 'Comptabilité'], ['/facturation', 'receipt', 'Facturation'], ['/team', 'users', 'Équipe']];
 
 export function layout({ title, body, email, scripts = [] }) {
   return `<!doctype html>

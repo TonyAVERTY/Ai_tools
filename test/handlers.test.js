@@ -57,6 +57,7 @@ test('flux complet : analyse → cible → prospection → modèle → envoi →
     let p = await getProject(s.app, s.id, { userId: s.userId });
     assert.equal(p.profile.resume, 'Cartes de fidélité digitales.');
     assert.equal(p.target.zone, 'Bretagne');
+    assert.equal(p.profile.facturation.legal_name, 'Atelier Averty', 'l\'analyse garde les informations d\'éditeur trouvées pour la Facturation');
     assert.equal(p.targetValidated, false);
     assert.match(p.profileCommit, /^[0-9a-f]{40}$/);
     const rl = JSON.parse(await getSetting(s.db, s.userId, 'claude_rate_limit_json'));

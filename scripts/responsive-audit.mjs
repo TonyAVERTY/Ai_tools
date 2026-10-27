@@ -31,7 +31,7 @@ await createFeed(s.app, u.id);
 const team = Number((await s.db.prepare("INSERT INTO teams(owner_id, name, created_at) VALUES(?, 'Équipe', ?)").run(u.id, now())).lastInsertRowid);
 await s.db.prepare("INSERT INTO team_members(team_id, user_id, role, created_at) VALUES(?, ?, 'member', ?)").run(team, other.id, now());
 const PUBLIC = ['/', '/fonctionnement', '/tarifs', '/docs', '/docs/api', '/docs/mcp', '/mentions-legales', '/confidentialite', '/cgu', '/login', '/page-inconnue'];
-const APP = ['/', '/settings', '/account', '/mails', '/mails?v=replies', '/calendar', '/compta', '/chat', '/support', '/team', '/developer', '/admin', '/link'];
+const APP = ['/', '/settings', '/account', '/mails', '/mails?v=replies', '/calendar', '/compta', '/facturation', '/chat', '/support', '/team', '/developer', '/admin', '/link'];
 const b = await chromium.launch(process.env.PLAYWRIGHT_CHROMIUM ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM } : {});
 const bad = [];
 const probe = (W) => {
