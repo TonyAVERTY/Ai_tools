@@ -89,7 +89,9 @@ function wizard(p) {
       <div class="bar" role="progressbar" aria-label="Questions répondues" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="w-0" data-wiz-bar></span></div>
       <ol class="wiz-dots" aria-hidden="true">${STEPS.map(() => `<li data-dot>${ic('check')}</li>`).join('')}</ol>
     </div>
-    ${STEPS.map((s, i) => `<fieldset class="wiz-step" data-step${i ? ' hidden' : ''}><legend>${esc(s.title)}</legend>${s.hint ? `<p class="hint">${esc(s.hint)}</p>` : ''}${s.body(p)}<p class="wiz-ok" role="status" data-wiz-ok><span class="wiz-pill">${ic('check')}</span>Pris en compte</p></fieldset>`).join('\n    ')}
+    ${STEPS.map((s, i) => `<fieldset class="wiz-step" data-step${i ? ' hidden' : ''}><legend>${esc(s.title)}</legend>${s.hint ? `<p class="hint">${esc(s.hint)}</p>` : ''}${s.body(p)}</fieldset>`).join('\n    ')}
+    <div class="wiz-confirm" data-wiz-confirm aria-hidden="true"><span class="wiz-big">${ic('check')}</span></div>
+    <p class="sr-only" role="status" data-wiz-live></p>
     <div class="wiz-f"><button type="button" class="btn" data-wiz-back hidden>Retour</button><button class="btn primary" data-wiz-next>Continuer</button></div>
     <p class="wiz-skip"><button class="link" formaction="/welcome/skip" formnovalidate>Passer le questionnaire</button></p>
   </form>`;
