@@ -27,7 +27,7 @@
     const opener = document.activeElement;
     const root = document.createElement('div');
     root.className = 'tour';
-    root.innerHTML = `<div class="tour-shield"></div><div class="tour-hole snap"></div>
+    root.innerHTML = `<div class="tour-shield"></div><div class="tour-dim"></div><div class="tour-hole snap"></div><div class="tour-hole2 snap"></div>
       <section class="tour-card" role="dialog" aria-modal="true" aria-labelledby="tour-t" aria-describedby="tour-d" tabindex="-1">
         <p class="tour-n"><span data-tour-count></span><b data-tour-pct></b></p>
         <div class="bar" role="progressbar" aria-label="Progression de la visite" aria-valuemin="0" aria-valuemax="100"><span class="w-0" data-tour-bar></span></div>
@@ -41,6 +41,8 @@
     // Les clics dans la visite ne remontent pas au reste de la page (sinon le « clic en dehors » du menu déplié le refermerait aussitôt)
     for (const t of ['click', 'mousedown', 'pointerdown']) root.addEventListener(t, (e) => e.stopPropagation());
     const hole = $('.tour-hole', root);
+    const hole2 = $('.tour-hole2', root);
+    const dim = $('.tour-dim', root);
     const card = $('.tour-card', root);
     const prev = $('[data-tour-prev]', root);
     const next = $('[data-tour-next]', root);
@@ -65,12 +67,27 @@
       const vw = innerWidth;
       const vh = innerHeight;
       if (!r) { // étape centrée : l'ombre couvre tout, la carte est au milieu
+        root.classList.remove('tour-multi');
         Object.assign(hole.style, { left: `${vw / 2}px`, top: `${vh / 2}px`, width: '0px', height: '0px', borderRadius: '0px' });
         card.classList.toggle('tour-sheet', vw < 640);
         Object.assign(card.style, vw < 640 ? { left: '', top: '' } : { left: `${Math.max(12, (vw - card.offsetWidth) / 2)}px`, top: `${Math.max(12, (vh - card.offsetHeight) / 2)}px` });
         return;
       }
-      Object.assign(hole.style, { left: `${r.left - PAD}px`, top: `${r.top - PAD}px`, width: `${r.width + 2 * PAD}px`, height: `${r.height + 2 * PAD}px`, borderRadius: '14px' });
+      const el1 = $(s.target);
+      const el2 = s.also && $(s.also);
+      const multi = !!el2 && shown(el2);
+      root.classList.toggle('tour-multi', multi);
+      if (multi) {
+        // Deux éléments éclairés (bouton + menu déplié) : on contourne ce qui les sépare (ex. le bouton voisin), qui reste assombri
+        const box = (el) => { const b = el.getBoundingClientRect(); return { left: b.left - PAD, top: b.top - PAD, width: b.width + 2 * PAD, height: b.height + 2 * PAD }; };
+        const a = box(el1);
+        const b = box(el2);
+        const rr = (x) => { const k = 14; const R = x.left + x.width; const B = x.top + x.height; return `M${x.left + k} ${x.top}H${R - k}A${k} ${k} 0 0 1 ${R} ${x.top + k}V${B - k}A${k} ${k} 0 0 1 ${R - k} ${B}H${x.left + k}A${k} ${k} 0 0 1 ${x.left} ${B - k}V${x.top + k}A${k} ${k} 0 0 1 ${x.left + k} ${x.top}Z`; };
+        dim.style.clipPath = `path(evenodd, 'M0 0H${vw}V${vh}H0Z ${rr(a)} ${rr(b)}')`;
+        for (const [h, x] of [[hole, a], [hole2, b]]) Object.assign(h.style, { left: `${x.left}px`, top: `${x.top}px`, width: `${x.width}px`, height: `${x.height}px`, borderRadius: '14px' });
+      } else {
+        Object.assign(hole.style, { left: `${r.left - PAD}px`, top: `${r.top - PAD}px`, width: `${r.width + 2 * PAD}px`, height: `${r.height + 2 * PAD}px`, borderRadius: '14px' });
+      }
       if (vw < 640) { card.classList.add('tour-sheet'); Object.assign(card.style, { left: '', top: '' }); return; }
       card.classList.remove('tour-sheet');
       const w = card.offsetWidth;
