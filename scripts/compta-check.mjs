@@ -41,7 +41,8 @@ for (const [vp, scheme, tag] of [[{ width: 1280, height: 900 }, 'light', '1280px
   await p.goto(`${s.base}/compta`);
   await p.waitForSelector('html[data-nav="ready"]');
   ok((await p.locator('.pills a[href="/compta"]').getAttribute('aria-current').catch(() => null)) !== undefined, `${tag} « Comptabilité » est dans la barre du haut`);
-  ok(await p.getByText('Commence ici : dis-nous où tu en es').isVisible(), `${tag} un nouvel utilisateur est guidé : questions sur sa situation`);
+  ok(await p.getByText('Comptabilité : dis-nous où tu en es').isVisible(), `${tag} un nouvel utilisateur est guidé : questions sur sa situation`);
+  ok(await p.getByRole('heading', { name: 'Tes chiffres' }).count() === 0 && await p.getByRole('button', { name: 'Ajouter une ligne' }).count() === 0 && await p.getByRole('heading', { name: 'Journal des lignes' }).count() === 0, `${tag} seules les questions s'affichent, le reste de la page est caché`);
   await shot(p, `compta-1-debut-${vp.width}`);
 
   // ---------- situation : une question à la fois ----------
@@ -62,7 +63,7 @@ for (const [vp, scheme, tag] of [[{ width: 1280, height: 900 }, 'light', '1280px
   await p.waitForSelector('.wiz-end', { state: 'detached' }); // … laisse la place à la page
   await p.waitForSelector('.cmp-flash.ok');
   await p.waitForSelector('html[data-nav="ready"]');
-  ok(await p.locator('details#situation').count() === 1, `${tag} la situation est enregistrée et repliée`);
+  ok(await p.locator('details#situation').count() === 1 && await p.getByRole('heading', { name: 'Tes chiffres' }).isVisible(), `${tag} la situation est enregistrée : le reste de la page apparaît, la situation est repliée`);
 
   // ---------- ajout : fichier obligatoire, TVA masquée en franchise ----------
   await p.getByRole('button', { name: 'Ajouter une ligne' }).first().click();
