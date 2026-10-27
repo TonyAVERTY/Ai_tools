@@ -15,6 +15,8 @@ const SYMBOLS = {
   check: '<path d="m5 12.5 4.5 4.5L19 7.5"></path>',
   chev: '<path d="m6 9 6 6 6-6"></path>',
   clock: '<circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path>',
+  wallet: '<path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v3"></path><rect x="4" y="8" width="16" height="12" rx="3"></rect><path d="M16 14h.01"></path>',
+  receipt: '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"></path><path d="M9 8h6M9 12h6"></path>',
   clip: '<path d="m21 11.5-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.6-8.6a3.7 3.7 0 0 1 5.2 5.2l-8.6 8.6a1.8 1.8 0 0 1-2.6-2.6l7.9-7.9"></path>',
   file: '<path d="M7 3h7l5 5v13H7z"></path><path d="M14 3v5h5M10 13h6M10 17h6"></path>',
   film: '<rect x="3" y="5" width="18" height="14" rx="2.5"></rect><path d="m10 9.5 5 2.5-5 2.5z"></path>',

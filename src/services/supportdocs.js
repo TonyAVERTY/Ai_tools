@@ -14,6 +14,7 @@ import { PROMO, FORMATS } from './promovideo.js';
 import { ROLES, MAX_NOTES } from './roles.js';
 import { loadSkills, SKILLS_MAX_CHARS } from './skills.js';
 import { TOUR_STEPS } from '../tour.js';
+import { LIMITS as ACC } from './accounting.js';
 
 export const STATIC_DOCS_DIR = fileURLToPath(new URL('../../docs/support/', import.meta.url));
 
@@ -58,6 +59,10 @@ Les offres se voient aussi sur la page publique « Tarifs ». Un administrateur 
 - ${files.perMessage ?? '—'} pièces jointes au plus par message.
 - Taille maximale : image ${mo(files.maxBytes?.image ?? 0)}, PDF ${mo(files.maxBytes?.pdf ?? 0)}, fichier texte ${mo(files.maxBytes?.text ?? 0)}, vidéo ${mo(files.maxBytes?.video ?? 0)}. Espace total par compte : ${mo(files.perUser ?? 0)}.
 - Une pièce jointe ajoutée mais jamais envoyée est supprimée au bout de ${files.pendingHours ?? 24} heures.
+
+## Justificatifs de la comptabilité
+- Un justificatif par ligne : PDF ou image (JPG, PNG, WebP, GIF), ${mo(ACC.fileBytes)} au plus. Espace total par compte : ${mo(ACC.perUserBytes)}.
+- ${ACC.perUserEntries.toLocaleString('fr-FR')} lignes au plus par compte.
 
 ## Vidéos de promotion (onglet « Promotion » d'un projet)
 - Images par seconde : de ${PROMO.fps.min} à ${PROMO.fps.max} (${PROMO.fps.def} par défaut). Durée : de ${PROMO.seconds.min} à ${PROMO.seconds.max} secondes (${PROMO.seconds.def} par défaut).

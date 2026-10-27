@@ -79,6 +79,8 @@ export async function loginIdentity(db, cfg, { provider, sub, email, name }) {
 export const userRepoRoot = (cfg, userId) => join(cfg.dataDir, 'repos', String(Number(userId)));
 /** Pièces jointes de la page IA (images, PDF, vidéos…) de cet utilisateur : un dossier par compte, supprimé avec lui. */
 export const userChatRoot = (cfg, userId) => join(cfg.dataDir, 'chat', String(Number(userId)));
+/** Justificatifs de la comptabilité : un dossier par compte, un sous-dossier par ligne. Supprimé avec le compte. */
+export const userAccountingRoot = (cfg, userId) => join(cfg.dataDir, 'compta', String(Number(userId)));
 export const userPromoRoot = (cfg, userId) => join(cfg.dataDir, 'promo', String(Number(userId)));
 
 /**
@@ -97,4 +99,5 @@ export async function deleteUser(app, userId) {
   rmSync(userRepoRoot(cfg, user.id), { recursive: true, force: true });
   rmSync(userChatRoot(cfg, user.id), { recursive: true, force: true });
   rmSync(userPromoRoot(cfg, user.id), { recursive: true, force: true });
+  rmSync(userAccountingRoot(cfg, user.id), { recursive: true, force: true });
 }
