@@ -11,7 +11,7 @@ La comptabilité est **personnelle** : seules tes propres lignes s'affichent, m�
 2. **Que vends-tu ?** « Prestations de services », « Profession libérale » ou « Vente de marchandises » : cela décide de la bonne case à remplir à l'URSSAF.
 3. **Factures-tu la TVA ?** « Je ne facture pas la TVA » (franchise en base : tes factures portent « TVA non applicable, art. 293 B du CGI ») ou « Je facture la TVA ».
 4. **À quel rythme déclares-tu ?** « Chaque mois » ou « Chaque trimestre ».
-À la dernière question, le bouton devient **Terminer** : ta situation est enregistrée (« Ta situation est enregistrée ») et revient sur la page. Ensuite la ligne **Ma situation** reste en haut, repliée : ouvre-la pour repasser les questions, tes réponses actuelles sont déjà cochées. Sans réponse au rythme de déclaration, le trimestre est choisi.
+À la dernière question, le bouton devient **Terminer** : ta situation est enregistrée (« Ta situation est enregistrée ») et revient sur la page. Pour changer tes réponses plus tard, ouvre **Faire ma déclaration** : le guide rappelle ta situation et propose **Modifier mes réponses** ; les questions s'affichent seules, tes réponses actuelles déjà cochées, sans toucher à tes lignes ni à tes justificatifs. Sans réponse au rythme de déclaration, le trimestre est choisi.
 
 ## 2. Ajouter une ligne
 1. Clique **Ajouter une ligne**. Une fenêtre s'ouvre.
