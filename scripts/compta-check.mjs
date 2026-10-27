@@ -44,14 +44,24 @@ for (const [vp, scheme, tag] of [[{ width: 1280, height: 900 }, 'light', '1280px
   ok(await p.getByText('Commence ici : dis-nous où tu en es').isVisible(), `${tag} un nouvel utilisateur est guidé : questions sur sa situation`);
   await shot(p, `compta-1-debut-${vp.width}`);
 
-  // ---------- situation ----------
-  await p.locator('label.opt', { hasText: 'Micro-entrepreneur' }).click();
-  await p.locator('label.opt', { hasText: 'Prestations de services' }).click();
-  await p.locator('label.opt', { hasText: 'Je ne facture pas la TVA' }).click();
-  await p.locator('label.opt', { hasText: 'Chaque trimestre' }).click();
-  await p.getByRole('button', { name: 'Enregistrer ma situation' }).click();
-  await p.waitForSelector('text=Ta situation est enregistrée');
-  await p.waitForSelector('html[data-nav="ready"]'); // les scripts de la page sont relancés après chaque remplacement
+  // ---------- situation : une question à la fois ----------
+  const wizard = async (root, choices) => {
+    for (let i = 0; i < choices.length; i++) {
+      const before = await root.locator('[data-wiz-count]').innerText();
+      if (choices[i]) await root.locator('[data-step]:not([hidden]) label.opt', { hasText: choices[i] }).click();
+      await root.locator('[data-wiz-next]').click();
+      if (i < choices.length - 1) await p.waitForFunction((x) => document.querySelector('[data-wiz-count]').textContent !== x, before, { timeout: 5000 });
+    }
+  };
+  ok(await p.locator('[data-step]:not([hidden])').count() === 1, `${tag} les questions sont posées une à une`);
+  ok(/Question 1 sur 4/.test(await p.locator('[data-wiz-count]').innerText()) && /0 %/.test(await p.locator('[data-wiz-pct]').innerText()), `${tag} « Question 1 sur 4 » et le pourcentage`);
+  await p.locator('[data-wiz-next]').click();
+  ok(await p.locator('[data-wiz-error]').first().isVisible() && /Question 1 sur 4/.test(await p.locator('[data-wiz-count]').innerText()), `${tag} le statut est obligatoire : on reste sur la question avec un message`);
+  await wizard(p, ['Micro-entrepreneur', 'Prestations de services', 'Je ne facture pas la TVA', 'Chaque trimestre']);
+  await p.waitForSelector('.wiz-end.show'); // la scène de fin « Ta situation est enregistrée »…
+  await p.waitForSelector('.wiz-end', { state: 'detached' }); // … laisse la place à la page
+  await p.waitForSelector('.cmp-flash.ok');
+  await p.waitForSelector('html[data-nav="ready"]');
   ok(await p.locator('details#situation').count() === 1, `${tag} la situation est enregistrée et repliée`);
 
   // ---------- ajout : fichier obligatoire, TVA masquée en franchise ----------
@@ -78,10 +88,12 @@ for (const [vp, scheme, tag] of [[{ width: 1280, height: 900 }, 'light', '1280px
 
   // ---------- dépense avec TVA calculée en direct (compte assujetti simulé via la situation) ----------
   await p.locator('details#situation > summary').click();
-  await p.locator('details#situation label.opt', { hasText: 'Je facture la TVA' }).click();
-  await p.locator('details#situation').getByRole('button', { name: 'Enregistrer ma situation' }).click();
-  await p.waitForSelector('text=Ta situation est enregistrée');
-  await p.waitForSelector('html[data-nav="ready"]'); // les scripts de la page sont relancés après chaque remplacement
+  ok(await p.locator('details#situation [data-step]:not([hidden]) input:checked').count() === 1, `${tag} en modification, la réponse actuelle est cochée`);
+  await wizard(p.locator('details#situation'), ['', '', 'Je facture la TVA', '']);
+  await p.waitForSelector('.wiz-end.show'); // la scène de fin « Ta situation est enregistrée »…
+  await p.waitForSelector('.wiz-end', { state: 'detached' }); // … laisse la place à la page
+  await p.waitForSelector('.cmp-flash.ok');
+  await p.waitForSelector('html[data-nav="ready"]');
   await p.getByRole('button', { name: 'Ajouter une ligne' }).first().click();
   await dlg.waitFor({ state: 'visible' });
   await dlg.locator('label.opt', { hasText: 'Dépense' }).first().click();

@@ -342,3 +342,21 @@ test('supprimer le compte efface aussi les justificatifs', async () => {
   await deleteUser(s.app, u.id);
   assert.equal(existsSync(root), false);
 });
+
+test('situation : l\'assistant l\'enregistre en JSON (statut obligatoire), la page pose une question à la fois', async () => {
+  const u = await s.newUser();
+  const h = await page(u);
+  assert.match(h, /data-wizard data-wiz-json="\/compta\/situation\?json=1"/);
+  assert.equal((h.match(/<fieldset class="wiz-step"/g) || []).length, 4, 'quatre questions');
+  assert.match(h, /data-required/, 'le statut attend une réponse');
+  assert.doesNotMatch(h, /name="freq" value="quarterly" checked/, 'rien de coché à la première visite');
+  let r = await u.post('/compta/situation?json=1', { activity: 'services' }, { form: true });
+  assert.equal(r.status, 400, 'sans statut : refusé, l\'assistant retombe sur l\'envoi classique');
+  r = await u.post('/compta/situation?json=1', { regime: 'reel', activity: 'liberal', vat: 'assujetti', freq: 'monthly' }, { form: true });
+  assert.equal(r.status, 200);
+  assert.deepEqual(await r.json(), { ok: true });
+  const again = await page(u);
+  assert.doesNotMatch(again, /Commence ici/);
+  assert.match(again, /Ma situation : Société ou entreprise au réel · Profession libérale · Je facture la TVA · déclaration chaque mois/);
+  assert.match(again, /name="regime" value="reel" checked/, 'en modification, les réponses actuelles sont cochées');
+});

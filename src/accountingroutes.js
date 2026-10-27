@@ -146,18 +146,21 @@ export function registerAccountingRoutes(router, app) {
   });
 
   // ---------- Situation (régime, activité, TVA, fréquence) ----------
-  router.post('/compta/situation', async ({ req, res, session }) => {
+  router.post('/compta/situation', async ({ req, res, session, url }) => {
     const b = await readBody(req);
+    const asJson = url.searchParams.get('json') === '1'; // fin de l'assistant (public/app.js) : l'enregistrement part pendant la scène de fin
     const pick = (v, list) => (list.some(([k]) => k === v) ? v : '');
     const regime = pick(b.regime, REGIMES);
     const activity = pick(b.activity, ACTIVITIES);
     const vat = pick(b.vat, VAT_MODES);
     const freq = pick(b.freq, FREQUENCIES) || 'quarterly';
+    if (!regime && asJson) throw refuse(400, 'Choisis ton statut pour continuer.');
     if (!regime) return redirect(res, '/compta?e=' + encodeURIComponent('Choisis ta situation pour continuer.') + '#situation');
     await setSetting(db, session.userId, 'acc_regime', regime);
     await setSetting(db, session.userId, 'acc_activity', activity || 'services');
     await setSetting(db, session.userId, 'acc_vat', vat || (regime === 'reel' ? 'assujetti' : 'franchise'));
     await setSetting(db, session.userId, 'acc_freq', freq);
+    if (asJson) return json(res, { ok: true });
     redirect(res, '/compta?ok=situation');
   }, { limit: 'compta' });
 
