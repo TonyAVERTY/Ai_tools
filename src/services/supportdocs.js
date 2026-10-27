@@ -12,6 +12,7 @@ import { RECOMMENDED, OTHERS, DEFAULT_MODEL } from './models.js';
 import { PROMPT_DEFS } from './prompts.js';
 import { PROMO, FORMATS } from './promovideo.js';
 import { ROLES, MAX_NOTES } from './roles.js';
+import { loadSkills, SKILLS_MAX_CHARS } from './skills.js';
 
 export const STATIC_DOCS_DIR = fileURLToPath(new URL('../../docs/support/', import.meta.url));
 
@@ -120,6 +121,19 @@ Résumé : la liste de tous les postes (Direction, Commerce, Marketing, Communic
 Comment les utiliser : voir « Postes et filtre par poste ». Chaque tâche écrit un livrable en Markdown à partir de la fiche du projet ; les précisions (jusqu'à ${MAX_NOTES} caractères) sont facultatives. Rien n'est envoyé ni publié.
 
 ${postes}
+`,
+  });
+  const labels = Object.fromEntries(Object.entries(PROMPT_DEFS).map(([k, d]) => [k, d.label]));
+  out.push({
+    name: 'savoir-faire-ia.md',
+    content: `# Savoir-faire d'AiTools donné à Claude
+Résumé : la liste des fiches de méthode (prospection B2B, rédaction de mails, conformité, lecture d'un dépôt, posts LinkedIn…) qu'AiTools ajoute automatiquement aux consignes de Claude, tâche par tâche. Fichier généré depuis le code.
+
+Chaque tâche IA reçoit, en plus de tes consignes et de la fiche du projet, les fiches de méthode qui la concernent (au plus ${SKILLS_MAX_CHARS} caractères par tâche). Elles ne se modifient pas depuis l'écran : elles font partie de l'application et évoluent avec elle. En cas de doute, la consigne de la tâche (Réglages → Prompts IA) l'emporte sur la fiche.
+
+${loadSkills().map((k) => `### ${k.title}
+${k.summary}
+- Appliquée à : ${k.tasks.map((t) => labels[t] || t).join(' ; ')}.`).join('\n\n')}
 `,
   });
   return out;
