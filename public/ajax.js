@@ -59,7 +59,7 @@
   }
 
   // Ce qui doit survivre à un remplacement sur la même page : sections ouvertes, onglet de gamme des prompts
-  const OPENABLE = 'details.project, details.acc, details.prompt-def, details.tip';
+  const OPENABLE = 'details.project, details.acc, details.prompt-def, details.tip, details.faq-i';
   const snapshot = () => ({
     open: [...document.querySelectorAll(OPENABLE)].map((d) => [d.querySelector('summary')?.textContent.trim() ?? '', d.open]),
     scope: document.querySelector('[data-prompts]')?.dataset.pscope ?? null,

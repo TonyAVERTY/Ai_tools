@@ -183,12 +183,12 @@ test('la page s\'ouvre pour un compte connecté seulement : d\'abord les questio
   let h = await page(u);
   assert.match(h, /Comptabilité : dis-nous où tu en es/);
   assert.match(h, /Question 1 sur 4/);
-  for (const absent of [/Ajouter une ligne/, /href="\/compta\?declarer/, /Tes chiffres/, /Journal des lignes/, /Petit guide/, /data-compta-dlg/]) assert.doesNotMatch(h, absent, `${absent} : caché tant que la situation n'est pas donnée`);
+  for (const absent of [/Ajouter une ligne/, /href="\/compta\?declarer/, /Tes chiffres/, /Journal des lignes/, /Questions fréquentes/, /data-compta-dlg/]) assert.doesNotMatch(h, absent, `${absent} : caché tant que la situation n'est pas donnée`);
   assert.equal((await situation(u)).status, 303);
   h = await page(u);
   assert.match(h, /<h1>Comptabilité<\/h1>/);
   assert.doesNotMatch(h, /dis-nous où tu en es/);
-  for (const present of [/Ajouter une ligne/, /Faire ma déclaration/, /Tes chiffres/, /Journal des lignes/, /Petit guide de la comptabilité/, /Aucune ligne pour l'instant/]) assert.match(h, present);
+  for (const present of [/Ajouter une ligne/, /Faire ma déclaration/, /Tes chiffres/, /Journal des lignes/, /Questions fréquentes/, /Aucune ligne pour l'instant/]) assert.match(h, present);
   assert.doesNotMatch(h, /href="\/compta\/export/, 'rien à exporter sans ligne');
   assert.match(h, /Comptabilité<\/a>/, 'dans la barre du haut');
 });

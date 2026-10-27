@@ -57,7 +57,7 @@ La section **Points d'attention** signale : une déclaration à faire (ou en ret
 Les boutons d'export n'apparaissent qu'une fois une ligne enregistrée. Exporte de temps en temps : les documents comptables se conservent 10 ans (à titre indicatif).
 
 ## 7. Le petit guide
-En bas de la page, **Petit guide de la comptabilité** répond aux questions de débutant : qu'est-ce qu'un justificatif, TTC / HT / TVA, quelle date choisir (le jour où l'argent est reçu), combien de temps garder les pièces, ce que doit contenir une facture, pourquoi « apport / prêt / retrait », et si la page remplace un comptable.
+En bas de la page, **Questions fréquentes** est une liste de questions : clique sur une question pour afficher sa réponse (un nouveau clic la referme). Elle répond aux questions de débutant : qu'est-ce qu'un justificatif, TTC / HT / TVA, quelle date choisir (le jour où l'argent est reçu), combien de temps garder les pièces, ce que doit contenir une facture, pourquoi « apport / prêt / retrait », que faire d'un justificatif perdu, comment corriger une erreur, et si la page remplace un comptable.
 
 ## Sécurité et confidentialité
 Les justificatifs sont des fichiers du serveur, rangés dans un dossier propre à ton compte, ouverts sans exécution (ni script ni réseau) et lisibles par toi seul. Ils sont supprimés avec la ligne ou avec ton compte.
