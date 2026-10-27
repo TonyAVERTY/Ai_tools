@@ -15,7 +15,7 @@ Quand un job est « En attente : … », la raison est écrite : budget IA attei
 La recherche de prospects, l'évolution et l'audit proposent « Maintenant » ou « Cette nuit ». Le job démarre au prochain créneau entre 1h et 6h (heure de Paris), quand le serveur est peu chargé et que le quota Claude est libre. Il reste annulable jusqu'au départ.
 
 ## La ligne d'état (sous la barre du haut)
-- **Claude session 5h** et **Claude semaine** (abonnement) : le taux d'utilisation du compte Claude, avec l'heure de remise à zéro au survol. Orange à 80 %, rouge à 100 %. Relevé en direct chez Anthropic quand c'est possible, sinon dernière mesure faite pendant un job.
+- **Claude session 5h** et **Claude semaine** (abonnement) : le taux d'utilisation du compte Claude, avec l'heure de remise à zéro au survol. Dans la carte « Consommation Claude » (page Projets), un petit texte grisé sous chaque barre indique quand la limite se réinitialise (par exemple « Remise à zéro aujourd'hui à 18:42 » ou « Remise à zéro lundi à 09:00 », heure de Paris). Orange à 80 %, rouge à 100 %. Relevé en direct chez Anthropic quand c'est possible, sinon dernière mesure faite pendant un job.
 - **IA via AiTools 24 h / 30 j** (**uniquement avec une clé API**) : ce que les jobs lancés par AiTools ont consommé, en $ équivalent API. Ce que la personne fait ailleurs avec Claude n'y est pas compté.
 - **Avec un abonnement Claude, aucun montant en dollars n'est affiché** (ni dans la ligne d'état, ni dans la carte « Usage du mois », ni dans le récapitulatif d'un projet, ni dans le rapport hebdomadaire ou les notifications) : rien n'est facturé en plus de l'abonnement, le seul repère est le quota Claude (session 5 h, semaine).
 - Avec une clé API : pas de quota d'abonnement, seulement le coût.

@@ -101,7 +101,7 @@ test('e-mail : plafond de 20 notifications par heure, SMTP du serveur requis', a
     mails.length = 0;
     assert.equal(await notify(noSmtp.app, w.id, 'job_done', { title: 'x' }), false);
     assert.equal(mails.length, 0);
-    assert.match(await (await w.get('/settings', { headers: { accept: 'text/html' } })).text(), /SMTP du serveur n'est pas configuré/);
+    assert.match(await (await w.get('/settings', { headers: { accept: 'text/html' } })).text(), /dès que l'administrateur a réglé le SMTP du serveur/);
   } finally { await noSmtp.close(); }
   assert.ok(EVENTS.reply);
 });
