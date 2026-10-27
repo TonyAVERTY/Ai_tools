@@ -18,7 +18,7 @@ if ((process.env.CLAUDE_CODE_OAUTH_TOKEN || '').includes('REVOKED')) {
   out({ type: 'result', subtype: 'success', is_error: true, result: 'Invalid bearer token · Please run /login', total_cost_usd: 0, num_turns: 0, usage: {} });
   process.exit(1);
 }
-const profile = { resume: 'Cartes de fidélité digitales.', proposition_valeur: 'Fidélisez sans carton.', fonctionnalites: ['tampons'], stack: 'node', modele_eco: 'abonnement', cible: { description: 'commerces de proximité', secteurs: ['boulangerie'], zone: 'Bretagne', taille: 'TPE', decideur: 'gérant', requetes: ['boulangerie rennes'] }, arguments: ['simple'], ton: 'direct' };
+const profile = { resume: 'Cartes de fidélité digitales.', proposition_valeur: 'Fidélisez sans carton.', fonctionnalites: ['tampons'], stack: 'node', modele_eco: 'abonnement', cible: { description: 'commerces de proximité', secteurs: ['boulangerie'], zone: 'Bretagne', taille: 'TPE', decideur: 'gérant', requetes: ['boulangerie rennes'] }, arguments: ['simple'], ton: 'direct', facturation: { legal_name: 'Atelier Averty', siret: '123 456 789 00012', address: '12 rue des Lilas', postal_code: '35000', city: 'Rennes', email: 'contact@atelier.fr', phone: null, website: 'javascript:x', activity_label: 'Développement web', pricing_notes: 'Forfait dès 900 €', vat_number: 'null' } };
 // Post LinkedIn : reprend la direction donnée (si elle existe) ; un 2e passage (brouillons déjà produits) donne un autre texte
 const liDirection = /Direction donnée par l'auteur \(le sujet du post\) : « (.*?) »/s.exec(prompt)?.[1];
 const liPost = () => JSON.stringify({ post: `${prompt.includes('Brouillons déjà produits') ? 'Autre angle' : 'Premier angle'} : ${liDirection ? `sur ${liDirection}` : 'sujet choisi par Claude'}. ${'Un texte de post assez long pour passer le contrôle de taille. '.repeat(2)}` });
@@ -31,8 +31,29 @@ const promoScene = () => {
   return '```html\n<!doctype html><html><head><style>body{margin:0;background:#0b1020;overflow:hidden}#t{position:absolute;top:40%;left:10%;font:700 40px sans-serif;color:#fff}</style></head><body><div id="t"></div><script>'
     + 'var S=' + JSON.stringify(promoSubject) + ';window.renderFrame=function(t){var e=document.getElementById("t");e.textContent=S;e.style.opacity=Math.min(1,t);e.style.left=(10+t*10)+"%";};</script></body></html>\n```';
 };
+// Facturation : trois exemples de devis, affinage d'un document, quatre modèles de documents (BILLBAD = réponse inutilisable)
+const billLine = (label, price, qty = 1, unit = 'forfait') => ({ label, description: `${label} (description)`, qty, unit, unit_price: price });
+const billOpt = (layout, tagline, lines) => ({ layout, tagline, title: 'Devis', intro: 'Merci de votre confiance.', lines, conditions: 'Deux retouches incluses.', payment: '30 % à la commande, le solde à la livraison.', closing: 'Cordialement.' });
+const billQuotes = () => (prompt.includes('BILLBAD') ? 'pas du json' : JSON.stringify({ options: [
+  billOpt('classique', 'Forfait clair', [billLine('Application web', 1200)]),
+  billOpt('moderne', 'Détail par étape', [billLine('Cadrage', 300), billLine('Réalisation', 900, 3, 'jour')]),
+  billOpt('epure', 'Mise en place + abonnement', [billLine('Mise en place', 600), billLine('Abonnement', 29, 12, 'mois')]),
+] }));
+const billRefine = () => {
+  const cur = JSON.parse(/Document actuel \(JSON\) :\n(.*)\n/.exec(prompt)[1]);
+  const request = /Demande de l'entrepreneur[^«]*« (.*?) »/s.exec(prompt)?.[1] || '';
+  return JSON.stringify({ ...cur, intro: `Affiné : ${request}`, lines: cur.lines.map((l, i) => (i === 0 && /remise/i.test(request) ? { ...l, unit_price: Math.round(l.unit_price * 0.9) } : l)) });
+};
+const billDocs = () => {
+  const q = JSON.parse(/Devis validé \(JSON\) :\n(.*)\n/.exec(prompt)[1]);
+  const base = (title, extra = {}) => ({ layout: q.layout, title, intro: `Introduction ${title}.`, lines: q.lines, conditions: 'Conditions.', payment: 'Paiement par virement.', closing: 'Merci.', ...extra });
+  return JSON.stringify({ devis: base('Devis'), acompte: base("Facture d'acompte", { deposit_percent: 30, lines: [] }), facture: base('Facture', { deposit_percent: 30 }), avoir: base('Avoir', { reason: 'Remboursement partiel', lines: [q.lines[0]] }) });
+};
 // Page IA : « ECHO » renvoie le dernier message de l'utilisateur (la conversation envoyée contient les précédents)
-const lines = prompt.includes('ECHO') ? ['Écho : ' + prompt.split('Utilisateur : ').pop().trim()]
+const lines = prompt.includes('proposer TROIS exemples de devis') ? [billQuotes()]
+  : prompt.includes('Affine ce document') ? [billRefine()]
+  : prompt.includes('QUATRE modèles de documents') ? [billDocs()]
+  : prompt.includes('ECHO') ? ['Écho : ' + prompt.split('Utilisateur : ').pop().trim()]
   : prompt.includes('UN post LinkedIn') ? [liPost()]
   : prompt.includes('window.renderFrame') ? [promoScene()]
   : prompt.includes('Audite ce projet') ? ['## Résumé\nCode correct.\n## Constats\n**[FAIBLE]** Pas de tests — `src/a.js:1` — manque de couverture.']

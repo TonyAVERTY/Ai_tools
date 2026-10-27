@@ -1170,7 +1170,6 @@ body.tour-active { padding-bottom: var(--tour-pad, 0px); }
 .cmp-alerts li.err > .ic { color: var(--err); }
 .cmp-next { display: flex; flex-flow: row wrap; align-items: center; justify-content: space-between; gap: 12px 20px; text-align: left; }
 .cmp-next > div { flex: 1 1 320px; }
-.cmp-faq .tip { margin: 2px 0; }
 .cmp-next h2, .cmp-next p { margin: 0; }
 .cmp-next p { margin-top: 4px; }
 .cmp-deadline { display: flex; gap: 10px; align-items: center; margin: 0; }
@@ -1213,8 +1212,6 @@ body.tour-active { padding-bottom: var(--tour-pad, 0px); }
 [data-compta] .cmp-alerts li { padding: 14px 18px; gap: 12px; }
 [data-compta] .cmp-steps { gap: 12px; margin-bottom: 20px; }
 [data-compta] .cmp-notes { gap: 12px; margin: 20px 0; }
-[data-compta] .cmp-faq .tip { margin: 4px 0; }
-[data-compta] .cmp-faq .tip-body { padding: 8px 20px 16px; }
 [data-compta] .empty-s { padding: 24px; }
 [data-compta] .tip-body { padding: 24px 28px 28px; }
 @media (max-width: 639px) {
@@ -1222,3 +1219,64 @@ body.tour-active { padding-bottom: var(--tour-pad, 0px); }
   [data-compta] > .card { padding: 20px 18px 22px; gap: 16px; }
   [data-compta] .tip-body { padding: 18px 16px 22px; }
 }
+
+/* Questions fréquentes : une liste de questions, une réponse qui s'ouvre sous chacune (Comptabilité) */
+.faq { border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden; background: var(--card); }
+.faq-i + .faq-i { border-top: 1px solid var(--line); }
+.faq-i > summary { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 60px; padding: 14px 20px; cursor: pointer; list-style: none; font-weight: 600; font-size: 1rem; line-height: 1.4; }
+.faq-i > summary::-webkit-details-marker { display: none; }
+.faq-i > summary:hover { background: var(--bg-sunk); }
+.faq-i > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.faq-i > summary .ic { flex: none; color: var(--muted); transition: transform var(--t) var(--ease); }
+.faq-i[open] > summary { background: var(--bg-sunk); }
+.faq-i[open] > summary .ic { transform: rotate(180deg); color: var(--text); }
+.faq-a { padding: 4px 20px 20px; background: var(--bg-sunk); }
+.faq-a p { margin: 8px 0 0; max-width: 70ch; }
+@media (prefers-reduced-motion: reduce) { .faq-i > summary .ic { transition: none; } }
+@media (max-width: 639px) { .faq-i > summary { padding: 12px 16px; } .faq-a { padding: 2px 16px 16px; } }
+
+/* Facturation */
+.bill-sum { margin: 0 0 14px; color: var(--muted); }
+.bill-list { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 900px) { .bill-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.bill-proj { display: flex; flex-direction: column; gap: 10px; }
+.bill-proj-h { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+.bill-proj-h h2 { margin: 0; font-size: 1.1rem; overflow-wrap: anywhere; }
+.bill-proj-h p { margin: 2px 0 0; overflow-wrap: anywhere; }
+.bill-resume { margin: 0; color: var(--muted); }
+.bill-busy { display: inline-flex; gap: 6px; align-items: center; }
+.bill-steps { list-style: none; margin: 0 0 16px; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 18px; }
+.bill-steps li { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+.bill-steps li.on { color: var(--text); font-weight: 600; }
+.bill-steps li.done { color: var(--ok); }
+.bill-dot { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--line); font-size: .8rem; flex: none; }
+.bill-steps li.on .bill-dot { border-color: var(--accent); }
+.bill-steps li.done .bill-dot { background: var(--ok-bg); border-color: var(--ok); }
+.bill-sec { margin-top: 16px; }
+.bill-sec > h2 { margin-top: 0; }
+.bill-det > summary { cursor: pointer; display: inline-flex; }
+.bill-form { margin-top: 14px; display: grid; gap: 16px; }
+.bill-fs { border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px 16px; margin: 0; min-width: 0; }
+.bill-fs legend { padding: 0 6px; font-weight: 600; }
+.bill-src { margin-left: 6px; }
+.bill-cta { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
+.bill-cta p { margin: 0; max-width: 62ch; }
+.bill-note { display: flex; gap: 8px; align-items: flex-start; margin: 0 0 14px; color: var(--muted); }
+.bill-opts, .bill-docs { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 1100px) { .bill-opts { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 900px) { .bill-docs { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.bill-opt, .bill-doc { border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.bill-opt.on, .bill-doc.ok { border-color: var(--ok); }
+.bill-opt-h { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+.bill-opt-h h3 { margin: 0; font-size: 1rem; }
+.bill-frame { width: 100%; height: 420px; border: 1px solid var(--line); border-radius: var(--radius); background: #fff; }
+.bill-refine { border-top: 1px solid var(--line); padding-top: 8px; }
+.bill-refine > summary { cursor: pointer; display: flex; gap: 6px; align-items: center; }
+.bill-pick { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
+.bill-vars code { overflow-wrap: anywhere; }
+.bill-run { display: flex; gap: 12px; align-items: center; margin: 12px 0; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg-sunk); }
+.bill-run > div { display: flex; flex-direction: column; min-width: 0; }
+.bill-ready { display: flex; gap: 14px; align-items: flex-start; margin-top: 16px; border-color: var(--ok); background: var(--ok-bg); }
+.bill-ready h2 { margin: 0 0 6px; }
+.bill-foot { margin-top: 18px; }
+.bill-disc { margin-top: 18px; max-width: 80ch; }

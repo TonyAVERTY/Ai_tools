@@ -27,6 +27,9 @@ import { ROLE_TASKS, roleById, MAX_NOTES } from './services/roles.js';
 import { getProject, repoDir, sentSince, getTemplate, saveTemplate, pickVariant } from './projects.js';
 import { getProfile, profileBlock } from './userprofile.js';
 import { repoProfile, renderRepoProfile } from './services/repoprofile.js';
+import { billingQuotesPrompt, billingRefinePrompt, billingDocsPrompt } from './services/prompts.js';
+import { getBilling, listDocs, getDoc, replaceOptions, updateDocContent, replaceFinals } from './billingdata.js';
+import { legalComplete, normalizeContent, DOC_KINDS, LAYOUTS } from './services/billing.js';
 
 // Constats du dépôt cloné (profil établi par le code, mis en cache par commit) ; vide si le dossier est illisible : un job ne doit jamais échouer pour ça
 function factsOf(dir) {
@@ -420,6 +423,83 @@ export function makeHandlers(app) {
       const t = extractJson(r.text);
       if (!t.body) throw new Error('Modèle de relance invalide');
       await saveTemplate(db, project.id, 'followup', { subject: '', body: t.body });
+      return { ok: true };
+    },
+
+    // Facturation : trois exemples de devis. Claude écrit le texte et propose les lignes ; les mentions légales et les totaux viennent du code.
+    async billing_quotes(ctx) {
+      const userId = ctx.job.user_id;
+      const project = await getProject(app, ctx.job.project_id, { userId });
+      const { legal } = await getBilling(db, project.id, userId);
+      if (!legalComplete(legal)) throw new Error("Complète d'abord les informations légales du projet");
+      if ((await listDocs(db, project.id, userId)).some((d) => d.kind === 'quote_option' && d.status === 'validated')) throw new Error('Un devis est déjà validé : recommence depuis le début pour en générer de nouveaux');
+      await ctx.progress({ message: 'Claude rédige trois exemples de devis…', pct: 30 });
+      const model = await writeModel(userId, 'sonnet');
+      const { prompt, system } = billingQuotesPrompt({ projectName: project.name, profile: project.profile, legal, custom: await custom(userId), model });
+      const r = await claude(userId, { prompt, system, model, maxTurns: 1, tools: [], signal: ctx.signal });
+      addUsage(ctx, r);
+      const raw = extractJson(r.text);
+      const options = (Array.isArray(raw.options) ? raw.options : []).map((o) => normalizeContent(o, 'devis')).filter(Boolean).slice(0, 3);
+      if (options.length < 3) throw new Error("Claude n'a pas produit trois devis exploitables : réessaie");
+      options.forEach((o, i) => { o.layout = LAYOUTS[i][0]; }); // trois mises en page différentes, dans l'ordre
+      await replaceOptions(db, project.id, userId, options);
+      return { ok: true };
+    },
+
+    // Facturation : affiner un exemple de devis ou un document selon la demande de l'utilisateur
+    async billing_refine(ctx) {
+      const userId = ctx.job.user_id;
+      const project = await getProject(app, ctx.job.project_id, { userId });
+      const doc = await getDoc(db, ctx.params.docId, userId);
+      if (!doc || doc.projectId !== project.id) throw new Error('Document introuvable');
+      const request = String(ctx.params.request ?? '').trim().slice(0, 800);
+      if (request.length < 3) throw new Error('Décris ce que tu veux changer');
+      const { legal } = await getBilling(db, project.id, userId);
+      const kind = doc.kind === 'quote_option' ? 'devis' : doc.kind;
+      await ctx.progress({ message: 'Claude affine le document selon ta demande…', pct: 30 });
+      const model = await writeModel(userId, 'sonnet');
+      const { prompt, system } = billingRefinePrompt({ projectName: project.name, profile: project.profile, legal, kind, content: doc.content, request, custom: await custom(userId), model });
+      const r = await claude(userId, { prompt, system, model, maxTurns: 1, tools: [], signal: ctx.signal });
+      addUsage(ctx, r);
+      const next = normalizeContent(extractJson(r.text), kind === 'acompte' ? 'acompte' : kind);
+      if (!next) throw new Error("Claude n'a pas produit un document exploitable : réessaie");
+      next.layout = doc.layout; // la mise en page choisie ne change pas en route
+      if (kind === 'acompte' || kind === 'facture') next.lines = doc.content.lines; // les lignes et les prix viennent du devis validé
+      await updateDocContent(db, doc.id, userId, next, request);
+      // Un devis définitif modifié : l'acompte et la facture reprennent ses lignes, et sont à revalider si elles ont changé
+      if (kind === 'devis' && doc.kind === 'devis') {
+        for (const other of (await listDocs(db, project.id, userId)).filter((d) => d.kind === 'acompte' || d.kind === 'facture')) {
+          if (JSON.stringify(other.content.lines) !== JSON.stringify(next.lines)) await updateDocContent(db, other.id, userId, { ...other.content, lines: next.lines }, other.refinement);
+        }
+      }
+      return { ok: true };
+    },
+
+    // Facturation : à partir du devis validé, les quatre modèles de documents (devis, acompte, facture finale, avoir)
+    async billing_docs(ctx) {
+      const userId = ctx.job.user_id;
+      const project = await getProject(app, ctx.job.project_id, { userId });
+      const quote = (await listDocs(db, project.id, userId)).find((d) => d.kind === 'quote_option' && d.status === 'validated');
+      if (!quote) throw new Error("Valide d'abord un devis");
+      const { legal } = await getBilling(db, project.id, userId);
+      await ctx.progress({ message: 'Claude prépare le devis, l\'acompte, la facture finale et l\'avoir…', pct: 30 });
+      const model = await writeModel(userId, 'sonnet');
+      const { prompt, system } = billingDocsPrompt({ projectName: project.name, profile: project.profile, legal, quote: quote.content, custom: await custom(userId), model });
+      const r = await claude(userId, { prompt, system, model, maxTurns: 1, tools: [], signal: ctx.signal });
+      addUsage(ctx, r);
+      const raw = extractJson(r.text);
+      const out = {};
+      for (const { key } of DOC_KINDS) {
+        // Les lignes viennent du devis validé (sauf l'avoir, qui peut ne reprendre qu'une partie) : Claude écrit les textes, pas les chiffres
+        const withLines = { ...(raw?.[key] && typeof raw[key] === 'object' ? raw[key] : {}), lines: key === 'avoir' && Array.isArray(raw?.avoir?.lines) && raw.avoir.lines.length ? raw.avoir.lines : quote.content.lines };
+        const c = normalizeContent(withLines, key);
+        if (!c || !raw?.[key]) throw new Error(`Claude n'a pas produit le document « ${key} » : réessaie`);
+        c.layout = quote.layout;
+        if (key !== 'avoir') c.lines = quote.content.lines;
+        out[key] = c;
+      }
+      out.facture.deposit_percent = out.acompte.deposit_percent;
+      await replaceFinals(db, project.id, userId, out);
       return { ok: true };
     },
 

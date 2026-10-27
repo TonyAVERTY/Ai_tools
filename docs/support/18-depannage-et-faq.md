@@ -97,3 +97,12 @@ Les fiches de méthode (voir « Savoir-faire de Claude dans AiTools ») sont des
 - **Le montant à déclarer me semble faux** : le guide « Faire ma déclaration » ne compte que les « Paiement reçu » (moins les « Remboursement versé à un client ») dans la période. Vérifie la date des lignes (le jour de l'encaissement), le type et ta situation (« Faire ma déclaration » → « Modifier mes réponses »).
 - **Je ne sais pas si je suis micro-entrepreneur ou en société** : choisis « Je ne sais pas encore » puis « Faire ma déclaration » : le guide explique comment retrouver ton statut.
 - **Les plafonds affichés ne sont pas les miens** : ce sont des valeurs de référence indiquées avec leur année ; vérifie sur service-public.fr.
+
+## Facturation
+- **Pas de bouton « Générer un modèle de document »** : des informations légales manquent ou sont invalides. Ouvre le projet, **Remplir les informations**, corrige les champs signalés (SIRET à 14 chiffres, code postal à 5 chiffres, IBAN valide, e-mail correct ; capital et immatriculation pour une société ; n° de TVA si tu factures la TVA), puis **Enregistrer les informations**.
+- **« La dernière demande à Claude a échoué »** : la réponse de Claude était inutilisable ou ton compte Claude n'est pas relié (voir « Relier Claude »). Rien n'a été modifié : clique de nouveau sur **Générer un modèle de document** (ou sur **Relancer la préparation** après la validation du devis).
+- **Les prix des exemples sont faux** : sans « Tes tarifs habituels », ce sont des prix d'exemple. Renseigne tes tarifs, puis **Recommencer depuis le début**, ou utilise « Affiner avec Claude » pour les corriger.
+- **« Tes documents sont prêts » a disparu** : tu as affiné un document, il repasse à « À valider ». Valide-le de nouveau.
+- **Un projet n'apparaît pas** : la page n'affiche que les projets de ton compte.
+- **Rien n'est prérempli** : Claude n'a rien trouvé d'écrit dans le dépôt (pas de mentions légales, de contact ou de tarifs) ou l'analyse date d'avant cette fonction. Clique **Réanalyser** dans la « Fiche projet », ou remplis à la main : la première fois suffit, les autres projets reprennent ton identité (« Repris d'un autre de tes projets »).
+- **Une valeur préremplie est fausse** : corrige-la avant **Enregistrer les informations** ; Claude peut se tromper de société si le dépôt en cite plusieurs.
