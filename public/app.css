@@ -1062,3 +1062,29 @@ html.nav-busy { cursor: progress; }
 .alt-t p { margin-top: 4px; font-size: .9375rem; color: var(--muted); }
 .alt .manual { flex: 1 1 100%; }
 .alt .manual:not([open]) { flex: 0 0 auto; }
+
+/* ---------- Questionnaire de première connexion : une question à la fois ---------- */
+.wiz-top { margin-bottom: 4px; }
+.wiz-n { display: flex; justify-content: space-between; align-items: baseline; margin: 0; font-size: .875rem; color: var(--muted); }
+.wiz-n b { color: var(--text); font-variant-numeric: tabular-nums; }
+.wiz-step { border: 0; padding: 0; margin: 20px 0 0; min-width: 0; }
+.wiz-step[hidden] { display: none; }
+.wiz-step legend { padding: 0; font-size: 1.1875rem; font-weight: 700; line-height: 1.3; }
+.wiz-step .hint { margin: 4px 0 0; }
+.wiz-step textarea { width: 100%; margin-top: 12px; }
+.wiz-step .opt { padding: 4px 14px; border: 1px solid var(--line); border-radius: 10px; margin-top: 10px; }
+.wiz-step .opt:has(input:checked) { border-color: var(--primary); }
+.wiz-f { display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; }
+.wiz-f [data-wiz-back] { margin-right: auto; }
+.wiz-skip { margin: 16px 0 0; text-align: center; }
+/* choix unique : pastille ronde au lieu de la coche */
+.opt.radio .box { border-radius: 999px; }
+.opt.radio .box .ic { display: none; }
+.opt.radio input:checked + .box::after { content: ''; width: 10px; height: 10px; border-radius: 999px; background: var(--on-primary); }
+
+/* ---------- Attente avec pourcentage estimé (connexion à Claude) ---------- */
+.dl-pct { margin-top: 12px; }
+.dl-pct[hidden] { display: none; }
+.dl-pct .bar { margin-top: 0; }
+.dl-pct-t { display: flex; justify-content: space-between; margin: 6px 0 0; font-size: .875rem; color: var(--muted); }
+.dl-pct-t b { color: var(--text); font-variant-numeric: tabular-nums; }
