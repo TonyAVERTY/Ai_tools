@@ -1,7 +1,7 @@
 // Prospects : ajout manuel, modification, suppression, et aperçu du mail tel que le prospect le recevra.
 // Accès : le propriétaire du projet ou un membre de l'équipe qui le partage (même règle que les notes et les statuts). Un prospect d'un autre compte est « introuvable ».
 import { randomBytes } from 'node:crypto';
-import { HttpError, json, readBody } from './http.js';
+import { HttpError, json, readBody, asBool } from './http.js';
 import { now, getSetting } from './db.js';
 import { accessOn } from './teams.js';
 import { getProject, getTemplate } from './projects.js';
@@ -164,7 +164,7 @@ export function registerProspectRoutes(router, app, { project }) {
     }
     const unsubUrl = prospect ? `${cfg.appUrl}/u/${encodeURIComponent(person.email)}/${unsubToken(cfg.secretKey, person.email)}` : `${cfg.appUrl}/u/exemple`;
     const footer = (await getSetting(db, p.userId, 'mail_footer', '1')) !== '0'; // l'aperçu montre ce qui partira, pied de page compris ou non
-    const mail = buildProspectMail({ template: { ...template, subject }, prospect: person, smtp, unsubUrl, subject, readReceipt: false, footer });
+    const mail = buildProspectMail({ template: { ...template, subject }, prospect: person, smtp, unsubUrl, subject, readReceipt: false, footer, html: asBool(b.html) });
     // Points d'attention : ce qu'on ne voit pas toujours à la relecture
     const warnings = [];
     const used = [...String(template.subject + ' ' + body).matchAll(/\{\{\s*(\w+)\s*\}\}/g)].map((m) => m[1]);
@@ -178,7 +178,7 @@ export function registerProspectRoutes(router, app, { project }) {
     json(ctx.res, {
       ok: true, kind, variant, sample, footer, hasB: !!String(b.subjectB ?? '').trim() && kind === 'initial',
       from: mail.from, to: mail.to, subject: mail.subject, text: mail.text, warnings,
-      url: `/api/preview/${keep(ctx.session.userId, mail.html)}`,
+      html: !!mail.html, url: mail.html ? `/api/preview/${keep(ctx.session.userId, mail.html)}` : null,
       note: sample ? 'Exemple fictif : choisis un de tes prospects pour voir le mail réel.' : null,
     });
   }, { limit: 'preview' });

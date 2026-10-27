@@ -22,18 +22,19 @@ const PROFILE = JSON.stringify({ resume: 'Cartes de fidélité.', proposition_va
 const FOOT = /publiée publiquement|Ne plus recevoir de messages|Pour ne plus être contacté/;
 const toggle = (u, body) => u.post('/api/settings/mail-footer', body);
 
-test('construction du mail : pied de page par défaut ; sans lui, le texte visible disparaît mais « List-Unsubscribe » reste', () => {
+test('construction du mail : texte simple par défaut, HTML sur demande ; pied de page par défaut, sans lui plus aucun lien de désinscription', () => {
   const args = { template: { subject: 'S', body: 'Bonjour {{entreprise}}' }, prospect: { company: 'Fournil', email: 'a@fournil.fr', source: 'https://fournil.fr/contact' }, smtp: { fromEmail: 'me@x.fr' }, unsubUrl: 'https://ai.test/u/a/b' };
   const withFooter = buildProspectMail(args);
   assert.match(withFooter.text, /publiée publiquement \(https:\/\/fournil\.fr\/contact\)/);
   assert.match(withFooter.text, /Pour ne plus être contacté : https:\/\/ai\.test\/u\/a\/b/);
-  assert.match(withFooter.html, /Ne plus recevoir de messages/);
+  assert.equal(withFooter.html, undefined, 'texte simple par défaut');
+  assert.match(buildProspectMail({ ...args, html: true }).html, /Ne plus recevoir de messages/);
   const without = buildProspectMail({ ...args, footer: false });
   assert.doesNotMatch(without.text, FOOT);
-  assert.doesNotMatch(without.html, FOOT);
+  assert.doesNotMatch(buildProspectMail({ ...args, footer: false, html: true }).html, FOOT);
   assert.match(without.text, /Bonjour Fournil/);
-  assert.equal(without.headers['List-Unsubscribe'], '<https://ai.test/u/a/b>', 'l\'en-tête de désabonnement reste');
-  assert.equal(without.headers['List-Unsubscribe-Post'], 'List-Unsubscribe=One-Click');
+  assert.equal(without.headers['List-Unsubscribe'], undefined, 'aucun en-tête de désabonnement invisible');
+  assert.equal(withFooter.headers['List-Unsubscribe'], undefined);
 });
 
 test('réglage : retirer exige la confirmation explicite, remettre est libre, chaque compte a le sien', async () => {
@@ -77,7 +78,7 @@ test('réglage : retirer exige la confirmation explicite, remettre est libre, ch
 test('aperçu : montre ce qui partira, pied de page compris ou non, avec un avertissement quand il est retiré', async () => {
   const u = await s.newUser();
   const pid = await addProject(s.db, u.id, { name: 'Fidélio', gitUrl: 'https://github.com/u/fidelio.git' });
-  const preview = async () => (await u.post(`/api/projects/${pid}/template/preview`, { subject: 'Bonjour {{entreprise}}', body: 'Bonjour {{entreprise}}.\n\n{{expediteur}}' })).json();
+  const preview = async () => (await u.post(`/api/projects/${pid}/template/preview`, { subject: 'Bonjour {{entreprise}}', body: 'Bonjour {{entreprise}}.\n\n{{expediteur}}', html: 'on' })).json();
   let d = await preview();
   assert.equal(d.footer, true);
   assert.match(d.text, FOOT);
@@ -92,7 +93,7 @@ test('aperçu : montre ce qui partira, pied de page compris ou non, avec un aver
   assert.doesNotMatch(await (await u.get(d.url, { headers: { accept: 'text/html' } })).text(), /Ne plus recevoir de messages/);
 });
 
-test('envoi réel : le mail part avec ou sans pied de page selon le réglage, toujours avec List-Unsubscribe', async () => {
+test('envoi réel : le mail part avec ou sans pied de page selon le réglage, en texte simple et sans en-tête List-Unsubscribe', async () => {
   const u = await s.newUser({ admin: false, link: testTokenLink() });
   const pid = await addProject(s.db, u.id, { name: 'Fidélio', gitUrl: 'https://github.com/u/fidelio.git' });
   await s.db.prepare('UPDATE projects SET profile_json = ?, target_json = ?, target_validated = 1 WHERE id = ?').run(PROFILE, JSON.stringify({ description: 'x' }), pid);
@@ -110,7 +111,8 @@ test('envoi réel : le mail part avec ou sans pied de page selon le réglage, to
   const first = sentMails.at(-1);
   assert.equal(first.to, 'un@fournil.fr');
   assert.match(first.text, /publiée publiquement/);
-  assert.match(first.html, /Ne plus recevoir de messages/);
+  assert.match(first.text, /Pour ne plus être contacté/);
+  assert.equal(first.html, undefined);
 
   await setSetting(s.db, u.id, 'mail_footer', '0');
   await add('deux@fournil.fr');
@@ -119,7 +121,21 @@ test('envoi réel : le mail part avec ou sans pied de page selon le réglage, to
   const second = sentMails.at(-1);
   assert.equal(second.to, 'deux@fournil.fr');
   assert.doesNotMatch(second.text, FOOT);
-  assert.doesNotMatch(second.html, FOOT);
+  assert.equal(second.html, undefined);
   assert.match(second.text, /Bonjour Fournil/);
-  assert.match(second.headers['List-Unsubscribe'], /\/u\//, 'désabonnement en un clic conservé');
+  assert.equal(second.headers['List-Unsubscribe'], undefined, 'aucun en-tête invisible');
+});
+
+test('modèle : la case « Envoyer en HTML » se choisit à la validation, le mail part en texte simple sinon', async () => {
+  const u = await s.newUser({ admin: false, link: testTokenLink() });
+  const pid = await addProject(s.db, u.id, { name: 'Fidélio', gitUrl: 'https://github.com/u/fidelio.git' });
+  const save = (b) => u.post(`/api/projects/${pid}/template/save`, { kind: 'initial', subject: 'Bonjour', body: 'Bonjour.', ...b });
+  assert.equal((await save({ mode: 'validate' })).status, 200);
+  assert.equal((await s.db.prepare("SELECT html FROM templates WHERE project_id = ? AND kind = 'initial'").get(pid)).html, 0, 'texte simple par défaut');
+  assert.equal((await save({ mode: 'validate', html: 'on' })).status, 200);
+  assert.equal((await s.db.prepare("SELECT html FROM templates WHERE project_id = ? AND kind = 'initial'").get(pid)).html, 1);
+  const state = await (await u.get(`/api/projects/${pid}/status`)).json();
+  assert.equal(state.templates.initial.html, true, 'le formulaire reçoit le choix');
+  assert.equal((await save({ mode: 'save' })).status, 200);
+  assert.equal((await s.db.prepare("SELECT html FROM templates WHERE project_id = ? AND kind = 'initial'").get(pid)).html, 0, 'décocher repasse en texte');
 });

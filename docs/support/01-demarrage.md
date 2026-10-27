@@ -35,7 +35,7 @@ Dans **Prospecter → Recherche de prospects** : choisis « Prospects à cherche
 Dans **Configuration du projet**, renseigne le SMTP de l'adresse qui enverra les mails (hôte, port, utilisateur, mot de passe, email et nom expéditeur) puis **Enregistrer SMTP**. Sans SMTP, rien ne peut partir.
 
 ## 7. Le modèle de mail
-Dans **Prospecter → Modèle de mail** : clique **Générer avec l'IA** (ou écris-le), relis l'objet et le corps, **Enregistrer** puis **Valider le modèle**. Seul un modèle validé peut être envoyé.
+Dans **Prospecter → Modèle de mail** : clique **Générer avec l'IA** (ou écris-le), relis l'objet et le corps, **Enregistrer** puis **Valider le modèle**. Le mail part en texte simple ; coche **Envoyer en mail HTML** avant de valider si tu veux un mail mis en forme. Seul un modèle validé peut être envoyé.
 
 ## 8. Le premier envoi
 Dans **Prospecter → Envoi** : indique « Mails à envoyer » puis **Envoyer** et confirme. Voir le fichier sur les mails pour les garde-fous.

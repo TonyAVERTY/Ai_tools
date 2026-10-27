@@ -112,7 +112,7 @@ export function makeClaude(app) {
       extraRoot: userChatRoot(cfg, userId),
     });
     if (!r.ok) console.warn(claudeDiagnostic({ userId, cred, cfg, cwd: o.cwd, r }));
-    // État du quota d'abonnement (session 5h + semaine), affiché dans la barre système. Une clé API n'en a pas.
+    // État du quota d'abonnement (session 5h + semaine), affiché dans la carte « Consommation Claude ». Une clé API n'en a pas.
     const w = cred.mode === 'api_key' ? null : rateLimitWindows(r.rateLimit);
     if (w) {
       await setSetting(db, userId, 'claude_rate_limit_json', JSON.stringify({ at: now(), ...w }));
@@ -242,7 +242,7 @@ export function makeHandlers(app) {
       }
       const mail = buildProspectMail({
         template, prospect: p, smtp: project.smtp, unsubUrl, subject, inReplyTo,
-        messageId: makeMessageId(project.smtp.fromEmail), readReceipt, footer,
+        messageId: makeMessageId(project.smtp.fromEmail), readReceipt, footer, html: !!template.html,
       });
       try {
         await transport.sendMail(mail);

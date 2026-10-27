@@ -31,10 +31,9 @@ export function makeMessageId(fromEmail) {
 }
 
 /**
- * `footer: false` : l'utilisateur a retiré le pied de page (Réglages → Garde-fous, avec avertissement). Seul le texte visible disparaît :
- * les en-têtes « List-Unsubscribe » restent, pour que la messagerie du destinataire propose quand même le désabonnement.
+ * `footer: false` : l'utilisateur a retiré le pied de page (Réglages → Garde-fous, avec avertissement) : aucun lien de désinscription, visible ou non.
  */
-export function buildProspectMail({ template, prospect, smtp, unsubUrl, subject = template.subject, messageId, inReplyTo, readReceipt = false, footer: withFooter = true }) {
+export function buildProspectMail({ template, prospect, smtp, unsubUrl, subject = template.subject, messageId, inReplyTo, readReceipt = false, footer: withFooter = true, html: asHtml = false }) {
   const vars = {
     entreprise: prospect.company,
     ville: prospect.city || '',
@@ -49,12 +48,11 @@ export function buildProspectMail({ template, prospect, smtp, unsubUrl, subject 
     to: prospect.email,
     subject: fillTemplate(subject, vars).trim(),
     text: withFooter ? body + '\n' + footer : body,
-    html: prospectHtml({ body, notice, unsubUrl, footer: withFooter }),
+    // Mail classique (texte) par défaut ; HTML seulement si le modèle a été validé avec la case « Envoyer en HTML »
+    ...(asHtml ? { html: prospectHtml({ body, notice, unsubUrl, footer: withFooter }) } : {}),
     ...(messageId ? { messageId } : {}),
     ...(inReplyTo ? { inReplyTo, references: [inReplyTo] } : {}),
     headers: {
-      'List-Unsubscribe': `<${unsubUrl}>`,
-      'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
       // Accusé de lecture standard (MDN) : la messagerie du destinataire LUI demande s'il accepte d'en envoyer un
       ...(readReceipt ? { 'Disposition-Notification-To': smtp.fromEmail } : {}),
     },
