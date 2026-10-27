@@ -67,12 +67,12 @@ test('réglages : chaque rubrique du sommaire est documentée', () => {
 // Pages de l'application : toute nouvelle page doit être ajoutée ici ET documentée.
 const PAGES = {
   '/': 'Projets', '/chat': 'Claude', '/support': 'Support', '/settings': 'Réglages', '/account': 'Mon compte', '/mails': 'Mails', '/calendar': 'Calendrier',
-  '/team': 'Équipe', '/compta': 'Comptabilité', '/facturation': 'Facturation', '/developer': 'Développeur', '/link': 'Relier Claude', '/admin': 'Administration', '/accueil': 'Site internet',
+  '/team': 'Équipe', '/compta': 'Comptabilité', '/facturation': 'Facturation', '/clients': 'Clients', '/developer': 'Développeur', '/link': 'Relier Claude', '/admin': 'Administration', '/accueil': 'Site internet',
   '/login': 'Connexion', '/fonctionnement': 'Fonctionnement', '/tarifs': 'Tarifs', '/docs': 'Documentation', '/mentions-legales': 'Mentions légales',
   '/confidentialite': 'Politique de confidentialité', '/cgu': 'CGU',
 };
 // Routes techniques : jamais une page à documenter pour un utilisateur
-const TECHNICAL = /^\/(developer\/mcp|api|auth|static|u|cal|robots\.txt|sitemap\.xml|logout|favicon|linkedin|developer\/tokens|link\/|docs\/|team\/|chat\/|support\/|calendar\/|compta\/|facturation\/|mails\/|admin\/|account\/|settings\/|mcp|health|status|unsub|invite|join|i\/|r\/)/;
+const TECHNICAL = /^\/(developer\/mcp|api|auth|static|u|cal|robots\.txt|sitemap\.xml|logout|favicon|linkedin|developer\/tokens|link\/|docs\/|team\/|chat\/|support\/|calendar\/|compta\/|facturation\/|clients\/|mails\/|admin\/|account\/|settings\/|mcp|health|status|unsub|invite|join|i\/|r\/)/;
 
 test('pages : toute page de l\'application est connue du test et documentée', () => {
   const found = new Set();
@@ -103,7 +103,7 @@ test('boutons : tout bouton affiché par l\'application est cité dans la docume
   const pid = await addProject(s.db, u.id, { name: 'Exemple', gitUrl: 'https://github.com/u/ex.git' });
   await s.db.prepare('UPDATE projects SET profile_json = ?, target_json = ? WHERE id = ?').run(JSON.stringify({ resume: 'Un produit.', proposition_valeur: 'v', arguments: ['a'], stack: 'node' }), JSON.stringify({ description: 'cible', secteurs: [], zone: '', taille: '', decideur: '', requetes: [] }), pid);
   const missing = new Set();
-  for (const p of ['/', '/settings', '/account', '/mails', '/calendar', '/compta', '/compta?declarer=1', '/facturation', '/team', '/developer', '/link', '/chat', '/support']) {
+  for (const p of ['/', '/settings', '/account', '/mails', '/calendar', '/compta', '/compta?declarer=1', '/facturation', '/clients', '/team', '/developer', '/link', '/chat', '/support']) {
     const html = await (await u.get(p, { headers: { accept: 'text/html' } })).text();
     for (const l of labelsOf(html)) check(l, p, missing);
   }
