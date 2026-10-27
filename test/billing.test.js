@@ -9,7 +9,7 @@ import { startApp } from './helpers/server.js';
 import { makeClaudeBin } from './helpers/claude-bin.js';
 import { addProject, testTokenLink } from './helpers/users.js';
 import { Worker, latestJobs } from '../src/services/jobs.js';
-import { makeHandlers } from '../src/handlers.js';
+import { makeHandlers, creeping } from '../src/handlers.js';
 import { setSetting } from '../src/db.js';
 import {
   normalizeLegal, legalMissing, legalComplete, suggestFromRepo, suggestFromAnalysis, suggestFromOthers, buildSuggestions, normalizeContent, totalsOf, rateOf, renderDocument, legalMentions, billingStage, stageLabel, DOC_KINDS,
@@ -374,4 +374,31 @@ test('plan : la facturation compte comme des jobs IA (plafond mensuel du plan)',
   await post(u, `${base(pid)}/generer`);
   const after = Number((await s.db.prepare("SELECT COUNT(*) n FROM usage_events WHERE user_id = ? AND kind = 'ai_job'").get(u.id).catch(() => ({ n: 1 }))).n);
   assert.ok(after >= before, 'usage enregistré');
+});
+
+test('pourcentage : un appel Claude d\'un seul tour fait avancer la barre sans jamais dépasser le plafond, puis s\'arrête', async () => {
+  const seen = [];
+  const ctx = { progress: async (p) => { seen.push(p); } };
+  const r = await creeping(ctx, 'Claude rédige…', 10, () => new Promise((ok) => setTimeout(() => ok('fini'), 2300)), { to: 50, ms: 1000 });
+  assert.equal(r, 'fini');
+  assert.ok(seen.length >= 1, 'au moins une mise à jour pendant l\'attente');
+  assert.ok(seen.every((p) => p.message === 'Claude rédige…' && p.pct > 10 && p.pct < 50));
+  const n = seen.length;
+  await new Promise((ok) => setTimeout(ok, 2300));
+  assert.equal(seen.length, n, 'plus de mise à jour une fois l\'appel terminé');
+  await assert.rejects(creeping(ctx, 'x', 0, () => Promise.reject(new Error('boum'))), /boum/);
+});
+
+test('pourcentage : le bandeau « Claude travaille… » affiche le pourcentage et la barre, et l\'API d\'état le renvoie', async () => {
+  const { u, pid } = await setup();
+  await saveLegal(u, pid);
+  await post(u, `${base(pid)}/generer`);
+  const job = (await latestJobs(s.db, pid)).billing_quotes;
+  await s.db.prepare("UPDATE jobs SET status = 'running', progress_json = ? WHERE id = ?").run(JSON.stringify({ message: 'Claude rédige trois exemples de devis…', pct: 42 }), job.id);
+  const h = await html(u, base(pid));
+  assert.match(h, /data-bill-pct>42 %</);
+  assert.match(h, /role="progressbar"[^>]*aria-valuenow="42"/);
+  const st = await (await u.get(`/api/facturation/${pid}/state`)).json();
+  assert.equal(st.pct, 42);
+  assert.equal(st.busy, true);
 });
