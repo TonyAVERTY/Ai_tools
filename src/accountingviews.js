@@ -159,7 +159,7 @@ export function accountingPage(d) {
   const hasAny = d.count > 0;
 
   const flash = d.error ? `<p class="cmp-flash warn" role="alert">${ic('alert')} ${esc(d.error)}</p>` : d.saved === 'situation' ? '<p class="cmp-flash ok" role="status">Ta situation est enregistrée.</p>'
-    : d.saved === 'supprimee' ? '<p class="cmp-flash ok" role="status">Ligne supprimée.</p>' : d.saved === 'declaration' ? '<p class="cmp-flash ok" role="status">C\'est noté.</p>' : '';
+    : d.saved === 'payee' ? '<p class="cmp-flash ok" role="status">Facture marquée payée : elle compte maintenant dans tes chiffres.</p>' : d.saved === 'supprimee' ? '<p class="cmp-flash ok" role="status">Ligne supprimée.</p>' : d.saved === 'declaration' ? '<p class="cmp-flash ok" role="status">C\'est noté.</p>' : '';
 
   const nextCard = d.next ? `<section class="card cmp-next" aria-labelledby="t-next">
       <div><h2 id="t-next">Prochaine déclaration</h2>
@@ -188,6 +188,19 @@ export function accountingPage(d) {
       <tr class="cmp-total"><td><b>Tous les projets</b></td><td class="num"><b>${esc(fmtEur(t.revenue))}</b></td><td class="num"><b>${esc(fmtEur(t.expenses))}</b></td><td class="num"><b>${esc(fmtEur(t.result))}</b></td><td class="num"><b>${t.count}</b></td>
         <td class="cmp-act">${t.count ? `<a class="btn small" href="${esc(exportHref())}" data-noajax>${ic('dl')}Exporter</a>` : ''}</td></tr>
     </tbody></table></div>`;
+
+  const pendingKind = (r) => (r.kind === 'refund_out' ? 'À rembourser' : 'À encaisser');
+  const pendingCard = d.pendingRows?.length ? `<section class="card cmp-pending" id="a-encaisser" aria-labelledby="t-pend">
+    <div class="card-h"><h2 id="t-pend">Factures émises, à encaisser</h2><p>Générées depuis « Facturation ». Elles ne comptent dans tes chiffres qu'une fois marquées payées, à la date où l'argent arrive.</p></div>
+    <div class="table-wrap"><table class="mtable cmp-table"><thead><tr><th>Émise le</th><th>Facture</th><th>Client</th><th class="num">Montant TTC</th><th>Justificatif</th><th>Paiement</th></tr></thead><tbody>${d.pendingRows.map((r) => `<tr>
+      <td>${esc(dayLabel(r.entry_date))}</td>
+      <td><b>${esc(r.label)}</b><span class="td-s"><span class="badge warn">${pendingKind(r)}</span></span></td>
+      <td>${esc(r.party)}</td>
+      <td class="num"><b>${r.kind === 'refund_out' ? '−' : '+'} ${esc(fmtEur(r.amount_cents))}</b></td>
+      <td><a class="cmp-doc" href="/compta/entries/${r.id}/file" target="_blank" rel="noopener noreferrer" data-noajax>${ic('clip')}<span>${esc(r.doc_name)}</span></a>
+        <a class="td-s" href="/compta/entries/${r.id}/file?telecharger=1" data-noajax>Télécharger</a></td>
+      <td><form method="post" action="/compta/entries/${r.id}/paid" class="cmp-paid"><label class="sr-only" for="paid-${r.id}">Date du paiement</label><input id="paid-${r.id}" type="date" name="date" value="${esc(d.today)}" max="${esc(d.today)}" required>
+        <button class="btn small primary">${r.kind === 'refund_out' ? 'Marquer remboursée' : 'Marquer payée'}</button></form></td></tr>`).join('')}</tbody></table></div></section>` : '';
 
   const journal = d.rows.length
     ? `<div class="table-wrap"><table class="mtable cmp-table"><thead><tr><th>Date</th><th>Libellé</th><th>Type</th><th class="num">Montant TTC</th><th>Justificatif</th><th><span class="sr-only">Actions</span></th></tr></thead><tbody>${d.rows.map((r) => entryRow(r, d)).join('')}</tbody></table></div>`
@@ -234,6 +247,7 @@ export function accountingPage(d) {
 
   <section class="card" aria-labelledby="t-proj"><h2 id="t-proj">Par projet</h2>${projectTable}</section>
 
+  ${pendingCard}
   <section class="card" id="journal" aria-labelledby="t-jr">
     <div class="row-between"><h2 id="t-jr">Journal des lignes</h2>
       <form method="get" action="/compta" class="cmp-filters"><input type="hidden" name="periode" value="${esc(d.periodValue)}">

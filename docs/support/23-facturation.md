@@ -26,11 +26,11 @@ Un maximum de champs est **prérempli pour toi**, et tu gardes la main : ce sont
 - **« package.json »**, **« composer.json »** ou **« LICENSE »** : l'auteur ou le titulaire du droit d'auteur du dépôt ;
 - **« un autre de tes projets »** : l'identité de ton entreprise (forme juridique, SIRET, adresse, TVA, IBAN, délais de paiement…) déjà enregistrée pour un autre de tes projets : tu ne la ressaisis pas ;
 - **« ta comptabilité »** (TVA, statut micro-entrepreneur) et **« ton compte »** (adresse e-mail).
-Seules tes propres informations sont reprises, jamais celles d'un autre compte, et rien n'est lu en dehors du dépôt du projet. Si le projet a été analysé avant cette fonction, clique **Réanalyser** dans la « Fiche projet » (voir « Projets ») pour que Claude cherche ces informations.
+Seules tes propres informations sont reprises, jamais celles d'un autre compte, et rien n'est lu en dehors du dépôt du projet. Si le projet a été analysé avant cette fonction, clique **Réanalyser** sur la ligne du projet (voir « Projets ») pour que Claude cherche ces informations.
 Clique **Enregistrer les informations**. Même incomplètes, elles sont **enregistrées** (rien n'est perdu) et les champs à corriger sont signalés ; le message « Informations enregistrées : il en manque encore pour continuer. » indique qu'il reste à faire. Tant que tout n'est pas rempli, le bouton de génération n'apparaît pas.
 
 ## 3. Générer et choisir un devis
-1. Quand le projet est complet, clique **Générer un modèle de document**. Claude rédige **trois exemples de devis** (mises en page « Classique », « Moderne » et « Épuré »). Cela prend une à deux minutes ; « Claude travaille… » s'affiche et la page se met à jour toute seule.
+1. Quand le projet est complet, clique **Générer un modèle de document**. Claude rédige **trois exemples de devis** (mises en page « Classique », « Moderne » et « Épuré »). Cela prend une à deux minutes ; « Claude travaille… » s'affiche avec une **barre et un pourcentage** (estimé : il avance tant que Claude écrit, pour que tu voies que ça tourne) et la page se met à jour toute seule à la fin.
 2. Chaque exemple s'affiche en aperçu (**Voir en grand** l'ouvre dans un nouvel onglet). Si tu n'as pas renseigné « Tes tarifs habituels », les prix sont des **prix d'exemple** : tu les ajustes ensuite.
 3. Clique **Choisir cet exemple** sur celui qui te plaît.
 4. Un champ « Ce que tu veux changer » apparaît sous « Ton devis : exemple N » : écris ta demande (« un ton plus chaleureux », « une remise de 10 % », « un acompte à 20 % »…) puis clique **Affiner ce devis**. Tu peux recommencer autant de fois que nécessaire ; la mise en page ne change pas.
@@ -43,6 +43,15 @@ Après la validation du devis, Claude prépare les quatre documents avec **la m�
 - Les parties qui changent à chaque émission (numéro, date, client…) restent sous forme de variables (« Rempli à l'émission : `{{client_nom}}` … ») : elles sont remplies à l'émission du document.
 - **Recommencer depuis le début** (avec confirmation) efface les exemples et les documents du projet ; tes informations légales sont conservées.
 Si tu modifies tes informations légales plus tard, les mentions légales des documents suivent automatiquement.
+
+## 5. Les documents en PDF et l'émission
+Tous les documents sortent en **PDF** (format A4, avec la mise en page choisie et tes mentions légales).
+- **Modèle en PDF** (sur chaque carte de document) télécharge le modèle : les informations qui changent à chaque fois (numéro, date, client…) restent sous forme de variables `{{…}}`. Il faut avoir rempli tes informations légales.
+- **Émettre en PDF : …** (sous un document **validé**, par exemple « Émettre en PDF : facture finale ») ouvre un formulaire : « Nom du client », « SIRET du client » (vide pour un particulier), « Adresse du client », « Date d'émission » (jamais dans le futur), et selon le document « Date de la prestation » (facture finale) ou « N° de la facture corrigée » et « Motif de l'avoir » (avoir). Clique **Générer le PDF** : le document reçoit un **numéro automatique** (« F-2026-0001 » pour une facture finale, « AC- » pour un acompte, « AV- » pour un avoir, « D- » pour un devis, un compteur par année), l'échéance (ou la validité du devis) est calculée d'après tes informations légales et le PDF est prêt. Les montants viennent du document validé : pour les changer, « Affiner » le document et valide-le de nouveau.
+- La section **4. Documents émis** liste tout ce que tu as émis (numéro, client, date, montant, état) avec le bouton **PDF** pour le télécharger de nouveau.
+**Joindre à la Comptabilité.** Pour un acompte, une facture finale ou un avoir, le formulaire propose la case **« Joindre automatiquement à la comptabilité »** (cochée par défaut ; elle n'existe pas pour un devis, qui n'entre jamais en comptabilité).
+- **Cochée** : la facture est ajoutée toute seule à la page « Comptabilité », avec son PDF comme justificatif, dans la carte « Factures émises, à encaisser » (état « À encaisser », ou « À rembourser » pour un avoir). Elle **ne compte dans tes chiffres, ta déclaration et tes exports qu'une fois marquée payée** (bouton **Marquer payée** de la Comptabilité) : un chiffre d'affaires se déclare à l'encaissement, pas à l'émission.
+- **Décochée** : le PDF reste dans « Documents émis » (état « Non jointe à la comptabilité ») et **rien n'est ajouté** à la Comptabilité.
 
 ## Si ça ne marche pas
 Voir « Facturation » dans « Dépannage et FAQ ».

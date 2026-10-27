@@ -1372,6 +1372,7 @@
 
     const runBtn = e.target.closest('[data-run]');
     if (runBtn) {
+      e.preventDefault(); // le bouton « Réanalyser » est dans la ligne du projet : il ne doit pas la replier
       const { run, id } = runBtn.dataset;
       if (run === 'analyze' && !confirm('Relancer l\'analyse complète du repo ? (consomme du quota Claude)')) return;
       try {

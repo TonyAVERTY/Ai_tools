@@ -444,20 +444,15 @@ function projectFacts(st) {
 function projectItem(p, smtp, dbCfg, imap, { open = false, stats = null } = {}) {
   const profile = p.profile;
   return `<details class="project anim" data-id="${p.id}"${open ? ' open' : ''}>
-<summary><span class="pname">${esc(p.name)}</span>${p.access !== 'owner' ? `<span class="badge" title="Projet partagé par ${esc(p.ownerEmail || '')}">équipe de ${esc(p.ownerEmail || '')}</span>` : p.teamId ? '<span class="badge ok">partagé</span>' : ''}<span class="pcfg badge" data-cfg title="Afficher la liste de mise en route" hidden></span><span class="pstate" data-state></span>${projectFacts(stats)}</summary>
+<summary><span class="pname">${esc(p.name)}</span>${p.access !== 'owner' ? `<span class="badge" title="Projet partagé par ${esc(p.ownerEmail || '')}">équipe de ${esc(p.ownerEmail || '')}</span>` : p.teamId ? '<span class="badge ok">partagé</span>' : ''}<span class="pcfg badge" data-cfg title="Afficher la liste de mise en route" hidden></span><button type="button" class="btn small secondary prean" data-run="analyze" data-id="${p.id}" title="Relancer l'analyse du dépôt" aria-label="Réanalyser le projet">${ic('repeat')}<span>Réanalyser</span></button><span class="pstate" data-state></span>${projectFacts(stats)}</summary>
 <div class="pbody"><div class="pcard">
   ${acc('header', 'git', 'En-tête', 'Dépôt Git et fiche projet', `
   <div class="field"><span class="lbl">Dépôt Git</span><div class="ro">${ic('lock', 'ic-s')}<span>${esc(p.gitUrl)}</span><span class="badge">lecture seule</span></div></div>
   <p class="muted small" data-todo-restore hidden><button type="button" class="link" data-todo-restore-btn>Afficher la mise en route</button> (la liste « config » que tu as retirée de ce projet)</p>
-  <section class="profile fiche">
-    <div class="fiche-h">
-      <b>Fiche projet</b>
-      <button class="btn secondary" data-run="analyze" data-id="${p.id}">${ic('repeat')}Réanalyser</button>
-    </div>
-    ${profile
-      ? `<p>${esc(profile.resume)}</p><p class="meta"><span>Analysé le ${fmtDate(p.profileAt)}</span><span>Commit <code>${esc((p.profileCommit || '').slice(0, 8))}</code></span><span>${esc(profile.stack || '')}</span></p>`
-      : '<p class="muted">Pas encore analysé.</p>'}
-  </section>`, { open: true })}
+  ${profile ? `<section class="profile fiche">
+    <div class="fiche-h"><b>Fiche projet</b></div>
+    <p>${esc(profile.resume)}</p><p class="meta"><span>Analysé le ${fmtDate(p.profileAt)}</span><span>Commit <code>${esc((p.profileCommit || '').slice(0, 8))}</code></span><span>${esc(profile.stack || '')}</span></p>
+  </section>` : ''}`, { open: true })}
 
   ${profile ? acc('target', 'target',
     `Cible ${p.targetValidated ? '<span class="badge ok">validée</span>' : '<span class="badge warn">à valider</span>'}`,
