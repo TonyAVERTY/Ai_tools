@@ -5,7 +5,7 @@ On y accède par l'avatar → **Réglages**. Un sommaire à gauche (« Notificat
 
 ## Notifications
 Où et quand AiTools prévient : réponses de prospects, jobs terminés ou en erreur, alertes.
-- **Email de réception (évolutions, rapport hebdo)** : l'adresse qui reçoit les évolutions et le rapport hebdomadaire. Ces mails partent de l'adresse d'AiTools (SMTP du serveur), jamais de celle d'un projet.
+- **Email de réception (évolutions, rapport hebdo)** : l'adresse qui reçoit les évolutions et le rapport hebdomadaire. Ces mails partent de l'adresse d'AiTools (SMTP du serveur).
 - Case **Rapport hebdo le lundi à 8h (mail + canaux ci-dessous)** et bouton **Envoyer le rapport maintenant** (pour tester). Le rapport résume, par projet et sur 7 jours : prospects trouvés, mails et relances envoyés, réponses et taux de réponse, clients, adresses invalides, objet gagnant du test A/B, coût IA.
 - **Canaux** : ajouter un canal avec le bouton « Ajouter un canal » : **Discord** (un webhook par salon, 5 au plus), **Slack** (webhook entrant), **Telegram** (bot et conversation), **E-mail** (une adresse de réception). Pour chaque canal : « 1. Quelles notifications veux-tu y recevoir ? » puis les informations de connexion. Plusieurs canaux Discord permettent de séparer (réponses d'un côté, erreurs de l'autre). Un bouton **Envoyer un test** vérifie un canal.
 - Les notifications au choix : **Recherche, analyse, envoi ou évolutions terminés** ; **Job en erreur** ; **Réponse d'un prospect** ; **Relances envoyées** ; **Serveur très chargé : tes jobs attendent** ; **Envois mis en pause (trop de mails rejetés)** ; **Budget IA atteint** ; **Quota Claude proche de la limite, ou job reporté** ; **Rapport hebdo**.
