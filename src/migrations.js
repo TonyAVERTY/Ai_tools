@@ -959,4 +959,65 @@ export const MIGRATIONS = [
       ) ${T}`,
     ],
   },
+  {
+    // Facturation : informations légales d'un projet et modèles de documents (3 exemples de devis, puis devis / acompte / facture finale / avoir).
+    // `variant` : 1 à 3 pour les exemples de devis (kind « quote_option »), 0 pour les quatre documents définitifs.
+    name: 'billing',
+    sqlite: [
+      `CREATE TABLE billing_projects (
+        project_id INTEGER PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        legal_json TEXT NOT NULL,
+        chosen INTEGER,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )`,
+      `CREATE TABLE billing_docs (
+        id INTEGER PRIMARY KEY,
+        project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        kind TEXT NOT NULL,
+        variant INTEGER NOT NULL DEFAULT 0,
+        status TEXT NOT NULL DEFAULT 'draft',
+        layout TEXT NOT NULL DEFAULT 'classique',
+        content_json TEXT NOT NULL,
+        refinement TEXT NOT NULL DEFAULT '',
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        validated_at INTEGER,
+        UNIQUE (project_id, kind, variant)
+      )`,
+      'CREATE INDEX billing_docs_user ON billing_docs(user_id)',
+    ],
+    mysql: [
+      `CREATE TABLE IF NOT EXISTS billing_projects (
+        project_id BIGINT NOT NULL PRIMARY KEY,
+        user_id BIGINT NOT NULL,
+        legal_json TEXT NOT NULL,
+        chosen INT NULL,
+        created_at BIGINT NOT NULL,
+        updated_at BIGINT NOT NULL,
+        CONSTRAINT billing_projects_project_fk FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+        CONSTRAINT billing_projects_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      ) ${T}`,
+      `CREATE TABLE IF NOT EXISTS billing_docs (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        project_id BIGINT NOT NULL,
+        user_id BIGINT NOT NULL,
+        kind VARCHAR(20) NOT NULL,
+        variant INT NOT NULL DEFAULT 0,
+        status VARCHAR(12) NOT NULL DEFAULT 'draft',
+        layout VARCHAR(12) NOT NULL DEFAULT 'classique',
+        content_json MEDIUMTEXT NOT NULL,
+        refinement VARCHAR(1000) NOT NULL DEFAULT '',
+        created_at BIGINT NOT NULL,
+        updated_at BIGINT NOT NULL,
+        validated_at BIGINT NULL,
+        UNIQUE KEY billing_docs_slot (project_id, kind, variant),
+        KEY billing_docs_user (user_id),
+        CONSTRAINT billing_docs_project_fk FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+        CONSTRAINT billing_docs_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      ) ${T}`,
+    ],
+  },
 ];
