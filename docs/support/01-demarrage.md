@@ -7,6 +7,12 @@ La connexion se fait avec **Google** (ou Apple quand il est proposé) depuis la 
 ## 2. Relier son Claude (obligatoire)
 Sans liaison Claude valide, l'application affiche la page « Relier Claude » et rien d'autre (seuls « Mon compte » et la déconnexion répondent). Trois façons de relier : clé API Anthropic (recommandée), « Se connecter avec Claude » (abonnement), ou jeton collé à la main. Détails dans le fichier sur la liaison Claude. Un membre d'équipe qui travaille sur les projets d'un autre n'a pas besoin de sa propre liaison.
 
+## 2 bis. Faisons connaissance (une seule fois)
+À ta première arrivée sur le tableau de bord (après la liaison Claude), AiTools affiche une page « Faisons connaissance » avec des questions générales sur toi, valables pour tous tes projets : ta fonction, ton niveau technique, ton expérience de la prospection, le niveau de détail que tu préfères dans les réponses, tutoiement ou vouvoiement, ce que tu veux faire avec AiTools, et une précision libre sur ta façon de travailler. Elle ne demande rien sur un projet précis (secteur, taille de l'entreprise, cible) : ces informations se règlent projet par projet, dans la section Cible. Tout est facultatif.
+1. Réponds à ce que tu veux, puis clique **Enregistrer mon profil**, ou clique **Passer** pour ne rien dire.
+2. La page ne revient plus d'elle-même. Tu peux la rouvrir et la modifier à tout moment : avatar → Mon compte → **Modifier mon profil**.
+Pourquoi : Claude adapte son vocabulaire, ses exemples et son niveau de détail à ton métier. Les réponses restent dans ton compte.
+
 ## 3. Créer le premier projet
 1. Page **Projets** → bouton **Nouveau projet**.
 2. **Nom** : le nom du produit. **Dépôt Git** : l'adresse du dépôt, par exemple `https://github.com/utilisateur/projet.git`. Le lien ne pourra plus être modifié ensuite.

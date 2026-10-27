@@ -486,13 +486,6 @@ figure.chart figcaption { font-size: .9375rem; font-weight: 600; margin-bottom: 
 .gitprojects li.error > span:first-child { color: var(--err); font-weight: 700; }
 
 /* ---------- Relier Claude ---------- */
-.opts { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
-.optc { display: flex; flex-direction: column; gap: 10px; padding: 16px; border: 1px solid var(--control); border-radius: var(--radius-lg); background: var(--card); }
-.optc-rec { border: 2px solid var(--accent); padding: 15px; background: var(--card-2); }
-.optc-h { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
-.optc h2, .optc h3 { font-size: 1.0625rem; font-weight: 600; }
-.optc p { font-size: .9375rem; color: var(--muted); }
-.optc-i { display: grid; place-items: center; width: 40px; height: 40px; border-radius: var(--radius-sm); background: var(--info-bg); color: var(--info); }
 
 /* ---------- Équipe, administration ---------- */
 .inline-form { display: flex; align-items: center; gap: 8px; margin: 0; flex-wrap: wrap; }
@@ -521,7 +514,6 @@ input.copy { font-family: var(--mono); font-size: .8125rem; }
   .page { padding-left: 24px; padding-right: 24px; }
   .form, .grid2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .grid3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .opts { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
 @media (min-width: 900px) {
@@ -1052,3 +1044,21 @@ html.nav-busy { cursor: progress; }
 .routes[open] > summary { margin-bottom: 8px; }
 .scopelist .opt > span:last-child { font-weight: 400; }
 .scopelist .opt b { font-weight: 600; }
+
+/* ---------- Relier Claude : l'option recommandée en grand, les alternatives par abonnement en lignes, avec leur risque ---------- */
+.link-main { max-width: 760px; }
+.link-main .panel-h { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.link-main > p { color: var(--muted); max-width: 46em; }
+.link-key { flex-direction: row; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
+.link-key .field { flex: 0 1 auto; width: min(100%, 460px); }
+.alts { max-width: 760px; display: flex; flex-direction: column; gap: 0; padding: 20px 24px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-lg); }
+.alts-h { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.alts-h h2 { font-size: 1.125rem; font-weight: 600; }
+.alts > .hint { margin: 6px 0 4px; max-width: 46em; font-size: .875rem; }
+.alt { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px 24px; padding: 16px 0; border-top: 1px solid var(--line); }
+.alt:first-of-type { margin-top: 8px; }
+.alt-t { flex: 1 1 auto; min-width: min(100%, 280px); }
+.alt-t h3 { font-size: 1rem; font-weight: 600; }
+.alt-t p { margin-top: 4px; font-size: .9375rem; color: var(--muted); }
+.alt .manual { flex: 1 1 100%; }
+.alt .manual:not([open]) { flex: 0 0 auto; }

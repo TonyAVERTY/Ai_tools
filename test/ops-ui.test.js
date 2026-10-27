@@ -117,3 +117,17 @@ test('page Développeur : adresse et commande écrites une seule fois et copiabl
   await other.post('/account/developer', { enabled: 'on' }, { form: true });
   assert.doesNotMatch(await html(other, '/developer'), /Jeton-Prive-42/, 'isolation : les jetons d\'un autre compte ne sont jamais listés');
 });
+
+test('page Relier Claude : la clé API recommandée d\'abord, le risque annoncé sur l\'abonnement, relevés suspendus sans accès utilisable', async () => {
+  const none = await s.newUser({ admin: false });
+  const page = await html(none, '/link');
+  assert.ok(page.indexOf('id="h-key"') > 0 && page.indexOf('id="h-key"') < page.indexOf('id="h-alt"'), 'la clé API vient avant les alternatives');
+  assert.match(page, /<h2 id="h-key">Clé API Anthropic<\/h2><span class="badge ok">[^]*?Recommandée/);
+  assert.match(page, /<h2 id="h-alt">Avec ton abonnement Claude \(Pro, Max\)<\/h2><span class="badge warn">[^]*?Risque pour ton compte/);
+  assert.match(page, /<h3>Se connecter avec Claude<\/h3>[^]*?data-open-dialog="consent-dialog"/);
+  assert.match(page, /<h3>Jeton collé à la main<\/h3>[^]*?action="\/link\/subscription"/);
+  assert.doesNotMatch(page, /optc|TON accès/, 'plus de cartes à pastille d\'icône ni de « TON » en capitales');
+  assert.match(page, /<div class="narrow" data-nolink>/, 'sans accès utilisable, la page demande à ne pas interroger les relevés (403)');
+  const linked = await s.newUser({ link: { v: 1, mode: 'api_key', valid: true } });
+  assert.doesNotMatch(await html(linked, '/link'), /data-nolink/, 'avec un accès valide, les relevés continuent');
+});

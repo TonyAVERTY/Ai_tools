@@ -204,6 +204,10 @@ ${notice ? `<p class="${notice.ok ? 'msg msg-ok' : 'msg msg-err'}" role="status"
 ${usagePanel(usage)}
 ${linkSection(link, consent, quota)}
 <section class="card">
+  <div class="card-h"><h2>Mon profil</h2><p>Ton secteur, ta fonction et ton niveau technique : Claude s'en sert pour adapter son vocabulaire et ses exemples. Rien n'est partagé avec un autre compte.</p></div>
+  <div class="row"><a class="btn small" href="/welcome?edit=1">${ic('user')}Modifier mon profil</a></div>
+</section>
+<section class="card">
   <div class="card-h"><h2>Agenda</h2><p><a href="/calendar">Voir le calendrier</a></p></div>
   ${icalBox(ical, '/account')}
 </section>
@@ -232,33 +236,34 @@ ${linkSection(link, consent, quota)}
 export function linkPage({ user, link, cliModeEnabled, error, start = false }) {
   const intro = link
     ? `<p class="lead">Accès actuel : <strong>${esc(link.label)}</strong>${link.valid ? '' : ' (à revalider)'}. Relier un autre accès remplace le précédent, dont le secret est effacé.</p>`
-    : '<p class="lead">Choisis comment AiTools accède à ton Claude. Les analyses, recherches et rédactions s\'exécutent avec TON accès, jamais celui d\'un autre utilisateur.</p>';
+    : '<p class="lead">Choisis comment AiTools accède à ton Claude. Les analyses, recherches et rédactions s\'exécutent avec <em>ton</em> accès, jamais celui d\'un autre utilisateur.</p>';
   const box = `<label class="check opt"><input type="checkbox" name="accept" data-consent required><span class="box">${ic('check')}</span><span>${esc(CONSENT_CHECKBOX)}</span></label>`;
   const notice = `<div class="notice">${CONSENT_TEXT.map((t) => `<p>${esc(t)}</p>`).join('')}</div>`;
   // Connexion guidée (public/app.js) : le bouton demande le lien au serveur, avec un petit chargement, puis l'étape 2
   // attend le code que Claude affiche ; le serveur récupère le jeton tout seul.
+  // Alternatives par abonnement : un bloc, avec le risque annoncé dans son titre ; deux lignes (connexion guidée, jeton collé)
   const cards = cliModeEnabled ? `
-<article class="optc">
-  <div class="optc-h"><span class="optc-i">${ic('link')}</span></div>
-  <h2>Se connecter avec Claude</h2>
-  <p>Utilise ton abonnement Claude (Pro, Max) au lieu d'une clé API. Cette option comporte un risque pour ton compte Claude : une fenêtre d'avertissement s'affiche avant de continuer.</p>
-  <button type="button" class="btn" data-open-dialog="consent-dialog">Se connecter avec Claude</button>
-</article>
-<article class="optc">
-  <div class="optc-h"><span class="optc-i">${ic('paste')}</span></div>
-  <h2>Jeton collé à la main</h2>
-  <p>Colle un jeton d'abonnement Claude. Pour les cas où la connexion directe ne passe pas.</p>
-  <details class="manual"><summary class="btn">Coller un jeton</summary>
-    <form method="post" action="/link/subscription" class="cfg" data-consent-form>
-      ${notice}
-      ${box}
-      <p class="hint">Sur ta propre machine, lance la commande <code>claude setup-token</code>, connecte-toi à ton compte Claude quand le navigateur s'ouvre, puis copie le jeton affiché et colle-le ci-dessous. Le jeton est chiffré, utilisé uniquement pour tes jobs, et n'est jamais réaffiché.</p>
-      <label class="field"><span class="lbl">Jeton d'abonnement</span><input name="token" type="password" autocomplete="new-password" spellcheck="false" required></label>
-      <p class="hint">La vérification lance un appel minimal du CLI : quelques tokens sont décomptés de ton abonnement.</p>
-      <button class="btn primary" data-consent-submit disabled>Relier avec mon jeton</button>
-    </form>
-  </details>
-</article>` : '';
+<section class="alts" aria-labelledby="h-alt">
+  <div class="alts-h"><h2 id="h-alt">Avec ton abonnement Claude (Pro, Max)</h2><span class="badge warn">${ic('alert')}Risque pour ton compte</span></div>
+  <p class="hint">Utilise ton abonnement au lieu d'une clé API. Cette option comporte un risque pour ton compte Claude : une fenêtre d'avertissement s'affiche avant de continuer.</p>
+  <div class="alt">
+    <div class="alt-t"><h3>Se connecter avec Claude</h3><p>Connexion guidée : tu te connectes à Claude, puis tu recopies le code qu'il affiche.</p></div>
+    <button type="button" class="btn" data-open-dialog="consent-dialog">Se connecter avec Claude</button>
+  </div>
+  <div class="alt">
+    <div class="alt-t"><h3>Jeton collé à la main</h3><p>Colle un jeton d'abonnement Claude. Pour les cas où la connexion directe ne passe pas.</p></div>
+    <details class="manual"><summary class="btn">Coller un jeton</summary>
+      <form method="post" action="/link/subscription" class="cfg" data-consent-form>
+        ${notice}
+        ${box}
+        <p class="hint">Sur ta propre machine, lance la commande <code>claude setup-token</code>, connecte-toi à ton compte Claude quand le navigateur s'ouvre, puis copie le jeton affiché et colle-le ci-dessous. Le jeton est chiffré, utilisé uniquement pour tes jobs, et n'est jamais réaffiché.</p>
+        <label class="field"><span class="lbl">Jeton d'abonnement</span><input name="token" type="password" autocomplete="new-password" spellcheck="false" required></label>
+        <p class="hint">La vérification lance un appel minimal du CLI : quelques tokens sont décomptés de ton abonnement.</p>
+        <button class="btn primary" data-consent-submit disabled>Relier avec mon jeton</button>
+      </form>
+    </details>
+  </div>
+</section>` : '';
   const dialog = cliModeEnabled ? `<dialog class="prospect-dialog modal" id="consent-dialog" aria-labelledby="consent-title"${start ? ' data-autoopen' : ''}>
   <div class="cfg">
     <h2 id="consent-title">${ic('alert')}Avant de continuer</h2>
@@ -285,21 +290,19 @@ export function linkPage({ user, link, cliModeEnabled, error, start = false }) {
 </dialog>` : '';
   return layout({
     title: 'Relier Claude', email: user.email,
-    body: `<div class="narrow">
+    body: `<div class="narrow"${!link || !link.valid ? ' data-nolink' : ''}>
 <h1 class="h1">Relier Claude</h1>
 ${intro}
 ${error ? `<p class="msg msg-err" role="alert">${esc(error)}</p>` : ''}
-<div class="opts">
-<article class="optc optc-rec">
-  <div class="optc-h"><span class="optc-i">${ic('key')}</span><span class="badge ok">${ic('check')}Recommandée</span></div>
-  <h2>Clé API Anthropic</h2>
+<section class="panel link-main" aria-labelledby="h-key">
+  <div class="panel-h"><h2 id="h-key">Clé API Anthropic</h2><span class="badge ok">${ic('check')}Recommandée</span></div>
   <p>Crée une clé sur console.anthropic.com puis colle-la ici. Elle est vérifiée sans consommer de tokens, chiffrée, et ne sera plus jamais affichée (seuls ses 4 derniers caractères le seront). Tu paies à l'usage, directement chez Anthropic.</p>
-  <form method="post" action="/link/api-key" class="cfg">
+  <form method="post" action="/link/api-key" class="cfg link-key">
     <label class="field"><span class="lbl">Clé API</span><input name="apiKey" type="password" autocomplete="new-password" spellcheck="false" required placeholder="sk-ant-…"></label>
     <button class="btn primary">Vérifier et relier</button>
   </form>
-</article>${cards}
-</div>
+</section>
+${cards}
 ${dialog}
 </div>`,
   });

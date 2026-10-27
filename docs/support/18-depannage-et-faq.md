@@ -80,3 +80,9 @@ Pour rédiger un mail, trouver des idées de posts, réfléchir à une stratégi
 - **Comment supprimer mes données ?** « Mon compte → Zone de danger → Supprimer mon compte et mes données ».
 - **Y a-t-il une application mobile ?** Non : le site s'adapte aux téléphones.
 - **Qui contacter si la documentation ne répond pas ?** L'administrateur du service d'AiTools.
+
+## Claude ignore la méthode attendue ou la réponse sort du cadre
+Les fiches de méthode (voir « Savoir-faire de Claude dans AiTools ») sont des repères : la consigne de la tâche dans « Réglages → Prompts IA » l'emporte en cas de contradiction.
+1. Vérifie la consigne de la tâche dans « Réglages → Prompts IA » : une consigne modifiée peut aller à l'encontre de la méthode.
+2. Clique « Revenir au texte par défaut » pour comparer.
+3. Choisis un modèle plus capable pour cette tâche dans « Réglages → Budget et modèles IA » si le résultat reste approximatif.

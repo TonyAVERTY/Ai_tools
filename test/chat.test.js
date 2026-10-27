@@ -196,7 +196,7 @@ test('historique envoyé : fin de la conversation seulement, dans les limites de
   assert.ok(PROMPT_DEFS.chat.text.length > 850);
   assert.match(chatPrompt({ message: 'x', model: 'claude-opus-4-8' }).system, /Prends le temps de bien comprendre/);
   assert.match(chatPrompt({ message: 'x', model: 'haiku' }).system, /huit lignes au plus/);
-  assert.match(chatPrompt({ message: 'x', custom: { '*': { chat: 'Tu es un pirate.' } } }).system, /^Tu es un pirate\.$/);
+  assert.match(chatPrompt({ message: 'x', custom: { '*': { chat: 'Tu es un pirate.' } } }).system, /^Tu es un pirate\.\n\nSavoir-faire d'AiTools/);
 });
 
 test('conversations supprimées avec le compte', async () => {

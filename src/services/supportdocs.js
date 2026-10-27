@@ -12,6 +12,7 @@ import { RECOMMENDED, OTHERS, DEFAULT_MODEL } from './models.js';
 import { PROMPT_DEFS } from './prompts.js';
 import { PROMO, FORMATS } from './promovideo.js';
 import { ROLES, MAX_NOTES } from './roles.js';
+import { loadSkills, SKILLS_MAX_CHARS } from './skills.js';
 
 export const STATIC_DOCS_DIR = fileURLToPath(new URL('../../docs/support/', import.meta.url));
 
@@ -120,6 +121,32 @@ Résumé : la liste de tous les postes (Direction, Commerce, Marketing, Communic
 Comment les utiliser : voir « Postes et filtre par poste ». Chaque tâche écrit un livrable en Markdown à partir de la fiche du projet ; les précisions (jusqu'à ${MAX_NOTES} caractères) sont facultatives. Rien n'est envoyé ni publié.
 
 ${postes}
+`,
+  });
+  const labels = Object.fromEntries(Object.entries(PROMPT_DEFS).map(([k, d]) => [k, d.label]));
+  const skills = loadSkills();
+  const LEVEL_TITLES = { base: 'Fondamentaux', specialise: 'Spécialisés (activés selon le dépôt)', workflow: 'Workflows' };
+  const devSkills = (lvl) => skills.filter((k) => k.level === lvl).map((k) => `#### ${k.title}
+${k.summary}
+- Quand : ${k.meta.quand}
+- Pas pour : ${k.meta.pas_pour}
+- Réussite : ${k.meta.reussite}`).join('\n\n');
+  out.push({
+    name: 'savoir-faire-ia.md',
+    content: `# Savoir-faire d'AiTools donné à Claude
+Résumé : les fiches de méthode (prospection B2B, mails, conformité, lecture de dépôt, posts LinkedIn, et pour le code : débogage, revue, tests, refactoring, sécurité, bases de données…) qu'AiTools ajoute automatiquement aux consignes de Claude, comment elles sont choisies et leurs limites. Fichier généré depuis le code.
+
+## Fiches métier (par tâche)
+Chaque tâche IA reçoit, en plus de tes consignes et de la fiche du projet, les fiches de méthode qui la concernent (au plus ${SKILLS_MAX_CHARS} caractères par tâche). Elles ne se modifient pas depuis l'écran. En cas de doute, la consigne de la tâche (Réglages → Prompts IA) l'emporte sur la fiche.
+
+${skills.filter((k) => k.level === 'metier').map((k) => `### ${k.title}
+${k.summary}
+- Appliquée à : ${k.tasks.map((t) => labels[t] || t).join(' ; ')}.`).join('\n\n')}
+
+## Fiches de développement (page IA avec un projet joint)
+Quand tu joins un projet à la conversation ou que tu poses une question de code, AiTools choisit seul, sans appeler Claude, la méthode (rapide, structurée ou approfondie) et au plus quelques fiches, d'après ta demande et le profil du dépôt (langages, commandes de test et de build, tests, intégration continue, base de données, zones sensibles). Une question simple reçoit presque rien ; un changement risqué reçoit la méthode complète. Claude lit le dépôt mais n'exécute rien : il propose les changements et les commandes à lancer, et distingue ce qu'il a lu de ce qu'il suppose.
+
+${['base', 'specialise', 'workflow'].map((lvl) => `### ${LEVEL_TITLES[lvl]}\n\n${devSkills(lvl)}`).join('\n\n')}
 `,
   });
   return out;
