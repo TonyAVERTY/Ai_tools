@@ -22,6 +22,12 @@ for (const [who, u, priced] of [['abonnement', sub, false], ['clé API', api, tr
     const errs = [];
     p.on('pageerror', (e) => errs.push(e.message));
     p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
+    // Abonnement : un relevé fictif donne à la carte de quoi afficher les barres et la date de remise à zéro
+    if (!priced) await p.route('**/api/system', async (route) => {
+      const j = await (await route.fetch()).json();
+      const t = Math.floor(Date.now() / 1000);
+      await route.fulfill({ json: { ...j, claudeRateLimit: { source: 'live', at: t, fiveHour: { utilization: 0.73, resetsAt: t + 7200 }, sevenDay: { utilization: 0.38, resetsAt: t + 3 * 86400 } } } });
+    });
     await p.goto(`${s.base}/`);
     await p.waitForSelector('html[data-nav="ready"]');
     await p.waitForFunction(() => document.querySelector('#sys')?.textContent.trim().length > 0);
@@ -35,7 +41,10 @@ for (const [who, u, priced] of [['abonnement', sub, false], ['clé API', api, tr
     } else {
       // Abonnement : aucun montant nulle part, et pas de carte vide quand le quota n'est pas mesuré
       ok(!(await p.locator('.dash').innerText()).includes('$'), `${tag} page Projets : aucun montant en $`);
-      ok(await p.locator('[data-claude-card]').evaluate((e) => e.hidden), `${tag} pas de carte « Consommation Claude » sans mesure`);
+      await p.waitForSelector('[data-claude-card]:not([hidden]) .g-r');
+      const notes = await p.locator('[data-usage-claude] .g-r').allInnerTexts();
+      ok(notes.length === 2 && notes.every((n) => /^Remise à zéro (aujourd'hui|demain|[a-zé]+) à \d\d:\d\d$/.test(n)), `${tag} carte « Consommation Claude » : date de remise à zéro sous chaque barre (${notes.join(' | ')})`);
+      ok(await p.locator('.g-r').first().evaluate((e) => getComputedStyle(e).color === getComputedStyle(document.querySelector('.g-v')).color), `${tag} le texte de remise à zéro est grisé`);
     }
     ok(!(await p.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)), `${tag} pas de défilement horizontal`);
     ok(errs.length === 0, `${tag} aucune erreur console${errs.length ? ` : ${errs.join(' | ')}` : ''}`);
