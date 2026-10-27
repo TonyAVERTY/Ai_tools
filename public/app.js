@@ -516,9 +516,18 @@
   listen(document, 'keydown', (e) => { if (e.key === 'Escape' && jobsOpen()) { toggleJobs(false); jobsBtn.focus(); } });
 
   // Carte « Usage du mois » : le quota Claude (session 5 h, semaine) et ce que les jobs d'AiTools ont consommé, mêmes données que la barre du haut
-  function usageRow(label, value, { ratio = null, tip = '', cls = '' } = {}) {
+  // « Remise à zéro aujourd'hui à 18:42 » / « demain à 09:00 » / « lundi à 09:00 » (heure de Paris)
+  function resetNote(ts) {
+    if (!ts) return '';
+    const day = (t) => new Date(t).toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris' });
+    const at = new Date(ts * 1000);
+    const hm = at.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
+    const d = day(at) === day(Date.now()) ? "aujourd'hui" : day(at) === day(Date.now() + 864e5) ? 'demain' : at.toLocaleDateString('fr-FR', { weekday: 'long', timeZone: 'Europe/Paris' });
+    return `Remise à zéro ${d} à ${hm}`;
+  }
+  function usageRow(label, value, { ratio = null, tip = '', cls = '', note = '' } = {}) {
     const w = ratio == null ? '' : `<div class="bar usage${ratio >= 1 ? ' full' : ''}" role="progressbar" aria-label="${esc(label)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.min(100, Math.round(ratio * 100))}"><span class="w-${Math.min(100, Math.round(ratio * 20) * 5)}"></span></div>`;
-    return `<li class="g"><div class="g-h" title="${esc(tip)}"><span>${esc(label)}</span><span class="g-v ${cls}">${value}</span></div>${w}</li>`;
+    return `<li class="g"><div class="g-h" title="${esc(tip)}"><span>${esc(label)}</span><span class="g-v ${cls}">${value}</span></div>${w}${note ? `<p class="g-r">${esc(note)}</p>` : ''}</li>`;
   }
   function usageClaude(s) {
     const rows = [];
@@ -535,7 +544,7 @@
         const live = rl.source === 'live' && !rl.error;
         const tip = `${live ? 'Relevé en direct chez Anthropic, tout ton usage Claude compris (y compris hors AiTools).' : `Dernière mesure ${ago(rl.at)} (pendant un job AiTools).`}${reset ? ` Réinitialisation ${reset}.` : ''}`;
         rows.push(w.expired ? usageRow(label, '– (remise à zéro)', { tip, cls: 'muted' })
-          : usageRow(label, pct(w.utilization), { ratio: w.utilization, tip, cls: w.utilization >= 1 ? 'error' : w.utilization >= 0.8 ? 'warn' : '' }));
+          : usageRow(label, pct(w.utilization), { ratio: w.utilization, tip, note: resetNote(w.resetsAt), cls: w.utilization >= 1 ? 'error' : w.utilization >= 0.8 ? 'warn' : '' }));
       }
     }
     // Montants en $ : seulement avec une clé API (c'est elle qui est facturée à l'usage). Avec un abonnement, rien n'est facturé en plus : on n'affiche aucun prix.

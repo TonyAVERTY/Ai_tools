@@ -214,6 +214,7 @@ dl.account dd { margin: 0; overflow-wrap: anywhere; font-weight: 600; }
 .g:first-child { border-top: 0; padding-top: 0; }
 .g-h { display: flex; justify-content: space-between; font-weight: 600; font-size: .875rem; }
 .g-v { font-variant-numeric: tabular-nums; color: var(--muted); font-weight: 500; }
+.g-r { margin: 6px 0 0; font-size: .8125rem; color: var(--muted); }
 .usage-card { align-self: start; }
 
 /* carte de projet : résumé en une ligne (nom, config, prospects, activité) */
@@ -1134,6 +1135,12 @@ html.nav-busy { cursor: progress; }
 .tour-shield { position: absolute; inset: 0; } /* intercepte les clics : on ne touche pas à la page pendant la visite */
 .tour-hole { position: fixed; pointer-events: none; box-shadow: 0 0 0 100vmax var(--tour-dim); outline: 2px solid var(--accent); transition: left .4s var(--ease), top .4s var(--ease), width .4s var(--ease), height .4s var(--ease), border-radius .4s var(--ease); }
 .tour-hole.snap { transition: none; }
+/* Deux éléments éclairés (bouton + menu) : une seule forme. L'ombre vient d'un calque découpé, le contour d'un tracé SVG ; le cadre simple est masqué */
+.tour-dim, .tour-ring { display: none; }
+.tour-dim { position: fixed; inset: 0; pointer-events: none; background: var(--tour-dim); }
+.tour-ring { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; fill: none; stroke: var(--accent); stroke-width: 2; }
+.tour.tour-multi .tour-dim, .tour.tour-multi .tour-ring { display: block; }
+.tour.tour-multi .tour-hole { box-shadow: none; outline: none; }
 .tour-card { position: fixed; z-index: 1; width: min(384px, calc(100vw - 24px)); display: flex; flex-direction: column; gap: 10px; padding: 18px; background: var(--card); color: var(--text); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); transition: left .4s var(--ease), top .4s var(--ease); outline: none; }
 .tour-card.tour-in { animation: tour-card-in .32s var(--ease) both; }
 .tour-card.tour-sheet { left: 12px; right: 12px; top: auto; bottom: 12px; width: auto; transition: none; }

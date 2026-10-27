@@ -209,7 +209,7 @@ test('réglages Discord : URL validée, chiffrée, événements enregistrés, pl
   assert.ok(!page.includes('abcdefghijklmnop'), 'URL jamais réaffichée');
   assert.match(page, /data-notify-test/);
   assert.match(page, /data-chan-pick="discord"/, 'menu « + » : Discord, pour un autre webhook');
-  assert.match(page, /Aucun canal ne reçoit pour l&#39;instant|Aucun canal ne reçoit pour l'instant/, 'événements sans webhook signalés');
+  assert.match(page, /Ajoute un canal pour recevoir aussi/, 'événements sans webhook signalés');
 
   // Un second webhook pour d'autres événements ; l'adresse laissée vide du premier est conservée
   const id0 = list[0].id;
