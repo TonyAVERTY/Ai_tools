@@ -94,7 +94,7 @@ export function mailsPage(d) {
   <nav class="mstats" aria-label="${d.view === 'replies' ? 'Filtrer par intention' : 'Filtrer par état'}">${stats}</nav>
   ${list}${pager}
   ${d.view === 'sent' ? `<details class="tip"><summary><span class="tip-i" aria-hidden="true">i</span><span class="tip-t">Comment sont comptés « Lu » et « Répondu » ?</span></summary>
-    <div class="tip-body"><p>Pas de suivi d'ouverture espion (pixel, lien traqué) : il abîme la délivrabilité et pose un problème de consentement (RGPD). Alternative : l'accusé de lecture standard, que le destinataire accepte ou non d'envoyer (option dans Réglages → Garde-fous). « Lu » est donc un minimum, jamais un « non lu ». « Répondu » vient de la boîte de réception du projet (IMAP).</p></div></details>` : ''}
+    <div class="tip-body"><p>« Lu » vient de l'accusé de lecture standard : la messagerie du destinataire lui demande s'il accepte de l'envoyer (option dans Réglages → Garde-fous). « Lu » est donc un minimum. « Répondu » vient de la boîte de réception du projet (IMAP).</p></div></details>` : ''}
 </section>`,
   });
 }

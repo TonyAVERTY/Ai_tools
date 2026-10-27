@@ -268,7 +268,7 @@ export function termsPage({ appUrl, apple = false }) {
       {
         id: 'plans', title: 'Plan gratuit et plans payants',
         html: `<p>Le plan gratuit comprend ${PLAN_LIMITS.free.projects} projet, ${PLAN_LIMITS.free.prospects} prospects, ${PLAN_LIMITS.free.mails} mails et ${PLAN_LIMITS.free.aiJobs} jobs IA par mois. Ces limites peuvent évoluer, avec information préalable.</p>
-<p>Des plans payants sont prévus : ${Object.keys(PLAN_PRICES).map((k) => `${PLAN_LABELS[k]} (${PLAN_PRICES[k]} € TTC par mois, ou ${annualPrice(k)} € TTC par an, ${ANNUAL_FREE_MONTHS} mois offerts)`).join(', ')}. Les prix sont TTC ; l'éditeur est en franchise de TVA (art. 293 B du CGI). Ces plans ne sont pas encore ouverts à la vente : aucun paiement n'est demandé aujourd'hui, et rien ne sera facturé sans ton accord exprès.</p>`,
+<p>Des plans payants sont prévus : ${Object.keys(PLAN_PRICES).map((k) => `${PLAN_LABELS[k]} (${PLAN_PRICES[k]} € TTC par mois, ou ${annualPrice(k)} € TTC par an, ${ANNUAL_FREE_MONTHS} mois offerts)`).join(', ')}. Les prix sont TTC ; l'éditeur est en franchise de TVA (art. 293 B du CGI). Ces plans ouvrent prochainement ; seul le plan Gratuit est ouvert aujourd'hui, et rien ne sera facturé sans ton accord exprès.</p>`,
       },
       {
         id: 'envois', title: 'Tes envois',

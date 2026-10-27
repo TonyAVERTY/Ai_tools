@@ -33,7 +33,7 @@ export function icalBox(url, back) {
       <p class="muted small">Ajoute ce lien dans Google Agenda (Autres agendas → À partir de l'URL), Apple Calendrier (Fichier → Nouvel abonnement) ou Outlook. Il affiche tes prochaines actions et tes posts LinkedIn programmés. <b>Garde-le secret</b> : quiconque l'a peut lire ces rendez-vous.</p>
       <div class="row-actions"><form method="post" action="/calendar/feed">${hidden}<button class="btn small">${ic('repeat')}Régénérer le lien</button></form>
         <form method="post" action="/calendar/feed/delete">${hidden}<button class="btn small danger">${ic('trash')}Supprimer le lien</button></form></div>`
-    : `<p class="muted">Affiche tes prochaines actions et tes posts LinkedIn programmés dans Google Agenda, Apple Calendrier ou Outlook, grâce à un lien d'abonnement secret.</p>
+    : `<p class="muted small">Affiche tes prochaines actions et tes posts LinkedIn programmés dans Google Agenda, Apple Calendrier ou Outlook, grâce à un lien d'abonnement secret.</p>
       ${icalTip(null)}
       <form method="post" action="/calendar/feed">${hidden}<button class="btn primary">${ic('link')}Créer mon lien d'agenda</button></form>`;
 }

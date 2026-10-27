@@ -221,12 +221,31 @@
         paint();
         await new Promise((r) => setTimeout(r, calm() ? 350 : 750)); // même avec « réduire les animations », la confirmation reste visible un instant
       } else validated.delete(at);
-      if (at === steps.length - 1) { setBar(100); paint(); wiz.submit(); return; } // submit() n'émet pas l'événement « submit » : pas de boucle
+      if (at === steps.length - 1) { setBar(100); paint(); await finishWizard(); return; }
       veil.classList.remove('show');
       here.classList.add('wiz-out');
       await wait(190);
       show(at + 1, { dir: 1 });
       moving = false;
+    }
+    // Fin : une scène plein écran apparaît en fondu (« Merci, ton espace est prêt »), le profil s'enregistre en arrière-plan, puis le tableau de bord
+    // prend la place sans coupure. Si l'enregistrement échoue, on retombe sur l'envoi classique du formulaire.
+    async function finishWizard() {
+      const end = document.createElement('div');
+      end.className = 'wiz-end';
+      end.setAttribute('role', 'status');
+      end.innerHTML = '<div class="wiz-end-in"></div>';
+      const inner = $('.wiz-end-in', end);
+      inner.append($('.wiz-big', wiz).cloneNode(true));
+      inner.insertAdjacentHTML('beforeend', '<h2>Merci, ton espace est prêt</h2><p>On te montre maintenant comment t\'y repérer.</p><div class="bar indet" aria-hidden="true"><span></span></div>');
+      document.body.append(end);
+      void end.offsetWidth;
+      end.classList.add('show');
+      let ok = true;
+      const saved = api('/welcome?json=1', Object.fromEntries(new FormData(wiz))).catch(() => { ok = false; });
+      await Promise.all([saved, new Promise((r) => setTimeout(r, calm() ? 500 : 1600))]);
+      if (!ok) { wiz.submit(); return; } // submit() n'émet pas l'événement « submit » : pas de boucle
+      go('/');
     }
     async function previous() {
       if (moving || at === 0) return;
@@ -244,6 +263,19 @@
       forward();
     });
     show(0, { focus: false });
+  }
+
+  // Visite guidée du tableau de bord (public/tour.js) : démarre toute seule une fois après les questions de bienvenue, ou à la demande (« Visite guidée »)
+  const tourData = $('#tour-data');
+  if (tourData && window.AiTour) {
+    const mode = tourData.dataset.mode;
+    cleanups.push(() => window.AiTour.stop());
+    later(() => window.AiTour.start(JSON.parse(tourData.textContent), {
+      onClose: (state) => {
+        if (mode === 'auto') api('/tour/complete', { state }).catch(() => {}); // une visite relancée à la main ne change rien : l'automatique ne revient plus
+        if (mode === 'replay') history.replaceState(null, '', '/');
+      },
+    }), 900);
   }
 
   // Attente dont la durée dépend d'un tiers (Claude) : un pourcentage ESTIMÉ monte vers 95 % selon la durée habituelle et ne passe à 100 % qu'avec la
