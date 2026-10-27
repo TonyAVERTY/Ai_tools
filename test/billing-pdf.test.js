@@ -15,6 +15,7 @@ import { renderDocumentPdf } from '../src/services/billingpdf.js';
 import { normalizeLegal, normalizeContent, documentFacts } from '../src/services/billing.js';
 import { normalizeIssue, IssueError } from '../src/billingissue.js';
 import { fmtEur, todayIso } from '../src/services/accounting.js';
+import { listClients } from '../src/billingissue.js';
 
 const LEGAL = { legal_form: 'micro', legal_name: 'Tony Averty', siret: '123 456 789 00012', address: '12 rue des Lilas', postal_code: '35000', city: 'Rennes', vat_mode: 'franchise',
   email: 'tony@exemple.fr', payment_terms_days: '30', quote_validity_days: '30', activity_label: 'Développement web', offer_description: 'Des applications web sur mesure.' };
@@ -270,9 +271,66 @@ test('case « Joindre automatiquement à la comptabilité » : décochée, la fa
   assert.equal((await u.get(`/facturation/factures/${inv.id}/pdf`, { headers: { accept: '*/*' } })).status, 200, 'le PDF reste téléchargeable');
   // Le formulaire propose la case, cochée par défaut, pour une facture seulement (pas pour un devis)
   assert.match(h, /name="to_accounting" value="1" checked/);
-  assert.equal((h.match(/name="to_accounting"/g) || []).length, 3, 'acompte, facture finale, avoir');
+  assert.equal((h.match(/name="to_accounting"/g) || []).length, 1, 'une seule case, dans la section « Générer un document »');
+  assert.match(h, /data-for="acompte facture avoir"/, 'la case ne concerne que les factures (masquée pour un devis)');
   // Cochée, une autre émission est jointe
   await post(u, `${base(pid)}/emettre`, { doc: byKind.facture.id, ...CLIENT });
   assert.equal((await entries(u.id)).length, 1);
   assert.match(await html(u, base(pid)), /À encaisser/);
+});
+
+test('section « Générer un document » : disponible une fois les modèles validés, tous les types, type présélectionnable', async () => {
+  const { u, pid } = await ready();
+  const h = await html(u, `${base(pid)}?type=avoir`);
+  assert.match(h, /<h2 id="t-gen">Générer un document<\/h2>/);
+  for (const t of ['Devis', 'Acompte', 'Facture finale', 'Avoir']) assert.match(h, new RegExp(`<option value="\\d+" data-kind="[a-z]+"[^>]*>${t}</option>`));
+  assert.match(h, /data-kind="avoir" selected/, 'le type demandé dans l\'adresse est présélectionné');
+  assert.match(h, /href="\?type=facture#generer"/, 'bouton « Émettre ce document » sur la carte du modèle');
+  assert.doesNotMatch(h, /Émettre en PDF :/, 'plus de formulaire caché sous chaque carte');
+  // Un modèle repassé en brouillon reste visible mais n'est pas choisissable
+  await s.db.prepare("UPDATE billing_docs SET status = 'draft' WHERE project_id = ? AND kind = 'acompte'").run(pid);
+  assert.match(await html(u, base(pid)), /<option value="\d+" data-kind="acompte" disabled>Acompte \(à valider d'abord\)<\/option>/);
+});
+
+test('clients par projet : enregistrés à l\'émission, repris pour les documents suivants, mis à jour sans doublon, jamais partagés', async () => {
+  const { u, pid, byKind } = await ready();
+  assert.equal((await listClients(s.db, u.id, pid)).length, 0);
+  assert.doesNotMatch(await html(u, base(pid)), /Clients du projet/);
+  await post(u, `${base(pid)}/emettre`, { doc: byKind.devis.id, ...CLIENT });
+  let cl = await listClients(s.db, u.id, pid);
+  assert.deepEqual(cl.map((c) => [c.name, c.address, c.siret]), [['Boulangerie Dupont', '5 place du Marché, 35000 Rennes', '98765432100011']]);
+  let h = await html(u, base(pid));
+  assert.match(h, /Clients du projet/);
+  assert.match(h, new RegExp(`<option value="${cl[0].id}" data-name="Boulangerie Dupont" data-address="5 place du Marché, 35000 Rennes" data-siret="98765432100011">Boulangerie Dupont</option>`));
+  // Même client choisi dans la liste, adresse corrigée : mise à jour, pas de doublon
+  await post(u, `${base(pid)}/emettre`, { doc: byKind.facture.id, client_id: cl[0].id, client_nom: 'Boulangerie Dupont', client_adresse: '8 rue Neuve, 35000 Rennes', client_siret: '98765432100011' });
+  // Même nom saisi à la main (casse différente) : le même client
+  await post(u, `${base(pid)}/emettre`, { doc: byKind.acompte.id, client_nom: 'BOULANGERIE DUPONT', client_adresse: '8 rue Neuve, 35000 Rennes', client_siret: '' });
+  cl = await listClients(s.db, u.id, pid);
+  assert.equal(cl.length, 1);
+  assert.equal(cl[0].address, '8 rue Neuve, 35000 Rennes');
+  assert.equal(cl[0].name, 'BOULANGERIE DUPONT');
+  // Un autre client
+  await post(u, `${base(pid)}/emettre`, { doc: byKind.devis.id, client_nom: 'Atelier Martin', client_adresse: '1 quai, 44000 Nantes' });
+  assert.deepEqual((await listClients(s.db, u.id, pid)).map((c) => c.name), ['Atelier Martin', 'BOULANGERIE DUPONT']);
+  // Un client refusé (nom manquant) n'est pas enregistré
+  await post(u, `${base(pid)}/emettre`, { doc: byKind.devis.id, client_nom: '', client_adresse: 'x' });
+  assert.equal((await listClients(s.db, u.id, pid)).length, 2);
+  // Un client d'un autre projet ou d'un autre compte n'est jamais repris
+  const pid2 = await addProject(s.db, u.id, { name: 'Autre', gitUrl: 'https://github.com/u/autre.git' });
+  assert.equal((await listClients(s.db, u.id, pid2)).length, 0);
+  assert.equal((await listClients(s.db, u.id + 999, pid)).length, 0);
+  const other = await ready();
+  assert.doesNotMatch(await html(other.u, base(other.pid)), /Atelier Martin/);
+  // client_id d'un autre projet : ignoré (un nouveau client est créé sur le bon projet)
+  await post(other.u, `${base(other.pid)}/emettre`, { doc: other.byKind.devis.id, client_id: cl[0].id, client_nom: 'Pirate', client_adresse: 'ailleurs' });
+  assert.equal((await listClients(s.db, u.id, pid)).find((c) => c.id === cl[0].id).name, 'BOULANGERIE DUPONT', 'le client d\'un autre compte n\'est pas modifié');
+  assert.deepEqual((await listClients(s.db, other.u.id, other.pid)).map((c) => c.name), ['Pirate']);
+  // Retirer un client : seulement les siens
+  const v = await s.newUser();
+  assert.equal((await post(v, `${base(pid)}/clients/${cl[0].id}/supprimer`)).status, 404);
+  assert.equal((await post(u, `${base(pid)}/clients/${cl[0].id}/supprimer`)).status, 303);
+  assert.deepEqual((await listClients(s.db, u.id, pid)).map((c) => c.name), ['Atelier Martin']);
+  await post(u, `${base(pid)}/emettre`, { doc: byKind.devis.id, client_id: (await listClients(s.db, u.id, pid))[0].id, client_nom: 'Atelier Martin', client_adresse: '1 quai, 44000 Nantes' });
+  assert.equal((await s.db.prepare('SELECT COUNT(*) n FROM billing_invoices WHERE project_id = ?').get(pid)).n >= 4, true, 'les documents déjà émis restent');
 });

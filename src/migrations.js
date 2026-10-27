@@ -1068,4 +1068,35 @@ export const MIGRATIONS = [
       { sql: 'ALTER TABLE accounting_entries ADD COLUMN invoice_id BIGINT NULL', when: colMissing('accounting_entries', 'invoice_id') },
     ],
   },
+  {
+    name: 'billing_clients',
+    sqlite: [
+      `CREATE TABLE billing_clients (
+        id INTEGER PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        address TEXT NOT NULL DEFAULT '',
+        siret TEXT NOT NULL DEFAULT '',
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )`,
+      'CREATE INDEX billing_clients_project ON billing_clients(project_id)',
+    ],
+    mysql: [
+      `CREATE TABLE IF NOT EXISTS billing_clients (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        user_id BIGINT NOT NULL,
+        project_id BIGINT NOT NULL,
+        name VARCHAR(120) NOT NULL,
+        address VARCHAR(200) NOT NULL DEFAULT '',
+        siret VARCHAR(20) NOT NULL DEFAULT '',
+        created_at BIGINT NOT NULL,
+        updated_at BIGINT NOT NULL,
+        KEY billing_clients_project (project_id),
+        CONSTRAINT billing_clients_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        CONSTRAINT billing_clients_project_fk FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+      ) ${T}`,
+    ],
+  },
 ];

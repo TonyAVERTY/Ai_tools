@@ -118,7 +118,41 @@ export async function issueDocument(app, { userId, project, doc, legal, raw }) {
     if (entryId) rmSync(join(userAccountingRoot(cfg, userId), String(entryId)), { recursive: true, force: true });
     throw e;
   }
+  await saveClient(db, userId, project.id, { name: values.client_nom, address: values.client_adresse, siret: values.client_siret }, raw?.client_id);
   return { id, number, entryId };
+}
+
+/** Clients enregistrés pour un projet (par ordre alphabétique) : leurs informations resservent à chaque nouveau document. */
+export async function listClients(db, userId, projectId) {
+  const rows = await db.prepare('SELECT * FROM billing_clients WHERE user_id = ? AND project_id = ? ORDER BY LOWER(name), id').all(Number(userId), Number(projectId));
+  return rows.map((r) => ({ id: Number(r.id), name: r.name, address: r.address, siret: r.siret }));
+}
+
+/**
+ * Enregistre le client d'un document émis : le client choisi dans la liste (clientId) est mis à jour, sinon un client du même nom l'est,
+ * sinon un nouveau est créé. Un client n'est jamais partagé entre projets ni entre comptes.
+ */
+export async function saveClient(db, userId, projectId, c, clientId = null) {
+  const at = now();
+  let id = null;
+  if (clientId) {
+    const r = await db.prepare('SELECT id FROM billing_clients WHERE id = ? AND user_id = ? AND project_id = ?').get(Number(clientId), Number(userId), Number(projectId));
+    if (r) id = Number(r.id);
+  }
+  if (id === null) {
+    const r = await db.prepare('SELECT id FROM billing_clients WHERE user_id = ? AND project_id = ? AND LOWER(name) = ?').get(Number(userId), Number(projectId), c.name.toLowerCase());
+    if (r) id = Number(r.id);
+  }
+  if (id !== null) {
+    await db.prepare('UPDATE billing_clients SET name = ?, address = ?, siret = ?, updated_at = ? WHERE id = ?').run(c.name, c.address, c.siret, at, id);
+    return id;
+  }
+  return Number((await db.prepare('INSERT INTO billing_clients(user_id, project_id, name, address, siret, created_at, updated_at) VALUES(?, ?, ?, ?, ?, ?, ?)')
+    .run(Number(userId), Number(projectId), c.name, c.address, c.siret, at, at)).lastInsertRowid);
+}
+
+export async function deleteClient(db, userId, projectId, id) {
+  await db.prepare('DELETE FROM billing_clients WHERE id = ? AND user_id = ? AND project_id = ?').run(Number(id), Number(userId), Number(projectId));
 }
 
 /** Documents émis d'un projet, du plus récent au plus ancien, avec l'état de leur ligne de comptabilité. */
