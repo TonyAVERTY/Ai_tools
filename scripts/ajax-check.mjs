@@ -72,7 +72,7 @@ check(await p.evaluate(() => window.__marker) === 'vivante' && navs.length === n
 // 3. un seul sondage /api/system après toutes ces navigations (pas de chaînes en double)
 sys.length = 0;
 await p.waitForTimeout(8000);
-check(sys.length <= 3, `pas de sondages en double de la barre système (${sys.length} requêtes en 8 s ; une seule chaîne = 1 toutes les 30 s au repos)`);
+check(sys.length <= 3, `pas de sondages en double de l'état du serveur (${sys.length} requêtes en 8 s ; une seule chaîne = 1 toutes les 30 s au repos)`);
 
 // 4. Réglages : défilement, onglet de prompts et sections ouvertes conservés après un enregistrement
 await p.locator('.user summary').hover().catch(() => {});

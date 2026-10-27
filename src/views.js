@@ -24,7 +24,7 @@ function acc(key, icon, title, sub, body, { open = false, cls = '' } = {}) {
 </details>`;
 }
 
-const NAV = [['/', 'folder', 'Projets'], ['/mails', 'mail', 'Mails'], ['/calendar', 'clock', 'Calendrier'], ['/team', 'users', 'Équipe']];
+const NAV = [['/', 'folder', 'Projets'], ['/mails', 'mail', 'Mails'], ['/calendar', 'clock', 'Calendrier'], ['/compta', 'wallet', 'Comptabilité'], ['/team', 'users', 'Équipe']];
 
 export function layout({ title, body, email, scripts = [] }) {
   return `<!doctype html>
@@ -222,7 +222,7 @@ ${linkSection(link, consent, quota)}
 </section>
 <section class="card danger">
   <div class="card-h"><h2>Zone de danger</h2></div>
-  <p class="card-d">Supprimer ton compte efface définitivement ton compte et toutes tes données : projets, prospects, notes, modèles de mail, journaux d'envoi, jobs, réglages et clones du code. Les adresses qui ont demandé à ne plus être contactées restent dans la liste d'opposition commune. Cette action est irréversible.</p>
+  <p class="card-d">Supprimer ton compte efface définitivement ton compte et toutes tes données : projets, prospects, notes, modèles de mail, journaux d'envoi, lignes de comptabilité et leurs justificatifs, jobs, réglages et clones du code. Les adresses qui ont demandé à ne plus être contactées restent dans la liste d'opposition commune. Cette action est irréversible.</p>
   ${error ? `<p class="msg msg-err" role="alert">${esc(error)}</p>` : ''}
   <form method="post" action="/account/delete" class="cfg">
     <label class="field"><span class="lbl">Pour confirmer, saisis ton email (${esc(user.email)})</span><input name="confirm" type="email" required autocomplete="off"></label>
