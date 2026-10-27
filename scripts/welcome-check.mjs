@@ -46,11 +46,18 @@ for (const [vp, scheme] of [[{ width: 1280, height: 800 }, 'dark'], [{ width: 39
   };
   await p.locator('[data-step]:not([hidden]) label.opt').nth(1).click(); // « Indépendant ou freelance »
   await p.locator('[data-wiz-next]').click();
-  await p.waitForSelector('[data-step]:not([hidden]) .wiz-ok.show');
-  ok(/Pris en compte/.test(await p.locator('[data-step]:not([hidden]) .wiz-ok').innerText()), `${tag} réponse validée : la pastille verte « Pris en compte » s'affiche`);
-  const pill = { width: await p.locator('[data-step]:not([hidden]) .wiz-pill').evaluate((e) => e.offsetWidth) }; // taille de mise en page (la boîte visuelle varie pendant l'animation d'apparition)
-  const pillBg = await p.locator('[data-step]:not([hidden]) .wiz-pill').evaluate((e) => getComputedStyle(e).backgroundColor);
-  ok(pill && pill.width >= 20 && /rgb\(/.test(pillBg), `${tag} la pastille est visible et colorée (${pillBg})`);
+  await p.waitForSelector('[data-wiz-confirm].show');
+  await p.waitForTimeout(430); // fin de l'animation d'apparition (.46 s)
+  const veil = await p.locator('[data-wiz-confirm]').boundingBox();
+  const big = await p.locator('.wiz-big').boundingBox();
+  const card = await p.locator('section.wiz').boundingBox();
+  const blur = await p.locator('[data-wiz-confirm]').evaluate((e) => getComputedStyle(e).backdropFilter || getComputedStyle(e).webkitBackdropFilter);
+  const bigBg = await p.locator('.wiz-big').evaluate((e) => getComputedStyle(e).backgroundColor);
+  ok(big && big.width >= 80 && /rgb\(/.test(bigBg), `${tag} réponse validée : un grand cercle vert (${Math.round(big?.width)} px, ${bigBg})`);
+  ok(big && Math.abs(big.x + big.width / 2 - (card.x + card.width / 2)) < 3 && Math.abs(big.y + big.height / 2 - (card.y + card.height / 2)) < 3, `${tag} le cercle est en plein milieu de la carte`);
+  ok(veil && Math.abs(veil.width - card.width) <= 3 && Math.abs(veil.height - card.height) <= 3, `${tag} le voile couvre toute la carte`);
+  ok(/blur\(/.test(blur), `${tag} l'arrière-plan est flouté (${blur})`);
+  ok(/Réponse prise en compte/.test(await p.locator('[data-wiz-live]').innerText()), `${tag} la confirmation est aussi annoncée aux lecteurs d'écran`);
   ok(await p.locator('[data-dot].done').count() === 1, `${tag} la pastille de progression de la question 1 passe au vert`);
   if (process.env.SHOTS) await p.screenshot({ path: `${process.env.SHOTS}/welcome-ok-${vp.width}-${scheme}.png` });
   await p.waitForFunction(() => document.querySelector('[data-wiz-count]').textContent !== 'Question 1 sur 7', null, { timeout: 5000 });
@@ -62,7 +69,7 @@ for (const [vp, scheme] of [[{ width: 1280, height: 800 }, 'dark'], [{ width: 39
   ok(back === 'wiz-in-back', `${tag} « Retour » ramène la question par la gauche (${back})`);
   ok((await pct(p)) === '0 %' && await p.locator('input[name=job]:checked').count() === 1, `${tag} « Retour » revient à la question 1 en gardant le choix`);
   await adv(); // question 1 revalidée
-  const none = await p.locator('[data-step]:not([hidden]) .wiz-ok.show').count();
+  const none = await p.locator('[data-wiz-confirm].show').count();
   ok(none === 0 && await p.locator('[data-dot].done').count() === 1, `${tag} question 2 : pas de pastille verte tant qu'on n'a pas répondu`);
   await adv(); // question 2 passée sans choix
   ok((await pct(p)) === '29 %' && await p.locator('[data-dot].done').count() === 1, `${tag} une question passée sans réponse compte dans le pourcentage mais pas de pastille verte (29 %)`);
@@ -104,7 +111,7 @@ for (const [vp, scheme] of [[{ width: 1280, height: 800 }, 'dark'], [{ width: 39
   await p.waitForFunction(() => document.querySelector('[data-wiz-count]').textContent === 'Question 2 sur 7', null, { timeout: 3000 });
   const ms = Date.now() - t0;
   const anim = await p.locator('[data-step]:not([hidden])').evaluate((e) => getComputedStyle(e).animationName);
-  ok(ms < 500 && anim === 'none', `mouvement réduit : passage immédiat (${ms} ms) et sans animation (${anim})`);
+  ok(ms < 900 && anim === 'none', `mouvement réduit : confirmation brève puis passage (${ms} ms) et sans animation (${anim})`);
   ok(await p.locator('[data-dot].done').count() === 1, 'mouvement réduit : la pastille verte de progression est bien là');
   ok(errs.length === 0, 'mouvement réduit : aucune erreur console');
   await ctx.close();
