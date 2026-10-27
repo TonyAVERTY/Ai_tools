@@ -142,11 +142,42 @@ export function suggestFromRepo(dir) {
   return out;
 }
 
+const ANALYSIS_SRC = "l'analyse du projet";
+const OTHER_SRC = 'un autre de tes projets';
+const IDENTITY_KEYS = ['legal_form', 'legal_name', 'siret', 'capital', 'rcs', 'address', 'postal_code', 'city', 'vat_mode', 'vat_number', 'vat_rate', 'email', 'phone', 'website', 'iban', 'bic', 'payment_terms_days', 'quote_validity_days'];
+
+/** Ce que Claude a trouvé dans le dépôt pendant l'analyse (profile.facturation) : seules les valeurs au bon format sont gardées. */
+export function suggestFromAnalysis(found) {
+  if (!found || typeof found !== 'object') return {};
+  const clean = {};
+  for (const k of LEGAL_KEYS) {
+    const v = found[k];
+    if (typeof v !== 'string' && typeof v !== 'number') continue;
+    const t = String(v).trim();
+    if (t && !/^(null|n\/a|inconnu|non renseign)/i.test(t)) clean[k] = t;
+  }
+  const { values, errors } = normalizeLegal(clean);
+  const out = {};
+  for (const k of Object.keys(clean)) if (!errors[k] && values[k]) out[k] = { value: String(values[k]), source: ANALYSIS_SRC };
+  // Les champs qui dépendent d'une valeur écartée ne sont pas proposés seuls
+  delete out.payment_terms_days; delete out.quote_validity_days; delete out.vat_rate;
+  return out;
+}
+
+/** Les informations déjà enregistrées pour un autre projet du compte : l'identité de l'entreprise ne se ressaisit pas. */
+export function suggestFromOthers(legals = []) {
+  const out = {};
+  for (const legal of legals) for (const k of IDENTITY_KEYS) if (legal?.[k] && !out[k]) out[k] = { value: String(legal[k]), source: OTHER_SRC };
+  return out;
+}
+
 /** Valeurs proposées au formulaire quand rien n'est encore enregistré, avec leur origine (affichée à côté du champ). */
-export function buildSuggestions({ repo = {}, profile = null, accounting = {}, smtpEmail = '', accountEmail = '' } = {}) {
-  const out = { ...repo };
+export function buildSuggestions({ repo = {}, profile = null, accounting = {}, smtpEmail = '', accountEmail = '', others = [] } = {}) {
+  const out = { ...suggestFromOthers(others) };
   const put = (key, value, source) => { if (value && !out[key]) out[key] = { value: String(value), source }; };
-  if (profile?.resume) put('offer_description', String(profile.resume).slice(0, 700), "l'analyse du projet");
+  for (const [k, v] of Object.entries(repo)) put(k, v.value, v.source);
+  for (const [k, v] of Object.entries(suggestFromAnalysis(profile?.facturation))) put(k, v.value, v.source);
+  if (profile?.resume) put('offer_description', String(profile.resume).slice(0, 700), ANALYSIS_SRC);
   if (accounting.vat) put('vat_mode', accounting.vat, 'ta comptabilité');
   if (accounting.regime === 'micro') put('legal_form', 'micro', 'ta comptabilité');
   put('email', smtpEmail, "l'adresse d'envoi du projet");

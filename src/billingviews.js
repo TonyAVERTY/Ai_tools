@@ -39,11 +39,11 @@ export function billingOverviewPage({ email, rows }) {
 
 // ---------- Un projet ----------
 
-const SRC = { 'package.json': 'package.json', 'composer.json': 'composer.json' };
+const SRC = { 'un autre de tes projets': "d'un autre de tes projets" };
 function fieldHtml(f, value, error, suggestion) {
   const id = `lf-${f.key}`;
   const shown = value || (suggestion ? suggestion.value : '');
-  const from = !value && suggestion ? `<span class="badge info bill-src">${ic('git')} Repris de ${esc(SRC[suggestion.source] || suggestion.source)}</span>` : '';
+  const from = !value && suggestion ? `<span class="badge info bill-src">${ic('git')} Repris ${esc(SRC[suggestion.source] || `de ${suggestion.source}`)}</span>` : '';
   const need = f.required({ legal_form: 'sas', vat_mode: 'assujetti' }) ? '' : ' <span class="muted">(facultatif)</span>';
   let input;
   if (f.type === 'select') {
@@ -62,7 +62,7 @@ function legalForm(p, legal, errors, suggestions, open) {
   const missing = legalMissing(legal);
   return `<section class="card bill-sec" id="legal" aria-labelledby="t-legal">
     <div class="row-between"><div><h2 id="t-legal">1. Informations légales</h2>
-      <p class="muted">${missing.length ? `${missing.length} information${missing.length > 1 ? 's' : ''} à compléter. Ce qu'on a pu lire dans ton code est déjà rempli : vérifie-le. Le reste, seul toi le sais.` : 'Tout est rempli. Ces informations figurent sur tes devis et tes factures.'}</p></div>
+      <p class="muted">${missing.length ? `${missing.length} information${missing.length > 1 ? 's' : ''} à compléter. Ce que Claude a trouvé dans ton projet, ou que tu as déjà saisi ailleurs, est prérempli : vérifie-le, rien n'est enregistré avant « Enregistrer les informations ». Le reste, seul toi le sais.` : 'Tout est rempli. Ces informations figurent sur tes devis et tes factures.'}</p></div>
       <span class="badge ${missing.length ? 'warn' : 'ok'}">${missing.length ? `${missing.length} à compléter` : 'Complet'}</span></div>
     <details class="bill-det"${open ? ' open' : ''}><summary class="btn small">${missing.length ? 'Remplir les informations' : 'Modifier les informations'}</summary>
     <form method="post" action="/facturation/projet/${p.id}/legal" class="bill-form">

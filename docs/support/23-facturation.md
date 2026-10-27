@@ -21,7 +21,12 @@ Ouvre un projet, puis **Remplir les informations** (ou **Modifier les informatio
 - « Comment te joindre » : « E-mail de contact », « Téléphone », « Site internet » ;
 - « Paiement » : « IBAN » (vérifié), « BIC », « Délai de paiement » et « Durée de validité d'un devis » ;
 - « Ce que tu vends » : « Ce que tu proposes à tes clients » et « Tes tarifs habituels ».
-Certaines valeurs sont **proposées** quand elles se retrouvent dans ton projet (fichiers `package.json` ou `LICENSE` du dépôt, analyse du projet, comptabilité, adresse de ton compte) : un badge « Repris de … » indique d'où elle vient. Vérifie-les avant d'enregistrer. Rien n'est lu en dehors du dépôt du projet.
+Un maximum de champs est **prérempli pour toi**, et tu gardes la main : ce sont des propositions, **rien n'est enregistré tant que tu n'as pas cliqué « Enregistrer les informations »**. Un badge « Repris de … » indique l'origine de chaque valeur :
+- **« l'analyse du projet »** : pendant la première analyse du projet, Claude lit aussi les mentions légales, CGV/CGU, pieds de page, pages contact et tarifs du dépôt et relève ce qui y est écrit (nom de l'éditeur, SIRET, adresse, e-mail, téléphone, site, tarifs…). Il ne recopie que ce qui est écrit : ce qu'il ne trouve pas reste vide, il ne devine jamais. Les valeurs au mauvais format (SIRET qui n'a pas 14 chiffres, adresse web douteuse…) sont écartées ;
+- **« package.json »**, **« composer.json »** ou **« LICENSE »** : l'auteur ou le titulaire du droit d'auteur du dépôt ;
+- **« un autre de tes projets »** : l'identité de ton entreprise (forme juridique, SIRET, adresse, TVA, IBAN, délais de paiement…) déjà enregistrée pour un autre de tes projets : tu ne la ressaisis pas ;
+- **« ta comptabilité »** (TVA, statut micro-entrepreneur) et **« ton compte »** (adresse e-mail).
+Seules tes propres informations sont reprises, jamais celles d'un autre compte, et rien n'est lu en dehors du dépôt du projet. Si le projet a été analysé avant cette fonction, clique **Réanalyser** dans la « Fiche projet » (voir « Projets ») pour que Claude cherche ces informations.
 Clique **Enregistrer les informations**. Même incomplètes, elles sont **enregistrées** (rien n'est perdu) et les champs à corriger sont signalés ; le message « Informations enregistrées : il en manque encore pour continuer. » indique qu'il reste à faire. Tant que tout n'est pas rempli, le bouton de génération n'apparaît pas.
 
 ## 3. Générer et choisir un devis
