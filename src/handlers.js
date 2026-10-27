@@ -25,6 +25,13 @@ import { evolutionMail } from './services/mailhtml.js';
 import { gitCredentialFor } from './gitservers.js';
 import { ROLE_TASKS, roleById, MAX_NOTES } from './services/roles.js';
 import { getProject, repoDir, sentSince, getTemplate, saveTemplate, pickVariant } from './projects.js';
+import { getProfile, profileBlock } from './userprofile.js';
+import { repoProfile, renderRepoProfile } from './services/repoprofile.js';
+
+// Constats du dépôt cloné (profil établi par le code, mis en cache par commit) ; vide si le dossier est illisible : un job ne doit jamais échouer pour ça
+function factsOf(dir) {
+  try { return renderRepoProfile(repoProfile(dir)); } catch (e) { console.warn('[repoprofile]', e.message); return ''; }
+}
 
 const sleep = (ms, signal) => new Promise((resolve, reject) => {
   const t = setTimeout(resolve, ms);
@@ -94,8 +101,10 @@ export function makeClaude(app) {
   const { db, cfg } = app;
   return async (userId, o) => {
     const cred = await resolveCredentials(app, userId); // refuse sans liaison valide (dernier garde-fou)
+    // Profil de l'utilisateur (secteur, métier…) : une donnée de plus dans les consignes système, sauf pour le Support (qui répond d'après la documentation)
+    const system = o.noProfile ? o.system : `${o.system ?? ''}${profileBlock(await getProfile(db, userId))}` || undefined;
     const r = await runClaude({
-      bin: cfg.claudeBin, ...o,
+      bin: cfg.claudeBin, ...o, system,
       sandbox: cfg.sandbox, secretEnv: cred.secretEnv,
       // Les clones lus sont ceux du propriétaire du projet (page IA : projet d'équipe joint, accès vérifié par l'appelant) ;
       // les pièces jointes lues en plus sont toujours dans le dossier de CET utilisateur.
@@ -272,7 +281,7 @@ export function makeHandlers(app) {
       await sync(userId, project.gitUrl, dir);
     }
     await ctx.progress({ message: `${task.label} : Claude rédige…`, pct: 10 });
-    const { prompt, system } = rolePrompt({ role, task, projectName: project.name, profile: project.profile, target: project.target || {}, notes, custom: await custom(userId), model });
+    const { prompt, system } = rolePrompt({ role, task, projectName: project.name, profile: project.profile, target: project.target || {}, notes, custom: await custom(userId), model, repoFacts: dir ? factsOf(dir) : '' });
     const maxTurns = task.repo ? 14 : task.web ? 10 : 1;
     const sink = makeSink();
     const r = await claude(userId, {
@@ -298,7 +307,7 @@ export function makeHandlers(app) {
 
       await ctx.progress({ message: 'Analyse du code par Claude…', pct: 10 });
       const model = await modelOf(userId, 'analyze_model');
-      const { prompt, system } = analyzePrompt(project.name, await custom(userId), model);
+      const { prompt, system } = analyzePrompt(project.name, await custom(userId), model, factsOf(dir));
       const sink = makeSink();
       const r = await claude(userId, {
         prompt, system, cwd: dir, model, maxTurns: 20, tools: ['Read', 'Glob', 'Grep'], signal: ctx.signal,
@@ -501,7 +510,7 @@ export function makeHandlers(app) {
       await sync(userId, project.gitUrl, dir);
 
       await ctx.progress({ message: `Recherche de ${count} évolutions (${level})…`, pct: 10 });
-      const { prompt, system } = evolutionPrompt({ projectName: project.name, profile: project.profile, count, level, custom: await custom(userId) });
+      const { prompt, system } = evolutionPrompt({ projectName: project.name, profile: project.profile, count, level, custom: await custom(userId), repoFacts: factsOf(dir) });
       const { model, maxTurns } = LEVELS[level];
       const sink = makeSink();
       const r = await claude(userId, {
@@ -533,7 +542,7 @@ export function makeHandlers(app) {
       const dir = repoDir(cfg, userId, project.id);
       await sync(userId, project.gitUrl, dir);
       await ctx.progress({ message: `Audit du code (${level})…`, pct: 10 });
-      const { prompt, system } = auditPrompt({ projectName: project.name, level, custom: await custom(userId) });
+      const { prompt, system } = auditPrompt({ projectName: project.name, level, custom: await custom(userId), repoFacts: factsOf(dir) });
       const { model, maxTurns } = LEVELS[level];
       const sink = makeSink();
       const r = await claude(userId, {

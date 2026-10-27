@@ -204,6 +204,10 @@ ${notice ? `<p class="${notice.ok ? 'msg msg-ok' : 'msg msg-err'}" role="status"
 ${usagePanel(usage)}
 ${linkSection(link, consent, quota)}
 <section class="card">
+  <div class="card-h"><h2>Mon profil</h2><p>Ton secteur, ta fonction et ton niveau technique : Claude s'en sert pour adapter son vocabulaire et ses exemples. Rien n'est partagé avec un autre compte.</p></div>
+  <div class="row"><a class="btn small" href="/welcome?edit=1">${ic('user')}Modifier mon profil</a></div>
+</section>
+<section class="card">
   <div class="card-h"><h2>Agenda</h2><p><a href="/calendar">Voir le calendrier</a></p></div>
   ${icalBox(ical, '/account')}
 </section>

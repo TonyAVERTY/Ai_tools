@@ -55,6 +55,8 @@ export async function startApp({ cfg = {}, worker = false, rateLimit = false, cr
     n++;
     const email = opts.email || `user${n}@test.fr`;
     const id = await addUser(app.db, { ...opts, email });
+    // Les questions de la première connexion (voir userprofile.js) ne gênent pas les autres tests ; `firstLogin: true` les garde
+    if (!opts.firstLogin) await app.db.prepare("INSERT INTO user_settings(user_id, `key`, value) VALUES(?, 'user_profile_asked', 'skipped')").run(id);
     const sid = `sess-${id}-${n}`;
     await app.db.prepare('INSERT INTO sessions(id, user_id, created_at, expires_at) VALUES(?, ?, ?, ?)').run(hashSid(sid), id, now(), now() + 3600);
     const cookie = `sid=${sid}`;
