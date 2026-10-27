@@ -185,6 +185,7 @@
     const next = $('[data-wiz-next]', wiz);
     const barBox = $('[role=progressbar]', wiz);
     const dots = $$('[data-dot]', wiz);
+    const veil = $('[data-wiz-confirm]', wiz);
     const validated = new Set(); // questions auxquelles une réponse a été validée (pastille verte)
     let at = 0;
     let moving = false;
@@ -215,11 +216,13 @@
       const here = steps[at];
       if (answered(at)) {
         validated.add(at);
-        $('[data-wiz-ok]', here).classList.add('show');
+        veil.classList.add('show'); // grand cercle vert au milieu, arrière-plan flouté
+        $('[data-wiz-live]', wiz).textContent = 'Réponse prise en compte';
         paint();
-        await wait(650);
+        await new Promise((r) => setTimeout(r, calm() ? 350 : 750)); // même avec « réduire les animations », la confirmation reste visible un instant
       } else validated.delete(at);
       if (at === steps.length - 1) { setBar(100); paint(); wiz.submit(); return; } // submit() n'émet pas l'événement « submit » : pas de boucle
+      veil.classList.remove('show');
       here.classList.add('wiz-out');
       await wait(190);
       show(at + 1, { dir: 1 });

@@ -44,7 +44,8 @@ test('questions globales : rien sur un projet (secteur, taille de l\'entreprise,
   assert.equal((form.match(/data-step hidden/g) || []).length, 6);
   assert.match(form, /Question 1 sur 7[\s\S]*role="progressbar"[\s\S]*data-wiz-next>Continuer<[\s\S]*Passer le questionnaire/);
   assert.equal((form.match(/<li data-dot>/g) || []).length, 7, 'une pastille de progression par question');
-  assert.equal((form.match(/class="wiz-ok"[^>]*data-wiz-ok>[^]*?Pris en compte/g) || []).length, 7, 'une confirmation « Pris en compte » par question');
+  assert.match(form, /class="wiz-confirm" data-wiz-confirm[^>]*><span class="wiz-big">/, 'un grand cercle de confirmation au milieu, une seule fois pour tout l\'assistant');
+  assert.match(form, /role="status" data-wiz-live/);
   assert.match(form, /<span class="box">/, 'cases et pastilles dessinées (l\'input natif est masqué)');
   // modification depuis Mon compte : toutes les questions sur une seule page, sans assistant
   const edit = await (await page(await s.newUser(), '/welcome?edit=1')).text();
