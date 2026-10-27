@@ -113,4 +113,8 @@ Les fiches de méthode (voir « Savoir-faire de Claude dans AiTools ») sont des
 - **Numéro de facture déjà pris / « Numérotation en cours »** : deux émissions simultanées se sont croisées, réessaie.
 - **Ma facture émise n'est pas dans la Comptabilité** : la case « Joindre automatiquement à la comptabilité » était décochée au moment de la génération (état « Non jointe à la comptabilité » dans « Documents émis »). Ajoute la ligne à la main dans « Comptabilité » (**Ajouter une ligne**) avec le PDF en justificatif.
 - **Mon client n'apparaît pas dans la liste « Client »** : les clients sont enregistrés **par projet**, au moment où tu génères un document. Génère-lui un premier document dans ce projet, il sera proposé ensuite. S'il a été retiré (**Retirer**), saisis-le de nouveau.
+- **« Ajoute au moins une ligne au devis »** : un devis se génère avec ce que ton client commande. Remplis au moins une ligne dans « Ce que ton client commande » (désignation, quantité, prix unitaire HT).
+- **« Choisis le devis auquel ce document se rattache »** : un acompte, une facture finale ou un avoir reprennent le client et les lignes d'un devis déjà généré. Génère d'abord le devis (type « Devis »), puis choisis-le dans « Devis de référence ».
+- **« Les acomptes dépasseraient le total du devis »** / **« Ce devis est déjà entièrement facturé par les acomptes »** : la somme des acomptes (et de la facture finale) ne peut pas dépasser le devis. Baisse la « Part de l'acompte (%) ».
+- **« Un avoir ne peut pas dépasser la facture corrigée »** : baisse le « Montant à rembourser TTC (€) », ou laisse-le vide pour créditer toute la facture.
 
