@@ -7,6 +7,12 @@ import { userAccountingSettings } from './accountingroutes.js';
 import { getBilling, saveLegal, listDocs, getDoc, setChosen, validateDoc, resetDocs, billingOverview, otherLegals } from './billingdata.js';
 import { LEGAL_KEYS, normalizeLegal, legalComplete, legalMissing, billingStage, renderDocument, suggestFromRepo, buildSuggestions } from './services/billing.js';
 import { billingOverviewPage, billingProjectPage } from './billingviews.js';
+import { renderDocumentPdf } from './services/billingpdf.js';
+import { issueDocument, listInvoices, getInvoice, invoiceDir, IssueError } from './billingissue.js';
+import { DOC_BY_KEY } from './services/billing.js';
+import { slug } from './services/accounting.js';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 const BILLING_JOBS = ['billing_quotes', 'billing_refine', 'billing_docs'];
 const refuse = (status, msg) => new HttpError(status, msg, { expose: true });
@@ -67,7 +73,7 @@ export function registerBillingRoutes(router, app, { aiOpts = {} } = {}) {
     const stage = billingStage({ legal: billing.legal, docs, chosen: billing.chosen, jobs });
     html(res, billingProjectPage({
       email: session.email, project: { id: p.id, name: p.name, gitUrl: p.gitUrl }, legal: billing.legal, saved: billing.exists, errors: verify || billing.exists ? errors : {}, suggestions,
-      docs, chosen: billing.chosen, stage, jobs, flash: { ok: url.searchParams.get('ok'), error: url.searchParams.get('e') },
+      docs, invoices: await listInvoices(db, userId, p.id), chosen: billing.chosen, stage, jobs, flash: { ok: url.searchParams.get('ok'), error: url.searchParams.get('e') },
     }));
   });
 
@@ -159,6 +165,47 @@ export function registerBillingRoutes(router, app, { aiOpts = {} } = {}) {
     if (BILLING_JOBS.some((t) => ['queued', 'running'].includes(jobs[t]?.status))) throw refuse(409, 'Une demande est en cours : attends sa fin.');
     await resetDocs(db, p.id, ctx.session.userId);
     redirect(ctx.res, back(p.id, '?ok=reset'));
+  }, { limit: 'compta' });
+
+  // ---------- PDF : le modèle d'un document (variables laissées vides), puis les vrais documents émis ----------
+  const sendPdf = (res, data, name) => {
+    res.writeHead(200, {
+      'Content-Type': 'application/pdf', 'Content-Length': data.length, 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff',
+      'Content-Disposition': `attachment; filename="${name}"`, 'Content-Security-Policy': "default-src 'none'; sandbox",
+    });
+    res.end(data);
+  };
+
+  router.get('/facturation/documents/:id/pdf', async ({ res, params, session }) => {
+    const doc = await getDoc(db, params.id, session.userId);
+    if (!doc || doc.kind === 'quote_option') throw refuse(404, 'Document introuvable.');
+    const billing = await getBilling(db, doc.projectId, session.userId);
+    if (!legalComplete(billing.legal)) throw refuse(400, 'Complète les informations légales du projet.');
+    sendPdf(res, renderDocumentPdf({ kind: doc.kind, content: doc.content, legal: billing.legal, layout: doc.layout }), `modele-${slug(DOC_BY_KEY[doc.kind].label)}.pdf`);
+  }, { limit: 'compta' });
+
+  // Émet un document validé : numéro, PDF et, pour une facture, ligne « à encaisser » dans la Comptabilité
+  router.post('/facturation/projet/:id/emettre', async (ctx) => {
+    const p = await mine(ctx);
+    const userId = ctx.session.userId;
+    const b = await readBody(ctx.req);
+    const doc = await getDoc(db, b.doc, userId);
+    if (!doc || doc.projectId !== p.id || doc.kind === 'quote_option') throw refuse(404, 'Document introuvable.');
+    const billing = await getBilling(db, p.id, userId);
+    try {
+      const r = await issueDocument(app, { userId, project: { id: p.id, name: p.name }, doc, legal: billing.legal, raw: b });
+      redirect(ctx.res, back(p.id, `?ok=${doc.kind === 'devis' ? 'emis_devis' : 'emis'}&n=${encodeURIComponent(r.number)}#emis`));
+    } catch (e) {
+      if (!(e instanceof IssueError)) throw e;
+      redirect(ctx.res, back(p.id, `?e=${encodeURIComponent(e.message)}#documents`));
+    }
+  }, { limit: 'compta' });
+
+  router.get('/facturation/factures/:id/pdf', async ({ res, params, session }) => {
+    const inv = await getInvoice(db, session.userId, params.id);
+    const path = inv && join(invoiceDir(cfg, session.userId, inv.id), inv.pdf_file);
+    if (!inv || !existsSync(path)) throw refuse(404, 'Document introuvable.');
+    sendPdf(res, readFileSync(path), inv.pdf_file);
   }, { limit: 'compta' });
 
   // État pour le suivi (public/facturation.js) : la page se recharge quand une tâche se termine

@@ -338,6 +338,39 @@ ${c.closing ? para(c.closing) : ''}
 </div></body></html>`;
 }
 
+/**
+ * Les chiffres d'un document, en centimes : lignes, totaux et montant à payer (ou à rembourser pour un avoir, en positif).
+ * Une seule source pour l'aperçu, le PDF et la ligne de comptabilité.
+ */
+export function documentFacts({ kind, content, legal }) {
+  const c = content;
+  const rate = rateOf(legal);
+  const t = totalsOf(c.lines, rate);
+  const assujetti = legal.vat_mode === 'assujetti';
+  const vatLabel = assujetti ? `TVA ${rate / 100} %`.replace('.', ',') : 'TVA non applicable, art. 293 B du CGI';
+  const dep = c.deposit_percent;
+  const depHt = Math.round((t.ht * dep) / 100);
+  const depVat = rate > 0 ? Math.round((depHt * rate) / 10000) : 0;
+  const depTtc = depHt + depVat;
+  const lineRows = c.lines.map((l) => ({ label: l.label, description: l.description || '', qty: `${String(l.qty).replace('.', ',')} ${l.unit || ''}`.trim(), unit: cents(l.unit_price), total: cents(l.qty * l.unit_price) }));
+  let rows = lineRows;
+  let totals;
+  let due = t.ttc;
+  if (kind === 'acompte') {
+    rows = [{ label: `Acompte de ${dep} % à la commande`, description: `Sur le devis : ${c.lines.map((l) => l.label).slice(0, 3).join(', ') || 'prestations convenues'}`, qty: '1', unit: depHt, total: depHt }];
+    totals = [['Total HT', depHt], [vatLabel, assujetti ? depVat : null], ['Total TTC à payer', depTtc, true]];
+    due = depTtc;
+  } else if (kind === 'facture') {
+    due = t.ttc - depTtc;
+    totals = [['Total HT', t.ht], [vatLabel, assujetti ? t.vat : null], ['Total TTC', t.ttc], [`Acompte déjà réglé (${dep} %)`, -depTtc], ['Reste à payer TTC', due, true]];
+  } else if (kind === 'avoir') {
+    totals = [['Total HT', -t.ht], [vatLabel, assujetti ? -t.vat : null], ["Total de l'avoir TTC", -t.ttc, true]];
+  } else {
+    totals = [['Total HT', t.ht], [vatLabel, assujetti ? t.vat : null], ['Total TTC', t.ttc, true]];
+  }
+  return { rate, t, dep, depTtc, vatLabel, assujetti, rows: kind === 'avoir' ? rows.map((r) => ({ ...r, unit: -r.unit, total: -r.total })) : rows, totals, due };
+}
+
 // ---------- Avancement d'un projet ----------
 
 /**

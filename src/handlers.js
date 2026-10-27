@@ -54,6 +54,17 @@ function makeSink() {
 // Avancement d'une phase Claude : de `from` à `to` % au fil des messages, sur `maxTurns` au plus (estimation)
 const turnPct = (from, to, n, maxTurns) => Math.round(from + (to - from) * Math.min(1, n / Math.max(1, maxTurns)));
 
+/**
+ * Un appel Claude d'un seul tour ne dit rien tant qu'il n'a pas fini : on fait avancer le pourcentage au fil du temps (jamais au-delà de `to`),
+ * pour que l'utilisateur voie que ça tourne. Le vrai résultat ramène ensuite la tâche à 100 %.
+ */
+export async function creeping(ctx, message, from, fn, { to = 90, ms = 45_000 } = {}) {
+  const t0 = Date.now();
+  const tick = () => ctx.progress({ message, pct: Math.round(from + (to - from) * (1 - Math.exp(-(Date.now() - t0) / ms))) }).catch(() => {});
+  const timer = setInterval(tick, 2000);
+  try { return await fn(); } finally { clearInterval(timer); }
+}
+
 // Une page web peut tenter de faire enregistrer "javascript:…" : seules les URLs http(s) sont gardées
 export function httpUrl(v) {
   const s = String(v ?? '').trim();
@@ -403,7 +414,7 @@ export function makeHandlers(app) {
       await ctx.progress({ message: 'Rédaction du modèle par Claude…', pct: 40 });
       const model = await writeModel(userId, 'haiku');
       const { prompt, system } = templatePrompt({ profile: project.profile, target: project.target || {}, senderName: project.smtp?.fromName, custom: await custom(userId), model });
-      const r = await claude(userId, { prompt, system, model, maxTurns: 1, tools: [], signal: ctx.signal });
+      const r = await creeping(ctx, 'Rédaction du modèle par Claude…', 40, () => claude(userId, { prompt, system, model, maxTurns: 1, tools: [], signal: ctx.signal }));
       addUsage(ctx, r);
       const t = extractJson(r.text);
       if (!t.subject || !t.body) throw new Error('Modèle de mail invalide');
@@ -418,7 +429,7 @@ export function makeHandlers(app) {
       await ctx.progress({ message: 'Rédaction de la relance par Claude…', pct: 40 });
       const model = await writeModel(userId, 'haiku');
       const { prompt, system } = followupTemplatePrompt({ profile: project.profile, senderName: project.smtp?.fromName, custom: await custom(userId), model });
-      const r = await claude(userId, { prompt, system, model, maxTurns: 1, tools: [], signal: ctx.signal });
+      const r = await creeping(ctx, 'Rédaction de la relance par Claude…', 40, () => claude(userId, { prompt, system, model, maxTurns: 1, tools: [], signal: ctx.signal }));
       addUsage(ctx, r);
       const t = extractJson(r.text);
       if (!t.body) throw new Error('Modèle de relance invalide');
@@ -433,10 +444,10 @@ export function makeHandlers(app) {
       const { legal } = await getBilling(db, project.id, userId);
       if (!legalComplete(legal)) throw new Error("Complète d'abord les informations légales du projet");
       if ((await listDocs(db, project.id, userId)).some((d) => d.kind === 'quote_option' && d.status === 'validated')) throw new Error('Un devis est déjà validé : recommence depuis le début pour en générer de nouveaux');
-      await ctx.progress({ message: 'Claude rédige trois exemples de devis…', pct: 30 });
+      await ctx.progress({ message: 'Claude rédige trois exemples de devis…', pct: 8 });
       const model = await writeModel(userId, 'sonnet');
       const { prompt, system } = billingQuotesPrompt({ projectName: project.name, profile: project.profile, legal, custom: await custom(userId), model });
-      const r = await claude(userId, { prompt, system, model, maxTurns: 1, tools: [], signal: ctx.signal });
+      const r = await creeping(ctx, 'Claude rédige trois exemples de devis…', 8, () => claude(userId, { prompt, system, model, maxTurns: 1, tools: [], signal: ctx.signal }));
       addUsage(ctx, r);
       const raw = extractJson(r.text);
       const options = (Array.isArray(raw.options) ? raw.options : []).map((o) => normalizeContent(o, 'devis')).filter(Boolean).slice(0, 3);
@@ -456,10 +467,10 @@ export function makeHandlers(app) {
       if (request.length < 3) throw new Error('Décris ce que tu veux changer');
       const { legal } = await getBilling(db, project.id, userId);
       const kind = doc.kind === 'quote_option' ? 'devis' : doc.kind;
-      await ctx.progress({ message: 'Claude affine le document selon ta demande…', pct: 30 });
+      await ctx.progress({ message: 'Claude affine le document selon ta demande…', pct: 8 });
       const model = await writeModel(userId, 'sonnet');
       const { prompt, system } = billingRefinePrompt({ projectName: project.name, profile: project.profile, legal, kind, content: doc.content, request, custom: await custom(userId), model });
-      const r = await claude(userId, { prompt, system, model, maxTurns: 1, tools: [], signal: ctx.signal });
+      const r = await creeping(ctx, 'Claude affine le document selon ta demande…', 8, () => claude(userId, { prompt, system, model, maxTurns: 1, tools: [], signal: ctx.signal }));
       addUsage(ctx, r);
       const next = normalizeContent(extractJson(r.text), kind === 'acompte' ? 'acompte' : kind);
       if (!next) throw new Error("Claude n'a pas produit un document exploitable : réessaie");
@@ -482,10 +493,10 @@ export function makeHandlers(app) {
       const quote = (await listDocs(db, project.id, userId)).find((d) => d.kind === 'quote_option' && d.status === 'validated');
       if (!quote) throw new Error("Valide d'abord un devis");
       const { legal } = await getBilling(db, project.id, userId);
-      await ctx.progress({ message: 'Claude prépare le devis, l\'acompte, la facture finale et l\'avoir…', pct: 30 });
+      await ctx.progress({ message: 'Claude prépare le devis, l\'acompte, la facture finale et l\'avoir…', pct: 8 });
       const model = await writeModel(userId, 'sonnet');
       const { prompt, system } = billingDocsPrompt({ projectName: project.name, profile: project.profile, legal, quote: quote.content, custom: await custom(userId), model });
-      const r = await claude(userId, { prompt, system, model, maxTurns: 1, tools: [], signal: ctx.signal });
+      const r = await creeping(ctx, 'Claude prépare le devis, l\'acompte, la facture finale et l\'avoir…', 8, () => claude(userId, { prompt, system, model, maxTurns: 1, tools: [], signal: ctx.signal }));
       addUsage(ctx, r);
       const raw = extractJson(r.text);
       const out = {};
@@ -516,7 +527,7 @@ export function makeHandlers(app) {
       const { prompt, system } = linkedinPostPrompt({
         profile: project.profile, target: project.target || {}, direction, previous: await recentDrafts(db, project.id), author: account.name, custom: await custom(userId), model,
       });
-      const r = await claude(userId, { prompt, system, model, maxTurns: 1, tools: [], signal: ctx.signal });
+      const r = await creeping(ctx, direction ? 'Rédaction du post selon ta direction…' : 'Claude choisit un angle et rédige le post…', 40, () => claude(userId, { prompt, system, model, maxTurns: 1, tools: [], signal: ctx.signal }));
       addUsage(ctx, r);
       let body = '';
       try { body = String(extractJson(r.text).post ?? ''); } catch { body = ''; }
@@ -548,7 +559,7 @@ export function makeHandlers(app) {
             projectName: project.name, profile: project.profile, target: project.target || {}, subject: params.subject,
             seconds: params.seconds, fps: params.fps, format: params.format, width: fmt.width, height: fmt.height, custom: await custom(userId), model, fix,
           });
-          const r = await claude(userId, { prompt, system, model, maxTurns: 1, tools: [], signal: ctx.signal });
+          const r = await creeping(ctx, attempt === 1 ? (params.subject ? 'Claude conçoit la vidéo sur ton sujet…' : 'Claude conçoit la vidéo de présentation du projet…') : 'Claude corrige la scène…', attempt === 1 ? 8 : 40, () => claude(userId, { prompt, system, model, maxTurns: 1, tools: [], signal: ctx.signal }), { to: 44 });
           addUsage(ctx, r);
           if (!r.ok) throw new Error(`La vidéo n'a pas pu être conçue (${r.subtype})${r.text ? ` : ${String(r.text).replace(/\s+/g, ' ').trim().slice(0, 200)}` : ''}`);
           try {

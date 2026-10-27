@@ -11,7 +11,7 @@ import { sniff, displayName } from './chatfiles.js';
 import { writeZip } from './services/zip.js';
 import {
   KIND_BY_KEY, EntryError, validateEntry, normalizeSettings, REGIMES, ACTIVITIES, VAT_MODES, FREQUENCIES, todayIso, periodRange, recentPeriods, periodToDeclare,
-  LIMITS, computeTotals, rowsInRange, computeAlerts, declarationGuide, buildCsv, exportFileName, extOf, slug, deadlineOf, daysLeft,
+  validDate, LIMITS, computeTotals, rowsInRange, computeAlerts, declarationGuide, buildCsv, exportFileName, extOf, slug, deadlineOf, daysLeft,
 } from './services/accounting.js';
 import { accountingPage } from './accountingviews.js';
 
@@ -92,7 +92,10 @@ export function registerAccountingRoutes(router, app) {
     const kindFilter = KIND_BY_KEY[q.get('type')] ? q.get('type') : '';
     const text = String(q.get('q') || '').trim().slice(0, 80).toLowerCase();
 
-    const all = await db.prepare('SELECT * FROM accounting_entries WHERE user_id = ? ORDER BY entry_date DESC, id DESC').all(userId);
+    const every = await db.prepare('SELECT * FROM accounting_entries WHERE user_id = ? ORDER BY entry_date DESC, id DESC').all(userId);
+    // Les factures émises dans AiTools et pas encore encaissées ne comptent dans aucun chiffre : elles sont listées à part
+    const all = every.filter((r) => !Number(r.pending));
+    const pendingRows = every.filter((r) => Number(r.pending));
     const inPeriod = rowsInRange(all, range.from, range.to);
     const assujetti = settings.vat === 'assujetti';
     const totals = computeTotals(inPeriod, { assujetti });
@@ -140,7 +143,7 @@ export function registerAccountingRoutes(router, app) {
     html(res, accountingPage({
       email: session.email, today, settings, projects, periodValue, periodOptions: periodOptions(today), periodLabel: periodValue === 'tout' ? 'toute la période' : periodRange(periodValue).label,
       filters: { projet: projectFilter, type: kindFilter, q: String(q.get('q') || '').slice(0, 80) },
-      totals, projectRows, rows, total: list.length, count: all.length, page, pages, alerts, next, guide, declOptions,
+      totals, projectRows, rows, total: list.length, count: all.length, pendingRows, page, pages, alerts, next, guide, declOptions,
       editSituation: q.get('situation') === '1', usedBytes: await used(userId), limits: LIMITS, error: q.get('e'), saved: q.get('ok'),
     }));
   });
@@ -234,6 +237,18 @@ export function registerAccountingRoutes(router, app) {
     json(res, { ok: true });
   }, { limit: 'compta' });
 
+  // ---------- Facture émise : marquée payée (elle entre alors dans les chiffres, à la date d'encaissement) ----------
+  router.post('/compta/entries/:id/paid', async ({ req, res, params, session }) => {
+    const row = await mine(session.userId, params.id);
+    if (!Number(row.pending)) throw refuse(400, 'Cette ligne est déjà payée.');
+    const b = await readBody(req);
+    const date = String(b.date || todayIso()).slice(0, 10);
+    if (!validDate(date)) throw refuse(400, 'Date invalide.');
+    if (date > todayIso()) throw refuse(400, 'La date de paiement ne peut pas être dans le futur.');
+    await db.prepare('UPDATE accounting_entries SET pending = 0, entry_date = ?, updated_at = ? WHERE id = ? AND user_id = ?').run(date, now(), row.id, session.userId);
+    redirect(res, '/compta?ok=payee#journal');
+  }, { limit: 'compta' });
+
   // ---------- Supprimer une ligne et son justificatif ----------
   router.post('/compta/entries/:id/delete', async ({ res, params, session }) => {
     const row = await mine(session.userId, params.id);
@@ -264,7 +279,7 @@ export function registerAccountingRoutes(router, app) {
   const exportRows = async (userId, q) => {
     const period = q.get('periode');
     const r = period && period !== 'tout' ? periodRange(period) : null;
-    let rows = await db.prepare('SELECT * FROM accounting_entries WHERE user_id = ? ORDER BY entry_date, id').all(userId);
+    let rows = await db.prepare('SELECT * FROM accounting_entries WHERE user_id = ? AND pending = 0 ORDER BY entry_date, id').all(userId);
     if (r) rows = rowsInRange(rows, r.from, r.to);
     const proj = q.get('projet') || '';
     let label = 'tous-les-projets';
