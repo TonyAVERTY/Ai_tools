@@ -7,6 +7,7 @@ import { assetUrl, brandMark, iconLinks } from './assets.js';
 import { SPRITE, ic } from './icons.js';
 import { GIT_SERVER_TYPES, MAX_GIT_SERVERS } from './gitservers.js';
 import { ROLES, MAX_NOTES, rolesOfSection } from './services/roles.js';
+import { tourJson } from './tour.js';
 import { MODE_LABELS, CONSENT_TEXT, CONSENT_CHECKBOX, CONSENT_VERSION } from './claudelink.js';
 
 const fmtDate = (ts) => (ts ? new Date(ts * 1000).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' }) : '—');
@@ -38,6 +39,7 @@ ${iconLinks()}
 <link rel="stylesheet" href="${assetUrl('/static/tokens.css')}">
 <link rel="stylesheet" href="${assetUrl('/static/app.css')}">
 <link rel="stylesheet" href="${assetUrl('/static/responsive.css')}">
+<script src="${assetUrl('/static/tour.js')}" defer></script>
 <script src="${assetUrl('/static/app.js')}" defer></script>
 <script src="${assetUrl('/static/responsive.js')}" defer></script>
 <script src="${assetUrl('/static/fx.js')}" defer></script>
@@ -75,6 +77,7 @@ ${email ? `<header class="top">
           <p class="user-mail">${esc(email)}</p>
           <a href="/account">${ic('user')}Mon compte</a>
           <a href="/settings">${ic('gear')}Réglages</a>
+          <a href="/?tour=1">${ic('help')}Visite guidée</a>
           <form method="post" action="/logout"><button>${ic('out')}Déconnexion</button></form>
         </div>
       </details>
@@ -576,7 +579,7 @@ function projectItem(p, smtp, dbCfg, imap, { open = false, stats = null } = {}) 
 </details>`;
 }
 
-export function dashboardPage({ email, projects, stats = new Map(), gitHosts = [], usage = null, pauseMessage = null }) {
+export function dashboardPage({ email, projects, stats = new Map(), gitHosts = [], usage = null, pauseMessage = null, tour = null }) {
   return layout({
     title: 'Projets', email,
     body: `<div class="dash">
@@ -604,7 +607,8 @@ ${usageKpis(usage)}
 </section>
 <aside class="col-s">${claudePanel()}</aside>
 </div>
-${projects.length ? '<aside class="todo" id="todo" aria-label="Mise en route du projet" hidden></aside>' : ''}`,
+${projects.length ? '<aside class="todo" id="todo" aria-label="Mise en route du projet" hidden></aside>' : ''}
+${tour ? `<script type="application/json" id="tour-data" data-mode="${esc(tour)}">${tourJson()}</script>` : ''}`,
   });
 }
 

@@ -4,7 +4,7 @@
 // Elles sont rangées dans user_settings (propres à CE compte, jamais partagées) et ajoutées aux consignes de Claude comme une DONNÉE sur la personne,
 // jamais comme une instruction. Tout est facultatif et modifiable depuis « Mon compte ».
 import { getSetting, setSetting } from './db.js';
-import { esc, html, redirect, readBody } from './http.js';
+import { esc, html, json, redirect, readBody } from './http.js';
 import { layout } from './views.js';
 import { ic } from './icons.js';
 
@@ -127,8 +127,10 @@ export function registerProfileRoutes(router, app) {
   router.get('/welcome', async ({ res, session, url }) => {
     html(res, welcomePage({ profile: await getProfile(db, session.userId), email: session.user.email, first: url.searchParams.get('edit') !== '1' }));
   });
-  router.post('/welcome', async ({ req, res, session }) => {
+  router.post('/welcome', async ({ req, res, session, url }) => {
     await saveProfile(db, session.userId, await readBody(req));
+    // Fin de l'assistant (public/app.js) : l'enregistrement part en arrière-plan pendant la scène de fin, la navigation se fait sans coupure
+    if (url.searchParams.get('json') === '1') return json(res, { ok: true });
     redirect(res, '/');
   });
   router.post('/welcome/skip', async ({ res, session }) => {

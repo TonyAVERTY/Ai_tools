@@ -1116,3 +1116,38 @@ html.nav-busy { cursor: progress; }
 .wiz-big { width: 104px; height: 104px; border-radius: 999px; background: var(--ok); display: grid; place-items: center; }
 .wiz-big .ic { width: 60px; height: 60px; stroke-width: 3; color: var(--card); }
 .wiz-confirm.show .wiz-big { animation: wiz-pop .46s var(--ease) both; }
+
+/* ---------- Scène de fin du questionnaire : fondu plein écran avant le tableau de bord ---------- */
+.wiz-end { position: fixed; inset: 0; z-index: 2500; display: grid; place-items: center; background: var(--bg); opacity: 0; visibility: hidden; transition: opacity .55s var(--ease), visibility 0s .55s; padding: 24px; text-align: center; }
+.wiz-end.show { opacity: 1; visibility: visible; transition: opacity .55s var(--ease); }
+.wiz-end-in { display: flex; flex-direction: column; align-items: center; gap: 12px; max-width: 420px; }
+.wiz-end h2 { font-size: 1.5rem; line-height: 1.25; margin: 8px 0 0; }
+.wiz-end p { color: var(--muted); margin: 0; }
+.wiz-end .bar { width: 220px; margin-top: 12px; }
+.wiz-end .wiz-big { animation: wiz-pop .5s var(--ease) both; }
+@media (prefers-reduced-motion: reduce) { .wiz-end, .wiz-end.show { transition: none; } .wiz-end .wiz-big { animation: none; } }
+
+/* ---------- Visite guidée : tout est assombri, seul l'élément présenté reste éclairé ---------- */
+.tour { position: fixed; inset: 0; z-index: 3000; opacity: 0; transition: opacity .22s var(--ease); --tour-dim: rgba(5, 9, 26, .76); }
+.tour.tour-on { opacity: 1; }
+.tour.tour-out { opacity: 0; pointer-events: none; }
+.tour-shield { position: absolute; inset: 0; } /* intercepte les clics : on ne touche pas à la page pendant la visite */
+.tour-hole { position: fixed; pointer-events: none; box-shadow: 0 0 0 100vmax var(--tour-dim); outline: 2px solid var(--accent); transition: left .4s var(--ease), top .4s var(--ease), width .4s var(--ease), height .4s var(--ease), border-radius .4s var(--ease); }
+.tour-hole.snap { transition: none; }
+.tour-card { position: fixed; z-index: 1; width: min(384px, calc(100vw - 24px)); display: flex; flex-direction: column; gap: 10px; padding: 18px; background: var(--card); color: var(--text); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); transition: left .4s var(--ease), top .4s var(--ease); outline: none; }
+.tour-card.tour-in { animation: tour-card-in .32s var(--ease) both; }
+.tour-card.tour-sheet { left: 12px; right: 12px; top: auto; bottom: 12px; width: auto; transition: none; }
+@keyframes tour-card-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+.tour-n { display: flex; justify-content: space-between; align-items: baseline; margin: 0; font-size: .875rem; color: var(--muted); }
+.tour-n b { color: var(--text); font-variant-numeric: tabular-nums; }
+.tour-card .bar { margin-top: 0; }
+.tour-card h2 { font-size: 1.1875rem; line-height: 1.3; margin: 4px 0 0; }
+.tour-card p { margin: 0; line-height: 1.5; }
+.tour-f { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.tour-sp { flex: 1; }
+.tour-f [hidden] { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .tour, .tour-hole, .tour-card { transition: none; }
+  .tour-card.tour-in { animation: none; }
+}
+body.tour-active { padding-bottom: var(--tour-pad, 0px); }
