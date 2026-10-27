@@ -148,7 +148,7 @@ const fmtReset = (ts) => new Date(ts * 1000).toLocaleString('fr-FR', { weekday: 
 // Limites d'utilisation du compte Claude : session glissante de 5 h et semaine de 7 j (abonnement seulement ; une clé API n'a pas ces limites).
 function claudeLimits(quota, mode) {
   const head = '<h3 class="sub-h">Limites d\'utilisation</h3>';
-  if (mode === 'api_key') return `${head}<p class="hint">Avec une clé API, il n'y a pas de limite de session ni de semaine : Anthropic facture ce que tu consommes.</p>`;
+  if (mode === 'api_key') return `${head}<p class="hint">Avec une clé API, Anthropic facture ce que tu consommes, à l'usage.</p>`;
   const row = (label, w) => {
     if (!w) return '';
     if (w.expired) return `<li class="g"><div class="g-h"><span>${label}</span><span class="g-v muted">remise à zéro</span></div></li>`;
@@ -169,7 +169,7 @@ function linkSection(link, consent, quota = null) {
   if (!link) {
     return `<section class="card">
   <div class="card-h"><h2>Liaison Claude</h2></div>
-  <p class="card-d">Aucun accès Claude n'est relié : l'application reste bloquée sur la page de liaison.</p>
+  <p class="card-d">Relie un accès Claude pour utiliser l'application : tant qu'il manque, cette page de liaison reste affichée.</p>
   <div class="row"><a class="btn primary" href="/link">Relier Claude</a></div>
 </section>`;
   }
@@ -410,7 +410,7 @@ const ROLE_SELECT = `<label class="rolesel"><span class="lbl">Poste</span><span 
 /** Section « Postes et tâches IA » : chaque poste avec ses tâches. Les tâches qui lisent le dépôt sont réservées aux administrateurs. */
 function postesBody(p) {
   const member = p.access === 'member';
-  return `<p class="muted small">Chaque tâche fait écrire à Claude un livrable à partir de la fiche du projet (aucun envoi, rien n'est publié). Les précisions sont facultatives. Les chiffres, prix et références que la fiche ne donne pas restent « à compléter ».</p>
+  return `<p class="muted small">Chaque tâche fait écrire à Claude un livrable à partir de la fiche du projet : le livrable reste dans AiTools, à toi de l'utiliser. Les précisions sont facultatives. Les chiffres, prix et références que la fiche ne donne pas restent « à compléter ».</p>
   <div class="roles">${ROLES.map((r) => `
     <details class="role" data-role="${r.id}">
       <summary><b>${esc(r.label)}</b><span class="muted small">${esc(r.summary)}</span></summary>
@@ -781,7 +781,7 @@ ${saved ? `<p class="ok-box" role="status">${ic('check')}<span><b>Réglages enre
     <label class="field"><span class="lbl">Délai max entre 2 mails</span><span class="unit"><input name="send_delay_max" type="number" min="5" value="${esc(s.send_delay_max)}"><span>secondes</span></span></label>
   </div>
   ${check('read_receipt', s.read_receipt, 'Demander un accusé de lecture dans les mails de prospection')}
-  <p class="hint">Alternative au suivi d'ouverture : aucun pixel espion, aucun lien traqué. La messagerie du destinataire lui demande s'il accepte d'envoyer un accusé ; beaucoup refusent ou l'ignorent, « Lu » est donc un minimum, jamais un « non lu ».</p>
+  <p class="hint">« Lu » repose sur l'accusé de lecture standard : la messagerie du destinataire lui demande s'il accepte de l'envoyer. « Lu » est donc un minimum ; « Répondu » vient de la boîte de réception du projet.</p>
   <div class="footer-opt" data-footer-opt data-on="${s.mail_footer ? '1' : '0'}">
     <h3>Pied de page des mails de prospection</h3>
     <p class="state ${s.mail_footer ? 'ok' : 'warn'}" data-footer-state role="status">${s.mail_footer

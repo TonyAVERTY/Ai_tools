@@ -343,7 +343,7 @@ test('Mon compte : état de la liaison, limites d\'utilisation, un seul bouton (
   const page = await (await u.get('/account', { headers: { accept: 'text/html' } })).text();
   assert.match(page, /Clé API Anthropic/);
   assert.match(page, /Valide/);
-  assert.match(page, /Limites d'utilisation[\s\S]*pas de limite de session ni de semaine/, 'clé API : pas de quota d\'abonnement');
+  assert.match(page, /Limites d'utilisation[\s\S]*Anthropic facture ce que tu consommes, à l'usage/, 'clé API : facturation à l\'usage');
   assert.doesNotMatch(page, /action="\/link\/test"|href="\/link\?change=1"|>Tester<|Changer de mode/);
   assert.match(page, /action="\/link\/unlink"><button class="btn danger">Déconnecter<\/button>/);
   assert.equal((page.match(/<form method="post" action="\/link\//g) || []).length, 1, 'plus que le bouton Déconnecter');

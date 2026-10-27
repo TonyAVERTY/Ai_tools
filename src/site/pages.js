@@ -64,7 +64,7 @@ export function loginPage({ appUrl, error = null, apple = false, bye = false, ca
   <div class="auth-b">
       ${loginButtons({ apple, captcha })}
   </div>
-  <p class="safe">${ic('shield')}Aucun mot de passe à créer ni à retenir.</p>
+  <p class="safe">${ic('shield')}Tu te connectes en un clic avec ${providersText(apple)}.</p>
   ${captcha ? `<p class="fine">Ce site est protégé par Google reCAPTCHA, qui vérifie tout seul que tu es bien une personne (<a href="/confidentialite#destinataires">en savoir plus</a>). La <a href="https://policies.google.com/privacy" rel="noopener noreferrer">politique de confidentialité</a> et les <a href="https://policies.google.com/terms" rel="noopener noreferrer">conditions d'utilisation</a> de Google s'appliquent.</p>` : ''}
   <p class="fine">En continuant, tu acceptes les <a href="/cgu">CGU</a> et la <a href="/confidentialite">politique de confidentialité</a>. Tu veux d'abord comprendre ? Regarde <a href="/fonctionnement">comment ça marche</a> ou <a href="/tarifs">les tarifs</a>.</p>
 </section>
@@ -142,7 +142,7 @@ const TRUST = (apple) => [
   ['Rien ne part sans ton accord', "Le premier envoi attend ta confirmation, chaque post attend ton clic. La relance, c'est toi qui l'actives."],
   ['Tes données restent cloisonnées', "Personne d'autre ne voit tes prospects ni tes brouillons. Un clic dans Mon compte et tout est effacé."],
   ['Tes secrets sont chiffrés', 'Tes accès sont stockés chiffrés, jamais affichés en clair.'],
-  ['Pas de mot de passe', `Tu te connectes avec ${providersText(apple)}.`],
+  ['Une connexion en un clic', `Tu te connectes avec ${providersText(apple)}.`],
 ];
 
 export function homePage({ appUrl, apple = false }) {
@@ -226,7 +226,7 @@ export function homePage({ appUrl, apple = false }) {
       <div><div class="ph"><h3>Plans payants</h3>${badge('', 'clock', 'Bientôt')}</div><p class="price">${PLAN_PRICES.starter} à ${PLAN_PRICES.intensive} € <small>TTC par mois</small></p>
         <ul class="list"><li>${ic('check')}${['Un', 'Deux', 'Trois', 'Quatre', 'Cinq', 'Six'][PAID.length - 1] ?? PAID.length} plans, de ${PLAN_LABELS[PAID[0]]} à ${PLAN_LABELS[PAID.at(-1)]}</li><li>${ic('check')}En annuel, ${ANNUAL_FREE_MONTHS} mois offerts</li></ul></div>
     </div>
-    <p class="price-n">Ton accès à Claude est facturé à part, par Anthropic : AiTools n'achète pas de Claude à ta place.</p>
+    <p class="price-n">Ton accès à Claude est facturé par Anthropic, directement à toi.</p>
     <a class="lnk" href="/tarifs">Voir tous les tarifs</a>
   </div>
 </section>
@@ -290,7 +290,7 @@ export function howPage({ appUrl, apple = false }) {
   const guards = [
     ['Un budget que tu fixes', "Tu peux limiter la dépense en IA sur 24 heures et sur 30 jours. Quand la limite est atteinte, les tâches IA attendent (elles ne sont pas perdues) et les envois continuent. Une tâche déjà commencée n'est jamais coupée."],
     ['Un œil sur ton quota', "Avec un abonnement, la barre du haut montre le quota restant que Claude indique lui-même. Au-delà de 85 %, l'analyse et les idées d'évolution sont reportées pour garder de la marge à la recherche de contacts."],
-    ['Des envois encadrés', "Pas de particuliers, un lien de désinscription dans chaque mail, une liste d'opposition respectée pour tout le monde, des plafonds sur 24 heures par projet et pour tout ton compte. Les règles qui t'incombent sont rappelées sur la page <a href=\"/tarifs#envois\">Tarifs</a>."],
+    ['Des envois encadrés', "Des professionnels uniquement, un lien de désinscription dans chaque mail, une liste d'opposition respectée pour tout le monde, des plafonds sur 24 heures par projet et pour tout ton compte. Les règles qui t'incombent sont rappelées sur la page <a href=\"/tarifs#envois\">Tarifs</a>."],
     ['Des modèles économes au départ', 'La recherche, l\'analyse et la rédaction utilisent Haiku par défaut (le plus léger). Dans les réglages, tu choisis un autre modèle Claude pour chacune, et tu adaptes les consignes à chaque modèle.'],
   ];
 
@@ -323,10 +323,10 @@ ${steps}
 
 // ---------- Tarifs ----------
 const FAQ = [
-  ['Faut-il une carte bancaire ?', 'Non. Le plan gratuit n\'en demande pas, et le paiement n\'existe pas encore dans l\'outil.'],
-  ['Quand puis-je passer à un plan payant ?', 'Les plans payants ne sont pas encore ouverts : rien n\'est facturé aujourd\'hui, et tu seras prévenu avant toute ouverture. Le plan Gratuit te permet de tout tester dès maintenant.'],
-  ['Dois-je fournir mon propre accès à Claude ?', 'Oui. Ton accès à Claude est facturé à part, par Anthropic : AiTools n\'achète pas de Claude à ta place. C\'est ce qui explique les prix bas : tu ne paies à AiTools que l\'outil (les projets, les contacts, les envois et le suivi), pas la machine qui réfléchit.'],
-  ['Combien me coûtera Claude ?', 'Ça dépend de ton usage et de ton contrat avec Anthropic. AiTools ne peut pas le prévoir à ta place, mais tu peux fixer un budget maximum dans les réglages. Pour comprendre ce qui consomme quoi, regarde <a href="/fonctionnement">comment ça marche</a>.'],
+  ['Faut-il une carte bancaire ?', 'Non. Le plan Gratuit s\'ouvre sans carte bancaire.'],
+  ['Quand puis-je passer à un plan payant ?', 'Le plan Gratuit est ouvert aujourd\'hui et te permet de tout tester. Les plans payants ouvriront prochainement : tu seras prévenu avant toute facturation.'],
+  ['Dois-je fournir mon propre accès à Claude ?', 'Oui. Ton accès à Claude est facturé par Anthropic, directement à toi. C\'est ce qui explique les prix bas : tu ne paies à AiTools que l\'outil (les projets, les contacts, les envois et le suivi), pas la machine qui réfléchit.'],
+  ['Combien me coûtera Claude ?', 'Ça dépend de ton usage et de ton contrat avec Anthropic. Tu fixes un budget maximum dans les réglages. Pour comprendre ce qui consomme quoi, regarde <a href="/fonctionnement">comment ça marche</a>.'],
   ['Que se passe-t-il quand j\'atteins un plafond ?', 'La nouvelle action est refusée, mais rien n\'est supprimé. Les plafonds repartent de zéro le 1er du mois, à l\'heure de Paris.'],
   [`Que veut dire « ${ANNUAL_FREE_MONTHS} mois offerts » ?`, `En payant à l'année, tu règles ${12 - ANNUAL_FREE_MONTHS} mois et tu profites de 12. Par exemple ${PLAN_LABELS.growth} : ${euros(annualPrice('growth'))} par an au lieu de ${euros(PLAN_PRICES.growth * 12)}.`],
   ["Comment fonctionne l'équipe ?", "Tu invites des collègues par email, tu choisis ce que chacun peut faire (membre ou administrateur) et tu partages les projets que tu veux. Ils travaillent avec <em>ton</em> offre, ton SMTP et ton accès Claude : pas besoin d'abonnement pour eux. Le nombre de places dépend de l'offre."],
@@ -350,11 +350,11 @@ export function pricingPage({ appUrl }) {
     body: `<div class="page">
 <div class="wrap">
   <h1 class="h1">Des tarifs simples, sans surprise</h1>
-  <p class="lead">Seul le plan Gratuit est ouvert aujourd'hui, sans carte bancaire. Les plans payants, de ${euros(PLAN_PRICES.starter)} à ${euros(PLAN_PRICES.intensive)} TTC par mois, ne sont pas encore ouverts : rien n'est facturé.</p>
+  <p class="lead">Seul le plan Gratuit est ouvert aujourd'hui, sans carte bancaire. Les plans payants, de ${euros(PLAN_PRICES.starter)} à ${euros(PLAN_PRICES.intensive)} TTC par mois, ouvrent prochainement.</p>
 
   <div class="claude-n" role="note">
     ${ic('info')}
-    <p><b>Ton accès à Claude est facturé à part, par Anthropic : AiTools n'achète pas de Claude à ta place.</b><span>C'est ce qui explique les prix bas.</span></p>
+    <p><b>Ton accès à Claude est facturé par Anthropic, directement à toi.</b><span>C'est ce qui explique les prix bas.</span></p>
   </div>
 
   <div class="bill" data-bill hidden>
@@ -382,7 +382,7 @@ export function pricingPage({ appUrl }) {
   </div>
 
   <div class="mentions">
-    <p>Prix TTC. L'éditeur est en franchise de TVA (art. 293 B du CGI) : le prix affiché est le prix payé. En annuel, tu paies ${12 - ANNUAL_FREE_MONTHS} mois et tu en profites 12. Les offres payantes ne sont pas encore ouvertes : rien n'est facturé aujourd'hui, et tu seras prévenu avant toute ouverture.</p>
+    <p>Prix TTC. L'éditeur est en franchise de TVA (art. 293 B du CGI) : le prix affiché est le prix payé. En annuel, tu paies ${12 - ANNUAL_FREE_MONTHS} mois et tu en profites 12. Les offres payantes ouvrent prochainement : tu seras prévenu avant toute facturation.</p>
     <p>Ces plafonds sont appliqués par le serveur. Les mails et les tâches IA se comptent par mois (heure de Paris) et repartent de zéro le 1er. Quand un plafond est atteint, la nouvelle action est refusée, mais rien n'est supprimé. Un compte ne peut pas envoyer plus de 300 mails par 24 heures, quelle que soit l'offre : c'est une protection pour la réputation de ton adresse.</p>
   </div>
 

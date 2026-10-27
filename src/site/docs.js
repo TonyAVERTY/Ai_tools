@@ -145,7 +145,7 @@ export function docsHomePage({ appUrl }) {
         <li><strong>Mêmes règles que le panel.</strong> Plafonds du plan, liste d'opposition, contrôle des adresses : l'API ne contourne rien.</li>
         <li><strong>Moindre droit.</strong> Trois droits distincts : <code>read</code>, <code>write</code>, <code>jobs</code>. Un jeton par outil, avec le minimum nécessaire.</li>
         <li><strong>Isolation.</strong> Une ressource d'un autre compte répond <code>404</code>, exactement comme si elle n'existait pas.</li>
-        <li><strong>Pas de cookie, pas de CORS.</strong> Le jeton se place dans l'en-tête <code>Authorization</code> ; l'API n'est pas appelable depuis une page web tierce. Appelle-la depuis un serveur ou un script, jamais depuis du JavaScript public.</li>
+        <li><strong>Un jeton dans l'en-tête.</strong> Le jeton se place dans l'en-tête <code>Authorization</code> ; appelle l'API depuis un serveur ou un script, où le jeton reste privé.</li>
         <li><strong>Actions réelles.</strong> L'envoi de mails touche de vraies personnes : il exige une confirmation explicite.</li></ul>` },
     ],
   });
@@ -169,7 +169,7 @@ export function docsApiPage({ appUrl }) {
         <p>Un jeton se crée sur la page <a href="/developer">Développeur</a> (mode développeur activé). Il est affiché une seule fois ; sa suppression, ou la désactivation du mode développeur, le coupe immédiatement. Les cookies du panel n'ouvrent jamais l'API.</p>
         ${callout('Garde-le secret', ' Ne place jamais un jeton dans une page web, un dépôt ou un message. Si tu as un doute : supprime-le et crées-en un autre.')}` },
       { id: 'droits', title: 'Droits des jetons', html: `<div class="tw"><table><thead><tr><th>Droit</th><th>Permet</th></tr></thead><tbody>${Object.entries(SCOPES).map(([k, v]) => `<tr><td><span class="scope">${esc(k)}</span></td><td>${esc(v)}</td></tr>`).join('')}</tbody></table></div>
-        <p>Un droit n'en implique pas un autre : un jeton <code>write</code> ne peut pas lire, un jeton <code>jobs</code> ne peut pas écrire. Cinq jetons au plus par compte.</p>` },
+        <p>Chaque droit est indépendant : <code>read</code> lit, <code>write</code> écrit, <code>jobs</code> lance des tâches. Cinq jetons au plus par compte.</p>` },
       { id: 'format', title: 'Format, dates et pagination', html: `<ul>
         <li>Corps de requête et de réponse en <strong>JSON</strong> (<code>Content-Type: application/json</code>), UTF-8.</li>
         <li>Les dates sont des <strong>secondes Unix</strong> (UTC) : <code>1792000000</code>.</li>

@@ -16,7 +16,7 @@ Clé API ou jeton Claude, mots de passe SMTP/IMAP/base, tokens Git, liens de web
 ## Protection des envois
 - Désinscription en un clic dans chaque mail ; liste d'opposition commune ; un prospect n'est contacté qu'une fois ; plafonds et délais ; pause automatique si trop de rejets.
 - La source publique de l'email est stockée et rappelée dans le pied de mail.
-- Pas de suivi d'ouverture espion (ni pixel ni lien traqué).
+- Le « Lu » d'un mail s'appuie sur l'accusé de lecture standard, que le destinataire choisit d'envoyer ou non.
 - Les mails de prospection ne visent que des **adresses professionnelles publiées** par l'entreprise.
 
 ## Données personnelles
