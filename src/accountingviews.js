@@ -193,6 +193,16 @@ export function accountingPage(d) {
   const pager = d.pages > 1 ? `<nav class="pager" aria-label="Pages">${d.page > 1 ? `<a class="btn small" href="/compta?${esc(qs({ page: String(d.page - 1) }))}#journal">Précédent</a>` : ''}
       <span class="muted small">Page ${d.page} / ${d.pages}</span>${d.page < d.pages ? `<a class="btn small" href="/compta?${esc(qs({ page: String(d.page + 1) }))}#journal">Suivant</a>` : ''}</nav>` : '';
 
+  // Première visite : seules les questions s'affichent ; le reste de la page apparaît une fois la situation enregistrée
+  if (!s.complete) {
+    const first = `<div data-compta data-today="${esc(d.today)}">
+  ${flash}
+  <section class="card" id="situation" aria-labelledby="t-sit"><h1 id="t-sit">Comptabilité : dis-nous où tu en es</h1>
+    <p class="muted">Quatre questions, une seule fois. Elles servent à te dire quoi déclarer, où et quand. Ensuite ta comptabilité s'ouvre : tes lignes, tes chiffres, ta déclaration. Tu pourras modifier tes réponses à tout moment.</p>${situationForm(s)}</section>
+</div>`;
+    return layout({ title: 'Comptabilité', email: d.email, body: first, scripts: ['/static/compta.js'] });
+  }
+
   const body = `<div data-compta data-today="${esc(d.today)}">
   <section class="card">
     <div class="row-between"><div><h1>Comptabilité</h1>
@@ -207,9 +217,7 @@ export function accountingPage(d) {
     ${flash}
   </section>
 
-  ${s.complete ? `<details class="tip" id="situation"><summary><span class="tip-i" aria-hidden="true">i</span><span class="tip-t">Ma situation : ${esc(summaryLine(s))}</span></summary><div class="tip-body">${situationForm(s)}</div></details>`
-    : `<section class="card" id="situation" aria-labelledby="t-sit"><h2 id="t-sit">Commence ici : dis-nous où tu en es</h2>
-      <p class="muted">Quatre questions, une seule fois. Elles servent à te dire quoi déclarer, où et quand. Tu pourras les modifier à tout moment.</p>${situationForm(s)}</section>`}
+  <details class="tip" id="situation"><summary><span class="tip-i" aria-hidden="true">i</span><span class="tip-t">Ma situation : ${esc(summaryLine(s))}</span></summary><div class="tip-body">${situationForm(s)}</div></details>
 
   ${nextCard}
   ${d.guide ? guideBlock(d.guide, d) : ''}
