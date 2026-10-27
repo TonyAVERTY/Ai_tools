@@ -26,7 +26,7 @@ Un maximum de champs est **prérempli pour toi**, et tu gardes la main : ce sont
 - **« package.json »**, **« composer.json »** ou **« LICENSE »** : l'auteur ou le titulaire du droit d'auteur du dépôt ;
 - **« un autre de tes projets »** : l'identité de ton entreprise (forme juridique, SIRET, adresse, TVA, IBAN, délais de paiement…) déjà enregistrée pour un autre de tes projets : tu ne la ressaisis pas ;
 - **« ta comptabilité »** (TVA, statut micro-entrepreneur) et **« ton compte »** (adresse e-mail).
-Seules tes propres informations sont reprises, jamais celles d'un autre compte, et rien n'est lu en dehors du dépôt du projet. Si le projet a été analysé avant cette fonction, clique **Réanalyser** dans la « Fiche projet » (voir « Projets ») pour que Claude cherche ces informations.
+Seules tes propres informations sont reprises, jamais celles d'un autre compte, et rien n'est lu en dehors du dépôt du projet. Si le projet a été analysé avant cette fonction, clique **Réanalyser** sur la ligne du projet (voir « Projets ») pour que Claude cherche ces informations.
 Clique **Enregistrer les informations**. Même incomplètes, elles sont **enregistrées** (rien n'est perdu) et les champs à corriger sont signalés ; le message « Informations enregistrées : il en manque encore pour continuer. » indique qu'il reste à faire. Tant que tout n'est pas rempli, le bouton de génération n'apparaît pas.
 
 ## 3. Générer et choisir un devis
