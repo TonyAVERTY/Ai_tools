@@ -12,7 +12,7 @@ import { Worker, latestJobs } from '../src/services/jobs.js';
 import { makeHandlers } from '../src/handlers.js';
 import { setSetting } from '../src/db.js';
 import {
-  normalizeLegal, legalMissing, legalComplete, suggestFromRepo, buildSuggestions, normalizeContent, totalsOf, rateOf, renderDocument, legalMentions, billingStage, stageLabel, DOC_KINDS,
+  normalizeLegal, legalMissing, legalComplete, suggestFromRepo, suggestFromAnalysis, suggestFromOthers, buildSuggestions, normalizeContent, totalsOf, rateOf, renderDocument, legalMentions, billingStage, stageLabel, DOC_KINDS,
 } from '../src/services/billing.js';
 import { AI_JOBS } from '../src/services/budget.js';
 
@@ -63,6 +63,23 @@ test('valeurs proposées : le dépôt (package.json, LICENSE), l\'analyse, la co
   const s = buildSuggestions({ repo: r, profile: { resume: 'Cartes de fidélité.' }, accounting: { vat: 'franchise', regime: 'micro' }, smtpEmail: 'envoi@x.fr', accountEmail: 'moi@x.fr' });
   assert.equal(s.email.value, 'tony@exemple.fr', 'le dépôt passe avant l\'adresse d\'envoi');
   assert.deepEqual([s.offer_description.source, s.vat_mode.source, s.legal_form.value], ["l'analyse du projet", 'ta comptabilité', 'micro']);
+});
+
+test('analyse du projet : seules les valeurs trouvées et au bon format sont proposées, les autres projets du compte passent avant', () => {
+  const found = { legal_name: 'Atelier Averty', siret: '123 456 789 00012', postal_code: '3500', city: 'Rennes', website: 'javascript:x', phone: null, email: 'null', vat_number: 'n/a', activity_label: 'Développement web', pricing_notes: 'Forfait dès 900 €' };
+  const a = suggestFromAnalysis(found);
+  assert.deepEqual(Object.keys(a).sort(), ['activity_label', 'city', 'legal_name', 'pricing_notes', 'siret']);
+  assert.equal(a.siret.value, '12345678900012');
+  assert.equal(a.siret.source, "l'analyse du projet");
+  assert.deepEqual(suggestFromAnalysis('texte'), {});
+  assert.deepEqual(suggestFromAnalysis(null), {});
+  const others = suggestFromOthers([{ legal_name: 'Ma Société', siret: '99999999900011', email: '' }, { legal_name: 'Ancienne', email: 'a@b.fr' }]);
+  assert.deepEqual([others.legal_name.value, others.siret.value, others.email.value, others.legal_name.source], ['Ma Société', '99999999900011', 'a@b.fr', 'un autre de tes projets']);
+  const s = buildSuggestions({ others: [{ siret: '99999999900011' }], profile: { resume: 'R', facturation: found }, repo: { legal_name: { value: 'Pkg', source: 'package.json' } } });
+  assert.equal(s.siret.value, '99999999900011', 'ce que tu as déjà validé passe avant l\'analyse');
+  assert.equal(s.legal_name.value, 'Pkg', 'le dépôt passe avant l\'analyse');
+  assert.equal(s.city.value, 'Rennes');
+  assert.equal(s.offer_description.value, 'R');
 });
 
 test('contenu d\'un document : borné, typé, sans HTML ; totaux et TVA calculés par le code', () => {
@@ -198,6 +215,27 @@ test('informations légales : prérempli depuis le projet, enregistré même inc
   assert.match(h, /Complet/);
   assert.match(h, /Générer un modèle de document/);
   assert.match(h, /value="12345678900012"/);
+});
+
+test('préremplissage : l\'analyse et les autres projets proposent des valeurs, rien n\'est enregistré avant la validation', async () => {
+  const { u, pid } = await setup();
+  await s.db.prepare('UPDATE projects SET profile_json = ? WHERE id = ?').run(JSON.stringify({ resume: 'Cartes.', facturation: { legal_name: 'Atelier Averty', siret: '123 456 789 00012', city: 'Rennes', website: 'javascript:x' } }), pid);
+  let h = await html(u, base(pid));
+  assert.match(h, /value="Atelier Averty"/);
+  assert.match(h, /value="12345678900012"/);
+  assert.match(h, /Repris de l'analyse du projet/);
+  assert.doesNotMatch(h, /javascript:x/);
+  assert.equal((await s.db.prepare('SELECT COUNT(*) n FROM billing_projects WHERE project_id = ?').get(pid)).n, 0, 'proposé, pas enregistré');
+  assert.match(await html(u, '/facturation'), /17 informations légales à compléter|\d+ informations légales à compléter/);
+  // Un 2e projet reprend l'identité déjà validée sur le 1er
+  await saveLegal(u, pid);
+  const pid2 = await addProject(s.db, u.id, { name: 'Autre', gitUrl: 'https://github.com/u/autre.git' });
+  h = await html(u, base(pid2));
+  assert.match(h, /value="Tony Averty"/);
+  assert.match(h, /Repris d'un autre de tes projets/);
+  const w = await s.newUser();
+  const pidW = await addProject(s.db, w.id, { name: 'Étranger', gitUrl: 'https://github.com/w/x.git' });
+  assert.doesNotMatch(await html(w, base(pidW)), /value="Tony Averty"/, 'jamais les informations d\'un autre compte');
 });
 
 test('parcours complet : trois devis, choix, affinage, validation, quatre documents, tous validés', async () => {

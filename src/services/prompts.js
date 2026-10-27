@@ -492,6 +492,7 @@ export function analyzePrompt(projectName, custom, model = null, repoFacts = '')
     prompt: `Analyse le projet "${projectName}" dans le dossier courant pour en faire une fiche commerciale.
 ${instructions('analyze', custom, {}, model)}
 
+Pour « facturation » : cherche l'éditeur dans les mentions légales, CGV/CGU, pieds de page, pages contact et tarifs, README. Ne recopie que ce qui est écrit : une information absente vaut null, jamais une supposition (un SIRET inventé engage l'utilisateur).
 Réponds UNIQUEMENT avec ce JSON :
 {
  "resume": "2 phrases : ce que fait le produit",
@@ -508,7 +509,17 @@ Réponds UNIQUEMENT avec ce JSON :
    "requetes": ["4 à 6 requêtes web pour trouver ces entreprises"]
  },
  "arguments": ["3 à 5 arguments de vente"],
- "ton": "ton recommandé pour les mails"
+ "ton": "ton recommandé pour les mails",
+ "facturation": {
+   "legal_name": "nom ou raison sociale de l'éditeur, tel qu'écrit dans le dépôt, sinon null",
+   "siret": "14 chiffres si écrits dans le dépôt, sinon null",
+   "legal_form": "micro, ei, eurl, sarl, sas, sasu ou autre, seulement si écrit, sinon null",
+   "address": "adresse de l'éditeur, sinon null", "postal_code": "sinon null", "city": "sinon null",
+   "email": "e-mail de contact de l'éditeur, sinon null", "phone": "sinon null", "website": "site de l'éditeur, sinon null",
+   "vat_number": "n° de TVA intracommunautaire si écrit, sinon null",
+   "activity_label": "l'activité de l'éditeur en une phrase, sinon null",
+   "pricing_notes": "tarifs publics du produit ou de la prestation (page de tarifs, README), sinon null"
+ }
 }`,
   };
 }

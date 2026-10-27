@@ -4,7 +4,7 @@ import { HttpError, html, json, redirect, readBody } from './http.js';
 import { enqueue, latestJobs } from './services/jobs.js';
 import { getProject, repoDir } from './projects.js';
 import { userAccountingSettings } from './accountingroutes.js';
-import { getBilling, saveLegal, listDocs, getDoc, setChosen, validateDoc, resetDocs, billingOverview } from './billingdata.js';
+import { getBilling, saveLegal, listDocs, getDoc, setChosen, validateDoc, resetDocs, billingOverview, otherLegals } from './billingdata.js';
 import { LEGAL_KEYS, normalizeLegal, legalComplete, legalMissing, billingStage, renderDocument, suggestFromRepo, buildSuggestions } from './services/billing.js';
 import { billingOverviewPage, billingProjectPage } from './billingviews.js';
 
@@ -59,6 +59,7 @@ export function registerBillingRoutes(router, app, { aiOpts = {} } = {}) {
     // Valeurs proposées (code, analyse, comptabilité) pour les champs encore vides ; elles ne sont enregistrées que si l'utilisateur valide le formulaire
     const acc = await userAccountingSettings(db, userId);
     const suggestions = buildSuggestions({
+      others: await otherLegals(db, userId, p.id),
       repo: suggestFromRepo(repoDir(cfg, userId, p.id)), profile: p.profile, accounting: { vat: acc.vat, regime: acc.regime }, smtpEmail: p.smtp?.fromEmail || '', accountEmail: session.email,
     });
     const verify = url.searchParams.has('verif');

@@ -87,3 +87,9 @@ export async function billingOverview(db, userId) {
   for (const d of docs) (byProject.get(Number(d.project_id)) || byProject.set(Number(d.project_id), []).get(Number(d.project_id))).push({ kind: d.kind, variant: Number(d.variant), status: d.status });
   return new Map(bill.map((b) => [Number(b.project_id), { legal: normalizeLegal(parse(b.legal_json, {})).values, chosen: b.chosen == null ? null : Number(b.chosen), docs: byProject.get(Number(b.project_id)) || [] }]));
 }
+
+/** Informations légales déjà enregistrées pour les AUTRES projets du compte, la plus récente d'abord (pour ne pas ressaisir l'identité de l'entreprise). */
+export async function otherLegals(db, userId, exceptProjectId) {
+  const rows = await db.prepare('SELECT legal_json FROM billing_projects WHERE user_id = ? AND project_id <> ? ORDER BY updated_at DESC, project_id DESC').all(Number(userId), Number(exceptProjectId));
+  return rows.map((r) => normalizeLegal(parse(r.legal_json, {})).values);
+}
