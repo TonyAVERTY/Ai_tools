@@ -1156,9 +1156,8 @@ body.tour-active { padding-bottom: var(--tour-pad, 0px); }
 
 /* ---------- Comptabilité ---------- */
 .cmp-help { display: block; margin-top: 2px; font-weight: 400; font-size: .8125rem; line-height: 1.4; }
-.cmp-situation { display: flex; flex-direction: column; gap: 18px; }
-.cmp-situation fieldset, .cmp-kinds { border: 0; margin: 0; padding: 0; min-width: 0; }
-.cmp-situation legend, .cmp-kinds legend { padding: 0; font-weight: 700; margin-bottom: 4px; }
+.cmp-kinds { border: 0; margin: 0; padding: 0; min-width: 0; }
+.cmp-kinds legend { padding: 0; font-weight: 700; margin-bottom: 4px; }
 .cmp-kinds { display: grid; gap: 2px 16px; grid-template-columns: minmax(0, 1fr); margin-bottom: 14px; }
 .cmp-kinds .opt { align-items: flex-start; margin: 4px 0 0; }
 .cmp-kpi { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); margin-top: 8px; }
@@ -1197,3 +1196,29 @@ body.tour-active { padding-bottom: var(--tour-pad, 0px); }
 .cmp-dlg form { display: flex; flex-direction: column; gap: 12px; }
 .cmp-dlg h2 { margin: 0; }
 @media (min-width: 640px) { .cmp-kinds { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Comptabilité : une page aérée. Les cartes ne se touchent plus, chaque carte respire, les tableaux et les listes ont plus de hauteur de ligne. */
+[data-compta] { display: flex; flex-direction: column; gap: 28px; }
+[data-compta] > .card { padding: 28px 28px 30px; gap: 20px; }
+[data-compta] > .card > .row-between { gap: 14px 20px; }
+[data-compta] > .card > h2, [data-compta] > .card > .row-between > h2 { font-size: 1.25rem; }
+[data-compta] .tip { margin: 0; }
+[data-compta] > .tip { margin: -8px 0; }
+[data-compta] .row-actions { gap: 12px; }
+[data-compta] .cmp-kpi { gap: 16px; margin-top: 0; }
+[data-compta] .ukpi-c { padding: 18px 20px; gap: 8px; }
+[data-compta] .mtable th { padding-block: 12px; }
+[data-compta] .mtable td { padding-block: 16px; }
+[data-compta] .cmp-alerts { gap: 12px; margin-top: 0; }
+[data-compta] .cmp-alerts li { padding: 14px 18px; gap: 12px; }
+[data-compta] .cmp-steps { gap: 12px; margin-bottom: 20px; }
+[data-compta] .cmp-notes { gap: 12px; margin: 20px 0; }
+[data-compta] .cmp-faq .tip { margin: 4px 0; }
+[data-compta] .cmp-faq .tip-body { padding: 8px 20px 16px; }
+[data-compta] .empty-s { padding: 24px; }
+[data-compta] .tip-body { padding: 24px 28px 28px; }
+@media (max-width: 639px) {
+  [data-compta] { gap: 20px; }
+  [data-compta] > .card { padding: 20px 18px 22px; gap: 16px; }
+  [data-compta] .tip-body { padding: 18px 16px 22px; }
+}
