@@ -107,8 +107,10 @@ Les fiches de méthode (voir « Savoir-faire de Claude dans AiTools ») sont des
 - **Rien n'est prérempli** : Claude n'a rien trouvé d'écrit dans le dépôt (pas de mentions légales, de contact ou de tarifs) ou l'analyse date d'avant cette fonction. Clique **Réanalyser** dans la « Fiche projet », ou remplis à la main : la première fois suffit, les autres projets reprennent ton identité (« Repris d'un autre de tes projets »).
 - **Une valeur préremplie est fausse** : corrige-la avant **Enregistrer les informations** ; Claude peut se tromper de société si le dépôt en cite plusieurs.
 - **« Indique le nom du client. » / « Indique l'adresse du client. »** à l'émission : ces deux champs sont obligatoires. « Le SIRET du client compte 14 chiffres » : corrige-le ou laisse-le vide pour un particulier.
-- **L'option « Émettre en PDF » n'apparaît pas sous un document** : seuls les documents **validés** s'émettent. Si tu viens de l'affiner, valide-le de nouveau.
+- **Je ne peux pas choisir un type dans « Générer un document »** : seuls les modèles **validés** se génèrent (« à valider d'abord » sinon). Si tu viens d'affiner un modèle, valide-le de nouveau.
 - **Ma facture émise n'apparaît pas dans mes chiffres de la Comptabilité** : c'est voulu. Elle est dans « Factures émises, à encaisser » et ne compte qu'une fois marquée payée (**Marquer payée**, avec la date d'encaissement).
 - **Je n'ai pas la carte « Factures émises, à encaisser »** : aucune facture n'a été émise, ou elles ont toutes été marquées payées. Si tu n'as pas encore répondu aux questions de situation de la Comptabilité, fais-le d'abord : la page n'affiche le reste qu'après.
 - **Numéro de facture déjà pris / « Numérotation en cours »** : deux émissions simultanées se sont croisées, réessaie.
 - **Ma facture émise n'est pas dans la Comptabilité** : la case « Joindre automatiquement à la comptabilité » était décochée au moment de la génération (état « Non jointe à la comptabilité » dans « Documents émis »). Ajoute la ligne à la main dans « Comptabilité » (**Ajouter une ligne**) avec le PDF en justificatif.
+- **Mon client n'apparaît pas dans la liste « Client »** : les clients sont enregistrés **par projet**, au moment où tu génères un document. Génère-lui un premier document dans ce projet, il sera proposé ensuite. S'il a été retiré (**Retirer**), saisis-le de nouveau.
+
