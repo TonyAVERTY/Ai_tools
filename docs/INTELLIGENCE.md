@@ -10,7 +10,7 @@ Document d'architecture et d'audit. Il dit ce qui existe, ce qui est réellement
 
 **Ce qui manquait.**
 - Aucune connaissance du **dépôt** : chaque question refaisait la découverte de la stack (tours de lecture, jetons, erreurs sur les commandes).
-- Aucune connaissance de la **personne** (secteur, métier, niveau).
+- Aucune connaissance de la **personne** (fonction, niveau technique, expérience, niveau de détail souhaité) : des questions **globales**, jamais sur un projet, car un compte a plusieurs projets (secteur, taille et cible vivent dans la fiche de chaque projet).
 - Aucune **méthode de développement** : débogage, revue, refactoring, tests, sécurité étaient laissés au modèle brut, donc équivalents à Claude Code seul.
 - Aucun **garde-fou transverse** sur les affirmations (« les tests passent ») ni sur le contenu du dépôt (CLAUDE.md, README, commentaires) traité comme une instruction.
 - Aucun moyen de **mesurer** quoi que ce soit.

@@ -26,7 +26,7 @@ Ce que Claude fait et ne fait pas : il lit le dépôt (lecture seule, dans un ba
 Les tâches du projet « Audit du projet », « Évolution » et l'analyse du projet reçoivent aussi le profil du dépôt, pour partir des faits.
 
 ## Ce que tu as renseigné sur toi
-Ton profil (Mon compte → **Modifier mon profil**, voir aussi « Faisons connaissance » dans le démarrage) est ajouté aux consignes de Claude : secteur, fonction, niveau technique. Le Support, lui, n'en reçoit pas.
+Ton profil (Mon compte → **Modifier mon profil**, voir aussi « Faisons connaissance » dans le démarrage) est ajouté aux consignes de Claude : fonction, niveau technique, expérience de la prospection, niveau de détail, tutoiement ou vouvoiement. Ce sont des informations sur toi, pas sur un projet : elles valent pour tous tes projets. Le Support, lui, n'en reçoit pas.
 
 ## Ce qu'il faut savoir
 - Les fiches ne se modifient pas depuis l'écran : elles évoluent avec l'application.
