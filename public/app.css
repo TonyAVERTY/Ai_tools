@@ -58,10 +58,6 @@ code { font-family: var(--mono); font-size: .875rem; background: var(--bg-sunk);
 .pill { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px; border-radius: 0; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); font: inherit; font-weight: 600; font-size: .9375rem; text-decoration: none; white-space: nowrap; cursor: pointer; transition: color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease); }
 .pill:hover { color: var(--text); border-bottom-color: var(--line-strong); }
 .pill[aria-current="page"] { color: var(--text); border-bottom-color: var(--primary); }
-.strip { background: var(--bg-sunk); border-top: 1px solid var(--line); padding: 6px 16px; display: flex; flex-wrap: wrap; gap: 2px 20px; font-size: .8125rem; color: var(--muted); }
-.strip:empty { display: none; }
-.strip .warn { color: var(--warn); font-weight: 600; }
-.strip .error { color: var(--err); font-weight: 600; }
 
 /* ---------- Boutons ---------- */
 .btn {
@@ -521,8 +517,7 @@ input.copy { font-family: var(--mono); font-size: .8125rem; }
   .top-in { flex-wrap: nowrap; padding: 12px 24px; gap: 20px; }
   .pills { order: 0; width: auto; overflow: visible; padding: 0; margin-left: 8px; }
   .top-r { order: 3; }
-  .strip { padding: 6px 24px; }
-  .page { padding-top: 24px; padding-bottom: 96px; }
+    .page { padding-top: 24px; padding-bottom: 96px; }
   .dash { grid-template-columns: minmax(0, 1fr) 320px; gap: 16px 24px; align-items: start; }
   .dash:not(:has([data-claude-card]:not([hidden]))) .col-p { grid-column: 1 / -1; }
   .ukpi-r { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
@@ -1012,7 +1007,7 @@ html.nav-busy { cursor: progress; }
 @media (min-width: 900px) { .team-new { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); column-gap: 40px; } .team-new .card-h, .team-new .team-form { grid-column: 1; } .team-roles { grid-column: 2; grid-row: 1 / span 2; } }
 
 /* ---------- Réglages : un seul bouton pour tout le formulaire, toujours à portée ---------- */
-.savebar { position: sticky; bottom: 0; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin-top: 16px; padding: 12px 16px; background: var(--card); border: 1px solid var(--line-strong); border-radius: var(--radius-lg); box-shadow: var(--shadow-2); }
+.savebar { position: sticky; bottom: 16px; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin-top: 16px; padding: 12px 16px; background: var(--card); border: 1px solid var(--line-strong); border-radius: var(--radius-lg); box-shadow: var(--shadow-2); }
 .savebar p { margin: 0; font-size: .875rem; color: var(--muted); }
 /* ---------- Administration : chiffres alignés à droite, statuts en pastilles ---------- */
 .admin-table th.num, .admin-table td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }

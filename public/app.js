@@ -395,13 +395,6 @@
   // Ce que les jobs lancés PAR AiTools ont consommé (équivalent API). Ce que la personne fait ailleurs avec son Claude n'y est pas :
   // Anthropic ne le communique pas à une application ; le quota réel du compte est la mesure « Claude … » à côté.
   const GAUGE_TIP = "Équivalent API des jobs lancés par AiTools uniquement. Ce que tu fais ailleurs avec Claude n'est pas compté ici : vois le quota « Claude » à côté.";
-  function gauge(label, x) {
-    const used = `${x.used.toFixed(2)} $`;
-    if (!x.limit) return `<span title="${GAUGE_TIP}">IA via AiTools ${label} : ${used}</span>`;
-    const r = x.used / x.limit;
-    return `<span class="${r >= 1 ? 'error' : r >= 0.8 ? 'warn' : ''}" title="${GAUGE_TIP}">IA via AiTools ${label} : ${used} / ${x.limit} $</span>`;
-  }
-
   // Quota du compte Claude Pro lui-même (session glissante de 5 h + semaine glissante de 7 j),
   // remonté par la CLI à chaque appel. Permet de décider en amont si une tâche vaut le coup.
   function resetLabel(ts) {
@@ -415,26 +408,6 @@
     unavailable: 'le relevé en direct est indisponible chez Anthropic',
     format: 'réponse inattendue du relevé en direct',
   };
-  // Relevé en direct chez Anthropic : il compte tout l'usage du compte Claude, y compris hors AiTools.
-  // Sinon : dernière mesure faite pendant un job, avec son âge et la raison.
-  function claudeBit(label, w, rl) {
-    if (!w) return '';
-    if (w.expired) return `<span class="muted" title="Cette fenêtre a été remise à zéro depuis la dernière mesure">Claude ${label} : – (remise à zéro)</span>`;
-    const cls = w.utilization >= 1 ? 'error' : w.utilization >= 0.8 ? 'warn' : '';
-    const reset = resetLabel(w.resetsAt);
-    const live = rl.source === 'live' && !rl.error;
-    const title = `${live ? 'Relevé en direct chez Anthropic, tout ton usage Claude compris (y compris hors AiTools).' : `Dernière mesure ${ago(rl.at)} (pendant un job AiTools)${rl.error ? ` : ${WHY[rl.error] || 'relevé en direct indisponible'}` : ''}.`}${reset ? ` Réinitialisation ${reset}.` : ''}`;
-    return `<span class="${cls}" title="${esc(title)}">Claude ${label} : ${pct(w.utilization)}${live ? '' : ` · ${esc(ago(rl.at))}`}</span>`;
-  }
-  function claudeQuota(rl, mode) {
-    // Clé API : pas de quota d'abonnement à afficher
-    if (mode === 'api_key') return '';
-    if (!rl) return '<span class="muted" title="Le relevé en direct se fait avec ton abonnement Claude">Claude : pas encore mesuré</span>';
-    if (!rl.fiveHour && !rl.sevenDay) return `<span class="muted" title="${esc(WHY[rl.error] || 'relevé indisponible')}">Claude : relevé indisponible</span>`;
-    const why = rl.error ? ` <span class="warn" title="${esc(WHY[rl.error] || 'relevé indisponible')}">· relevé en direct impossible</span>` : '';
-    return `${claudeBit('session 5h', rl.fiveHour, rl)} ${claudeBit('semaine', rl.sevenDay, rl)}${why}`.trim();
-  }
-
   // ---------- Menu « jobs » : détail de ce qui tourne, avec l'avancement ----------
   const jobsBox = $('#jobs');
   const jobsBtn = jobsBox && $('.jobs-btn', jobsBox);
@@ -560,17 +533,10 @@
   const unlinked = () => !!document.querySelector('[data-nolink]');
   async function refreshSys() {
     clearTimeout(sysTimer);
-    const el = $('#sys');
-    if (!el) return;
     if (unlinked()) { sysTimer = later(refreshSys, 4000); return; }
     let busy = false;
     try {
       const s = await api('/api/system');
-      const hot = s.temp !== null && s.temp >= 70;
-      el.innerHTML = `${s.temp !== null ? `<span class="${hot ? 'warn' : ''}">${s.temp} °C</span>` : ''}
-        ${claudeQuota(s.claudeRateLimit, s.linkMode)}
-        ${s.linkMode === 'api_key' ? `${gauge('24 h', s.budget.day)} ${gauge('30 j', s.budget.month)}` : ''}
-        ${s.budget.blocked && s.linkMode === 'api_key' ? '<span class="error">Budget IA atteint : jobs IA en attente</span>' : ''}`;
       for (const box of $$('[data-usage-claude]')) { box.innerHTML = usageClaude(s); box.hidden = false; const card = box.closest('[data-claude-card]'); if (card) card.hidden = !box.innerHTML.trim(); }
       renderJobsMenu(s);
       busy = s.queue > 0;
@@ -710,6 +676,7 @@
         form.subject.value = t.subject;
         if (form.subjectB) form.subjectB.value = t.subjectB || '';
         form.body.value = t.body;
+        form.html.checked = !!t.html;
       }
       $('[data-tpl-state]', form).innerHTML = t
         ? (t.status === 'validated' ? '<span class="badge ok">validé</span>' : '<span class="badge warn">brouillon</span>') : '';
@@ -1928,7 +1895,7 @@
     let r;
     try {
       r = await api(`/api/projects/${id}/template/preview`, {
-        kind: form.dataset.kind, subject: form.subject.value, subjectB: form.subjectB?.value || '', body: form.body.value, variant: pv.variant, prospectId: pv.prospectId,
+        kind: form.dataset.kind, subject: form.subject.value, subjectB: form.subjectB?.value || '', body: form.body.value, html: form.html.checked ? 'on' : '', variant: pv.variant, prospectId: pv.prospectId,
       });
     } catch (err) { toast(err.message, 'error'); return; }
     if (!pv.prospects) {
@@ -1948,10 +1915,10 @@
       ${r.note ? `<p class="muted small">${esc(r.note)}</p>` : ''}
       <dl class="pv-head"><dt>De</dt><dd>${esc(r.from)}</dd><dt>À</dt><dd>${esc(r.to)}</dd><dt>Objet</dt><dd><strong>${esc(r.subject) || '<span class="error">(vide)</span>'}</strong></dd></dl>
       ${r.warnings.length ? `<ul class="pv-warn" role="status">${r.warnings.map((w) => `<li>${icon('alert')}<span>${esc(w)}</span></li>`).join('')}</ul>` : ''}
-      <div class="seg" role="group" aria-label="Version du mail">
+      ${r.html ? `<div class="seg" role="group" aria-label="Version du mail">
         <button type="button" class="btn small" data-pv-tab="html" aria-pressed="${pv.tab === 'html'}">Mail</button>
-        <button type="button" class="btn small" data-pv-tab="text" aria-pressed="${pv.tab === 'text'}">Version texte</button></div>
-      ${pv.tab === 'html'
+        <button type="button" class="btn small" data-pv-tab="text" aria-pressed="${pv.tab === 'text'}">Version texte</button></div>` : ''}
+      ${r.html && pv.tab === 'html'
     ? `<iframe class="pv-frame" sandbox title="Aperçu du mail" src="${esc(r.url)}"></iframe>`
     : `<pre class="pv-text">${esc(r.text)}</pre>`}
       <p class="muted small">${r.footer ? `Le lien « Ne plus recevoir de messages » ${r.sample ? 'est un lien d\'exemple' : 'est le vrai lien de ce prospect'} ; il est ajouté automatiquement à chaque mail, avec l'origine de l'adresse.` : 'Le pied de page est retiré dans Réglages → Garde-fous : le mail part tel quel, sans lien de désinscription visible.'}</p>`;
