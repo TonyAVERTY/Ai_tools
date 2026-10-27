@@ -16,8 +16,14 @@
       const s = await r.json();
       const msg = document.querySelector('[data-bill-msg]');
       if (msg && s.message) msg.textContent = s.message;
+      if (typeof s.pct === 'number') {
+        const pct = Math.max(0, Math.min(100, Math.round(s.pct)));
+        const t = document.querySelector('[data-bill-pct]'); if (t) t.textContent = `${pct} %`;
+        const bar = document.querySelector('[data-bill-bar]'); if (bar) bar.setAttribute('aria-valuenow', String(pct));
+        const fill = document.querySelector('[data-bill-fill]'); if (fill) { fill.className = ''; fill.style.width = `${pct}%`; }
+      }
       if (rev === null) rev = s.rev;
       if (!s.busy || s.rev !== rev) { stop(); if (window.AiNav) window.AiNav.reload(); else location.reload(); }
     } catch { /* réseau coupé un instant : on réessaie au prochain passage */ }
-  }, 3000);
+  }, 2000);
 })();

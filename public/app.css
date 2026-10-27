@@ -1290,3 +1290,5 @@ body.tour-active { padding-bottom: var(--tour-pad, 0px); }
 .prean { flex: none; margin-left: auto; }
 @media (min-width: 640px) { .prean { order: 9; margin-left: 0; } }
 @media (max-width: 639px) { .prean > span { display: none; } .prean { padding-left: 10px; padding-right: 10px; } }
+.bill-run-b { flex: 1; min-width: 0; }
+.bill-run-h { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }

@@ -30,7 +30,7 @@ Seules tes propres informations sont reprises, jamais celles d'un autre compte, 
 Clique **Enregistrer les informations**. Même incomplètes, elles sont **enregistrées** (rien n'est perdu) et les champs à corriger sont signalés ; le message « Informations enregistrées : il en manque encore pour continuer. » indique qu'il reste à faire. Tant que tout n'est pas rempli, le bouton de génération n'apparaît pas.
 
 ## 3. Générer et choisir un devis
-1. Quand le projet est complet, clique **Générer un modèle de document**. Claude rédige **trois exemples de devis** (mises en page « Classique », « Moderne » et « Épuré »). Cela prend une à deux minutes ; « Claude travaille… » s'affiche et la page se met à jour toute seule.
+1. Quand le projet est complet, clique **Générer un modèle de document**. Claude rédige **trois exemples de devis** (mises en page « Classique », « Moderne » et « Épuré »). Cela prend une à deux minutes ; « Claude travaille… » s'affiche avec une **barre et un pourcentage** (estimé : il avance tant que Claude écrit, pour que tu voies que ça tourne) et la page se met à jour toute seule à la fin.
 2. Chaque exemple s'affiche en aperçu (**Voir en grand** l'ouvre dans un nouvel onglet). Si tu n'as pas renseigné « Tes tarifs habituels », les prix sont des **prix d'exemple** : tu les ajustes ensuite.
 3. Clique **Choisir cet exemple** sur celui qui te plaît.
 4. Un champ « Ce que tu veux changer » apparaît sous « Ton devis : exemple N » : écris ta demande (« un ton plus chaleureux », « une remise de 10 % », « un acompte à 20 % »…) puis clique **Affiner ce devis**. Tu peux recommencer autant de fois que nécessaire ; la mise en page ne change pas.

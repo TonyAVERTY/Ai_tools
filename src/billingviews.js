@@ -128,7 +128,10 @@ export function billingProjectPage({ email, project: p, legal, errors, suggestio
   const lastDoc = docs.reduce((m, d) => Math.max(m, d.updatedAt), 0);
   const failed = !running ? Object.values(jobs).filter((j) => j.status === 'error' && Number(j.finishedAt || 0) >= lastDoc).sort((a, b) => b.finishedAt - a.finishedAt)[0] : null;
   const notes = { legal: 'Informations enregistrées.', legal_incomplet: 'Informations enregistrées : il en manque encore pour continuer.', quotes: 'Claude rédige tes trois exemples de devis…', refine: 'Claude affine le document selon ta demande…', docs: 'Devis validé : Claude prépare les documents…', valide: 'Document validé.', reset: 'Tout est effacé : tu repars du début (tes informations légales sont conservées).' };
-  const banner = running ? `<div class="bill-run" role="status">${ic('load')}<div><b>Claude travaille…</b><span class="muted small" data-bill-msg>${esc(running.progress?.message || 'Cela prend une à deux minutes.')}</span></div></div>`
+  const runPct = typeof running?.progress?.pct === 'number' ? Math.max(0, Math.min(100, Math.round(running.progress.pct))) : 0;
+  const banner = running ? `<div class="bill-run" role="status">${ic('load')}<div class="bill-run-b"><div class="bill-run-h"><b>Claude travaille…</b><strong class="jpct" data-bill-pct>${runPct} %</strong></div>
+    <span class="muted small" data-bill-msg>${esc(running.progress?.message || 'Cela prend une à deux minutes.')}</span>
+    <div class="bar" role="progressbar" aria-label="Avancement" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${runPct}" data-bill-bar><span class="w-${Math.round(runPct / 5) * 5}" data-bill-fill></span></div></div></div>`
     : failed ? `<p class="cmp-flash warn" role="alert">${ic('alert')} La dernière demande à Claude a échoué : ${esc(failed.error || 'erreur inconnue')}. Tu peux réessayer.</p>`
       : flash.error ? `<p class="cmp-flash warn" role="alert">${ic('alert')} ${esc(flash.error)}</p>`
         : flash.ok && notes[flash.ok] ? `<p class="cmp-flash ${flash.ok === 'legal_incomplet' ? 'warn' : 'ok'}" role="status">${esc(notes[flash.ok])}</p>` : '';
