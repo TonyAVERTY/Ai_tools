@@ -170,7 +170,7 @@ export function registerAccountingRoutes(router, app) {
     const r = periodRange(b.period);
     if (!r || r.kind === 'year') throw refuse(400, 'Période inconnue.');
     if (b.done === '0' || b.done === 0) await db.prepare('DELETE FROM accounting_declarations WHERE user_id = ? AND period = ?').run(session.userId, b.period);
-    else await db.prepare('INSERT INTO accounting_declarations(user_id, period, done_at) VALUES(?, ?, ?) ON CONFLICT(user_id, period) DO NOTHING').run(session.userId, b.period, now());
+    else await db.prepare('INSERT OR IGNORE INTO accounting_declarations(user_id, period, done_at) VALUES(?, ?, ?)').run(session.userId, b.period, now());
     redirect(res, `/compta?declarer=${encodeURIComponent(b.period)}&ok=declaration#declaration`);
   }, { limit: 'compta' });
 
