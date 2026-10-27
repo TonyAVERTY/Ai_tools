@@ -176,6 +176,46 @@
   });
   $('dialog[data-autoopen]')?.showModal();
 
+  // Questionnaire de première connexion : une question à la fois, « Continuer » pour passer à la suivante (sans choix = question passée),
+  // « Retour » pour revenir, et le pourcentage de questions déjà passées. La dernière question envoie le formulaire.
+  const wiz = $('form[data-wizard]');
+  if (wiz) {
+    const steps = $$('[data-step]', wiz);
+    const back = $('[data-wiz-back]', wiz);
+    const next = $('[data-wiz-next]', wiz);
+    const barBox = $('[role=progressbar]', wiz);
+    let at = 0;
+    const setBar = (p) => { $('[data-wiz-bar]', wiz).className = `w-${Math.floor(p / 5) * 5}`; $('[data-wiz-pct]', wiz).textContent = `${p} %`; barBox.setAttribute('aria-valuenow', String(p)); };
+    const show = (i, focus = true) => {
+      at = i;
+      steps.forEach((s, k) => { s.hidden = k !== i; });
+      $('[data-wiz-count]', wiz).textContent = `Question ${i + 1} sur ${steps.length}`;
+      setBar(Math.round((100 * i) / steps.length)); // questions déjà passées
+      back.hidden = i === 0;
+      next.textContent = i === steps.length - 1 ? 'Terminer' : 'Continuer';
+      if (focus) ($('input:checked, input, textarea', steps[i]))?.focus();
+    };
+    const forward = () => { if (at < steps.length - 1) show(at + 1); else { setBar(100); wiz.requestSubmit?.() ?? wiz.submit(); } };
+    back.addEventListener('click', () => show(Math.max(0, at - 1)));
+    // « Passer le questionnaire » (formaction) part tel quel ; « Continuer » avance tant qu'il reste des questions
+    wiz.addEventListener('submit', (e) => { if (!e.submitter?.hasAttribute('formaction') && at < steps.length - 1) { e.preventDefault(); forward(); } });
+    show(0, false);
+  }
+
+  // Attente dont la durée dépend d'un tiers (Claude) : un pourcentage ESTIMÉ monte vers 95 % selon la durée habituelle et ne passe à 100 % qu'avec la
+  // réponse. Il ne prétend pas mesurer l'avancement réel : le CLI de Claude n'en donne pas.
+  function track(box, typicalMs) {
+    const bar = $('[data-pct-bar]', box);
+    const text = $('[data-pct-text]', box);
+    const host = $('[role=progressbar]', box);
+    const set = (p) => { p = Math.max(0, Math.min(100, Math.round(p))); bar.className = `w-${Math.floor(p / 5) * 5}`; text.textContent = `${p} %`; host.setAttribute('aria-valuenow', String(p)); };
+    const t0 = performance.now();
+    box.hidden = false;
+    set(0);
+    const id = every(() => set(95 * (1 - Math.exp((-3 * (performance.now() - t0)) / typicalMs))), 200);
+    return async (ok) => { clearInterval(id); if (ok) { set(100); await new Promise((r) => setTimeout(r, 350)); } box.hidden = true; };
+  }
+
   // Connexion guidée à Claude : 1) le serveur prépare le lien (petit chargement) et il s'ouvre dans une petite fenêtre,
   // 2) l'utilisateur se connecte et copie le code affiché par Claude : dès qu'il revient ici (ou colle), le code est
   // reconnu et envoyé tout seul, 3) le serveur récupère le jeton, la petite fenêtre se ferme et la page se recharge.
@@ -206,8 +246,10 @@
       popup = window.open('', 'aitools-claude-login', 'popup,width=520,height=760');
       busy(loginForm, true, 'Je prépare ton lien…');
       $('[data-claude-status]', loginForm).textContent = 'Ça prend quelques secondes.';
+      const stop = track($('[data-pct]', loginForm), 10_000);
       try {
         const r = await api('/link/claude/login', { accept: 'on' });
+        await stop(true);
         loginId = r.id;
         $('[data-claude-link]', dlg).href = r.url;
         if (popup) popup.location.href = r.url;
@@ -217,6 +259,7 @@
         $('[data-claude-hint-link]', dlg).hidden = !!popup;
         codeInput.focus();
       } catch (err) {
+        await stop(false);
         closePopup();
         fail('[data-claude-error]', err);
         busy(loginForm, false, 'Se connecter avec Claude');
@@ -230,13 +273,16 @@
       sending = true;
       $('[data-claude-error2]', dlg).hidden = true;
       busy(codeForm, true, 'Je récupère ton jeton…');
+      const stop = track($('[data-pct]', codeForm), 12_000);
       try {
         await api('/link/claude/login/code', { id: loginId, code });
+        await stop(true);
         loginId = null;
         closePopup();
         go('/');
       } catch (err) {
         // Le serveur a fermé cette connexion (code refusé, expirée) : on repart de l'étape 1 avec le message
+        await stop(false);
         loginId = null; sending = false; closePopup();
         codeForm.reset();
         busy(codeForm, false, 'Terminer la connexion');

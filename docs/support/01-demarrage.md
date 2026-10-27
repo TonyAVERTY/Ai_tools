@@ -9,8 +9,11 @@ Sans liaison Claude valide, l'application affiche la page « Relier Claude » et
 
 ## 2 bis. Faisons connaissance (une seule fois)
 À ta première arrivée sur le tableau de bord (après la liaison Claude), AiTools affiche une page « Faisons connaissance » avec des questions générales sur toi, valables pour tous tes projets : ta fonction, ton niveau technique, ton expérience de la prospection, le niveau de détail que tu préfères dans les réponses, tutoiement ou vouvoiement, ce que tu veux faire avec AiTools, et une précision libre sur ta façon de travailler. Elle ne demande rien sur un projet précis (secteur, taille de l'entreprise, cible) : ces informations se règlent projet par projet, dans la section Cible. Tout est facultatif.
-1. Réponds à ce que tu veux, puis clique **Enregistrer mon profil**, ou clique **Passer** pour ne rien dire.
-2. La page ne revient plus d'elle-même. Tu peux la rouvrir et la modifier à tout moment : avatar → Mon compte → **Modifier mon profil**.
+Les questions s'affichent **une à la fois** (7 au total) :
+1. Choisis une réponse puis clique **Continuer**. Sans choix, **Continuer** passe simplement la question. **Retour** revient à la question précédente en gardant ta réponse.
+2. En haut, « Question 3 sur 7 » et un pourcentage avec sa barre indiquent combien de questions sont déjà passées (0 % à la première, 14 % à la deuxième, 86 % à la dernière).
+3. À la dernière question, le bouton devient **Terminer** : il enregistre ton profil. À tout moment, **Passer le questionnaire** ferme tout sans rien enregistrer.
+4. La page ne revient plus d'elle-même. Tu peux la rouvrir et la modifier à tout moment : avatar → Mon compte → **Modifier mon profil** (toutes les questions s'affichent alors sur une seule page, avec **Enregistrer mon profil** et **Annuler**).
 Pourquoi : Claude adapte son vocabulaire, ses exemples et son niveau de détail à ton métier. Les réponses restent dans ton compte.
 
 ## 3. Créer le premier projet
