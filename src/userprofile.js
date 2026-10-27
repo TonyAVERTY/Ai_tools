@@ -6,6 +6,7 @@
 import { getSetting, setSetting } from './db.js';
 import { esc, html, redirect, readBody } from './http.js';
 import { layout } from './views.js';
+import { ic } from './icons.js';
 
 const KEY = 'user_profile_json';
 const ASKED = 'user_profile_asked'; // 'done' | 'skipped'
@@ -64,25 +65,57 @@ export function profileBlock(p) {
 }
 
 const select = (name, opts, value, blank = 'Ne pas répondre') => `<select name="${name}"><option value="">${blank}</option>${Object.entries(opts).map(([k, v]) => `<option value="${k}"${k === value ? ' selected' : ''}>${esc(v)}</option>`).join('')}</select>`;
+const box = `<span class="box">${ic('check')}</span>`;
+const radios = (name, opts, value) => Object.entries(opts).map(([k, v]) => `<label class="opt radio"><input type="radio" name="${name}" value="${k}"${k === value ? ' checked' : ''}>${box}<span>${esc(v)}</span></label>`).join('');
+const checks = (goals) => Object.entries(GOALS).map(([k, v]) => `<label class="opt"><input type="checkbox" name="goal_${k}" value="1"${goals.includes(k) ? ' checked' : ''}>${box}<span>${esc(v)}</span></label>`).join('');
 
-export function welcomePage({ profile, email, first = true }) {
-  const p = profile || cleanProfile({});
-  return layout({
-    title: first ? 'Faisons connaissance' : 'Mon profil', email, body: `<section class="card narrow" aria-labelledby="h-welcome">
-  <div class="card-h"><h1 id="h-welcome">${first ? 'Faisons connaissance' : 'Mon profil'}</h1>
-  <p>${first ? 'Quelques questions, une seule fois, pour que Claude s\'adapte à toi.' : 'Ces réponses adaptent la façon dont Claude te répond.'} Elles valent pour tous tes projets (le secteur et la cible de chaque projet se règlent dans le projet). Tout est facultatif et modifiable depuis « Mon compte ».</p></div>
-  <form method="post" action="/welcome" class="cfg">
+/** Les questions, dans l'ordre : une par écran à la première connexion. */
+export const STEPS = [
+  { key: 'job', title: 'Quelle est ta fonction ?', body: (p) => radios('job', JOBS, p.job) },
+  { key: 'level', title: 'Quel est ton niveau technique ?', body: (p) => radios('level', LEVELS, p.level) },
+  { key: 'experience', title: 'Quelle est ton expérience de la prospection ?', body: (p) => radios('experience', EXPERIENCE, p.experience) },
+  { key: 'detail', title: 'Quel niveau de détail préfères-tu dans les réponses ?', body: (p) => radios('detail', DETAIL, p.detail) },
+  { key: 'address', title: "Comment Claude doit-il s'adresser à toi ?", body: (p) => radios('address', ADDRESS, p.address) },
+  { key: 'goals', title: 'Que veux-tu faire avec AiTools ?', hint: 'Plusieurs choix possibles.', body: (p) => checks(p.goals) },
+  { key: 'notes', title: 'Autre chose à savoir sur ta façon de travailler ?', hint: 'Facultatif.', body: (p) => `<textarea name="notes" rows="4" maxlength="${MAX_NOTES}" aria-label="Précision libre" placeholder="ex. j'aime avoir un exemple concret à chaque conseil">${esc(p.notes)}</textarea>` },
+];
+
+/** Première connexion : une question à la fois, « Continuer », et le pourcentage de questions passées (public/app.js, data-wizard). */
+function wizard(p) {
+  const n = STEPS.length;
+  return `<form method="post" action="/welcome" class="cfg" data-wizard>
+    <div class="wiz-top">
+      <p class="wiz-n"><span data-wiz-count>Question 1 sur ${n}</span><b data-wiz-pct>0 %</b></p>
+      <div class="bar" role="progressbar" aria-label="Questions répondues" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="w-0" data-wiz-bar></span></div>
+      <ol class="wiz-dots" aria-hidden="true">${STEPS.map(() => `<li data-dot>${ic('check')}</li>`).join('')}</ol>
+    </div>
+    ${STEPS.map((s, i) => `<fieldset class="wiz-step" data-step${i ? ' hidden' : ''}><legend>${esc(s.title)}</legend>${s.hint ? `<p class="hint">${esc(s.hint)}</p>` : ''}${s.body(p)}<p class="wiz-ok" role="status" data-wiz-ok><span class="wiz-pill">${ic('check')}</span>Pris en compte</p></fieldset>`).join('\n    ')}
+    <div class="wiz-f"><button type="button" class="btn" data-wiz-back hidden>Retour</button><button class="btn primary" data-wiz-next>Continuer</button></div>
+    <p class="wiz-skip"><button class="link" formaction="/welcome/skip" formnovalidate>Passer le questionnaire</button></p>
+  </form>`;
+}
+
+/** Modification depuis Mon compte : toutes les questions d'un coup. */
+function fullForm(p) {
+  return `<form method="post" action="/welcome" class="cfg">
     <label class="field"><span class="lbl">Ta fonction</span>${select('job', JOBS, p.job)}</label>
     <label class="field"><span class="lbl">Ton niveau technique</span>${select('level', LEVELS, p.level)}</label>
     <label class="field"><span class="lbl">Ton expérience de la prospection</span>${select('experience', EXPERIENCE, p.experience)}</label>
     <label class="field"><span class="lbl">Le niveau de détail que tu préfères</span>${select('detail', DETAIL, p.detail)}</label>
     <label class="field"><span class="lbl">Comment Claude s'adresse à toi</span>${select('address', ADDRESS, p.address)}</label>
-    <fieldset class="field"><legend class="lbl">Ce que tu veux faire avec AiTools</legend>
-      ${Object.entries(GOALS).map(([k, v]) => `<label class="opt"><input type="checkbox" name="goal_${k}" value="1"${p.goals.includes(k) ? ' checked' : ''}><span>${esc(v)}</span></label>`).join('')}
-    </fieldset>
+    <fieldset class="field"><legend class="lbl">Ce que tu veux faire avec AiTools</legend>${checks(p.goals)}</fieldset>
     <label class="field"><span class="lbl">Autre chose que Claude doit savoir sur ta façon de travailler (facultatif)</span><textarea name="notes" rows="3" maxlength="${MAX_NOTES}" placeholder="ex. j'aime avoir un exemple concret à chaque conseil">${esc(p.notes)}</textarea></label>
-    <div class="actions"><button class="btn primary">Enregistrer mon profil</button>${first ? '<button class="btn" formaction="/welcome/skip" formnovalidate>Passer</button>' : '<a class="btn" href="/account">Annuler</a>'}</div>
-  </form>
+    <div class="actions"><button class="btn primary">Enregistrer mon profil</button><a class="btn" href="/account">Annuler</a></div>
+  </form>`;
+}
+
+export function welcomePage({ profile, email, first = true }) {
+  const p = profile || cleanProfile({});
+  return layout({
+    title: first ? 'Faisons connaissance' : 'Mon profil', email, body: `<section class="card narrow wiz" aria-labelledby="h-welcome">
+  <div class="card-h"><h1 id="h-welcome">${first ? 'Faisons connaissance' : 'Mon profil'}</h1>
+  <p>${first ? 'Quelques questions, une seule fois, pour que Claude s\'adapte à toi.' : 'Ces réponses adaptent la façon dont Claude te répond.'} Elles valent pour tous tes projets (le secteur et la cible de chaque projet se règlent dans le projet). Tout est facultatif et modifiable depuis « Mon compte ».</p></div>
+  ${first ? wizard(p) : fullForm(p)}
 </section>`,
   });
 }

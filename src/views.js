@@ -188,6 +188,9 @@ function linkSection(link, consent, quota = null) {
 </section>`;
 }
 
+// Barre de chargement avec pourcentage ESTIMÉ (public/app.js, track) : montée vers 95 % selon la durée habituelle, 100 % à la réponse
+const pctBlock = (label) => `<div class="dl-pct" data-pct hidden><div class="bar" role="progressbar" aria-label="${esc(label)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="w-0" data-pct-bar></span></div><p class="dl-pct-t"><span>${esc(label)} · estimation</span><b data-pct-text>0 %</b></p></div>`;
+
 export function accountPage({ user, error, link = null, consent = null, notice = null, usage = null, developer = false, ical = null, appUrl = '', quota = null }) {
   return layout({
     title: 'Mon compte', email: user.email,
@@ -273,6 +276,7 @@ export function linkPage({ user, link, cliModeEnabled, error, start = false }) {
       <p class="hint">Un lien de connexion va s'afficher. Tu te connectes à Claude, puis tu recopies ici le petit code qu'il te montre : AiTools récupère le jeton tout seul. Texte d'avertissement version ${esc(CONSENT_VERSION)}.</p>
       <div class="modal-f"><button type="button" class="btn" data-close-dialog>Annuler</button><button class="btn primary" data-consent-submit disabled><span class="spin-inline" hidden></span><span data-label>Continuer</span></button></div>
       <p class="hint" role="status" data-claude-status></p>
+      ${pctBlock('Préparation du lien de connexion')}
       <p class="msg msg-err" role="alert" data-claude-error hidden></p>
     </form>
     <div class="cfg" data-claude-step2 hidden>
@@ -283,6 +287,7 @@ export function linkPage({ user, link, cliModeEnabled, error, start = false }) {
       <form class="cfg" data-claude-code>
         <label class="field"><span class="lbl">Code affiché par Claude</span><input name="code" autocomplete="off" spellcheck="false" required></label>
         <button class="btn primary"><span class="spin-inline" hidden></span><span data-label>Terminer la connexion</span></button>
+        ${pctBlock('Récupération de ton jeton')}
       </form>
       <p class="msg msg-err" role="alert" data-claude-error2 hidden></p>
     </div>
