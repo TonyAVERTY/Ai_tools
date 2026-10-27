@@ -26,6 +26,10 @@ Dans le **Journal des lignes**, chaque ligne montre sa date, son libellé, son t
 - Les filtres du journal (projet, type, recherche, bouton **Filtrer**) et la liste « période » de « Tes chiffres » restreignent ce qui s'affiche.
 - Si un projet est supprimé, ses lignes **restent** (on garde les pièces) : elles apparaissent sous le nom du projet suivi de « (supprimé) ».
 
+### Factures émises depuis « Facturation »
+Quand tu génères une facture en PDF dans « Facturation » (acompte, facture finale ou avoir) **en laissant cochée la case « Joindre automatiquement à la comptabilité »**, elle apparaît ici **automatiquement** dans la carte **Factures émises, à encaisser** (au-dessus du « Journal des lignes »), avec son PDF en justificatif. Elle porte l'état « À encaisser » (« À rembourser » pour un avoir).
+Tant qu'elle n'est pas payée, elle **ne compte nulle part** : ni dans « Tes chiffres », ni dans la déclaration, ni dans les exports. Quand l'argent arrive (ou que tu as remboursé le client), choisis la date puis clique **Marquer payée** (**Marquer remboursée** pour un avoir) : la ligne passe dans le « Journal des lignes » à cette date et compte dans tes chiffres (« Facture marquée payée : elle compte maintenant dans tes chiffres. »). **Modifier** et **Supprimer** fonctionnent comme sur toute ligne ; supprimer la ligne ne supprime pas le PDF dans « Facturation ».
+
 ## 3. Tes chiffres et les projets
 La section **Tes chiffres** (choisis la période : toute la période, une année, un trimestre ou un mois) montre :
 - **Encaissé** : les paiements reçus moins les remboursements versés à des clients ;

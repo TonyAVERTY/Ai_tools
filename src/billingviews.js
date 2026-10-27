@@ -1,5 +1,6 @@
 // Pages « Facturation » : recap des projets, puis pour un projet les informations légales, le choix du devis et les quatre documents.
 // public/facturation.js suit les tâches de Claude en cours et recharge la page quand elles se terminent.
+import { todayIso, fmtEur } from './services/accounting.js';
 import { esc } from './http.js';
 import { layout } from './views.js';
 import { ic } from './icons.js';
@@ -101,6 +102,40 @@ function quoteSection(p, docs, chosen, stage, legal, busy) {
   return `<section class="card bill-sec" id="devis" aria-labelledby="t-devis"><h2 id="t-devis">2. Choisis ton devis</h2>${inner}</section>`;
 }
 
+const KIND_INVOICE = { acompte: true, facture: true, avoir: true };
+function issueForm(p, d) {
+  const today = todayIso();
+  const inv = KIND_INVOICE[d.kind];
+  return `<details class="bill-refine bill-issue"><summary>${ic('receipt')}Émettre en PDF : ${esc(DOC_BY_KEY[d.kind].label.toLowerCase())}</summary>
+    <form method="post" action="/facturation/projet/${p.id}/emettre" class="bill-issue-f"><input type="hidden" name="doc" value="${d.id}">
+      <p class="muted small">Le document est numéroté et généré en PDF.</p>
+      <div class="grid2">
+        <label class="field" for="is-n-${d.id}"><span class="lbl">Nom du client</span><input id="is-n-${d.id}" name="client_nom" maxlength="120" required autocomplete="off"></label>
+        <label class="field" for="is-s-${d.id}"><span class="lbl">SIRET du client <span class="muted small">(vide pour un particulier)</span></span><input id="is-s-${d.id}" name="client_siret" inputmode="numeric" maxlength="20" autocomplete="off"></label>
+        <label class="field wide" for="is-a-${d.id}"><span class="lbl">Adresse du client</span><input id="is-a-${d.id}" name="client_adresse" maxlength="200" required autocomplete="off"></label>
+        <label class="field" for="is-d-${d.id}"><span class="lbl">Date d'émission</span><input id="is-d-${d.id}" type="date" name="issue_date" value="${today}" max="${today}" required></label>
+        ${d.kind === 'facture' ? `<label class="field" for="is-p-${d.id}"><span class="lbl">Date de la prestation</span><input id="is-p-${d.id}" type="date" name="date_prestation" value="${today}" max="${today}"></label>` : ''}
+        ${d.kind === 'avoir' ? `<label class="field" for="is-f-${d.id}"><span class="lbl">N° de la facture corrigée</span><input id="is-f-${d.id}" name="facture_numero" maxlength="40" required autocomplete="off"></label>
+        <label class="field wide" for="is-m-${d.id}"><span class="lbl">Motif de l'avoir</span><input id="is-m-${d.id}" name="motif" maxlength="300" autocomplete="off" value="${esc(d.content.reason || '')}"></label>` : ''}
+      </div>
+      ${inv ? `<label class="check" for="is-c-${d.id}"><input id="is-c-${d.id}" type="checkbox" name="to_accounting" value="1" checked><span>Joindre automatiquement à la comptabilité</span></label>
+      <p class="muted small">Coché : la facture est ajoutée à ta Comptabilité, à encaisser (elle ne compte dans tes chiffres qu'une fois payée). Décoché : le PDF reste ici et rien n'est ajouté à la Comptabilité.</p>` : ''}
+      <div class="row-actions"><button class="btn primary">${ic('file')}Générer le PDF</button></div>
+    </form></details>`;
+}
+
+function invoicesSection(invoices) {
+  if (!invoices?.length) return '';
+  const label = { pending: ['À encaisser', 'warn'], paid: ['Payée', 'ok'], devis: ['Devis', ''], hors: ['Non jointe à la comptabilité', ''] };
+  return `<section class="card bill-sec" id="emis" aria-labelledby="t-emis"><h2 id="t-emis">4. Documents émis</h2>
+    <p class="muted">Les factures jointes à la <a class="link" href="/compta#a-encaisser">Comptabilité</a> s'y marquent payées à l'encaissement.</p>
+    <div class="table-wrap"><table class="mtable"><thead><tr><th>Numéro</th><th>Client</th><th>Émis le</th><th class="num">Montant TTC</th><th>État</th><th><span class="sr-only">PDF</span></th></tr></thead><tbody>${invoices.map((i) => `<tr>
+      <td><b>${esc(i.number)}</b><span class="td-s">${esc(DOC_BY_KEY[i.kind]?.label || i.kind)}</span></td><td>${esc(i.client.name || '')}</td><td>${esc(i.issueDate.split('-').reverse().join('/'))}</td>
+      <td class="num">${esc(fmtEur(i.kind === 'avoir' ? -i.amount : i.amount))}</td>
+      <td><span class="badge ${label[i.state][1]}">${label[i.state][0]}</span></td>
+      <td><a class="btn small" href="/facturation/factures/${i.id}/pdf" data-noajax>${ic('file')}PDF</a>${i.entryId ? ` <a class="btn small" href="/compta/entries/${i.entryId}/file" target="_blank" rel="noopener noreferrer" data-noajax>Comptabilité</a>` : ''}</td></tr>`).join('')}</tbody></table></div></section>`;
+}
+
 function docsSection(p, docs, stage, busy, validatedCount) {
   const finals = DOC_KINDS.map(({ key }) => docs.find((d) => d.kind === key)).filter(Boolean);
   let inner;
@@ -116,18 +151,20 @@ function docsSection(p, docs, stage, busy, validatedCount) {
         ${frame(d)}
         <p class="muted small bill-vars">Rempli à l'émission : ${DOC_VARIABLES[d.kind].map((v) => `<code>{{${v}}}</code>`).join(' ')}</p>
         <div class="row-actions">${d.status === 'validated' ? '' : `<form method="post" action="/facturation/projet/${p.id}/valider"><input type="hidden" name="doc" value="${d.id}"><button class="btn primary small"${busy ? ' disabled' : ''}>${ic('check')}Valider ce document</button></form>`}
-          <a class="btn small" href="/facturation/documents/${d.id}/apercu" target="_blank" rel="noopener noreferrer" data-noajax>Voir en grand</a></div>
+          <a class="btn small" href="/facturation/documents/${d.id}/apercu" target="_blank" rel="noopener noreferrer" data-noajax>Voir en grand</a>
+          <a class="btn small" href="/facturation/documents/${d.id}/pdf" data-noajax>${ic('file')}Modèle en PDF</a></div>
         ${refineForm(p, d, 'Affiner ce document')}
+        ${d.status === 'validated' ? issueForm(p, d) : ''}
       </article>`).join('')}</div>`;
   }
   return `<section class="card bill-sec" id="documents" aria-labelledby="t-docs"><h2 id="t-docs">3. Valide tes documents</h2>${inner}</section>`;
 }
 
-export function billingProjectPage({ email, project: p, legal, errors, suggestions, docs, chosen, stage, jobs, flash }) {
+export function billingProjectPage({ email, project: p, legal, errors, suggestions, docs, invoices = [], chosen, stage, jobs, flash }) {
   const running = Object.values(jobs).find((j) => ['queued', 'running'].includes(j.status));
   const lastDoc = docs.reduce((m, d) => Math.max(m, d.updatedAt), 0);
   const failed = !running ? Object.values(jobs).filter((j) => j.status === 'error' && Number(j.finishedAt || 0) >= lastDoc).sort((a, b) => b.finishedAt - a.finishedAt)[0] : null;
-  const notes = { legal: 'Informations enregistrées.', legal_incomplet: 'Informations enregistrées : il en manque encore pour continuer.', quotes: 'Claude rédige tes trois exemples de devis…', refine: 'Claude affine le document selon ta demande…', docs: 'Devis validé : Claude prépare les documents…', valide: 'Document validé.', reset: 'Tout est effacé : tu repars du début (tes informations légales sont conservées).' };
+  const notes = { legal: 'Informations enregistrées.', legal_incomplet: 'Informations enregistrées : il en manque encore pour continuer.', quotes: 'Claude rédige tes trois exemples de devis…', refine: 'Claude affine le document selon ta demande…', docs: 'Devis validé : Claude prépare les documents…', valide: 'Document validé.', emis: 'Document émis : le PDF est prêt, et la facture est dans ta Comptabilité, à encaisser.', emis_devis: 'Devis émis : le PDF est prêt.', reset: 'Tout est effacé : tu repars du début (tes informations légales sont conservées).' };
   const runPct = typeof running?.progress?.pct === 'number' ? Math.max(0, Math.min(100, Math.round(running.progress.pct))) : 0;
   const banner = running ? `<div class="bill-run" role="status">${ic('load')}<div class="bill-run-b"><div class="bill-run-h"><b>Claude travaille…</b><strong class="jpct" data-bill-pct>${runPct} %</strong></div>
     <span class="muted small" data-bill-msg>${esc(running.progress?.message || 'Cela prend une à deux minutes.')}</span>
@@ -144,6 +181,7 @@ export function billingProjectPage({ email, project: p, legal, errors, suggestio
       const q = docs.find((d) => d.kind === 'quote_option' && d.status === 'validated');
       if (q) sections.push(`<section class="card bill-sec" id="devis" aria-labelledby="t-devis"><h2 id="t-devis">2. Ton devis est validé</h2><p class="muted">Exemple ${q.variant} (${esc(LAYOUTS.find(([k]) => k === q.layout)?.[1] || '')}). Les documents suivants reprennent son style et ses lignes.</p></section>`);
       sections.push(docsSection(p, docs, stage, stage.busy, finalsCount));
+      sections.push(invoicesSection(invoices));
     }
   }
   const done = ready ? `<section class="card bill-ready" aria-labelledby="t-ready"><div>${ic('check')}</div><div><h2 id="t-ready">Tes documents sont prêts</h2>

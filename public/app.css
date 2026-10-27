@@ -1292,3 +1292,9 @@ body.tour-active { padding-bottom: var(--tour-pad, 0px); }
 @media (max-width: 639px) { .prean > span { display: none; } .prean { padding-left: 10px; padding-right: 10px; } }
 .bill-run-b { flex: 1; min-width: 0; }
 .bill-run-h { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+.bill-issue { margin-top: 4px; }
+.bill-issue-f { display: grid; gap: 16px; margin-top: 12px; }
+.bill-issue-f .wide { grid-column: 1 / -1; }
+.cmp-pending { margin-bottom: 0; }
+.cmp-paid { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.cmp-paid input[type="date"] { min-width: 0; }
