@@ -26,6 +26,7 @@ import { purgePendingUploads, sweepRunDirs } from './chatfiles.js';
 import { securityHeaders, robotsHeaderFor, cspFor } from './site/seo.js';
 import { hasUsableLink, isLinkExempt, LINK_REQUIRED_MESSAGE } from './claudelink.js';
 import { memberTeamIds, purgeInvites } from './teams.js';
+import { needsWelcome } from './userprofile.js';
 import { sandboxStartupMessages } from './services/sandbox.js';
 import { gitVersionNotes } from './services/git.js';
 
@@ -142,6 +143,8 @@ export async function createApp(cfg, { db, worker = true, createTransport, fetch
           return redirect(res, '/link');
         }
       }
+      // Première connexion : quelques questions sur l'activité (une seule fois, facultatives), avant le tableau de bord
+      if (!route.public && isRead && url.pathname === '/' && !req.headers.accept?.includes('json') && await needsWelcome(db, session.userId)) return redirect(res, '/welcome');
       await route.handler({ req, res, url, params: route.params, session, app });
     } catch (e) {
       const status = e.status || 500;

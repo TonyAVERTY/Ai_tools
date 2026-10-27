@@ -16,6 +16,7 @@ import { registerAdminRoutes } from './adminroutes.js';
 import { loginsOf } from './claudelogin.js';
 import { accessOn, memberTeamIds, needAccess } from './teams.js';
 import { registerTeamRoutes } from './teamroutes.js';
+import { registerProfileRoutes } from './userprofile.js';
 import { registerMailRoutes } from './mailroutes.js';
 import { registerApiV1 } from './apiv1.js';
 import { registerDeveloperRoutes } from './developerroutes.js';
@@ -78,6 +79,7 @@ export function registerRoutes(router, app) {
   registerSiteRoutes(router, app);
   registerAdminRoutes(router, app);
   registerTeamRoutes(router, app);
+  registerProfileRoutes(router, app);
   registerMailRoutes(router, app);
   registerLinkedinRoutes(router, app, { project, aiOpts });
   registerPromoRoutes(router, app, { project, aiOpts });

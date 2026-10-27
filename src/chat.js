@@ -10,6 +10,8 @@ import { now, getSetting, setSetting } from './db.js';
 import { makeClaude, makeSync } from './handlers.js';
 import { chatPrompt, supportPrompt, chatContext, parseCustomPrompts, CHAT_MAX_MESSAGE } from './services/prompts.js';
 import { ensureSupportDocs } from './services/supportdocs.js';
+import { plan } from './services/orchestrator.js';
+import { repoProfile, renderRepoProfile } from './services/repoprofile.js';
 import { getProject, repoDir } from './projects.js';
 import { needAccess, accessOn } from './teams.js';
 import { accessibleProjects } from './mailroutes.js';
@@ -244,10 +246,16 @@ export function registerChatRoutes(router, app) {
         const tools = docs || repo || run?.files.length ? ['Read', 'Glob', 'Grep'] : [];
         const prompts = parseCustomPrompts(await getSetting(db, userId, 'prompts_json', ''));
         const text = `${attachmentsNote(sent?.attachments)}${message}`;
-        const base = docs ? supportPrompt({ history, message: text, custom: prompts, model, index: docs.index }) : chatPrompt({ history, message: text, custom: prompts, model });
-        const system = `${base.system}${chatContext({ project: project && { name: project.name, profile: project.profile }, files: run?.files ?? [] })}`;
+        // Orchestration (déterministe, aucun appel au modèle) : sur un dépôt joint ou une question de code, méthode et fiches choisies d'après la demande
+        // et le profil du dépôt (stack, commandes, tests…) ; sinon les fiches métier de la prospection. Le Support n'en reçoit pas.
+        let repoInfo = null;
+        if (repo) { try { repoInfo = repoProfile(repo); } catch (e) { console.warn('[chat] profil du dépôt :', e.message); } }
+        const orch = docs ? null : plan(message, { hasRepo: !!repo, profile: repoInfo });
+        const base = docs ? supportPrompt({ history, message: text, custom: prompts, model, index: docs.index }) : chatPrompt({ history, message: text, custom: prompts, model, domain: orch.domain });
+        const repoFacts = repoInfo ? `\n\n${renderRepoProfile(repoInfo)}` : '';
+        const system = `${base.system}${chatContext({ project: project && { name: project.name, profile: project.profile }, files: run?.files ?? [] })}${repoFacts}${orch?.block ?? ''}`;
         const r = await claude(userId, {
-          prompt: base.prompt, system, model, maxTurns: tools.length ? CHAT.toolTurns : 1, tools, chat: true, signal: ctrl.signal, timeoutMs: CHAT.timeoutMs,
+          prompt: base.prompt, system, model, maxTurns: tools.length ? (orch?.mode === 'rapide' ? Math.min(6, CHAT.toolTurns) : CHAT.toolTurns) : 1, tools, chat: true, noProfile: !!docs, signal: ctrl.signal, timeoutMs: CHAT.timeoutMs,
           // Dossier de travail : le dépôt joint (celui de son propriétaire), sinon le dossier des fichiers joints ; l'un et l'autre en lecture seule
           ...(docs ? { cwd: docs.dir, allowedRoot: docs.dir, extraDirs: run ? [run.dir] : [] } : repo ? { cwd: repo, repoOwnerId: project.userId, extraDirs: run ? [run.dir] : [] } : run ? { cwd: run.dir, allowedRoot: userChatRoot(cfg, userId) } : {}),
           onDelta: (text) => write({ type: 'delta', text }),
