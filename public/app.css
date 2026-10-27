@@ -528,7 +528,6 @@ input.copy { font-family: var(--mono); font-size: .8125rem; }
   .pfacts { flex-basis: auto; padding-left: 0; margin-left: auto; }
   .card, .panel { padding: 24px; }
   .col-p .panel { padding: 20px; }
-  .usage-card { padding: 20px; }
   .project > summary { flex-wrap: nowrap; }
   .pstate { flex-basis: auto; padding-left: 0; }
   .acc > summary { padding: 12px 20px; }
@@ -1025,7 +1024,6 @@ html.nav-busy { cursor: progress; }
 .admin-actions .del { flex-basis: 100%; }
 
 /* ---------- Compte et Support ---------- */
-.narrow .usage-card, .narrow .usage-card.panel { padding: 24px; }
 .chat-ideas { justify-content: flex-start; }
 .chat-empty .chat-ideas { margin-top: 12px; }
 

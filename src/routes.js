@@ -16,7 +16,7 @@ import { registerAdminRoutes } from './adminroutes.js';
 import { loginsOf } from './claudelogin.js';
 import { accessOn, memberTeamIds, needAccess } from './teams.js';
 import { registerTeamRoutes } from './teamroutes.js';
-import { registerProfileRoutes } from './userprofile.js';
+import { registerProfileRoutes, getProfile, isEmpty } from './userprofile.js';
 import { registerMailRoutes } from './mailroutes.js';
 import { registerApiV1 } from './apiv1.js';
 import { registerDeveloperRoutes } from './developerroutes.js';
@@ -331,7 +331,7 @@ export function registerRoutes(router, app) {
     html(res, accountPage({
       user: session.user, error: url.searchParams.get('e'), link: account.link, quota: account.quota, developer: await developerMode(db, session.userId), appUrl: cfg.appUrl,
       ical: await (async () => { const t = await feedToken(app, session.userId); return t ? feedUrl(cfg, t) : null; })(),
-      consent: await lastConsent(db, session.userId), cliModeEnabled, usage: await usageView(db, await getUser(db, session.userId)),
+      consent: await lastConsent(db, session.userId), profileSet: !isEmpty(await getProfile(db, session.userId)), cliModeEnabled, usage: await usageView(db, await getUser(db, session.userId)),
       notice: t === 'unlinked' ? { ok: true, text: 'Liaison supprimée : le secret a été effacé et tes jobs IA en attente ont été annulés.' }
         : t === 'ok' || t === 'ko' ? { ok: t === 'ok', text: String(url.searchParams.get('m') || '').slice(0, 300) } : null,
     }));

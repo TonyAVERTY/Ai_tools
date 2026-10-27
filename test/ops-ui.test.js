@@ -6,6 +6,7 @@ import { now } from '../src/db.js';
 import { startApp } from './helpers/server.js';
 import { addProject } from './helpers/users.js';
 import { projectStats } from '../src/projects.js';
+import { readFileSync } from 'node:fs';
 
 let s;
 before(async () => { s = await startApp(); });
@@ -133,4 +134,22 @@ test('page Relier Claude : la clé API recommandée d\'abord, le risque annoncé
   assert.match(page, /role="progressbar"[^>]*aria-valuenow="0"/);
   const linked = await s.newUser({ link: { v: 1, mode: 'api_key', valid: true } });
   assert.doesNotMatch(await html(linked, '/link'), /data-nolink/, 'avec un accès valide, les relevés continuent');
+});
+
+test('Mon compte : le profil dit s\'il est renseigné, le fournisseur de connexion n\'est écrit qu\'une fois, la carte Usage a le même gabarit que les autres', async () => {
+  const u = await s.newUser();
+  const before = await html(u, '/account');
+  assert.match(before, /<h2>Mon profil<\/h2><span class="badge ">Non renseigné<\/span>/);
+  assert.match(before, /href="\/welcome\?edit=1"[^>]*>[^]*?Renseigner mon profil/);
+  assert.doesNotMatch(before, /Ton secteur/, 'le profil est global : plus de secteur');
+  assert.match(before, /Connecté avec Google, sans mot de passe/);
+  assert.doesNotMatch(before, /<span class="badge">Google<\/span>/, 'pas de badge qui répète le fournisseur');
+  assert.match(before, /<h2>Agenda<\/h2><a class="btn small" href="\/calendar">[^]*?Voir le calendrier/);
+  await u.post('/welcome', { job: 'fondateur' }, { form: true });
+  const after = await html(u, '/account');
+  assert.match(after, /<h2>Mon profil<\/h2><span class="badge ok">[^]*?Renseigné<\/span>/);
+  assert.match(after, /Modifier mon profil/);
+  const css = readFileSync(new URL('../public/app.css', import.meta.url), 'utf8');
+  assert.doesNotMatch(css, /\.usage-card\s*\{\s*padding/, 'plus de remplissage propre à la carte Usage (il décalait son contenu sur téléphone)');
+  assert.doesNotMatch(await html(await s.newUser(), '/account'), /Renseigné<\/span>/, 'isolation : le profil d\'un autre compte ne se voit pas');
 });
