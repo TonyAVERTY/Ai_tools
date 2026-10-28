@@ -9,7 +9,7 @@ export { ic };
 
 export const SITE_NAME = 'AiTools';
 const OG_IMAGE = '/static/img/share_img.jpg'; // 1024 x 541, aperçu des liens partagés
-export const CONTACT_EMAIL = 'contact@tony-averty.dev';
+export const CONTACT_EMAIL = 'contact@iaboss.fr';
 
 const NAV = [
   ['/fonctionnement', 'Fonctionnement'],

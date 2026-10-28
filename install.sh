@@ -335,7 +335,7 @@ ask_app() {
   fi
 
   while :; do
-    ask DOMAIN "Domaine public" "ai.tony-averty.dev"
+    ask DOMAIN "Domaine public" "iaboss.fr"
     [[ $DOMAIN =~ ^[a-z0-9]([a-z0-9.-]*[a-z0-9])?\.[a-z]{2,}$ ]] && break
     warn "Domaine invalide (ex. ai.mondomaine.fr)."
   done
@@ -371,7 +371,7 @@ ask_tunnel() {
     [[ $c == 2 ]] && { TUNNEL_MODE=later; return; }
   fi
   info "Cloudflare Zero Trust › Networks › Tunnels › Create a tunnel (Cloudflared)"
-  info "Public hostname : ${DOMAIN:-ai.tony-averty.dev} → http://localhost:$PORT"
+  info "Public hostname : ${DOMAIN:-iaboss.fr} → http://localhost:$PORT"
   info "Copie le token (la longue chaîne après « --token » dans la commande proposée)."
   while :; do
     ask_secret TUNNEL_TOKEN "Token du tunnel"

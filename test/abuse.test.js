@@ -127,7 +127,7 @@ test('envois refusés avec un message clair (jamais silencieux) : mise en file, 
       assert.match(e.message, /10 adresse\(s\) sur 50/);
       assert.match(e.message, /20 %/);
       assert.match(e.message, /seuil de 10 %/);
-      assert.match(e.message, /contact@tony-averty\.dev/);
+      assert.match(e.message, /contact@iaboss\.fr/);
       assert.match(e.message, /désinscription/);
       return true;
     });
