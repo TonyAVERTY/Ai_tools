@@ -28,7 +28,7 @@ la version publique cible un serveur CloudPanel avec une base MySQL/MariaDB (voi
 
 ## Site public
 
-Le site (`ai.tony-averty.dev`) est servi par la même application, dans `src/site/`, en rendu serveur sans JavaScript ni dépendance.
+Le site (`iaboss.fr`) est servi par la même application, dans `src/site/`, en rendu serveur sans JavaScript ni dépendance.
 
 - **Pages** : `/` (accueil pour un visiteur, tableau de bord pour un compte connecté), `/fonctionnement`, `/tarifs`, `/login`, `/mentions-legales`, `/confidentialite`, `/cgu`, et une 404 propre. Toutes répondent sans session.
 - **Identité** : `public/site.css` s'ajoute à `public/app.css` et n'utilise que ses jetons (`--bg`, `--card`, `--text`, `--muted`, `--line`, `--accent`, thème sombre compris). Pas de seconde palette : pour changer une couleur, on modifie `app.css`.
@@ -332,14 +332,14 @@ Garde-fous :
 
 Dans la console Google Cloud, crée un ID client OAuth de type « Application Web » (menu Identifiants).
 
-- URI de redirection : `https://ai.tony-averty.dev/auth/google/callback`
+- URI de redirection : `https://iaboss.fr/auth/google/callback`
 - Écran de consentement : mode « Test » avec ton email en testeur, ça suffit.
 
 ### Cloudflare Tunnel
 
 Dans Zero Trust, va dans Networks → Tunnels → Create a tunnel (Cloudflared).
 
-- Public hostname : `ai.tony-averty.dev` → `http://localhost:3100`
+- Public hostname : `iaboss.fr` → `http://localhost:3100`
 - Copie le token, `install.sh` te le demandera.
 
 ### Dépôts Git : GitHub par défaut, serveurs ajoutables

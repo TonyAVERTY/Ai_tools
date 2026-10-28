@@ -233,5 +233,5 @@ test('mail d\'avertissement : jamais le mot de passe ni de donnée métier, lien
   assert.match(m.subject, /supprimé pour inactivité/);
   assert.match(m.text, /ada@ex\.fr/);
   assert.match(m.text, /export/i);
-  assert.ok(m.text.includes('contact@tony-averty.dev'));
+  assert.ok(m.text.includes('contact@iaboss.fr'));
 });
