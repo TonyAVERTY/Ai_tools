@@ -202,7 +202,7 @@ test('aucune ressource externe : tout est servi par l\'application, rien en lign
 
 test('textes : faits réels du statut, tarifs sans prix inventé, aucun terme interdit', async () => {
   const mentions = await text('/mentions-legales');
-  for (const f of ['Tony AVERTY', '100 142 819 00018', '62.01Z', 'contact@tony-averty.dev', 'TVA non applicable, art. 293 B du CGI', 'Directeur de la publication']) {
+  for (const f of ['Tony AVERTY', '100 142 819 00018', '62.01Z', 'contact@iaboss.fr', 'TVA non applicable, art. 293 B du CGI', 'Directeur de la publication']) {
     assert.ok(mentions.includes(f), f);
   }
   const tarifs = await text('/tarifs');

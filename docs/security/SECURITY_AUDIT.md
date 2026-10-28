@@ -47,7 +47,7 @@ Couvert : tout `src/`, `public/*.js`, `deploy/`, `install.sh`, `package.json` / 
 | FAIBLE | Pas de limite globale de requêtes pour un compte connecté (seules les routes coûteuses sont limitées) et limiteur en mémoire (non partagé, remis à zéro au redémarrage). | Volontaire (une seule instance). Une règle Cloudflare (rate limiting / WAF) devant le tunnel est la vraie protection contre un abus distribué : action infrastructure. |
 | FAIBLE | Liste d'opposition globale : tout utilisateur peut, en important un CSV contenant une adresse puis en la marquant « refusé », l'ajouter à la liste commune (empoisonnement possible). | Comportement **voulu** (demande produit). Risque limité à l'effet « ne plus contacter ». À surveiller via le journal d'administration. |
 | FAIBLE | Cookie de session sans préfixe `__Host-`. | Gain marginal ; changer le nom déconnecterait les utilisateurs. |
-| INFO | HSTS sans `includeSubDomains` ni `preload`. | Volontaire : n'activer que si tous les sous-domaines de `tony-averty.dev` sont en HTTPS. |
+| INFO | HSTS sans `includeSubDomains` ni `preload`. | Volontaire : n'activer que si tous les sous-domaines de `iaboss.fr` sont en HTTPS. |
 
 ## 5. Tests exécutés
 

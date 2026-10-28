@@ -99,7 +99,7 @@ Hors paiement Stripe (Could, +3–5 j).
 ## 8. Décisions de Tony et points restants
 
 ### Décisions (réponses de Tony)
-1. **Domaine** : `ai.tony-averty.dev`.
+1. **Domaine** : `iaboss.fr` (avant : `ai.tony-averty.dev`).
 2. **Inscription** : validation automatique, connexion **Google ou Apple** uniquement (pas de mot de passe), puis liaison Claude obligatoire. Le §3 « email + mot de passe, vérification, reset » est donc supprimé du périmètre.
 3. **Modèle** : freemium (plan gratuit limité + plan payant → le paiement passe de Could à **Should**).
 4. **Isolation du mode CLI** : la plus optimisée en ressources, avec garantie qu'un utilisateur n'accède jamais au Claude d'un autre. Retenu : un seul utilisateur système, un dossier de config par compte en 700, et chaque job lancé dans un bac à sable (bubblewrap ou `systemd-run` avec montages privés) qui ne voit que le dossier de son propriétaire. Mode clé API : clé passée par variable d'environnement au processus uniquement, jamais écrite sur disque.
