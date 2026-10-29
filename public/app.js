@@ -1310,15 +1310,16 @@
             <label class="field"><span class="lbl">Fournisseur</span><span class="sel"><select name="voiceProvider">${s.voices.map((p) => `<option value="${esc(p.id)}">${esc(p.label)}</option>`).join('')}</select>${icon('down')}</span></label>
             <label class="field"><span class="lbl">Voix</span><span class="sel"><select name="voiceName">${voiceOptions(s.voices[0])}</select>${icon('down')}</span></label>
           </div>
+          <p class="muted small" data-promo-local hidden role="status"></p>
           <label class="field" data-promo-lang hidden><span class="lbl">Langue</span><span class="sel"><select name="voiceLang">${s.voiceLangs.map((l) => `<option value="${esc(l.id)}">${esc(l.label)}</option>`).join('')}</select>${icon('down')}</span></label>
           <div class="promo-key" data-promo-key hidden data-can="${s.canManageKeys ? '1' : ''}">
             <p class="muted small" data-promo-key-help></p>
-            <div class="row" data-promo-key-new><input type="password" name="voiceKey" placeholder="Colle ta clé API" autocomplete="off" spellcheck="false" aria-label="Clé API du fournisseur"><button type="button" class="btn small" data-promo-key-save>Enregistrer la clé</button></div>
+            <div class="row" data-promo-key-new><input type="password" name="voiceKey" placeholder="Colle ta clé API" autocomplete="off" spellcheck="false" aria-label="Clé API du fournisseur"><input type="text" name="voiceRegion" data-promo-region placeholder="Région (ex. francecentral)" autocomplete="off" spellcheck="false" aria-label="Région de la ressource Microsoft Azure" hidden><button type="button" class="btn small" data-promo-key-save>Enregistrer la clé</button></div>
             <div class="row" data-promo-key-set><span class="hint" data-promo-key-last4></span><button type="button" class="btn small" data-promo-key-remove>Retirer la clé</button></div>
           </div>
           <div class="row"><button type="button" class="btn small" data-promo-sample>${icon('play')}Écouter un extrait</button><span class="hint" data-promo-sample-state role="status"></span></div>
           <audio data-promo-audio preload="none"></audio>
-          <p class="muted small">La voix lit un texte écrit par Claude, dans la langue de la voix choisie. Ce texte est envoyé au fournisseur pour être lu. Microsoft Edge et Google Traduction sont gratuits, sans clé, mais non officiels : ils peuvent changer ou refuser des demandes. ElevenLabs et Google Cloud donnent les voix les plus naturelles avec ta propre clé API (quota gratuit mensuel du fournisseur) ; ta clé est chiffrée et jamais réaffichée.</p>
+          <p class="muted small">La voix lit un texte écrit par Claude, dans la langue de la voix choisie. Ce texte est envoyé au fournisseur pour être lu. Google Traduction est gratuit et sans clé, mais non officiel (il peut changer ou refuser des demandes) et sa voix est simple. Piper et eSpeak NG sont des voix locales, gratuites, sans clé : elles tournent sur le serveur (rien n'en sort) si l'administrateur les a installées ; Piper est bien plus naturelle. ElevenLabs, Google Cloud et Microsoft Azure donnent des voix bien plus naturelles avec ta propre clé API (quota gratuit mensuel du fournisseur) ; ta clé est chiffrée et jamais réaffichée.</p>
         </div>
         <p class="hint" data-promo-count></p>
         <div class="row"><button class="btn primary" data-promo-go>${icon('film')}Générer la vidéo</button></div>
@@ -1352,13 +1353,17 @@
     const p = voiceProvider(f);
     if (!p) return;
     $('[data-promo-lang]', f).hidden = !p.multilingual;
+    const local = $('[data-promo-local]', f);
+    local.hidden = !(p.local && !p.available);
+    local.textContent = p.unavailable || '';
     const key = $('[data-promo-key]', f);
     key.hidden = !p.keyed;
     if (p.keyed) {
       $('[data-promo-key-help]', f).textContent = p.keyHelp || '';
       $('[data-promo-key-new]', f).hidden = !!p.keyLast4 || !key.dataset.can;
       $('[data-promo-key-set]', f).hidden = !p.keyLast4;
-      $('[data-promo-key-last4]', f).textContent = p.keyLast4 ? `Clé enregistrée (se termine par ${p.keyLast4})` : '';
+      $('[data-promo-region]', f).hidden = !p.needsRegion;
+      $('[data-promo-key-last4]', f).textContent = p.keyLast4 ? `Clé enregistrée (se termine par ${p.keyLast4})${p.region ? ` · région ${p.region}` : ''}` : '';
       if (!key.dataset.can && !p.keyLast4) $('[data-promo-key-help]', f).textContent = 'Seul le propriétaire du projet peut enregistrer la clé de ce fournisseur.';
       $('[data-promo-key-remove]', f).hidden = !key.dataset.can;
     }
@@ -1388,15 +1393,16 @@
     btn.disabled = true;
     state.textContent = 'Vérification de la clé…';
     try {
-      const r = await api('/api/promo/voice-key', { provider: p.id, key: input.value });
+      const r = await api('/api/promo/voice-key', { provider: p.id, key: input.value, region: f.voiceRegion.value });
       input.value = '';
       p.keyLast4 = r.keyLast4;
+      p.region = r.region;
       p.voices = r.voices;
       state.textContent = 'Clé enregistrée';
       voiceSync(f);
     } catch (err) { state.textContent = err.message; } finally { btn.disabled = false; }
   }
-  listen(document, 'keydown', (e) => { if (e.key === 'Enter' && e.target.name === 'voiceKey') { e.preventDefault(); const f = e.target.closest('[data-promo-form]'); if (f) saveVoiceKey(f); } });
+  listen(document, 'keydown', (e) => { if (e.key === 'Enter' && (e.target.name === 'voiceKey' || e.target.name === 'voiceRegion')) { e.preventDefault(); const f = e.target.closest('[data-promo-form]'); if (f) saveVoiceKey(f); } });
   listen(document, 'click', async (e) => {
     const f = e.target.closest('[data-promo-form]');
     if (!f) return;
@@ -1404,7 +1410,7 @@
     if (e.target.closest('[data-promo-key-remove]')) {
       const p = voiceProvider(f);
       if (!confirm(`Retirer la clé ${p.label.split(' (')[0]} ? Il faudra la coller de nouveau pour reprendre ses voix.`)) return;
-      try { await api('/api/promo/voice-key/delete', { provider: p.id }); p.keyLast4 = null; p.voices = null; voiceSync(f); } catch (err) { $('[data-promo-sample-state]', f).textContent = err.message; }
+      try { await api('/api/promo/voice-key/delete', { provider: p.id }); p.keyLast4 = null; p.region = null; p.voices = null; voiceSync(f); } catch (err) { $('[data-promo-sample-state]', f).textContent = err.message; }
       return;
     }
     const b = e.target.closest('[data-promo-sample]');
@@ -1433,6 +1439,7 @@
     if (f.voice.checked) {
       const vp = voiceProvider(f);
       if (vp?.keyed && !vp.keyLast4) return toast(`Ajoute d'abord ta clé API ${vp.label.split(' (')[0]}, ou choisis un autre fournisseur`, 'error');
+      if (vp?.local && !vp.available) return toast(vp.unavailable, 'error');
       if (!f.voiceName.value) return toast('Choisis une voix', 'error');
     }
     btn.disabled = true;

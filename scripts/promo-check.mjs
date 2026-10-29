@@ -12,6 +12,7 @@ s.app.cfg.claudeBin = makeClaudeBin(s.tmp, { fixture: 'fake-claude.js' });
 // Extrait d'écoute : un vrai MP3 d'une seconde (le service de voix n'est jamais appelé)
 const sample = spawnSync('ffmpeg', ['-v', 'error', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=1', '-f', 'mp3', '-'], { maxBuffer: 1 << 20 }).stdout;
 s.app.sampleVoice = async () => sample;
+s.app.localStatus = () => ({ piper: { ok: false, voices: [] }, espeak: { ok: true, voices: [{ id: 'fr', label: 'Français · voix masculine', lang: 'fr' }, { id: 'fr+f3', label: 'Français · voix féminine', lang: 'fr' }] } });
 s.app.listVoices = async () => [{ id: 'abcDEF123', label: 'Bella · féminine', lang: 'fr' }, { id: 'zzz999', label: 'Adam · masculine', lang: 'fr' }];
 const u = await s.newUser();
 const pid = await addProject(s.db, u.id, { name: 'Fidélio', gitUrl: 'https://github.com/u/fidelio.git' });
@@ -42,22 +43,26 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   ok(await p.locator('[data-promo-voice]').isHidden(), `${tag} voix : choix masqués tant que la case n'est pas cochée`);
   await p.check('[data-promo-voice-toggle]');
   ok(await p.locator('[data-promo-voice]').isVisible(), `${tag} voix : choix affichés`);
-  const edgeVoices = await p.locator('select[name="voiceName"] option').count();
-  await p.selectOption('select[name="voiceProvider"]', 'google');
-  const googleVoices = await p.locator('select[name="voiceName"] option').count();
-  ok(edgeVoices > googleVoices && googleVoices === 6, `${tag} voix : la liste suit le fournisseur (${edgeVoices} puis ${googleVoices})`);
-  await p.selectOption('select[name="voiceProvider"]', 'edge');
-  await p.selectOption('select[name="voiceName"]', 'fr-FR-HenriNeural');
+  ok(await p.locator('select[name="voiceProvider"]').inputValue() === 'google' && await p.locator('select[name="voiceName"] option').count() === 6, `${tag} voix : Google Traduction par défaut (6 voix), sans clé à saisir`);
+  ok(await p.locator('[data-promo-key]').isHidden() && await p.locator('[data-promo-lang]').isHidden(), `${tag} voix : ni clé ni langue à choisir pour ce fournisseur`);
+  await p.selectOption('select[name="voiceName"]', 'fr');
   const sampled = p.waitForResponse((r) => r.url().includes('/api/promo/voice-sample'), { timeout: 8000 });
   await p.locator('[data-promo-sample]').click();
   ok((await sampled).status() === 200, `${tag} voix : extrait servi`);
   await p.waitForFunction(() => { const a = document.querySelector('[data-promo-audio]'); return a && (a.currentTime > 0 || a.ended || a.readyState >= 2 || a.error); }, null, { timeout: 5000 }).catch(() => {});
   ok(await p.locator('[data-promo-audio]').evaluate((a) => !a.error), `${tag} voix : l'élément audio lit l'extrait sans erreur (CSP comprise)`);
+  // Voix locales : Piper non installé (message pour l'administrateur, pas d'extrait), eSpeak NG disponible
+  await p.selectOption('select[name="voiceProvider"]', 'piper');
+  ok(/administrateur/.test(await p.locator('[data-promo-local]').textContent()) && await p.locator('[data-promo-local]').isVisible() && await p.locator('[data-promo-sample]').isDisabled(), `${tag} Piper non installé : message et pas d'extrait`);
+  ok(await p.locator('[data-promo-key]').isHidden(), `${tag} voix locale : aucune clé demandée`);
+  await p.selectOption('select[name="voiceProvider"]', 'espeak');
+  ok(await p.locator('[data-promo-local]').isHidden() && await p.locator('select[name="voiceName"] option').count() === 2 && await p.locator('[data-promo-sample]').isEnabled(), `${tag} eSpeak NG disponible : 2 voix, extrait possible`);
   // Fournisseur à clé : panneau de clé, enregistrement, voix de l'API, langue
   await p.selectOption('select[name="voiceProvider"]', 'elevenlabs');
   ok(await p.locator('[data-promo-key]').isVisible() && await p.locator('[data-promo-key-new]').isVisible() && await p.locator('[data-promo-key-set]').isHidden(), `${tag} clé : champ affiché tant qu'aucune clé n'est enregistrée`);
   ok(await p.locator('[data-promo-lang]').isVisible(), `${tag} clé : choix de la langue (voix multilingue)`);
   ok(await p.locator('[data-promo-sample]').isDisabled(), `${tag} clé : pas d'extrait sans voix`);
+  ok(await p.locator('input[name="voiceRegion"]').isHidden(), `${tag} clé : pas de région pour ElevenLabs`);
   await p.fill('input[name="voiceKey"]', 'sk_test_1234567890abcdefghij');
   await p.locator('input[name="voiceKey"]').press('Enter');
   await p.waitForFunction(() => document.querySelectorAll('select[name="voiceName"] option').length === 2, null, { timeout: 5000 });
@@ -70,7 +75,9 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   await p.locator('[data-promo-key-remove]').click();
   await p.waitForFunction(() => !document.querySelector('[data-promo-key-new]').hidden, null, { timeout: 5000 });
   ok(true, `${tag} clé : retirée`);
-  await p.selectOption('select[name="voiceProvider"]', 'edge');
+  await p.selectOption('select[name="voiceProvider"]', 'azure');
+  ok(await p.locator('input[name="voiceRegion"]').isVisible() && await p.locator('[data-promo-lang]').isHidden(), `${tag} Azure : champ région affiché, pas de choix de langue (la voix la porte)`);
+  await p.selectOption('select[name="voiceProvider"]', 'google');
   if (process.env.SHOTS) await p.locator('details[data-acc="promo"]').screenshot({ path: `${process.env.SHOTS}/promo-voice-${vp.width}.png` });
   await p.uncheck('[data-promo-voice-toggle]');
   await p.fill('[data-promo-form] input[name="fps"]', '10'); await p.fill('[data-promo-form] input[name="seconds"]', '3');

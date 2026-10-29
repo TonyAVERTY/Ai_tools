@@ -1,16 +1,17 @@
 // Voix off des vidéos de promotion. Claude écrit, avec la scène, un petit script (« voix ») : des phrases avec l'instant où elles commencent.
 // Ce module le valide, le fait lire par un fournisseur de synthèse vocale, puis ffmpeg pose les voix sur la bande-son de la vidéo.
-//  - edge       : voix neuronales de Microsoft Edge (lecture à voix haute), gratuit et sans clé, bonne qualité ;
-//  - elevenlabs : les voix les plus naturelles, avec la clé API de l'utilisateur (plan gratuit mensuel) ;
-//  - googlecloud: voix Google Cloud (Chirp 3 HD, Neural2, Studio), avec la clé API de l'utilisateur (quota gratuit mensuel) ;
-//  - google     : voix de Google Traduction, gratuit et sans clé, la plus simple (une voix par langue).
-// Edge et Google Traduction ne sont pas des API officielles : ils peuvent changer ou refuser des requêtes. Le texte lu est envoyé au fournisseur choisi.
+//  - google      : voix de Google Traduction, gratuit et sans clé, la plus simple (une voix par langue) ; service non officiel, il peut changer ou refuser des requêtes ;
+//  - elevenlabs  : les voix les plus naturelles, avec la clé API de l'utilisateur (plan gratuit mensuel) ;
+//  - googlecloud : voix Google Cloud (Chirp 3 HD, Neural2, Studio), avec la clé API de l'utilisateur (quota gratuit mensuel) ;
+//  - piper       : Piper, voix neuronales libres qui tournent SUR le serveur (hors ligne, sans clé, rien ne sort du serveur) ; à installer par l'administrateur ;
+//  - espeak      : eSpeak NG, synthèse locale très simple (robotique mais toujours disponible : un paquet à installer) ;
+//  - azure       : Microsoft Azure AI Speech (voix neuronales dont les « Multilingual »), avec la clé et la région de l'utilisateur (niveau gratuit F0).
+// Le service de lecture à voix haute de Microsoft Edge n'est volontairement PAS utilisé : Microsoft le réserve à son navigateur (jeton propre à Edge : un client tiers
+// reçoit un 403) et ne le propose pas aux applications ; la voie officielle de Microsoft, ce sont les voix Azure ci-dessus. Le texte lu est envoyé au fournisseur choisi.
 // Les clés sont chiffrées en base, jamais réaffichées, jamais dans un message d'erreur ni un journal.
 // Aucun appel réseau n'est fait ailleurs que dans `synthesize` (remplaçable dans les tests).
-import { createHash, randomBytes, randomUUID } from 'node:crypto';
-import { spawn } from 'node:child_process';
-import { request as httpsRequest } from 'node:https';
-import { mkdtempSync, writeFileSync, rmSync, renameSync } from 'node:fs';
+import { spawn, spawnSync } from 'node:child_process';
+import { mkdtempSync, writeFileSync, readFileSync, readdirSync, rmSync, renameSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { SceneError } from './promovideo.js';
@@ -26,37 +27,37 @@ const SAMPLES = {
 const v = (id, label, lang) => ({ id, label, lang });
 export const VOICE_LANGS = Object.entries(LANGS).map(([id, label]) => ({ id, label: label[0].toUpperCase() + label.slice(1) }));
 export const VOICE_PROVIDERS = {
-  edge: {
-    label: 'Microsoft Edge (gratuit)',
+  google: {
+    label: 'Google Traduction (gratuit)',
+    voices: [v('fr', 'Français', 'fr'), v('en', 'Anglais', 'en'), v('es', 'Espagnol', 'es'), v('de', 'Allemand', 'de'), v('it', 'Italien', 'it'), v('pt', 'Portugais', 'pt')],
+  },
+  // Voix locales : exécutées par le serveur lui-même (aucun appel réseau, aucune clé). Disponibles seulement si l'administrateur les a installées.
+  piper: { label: 'Piper (voix locale, gratuit)', local: true, installHelp: 'Piper n\'est pas installé sur ce serveur : l\'administrateur doit l\'installer (voir la documentation du Support, « Voix locales ») puis renseigner PIPER_BIN et PIPER_VOICES_DIR.' },
+  espeak: {
+    label: 'eSpeak NG (voix locale, simple)', local: true, installHelp: 'eSpeak NG n\'est pas installé sur ce serveur : l\'administrateur doit installer le paquet espeak-ng.',
     voices: [
-      v('fr-FR-VivienneMultilingualNeural', 'Vivienne · français, féminine (très naturelle)', 'fr'), v('fr-FR-RemyMultilingualNeural', 'Rémy · français, masculine (très naturelle)', 'fr'),
-      v('fr-FR-LucienMultilingualNeural', 'Lucien · français, masculine (très naturelle)', 'fr'),
-      v('fr-FR-DeniseNeural', 'Denise · français, féminine', 'fr'), v('fr-FR-HenriNeural', 'Henri · français, masculine', 'fr'),
-      v('fr-BE-CharlineNeural', 'Charline · français de Belgique, féminine', 'fr'), v('fr-CA-SylvieNeural', 'Sylvie · français du Canada, féminine', 'fr'),
-      v('en-US-AvaMultilingualNeural', 'Ava · anglais américain, féminine (très naturelle)', 'en'), v('en-US-AndrewMultilingualNeural', 'Andrew · anglais américain, masculine (très naturelle)', 'en'),
-      v('en-US-JennyNeural', 'Jenny · anglais américain, féminine', 'en'), v('en-US-GuyNeural', 'Guy · anglais américain, masculine', 'en'),
-      v('en-GB-SoniaNeural', 'Sonia · anglais britannique, féminine', 'en'), v('en-GB-RyanNeural', 'Ryan · anglais britannique, masculine', 'en'),
-      v('es-ES-ElviraNeural', 'Elvira · espagnol, féminine', 'es'), v('es-ES-AlvaroNeural', 'Álvaro · espagnol, masculine', 'es'),
-      v('de-DE-SeraphinaMultilingualNeural', 'Seraphina · allemand, féminine (très naturelle)', 'de'), v('de-DE-FlorianMultilingualNeural', 'Florian · allemand, masculine (très naturelle)', 'de'),
-      v('de-DE-KatjaNeural', 'Katja · allemand, féminine', 'de'), v('de-DE-ConradNeural', 'Conrad · allemand, masculine', 'de'),
-      v('it-IT-ElsaNeural', 'Elsa · italien, féminine', 'it'), v('it-IT-DiegoNeural', 'Diego · italien, masculine', 'it'),
-      v('pt-BR-FranciscaNeural', 'Francisca · portugais, féminine', 'pt'), v('pt-PT-DuarteNeural', 'Duarte · portugais, masculine', 'pt'),
+      v('fr', 'Français · voix masculine', 'fr'), v('fr+f3', 'Français · voix féminine', 'fr'), v('en-us', 'Anglais américain · voix masculine', 'en'), v('en-us+f3', 'Anglais américain · voix féminine', 'en'),
+      v('en-gb', 'Anglais britannique · voix masculine', 'en'), v('es', 'Espagnol · voix masculine', 'es'), v('es+f3', 'Espagnol · voix féminine', 'es'),
+      v('de', 'Allemand · voix masculine', 'de'), v('de+f3', 'Allemand · voix féminine', 'de'), v('it', 'Italien · voix masculine', 'it'), v('it+f3', 'Italien · voix féminine', 'it'),
+      v('pt-br', 'Portugais · voix masculine', 'pt'), v('pt-br+f3', 'Portugais · voix féminine', 'pt'),
     ],
   },
   // Voix très naturelles : la clé de l'utilisateur ouvre la liste de ses voix ; une voix ElevenLabs parle toutes les langues (modèle multilingue)
   elevenlabs: { label: 'ElevenLabs (clé gratuite)', keyed: true, multilingual: true, keyUrl: 'elevenlabs.io', keyHelp: 'Crée un compte gratuit sur elevenlabs.io, ouvre ton profil → « API Keys », crée une clé et colle-la ici.' },
   googlecloud: { label: 'Google Cloud (clé gratuite)', keyed: true, keyUrl: 'console.cloud.google.com', keyHelp: 'Dans console.cloud.google.com : active « Cloud Text-to-Speech API », puis Identifiants → Créer des identifiants → Clé API, et colle-la ici.' },
-  google: {
-    label: 'Google Traduction (gratuit)',
-    voices: [v('fr', 'Français', 'fr'), v('en', 'Anglais', 'en'), v('es', 'Espagnol', 'es'), v('de', 'Allemand', 'de'), v('it', 'Italien', 'it'), v('pt', 'Portugais', 'pt')],
-  },
+  // Microsoft : la voie officielle (niveau gratuit F0 : 500 000 caractères par mois). Clé ET région (celle de la ressource, par exemple « francecentral » ou « westeurope »)
+  azure: { label: 'Microsoft Azure (clé gratuite)', keyed: true, region: true, keyUrl: 'portal.azure.com', keyHelp: 'Sur portal.azure.com : crée une ressource « Speech » (niveau gratuit F0), ouvre « Clés et point de terminaison », puis colle ici la clé 1 et la région (par exemple francecentral).' },
 };
 
 /** Catalogue pour la page : les voix des fournisseurs à clé viennent de leur API (une fois la clé enregistrée). `keys` : { fournisseur: 4 derniers caractères }. */
-export const voiceCatalog = (keys = {}) => Object.entries(VOICE_PROVIDERS).map(([id, p]) => ({
-  id, label: p.label, keyed: !!p.keyed, multilingual: !!p.multilingual, keyHelp: p.keyHelp || null,
-  keyLast4: p.keyed ? (keys[id] || null) : null, voices: p.voices || null,
+export const voiceCatalog = (keys = {}, regions = {}, locals = {}) => Object.entries(VOICE_PROVIDERS).map(([id, p]) => ({
+  id, label: p.label, keyed: !!p.keyed, multilingual: !!p.multilingual, needsRegion: !!p.region, keyHelp: p.keyHelp || null,
+  keyLast4: p.keyed ? (keys[id] || null) : null, region: p.region ? (regions[id] || null) : null,
+  local: !!p.local, available: p.local ? !!locals[id]?.ok : true, unavailable: p.local && !locals[id]?.ok ? p.installHelp : null,
+  voices: p.local ? (locals[id]?.ok ? locals[id].voices : []) : (p.voices || null),
 }));
+const REGION_RE = /^[a-z0-9]{3,30}$/;
+export const REGION = { test: (r) => typeof r === 'string' && REGION_RE.test(r) }; // « null » ou un nombre ne sont pas une région
 const findVoice = (provider, id) => VOICE_PROVIDERS[provider]?.voices?.find((x) => x.id === id) || null;
 export const langName = (lang) => LANGS[lang] || 'français';
 const VOICE_ID = /^[A-Za-z0-9_.-]{1,80}$/;
@@ -68,7 +69,7 @@ export function parseVoiceParams(b = {}) {
   const p = VOICE_PROVIDERS[provider];
   if (!p) return { error: 'Voix : choisis un fournisseur dans la liste.' };
   const id = String(b.voiceName ?? '');
-  if (p.keyed) {
+  if (p.keyed || (p.local && !p.voices)) {
     if (!VOICE_ID.test(id)) return { error: 'Voix : choisis une voix dans la liste.' };
     const lang = p.multilingual ? (LANGS[b.voiceLang] ? String(b.voiceLang) : 'fr') : (LANGS[id.slice(0, 2)] ? id.slice(0, 2) : 'fr');
     return { voice: { provider, voice: id, lang } };
@@ -128,124 +129,6 @@ const withTimeout = async (promise, ms, what) => {
 
 const xmlEscape = (s) => s.replace(/[<>&'"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' }[c]));
 
-// Edge « lecture à voix haute » : WebSocket, jeton de la forme décrite par les clients libres de ce service.
-const EDGE = {
-  token: '6A5AA1D4EAFF4E9FB37E23D68491D6F4', chrome: '143.0.3650.75',
-  url: 'wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1',
-  voicesUrl: 'https://speech.platform.bing.com/consumer/speech/synthesize/readaloud/voices/list',
-};
-const EDGE_ORIGIN = 'chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold';
-const edgeAgent = () => `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${EDGE.chrome.split('.')[0]}.0.0.0 Safari/537.36 Edg/${EDGE.chrome.split('.')[0]}.0.0.0`;
-export function edgeGec(now = Date.now()) {
-  let ticks = Math.floor(now / 1000) + 11644473600; // secondes depuis 1601
-  ticks -= ticks % 300;
-  return createHash('sha256').update(`${ticks * 1e7}${EDGE.token}`).digest('hex').toUpperCase();
-}
-
-export function edgeSsml(text, voice) {
-  const lang = voice.split('-').slice(0, 2).join('-');
-  return `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='${lang}'><voice name='${voice}'><prosody pitch='+0Hz' rate='+0%' volume='+0%'>${xmlEscape(text)}</prosody></voice></speak>`;
-}
-
-/** Adresse et en-têtes de la connexion vocale Edge (partagés par la connexion et la sonde de diagnostic). */
-export function edgeHandshake({ skew = 0 } = {}) {
-  const id = randomUUID().replace(/-/g, '');
-  return {
-    id,
-    url: `${EDGE.url}?TrustedClientToken=${EDGE.token}&Sec-MS-GEC=${edgeGec(Date.now() + skew)}&Sec-MS-GEC-Version=1-${EDGE.chrome}&ConnectionId=${id}`,
-    headers: {
-      Pragma: 'no-cache', 'Cache-Control': 'no-cache', Origin: EDGE_ORIGIN, 'User-Agent': edgeAgent(), 'Accept-Language': 'en-US,en;q=0.9',
-      Cookie: `muid=${randomUUID().replace(/-/g, '').toUpperCase()};`,
-    },
-  };
-}
-
-/** Sonde : la même poignée de main WebSocket, faite à la main, pour connaître le code que Microsoft répond (le WebSocket de Node ne le donne pas). */
-export function edgeProbe({ skew = 0, request = httpsRequest, timeoutMs = 8000 } = {}) {
-  return new Promise((resolve) => {
-    const { url, headers } = edgeHandshake({ skew });
-    const u = new URL(url.replace(/^wss:/, 'https:'));
-    const req = request({
-      hostname: u.hostname, path: u.pathname + u.search, method: 'GET', timeout: timeoutMs,
-      headers: { ...headers, Connection: 'Upgrade', Upgrade: 'websocket', 'Sec-WebSocket-Version': '13', 'Sec-WebSocket-Key': randomBytes(16).toString('base64') },
-    });
-    const done = (r) => { try { req.destroy(); } catch { /* déjà fermée */ } resolve(r); };
-    req.on('upgrade', (res) => done({ status: 101, headers: res.headers }));
-    req.on('response', (res) => {
-      let body = '';
-      res.on('data', (d) => { body = (body + d).slice(0, 300); });
-      res.on('end', () => done({ status: res.statusCode, headers: res.headers, body }));
-      setTimeout(() => done({ status: res.statusCode, headers: res.headers, body }), 1500);
-    });
-    req.on('timeout', () => done({ error: 'délai dépassé' }));
-    req.on('error', (e) => done({ error: e.code || e.message }));
-    req.end();
-  });
-}
-
-function edgeSynth(text, voice, { WS = globalThis.WebSocket, skew = 0 } = {}) {
-  return new Promise((resolve, reject) => {
-    if (!WS) return reject(new Error('Ce Node ne fournit pas WebSocket'));
-    const { id, url, headers } = edgeHandshake({ skew });
-    const chunks = [];
-    const ws = new WS(url, { headers });
-    ws.binaryType = 'arraybuffer';
-    let settled = false;
-    const end = (err) => { if (settled) return; settled = true; try { ws.close(); } catch { /* déjà fermée */ } err ? reject(err) : resolve(Buffer.concat(chunks)); };
-    ws.onerror = () => end(Object.assign(new Error('Connexion refusée par le service de voix Microsoft Edge'), { edgeWs: true })); // le navigateur ne dit pas pourquoi : voir edgeDiagnose
-    ws.onclose = () => end(chunks.length ? null : new Error('Le service de voix Microsoft Edge a fermé la connexion sans audio'));
-    ws.onopen = () => {
-      const stamp = new Date().toString();
-      ws.send(`X-Timestamp:${stamp}\r\nContent-Type:application/json; charset=utf-8\r\nPath:speech.config\r\n\r\n{"context":{"synthesis":{"audio":{"metadataoptions":{"sentenceBoundaryEnabled":"false","wordBoundaryEnabled":"false"},"outputFormat":"audio-24khz-48kbitrate-mono-mp3"}}}}\r\n`);
-      ws.send(`X-RequestId:${id}\r\nContent-Type:application/ssml+xml\r\nX-Timestamp:${stamp}Z\r\nPath:ssml\r\n\r\n${edgeSsml(text, voice)}`);
-    };
-    ws.onmessage = (ev) => {
-      if (typeof ev.data === 'string') { if (/Path:turn\.end/.test(ev.data)) end(chunks.length ? null : new Error('Le service de voix Microsoft Edge n\'a renvoyé aucun audio')); return; }
-      const buf = Buffer.from(ev.data);
-      if (buf.length < 2) return;
-      const headLen = buf.readUInt16BE(0);
-      if (/Path:audio/.test(buf.subarray(2, 2 + headLen).toString('latin1'))) chunks.push(buf.subarray(2 + headLen));
-    };
-  });
-}
-
-/**
- * Pourquoi la connexion WebSocket a-t-elle échoué ? Une requête HTTPS vers le même service sépare : réseau bloqué (pas de réponse), horloge du serveur
- * décalée (le jeton dépend de l'heure, Microsoft répond 403), protocole modifié (403 sans décalage), ou service joignable (le problème est le WebSocket).
- */
-export async function edgeDiagnose({ fetchImpl = fetch, now = Date.now, probe = edgeProbe } = {}) {
-  let res;
-  try {
-    res = await fetchImpl(`${EDGE.voicesUrl}?trustedclienttoken=${EDGE.token}&Sec-MS-GEC=${edgeGec(now())}&Sec-MS-GEC-Version=1-${EDGE.chrome}`, { headers: { 'User-Agent': edgeAgent(), Origin: EDGE_ORIGIN }, signal: AbortSignal.timeout(8000) });
-  } catch { return { kind: 'network' }; }
-  const date = Date.parse(res.headers?.get?.('date') || '');
-  const skew = Number.isFinite(date) ? date - now() : 0;
-  if (!res.ok) return { kind: 'refused', status: res.status, skew };
-  const ws = await probe({ skew: Math.abs(skew) > 30_000 ? skew : 0 }); // le service répond : que dit-il à la poignée de main WebSocket ?
-  return { kind: 'service', status: res.status, skew, ws: ws.status || null, wsError: ws.error || null };
-}
-
-export function edgeHint(d) {
-  if (d.kind === 'network') return 'Le serveur ne joint pas speech.platform.bing.com (réseau ou pare-feu qui bloque la sortie vers Microsoft) : demande à l\'administrateur d\'autoriser ce domaine, ou choisis un autre fournisseur';
-  if (Math.abs(d.skew) > 30_000) return `L'horloge du serveur est décalée de ${Math.round(Math.abs(d.skew) / 60_000)} min : Microsoft refuse alors la connexion. Synchronise l'heure du serveur (NTP), ou choisis un autre fournisseur`;
-  if (d.kind === 'refused') return `Microsoft Edge a refusé la requête (code ${d.status}) : ce service non officiel a probablement changé son protocole ; choisis un autre fournisseur`;
-  if (d.ws && d.ws !== 101) return `Microsoft Edge répond mais refuse la connexion vocale (code ${d.ws}) : ce service non officiel a probablement changé son protocole ; choisis un autre fournisseur (ElevenLabs et Google Cloud sont officiels)`;
-  if (d.ws === 101) return 'La connexion vocale Microsoft Edge s\'ouvre en test mais a échoué pendant la lecture : réessaie ; si cela se répète, choisis un autre fournisseur';
-  return 'Microsoft Edge répond mais refuse la connexion vocale (WebSocket) : ce service non officiel a probablement changé son protocole ; choisis un autre fournisseur';
-}
-
-/** Edge, avec un diagnostic lisible quand la connexion est refusée (et une seconde tentative si l'horloge du serveur était décalée). */
-async function edgeRun(text, voice, deps) {
-  try { return await edgeSynth(text, voice, deps); } catch (e) {
-    if (!e.edgeWs) throw e;
-    const d = await edgeDiagnose(deps);
-    if (d.kind !== 'network' && Math.abs(d.skew) > 30_000) {
-      try { return await edgeSynth(text, voice, { ...deps, skew: d.skew }); } catch { /* le diagnostic ci-dessous explique */ }
-    }
-    throw new Error(edgeHint(d));
-  }
-}
-
 // Google Traduction : une requête GET par morceau d'au plus 180 caractères, les MP3 se mettent bout à bout.
 export function googleChunks(text, max = 180) {
   const out = [];
@@ -294,8 +177,19 @@ async function googleCloudSynth(text, voice, { key, fetchImpl = fetch }) {
   return Buffer.from(String((await res.json())?.audioContent || ''), 'base64');
 }
 
+const azureHost = (region) => `https://${region}.tts.speech.microsoft.com/cognitiveservices`;
+
+async function azureSynth(text, voice, { key, region, fetchImpl = fetch }) {
+  const lang = voice.split('-').slice(0, 2).join('-');
+  const ssml = `<speak version='1.0' xml:lang='${lang}'><voice name='${voice}'>${xmlEscape(text)}</voice></speak>`;
+  const res = await keyedFetch(fetchImpl, `${azureHost(region)}/v1`, {
+    method: 'POST', headers: { 'Ocp-Apim-Subscription-Key': key, 'Content-Type': 'application/ssml+xml', 'X-Microsoft-OutputFormat': 'audio-24khz-96kbitrate-mono-mp3', 'User-Agent': 'AiTools' }, body: ssml,
+  }, 'Microsoft Azure');
+  return Buffer.from(await res.arrayBuffer());
+}
+
 /** Voix proposées par un fournisseur à clé (c'est aussi le test de la clé : refusée, la liste échoue). */
-export async function listVoices(provider, { key, fetchImpl = fetch } = {}) {
+export async function listVoices(provider, { key, region = null, fetchImpl = fetch } = {}) {
   if (provider === 'elevenlabs') {
     const res = await keyedFetch(fetchImpl, 'https://api.elevenlabs.io/v1/voices', { headers: { 'xi-api-key': key } }, 'ElevenLabs');
     const sex = { female: 'féminine', male: 'masculine' };
@@ -317,25 +211,113 @@ export async function listVoices(provider, { key, fetchImpl = fetch } = {}) {
     }
     return out.sort((a, b) => a.lang.localeCompare(b.lang) || a.rank - b.rank || a.label.localeCompare(b.label)).map(({ rank, ...x }) => x);
   }
+  if (provider === 'azure') {
+    if (!REGION.test(region)) throw new Error('Microsoft Azure : région absente ou de mauvaise forme (par exemple francecentral)');
+    const res = await keyedFetch(fetchImpl, `${azureHost(region)}/voices/list`, { headers: { 'Ocp-Apim-Subscription-Key': key } }, 'Microsoft Azure');
+    const out = [];
+    for (const x of (await res.json()) || []) {
+      const lang = String(x.Locale || '').slice(0, 2);
+      const name = String(x.ShortName || '');
+      if (!LANGS[lang] || !VOICE_ID.test(name) || !/Neural|Multilingual|HD/.test(name)) continue;
+      const multi = /Multilingual|HD/.test(name);
+      out.push({ ...v(name, `${x.LocalName || x.DisplayName || name} · ${x.LocaleName || x.Locale}, ${x.Gender === 'Female' ? 'féminine' : x.Gender === 'Male' ? 'masculine' : 'neutre'}${multi ? ' (très naturelle)' : ''}`, lang), rank: multi ? 0 : 1 });
+    }
+    return out.sort((a, b) => a.lang.localeCompare(b.lang) || a.rank - b.rank || a.label.localeCompare(b.label, 'fr')).map(({ rank, ...x }) => x);
+  }
   throw new Error('Ce fournisseur n\'a pas de liste de voix');
 }
 
-/** Texte → MP3 (Buffer). Les erreurs réseau remontent avec le nom du service ; jamais de clé ni de texte dans le message. */
-export async function synthesize({ provider, voice, text, key = null }, deps = {}) {
+// ---------- Voix locales (Piper, eSpeak NG) ----------
+
+/** Outils locaux : réglages du compte serveur (variables d'environnement), jamais choisis par un utilisateur. */
+export const localConfig = (cfg = {}, env = process.env) => ({
+  piperBin: cfg.piperBin || env.PIPER_BIN || 'piper',
+  piperVoicesDir: cfg.piperVoicesDir || env.PIPER_VOICES_DIR || '',
+  espeakBin: cfg.espeakBin || env.ESPEAK_BIN || 'espeak-ng',
+});
+const isPython = (bin) => /(^|\/)python[\d.]*$/.test(bin);
+const piperArgs = (bin) => (isPython(bin) ? ['-m', 'piper'] : []); // « python -m piper » (installation pip) ou un exécutable piper
+
+/** Voix Piper installées : un fichier `<nom>.onnx` avec son `<nom>.onnx.json`, dans les langues gérées. */
+export function piperVoices(dir, { list = readdirSync } = {}) {
+  let names;
+  try { names = list(dir); } catch { return []; }
+  const set = new Set(names);
+  const out = [];
+  for (const f of names) {
+    if (!f.endsWith('.onnx')) continue;
+    const id = f.slice(0, -5);
+    const lang = id.slice(0, 2);
+    if (!VOICE_ID.test(id) || !set.has(`${f}.json`) || !LANGS[lang]) continue;
+    const [loc, name, quality] = id.split('-');
+    out.push(v(id, `${(name || id).replace(/^./, (c) => c.toUpperCase())} · ${LANGS[lang]}${/_/.test(loc || '') ? ` (${loc.split('_')[1]})` : ''}${quality ? `, qualité ${quality}` : ''}`, lang));
+  }
+  return out.sort((a, b) => a.lang.localeCompare(b.lang) || a.label.localeCompare(b.label, 'fr'));
+}
+
+const works = (bin, args, run = spawnSync) => { try { return run(bin, args, { stdio: 'ignore', timeout: 8000 }).status === 0; } catch { return false; } };
+
+/** Disponibilité des voix locales (gardée une minute : elle interroge le disque et lance les programmes). */
+let localCache = null;
+export function localStatus(cfg, { run = spawnSync, list = readdirSync, now = Date.now } = {}) {
+  const c = localConfig(cfg);
+  const key = JSON.stringify(c);
+  if (localCache && localCache.key === key && localCache.at > now() - 60_000 && run === spawnSync) return localCache.value;
+  const piper = c.piperVoicesDir ? piperVoices(c.piperVoicesDir, { list }) : [];
+  const value = {
+    piper: works(c.piperBin, [...piperArgs(c.piperBin), '--help'], run) && piper.length ? { ok: true, voices: piper } : { ok: false, voices: [] },
+    espeak: works(c.espeakBin, ['--version'], run) ? { ok: true, voices: VOICE_PROVIDERS.espeak.voices } : { ok: false, voices: [] },
+  };
+  if (run === spawnSync) localCache = { key, at: now(), value };
+  return value;
+}
+export const resetLocalStatus = () => { localCache = null; };
+
+/** Lance un programme local sans shell ; renvoie ce qu'il a écrit dans le fichier de sortie. */
+function localRun(bin, args, outFile, { run = spawn, timeoutMs = 60_000 } = {}) {
+  return new Promise((resolve, reject) => {
+    let child;
+    try { child = run(bin, args, { stdio: ['ignore', 'ignore', 'pipe'], timeout: timeoutMs }); } catch { return reject(new Error('Le programme de voix locale ne démarre pas')); }
+    let err = '';
+    child.stderr?.on('data', (d) => { err = (err + d).slice(-500); });
+    child.on('error', () => reject(new Error('Le programme de voix locale ne démarre pas')));
+    child.on('close', (code) => (code === 0 ? resolve(readFileSync(outFile)) : reject(new Error(`La voix locale a échoué (code ${code})`))));
+  });
+}
+
+async function localSynth(provider, voice, text, { cfg = {}, run } = {}) {
+  const c = localConfig(cfg);
+  const dir = mkdtempSync(join(tmpdir(), 'aitools-tts-'));
+  const out = join(dir, 'voix.wav');
+  try {
+    if (provider === 'piper') {
+      if (!piperVoices(c.piperVoicesDir).some((x) => x.id === voice)) throw new Error('Cette voix Piper n\'est pas installée sur le serveur');
+      return await localRun(c.piperBin, [...piperArgs(c.piperBin), '-m', voice, '--data-dir', c.piperVoicesDir, '-f', out, '--', text], out, { run });
+    }
+    return await localRun(c.espeakBin, ['-v', voice, '-s', '150', '-w', out, '--', text], out, { run });
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+}
+
+/** Type du son produit : les voix locales rendent du WAV, les services du MP3. */
+export const audioType = (buf) => (buf.subarray(0, 4).toString('latin1') === 'RIFF' ? { ext: 'wav', mime: 'audio/wav' } : { ext: 'mp3', mime: 'audio/mpeg' });
+
+/** Texte → son (Buffer : MP3 des services, WAV des voix locales). Les erreurs réseau remontent avec le nom du service ; jamais de clé ni de texte dans le message. */
+export async function synthesize({ provider, voice, text, key = null, region = null }, deps = {}) {
   const p = VOICE_PROVIDERS[provider];
   if (!p || (p.voices ? !findVoice(provider, voice) : !VOICE_ID.test(String(voice)))) throw new Error('Voix inconnue');
   if (p.keyed && !key) throw new Error(`Aucune clé API ${p.label.split(' (')[0]} : ajoute-la dans l'onglet Promotion`);
+  if (p.region && !REGION.test(region)) throw new Error(`Aucune région ${p.label.split(' (')[0]} : ajoute-la dans l'onglet Promotion`);
   const clean = String(text ?? '').replace(/\s+/g, ' ').trim();
   if (!clean) throw new Error('Texte vide');
-  const run = provider === 'edge' ? edgeRun(clean, voice, deps) : provider === 'google' ? googleSynth(clean, voice, deps)
-    : provider === 'elevenlabs' ? elevenSynth(clean, voice, { ...deps, key }) : googleCloudSynth(clean, voice, { ...deps, key });
-  const audio = await withTimeout(run, VOICE.timeoutMs, `Service de voix ${p.label}`);
+  const run = p.local ? localSynth(provider, voice, clean, deps) : provider === 'google' ? googleSynth(clean, voice, deps)
+    : provider === 'elevenlabs' ? elevenSynth(clean, voice, { ...deps, key }) : provider === 'azure' ? azureSynth(clean, voice, { ...deps, key, region }) : googleCloudSynth(clean, voice, { ...deps, key });
+  const audio = await withTimeout(run, p.local ? 70_000 : VOICE.timeoutMs, `Service de voix ${p.label}`);
   if (audio.length < 200) throw new Error('Le service de voix a renvoyé un audio vide');
   return audio;
 }
 
 /** Extrait d'écoute : phrase courte dans la langue de la voix. */
-export const sampleFor = ({ provider, voice, lang, key }, deps) => synthesize({ provider, voice, key, text: SAMPLES[findVoice(provider, voice)?.lang || lang] || VOICE.sampleText }, deps);
+export const sampleFor = ({ provider, voice, lang, key, region }, deps) => synthesize({ provider, voice, key, region, text: SAMPLES[findVoice(provider, voice)?.lang || lang] || VOICE.sampleText }, deps);
 
 // ---------- ffmpeg ----------
 
@@ -374,8 +356,9 @@ export async function prepareVoice({ cfg, segments, voice, seconds, synth = synt
     for (let i = 0; i < segments.length; i++) {
       if (signal?.aborted) throw new Error('Annulé');
       onProgress({ done: i, total: segments.length });
-      const file = join(dir, `${i}.mp3`);
-      writeFileSync(file, await synth({ provider: voice.provider, voice: voice.voice, text: segments[i].text }));
+      const audio = await synth({ provider: voice.provider, voice: voice.voice, text: segments[i].text });
+      const file = join(dir, `${i}.${audioType(audio).ext}`);
+      writeFileSync(file, audio);
       parts.push({ t: segments[i].t, text: segments[i].text, file, dur: await audioDuration(cfg, file) });
     }
     onProgress({ done: segments.length, total: segments.length });

@@ -9,7 +9,7 @@ import { normalizeModel } from './services/models.js';
 import { analyzePrompt, prospectPrompt, templatePrompt, reviewMailPrompt, followupTemplatePrompt, evolutionPrompt, linkedinPostPrompt, hookPrompt, auditPrompt, promoPrompt, rolePrompt, parseCustomPrompts, LEVELS } from './services/prompts.js';
 import { VOICE_PROVIDERS, parseVoiceParams, extractVoiceScript, prepareVoice, cleanVoice, mixVoice, synthesize, langName } from './services/voiceover.js';
 import { PROMO, FORMATS, SceneError, parsePromoParams, extractScene, promoSupported, renderPromo } from './services/promovideo.js';
-import { reserveVideo, finishVideo, removeVideo, countVideos, getVoiceKey } from './promo.js';
+import { reserveVideo, finishVideo, removeVideo, countVideos, getVoiceKey, getVoiceRegion } from './promo.js';
 import { linkedinAccount, saveDraft, recentDrafts } from './linkedin.js';
 import { followupCandidates, followupSubject, isBusinessHours } from './services/followup.js';
 import { EMAIL_RE, createTransport, buildProspectMail, allowedToSend, makeMessageId } from './services/mailer.js';
@@ -633,9 +633,10 @@ export function makeHandlers(app) {
               await ctx.progress({ message: 'Voix : lecture des phrases…', pct: 44 });
               const key = VOICE_PROVIDERS[voice.provider].keyed ? await getVoiceKey(app, userId, voice.provider) : null;
               if (VOICE_PROVIDERS[voice.provider].keyed && !key) throw new Error(`Aucune clé API ${VOICE_PROVIDERS[voice.provider].label.split(' (')[0]} : ajoute-la dans l'onglet Promotion du projet`);
+              const region = VOICE_PROVIDERS[voice.provider].region ? await getVoiceRegion(app, userId, voice.provider) : null;
               const synth = app.synthVoice || synthesize;
               prepared = await (app.prepareVoice || prepareVoice)({
-                cfg, segments: extractVoiceScript(html, params.seconds), voice, seconds: params.seconds, synth: (o) => synth({ ...o, key }), signal: ctx.signal,
+                cfg, segments: extractVoiceScript(html, params.seconds), voice, seconds: params.seconds, synth: (o) => synth({ ...o, key, region }, { cfg }), signal: ctx.signal,
                 onProgress: ({ done, total }) => sink.push(() => ctx.progress({ message: `Voix : phrase ${Math.min(done + 1, total)}/${total}`, pct: 44 })),
               });
               await sink.flush();
