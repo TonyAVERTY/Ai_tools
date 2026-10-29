@@ -1,7 +1,7 @@
 # Réglages : notifications, dépôts Git, garde-fous, modèles, prompts
 Résumé : toutes les sections de la page Réglages (Notifications et canaux Discord, Slack, Telegram, e-mail ; Dépôts Git ; Garde-fous ; Budget et modèles IA ; Prompts IA) et leurs champs.
 
-On y accède par l'avatar → **Réglages**. Un sommaire à gauche (« Notifications », « Dépôts Git », « Garde-fous », « Budget et modèles IA », « Prompts IA ») suit la lecture. Toutes les sections de la page forment un seul formulaire : le bouton **Enregistrer les réglages**, dans la barre fixée en bas de l'écran, enregistre d'un coup les notifications, les dépôts Git, les garde-fous, les modèles et les prompts (il n'y a plus de bouton d'enregistrement par section) ; les liens et jetons sont chiffrés et jamais réaffichés.
+On y accède par l'avatar → **Réglages**. Un sommaire à gauche (« Notifications », « Dépôts Git », « Garde-fous », « Budget et modèles IA », « Prompts IA ») suit la lecture. Toutes les sections de la page forment un seul formulaire : le bouton **Enregistrer les réglages**, dans la barre fixée en bas de l'écran (cette barre n'apparaît que lorsqu'un champ a été modifié ; elle disparaît une fois les réglages enregistrés, ou si tu remets les valeurs d'origine), enregistre d'un coup les notifications, les dépôts Git, les garde-fous, les modèles et les prompts (il n'y a plus de bouton d'enregistrement par section) ; les liens et jetons sont chiffrés et jamais réaffichés.
 
 ## Notifications
 Où et quand AiTools prévient : réponses de prospects, jobs terminés ou en erreur, alertes.

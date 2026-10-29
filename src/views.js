@@ -826,7 +826,7 @@ ${saved ? `<p class="ok-box" role="status">${ic('check')}<span><b>Réglages enre
     <p class="muted small">${esc(t.fixed)}${t.vars.length ? ` Valeurs insérées automatiquement : ${t.vars.map((v) => `<code>[[${v}]]</code>`).join(', ')}.` : ''}</p>
   </details>`).join('\n  ')}
 </section>
-<div class="savebar"><p>Notifications, dépôts Git, garde-fous, modèles et prompts s'enregistrent ensemble.</p><button class="btn primary">Enregistrer les réglages</button></div>
+<div class="savebar" data-savebar hidden><p>Notifications, dépôts Git, garde-fous, modèles et prompts s'enregistrent ensemble.</p><button class="btn primary">Enregistrer les réglages</button></div>
 </form>
 
 </div>
