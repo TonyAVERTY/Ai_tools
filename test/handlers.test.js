@@ -285,7 +285,7 @@ test('modèle et consignes de sa gamme : le prompt de la gamme du modèle choisi
     await setSetting(s.db, s.userId, 'prompts_json', '');
     await setSetting(s.db, s.userId, 'write_model', 'haiku');
     assert.equal((await run(s, 'template')).status, 'done');
-    assert.match(last().prompt, /Reste sous 100 mots/);
+    assert.match(last().prompt, /Reste sous 150 mots/);
     await setSetting(s.db, s.userId, 'write_model', 'claude-fable-5-1');
     assert.equal((await run(s, 'template')).status, 'done');
     assert.match(last().prompt, /excellent commercial/);
