@@ -1560,6 +1560,7 @@
           setTimeout(() => reload(), 1200);
           break;
         }
+        case 'site': { const r = await api(`/api/projects/${id}/site`, data); form.elements.site_url.value = r.siteUrl; toast(r.siteUrl ? 'Site enregistré' : 'Site retiré'); break; }
         case 'target': await api(`/api/projects/${id}/target`, data); toast('Cible validée'); setTimeout(() => reload(), 500); break;
         case 'prospect': {
           const r = await api(`/api/projects/${id}/prospect`, data);

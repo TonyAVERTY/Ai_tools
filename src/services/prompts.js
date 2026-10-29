@@ -78,13 +78,13 @@ Qualité avant quantité : ignore annuaires, agrégateurs, réseaux sociaux et f
     text: `Rédige un email de prospection B2B qui FAIT CONNAÎTRE le produit : à la fin du mail, la personne doit savoir ce que c'est, à qui ça sert, ce que ça lui apporterait et comment aller plus loin.
 Ton : [[ton]]
 Expéditeur : [[expediteur]]
-Variables disponibles dans le mail : {{entreprise}}, {{ville}}, {{accroche}} (phrase personnalisée déjà rédigée, qui se termine par un point : à placer en ouverture telle quelle, puis commence une NOUVELLE phrase, jamais une virgule ni « et » à la suite).
+Variables disponibles dans le mail : {{entreprise}}, {{ville}}, {{site}} (adresse du site du produit, remplie à l'envoi), {{accroche}} (phrase personnalisée déjà rédigée, qui se termine par un point : à placer en ouverture telle quelle, puis commence une NOUVELLE phrase, jamais une virgule ni « et » à la suite).
 
 Structure : 150 à 180 mots maximum, 4 à 5 courts paragraphes, un mail commercial clair et concret.
 1. Ouverture : {{accroche}}, puis une phrase qui la relie à un problème concret de leur métier.
 2. Présentation du produit : son nom, ce que c'est en une phrase simple, et pour qui. Donne les mots exacts de la fiche, pas un slogan.
 3. Ce qu'il apporte : 2 à 3 bénéfices concrets, chacun vérifiable dans la fiche (une fonction précise, un cas d'usage, un gain de temps ou de clients), en phrases courtes ou en lignes commençant par un tiret (texte brut). Ajoute en une phrase comment ça marche ou comment on démarre, et le prix ou l'offre SEULEMENT s'ils figurent dans la fiche.
-4. Un seul appel à l'action, facile : répondre « oui » pour recevoir une démonstration ou plus de détails, ou « pas maintenant ». Si la fiche donne l'adresse du site ou de la page du produit, indique-la une fois pour qu'ils puissent voir de leurs yeux. Pas de proposition d'appel téléphonique ni de visio.
+4. Un seul appel à l'action, facile : répondre « oui » pour recevoir une démonstration ou plus de détails, ou « pas maintenant ». Si une adresse de site est indiquée sous « Site du produit », écris {{site}} UNE fois, sur sa propre ligne juste avant la signature (« Pour voir le produit : {{site}} »), jamais l'adresse en clair ; sinon n'écris aucune adresse. Pas de proposition d'appel téléphonique ni de visio.
 5. Signature : prénom ou nom de l'expéditeur, puis le nom du produit.
 
 Objet : 4 à 7 mots, en minuscules sauf noms propres, sans point d'exclamation, sans mot de spam (gratuit, offre, urgent, promo, garanti), une question ou un fait, jamais une promesse. Il peut citer le produit ou le bénéfice, comme le ferait un collègue.
@@ -546,7 +546,7 @@ Trouve ${count} prospects.${exclude.length ? `\nDéjà connus, à ignorer : ${ex
   };
 }
 
-export function templatePrompt({ profile, target, senderName, custom, model = null }) {
+export function templatePrompt({ profile, target, senderName, site = '', custom, model = null }) {
   return {
     system: withSkills(SYSTEM_FR, 'template'),
     prompt: `Contexte du projet :
@@ -554,6 +554,7 @@ Produit : ${profile.resume}
 Valeur : ${profile.proposition_valeur}
 Arguments : ${(profile.arguments || []).join(' ; ')}
 Cible : ${target.description} (${target.decideur})
+Site du produit : ${site ? `${site} (mets {{site}} dans le mail, pas l'adresse)` : '(aucun : n\'écris aucune adresse de site)'}
 
 ${instructions('template', custom, { ton: profile.ton || 'direct et chaleureux', expediteur: senderName || '{{expediteur}}' }, model)}
 Ne mets PAS de lien de désinscription (ajouté automatiquement).
