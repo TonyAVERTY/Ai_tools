@@ -12,7 +12,7 @@ Tout ce que fait l'IA passe par le compte Claude de la personne, jamais par un c
 
 ## Vocabulaire
 - **Projet** : un produit à promouvoir, relié à un dépôt Git (lecture seule). Il a sa fiche, sa cible, ses prospects, ses modèles de mail, son adresse d'envoi (SMTP).
-- **Fiche projet** : résumé du produit écrit par Claude après lecture du code (bouton « Réanalyser » pour la refaire).
+- **Fiche projet** : résumé du produit écrit par Claude après lecture du code (bouton « Analyser » la première fois, puis « Réanalyser » pour la refaire).
 - **Cible** : le public à démarcher (description, zone, taille, décideur, secteurs, requêtes de recherche). Elle doit être validée avec « Valider la cible ».
 - **Prospect** : une entreprise trouvée, avec son email professionnel, sa source publique, une accroche personnalisée et un score de pertinence de 1 à 10.
 - **Job** : une tâche lancée en arrière-plan (analyse, recherche, envoi, évolution, audit, post LinkedIn, vidéo…). Ses jobs en cours se voient dans « Activité ».
