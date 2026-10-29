@@ -3,7 +3,7 @@ import { now, getSetting, setSetting } from './db.js';
 import { readdirSync } from 'node:fs';
 import { runClaude, extractJson, rateLimitWindows } from './services/claude.js';
 import { tidyTemplateText, acceptReview } from './services/mailcheck.js';
-import { addUsage } from './services/jobs.js';
+import { addUsage, jobContext } from './services/jobs.js';
 import { syncRepo } from './services/git.js';
 import { normalizeModel } from './services/models.js';
 import { analyzePrompt, prospectPrompt, templatePrompt, reviewMailPrompt, followupTemplatePrompt, evolutionPrompt, linkedinPostPrompt, hookPrompt, auditPrompt, promoPrompt, rolePrompt, parseCustomPrompts, LEVELS } from './services/prompts.js';
@@ -129,6 +129,8 @@ export function makeClaude(app) {
   const { db, cfg } = app;
   return async (userId, o) => {
     const cred = await resolveCredentials(app, userId); // refuse sans liaison valide (dernier garde-fou)
+    const jc = jobContext.getStore();
+    if (jc && o.model) jc.model = o.model; // le job sait quel modèle sert vraiment
     // Profil de l'utilisateur (secteur, métier…) : une donnée de plus dans les consignes système, sauf pour le Support (qui répond d'après la documentation)
     const system = o.noProfile ? o.system : `${o.system ?? ''}${profileBlock(await getProfile(db, userId))}` || undefined;
     // Accès refusé par Claude (jeton expiré, clé révoquée) : la liaison devient invalide et l'interface demande de se reconnecter
@@ -452,7 +454,10 @@ export function makeHandlers(app) {
       addUsage(ctx, r);
       const t = extractJson(r.text);
       if (!t.subject || !t.body) throw new Error('Modèle de mail invalide');
-      let mail = { subject: String(t.subject).trim(), body: tidyTemplateText(t.body) };
+      // Objet B (test A/B) : gardé seulement s'il est écrit, différent de l'objet A et d'une longueur d'objet
+      const sb = String(t.subject_b ?? '').replace(/\s+/g, ' ').trim();
+      const subjectB = sb && sb.length <= 120 && sb.toLowerCase() !== String(t.subject).trim().toLowerCase() ? sb : '';
+      let mail = { subject: String(t.subject).trim(), subjectB, body: tidyTemplateText(t.body) };
       // Relecture par Claude (langue, ponctuation, signature) : facultative, retenue seulement si elle ne change ni variables ni adresses
       let corrections = [];
       let reviewed = false;
@@ -463,7 +468,7 @@ export function makeHandlers(app) {
         addUsage(ctx, rr);
         const fixed = extractJson(rr.text);
         if (acceptReview(mail, fixed)) {
-          mail = { subject: fixed.subject.trim(), body: tidyTemplateText(fixed.body) };
+          mail = { subject: fixed.subject.trim(), subjectB: mail.subjectB ? String(fixed.subject_b).replace(/\s+/g, ' ').trim() : '', body: tidyTemplateText(fixed.body) };
           corrections = (Array.isArray(fixed.corrections) ? fixed.corrections : []).map((c) => String(c).trim().slice(0, 100)).filter(Boolean).slice(0, 6);
           reviewed = true;
         }
