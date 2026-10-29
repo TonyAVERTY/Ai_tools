@@ -136,3 +136,6 @@ Le résultat s'affiche dans une petite bulle en bas à droite, pendant quelques 
 
 ## J'ai cliqué deux fois sur un bouton : l'action est-elle partie deux fois ?
 Non. Les clics répétés sur un même bouton (double clic, rafale) sont ignorés : une seule demande part. Pendant l'envoi, le bouton est grisé, puis il redevient cliquable une fois la réponse reçue. Si une action ne part pas, attends la fin de l'envoi précédent, puis reclique une seule fois.
+
+## « Analyse en échec : Git : EACCES: permission denied, mkdir '/data/repos/…' »
+Le serveur ne peut pas écrire dans son dossier de données (réglage `DATA_DIR` de l'administrateur) : les dépôts ne peuvent donc pas être clonés. C'est à l'administrateur du serveur de pointer `DATA_DIR` vers un dossier qui appartient à l'utilisateur qui fait tourner iaboss, puis de redémarrer. Une fois corrigé, clique de nouveau sur **Analyser**.

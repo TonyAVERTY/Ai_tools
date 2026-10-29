@@ -620,6 +620,7 @@
     } else if (job.status === 'cancelled') {
       box.innerHTML = `<p class="muted small">${name} annulé(e).</p>`;
     } else if (job.status === 'done') {
+      if (type === 'analyze') { box.innerHTML = ''; return; } // la fiche projet affichée juste au-dessus est le résultat
       const r = job.result || {};
       let txt = `${name} terminé(e).`;
       if (type === 'prospect') txt = `Recherche terminée : ${r.found} nouveau(x) prospect(s) sur ${r.requested} demandés.`;
@@ -662,12 +663,12 @@
     try { s = await api(`/api/projects/${id}/status`); } catch (e) { return schedule(el, 30_000); }
     const st = state.get(id) || {};
     const jobs = s.jobs;
-    for (const type of ['prospect', 'template', 'send', 'evolution', 'audit', 'followup_template', 'followup', 'linkedin_post', 'promo_video']) renderJob($(`[data-job="${type}"]`, el), jobs[type], type);
+    for (const type of ['analyze', 'prospect', 'template', 'send', 'evolution', 'audit', 'followup_template', 'followup', 'linkedin_post', 'promo_video']) renderJob($(`[data-job="${type}"]`, el), jobs[type], type);
     for (const box of $$('[data-job^="poste_"]', el)) renderJob(box, jobs[box.dataset.job], box.dataset.job);
 
-    const running = Object.entries(jobs).filter(([, j]) => ACTIVE.includes(j.status)).map(([t]) => LABELS[t] || $(`[data-job="${t}"]`, el)?.dataset.label || 'Tâche');
+    const running = Object.entries(jobs).filter(([, j]) => ACTIVE.includes(j.status));
     $('[data-state]', el).innerHTML = running.length
-      ? `<span class="spin-inline"></span>${esc(running.join(', '))}`
+      ? `<span class="spin-inline"></span>${esc(running.map(([t, j]) => { const v = pctOf(j.progress); return `${LABELS[t] || $(`[data-job="${t}"]`, el)?.dataset.label || 'Tâche'}${v !== null ? ` ${v} %` : ''}`; }).join(', '))}`
       : `<span class="muted small">${s.stats.total || 0} prospect(s)</span>`;
 
     // Fin d'un post LinkedIn → on recharge la zone pour afficher le brouillon
@@ -688,7 +689,6 @@
       if (an.status === 'done') { toast('Analyse terminée'); reload(); return; }
       if (an.status === 'error') toast(`Analyse en échec : ${an.error}`, 'error');
     }
-    if (an?.status === 'error' && !s.hasProfile) $('.profile p', el).outerHTML = `<p class="error small">${esc(an.error)}</p>`;
 
     // Modèle de mail : on ne remplace le formulaire que s'il a changé côté serveur
     st.tplStamp ||= {};
@@ -1387,7 +1387,7 @@
     if (runBtn) {
       e.preventDefault(); // le bouton « Réanalyser » est dans la ligne du projet : il ne doit pas la replier
       const { run, id } = runBtn.dataset;
-      if (run === 'analyze' && !confirm('Relancer l\'analyse complète du repo ? (consomme du quota Claude)')) return;
+      if (run === 'analyze' && runBtn.hasAttribute('data-reanalyze') && !confirm('Relancer l\'analyse complète du repo ? (consomme du quota Claude)')) return;
       try {
         const r = await api(`/api/projects/${id}/${run}`, {});
         toast(r.existing ? 'Déjà en cours' : 'Lancé');
@@ -1537,7 +1537,9 @@
         case 'create': {
           const r = await api('/api/projects', data);
           toast('Projet créé, analyse lancée');
-          setTimeout(() => reload(), 600);
+          // L'analyse apparaît d'abord dans « Activité », avec son pourcentage, puis la page se recharge
+          await refreshSys().then(showActivity).catch(() => {});
+          setTimeout(() => reload(), 1200);
           break;
         }
         case 'target': await api(`/api/projects/${id}/target`, data); toast('Cible validée'); setTimeout(() => reload(), 500); break;

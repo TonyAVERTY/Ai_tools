@@ -1,5 +1,5 @@
 import { createServer } from 'node:http';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, mkdirSync, accessSync, constants as fsConstants } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { join, dirname, extname } from 'node:path';
@@ -229,6 +229,9 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   if (cfg.production && cfg.allowPrivateHosts) console.warn('ALLOW_PRIVATE_HOSTS est actif en production : seuls les administrateurs peuvent viser des hôtes privés.');
   if (cfg.production && !cfg.trustProxy) console.warn("TRUST_PROXY est désactivé : derrière Nginx, tous les visiteurs partagent la même adresse pour la limitation de débit. Pose TRUST_PROXY=true.");
   if (!cfg.recaptcha) console.warn(`reCAPTCHA désactivé (RECAPTCHA_SITE_KEY / RECAPTCHA_SECRET absentes)${cfg.sandbox.production ? " : à configurer avant l'ouverture au public" : ''}.`);
+  // Les dépôts clonés (analyse) et les vidéos vivent dans DATA_DIR : s'il n'est pas inscriptible, l'analyse échoue avec « permission denied »
+  try { mkdirSync(join(cfg.dataDir, 'repos'), { recursive: true }); accessSync(cfg.dataDir, fsConstants.W_OK); }
+  catch (e) { console.error(`DATA_DIR (${cfg.dataDir}) n'est pas inscriptible par cet utilisateur : ${e.code || e.message}. Les analyses de projet échoueront. Pose DATA_DIR sur un dossier qui t'appartient (ex. DATA_DIR=./data).`); }
   const app = await createApp(cfg);
   app.server.listen(cfg.port, cfg.host, () => console.log(`AiTools sur http://${cfg.host}:${cfg.port} (${cfg.appUrl})`));
   const shutdown = () => app.close().then(() => process.exit(0), (e) => { console.error(e); process.exit(1); });
