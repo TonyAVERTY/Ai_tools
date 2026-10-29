@@ -71,24 +71,30 @@
     const target = [to, document.querySelector('#jobs .jobs-btn'), document.querySelector('.top-r')].find(visible);
     if (!target) return;
     if (calm() || !from || !from.isConnected) { bump(document.querySelector('#jobs .jobs-btn') || target); return; }
-    const fr = from.getBoundingClientRect();
-    const tr = target.getBoundingClientRect();
-    const tc = { x: tr.left + tr.width / 2, y: tr.top + tr.height / 2 };
-    const goesRight = tc.x >= fr.left + fr.width / 2;
-    // Départ : côté du bouton tourné vers la cible, à mi-hauteur. Si la cible est à l'aplomb du bouton (téléphone), le trait monte directement depuis son bord,
-    // sans repasser sur le bouton.
-    const above = tc.y < fr.top + fr.height / 2;
-    const a0 = tc.x >= fr.left && tc.x <= fr.right
-      ? { x: tc.x, y: above ? fr.top : fr.bottom }
-      : { x: goesRight ? fr.right : fr.left, y: fr.top + fr.height / 2 };
-    const end = { x: tc.x, y: tc.y < a0.y ? tr.bottom : tr.top }; // arrivée : bord de la cible tourné vers le trait vertical
-    const sx = end.x < a0.x ? -1 : 1;
-    const sy = end.y < a0.y ? -1 : 1;
-    const lh = Math.abs(end.x - a0.x); // trait horizontal : du bouton jusqu'à l'aplomb de la cible
-    const lv = Math.abs(end.y - a0.y); // trait vertical : jusqu'à la cible
-    const total = lh + lv;
-    if (total < 8) { bump(target); return; }
-    const dur = Math.round(Math.min(3600, Math.max(1800, 900 + total * 2.2)));
+    // Géométrie recalculée à chaque image et à chaque défilement : le trait reste accroché au bouton (qui défile avec la page) et à la cible
+    // (menu « Activité », fixe quand la barre du haut est sortie de l'écran), au lieu de rester figé à l'écran.
+    let last = null;
+    const geom = () => {
+      const fr = (from.isConnected ? from : { getBoundingClientRect: () => last?.fr }).getBoundingClientRect();
+      const tr = (target.isConnected ? target : { getBoundingClientRect: () => last?.tr }).getBoundingClientRect();
+      if (!fr || !tr) return last;
+      const tc = { x: tr.left + tr.width / 2, y: tr.top + tr.height / 2 };
+      const goesRight = tc.x >= fr.left + fr.width / 2;
+      // Départ : côté du bouton tourné vers la cible, à mi-hauteur. Si la cible est à l'aplomb du bouton (téléphone), le trait monte directement depuis son bord,
+      // sans repasser sur le bouton.
+      const above = tc.y < fr.top + fr.height / 2;
+      const a0 = tc.x >= fr.left && tc.x <= fr.right
+        ? { x: tc.x, y: above ? fr.top : fr.bottom }
+        : { x: goesRight ? fr.right : fr.left, y: fr.top + fr.height / 2 };
+      const end = { x: tc.x, y: tc.y < a0.y ? tr.bottom : tr.top }; // arrivée : bord de la cible tourné vers le trait vertical
+      const lh = Math.abs(end.x - a0.x); // trait horizontal : du bouton jusqu'à l'aplomb de la cible
+      const lv = Math.abs(end.y - a0.y); // trait vertical : jusqu'à la cible
+      last = { fr, tr, a0, end, sx: end.x < a0.x ? -1 : 1, sy: end.y < a0.y ? -1 : 1, lh, lv, total: lh + lv };
+      return last;
+    };
+    const g0 = geom();
+    if (!g0 || g0.total < 8) { bump(target); return; }
+    const dur = Math.round(Math.min(3600, Math.max(1800, 900 + g0.total * 2.2)));
 
     const svg = document.createElementNS(NS, 'svg');
     svg.setAttribute('class', 'fx-trail');
@@ -100,13 +106,9 @@
     const dotA = document.createElementNS(NS, 'circle');
     dotA.setAttribute('class', 'fx-dot');
     dotA.setAttribute('r', '5');
-    dotA.setAttribute('cx', String(a0.x));
-    dotA.setAttribute('cy', String(a0.y));
     const dotB = document.createElementNS(NS, 'circle');
     dotB.setAttribute('class', 'fx-dot');
     dotB.setAttribute('r', '5');
-    dotB.setAttribute('cx', String(end.x));
-    dotB.setAttribute('cy', String(end.y));
     dotB.style.opacity = '0';
     svg.append(path, dotA, dotB);
     const node = document.createElement('div');
@@ -126,19 +128,34 @@
     ];
 
     // Une seule horloge pour le trait et l'agent : le trait s'allonge exactement jusqu'où l'agent est arrivé
+    let frac = 0; // avancement 0..1 (le trait garde sa forme quand la page défile)
+    let hopT = 0;
+    const draw = (agent = true) => {
+      const g = geom();
+      const d = frac * g.total;
+      const x = d <= g.lh ? g.a0.x + g.sx * d : g.end.x;
+      const y = d <= g.lh ? g.a0.y : g.a0.y + g.sy * (d - g.lh);
+      path.setAttribute('d', d <= g.lh ? `M${g.a0.x} ${g.a0.y} H${x}` : `M${g.a0.x} ${g.a0.y} H${g.end.x} V${y}`);
+      dotA.setAttribute('cx', String(g.a0.x)); dotA.setAttribute('cy', String(g.a0.y));
+      dotB.setAttribute('cx', String(g.end.x)); dotB.setAttribute('cy', String(g.end.y));
+      if (!agent) return;
+      const p = (d % HOP) / HOP; // un saut tous les HOP pixels parcourus : l'agent sautille, d'un rythme tranquille
+      const hop = -HOP_H * 4 * p * (1 - p);
+      const t = hopT;
+      const scale = t < 0.06 ? 0.5 + (t / 0.06) * 0.5 : t > 0.92 ? 1 - ((t - 0.92) / 0.08) * 0.6 : 1; // apparaît au départ, rétrécit en arrivant
+      node.style.transform = `translate(${(x - W / 2).toFixed(1)}px, ${(y - H / 2 + hop).toFixed(1)}px) scaleX(${d <= g.lh ? g.sx : 1}) scale(${scale.toFixed(3)})`;
+      node.style.opacity = String(t > 0.95 ? (1 - t) / 0.05 : 1);
+    };
+    const onMove = () => draw(false);
+    addEventListener('scroll', onMove, { passive: true, capture: true });
+    addEventListener('resize', onMove, { passive: true });
     await new Promise((resolve) => {
       const t0 = performance.now();
       const frame = (now) => {
         const t = Math.min(1, (now - t0) / dur);
-        const d = ease(t) * total;
-        const x = d <= lh ? a0.x + sx * d : end.x;
-        const y = d <= lh ? a0.y : a0.y + sy * (d - lh);
-        path.setAttribute('d', d <= lh ? `M${a0.x} ${a0.y} H${x}` : `M${a0.x} ${a0.y} H${end.x} V${y}`);
-        const p = (d % HOP) / HOP; // un saut tous les HOP pixels parcourus : l'agent sautille, d'un rythme tranquille
-        const hop = -HOP_H * 4 * p * (1 - p);
-        const scale = t < 0.06 ? 0.5 + (t / 0.06) * 0.5 : t > 0.92 ? 1 - ((t - 0.92) / 0.08) * 0.6 : 1; // apparaît au départ, rétrécit en arrivant
-        node.style.transform = `translate(${(x - W / 2).toFixed(1)}px, ${(y - H / 2 + hop).toFixed(1)}px) scaleX(${d <= lh ? sx : 1}) scale(${scale.toFixed(3)})`;
-        node.style.opacity = String(t > 0.95 ? (1 - t) / 0.05 : 1);
+        hopT = t;
+        frac = ease(t);
+        draw();
         if (t < 1) requestAnimationFrame(frame); else resolve();
       };
       requestAnimationFrame(frame);
@@ -149,6 +166,8 @@
     bump(target);
     // Les traits restent un instant, puis s'effacent
     await wait(svg.animate([{ opacity: 1 }, { opacity: 1, offset: 0.45 }, { opacity: 0 }], { duration: 900, fill: 'forwards' }));
+    removeEventListener('scroll', onMove, { capture: true });
+    removeEventListener('resize', onMove);
     svg.remove();
   }
 
