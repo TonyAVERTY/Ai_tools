@@ -53,7 +53,7 @@ Cible trop étroite ou requêtes de recherche trop vagues : revoir la section **
 Dépôt privé : ajouter un token dans **Réglages → Dépôts Git** (lecture seule). Autre serveur Git que GitHub : l'ajouter d'abord (URL du serveur et token). L'adresse doit être publique (les adresses internes sont refusées).
 
 ## L'analyse a échoué ou la fiche est incomplète
-Relancer avec **Réanalyser**. Vérifier la liaison Claude, le quota Claude, et l'accès au dépôt.
+Relancer avec **Analyser** (ou **Réanalyser** si une fiche existe déjà). Vérifier la liaison Claude, le quota Claude, et l'accès au dépôt.
 
 ## Je ne vois pas certaines sections ou certains boutons
 Ils dépendent du rôle dans le projet : Configuration du projet, Audit, Récapitulatif, connexion LinkedIn et publication sont réservés aux administrateurs et au propriétaire ; supprimer un projet est réservé au propriétaire (voir le fichier sur les projets). Un membre d'équipe ne voit pas le SMTP ni l'IMAP.
@@ -133,3 +133,6 @@ C'est normal : la barre du bas n'apparaît que lorsqu'un champ des Réglages a �
 
 ## Le bouton « Envoyer le rapport maintenant » semble ne rien faire
 Le résultat s'affiche dans une petite bulle en bas à droite, pendant quelques secondes. Si rien ne s'affiche : vérifie que l'**Email de réception** est renseigné et enregistré. Si le serveur de mail ne répond pas, une erreur apparaît au bout de 15 à 30 secondes (l'administrateur consulte alors les journaux du serveur : mauvais hôte ou port SMTP, identifiant ou mot de passe refusé).
+
+## J'ai cliqué deux fois sur un bouton : l'action est-elle partie deux fois ?
+Non. Les clics répétés sur un même bouton (double clic, rafale) sont ignorés : une seule demande part. Pendant l'envoi, le bouton est grisé, puis il redevient cliquable une fois la réponse reçue. Si une action ne part pas, attends la fin de l'envoi précédent, puis reclique une seule fois.
