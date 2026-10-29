@@ -156,6 +156,20 @@ async function call(app, url, init, what) {
   return r;
 }
 
+/** Message pour un retour de LinkedIn en erreur : la cause réelle et le remède, au lieu d'un « refusé » sans explication. */
+export function refusalMessage(code, why, redirectUri) {
+  if (code === 'user_cancelled_authorize' || code === 'user_cancelled_login') return 'Connexion LinkedIn annulée.';
+  if (code === 'unauthorized_scope_error') {
+    return "LinkedIn refuse un des droits demandés : l'application LinkedIn n'a pas les produits nécessaires. Dans developer.linkedin.com → ton application → onglet Produits, ajoute « Sign In with LinkedIn using OpenID Connect » et « Share on LinkedIn » (ou « Community Management API »), attends qu'ils soient approuvés, puis recommence.";
+  }
+  if (code === 'invalid_redirect_uri' || /redirect/i.test(`${code} ${why}`)) {
+    return `LinkedIn refuse l'adresse de retour. Dans developer.linkedin.com → ton application → onglet Auth, ajoute exactement cette adresse dans « URL de redirection autorisées » : ${redirectUri}`;
+  }
+  if (code === 'unauthorized_client' || code === 'invalid_client') return "LinkedIn ne reconnaît pas l'application (identifiant ou secret client refusé) : vérifie LINKEDIN_CLIENT_ID et LINKEDIN_CLIENT_SECRET dans le .env du serveur.";
+  if (code === 'access_denied') return "LinkedIn a refusé l'accès : le compte connecté n'a pas le droit d'autoriser cette application (ou ne gère aucune page). Recommence avec un compte administrateur de la page.";
+  return `LinkedIn a refusé la connexion (${code}${why ? ` : ${why}` : ''}).`;
+}
+
 /**
  * Retour de LinkedIn. `checkAccess(projectId)` vérifie que le compte peut encore régler ce projet (administrateur au moins).
  * Contrôles : state connu, à usage unique, non expiré, émis pour CE compte et CE navigateur.
@@ -170,7 +184,12 @@ export async function finishLinkedin(app, userId, params, req, res, checkAccess)
   if (!cfg.linkedin) throw fail(503, NOT_CONFIGURED);
 
   const [ownerId, projectId] = String(row?.nonce ?? '').split(':').map(Number);
-  if (params.get('error')) throw fail(400, params.get('error') === 'user_cancelled_authorize' || params.get('error') === 'user_cancelled_login' ? 'Connexion LinkedIn annulée.' : 'LinkedIn a refusé la connexion.');
+  if (params.get('error')) {
+    const code = String(params.get('error')).slice(0, 80);
+    const why = String(params.get('error_description') ?? '').replace(/[\r\n]+/g, ' ').slice(0, 200);
+    if (code !== 'user_cancelled_authorize' && code !== 'user_cancelled_login') console.warn(`[linkedin] connexion refusée par LinkedIn : ${code}${why ? ` : ${why}` : ''}`);
+    throw fail(400, refusalMessage(code, why, cfg.linkedin.redirectUri));
+  }
   if (!params.get('code') || !state) throw fail(400, 'Retour de LinkedIn incomplet : recommence.');
   if (!row || row.provider !== 'linkedin' || ownerId !== Number(userId) || !projectId) throw fail(400, 'Connexion expirée ou lancée depuis un autre compte : recommence.');
   const bind = parseCookies(req)[COOKIE];

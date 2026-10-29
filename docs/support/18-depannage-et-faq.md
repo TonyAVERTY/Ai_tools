@@ -167,3 +167,6 @@ Claude n'a pas proposé de second objet, ou l'a rendu identique à l'objet A : i
 ## Le mail propose une démonstration (ou un essai, un rendez-vous…) qui n'existe pas
 Claude n'a le droit de proposer que ce que la fiche projet dit exister, et l'**Aperçu** avertit quand le mail parle d'une démonstration, d'un essai, d'un devis, d'un appel, d'un rendez-vous ou d'une garantie absents de la fiche. Si ton modèle a été généré avant ce contrôle, clique de nouveau sur **Générer avec l'IA** puis **Valider le modèle**, ou retire la phrase à la main. Si la proposition existe vraiment (une démonstration, par exemple), ajoute-la d'abord à la fiche projet en relançant **Réanalyser** après l'avoir écrite dans le dépôt (par exemple dans le README).
 
+## « LinkedIn a refusé la connexion »
+Le message précise maintenant la cause : produits manquants dans l'application LinkedIn (« onglet Produits »), adresse de retour non déclarée (« onglet Auth → URL de redirection autorisées »), identifiants de l'application faux, ou compte sans droit sur la page. Suis le remède indiqué dans le message, puis recommence la connexion depuis le projet. Les détails sont dans « LinkedIn » (Problèmes fréquents).
+
