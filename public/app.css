@@ -409,6 +409,7 @@ figure.chart figcaption { font-size: .9375rem; font-weight: 600; margin-bottom: 
 .jitem:last-child { margin-bottom: 0; }
 .jitem.j-running { border-color: var(--link); background: var(--card-2); }
 .jrow { display: flex; gap: 8px; align-items: center; }
+.jmodel { flex: none; padding: 1px 8px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--bg-sunk); color: var(--muted); font-size: .75rem; font-weight: 600; white-space: nowrap; }
 .jproj { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: .875rem; }
 .jmsg { margin: 3px 0 0; overflow-wrap: anywhere; }
 .jmeta { display: flex; justify-content: space-between; gap: 8px; margin-top: 8px; }
