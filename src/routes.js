@@ -410,7 +410,7 @@ export function registerRoutes(router, app) {
     }));
     json(res, {
       temp: session.user.isAdmin ? cpuTemp() : null, queue, scheduled, jobs, usage: await usageSummary(db, userId), budget: await budgetState(db, userId),
-      claudeRateLimit: quota, linkMode: link?.mode ?? null,
+      claudeRateLimit: quota, linkMode: link?.mode ?? null, linkValid: link ? !!link.valid : null,
     });
   });
 
