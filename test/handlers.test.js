@@ -263,7 +263,8 @@ test('modèle et consignes de sa gamme : le prompt de la gamme du modèle choisi
   const s = await setup();
   const spyFile = join(s.tmp, 'prompts.log');
   s.app.cfg.claudeBin = makeClaudeBin(s.tmp, { fixture: 'spy-claude.js', env: { PROMPT_SPY_FILE: spyFile } });
-  const last = () => JSON.parse(readFileSync(spyFile, 'utf8').trim().split('\n').pop());
+  // Dernier appel de rédaction (la relecture du mail, qui suit un modèle de mail, a son propre prompt)
+  const last = () => JSON.parse(readFileSync(spyFile, 'utf8').trim().split('\n').filter((l) => !l.includes('RELECTURE DU MAIL')).pop());
   try {
     assert.equal((await run(s, 'analyze')).status, 'done'); // le modèle de mail s'écrit à partir de la fiche du projet
     await setSetting(s.db, s.userId, 'prompts_json', JSON.stringify({ '*': { template: 'email de prospection MARQUE-COMMUNE' }, haiku: { template: 'email de prospection MARQUE-HAIKU' }, opus: { template: 'email de prospection MARQUE-OPUS' } }));

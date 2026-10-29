@@ -2,10 +2,11 @@
 import { now, getSetting, setSetting } from './db.js';
 import { readdirSync } from 'node:fs';
 import { runClaude, extractJson, rateLimitWindows } from './services/claude.js';
+import { tidyTemplateText, acceptReview } from './services/mailcheck.js';
 import { addUsage } from './services/jobs.js';
 import { syncRepo } from './services/git.js';
 import { normalizeModel } from './services/models.js';
-import { analyzePrompt, prospectPrompt, templatePrompt, followupTemplatePrompt, evolutionPrompt, linkedinPostPrompt, hookPrompt, auditPrompt, promoPrompt, rolePrompt, parseCustomPrompts, LEVELS } from './services/prompts.js';
+import { analyzePrompt, prospectPrompt, templatePrompt, reviewMailPrompt, followupTemplatePrompt, evolutionPrompt, linkedinPostPrompt, hookPrompt, auditPrompt, promoPrompt, rolePrompt, parseCustomPrompts, LEVELS } from './services/prompts.js';
 import { PROMO, FORMATS, SceneError, parsePromoParams, extractScene, promoSupported, renderPromo } from './services/promovideo.js';
 import { reserveVideo, finishVideo, removeVideo, countVideos } from './promo.js';
 import { linkedinAccount, saveDraft, recentDrafts } from './linkedin.js';
@@ -451,8 +452,26 @@ export function makeHandlers(app) {
       addUsage(ctx, r);
       const t = extractJson(r.text);
       if (!t.subject || !t.body) throw new Error('Modèle de mail invalide');
-      await saveTemplate(db, project.id, 'initial', { subject: t.subject, body: t.body });
-      return { ok: true };
+      let mail = { subject: String(t.subject).trim(), body: tidyTemplateText(t.body) };
+      // Relecture par Claude (langue, ponctuation, signature) : facultative, retenue seulement si elle ne change ni variables ni adresses
+      let corrections = [];
+      let reviewed = false;
+      await ctx.progress({ message: 'Relecture du mail par Claude…', pct: 80 });
+      try {
+        const rp = reviewMailPrompt(mail);
+        const rr = await creeping(ctx, 'Relecture du mail par Claude…', 80, () => claude(userId, { prompt: rp.prompt, system: rp.system, model, maxTurns: 1, tools: [], signal: ctx.signal }), { to: 98, ms: 20_000 });
+        addUsage(ctx, rr);
+        const fixed = extractJson(rr.text);
+        if (acceptReview(mail, fixed)) {
+          mail = { subject: fixed.subject.trim(), body: tidyTemplateText(fixed.body) };
+          corrections = (Array.isArray(fixed.corrections) ? fixed.corrections : []).map((c) => String(c).trim().slice(0, 100)).filter(Boolean).slice(0, 6);
+          reviewed = true;
+        }
+      } catch (e) {
+        if (ctx.signal?.aborted || e.status === 403) throw e; // annulation, ou accès Claude perdu : on ne l'avale pas
+      }
+      await saveTemplate(db, project.id, 'initial', mail);
+      return { ok: true, reviewed, corrections };
     },
 
     async followup_template(ctx) {

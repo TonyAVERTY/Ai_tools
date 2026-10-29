@@ -240,7 +240,7 @@ test('avec le CLI simulé : deux utilisateurs tournent en parallèle, jamais deu
     }
     assert.equal(maxOpen, 2, 'deux processus simultanés (maxJobs = 2), pas trois');
     assert.equal(sameUser, false, 'jamais deux processus du même utilisateur');
-    assert.equal(events.filter((e) => e.what === 'start').length, 6);
+    assert.equal(events.filter((e) => e.what === 'start').length, 9, '6 jobs, dont 3 modèles de mail qui font deux appels (rédaction puis relecture)');
     // L'ordre d'équité est vérifié de façon déterministe plus haut : l'horodatage de démarrage des processus dépend de leur lancement
   } finally { await s.close(); rmSync(tmp, { recursive: true, force: true }); }
 });

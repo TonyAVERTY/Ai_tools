@@ -7,6 +7,7 @@ import { accessOn } from './teams.js';
 import { getProject, getTemplate } from './projects.js';
 import { getUser } from './users.js';
 import { EMAIL_RE, buildProspectMail, fillTemplate } from './services/mailer.js';
+import { reviewMail } from './services/mailcheck.js';
 import { followupSubject } from './services/followup.js';
 import { quotaFor, planLimitError, withUserLock } from './services/plans.js';
 import { unsubToken } from './crypto.js';
@@ -175,6 +176,8 @@ export function registerProspectRoutes(router, app, { project }) {
     if (used.includes('site') && !p.siteUrl) warnings.push("Aucun site n'est renseigné pour ce projet (section En-tête) : {{site}} restera vide.");
     if (!p.smtp?.fromEmail) warnings.push("Aucune adresse d'envoi n'est réglée pour ce projet : l'expéditeur affiché est un exemple.");
     if (!mail.subject) warnings.push("L'objet est vide.");
+    const review = reviewMail({ subject: template.subject, body });
+    warnings.push(...review.errors, ...review.warnings);
     if (!footer) warnings.push('Le pied de page est retiré (Réglages → Garde-fous) : ce mail part sans lien « Ne plus recevoir de messages » ni origine de l\'adresse.');
     json(ctx.res, {
       ok: true, kind, variant, sample, footer, hasB: !!String(b.subjectB ?? '').trim() && kind === 'initial',
