@@ -11,7 +11,8 @@ import { addProject } from './helpers/users.js';
 import { Worker, latestJobs } from '../src/services/jobs.js';
 import { makeHandlers } from '../src/handlers.js';
 import { SceneError } from '../src/services/promovideo.js';
-import { VOICE_PROVIDERS, listVoices, edgeDiagnose, edgeHint, parseVoiceParams, extractVoiceScript, planVoice, edgeGec, edgeSsml, googleChunks, synthesize, audioDuration, mixVoice, voiceCatalog } from '../src/services/voiceover.js';
+import http from 'node:http';
+import { VOICE_PROVIDERS, listVoices, edgeDiagnose, edgeHint, edgeProbe, parseVoiceParams, extractVoiceScript, planVoice, edgeGec, edgeSsml, googleChunks, synthesize, audioDuration, mixVoice, voiceCatalog } from '../src/services/voiceover.js';
 
 const hasFfmpeg = spawnSync('ffmpeg', ['-version']).status === 0;
 const skipFf = !hasFfmpeg && "ffmpeg n'est pas installé";
@@ -96,10 +97,11 @@ const status = (code, date) => async () => ({ ok: code < 400, status: code, head
 test('Edge refusé : le diagnostic dit pourquoi (réseau, horloge, protocole), sans le texte du projet ; Google : refus HTTP signalé', async () => {
   let tries = 0;
   class Refuse { constructor() { tries++; setTimeout(() => this.onerror(), 0); } close() {} }
-  const say = (fetchImpl) => synthesize({ provider: 'edge', voice: 'fr-FR-DeniseNeural', text: 'secret du projet' }, { WS: Refuse, fetchImpl });
+  const say = (fetchImpl) => synthesize({ provider: 'edge', voice: 'fr-FR-DeniseNeural', text: 'secret du projet' }, { WS: Refuse, fetchImpl, probe: async () => ({ error: 'test' }) });
   await assert.rejects(say(down), (e) => /ne joint pas speech\.platform\.bing\.com/.test(e.message) && !/secret/.test(e.message));
   await assert.rejects(say(status(403)), /a refusé la requête \(code 403\)[\s\S]*changé son protocole/);
   await assert.rejects(say(status(200)), /répond mais refuse la connexion vocale/);
+  await assert.rejects(synthesize({ provider: 'edge', voice: 'fr-FR-DeniseNeural', text: 'x y' }, { WS: Refuse, fetchImpl: status(200), probe: async () => ({ status: 404 }) }), /refuse la connexion vocale \(code 404\)/);
   tries = 0;
   const late = new Date(Date.now() + 10 * 60_000).toUTCString();
   await assert.rejects(say(status(403, late)), /horloge du serveur est décalée de (9|10) min/);
@@ -110,6 +112,23 @@ test('Edge refusé : le diagnostic dit pourquoi (réseau, horloge, protocole), s
   const ok = await synthesize({ provider: 'google', voice: 'fr', text: 'Bonjour tout le monde' }, { fetchImpl: async (u) => { assert.match(u, /tl=fr&q=Bonjour/); return { ok: true, arrayBuffer: async () => new Uint8Array(400).buffer }; } });
   assert.equal(ok.length, 400);
   await assert.rejects(synthesize({ provider: 'edge', voice: 'nimporte', text: 'x y' }), /Voix inconnue/);
+});
+
+test('Edge : la sonde relève le code de la poignée de main (403, 101) et le diagnostic le dit', async () => {
+  const refuser = http.createServer((q, r) => { r.writeHead(403, { 'x-test': 'oui' }); r.end('refusé par le test'); });
+  const opener = http.createServer();
+  opener.on('upgrade', (q, sock) => { sock.write('HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n'); setTimeout(() => sock.destroy(), 20); });
+  await Promise.all([refuser, opener].map((x) => new Promise((res) => x.listen(0, '127.0.0.1', res))));
+  const to = (srv) => (o) => http.request({ ...o, hostname: '127.0.0.1', port: srv.address().port });
+  try {
+    const refused = await edgeProbe({ request: to(refuser) });
+    assert.equal(refused.status, 403);
+    assert.match(refused.body, /refusé par le test/);
+    assert.match(edgeHint(await edgeDiagnose({ fetchImpl: status(200), probe: () => edgeProbe({ request: to(refuser) }) })), /refuse la connexion vocale \(code 403\)/);
+    assert.equal((await edgeProbe({ request: to(opener) })).status, 101);
+  } finally { refuser.close(); opener.close(); }
+  assert.deepEqual(await edgeProbe({ request: (o) => http.request({ ...o, hostname: '127.0.0.1', port: 1 }) }), { error: 'ECONNREFUSED' });
+  assert.match(edgeHint({ kind: 'service', skew: 0, ws: 101 }), /s'ouvre en test/);
 });
 
 test('Edge : seconde tentative réussie quand l\'horloge du serveur était décalée', async () => {

@@ -7,8 +7,9 @@
 // Edge et Google Traduction ne sont pas des API officielles : ils peuvent changer ou refuser des requêtes. Le texte lu est envoyé au fournisseur choisi.
 // Les clés sont chiffrées en base, jamais réaffichées, jamais dans un message d'erreur ni un journal.
 // Aucun appel réseau n'est fait ailleurs que dans `synthesize` (remplaçable dans les tests).
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { spawn } from 'node:child_process';
+import { request as httpsRequest } from 'node:https';
 import { mkdtempSync, writeFileSync, rmSync, renameSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -146,16 +147,48 @@ export function edgeSsml(text, voice) {
   return `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='${lang}'><voice name='${voice}'><prosody pitch='+0Hz' rate='+0%' volume='+0%'>${xmlEscape(text)}</prosody></voice></speak>`;
 }
 
+/** Adresse et en-têtes de la connexion vocale Edge (partagés par la connexion et la sonde de diagnostic). */
+export function edgeHandshake({ skew = 0 } = {}) {
+  const id = randomUUID().replace(/-/g, '');
+  return {
+    id,
+    url: `${EDGE.url}?TrustedClientToken=${EDGE.token}&Sec-MS-GEC=${edgeGec(Date.now() + skew)}&Sec-MS-GEC-Version=1-${EDGE.chrome}&ConnectionId=${id}`,
+    headers: {
+      Pragma: 'no-cache', 'Cache-Control': 'no-cache', Origin: EDGE_ORIGIN, 'User-Agent': edgeAgent(), 'Accept-Language': 'en-US,en;q=0.9',
+      Cookie: `muid=${randomUUID().replace(/-/g, '').toUpperCase()};`,
+    },
+  };
+}
+
+/** Sonde : la même poignée de main WebSocket, faite à la main, pour connaître le code que Microsoft répond (le WebSocket de Node ne le donne pas). */
+export function edgeProbe({ skew = 0, request = httpsRequest, timeoutMs = 8000 } = {}) {
+  return new Promise((resolve) => {
+    const { url, headers } = edgeHandshake({ skew });
+    const u = new URL(url.replace(/^wss:/, 'https:'));
+    const req = request({
+      hostname: u.hostname, path: u.pathname + u.search, method: 'GET', timeout: timeoutMs,
+      headers: { ...headers, Connection: 'Upgrade', Upgrade: 'websocket', 'Sec-WebSocket-Version': '13', 'Sec-WebSocket-Key': randomBytes(16).toString('base64') },
+    });
+    const done = (r) => { try { req.destroy(); } catch { /* déjà fermée */ } resolve(r); };
+    req.on('upgrade', (res) => done({ status: 101, headers: res.headers }));
+    req.on('response', (res) => {
+      let body = '';
+      res.on('data', (d) => { body = (body + d).slice(0, 300); });
+      res.on('end', () => done({ status: res.statusCode, headers: res.headers, body }));
+      setTimeout(() => done({ status: res.statusCode, headers: res.headers, body }), 1500);
+    });
+    req.on('timeout', () => done({ error: 'délai dépassé' }));
+    req.on('error', (e) => done({ error: e.code || e.message }));
+    req.end();
+  });
+}
+
 function edgeSynth(text, voice, { WS = globalThis.WebSocket, skew = 0 } = {}) {
   return new Promise((resolve, reject) => {
     if (!WS) return reject(new Error('Ce Node ne fournit pas WebSocket'));
-    const id = randomUUID().replace(/-/g, '');
-    const url = `${EDGE.url}?TrustedClientToken=${EDGE.token}&Sec-MS-GEC=${edgeGec(Date.now() + skew)}&Sec-MS-GEC-Version=1-${EDGE.chrome}&ConnectionId=${id}`;
+    const { id, url, headers } = edgeHandshake({ skew });
     const chunks = [];
-    const ws = new WS(url, { headers: {
-      Pragma: 'no-cache', 'Cache-Control': 'no-cache', Origin: EDGE_ORIGIN, 'User-Agent': edgeAgent(), 'Accept-Language': 'en-US,en;q=0.9',
-      Cookie: `muid=${randomUUID().replace(/-/g, '').toUpperCase()};`,
-    } });
+    const ws = new WS(url, { headers });
     ws.binaryType = 'arraybuffer';
     let settled = false;
     const end = (err) => { if (settled) return; settled = true; try { ws.close(); } catch { /* déjà fermée */ } err ? reject(err) : resolve(Buffer.concat(chunks)); };
@@ -180,19 +213,24 @@ function edgeSynth(text, voice, { WS = globalThis.WebSocket, skew = 0 } = {}) {
  * Pourquoi la connexion WebSocket a-t-elle échoué ? Une requête HTTPS vers le même service sépare : réseau bloqué (pas de réponse), horloge du serveur
  * décalée (le jeton dépend de l'heure, Microsoft répond 403), protocole modifié (403 sans décalage), ou service joignable (le problème est le WebSocket).
  */
-export async function edgeDiagnose({ fetchImpl = fetch, now = Date.now } = {}) {
+export async function edgeDiagnose({ fetchImpl = fetch, now = Date.now, probe = edgeProbe } = {}) {
   let res;
   try {
     res = await fetchImpl(`${EDGE.voicesUrl}?trustedclienttoken=${EDGE.token}&Sec-MS-GEC=${edgeGec(now())}&Sec-MS-GEC-Version=1-${EDGE.chrome}`, { headers: { 'User-Agent': edgeAgent(), Origin: EDGE_ORIGIN }, signal: AbortSignal.timeout(8000) });
   } catch { return { kind: 'network' }; }
   const date = Date.parse(res.headers?.get?.('date') || '');
-  return { kind: res.ok ? 'service' : 'refused', status: res.status, skew: Number.isFinite(date) ? date - now() : 0 };
+  const skew = Number.isFinite(date) ? date - now() : 0;
+  if (!res.ok) return { kind: 'refused', status: res.status, skew };
+  const ws = await probe({ skew: Math.abs(skew) > 30_000 ? skew : 0 }); // le service répond : que dit-il à la poignée de main WebSocket ?
+  return { kind: 'service', status: res.status, skew, ws: ws.status || null, wsError: ws.error || null };
 }
 
 export function edgeHint(d) {
   if (d.kind === 'network') return 'Le serveur ne joint pas speech.platform.bing.com (réseau ou pare-feu qui bloque la sortie vers Microsoft) : demande à l\'administrateur d\'autoriser ce domaine, ou choisis un autre fournisseur';
   if (Math.abs(d.skew) > 30_000) return `L'horloge du serveur est décalée de ${Math.round(Math.abs(d.skew) / 60_000)} min : Microsoft refuse alors la connexion. Synchronise l'heure du serveur (NTP), ou choisis un autre fournisseur`;
   if (d.kind === 'refused') return `Microsoft Edge a refusé la requête (code ${d.status}) : ce service non officiel a probablement changé son protocole ; choisis un autre fournisseur`;
+  if (d.ws && d.ws !== 101) return `Microsoft Edge répond mais refuse la connexion vocale (code ${d.ws}) : ce service non officiel a probablement changé son protocole ; choisis un autre fournisseur (ElevenLabs et Google Cloud sont officiels)`;
+  if (d.ws === 101) return 'La connexion vocale Microsoft Edge s\'ouvre en test mais a échoué pendant la lecture : réessaie ; si cela se répète, choisis un autre fournisseur';
   return 'Microsoft Edge répond mais refuse la connexion vocale (WebSocket) : ce service non officiel a probablement changé son protocole ; choisis un autre fournisseur';
 }
 
