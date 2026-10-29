@@ -56,7 +56,7 @@ export function errorMail({ error, method, path, userId, at, repeats, appUrl }) 
  */
 export async function reportError(app, error, { method = '?', path = '?', userId = null } = {}) {
   try {
-    const smtp = app.cfg.systemSmtp;
+    const smtp = app.cfg.errorSmtp || app.cfg.systemSmtp; // boîte erreur@ si elle est configurée
     const to = app.cfg.adminEmails || [];
     if (!smtp || !to.length) return { sent: false, reason: 'smtp-ou-admin-absent' };
     const st = (app.errorMail ??= { seen: new Map(), sent: [] });

@@ -14,6 +14,13 @@ Le mode **Support** de la page IA (menu IA → Support) fait répondre le Claude
 - Le test ne voit pas tout (le sens, les règles de gestion, les étapes) : c'est à toi de relire la documentation du sujet et de la corriger.
 - Change le comportement d'un bouton ou d'un plafond : corrige la phrase qui le décrit, pas seulement le code.
 
+## Règle n° 2 : la visite guidée suit chaque nouveauté
+
+La visite guidée du tableau de bord (`src/tour.js`, `TOUR_STEPS`) fait découvrir l'application. **À chaque nouvel onglet de la barre du haut, nouvelle page ou nouvelle fonctionnalité importante, ajoute son étape dans `TOUR_STEPS` dans le même commit**, avec un titre, un texte qui explique à quoi ça sert et la cible à éclairer.
+- Un onglet dans `NAV` (`src/views.js`) sans étape qui vise `.pills a[href="…"]` **fait échouer `test/tour.test.js`** : ajoute l'étape, ne contourne pas le test. Les étapes suivent l'ordre des onglets.
+- Ajoute le sélecteur de la cible dans le tableau `has` de `test/tour.test.js`, et relance `scripts/tour-check.mjs` (rendu dans Chromium).
+- La documentation du Support liste les étapes toute seule (générée depuis `TOUR_STEPS`) : ne la recopie pas.
+
 ## Autres règles du dépôt
 
 - **Migrations** (`src/migrations.js`) : on ajoute **toujours à la fin** de la liste (la version est l'index). Jamais d'insertion au milieu : une base déjà migrée sauterait la migration. Les `ALTER TABLE` MySQL doivent être rejouables (`when: colMissing(…)`). Les tests de migration ne tournent que sur SQLite : le dire dans la PR.
