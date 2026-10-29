@@ -62,7 +62,7 @@ Ils dépendent du rôle dans le projet : Configuration du projet, Audit, Récapi
 Cliquer **Reconnecter**. Publier grisé : aucune page choisie alors que le compte ne peut pas publier sur le profil (**Choisir une page**). Voir le fichier sur LinkedIn.
 
 ## La vidéo de promotion échoue
-Lire le message du job : outils manquants sur le serveur (Chromium, ffmpeg), plafond de 20 vidéos, scène refusée après correction (relancer ou changer de modèle). Voir le fichier sur la Promotion.
+Lire le message du job : outils manquants sur le serveur (Chromium, ffmpeg), plafond de 20 vidéos, scène refusée après correction (relancer ou changer de modèle). Si le message parle d'un « Trop de vide », d'une « Image figée » ou de « Titres trop petits », c'est le contrôle qualité automatique : relancer, choisir un « Style » précis dans l'onglet Promotion, ou passer sur Opus ou Fable. Voir le fichier sur la Promotion.
 
 ## L'agenda externe ne se met pas à jour
 Les agendas se rafraîchissent tout seuls mais lentement (Google : 12 à 24 heures). Pour voir un changement tout de suite, retirer puis rajouter l'abonnement, ou régénérer le lien (Créer mon lien d'agenda).

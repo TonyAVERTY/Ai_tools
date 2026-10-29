@@ -10,6 +10,7 @@ import { mkdtempSync, rmSync, statSync, existsSync, readdirSync } from 'node:fs'
 import { tmpdir } from 'node:os';
 import { join, delimiter } from 'node:path';
 import { prepareLaunch } from './sandbox.js';
+import { PROMO_STYLE_IDS } from './promokit.js';
 
 export const PROMO = {
   fps: { min: 10, max: 60, def: 30 },
@@ -44,7 +45,8 @@ export function parsePromoParams(b = {}) {
   if (fps * seconds > PROMO.maxFrames) return { error: `Trop d'images à produire (${fps * seconds}) : ${fps} images/s × ${seconds} s dépasse ${PROMO.maxFrames}. Réduis la durée ou le nombre d'images par seconde.` };
   const format = FORMATS[b.format] ? b.format : 'paysage';
   const subject = String(b.subject ?? '').replace(/\s+/g, ' ').trim().slice(0, PROMO.maxSubject);
-  return { fps, seconds, format, subject };
+  const style = PROMO_STYLE_IDS.includes(b.style) ? b.style : 'auto';
+  return { fps, seconds, format, subject, style };
 }
 
 // ---------- La scène ----------
@@ -72,6 +74,9 @@ const FORBIDDEN = [
   [/https?:\/\/(?!www\.w3\.org\/)/i, 'adresse http(s) : la scène doit être autonome, sans aucune ressource externe'],
 ];
 
+// Textes de la scène de référence : un emplacement oublié dans la vidéo est un défaut, pas un contenu
+const PLACEHOLDERS = ['EXEMPLE · remplace', 'adresse-du-site.fr', 'Premier bénéfice concret', 'Deuxième bénéfice concret', 'Troisième bénéfice concret', 'La promesse, en une ligne', 'Le problème, dit avec les mots du public', 'ce que c’est, en une phrase'];
+
 /** Vérifie la scène avant tout rendu. Renvoie le document avec la CSP, ou lève une SceneError dont le message est renvoyé à Claude. */
 export function prepareScene(html) {
   const doc = String(html || '');
@@ -81,6 +86,8 @@ export function prepareScene(html) {
     throw new SceneError('La scène doit définir window.renderFrame = function (t) { … } (t en secondes).');
   }
   for (const [re, what] of FORBIDDEN) if (re.test(doc)) throw new SceneError(`Interdit dans la scène : ${what}.`);
+  const left = PLACEHOLDERS.find((p) => doc.includes(p));
+  if (left) throw new SceneError(`Le texte d'exemple de la scène de référence est resté dans la vidéo (« ${left} ») : remplace tous les textes par ceux du projet.`);
   const meta = `<meta http-equiv="Content-Security-Policy" content="${CSP}">`;
   // Notre CSP passe en premier : une seconde politique ne peut que restreindre davantage, jamais lever celle-ci
   if (/<head[\s>]/i.test(doc)) return doc.replace(/<head(\s[^>]*)?>/i, (m) => `${m}${meta}`);
@@ -257,12 +264,133 @@ async function shot(cdp, t) {
   return Buffer.from(s.data, 'base64');
 }
 
+
+// ---------- Contrôle de qualité visuelle ----------
+// Avant de rendre, la scène est parcourue (renderFrame à intervalles réguliers) et mesurée dans la page : place occupée, taille des titres, position du
+// contenu, fond, mouvement. Une scène vide, minuscule, collée en haut, sur fond blanc ou figée est renvoyée à Claude avec ce qui ne va pas, une fois.
+
+/** Fonction exécutée DANS la page : renvoie une mesure par instant. */
+const MEASURE = String.raw`(async (times) => {
+  const W = innerWidth, H = innerHeight, GX = 8, GY = 14;
+  const SHAPES = new Set(['path','rect','circle','ellipse','line','polyline','polygon','image','canvas','text','use']);
+  const alpha = (c) => { const m = /rgba?\(([^)]+)\)/.exec(c || ''); if (!m) return c && c !== 'transparent' ? 1 : 0; const p = m[1].split(',').map(Number); return p.length > 3 ? p[3] : 1; };
+  const lum = (c) => { const m = /rgba?\(([^)]+)\)/.exec(c || ''); if (!m) return 0; const [r, g, b] = m[1].split(',').map(Number); return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255; };
+  const out = [];
+  for (const t of times) {
+    await window.renderFrame(t);
+    const items = [];
+    let bgSolid = null, bgGradient = false;
+    const all = document.body.querySelectorAll('*');
+    for (let i = 0; i < all.length; i++) {
+      const el = all[i];
+      if (el.tagName === 'SCRIPT' || el.tagName === 'STYLE') continue;
+      let op = 1, hidden = false;
+      for (let n = el; n && n.nodeType === 1; n = n.parentElement) {
+        const c = getComputedStyle(n);
+        if (c.display === 'none') { hidden = true; break; }
+        op *= parseFloat(c.opacity);
+      }
+      const cs = getComputedStyle(el);
+      if (hidden || cs.visibility === 'hidden' || op < 0.2) continue;
+      const r = el.getBoundingClientRect();
+      if (r.width < 2 || r.height < 2) continue;
+      const x = Math.max(0, r.left), y = Math.max(0, r.top), w = Math.min(W, r.right) - x, h = Math.min(H, r.bottom) - y;
+      if (w <= 0 || h <= 0) continue;
+      const img = cs.backgroundImage || '';
+      const big = w >= W * 0.8 && h >= H * 0.8;
+      if (big) { if (/gradient/.test(img)) bgGradient = true; else if (alpha(cs.backgroundColor) > 0.9) bgSolid = cs.backgroundColor; continue; }
+      let type = null, fs = 0;
+      const own = [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
+      if (own) { type = 'text'; fs = parseFloat(cs.fontSize); }
+      else if (el instanceof SVGElement && SHAPES.has(el.tagName.toLowerCase())) type = 'shape';
+      else if (alpha(cs.backgroundColor) > 0.04 || (img && img !== 'none') || (parseFloat(cs.borderTopWidth) > 0 && alpha(cs.borderTopColor) > 0.1)) type = 'box';
+      if (!type) continue;
+      // Halos et grilles de fond : décor, pas contenu
+      if (type === 'box' && (/radial-gradient/.test(img) || (/gradient/.test(img) && w >= W * 0.8))) continue;
+      items.push({ i, type, x, y, w, h, fs });
+    }
+    const cells = new Set();
+    for (const it of items) {
+      const x0 = Math.floor(it.x / W * GX), x1 = Math.min(GX - 1, Math.floor((it.x + it.w) / W * GX));
+      const y0 = Math.floor(it.y / H * GY), y1 = Math.min(GY - 1, Math.floor((it.y + it.h) / H * GY));
+      for (let a = x0; a <= x1; a++) for (let b = y0; b <= y1; b++) cells.add(a * 100 + b);
+    }
+    let cy = null;
+    if (cells.size) { let s = 0; for (const c of cells) s += (c % 100 + 0.5) / GY; cy = s / cells.size; }
+    const fonts = items.filter((n) => n.type === 'text').map((n) => n.fs);
+    const bodyBg = getComputedStyle(document.body).backgroundColor;
+    out.push({ t, cover: cells.size / (GX * GY), cy, maxFont: fonts.length ? Math.max(...fonts) : 0, minFont: fonts.length ? Math.min(...fonts) : 0,
+      count: items.length, boxes: items.map((n) => [n.i, Math.round(n.x), Math.round(n.y), Math.round(n.w), Math.round(n.h)]),
+      bg: { solid: bgSolid || (alpha(bodyBg) > 0.9 ? bodyBg : null), gradient: bgGradient, lum: lum(bgSolid || bodyBg) } });
+  }
+  return out;
+})`;
+
+const median = (a) => { const s = a.filter((x) => Number.isFinite(x)).sort((x, y) => x - y); return s.length ? s[Math.floor(s.length / 2)] : 0; };
+const pct = (x) => `${Math.round(x * 100)} %`;
+
+/**
+ * Juge les mesures. `errors` : défauts qui justifient de redemander la scène à Claude ; `notes` : constats à garder (affichés avec la vidéo).
+ * Fonction pure : testée sans navigateur.
+ */
+export function judgeScene(metrics, { width, height }) {
+  const errors = [];
+  const notes = [];
+  if (!metrics?.length) return { errors, notes };
+  const cover = median(metrics.map((m) => m.cover));
+  const maxFont = median(metrics.filter((m) => m.maxFont > 0).map((m) => m.maxFont));
+  const minFonts = metrics.filter((m) => m.minFont > 0).map((m) => m.minFont).sort((a, b) => a - b);
+  const smallFont = minFonts.length ? minFonts[Math.floor(minFonts.length * 0.1)] : 0;
+  const cy = median(metrics.filter((m) => m.cy != null).map((m) => m.cy));
+  const empty = metrics.filter((m) => m.cover === 0).length / metrics.length;
+  const side = Math.min(width, height); // les textes se jugent sur le petit côté : c'est lui qui limite leur largeur
+  if (cover < 0.22) errors.push(`Trop de vide : en moyenne ${pct(cover)} de l'image est occupée par du contenu (vise au moins 30 %). Agrandis les éléments (la maquette ou l'illustration principale doit couvrir au moins 30 % de la largeur) et remplis l'image au lieu de la laisser blanche.`);
+  if (maxFont && maxFont < side * 0.05) errors.push(`Titres trop petits : le plus grand texte fait ${Math.round(maxFont)} px sur une image de ${width} × ${height} px (${pct(maxFont / side)} du petit côté) ; vise au moins ${Math.round(side * 0.06)} px (6 % du petit côté) pour les titres.`);
+  if (smallFont && smallFont < side * 0.03) errors.push(`Texte illisible : certains textes font ${Math.round(smallFont)} px (${pct(smallFont / side)} du petit côté) ; aucun texte ne doit descendre sous ${Math.round(side * 0.035)} px.`);
+  if (cy && cy < 0.28) errors.push(`Le contenu est collé en haut de l'image (centre à ${pct(cy)} de la hauteur) : centre la composition verticalement, vers ${pct(0.5)}, et répartis les éléments sur toute la hauteur.`);
+  if (cy && cy > 0.78) errors.push(`Le contenu est collé en bas de l'image (centre à ${pct(cy)} de la hauteur) : centre la composition verticalement.`);
+  if (empty > 0.12) errors.push(`${pct(empty)} de la vidéo n'affiche aucun contenu (écran vide) : chaque seconde doit montrer quelque chose ; enchaîne les plans sans trou.`);
+  const last = metrics[metrics.length - 1];
+  if (last && last.cover < 0.1) errors.push("Le dernier plan est vide : il doit montrer le nom du produit (et l'adresse du site si elle est connue) jusqu'à la fin.");
+  // Fond : un aplat blanc ou presque blanc, sans dégradé, ressemble à une diapositive vide
+  const solidWhite = metrics.filter((m) => m.bg?.solid && !m.bg.gradient && m.bg.lum > 0.965).length / metrics.length;
+  if (solidWhite > 0.5) errors.push('Fond blanc uni : utilise le dégradé et les halos de la direction artistique (jamais de fond blanc pur).');
+  // Mouvement : parmi les éléments de contenu, combien bougent (position ou taille d'au moins ~1 px) entre deux instants voisins
+  let still = 0;
+  let steps = 0;
+  for (let k = 1; k < metrics.length; k++) {
+    const prev = new Map(metrics[k - 1].boxes.map((b) => [b[0], b]));
+    let moved = false;
+    for (const b of metrics[k].boxes) {
+      const p = prev.get(b[0]);
+      if (p && (Math.abs(b[1] - p[1]) >= 1 || Math.abs(b[2] - p[2]) >= 1 || Math.abs(b[3] - p[3]) >= 2 || Math.abs(b[4] - p[4]) >= 2)) { moved = true; break; }
+    }
+    steps++;
+    if (!moved) still++;
+  }
+  const stillRatio = steps ? still / steps : 0;
+  if (stillRatio > 0.4) errors.push(`Image figée : pendant ${pct(stillRatio)} du temps, aucun élément ne bouge. Ajoute un mouvement continu (légère flottaison des éléments, halos et grille de fond qui dérivent, compteurs qui avancent) en plus des entrées et sorties.`);
+  notes.push(`Occupation de l'image : ${pct(cover)} · plus grand texte : ${pct(maxFont ? maxFont / side : 0)} du petit côté · mouvement : ${pct(1 - stillRatio)} du temps`);
+  return { errors, notes };
+}
+
+/** Mesure la scène chargée : un instant toutes les ~0,5 s (au plus 80). */
+export async function measureScene(cdp, { seconds }) {
+  const step = Math.max(0.5, seconds / 80);
+  const times = [];
+  for (let t = 0; t < seconds; t += step) times.push(Number(t.toFixed(3)));
+  times.push(Math.max(0, seconds - 0.05));
+  const r = await cdp.send('Runtime.evaluate', { expression: `${MEASURE}(${JSON.stringify(times)})`, awaitPromise: true, returnByValue: true }, PROMO.frameTimeoutMs * 4);
+  if (r.exceptionDetails) throw new SceneError(`Mesure de la scène impossible : ${r.exceptionDetails.exception?.description?.split('\n')[0] || r.exceptionDetails.text}`);
+  return r.result?.value || [];
+}
+
 /**
  * Rend la scène en MP4 (`out`). Vérifie d'abord trois images (début, milieu, fin) : la scène doit se charger, ne pas planter et bouger.
  * @returns {Promise<{frames:number, bytes:number}>}
  * @throws SceneError : problème de la scène (renvoyé à Claude pour correction) ; Error : problème technique.
  */
-export async function renderPromo({ cfg, html, fps, seconds, width, height, out, onProgress = () => {}, signal }) {
+export async function renderPromo({ cfg, html, fps, seconds, width, height, out, onProgress = () => {}, signal, quality = 'off' }) {
   const doc = prepareScene(html);
   const total = Math.round(fps * seconds);
   const ffmpegBin = cfg.ffmpegBin || 'ffmpeg';
@@ -278,6 +406,14 @@ export async function renderPromo({ cfg, html, fps, seconds, width, height, out,
     const b = await shot(cdp, seconds / 2);
     const c = await shot(cdp, Math.max(0, seconds - 1 / fps));
     if (a.equals(b) && b.equals(c)) throw new SceneError("La scène ne bouge pas : renderFrame(t) doit modifier l'affichage en fonction de t (début, milieu et fin identiques).");
+    // Qualité visuelle : 'strict' renvoie la scène à Claude si elle est vide, minuscule, figée ou sur fond blanc ; 'warn' rend quand même et garde les constats
+    let notes = [];
+    if (quality !== 'off') {
+      const verdict = judgeScene(await measureScene(cdp, { seconds }), { width, height });
+      notes = verdict.notes;
+      if (verdict.errors.length && quality === 'strict') throw new SceneError(`Qualité visuelle insuffisante, corrige : ${verdict.errors.join(' ')}`);
+      if (verdict.errors.length) notes = [...verdict.errors.map((e) => `À améliorer : ${e}`), ...notes];
+    }
 
     ff = spawn(ffmpegBin, [
       '-v', 'error', '-y', '-f', 'image2pipe', '-framerate', String(fps), '-c:v', 'mjpeg', '-i', '-',
@@ -297,7 +433,7 @@ export async function renderPromo({ cfg, html, fps, seconds, width, height, out,
     }
     ff.stdin.end();
     await done;
-    return { frames: total, bytes: statSync(out).size };
+    return { frames: total, bytes: statSync(out).size, notes };
   } catch (e) {
     try { ff?.kill('SIGKILL'); } catch { /* déjà arrêté */ }
     rmSync(out, { force: true });

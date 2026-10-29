@@ -10,6 +10,7 @@ import { assertCanRunAi } from './claudelink.js';
 import { budgetState } from './services/budget.js';
 import { userPromoRoot } from './users.js';
 import { PROMO, FORMATS, parsePromoParams, promoSupported } from './services/promovideo.js';
+import { PROMO_STYLES } from './services/promokit.js';
 
 const nameOf = (id) => `${Number(id)}.mp4`;
 export const promoFile = (cfg, userId, id) => join(userPromoRoot(cfg, userId), nameOf(id));
@@ -61,6 +62,7 @@ export function registerPromoRoutes(router, app, { project, aiOpts }) {
       supported: sup.ok, reason: sup.ok ? null : sup.reason, hasProfile: !!p.profile, canDelete: p.access !== 'member',
       limits: { fps: PROMO.fps, seconds: PROMO.seconds, maxFrames: PROMO.maxFrames, maxSubject: PROMO.maxSubject, maxVideos: PROMO.maxVideos },
       formats: Object.entries(FORMATS).map(([id, f]) => ({ id, label: f.label })),
+      styles: [{ id: 'auto', label: 'Automatique' }, ...Object.entries(PROMO_STYLES).map(([id, st]) => ({ id, label: st.label }))],
       videos: await listVideos(db, p.id),
     });
   });

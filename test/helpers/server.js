@@ -28,7 +28,8 @@ export async function startApp({ cfg = {}, worker = false, rateLimit = false, cr
   const tmp = mkdtempSync(join(tmpdir(), 'aitools-srv-'));
   const config = {
     appUrl: APP_URL, google: { clientId: 'gid', clientSecret: 'gsecret' }, apple: null, adminEmails: [],
-    secretKey: TEST_SECRET_KEY, dataDir: tmp, claudeBin: 'claude', cliModeEnabled: true,
+    secretKey: TEST_SECRET_KEY, dataDir: tmp, claudeBin: 'claude', cliModeEnabled: true, promoQuality: false, // le contrôle de qualité visuelle des vidéos a ses propres tests (les scènes factices des autres tests sont minuscules)
+   
     sandbox: { enabled: false, production: false, roBinds: [] }, ...cfg,
   };
   const limiter = rateLimit ? new RateLimiter(rateLimit === true ? {} : rateLimit) : unlimited();
