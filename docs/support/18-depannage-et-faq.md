@@ -158,3 +158,9 @@ Claude avait cité une variable (comme `{{site}}`) dans une phrase avant de donn
 ## L'Objet B est vide après « Générer avec l'IA »
 Claude n'a pas proposé de second objet, ou l'a rendu identique à l'objet A : il n'y a alors pas de test A/B. Clique de nouveau sur **Générer avec l'IA**, ou écris toi-même l'**Objet B** (les envois alternent ensuite entre A et B ; le taux de réponse de chaque objet s'affiche sous le bouton Envoyer).
 
+## Mon choix de modèle (Haiku, Sonnet, Opus) n'a pas l'air pris en compte
+1. Vérifie qu'il est enregistré : après **Enregistrer les réglages**, le message « Réglages enregistrés » s'affiche et la liste montre ton choix quand tu rouvres les Réglages.
+2. Le modèle s'applique aux tâches lancées **après** l'enregistrement : une tâche déjà en cours garde le sien.
+3. Regarde le **modèle réellement utilisé** dans le menu **Activité** (« · modèle … ») ou, sur le projet, dans la zone de la tâche (« Modèle : … »).
+4. Chaque tâche suit son réglage : **prospection** (recherche de prospects et accroches), **analyse de projet** (analyse du dépôt), **rédaction** (modèles de mail et relances, relecture, posts LinkedIn, devis…). Le modèle de la page IA se règle dans la page IA.
+

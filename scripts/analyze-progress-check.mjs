@@ -15,7 +15,7 @@ const ok = (c, m) => { console.log(`${c ? 'OK ' : 'KO '} ${m}`); if (!c) bad++; 
 const u = await s.newUser();
 const pid = await addProject(s.db, u.userId ?? u.id, { name: 'MonEspacePro' });
 await s.db.prepare('INSERT INTO jobs(user_id, project_id, type, status, progress_json, created_at, started_at) VALUES(?, ?, ?, ?, ?, ?, ?)')
-  .run(u.userId ?? u.id, pid, 'analyze', 'running', JSON.stringify({ message: 'Lecture du code par Claude (étape 4)…', pct: 42 }), now(), now());
+  .run(u.userId ?? u.id, pid, 'analyze', 'running', JSON.stringify({ message: 'Lecture du code par Claude (étape 4)…', pct: 42, model: 'Sonnet 5.5' }), now(), now());
 const ctx = await b.newContext({ viewport: { width: 1280, height: 900 } });
 const [name, value] = u.cookie.split('=');
 await ctx.addCookies([{ name, value, url: s.base }]);
@@ -33,6 +33,8 @@ ok(/42 %/.test(await box.innerText()) && /Lecture du code/.test(await box.innerT
 await p.locator('.jobs-btn').click();
 await p.waitForFunction(() => /42 %/.test(document.querySelector('[data-jobs-list]')?.textContent || ''), null, { timeout: 8000 }).catch(() => {});
 ok(/Analyse/.test(await p.locator('[data-jobs-list]').innerText()) && /42 %/.test(await p.locator('[data-jobs-list]').innerText()), 'menu Activité : Analyse 42 %');
+ok(/modèle Sonnet 5\.5/.test(await p.locator('[data-jobs-list]').innerText()), 'menu Activité : le modèle utilisé est affiché');
+ok(/Modèle : Sonnet 5\.5/.test(await box.innerText()), 'page du projet : le modèle utilisé est affiché');
 ok(errs.length === 0, `aucune erreur JS ${errs.join(' | ')}`);
 
 // Analyse en échec sur un projet sans fiche : le message d'erreur s'affiche dans l'en-tête, sans erreur JavaScript

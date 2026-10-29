@@ -1,5 +1,7 @@
 // File de jobs en base : jobs IA simultanés (plafond global), plafond par utilisateur selon son offre (multi jobs), tourniquet entre utilisateurs.
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { now } from '../db.js';
+import { modelLabel } from './models.js';
 import { HttpError } from '../http.js';
 import { AI_JOBS } from './budget.js';
 import { getUser } from '../users.js';
@@ -8,6 +10,9 @@ import { loadRatio } from './load.js';
 import { LOAD } from '../limits.js';
 import { assertRoom, recordUsage, withUserLock, MAIL_JOBS } from './plans.js';
 import { sendPause, pauseMessage } from './abuse.js';
+
+// Job en cours d'exécution, retrouvé par le wrapper claude() : c'est lui qui dit quel modèle a réellement servi (affiché dans l'avancement et le résultat)
+export const jobContext = new AsyncLocalStorage();
 
 /**
  * Met un job en file pour un utilisateur. Point de passage obligé de toutes les routes et tâches de fond :
@@ -333,7 +338,8 @@ export class Worker {
       job,
       params: JSON.parse(job.params_json || '{}'),
       signal: ctrl.signal,
-      progress: (p) => setProgress(this.db, job.id, p),
+      // Le modèle réellement utilisé (réglage de l'utilisateur) est joint à chaque avancement : « Modèle : Sonnet » dans Activité et sur le projet
+      progress: (p) => setProgress(this.db, job.id, ctx.model ? { ...p, model: modelLabel(ctx.model) } : p),
       cancelled: () => this.isCancelled(job.id),
       usage: { costUsd: 0, tokensIn: 0, tokensOut: 0 },
     };
@@ -348,7 +354,8 @@ export class Worker {
         return;
       }
       try {
-        const result = await handler(ctx);
+        const out = await jobContext.run(ctx, () => handler(ctx));
+        const result = ctx.model && out && typeof out === 'object' && !Array.isArray(out) ? { ...out, model: ctx.model } : out;
         if (!(await this.isCancelled(job.id))) {
           await this.db.prepare("UPDATE jobs SET status='done', result_json=?, finished_at=?, cost_usd=?, tokens_in=?, tokens_out=? WHERE id=?")
             .run(JSON.stringify(result ?? null), now(), ctx.usage.costUsd, ctx.usage.tokensIn, ctx.usage.tokensOut, job.id);
