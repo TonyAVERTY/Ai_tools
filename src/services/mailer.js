@@ -15,6 +15,8 @@ export function createTransport(smtp) {
     secure: Number(smtp.port) === 465,
     auth: { user: smtp.user, pass: smtp.pass },
     pool: false,
+    // Un serveur qui ne répond pas doit finir en erreur lisible, pas en attente de plusieurs minutes
+    connectionTimeout: 15_000, greetingTimeout: 15_000, socketTimeout: 30_000,
     // Hôte épinglé sur l'IP vérifiée (netguard.js) : le nom reste utilisé pour SNI et la vérification du certificat
     ...(smtp.servername ? { servername: smtp.servername, tls: { servername: smtp.servername } } : {}),
   }, smtp.replyTo ? { replyTo: smtp.replyTo } : undefined);

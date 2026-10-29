@@ -1008,6 +1008,7 @@ html.nav-busy { cursor: progress; }
 
 /* ---------- Réglages : un seul bouton pour tout le formulaire, toujours à portée ---------- */
 .savebar { position: sticky; bottom: 16px; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin-top: 16px; padding: 12px 16px; background: var(--card); border: 1px solid var(--line-strong); border-radius: var(--radius-lg); box-shadow: var(--shadow-2); }
+.savebar[hidden] { display: none; }
 .savebar p { margin: 0; font-size: .875rem; color: var(--muted); }
 /* ---------- Administration : chiffres alignés à droite, statuts en pastilles ---------- */
 .admin-table th.num, .admin-table td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
