@@ -30,7 +30,11 @@ test('fx.js : aucun style en ligne dans le balisage, aucun écouteur global, mou
   assert.match(fx, /prefers-reduced-motion/);
   assert.match(fx, /window\.AiFx = \{ press, launch, bump \}/);
   // deux traits pointillés bleus tracés au rythme de l'agent : d'abord l'horizontal (H, dans la marge), puis le vertical (V) jusqu'à la cible
-  assert.match(fx, /H\$\{end\.x\} V\$\{y\}/);
+  assert.match(fx, /H\$\{g\.end\.x\} V\$\{y\}/);
+  // le trait reste accroché au bouton quand la page défile : géométrie relue à chaque image et au défilement, écouteurs retirés à la fin
+  assert.match(fx, /addEventListener\('scroll', onMove/);
+  assert.match(fx, /removeEventListener\('scroll', onMove/);
+  assert.match(fx, /removeEventListener\('resize', onMove\)/);
   assert.doesNotMatch(fx, /V\$\{[^}]+\} H\$\{[^}]+\}/, 'plus de vertical d\'abord : il traversait le contenu de la page');
   assert.match(read('app.css'), /\.fx-trail \.fx-dash \{[^}]*stroke: var\(--accent\)[^}]*stroke-dasharray/);
   assert.match(read('app.js'), /AiFx\?\.launch\(trigger, \$\('\.jitem\.new', jobsPop\)/, 'le trait va jusqu\'à la ligne de la nouvelle tâche, menu ouvert');
