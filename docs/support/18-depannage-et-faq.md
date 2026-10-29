@@ -152,3 +152,6 @@ Renseigne l'adresse dans **En-tête → Site du produit** (puis **Enregistrer le
 ## « Modèle à corriger avant validation » ou une virgule en début de ligne dans le mail
 Le bouton **Valider le modèle** refuse un modèle cassé : variable inconnue ou mal fermée (`{{site` sans les deux accolades), ligne qui commence par une virgule ou un point-virgule. Corrige la ligne indiquée (le message donne son numéro), puis valide de nouveau. Une virgule en début de ligne vient souvent d'une variable vide, par exemple `{{expediteur}}, MonProduit` sans **Nom expéditeur** réglé : renseigne le **Nom expéditeur** dans **Configuration du projet → SMTP**, ou mets la variable et le nom du produit sur deux lignes. À l'envoi et dans l'aperçu, ces restes sont de toute façon retirés. Si **Générer avec l'IA** dit « la relecture n'a pas pu être faite », relis le mail toi-même avant de le valider.
 
+## « Modèle en échec : Expected property name or '}' in JSON … »
+Claude avait cité une variable (comme `{{site}}`) dans une phrase avant de donner le mail, et l'application a pris cette accolade pour le début du mail. C'est corrigé : l'application ignore maintenant ce qui n'est pas du JSON valide et retient le vrai mail. Si tu vois encore ce message, clique de nouveau sur **Générer avec l'IA** : Claude répond un peu différemment à chaque fois.
+
