@@ -2246,6 +2246,19 @@
     const s = e.target.closest('[data-reply-seen]');
     if (s) { await markSeen(s.dataset.replySeen); s.closest('.reply-row')?.classList.remove('unseen'); s.remove(); pollReplies(); }
   });
+  // Barre d'enregistrement des réglages : visible seulement tant qu'un champ diffère de sa valeur enregistrée
+  const fieldChanged = (el) => {
+    if (el.type === 'checkbox' || el.type === 'radio') return el.checked !== el.defaultChecked;
+    if (el.tagName === 'SELECT') return [...el.options].some((o) => o.selected !== o.defaultSelected);
+    return el.value !== el.defaultValue;
+  };
+  const syncSavebar = (e) => {
+    const form = e.target.closest?.('form');
+    const bar = form && $('[data-savebar]', form);
+    if (bar) bar.hidden = ![...form.elements].some((el) => el.name && el.type !== 'hidden' && el.type !== 'submit' && el.type !== 'button' && fieldChanged(el));
+  };
+  listen(document, 'input', syncSavebar);
+  listen(document, 'change', syncSavebar);
   listen(document, 'change', (e) => { if (e.target.matches('[data-autosubmit]')) e.target.form.requestSubmit(); });
 
 })();

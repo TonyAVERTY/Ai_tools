@@ -127,3 +127,9 @@ Les fiches de méthode (voir « Savoir-faire de Claude dans AiTools ») sont des
 
 ## Les mails d'iaboss (invitations, rapports, alertes) : de quelle adresse partent-ils ?
 Ils partent de l'adresse d'envoi du serveur (noreply@iaboss.fr). Si tu réponds à l'un d'eux, ta réponse arrive sur l'adresse de contact (contact@iaboss.fr). Les alertes d'erreur envoyées aux administrateurs partent de la boîte dédiée (erreur@iaboss.fr). Les trois boîtes partagent le même mot de passe, réglé par l'administrateur du serveur : tu n'as rien à configurer dans l'application. Les mails de prospection, eux, partent toujours du SMTP du projet.
+
+## Je ne vois plus le bouton « Enregistrer les réglages »
+C'est normal : la barre du bas n'apparaît que lorsqu'un champ des Réglages a été modifié. Une fois les réglages enregistrés (message « Réglages enregistrés »), elle se masque. Modifie un champ et elle revient.
+
+## Le bouton « Envoyer le rapport maintenant » semble ne rien faire
+Le résultat s'affiche dans une petite bulle en bas à droite, pendant quelques secondes. Si rien ne s'affiche : vérifie que l'**Email de réception** est renseigné et enregistré. Si le serveur de mail ne répond pas, une erreur apparaît au bout de 15 à 30 secondes (l'administrateur consulte alors les journaux du serveur : mauvais hôte ou port SMTP, identifiant ou mot de passe refusé).
