@@ -61,6 +61,7 @@ const lines = prompt.includes('proposer TROIS exemples de devis') ? [billQuotes(
   : prompt.includes('ENVDUMP') ? ['```json\n' + JSON.stringify({ env: process.env, cwd: process.cwd() }) + '\n```']
   : prompt.includes('fiche commerciale') ? ['```json\n' + JSON.stringify(profile) + '\n```']
   : prompt.includes('mail de RELANCE') ? ['{"body":"Petite relance : toujours partant, {{entreprise}} ?"}']
+  : prompt.includes('RELECTURE DU MAIL') ? [JSON.stringify({ subject: 'Idée pour {{entreprise}}', body: '{{accroche}}\n\nBonjour {{entreprise}} à {{ville}}.\n\n{{expediteur}}', corrections: ['signature sans virgule'] })]
   : prompt.includes('email de prospection') ? ['{"subject":"Idée pour {{entreprise}}","body":"{{accroche}}\\n\\nBonjour {{entreprise}} à {{ville}}.\\n\\n{{expediteur}}"}']
   : prompt.includes('évolutions') ? ['### 1. Export CSV\n- **Pourquoi** : pratique']
   : prompt.includes('prospects')

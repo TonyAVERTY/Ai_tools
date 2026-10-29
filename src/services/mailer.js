@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer';
 import { randomBytes } from 'node:crypto';
 import { prospectHtml } from './mailhtml.js';
+import { fillBody, fillSubject } from './mailcheck.js';
 
 export const EMAIL_RE = /^[^\s@<>()"',;:]+@[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/i;
 
@@ -43,13 +44,13 @@ export function buildProspectMail({ template, prospect, smtp, site = '', unsubUr
     expediteur: smtp.fromName || '',
     site: site || '', // adresse du site du produit (En-tête du projet)
   };
-  const body = fillTemplate(template.body, vars).replace(/\n{3,}/g, '\n\n').trim();
+  const body = fillBody(template.body, vars).replace(/\n{3,}/g, '\n\n').trim();
   const notice = `Vous recevez ce message car l'adresse ${prospect.email} est publiée publiquement${prospect.source ? ` (${prospect.source})` : ''}.`;
   const footer = ['', '—', notice, `Pour ne plus être contacté : ${unsubUrl}`].join('\n');
   return {
     from: smtp.fromName ? `"${smtp.fromName.replace(/"/g, '')}" <${smtp.fromEmail}>` : smtp.fromEmail,
     to: prospect.email,
-    subject: fillTemplate(subject, vars).trim(),
+    subject: fillSubject(subject, vars),
     text: withFooter ? body + '\n' + footer : body,
     // Mail classique (texte) par défaut ; HTML seulement si le modèle a été validé avec la case « Envoyer en HTML »
     ...(asHtml ? { html: prospectHtml({ body, notice, unsubUrl, footer: withFooter }) } : {}),
