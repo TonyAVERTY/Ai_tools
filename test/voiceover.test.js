@@ -11,7 +11,7 @@ import { addProject } from './helpers/users.js';
 import { Worker, latestJobs } from '../src/services/jobs.js';
 import { makeHandlers } from '../src/handlers.js';
 import { SceneError } from '../src/services/promovideo.js';
-import { VOICE_PROVIDERS, parseVoiceParams, extractVoiceScript, planVoice, edgeGec, edgeSsml, googleChunks, synthesize, audioDuration, mixVoice, voiceCatalog } from '../src/services/voiceover.js';
+import { VOICE_PROVIDERS, listVoices, parseVoiceParams, extractVoiceScript, planVoice, edgeGec, edgeSsml, googleChunks, synthesize, audioDuration, mixVoice, voiceCatalog } from '../src/services/voiceover.js';
 
 const hasFfmpeg = spawnSync('ffmpeg', ['-version']).status === 0;
 const skipFf = !hasFfmpeg && "ffmpeg n'est pas installé";
@@ -24,7 +24,14 @@ test('paramètres : sans case rien n\'est lu ; fournisseur et voix doivent exist
   assert.match(parseVoiceParams({ voice: true, voiceProvider: 'edge', voiceName: 'inconnue' }).error, /voix/);
   assert.deepEqual(parseVoiceParams({ voice: true, voiceProvider: 'edge', voiceName: 'fr-FR-DeniseNeural' }).voice, { provider: 'edge', voice: 'fr-FR-DeniseNeural', lang: 'fr' });
   assert.deepEqual(parseVoiceParams({ voice: true, voiceProvider: 'google', voiceName: 'en' }).voice, { provider: 'google', voice: 'en', lang: 'en' });
-  for (const p of voiceCatalog()) assert.ok(p.label && p.voices.length, p.id);
+  assert.deepEqual(voiceCatalog().map((p) => p.id), ['edge', 'elevenlabs', 'googlecloud', 'google']);
+  for (const p of voiceCatalog()) assert.ok(p.label && (p.keyed ? !p.voices : p.voices.length), p.id);
+  // Fournisseurs à clé : identifiant de voix de forme sûre ; langue choisie (ElevenLabs) ou déduite de la voix (Google Cloud)
+  assert.deepEqual(parseVoiceParams({ voice: true, voiceProvider: 'elevenlabs', voiceName: 'EXAVITQu4vr4xnSDxMaL', voiceLang: 'es' }).voice, { provider: 'elevenlabs', voice: 'EXAVITQu4vr4xnSDxMaL', lang: 'es' });
+  assert.equal(parseVoiceParams({ voice: true, voiceProvider: 'elevenlabs', voiceName: 'abc', voiceLang: 'xx' }).voice.lang, 'fr');
+  assert.equal(parseVoiceParams({ voice: true, voiceProvider: 'googlecloud', voiceName: 'de-DE-Chirp3-HD-Aoede' }).voice.lang, 'de');
+  assert.match(parseVoiceParams({ voice: true, voiceProvider: 'elevenlabs', voiceName: '../../etc' }).error, /voix/);
+  assert.equal(voiceCatalog({ elevenlabs: '1234' }).find((p) => p.id === 'elevenlabs').keyLast4, '1234');
 });
 
 test('script de Claude : forme, instants, longueurs ; erreurs renvoyées comme des défauts de scène', () => {
@@ -245,7 +252,7 @@ test('extrait d\'écoute : audio MP3, mis en cache, voix inconnue refusée, conn
 test('l\'état de l\'onglet liste les fournisseurs et leurs voix', async () => {
   const { u, pid } = await setup();
   const st = await (await u.get(`/api/projects/${pid}/promo`)).json();
-  assert.deepEqual(st.voices.map((p) => p.id), ['edge', 'google']);
+  assert.deepEqual(st.voices.map((p) => p.id), ['edge', 'elevenlabs', 'googlecloud', 'google']);
   assert.ok(st.voices[0].voices.some((v) => v.id === 'fr-FR-DeniseNeural'));
 });
 
@@ -257,4 +264,103 @@ test('prompt : le contrat de voix apparaît seulement avec une voix, dans sa lan
   assert.match(p, /VOIX OFF : une voix lira la vidéo en espagnol/);
   assert.match(p, /<script type="application\/json" id="voix">\[\{"t":0\.4/);
   assert.match(p, /72 mots au plus pour 30 s/);
+});
+
+// ---------- Fournisseurs à clé (ElevenLabs, Google Cloud) ----------
+const KEY = 'sk_test_1234567890abcdefghij';
+const jsonRes = (obj, status = 200) => ({ ok: status < 400, status, json: async () => obj, arrayBuffer: async () => new Uint8Array(500).buffer });
+
+test('ElevenLabs : clé dans l\'en-tête (jamais dans l\'adresse), modèle multilingue, erreurs sans la clé', async () => {
+  const seen = [];
+  const fetchImpl = async (url, init) => { seen.push({ url, init }); return jsonRes({}); };
+  const audio = await synthesize({ provider: 'elevenlabs', voice: 'EXAVITQu4vr4xnSDxMaL', text: 'Bonjour à tous', key: KEY }, { fetchImpl });
+  assert.equal(audio.length, 500);
+  assert.match(seen[0].url, /api\.elevenlabs\.io\/v1\/text-to-speech\/EXAVITQu4vr4xnSDxMaL/);
+  assert.ok(!seen[0].url.includes(KEY));
+  assert.equal(seen[0].init.headers['xi-api-key'], KEY);
+  assert.equal(JSON.parse(seen[0].init.body).model_id, 'eleven_multilingual_v2');
+  await assert.rejects(synthesize({ provider: 'elevenlabs', voice: 'abc', text: 'x y z', key: KEY }, { fetchImpl: async () => jsonRes({}, 401) }), (e) => /ElevenLabs a refusé la clé API/.test(e.message) && !e.message.includes(KEY));
+  await assert.rejects(synthesize({ provider: 'elevenlabs', voice: 'abc', text: 'x y z', key: KEY }, { fetchImpl: async () => jsonRes({}, 429) }), /quota ou débit/);
+  await assert.rejects(synthesize({ provider: 'elevenlabs', voice: 'abc', text: 'x y z', key: KEY }, { fetchImpl: async () => { throw new Error(`boom ${KEY}`); } }), (e) => /ElevenLabs ne répond pas/.test(e.message) && !e.message.includes(KEY));
+  await assert.rejects(synthesize({ provider: 'elevenlabs', voice: 'abc', text: 'x y z' }), /Aucune clé API ElevenLabs/);
+});
+
+test('Google Cloud : clé dans l\'en-tête, langue déduite de la voix, audio décodé', async () => {
+  let seen;
+  const audio = await synthesize({ provider: 'googlecloud', voice: 'fr-FR-Chirp3-HD-Aoede', text: 'Bonjour à tous', key: KEY }, { fetchImpl: async (url, init) => { seen = { url, init }; return jsonRes({ audioContent: Buffer.alloc(600, 3).toString('base64') }); } });
+  assert.equal(audio.length, 600);
+  assert.ok(!seen.url.includes(KEY));
+  assert.equal(seen.init.headers['X-Goog-Api-Key'], KEY);
+  assert.deepEqual(JSON.parse(seen.init.body).voice, { languageCode: 'fr-FR', name: 'fr-FR-Chirp3-HD-Aoede' });
+});
+
+test('listes de voix : ElevenLabs (étiquettes lisibles) et Google Cloud (voix naturelles seulement, Chirp en premier)', async () => {
+  const el = await listVoices('elevenlabs', { key: KEY, fetchImpl: async () => jsonRes({ voices: [{ voice_id: 'b1', name: 'Bella', labels: { gender: 'female', accent: 'american' } }, { voice_id: '../x', name: 'Piège' }, { voice_id: 'a1', name: 'Adam', labels: { gender: 'male' } }] }) });
+  assert.deepEqual(el.map((x) => [x.id, x.label]), [['a1', 'Adam · masculine'], ['b1', 'Bella · féminine, american']]);
+  const gc = await listVoices('googlecloud', { key: KEY, fetchImpl: async (url) => jsonRes({ voices: url.includes('fr-FR') ? [
+    { name: 'fr-FR-Standard-A', ssmlGender: 'FEMALE' }, { name: 'fr-FR-Neural2-B', ssmlGender: 'MALE' }, { name: 'fr-FR-Chirp3-HD-Aoede', ssmlGender: 'FEMALE' }] : [] }) });
+  assert.deepEqual(gc.map((x) => [x.id, x.lang]), [['fr-FR-Chirp3-HD-Aoede', 'fr'], ['fr-FR-Neural2-B', 'fr']]);
+  assert.match(gc[0].label, /très naturelle/);
+});
+
+test('clé API : essayée avant d\'être gardée, chiffrée en base, jamais renvoyée, retirable, propre à chaque compte', async () => {
+  const u = await s.newUser();
+  const other = await s.newUser();
+  const calls = [];
+  s.app.listVoices = async (provider, { key }) => { calls.push([provider, key]); if (key.startsWith('bad')) throw new Error('ElevenLabs a refusé la clé API (vérifie-la, ou son quota)'); return [{ id: 'v1', label: 'Voix un', lang: 'fr' }]; };
+  try {
+    assert.equal((await u.post('/api/promo/voice-key', { provider: 'edge', key: KEY })).status, 400, 'fournisseur sans clé');
+    assert.equal((await u.post('/api/promo/voice-key', { provider: 'elevenlabs', key: 'court' })).status, 400);
+    assert.equal((await u.post('/api/promo/voice-key', { provider: 'elevenlabs', key: 'a b c d e f g h i j k l m n' })).status, 400);
+    const bad = await u.post('/api/promo/voice-key', { provider: 'elevenlabs', key: 'bad_key_1234567890abcdef' });
+    assert.equal(bad.status, 502);
+    assert.match((await bad.json()).error, /ElevenLabs a refusé la clé API/);
+    assert.equal(await s.db.prepare("SELECT value FROM user_settings WHERE user_id = ? AND `key` = 'voice_key_elevenlabs_enc'").get(u.id), undefined, 'clé refusée : rien de gardé');
+    const ok = await u.post('/api/promo/voice-key', { provider: 'elevenlabs', key: KEY });
+    assert.equal(ok.status, 200);
+    const body = await ok.json();
+    assert.equal(body.keyLast4, KEY.slice(-4));
+    assert.ok(!JSON.stringify(body).includes(KEY), 'la clé n\'est pas renvoyée');
+    const row = await s.db.prepare("SELECT value FROM user_settings WHERE user_id = ? AND `key` = 'voice_key_elevenlabs_enc'").get(u.id);
+    assert.ok(row.value.startsWith('v1:') && !row.value.includes(KEY), 'chiffrée en base');
+    const pid = await addProject(s.db, u.id, { name: 'P', gitUrl: 'https://github.com/u/p.git' });
+    const st = await (await u.get(`/api/projects/${pid}/promo`)).json();
+    const el = st.voices.find((p) => p.id === 'elevenlabs');
+    assert.equal(el.keyLast4, KEY.slice(-4));
+    assert.ok(!JSON.stringify(st).includes(KEY));
+    // Liste des voix : demandée avec la clé de la personne, puis gardée
+    const n = calls.length;
+    const list = await (await u.get('/api/promo/voices?provider=elevenlabs')).json();
+    assert.deepEqual(list.voices.map((x) => x.id), ['v1']);
+    assert.equal(calls.length, n, 'liste en cache après l\'enregistrement');
+    // Isolation : un autre compte n'a pas cette clé
+    assert.equal((await other.get('/api/promo/voices?provider=elevenlabs')).status, 400);
+    assert.equal((await other.get('/api/promo/voice-sample?provider=elevenlabs&voice=v1')).status, 400);
+    assert.equal((await s.anon.post('/api/promo/voice-key', { provider: 'elevenlabs', key: KEY })).status, 401);
+    // Retrait
+    assert.equal((await u.post('/api/promo/voice-key/delete', { provider: 'elevenlabs' })).status, 200);
+    assert.equal((await u.get('/api/promo/voices?provider=elevenlabs')).status, 400);
+    assert.equal(((await (await u.get(`/api/projects/${pid}/promo`)).json()).voices.find((p) => p.id === 'elevenlabs')).keyLast4, null);
+  } finally { delete s.app.listVoices; }
+});
+
+test('vidéo avec une voix ElevenLabs : la clé du compte est transmise à la synthèse, absente = erreur claire avant le rendu', async () => {
+  const { u, pid } = await setup();
+  const log = fakes();
+  const body = { fps: 10, seconds: 6, voice: true, voiceProvider: 'elevenlabs', voiceName: 'EXAVITQu4vr4xnSDxMaL', voiceLang: 'es' };
+  try {
+    await gen(u, pid, body);
+    let job = await runJob(pid);
+    assert.equal(job.status, 'error');
+    assert.match(job.error, /Aucune clé API ElevenLabs/);
+    assert.equal(log.rendered.length, 0);
+    s.app.listVoices = async () => [{ id: 'x', label: 'x', lang: 'fr' }];
+    assert.equal((await u.post('/api/promo/voice-key', { provider: 'elevenlabs', key: KEY })).status, 200);
+    await gen(u, pid, body);
+    job = await runJob(pid);
+    assert.equal(job.status, 'done', job.error);
+    assert.equal(log.synth[0].key, KEY);
+    assert.equal(log.synth[0].provider, 'elevenlabs');
+    assert.ok(!JSON.stringify(job).includes(KEY), 'la clé n\'apparaît pas dans la tâche');
+  } finally { unfake(); delete s.app.listVoices; }
 });
