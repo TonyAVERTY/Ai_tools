@@ -20,3 +20,5 @@ Textes :
 
 Vérité : n'invente aucun chiffre, pourcentage, client, témoignage, prix, récompense, fonctionnalité, démonstration ni essai. Un compteur n'affiche que des valeurs fournies. Ce que les informations du projet ne disent pas n'existe pas.
 Relis avant de rendre : chaque texte vient des informations du projet, aucun texte d'exemple ne reste, le dernier plan est à l'écran jusqu'à la fin.
+
+Voix off (quand une voix est demandée) : un script de voix accompagne la scène, une phrase par plan, calée sur l'apparition du plan. On parle à 2,5 mots par seconde : une phrase de 12 mots demande 5 s. La voix dit l'essentiel, pas tout ce qui est écrit ; elle écrit en toutes lettres (jamais de sigle, de symbole ni d'émoji), dans la langue de la voix, et finit au moins 1 s avant la fin. Le dernier plan dit le nom du produit et la promesse.

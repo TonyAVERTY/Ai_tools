@@ -1304,16 +1304,36 @@
           <label class="field"><span class="lbl">Format</span><span class="sel"><select name="format">${s.formats.map((f) => `<option value="${esc(f.id)}">${esc(f.label)}</option>`).join('')}</select>${icon('down')}</span></label>
         </div>
         <label class="field"><span class="lbl">Style</span><span class="sel"><select name="style">${s.styles.map((f) => `<option value="${esc(f.id)}">${esc(f.label)}</option>`).join('')}</select>${icon('down')}</span></label>
+        <label class="check"><input type="checkbox" name="voice" data-promo-voice-toggle><span>Ajouter une voix</span></label>
+        <div class="promo-voice" data-promo-voice hidden>
+          <div class="grid2">
+            <label class="field"><span class="lbl">Fournisseur</span><span class="sel"><select name="voiceProvider">${s.voices.map((p) => `<option value="${esc(p.id)}">${esc(p.label)}</option>`).join('')}</select>${icon('down')}</span></label>
+            <label class="field"><span class="lbl">Voix</span><span class="sel"><select name="voiceName">${voiceOptions(s.voices[0])}</select>${icon('down')}</span></label>
+          </div>
+          <label class="field" data-promo-lang hidden><span class="lbl">Langue</span><span class="sel"><select name="voiceLang">${s.voiceLangs.map((l) => `<option value="${esc(l.id)}">${esc(l.label)}</option>`).join('')}</select>${icon('down')}</span></label>
+          <div class="promo-key" data-promo-key hidden data-can="${s.canManageKeys ? '1' : ''}">
+            <p class="muted small" data-promo-key-help></p>
+            <div class="row" data-promo-key-new><input type="password" name="voiceKey" placeholder="Colle ta clé API" autocomplete="off" spellcheck="false" aria-label="Clé API du fournisseur"><button type="button" class="btn small" data-promo-key-save>Enregistrer la clé</button></div>
+            <div class="row" data-promo-key-set><span class="hint" data-promo-key-last4></span><button type="button" class="btn small" data-promo-key-remove>Retirer la clé</button></div>
+          </div>
+          <div class="row"><button type="button" class="btn small" data-promo-sample>${icon('play')}Écouter un extrait</button><span class="hint" data-promo-sample-state role="status"></span></div>
+          <audio data-promo-audio preload="none"></audio>
+          <p class="muted small">La voix lit un texte écrit par Claude, dans la langue de la voix choisie. Ce texte est envoyé au fournisseur pour être lu. Microsoft Edge et Google Traduction sont gratuits, sans clé, mais non officiels : ils peuvent changer ou refuser des demandes. ElevenLabs et Google Cloud donnent les voix les plus naturelles avec ta propre clé API (quota gratuit mensuel du fournisseur) ; ta clé est chiffrée et jamais réaffichée.</p>
+        </div>
         <p class="hint" data-promo-count></p>
         <div class="row"><button class="btn primary" data-promo-go>${icon('film')}Générer la vidéo</button></div>
       </form>
       <p class="muted small">Claude écrit la scène, elle est ensuite dessinée image par image sur le serveur : compte quelques minutes selon la durée et le nombre d'images par seconde. Les consignes se modifient dans les Réglages (« Vidéo de promotion »).</p>`
       : '<p class="muted">Analyse d\'abord le projet : Claude s\'appuie sur sa fiche pour concevoir la vidéo.</p>';
+    voiceCatalogs.set(box, s.voices);
     box.innerHTML = `${form}${s.videos.length ? `<div class="pv-list">${s.videos.map((v) => promoVideoCard(v, s, id)).join('')}</div>` : (s.hasProfile ? '<p class="muted small">Aucune vidéo pour l\'instant.</p>' : '')}`;
     promoCount(box);
+    const pf = $('[data-promo-form]', box);
+    if (pf) voiceSync(pf);
   }
 
   // Nombre d'images à produire, et message clair si la limite est dépassée (le serveur la contrôle aussi)
+  const voiceOptions = (p) => (p?.voices ? p.voices.map((v) => `<option value="${esc(v.id)}">${esc(v.label)}</option>`).join('') : '<option value="">—</option>');
   function promoCount(box) {
     const f = $('[data-promo-form]', box);
     if (!f) return;
@@ -1325,6 +1345,84 @@
     $('[data-promo-go]', f).disabled = bad;
   }
 
+  // Voix : la case montre les choix ; le fournisseur change la liste des voix (et demande une clé pour ElevenLabs et Google Cloud) ; l'extrait se lit depuis le serveur
+  const voiceCatalogs = new WeakMap();
+  const voiceProvider = (f) => voiceCatalogs.get(f.closest('[data-promo]'))?.find((p) => p.id === f.voiceProvider.value);
+  function voiceSync(f) {
+    const p = voiceProvider(f);
+    if (!p) return;
+    $('[data-promo-lang]', f).hidden = !p.multilingual;
+    const key = $('[data-promo-key]', f);
+    key.hidden = !p.keyed;
+    if (p.keyed) {
+      $('[data-promo-key-help]', f).textContent = p.keyHelp || '';
+      $('[data-promo-key-new]', f).hidden = !!p.keyLast4 || !key.dataset.can;
+      $('[data-promo-key-set]', f).hidden = !p.keyLast4;
+      $('[data-promo-key-last4]', f).textContent = p.keyLast4 ? `Clé enregistrée (se termine par ${p.keyLast4})` : '';
+      if (!key.dataset.can && !p.keyLast4) $('[data-promo-key-help]', f).textContent = 'Seul le propriétaire du projet peut enregistrer la clé de ce fournisseur.';
+      $('[data-promo-key-remove]', f).hidden = !key.dataset.can;
+    }
+    f.voiceName.innerHTML = voiceOptions(p);
+    $('[data-promo-sample]', f).disabled = !f.voiceName.value;
+  }
+  async function voiceLoad(f) {
+    const p = voiceProvider(f);
+    voiceSync(f);
+    if (!p?.keyed || !p.keyLast4 || p.voices) return;
+    const state = $('[data-promo-sample-state]', f);
+    state.textContent = 'Chargement des voix…';
+    try { p.voices = (await api(`/api/promo/voices?provider=${encodeURIComponent(p.id)}`)).voices; state.textContent = ''; } catch (err) { state.textContent = err.message; }
+    if (voiceProvider(f) === p) voiceSync(f);
+  }
+  listen(document, 'change', (e) => {
+    const f = e.target.closest('[data-promo-form]');
+    if (!f) return;
+    if (e.target.matches('[data-promo-voice-toggle]')) $('[data-promo-voice]', f).hidden = !e.target.checked;
+    if (e.target.name === 'voiceProvider') voiceLoad(f);
+  });
+  async function saveVoiceKey(f) {
+    const p = voiceProvider(f);
+    const input = f.voiceKey;
+    const state = $('[data-promo-sample-state]', f);
+    const btn = $('[data-promo-key-save]', f);
+    btn.disabled = true;
+    state.textContent = 'Vérification de la clé…';
+    try {
+      const r = await api('/api/promo/voice-key', { provider: p.id, key: input.value });
+      input.value = '';
+      p.keyLast4 = r.keyLast4;
+      p.voices = r.voices;
+      state.textContent = 'Clé enregistrée';
+      voiceSync(f);
+    } catch (err) { state.textContent = err.message; } finally { btn.disabled = false; }
+  }
+  listen(document, 'keydown', (e) => { if (e.key === 'Enter' && e.target.name === 'voiceKey') { e.preventDefault(); const f = e.target.closest('[data-promo-form]'); if (f) saveVoiceKey(f); } });
+  listen(document, 'click', async (e) => {
+    const f = e.target.closest('[data-promo-form]');
+    if (!f) return;
+    if (e.target.closest('[data-promo-key-save]')) return saveVoiceKey(f);
+    if (e.target.closest('[data-promo-key-remove]')) {
+      const p = voiceProvider(f);
+      if (!confirm(`Retirer la clé ${p.label.split(' (')[0]} ? Il faudra la coller de nouveau pour reprendre ses voix.`)) return;
+      try { await api('/api/promo/voice-key/delete', { provider: p.id }); p.keyLast4 = null; p.voices = null; voiceSync(f); } catch (err) { $('[data-promo-sample-state]', f).textContent = err.message; }
+      return;
+    }
+    const b = e.target.closest('[data-promo-sample]');
+    if (!b) return;
+    const state = $('[data-promo-sample-state]', f);
+    const url = `/api/promo/voice-sample?provider=${encodeURIComponent(f.voiceProvider.value)}&voice=${encodeURIComponent(f.voiceName.value)}&lang=${encodeURIComponent(f.voiceLang.value)}`;
+    b.disabled = true;
+    state.textContent = 'Chargement de l\'extrait…';
+    try {
+      const r = await fetch(url, { credentials: 'same-origin' });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'Extrait indisponible');
+      const audio = $('[data-promo-audio]', f);
+      audio.src = url;
+      await audio.play();
+      state.textContent = 'Lecture…';
+      audio.onended = () => { state.textContent = ''; };
+    } catch (err) { state.textContent = err.message; } finally { b.disabled = false; }
+  });
   listen(document, 'input', (e) => { const b = e.target.closest('[data-promo-form]'); if (b) promoCount(b.closest('[data-promo]')); });
   listen(document, 'submit', async (e) => {
     const f = e.target.closest('[data-promo-form]');
@@ -1332,9 +1430,14 @@
     e.preventDefault();
     const proj = f.closest('.project');
     const btn = $('[data-promo-go]', f);
+    if (f.voice.checked) {
+      const vp = voiceProvider(f);
+      if (vp?.keyed && !vp.keyLast4) return toast(`Ajoute d'abord ta clé API ${vp.label.split(' (')[0]}, ou choisis un autre fournisseur`, 'error');
+      if (!f.voiceName.value) return toast('Choisis une voix', 'error');
+    }
     btn.disabled = true;
     try {
-      const r = await api(`/api/projects/${proj.dataset.id}/promo/generate`, { subject: f.subject.value, fps: Number(f.fps.value), seconds: Number(f.seconds.value), format: f.format.value, style: f.style.value });
+      const r = await api(`/api/projects/${proj.dataset.id}/promo/generate`, { subject: f.subject.value, fps: Number(f.fps.value), seconds: Number(f.seconds.value), format: f.format.value, style: f.style.value, voice: f.voice.checked, voiceProvider: f.voiceProvider.value, voiceName: f.voiceName.value, voiceLang: f.voiceLang.value });
       toast(r.budgetBlocked ? `En file, mais ${r.budgetBlocked}` : r.existing ? 'Une vidéo est déjà en cours de production' : 'Claude conçoit la vidéo…', r.budgetBlocked ? 'error' : 'ok');
       refreshProject(proj);
     } catch (err) { toast(err.message, 'error'); }

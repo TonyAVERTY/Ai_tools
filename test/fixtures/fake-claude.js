@@ -28,7 +28,9 @@ const promoSubject = /Sujet demandé : « (.*?) »/s.exec(prompt)?.[1] || 'prés
 const promoScene = () => {
   const fixed = prompt.includes('Ta version précédente a été refusée au rendu');
   if (prompt.includes('SCENEFOREVER') || (prompt.includes('SCENEBAD') && !fixed)) return '<!doctype html><html><body>rien</body></html>';
-  return '```html\n<!doctype html><html><head><style>body{margin:0;background:#0b1020;overflow:hidden}#t{position:absolute;top:40%;left:10%;font:700 40px sans-serif;color:#fff}</style></head><body><div id="t"></div><script>'
+  // VOIX OFF (contrat de voix dans le prompt) : script de voix ; VOICEBAD dans le sujet = oublié au premier essai
+  const voix = prompt.includes('VOIX OFF') && !(prompt.includes('VOICEBAD') && !fixed) ? '<script type="application/json" id="voix">[{"t":0.5,"texte":"Bonjour"},{"t":3,"texte":"Au revoir"}]</script>' : '';
+  return '```html\n<!doctype html><html><head><style>body{margin:0;background:#0b1020;overflow:hidden}#t{position:absolute;top:40%;left:10%;font:700 40px sans-serif;color:#fff}</style></head><body><div id="t"></div>' + voix + '<script>'
     + 'var S=' + JSON.stringify(promoSubject) + ';window.renderFrame=function(t){var e=document.getElementById("t");e.textContent=S;e.style.opacity=Math.min(1,t);e.style.left=(10+t*10)+"%";};</script></body></html>\n```';
 };
 // Facturation : trois exemples de devis, affinage d'un document, quatre modèles de documents (BILLBAD = réponse inutilisable)
