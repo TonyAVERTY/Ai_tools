@@ -110,6 +110,21 @@ test('connexion : vers LinkedIn avec le bon périmètre, retour contrôlé, jeto
   assert.match(location(await goto(owner, `/linkedin/callback?code=c1&state=${st}`, cookie)), /^\/\?li=error/);
 });
 
+test('retour de LinkedIn en erreur : la cause et le remède sont donnés, pas un « refusé » sans explication', async () => {
+  const { owner, p } = await setup();
+  const reason = async (qs) => {
+    const start = await goto(owner, `/linkedin/connect?project=${p}`);
+    const st = new URL(start.headers.get('location')).searchParams.get('state');
+    return decodeURIComponent(location(await goto(owner, `/linkedin/callback?${qs}&state=${st}`, jar(start))));
+  };
+  assert.match(await reason('error=unauthorized_scope_error'), /onglet Produits[\s\S]*Share on LinkedIn/);
+  assert.match(await reason('error=invalid_redirect_uri'), /URL de redirection autorisées[\s\S]*\/linkedin\/callback/);
+  assert.match(await reason('error=unauthorized_client'), /LINKEDIN_CLIENT_ID/);
+  assert.match(await reason('error=access_denied'), /administrateur de la page/);
+  assert.match(await reason('error=server_error&error_description=Quelque%20chose%0Acloche'), /refusé la connexion \(server_error : Quelque chose cloche\)/);
+  assert.match(await reason('error=user_cancelled_login'), /annulée/);
+});
+
 test('connexion : navigateur ou compte différent, annulation, droit de publier absent = refus sans rien enregistrer', async () => {
   const { owner, p } = await setup();
   const stranger = await s.newUser({ admin: true });
