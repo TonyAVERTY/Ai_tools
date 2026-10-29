@@ -41,12 +41,25 @@
   listen(document, 'click', (e) => { const t = e.target.closest?.('button, a.btn, label.btn'); if (t) lastTrigger = t; }, true);
   listen(document, 'submit', (e) => { lastTrigger = e.submitter || $('button:not([type=button])', e.target) || lastTrigger; }, true);
 
+  // Anti-double-clic : un clic répété sur un bouton (2e, 3e clic d'une série rapide) est ignoré, sauf bouton marqué data-repeat
+  listen(document, 'click', (e) => {
+    const t = e.target.closest?.('button');
+    if (t && e.detail > 1 && !t.hasAttribute('data-repeat')) { e.preventDefault(); e.stopImmediatePropagation(); }
+  }, true);
+
   async function api(path, body) {
     const launching = body !== undefined && LAUNCH.test(path);
     if (launching) window.AiFx?.press(lastTrigger);
-    const data = await call(path, body);
-    if (launching && !data.existing) launched(lastTrigger);
-    return data;
+    // Le bouton cliqué reste bloqué le temps de l'envoi (les formulaires qui bloquent déjà leurs boutons ne sont pas touchés)
+    const btn = body !== undefined && lastTrigger?.tagName === 'BUTTON' && !lastTrigger.disabled ? lastTrigger : null;
+    if (btn) { btn.disabled = true; btn.setAttribute('aria-busy', 'true'); }
+    try {
+      const data = await call(path, body);
+      if (launching && !data.existing) launched(lastTrigger);
+      return data;
+    } finally {
+      if (btn) { btn.removeAttribute('aria-busy'); btn.disabled = false; }
+    }
   }
 
   async function call(path, body) {
