@@ -164,3 +164,6 @@ Claude n'a pas proposé de second objet, ou l'a rendu identique à l'objet A : i
 3. Regarde le **modèle réellement utilisé** dans le menu **Activité** (pastille à côté du nom du job) ou, sur le projet, dans la zone de la tâche (« Modèle : … »).
 4. Chaque tâche suit son réglage : **prospection** (recherche de prospects et accroches), **analyse de projet** (analyse du dépôt), **rédaction** (modèles de mail et relances, relecture, posts LinkedIn, devis…). Le modèle de la page IA se règle dans la page IA.
 
+## Le mail propose une démonstration (ou un essai, un rendez-vous…) qui n'existe pas
+Claude n'a le droit de proposer que ce que la fiche projet dit exister, et l'**Aperçu** avertit quand le mail parle d'une démonstration, d'un essai, d'un devis, d'un appel, d'un rendez-vous ou d'une garantie absents de la fiche. Si ton modèle a été généré avant ce contrôle, clique de nouveau sur **Générer avec l'IA** puis **Valider le modèle**, ou retire la phrase à la main. Si la proposition existe vraiment (une démonstration, par exemple), ajoute-la d'abord à la fiche projet en relançant **Réanalyser** après l'avoir écrite dans le dépôt (par exemple dans le README).
+

@@ -84,17 +84,19 @@ Structure : 150 à 180 mots maximum, 4 à 5 courts paragraphes, un mail commerci
 1. Ouverture : {{accroche}}, puis une phrase qui la relie à un problème concret de leur métier.
 2. Présentation du produit : son nom, ce que c'est en une phrase simple, et pour qui. Donne les mots exacts de la fiche, pas un slogan.
 3. Ce qu'il apporte : 2 à 3 bénéfices concrets, chacun vérifiable dans la fiche (une fonction précise, un cas d'usage, un gain de temps ou de clients), en phrases courtes ou en lignes commençant par un tiret (texte brut). Ajoute en une phrase comment ça marche ou comment on démarre, et le prix ou l'offre SEULEMENT s'ils figurent dans la fiche.
-4. Un seul appel à l'action, facile : répondre « oui » pour recevoir une démonstration ou plus de détails, ou « pas maintenant ». Si une adresse de site est indiquée sous « Site du produit », écris {{site}} UNE fois, sur sa propre ligne juste avant la signature (« Pour voir le produit : {{site}} »), jamais l'adresse en clair ; sinon n'écris aucune adresse. Pas de proposition d'appel téléphonique ni de visio.
+4. Un seul appel à l'action, facile, qui ne propose QUE ce qui existe : répondre au mail pour en savoir plus (« répondez simplement à ce mail si ça vous intéresse »), ou aller voir le produit sur {{site}} ; une démonstration, un essai, un devis, un appel ou un rendez-vous seulement si la fiche dit qu'ils existent. Si tu hésites, propose seulement de répondre. Si une adresse de site est indiquée sous « Site du produit », écris {{site}} UNE fois, sur sa propre ligne juste avant la signature (« Pour voir le produit : {{site}} »), jamais l'adresse en clair ; sinon n'écris aucune adresse. Pas de proposition d'appel téléphonique ni de visio.
 5. Signature sur deux lignes : {{expediteur}} seul sur la première, le nom du produit seul sur la seconde. Jamais de virgule ni de tiret entre les deux.
 
 Objet : 4 à 7 mots, en minuscules sauf noms propres, sans point d'exclamation, sans mot de spam (gratuit, offre, urgent, promo, garanti), une question ou un fait, jamais une promesse. Il peut citer le produit ou le bénéfice, comme le ferait un collègue.
 
 Ponctuation : n'écris jamais de virgule, de point-virgule ni de tiret collé juste avant ou juste après une variable {{…}}, et ne commence aucune ligne par une virgule (une variable vide laisserait un texte cassé). Une variable ne doit jamais être la seule chose qui rende une phrase correcte.
 
+Vérité : tout ce que tu écris (fonction, prix, engagement, délai, offre, démonstration, essai, service, support) doit figurer dans la fiche du projet. Ce que la fiche ne dit pas n'existe pas : ne le propose, ne le promets et ne le suggère pas, même s'il serait courant pour ce type de produit. Mieux vaut un mail plus court et exact qu'un mail qui promet ce que le produit ne fait pas.
+
 Style : phrases courtes, aucune formule creuse (« solution innovante », « leader », « révolutionner »), aucune pression, ni gras ni mise en forme autre que les tirets des bénéfices. N'invente aucun chiffre, client, résultat, prix ni délai absents de la fiche. Écris comme une personne qui écrit à une personne, avec l'envie de faire découvrir quelque chose d'utile.`,
     byModel: {
       haiku: `Reste sous 150 mots. Modèle de structure (adapte le fond, pas la forme) :
-« {{accroche}} [Nouvelle phrase qui relie à un problème de leur métier.]\n[Produit] est [ce que c'est] pour [type d'entreprise].\nConcrètement : [bénéfice 1], [bénéfice 2], [bénéfice 3].\n[Comment on démarre, en une phrase.] Si ça vous parle, répondez simplement « oui » et je vous envoie [la suite]. »
+« {{accroche}} [Nouvelle phrase qui relie à un problème de leur métier.]\n[Produit] est [ce que c'est] pour [type d'entreprise].\nConcrètement : [bénéfice 1], [bénéfice 2], [bénéfice 3].\n[Comment on démarre, en une phrase.] Si ça vous parle, répondez simplement à ce mail. »
 Relis une fois : si une phrase pourrait figurer dans n'importe quel mail commercial, remplace-la par un détail propre au produit.`,
       sonnet: `Adapte le registre au décideur indiqué dans la fiche (gérant de TPE : direct et concret ; responsable : un peu plus structuré). Choisis l'argument le plus fort pour CE public, pas tous.`,
       opus: `Écris pour un décideur sceptique qui reçoit vingt sollicitations par jour : un angle précis, une raison réelle de répondre maintenant, aucune phrase décorative. Le mail doit pouvoir être transféré tel quel à un collègue sans gêne.`,
@@ -576,7 +578,7 @@ export function reviewMailPrompt({ subject, subjectB = '', body }) {
 Corrige uniquement : fautes d'orthographe, de grammaire et d'accord, ponctuation (virgule ou point en trop ou manquant, espace avant une virgule, virgule en début de ligne), phrases coupées ou incomplètes, répétitions, signature mal formée, mauvaise typographie française (« oui », espace avant : ? !).
 Règles strictes :
 - Garde exactement les variables {{entreprise}}, {{ville}}, {{accroche}}, {{expediteur}}, {{site}} telles quelles, en même nombre, et n'en ajoute aucune.
-- Garde les adresses web, les chiffres, les prix et les noms propres tels quels. N'invente rien.
+- Garde les adresses web, les chiffres, les prix et les noms propres tels quels. N'invente rien et n'ajoute aucune promesse ni proposition (démonstration, essai, appel, rendez-vous, devis).
 - Garde la structure (paragraphes, lignes commençant par un tiret) et le ton ; la longueur reste proche.
 - Aucune ligne ne commence par une virgule ou un point-virgule.
 Si le mail est déjà correct, renvoie-le inchangé avec une liste de corrections vide.
