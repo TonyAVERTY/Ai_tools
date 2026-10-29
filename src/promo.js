@@ -12,7 +12,7 @@ import { budgetState } from './services/budget.js';
 import { userPromoRoot } from './users.js';
 import { PROMO, FORMATS, parsePromoParams, promoSupported } from './services/promovideo.js';
 import { PROMO_STYLES } from './services/promokit.js';
-import { voiceCatalog, parseVoiceParams, sampleFor, listVoices, VOICE_PROVIDERS, VOICE_LANGS } from './services/voiceover.js';
+import { voiceCatalog, parseVoiceParams, sampleFor, listVoices, VOICE_PROVIDERS, VOICE_LANGS, REGION, localStatus, audioType } from './services/voiceover.js';
 
 // Clés API des fournisseurs de voix : chiffrées dans les réglages du compte, jamais renvoyées (seuls les 4 derniers caractères le sont)
 const keyName = (provider) => `voice_key_${provider}`;
@@ -20,10 +20,16 @@ export async function getVoiceKey(app, userId, provider) {
   const enc = await getSetting(app.db, userId, `${keyName(provider)}_enc`);
   try { return enc ? decrypt(app.cfg.secretKey, enc) : null; } catch { return null; } // illisible (SECRET_KEY changée) : à ressaisir
 }
+export const getVoiceRegion = (app, userId, provider) => getSetting(app.db, userId, `${keyName(provider)}_region`); // la région n'est pas un secret
 async function voiceKeyHints(app, userId) {
-  const out = {};
-  for (const [id, p] of Object.entries(VOICE_PROVIDERS)) if (p.keyed && await getVoiceKey(app, userId, id)) out[id] = (await getSetting(app.db, userId, `${keyName(id)}_last4`)) || '••••';
-  return out;
+  const keys = {};
+  const regions = {};
+  for (const [id, p] of Object.entries(VOICE_PROVIDERS)) {
+    if (!p.keyed || !await getVoiceKey(app, userId, id)) continue;
+    keys[id] = (await getSetting(app.db, userId, `${keyName(id)}_last4`)) || '••••';
+    if (p.region) regions[id] = await getVoiceRegion(app, userId, id);
+  }
+  return { keys, regions };
 }
 
 const nameOf = (id) => `${Number(id)}.mp4`;
@@ -77,7 +83,7 @@ export function registerPromoRoutes(router, app, { project, aiOpts }) {
       limits: { fps: PROMO.fps, seconds: PROMO.seconds, maxFrames: PROMO.maxFrames, maxSubject: PROMO.maxSubject, maxVideos: PROMO.maxVideos },
       formats: Object.entries(FORMATS).map(([id, f]) => ({ id, label: f.label })),
       styles: [{ id: 'auto', label: 'Automatique' }, ...Object.entries(PROMO_STYLES).map(([id, st]) => ({ id, label: st.label }))],
-      voices: voiceCatalog(await voiceKeyHints(app, p.userId)),
+      voices: voiceCatalog(...Object.values(await voiceKeyHints(app, p.userId)), (app.localStatus || localStatus)(cfg)),
       voiceLangs: VOICE_LANGS,
       canManageKeys: p.access !== 'member',
       videos: await listVideos(db, p.id),
@@ -91,7 +97,7 @@ export function registerPromoRoutes(router, app, { project, aiOpts }) {
   const needKey = async (ctx, provider) => {
     const key = await getVoiceKey(app, ctx.session.userId, provider);
     if (!key) throw new HttpError(400, `Ajoute d'abord ta clé API ${VOICE_PROVIDERS[provider].label.split(' (')[0]}`, { expose: true });
-    return key;
+    return { key, region: VOICE_PROVIDERS[provider].region ? await getVoiceRegion(app, ctx.session.userId, provider) : null };
   };
   const fail = (provider, e) => {
     const name = VOICE_PROVIDERS[provider].label.split(' (')[0];
@@ -102,11 +108,11 @@ export function registerPromoRoutes(router, app, { project, aiOpts }) {
   const voiceLists = new Map();
   router.get('/api/promo/voices', async (ctx) => {
     const provider = keyedProvider(ctx.url.searchParams.get('provider') || '');
-    const key = await needKey(ctx, provider);
+    const { key, region } = await needKey(ctx, provider);
     const ck = `${ctx.session.userId}/${provider}`;
     let hit = voiceLists.get(ck);
     if (!hit || hit.at < Date.now() - 10 * 60_000) {
-      try { hit = { at: Date.now(), voices: await (app.listVoices || listVoices)(provider, { key }) }; } catch (e) { throw fail(provider, e); }
+      try { hit = { at: Date.now(), voices: await (app.listVoices || listVoices)(provider, { key, region }) }; } catch (e) { throw fail(provider, e); }
       voiceLists.set(ck, hit);
     }
     json(ctx.res, { voices: hit.voices });
@@ -118,18 +124,22 @@ export function registerPromoRoutes(router, app, { project, aiOpts }) {
     const provider = keyedProvider(String(b.provider || ''));
     const key = String(b.key ?? '').trim();
     if (key.length < 16 || key.length > 200 || /\s/.test(key)) throw new HttpError(400, 'Cette clé API n\'a pas la bonne forme : colle-la en entier, sans espace', { expose: true });
+    const region = VOICE_PROVIDERS[provider].region ? String(b.region ?? '').trim().toLowerCase() : null;
+    if (VOICE_PROVIDERS[provider].region && !REGION.test(region)) throw new HttpError(400, 'La région doit être celle de ta ressource, en minuscules et sans espace (par exemple francecentral)', { expose: true });
     let voices;
-    try { voices = await (app.listVoices || listVoices)(provider, { key }); } catch (e) { throw fail(provider, e); }
+    try { voices = await (app.listVoices || listVoices)(provider, { key, region }); } catch (e) { throw fail(provider, e); }
     await setSetting(db, ctx.session.userId, `${keyName(provider)}_enc`, encrypt(cfg.secretKey, key));
+    if (region) await setSetting(db, ctx.session.userId, `${keyName(provider)}_region`, region);
     await setSetting(db, ctx.session.userId, `${keyName(provider)}_last4`, key.slice(-4));
     voiceLists.set(`${ctx.session.userId}/${provider}`, { at: Date.now(), voices });
-    json(ctx.res, { ok: true, keyLast4: key.slice(-4), voices });
+    json(ctx.res, { ok: true, keyLast4: key.slice(-4), region, voices });
   }, { limit: 'promo_voice' });
 
   router.post('/api/promo/voice-key/delete', async (ctx) => {
     const provider = keyedProvider(String((await readBody(ctx.req)).provider || ''));
     await setSetting(db, ctx.session.userId, `${keyName(provider)}_enc`, null);
     await setSetting(db, ctx.session.userId, `${keyName(provider)}_last4`, null);
+    await setSetting(db, ctx.session.userId, `${keyName(provider)}_region`, null);
     voiceLists.delete(`${ctx.session.userId}/${provider}`);
     json(ctx.res, { ok: true });
   });
@@ -141,15 +151,15 @@ export function registerPromoRoutes(router, app, { project, aiOpts }) {
     const vp = parseVoiceParams({ voice: true, voiceProvider: sp.get('provider') || '', voiceName: sp.get('voice') || '', voiceLang: sp.get('lang') || '' });
     if (vp.error) throw new HttpError(400, 'Voix inconnue', { expose: true });
     const { provider, voice, lang } = vp.voice;
-    const key = VOICE_PROVIDERS[provider].keyed ? await needKey(ctx, provider) : null;
+    const creds = VOICE_PROVIDERS[provider].keyed ? await needKey(ctx, provider) : {};
     const ck = `${provider}/${voice}/${lang}`;
     let audio = samples.get(ck);
     if (!audio) {
-      try { audio = await (app.sampleVoice || sampleFor)({ provider, voice, lang, key }); } catch (e) { throw fail(provider, e); }
+      try { audio = await (app.sampleVoice || sampleFor)({ provider, voice, lang, ...creds }, { cfg }); } catch (e) { throw fail(provider, e); }
       if (samples.size >= 60) samples.delete(samples.keys().next().value);
       samples.set(ck, audio);
     }
-    ctx.res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Content-Length': audio.length, 'Cache-Control': 'private, max-age=3600', 'X-Content-Type-Options': 'nosniff' });
+    ctx.res.writeHead(200, { 'Content-Type': audioType(audio).mime, 'Content-Length': audio.length, 'Cache-Control': 'private, max-age=3600', 'X-Content-Type-Options': 'nosniff' });
     ctx.res.end(audio);
   }, { limit: 'promo_voice' });
 
