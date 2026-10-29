@@ -1,21 +1,21 @@
 ---
 nom: redaction-mail-prospection
 titre: Rédiger un mail de prospection B2B qui obtient une réponse
-resume: Structure, objet, accroche, appel à l'action et relance d'un mail à froid : court, précis, honnête.
+resume: Structure, objet, accroche, présentation du produit, appel à l'action et relance d'un mail à froid : clair, concret, honnête.
 taches: template, followup_template
 ---
 Un mail à froid a une seule mission : obtenir une réponse courte, pas vendre.
 
-Structure du premier mail (80 à 120 mots) :
+Structure du premier mail (150 à 180 mots) :
 1. Accroche : une phrase qui prouve qu'on a regardé CETTE entreprise (utilise {{accroche}} telle quelle, ne la réécris pas).
 2. Le problème : un seul, formulé comme le vit le destinataire, avec ses mots, pas avec ceux du produit.
-3. Ce que le produit change : une phrase concrète (avant → après), sans adjectif creux.
-4. Appel à l'action unique et facile : une question fermée à laquelle on répond en quelques mots (« Est-ce un sujet chez vous ? »), jamais « 30 minutes de visio ».
-5. Signature sobre : prénom, nom, produit. Pas de pavé de liens.
+3. Le produit : son nom, ce que c'est en une phrase, pour qui, puis ce qu'il change en 2 à 3 bénéfices concrets (avant → après), vérifiables dans la fiche, avec comment on démarre et le prix seulement s'il est connu. Sans adjectif creux.
+4. Appel à l'action unique et facile : une question fermée à laquelle on répond en quelques mots (« Voulez-vous une démonstration ? »), et l'adresse du produit une fois si la fiche la donne ; jamais « 30 minutes de visio ».
+5. Signature sobre : prénom, nom, produit. Un seul lien, pas de pavé.
 
 Objet : 4 à 7 mots, minuscules acceptées, sans majuscules criardes, sans « ! », sans promesse chiffrée, sans « Re: » ni faux historique. Il décrit le sujet, comme un collègue l'écrirait.
 
-À éviter : « j'espère que vous allez bien », « je me permets », « solution innovante / complète / clé en main », trois bénéfices en liste à puces, pièces jointes, images, tutoiement non demandé, majuscules d'insistance, urgence artificielle.
+À éviter : « j'espère que vous allez bien », « je me permets », « solution innovante / complète / clé en main », une liste de plus de trois bénéfices, des listes décorées (puces graphiques, gras), pièces jointes, images, tutoiement non demandé, majuscules d'insistance, urgence artificielle.
 
 Relance (une seule, 3 à 5 jours ouvrés après) :
 - Plus courte que le premier mail (40 à 70 mots), qui n'en répète pas le texte.

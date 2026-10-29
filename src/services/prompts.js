@@ -75,27 +75,28 @@ Qualité avant quantité : ignore annuaires, agrégateurs, réseaux sociaux et f
     label: 'Mail de prospection',
     fixed: 'Le format de réponse (objet + corps) est imposé ; le lien de désinscription est ajouté automatiquement.',
     vars: ['ton', 'expediteur'],
-    text: `Rédige un email de prospection B2B qui se lit en 20 secondes et appelle une réponse courte.
+    text: `Rédige un email de prospection B2B qui FAIT CONNAÎTRE le produit : à la fin du mail, la personne doit savoir ce que c'est, à qui ça sert, ce que ça lui apporterait et comment aller plus loin.
 Ton : [[ton]]
 Expéditeur : [[expediteur]]
-Variables disponibles dans le mail : {{entreprise}}, {{ville}}, {{accroche}} (phrase personnalisée déjà rédigée, à placer en ouverture telle quelle).
+Variables disponibles dans le mail : {{entreprise}}, {{ville}}, {{accroche}} (phrase personnalisée déjà rédigée, qui se termine par un point : à placer en ouverture telle quelle, puis commence une NOUVELLE phrase, jamais une virgule ni « et » à la suite).
 
-Structure : 120 mots maximum, 3 à 4 courts paragraphes.
-1. Ouverture : {{accroche}}, puis une demi-phrase qui la relie à un problème concret de leur métier.
-2. Le produit en une phrase : ce qu'il change pour eux, par un bénéfice que la fiche permet de vérifier.
-3. Un détail concret tiré des arguments de la fiche (un cas d'usage, une fonction précise) : c'est lui qui rend le mail crédible.
-4. Un seul appel à l'action, facile : répondre « oui » ou « pas maintenant », ou essayer le produit. Pas de proposition d'appel téléphonique ni de visio.
+Structure : 150 à 180 mots maximum, 4 à 5 courts paragraphes, un mail commercial clair et concret.
+1. Ouverture : {{accroche}}, puis une phrase qui la relie à un problème concret de leur métier.
+2. Présentation du produit : son nom, ce que c'est en une phrase simple, et pour qui. Donne les mots exacts de la fiche, pas un slogan.
+3. Ce qu'il apporte : 2 à 3 bénéfices concrets, chacun vérifiable dans la fiche (une fonction précise, un cas d'usage, un gain de temps ou de clients), en phrases courtes ou en lignes commençant par un tiret (texte brut). Ajoute en une phrase comment ça marche ou comment on démarre, et le prix ou l'offre SEULEMENT s'ils figurent dans la fiche.
+4. Un seul appel à l'action, facile : répondre « oui » pour recevoir une démonstration ou plus de détails, ou « pas maintenant ». Si la fiche donne l'adresse du site ou de la page du produit, indique-la une fois pour qu'ils puissent voir de leurs yeux. Pas de proposition d'appel téléphonique ni de visio.
+5. Signature : prénom ou nom de l'expéditeur, puis le nom du produit.
 
-Objet : 4 à 7 mots, en minuscules sauf noms propres, sans point d'exclamation, sans mot de spam (gratuit, offre, urgent, promo, garanti), une question ou un fait, jamais une promesse. Il doit pouvoir venir d'un collègue.
+Objet : 4 à 7 mots, en minuscules sauf noms propres, sans point d'exclamation, sans mot de spam (gratuit, offre, urgent, promo, garanti), une question ou un fait, jamais une promesse. Il peut citer le produit ou le bénéfice, comme le ferait un collègue.
 
-Style : phrases courtes, aucune formule creuse (« solution innovante », « leader », « révolutionner »), aucune pression, aucune mise en forme (ni gras, ni liste), un seul sujet. N'invente aucun chiffre, client, résultat ni délai absents de la fiche. Écris comme une personne qui écrit à une personne.`,
+Style : phrases courtes, aucune formule creuse (« solution innovante », « leader », « révolutionner »), aucune pression, ni gras ni mise en forme autre que les tirets des bénéfices. N'invente aucun chiffre, client, résultat, prix ni délai absents de la fiche. Écris comme une personne qui écrit à une personne, avec l'envie de faire découvrir quelque chose d'utile.`,
     byModel: {
-      haiku: `Reste sous 100 mots. Modèle de structure (adapte le fond, pas la forme) :
-« {{accroche}} [lien en une demi-phrase avec leur métier]. [Produit] aide [type d'entreprise] à [bénéfice concret]. [Un détail précis]. Si ça vous parle, répondez simplement « oui » et je vous envoie [la suite]. »
+      haiku: `Reste sous 150 mots. Modèle de structure (adapte le fond, pas la forme) :
+« {{accroche}} [Nouvelle phrase qui relie à un problème de leur métier.]\n[Produit] est [ce que c'est] pour [type d'entreprise].\nConcrètement : [bénéfice 1], [bénéfice 2], [bénéfice 3].\n[Comment on démarre, en une phrase.] Si ça vous parle, répondez simplement « oui » et je vous envoie [la suite]. »
 Relis une fois : si une phrase pourrait figurer dans n'importe quel mail commercial, remplace-la par un détail propre au produit.`,
       sonnet: `Adapte le registre au décideur indiqué dans la fiche (gérant de TPE : direct et concret ; responsable : un peu plus structuré). Choisis l'argument le plus fort pour CE public, pas tous.`,
       opus: `Écris pour un décideur sceptique qui reçoit vingt sollicitations par jour : un angle précis, une raison réelle de répondre maintenant, aucune phrase décorative. Le mail doit pouvoir être transféré tel quel à un collègue sans gêne.`,
-      fable: `Vise le mail qu'un excellent commercial écrirait lui-même après avoir lu leur site : sobre, spécifique, avec une vraie raison de répondre. Moins de mots, plus de précision.`,
+      fable: `Vise le mail qu'un excellent commercial écrirait lui-même après avoir lu leur site : spécifique, avec une vraie raison de répondre, et qui présente le produit si bien qu'on le comprend sans rien ouvrir.`,
     },
   },
   followup_template: {
