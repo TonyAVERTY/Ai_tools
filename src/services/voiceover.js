@@ -129,9 +129,12 @@ const xmlEscape = (s) => s.replace(/[<>&'"]/g, (c) => ({ '<': '&lt;', '>': '&gt;
 
 // Edge « lecture à voix haute » : WebSocket, jeton de la forme décrite par les clients libres de ce service.
 const EDGE = {
-  token: '6A5AA1D4EAFF4E9FB37E23D68491D6F4', chrome: '130.0.2849.68',
+  token: '6A5AA1D4EAFF4E9FB37E23D68491D6F4', chrome: '143.0.3650.75',
   url: 'wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1',
+  voicesUrl: 'https://speech.platform.bing.com/consumer/speech/synthesize/readaloud/voices/list',
 };
+const EDGE_ORIGIN = 'chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold';
+const edgeAgent = () => `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${EDGE.chrome.split('.')[0]}.0.0.0 Safari/537.36 Edg/${EDGE.chrome.split('.')[0]}.0.0.0`;
 export function edgeGec(now = Date.now()) {
   let ticks = Math.floor(now / 1000) + 11644473600; // secondes depuis 1601
   ticks -= ticks % 300;
@@ -143,20 +146,20 @@ export function edgeSsml(text, voice) {
   return `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='${lang}'><voice name='${voice}'><prosody pitch='+0Hz' rate='+0%' volume='+0%'>${xmlEscape(text)}</prosody></voice></speak>`;
 }
 
-function edgeSynth(text, voice, { WS = globalThis.WebSocket } = {}) {
+function edgeSynth(text, voice, { WS = globalThis.WebSocket, skew = 0 } = {}) {
   return new Promise((resolve, reject) => {
     if (!WS) return reject(new Error('Ce Node ne fournit pas WebSocket'));
     const id = randomUUID().replace(/-/g, '');
-    const url = `${EDGE.url}?TrustedClientToken=${EDGE.token}&Sec-MS-GEC=${edgeGec()}&Sec-MS-GEC-Version=1-${EDGE.chrome}&ConnectionId=${id}`;
+    const url = `${EDGE.url}?TrustedClientToken=${EDGE.token}&Sec-MS-GEC=${edgeGec(Date.now() + skew)}&Sec-MS-GEC-Version=1-${EDGE.chrome}&ConnectionId=${id}`;
     const chunks = [];
     const ws = new WS(url, { headers: {
-      Pragma: 'no-cache', 'Cache-Control': 'no-cache', Origin: 'chrome-extension://jdiccldimpdaibmpdkjnbmckianbfold',
-      'User-Agent': `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${EDGE.chrome.split('.')[0]}.0.0.0 Safari/537.36 Edg/${EDGE.chrome.split('.')[0]}.0.0.0`,
+      Pragma: 'no-cache', 'Cache-Control': 'no-cache', Origin: EDGE_ORIGIN, 'User-Agent': edgeAgent(), 'Accept-Language': 'en-US,en;q=0.9',
+      Cookie: `muid=${randomUUID().replace(/-/g, '').toUpperCase()};`,
     } });
     ws.binaryType = 'arraybuffer';
     let settled = false;
     const end = (err) => { if (settled) return; settled = true; try { ws.close(); } catch { /* déjà fermée */ } err ? reject(err) : resolve(Buffer.concat(chunks)); };
-    ws.onerror = () => end(new Error('Connexion refusée par le service de voix Microsoft Edge'));
+    ws.onerror = () => end(Object.assign(new Error('Connexion refusée par le service de voix Microsoft Edge'), { edgeWs: true })); // le navigateur ne dit pas pourquoi : voir edgeDiagnose
     ws.onclose = () => end(chunks.length ? null : new Error('Le service de voix Microsoft Edge a fermé la connexion sans audio'));
     ws.onopen = () => {
       const stamp = new Date().toString();
@@ -171,6 +174,38 @@ function edgeSynth(text, voice, { WS = globalThis.WebSocket } = {}) {
       if (/Path:audio/.test(buf.subarray(2, 2 + headLen).toString('latin1'))) chunks.push(buf.subarray(2 + headLen));
     };
   });
+}
+
+/**
+ * Pourquoi la connexion WebSocket a-t-elle échoué ? Une requête HTTPS vers le même service sépare : réseau bloqué (pas de réponse), horloge du serveur
+ * décalée (le jeton dépend de l'heure, Microsoft répond 403), protocole modifié (403 sans décalage), ou service joignable (le problème est le WebSocket).
+ */
+export async function edgeDiagnose({ fetchImpl = fetch, now = Date.now } = {}) {
+  let res;
+  try {
+    res = await fetchImpl(`${EDGE.voicesUrl}?trustedclienttoken=${EDGE.token}&Sec-MS-GEC=${edgeGec(now())}&Sec-MS-GEC-Version=1-${EDGE.chrome}`, { headers: { 'User-Agent': edgeAgent(), Origin: EDGE_ORIGIN }, signal: AbortSignal.timeout(8000) });
+  } catch { return { kind: 'network' }; }
+  const date = Date.parse(res.headers?.get?.('date') || '');
+  return { kind: res.ok ? 'service' : 'refused', status: res.status, skew: Number.isFinite(date) ? date - now() : 0 };
+}
+
+export function edgeHint(d) {
+  if (d.kind === 'network') return 'Le serveur ne joint pas speech.platform.bing.com (réseau ou pare-feu qui bloque la sortie vers Microsoft) : demande à l\'administrateur d\'autoriser ce domaine, ou choisis un autre fournisseur';
+  if (Math.abs(d.skew) > 30_000) return `L'horloge du serveur est décalée de ${Math.round(Math.abs(d.skew) / 60_000)} min : Microsoft refuse alors la connexion. Synchronise l'heure du serveur (NTP), ou choisis un autre fournisseur`;
+  if (d.kind === 'refused') return `Microsoft Edge a refusé la requête (code ${d.status}) : ce service non officiel a probablement changé son protocole ; choisis un autre fournisseur`;
+  return 'Microsoft Edge répond mais refuse la connexion vocale (WebSocket) : ce service non officiel a probablement changé son protocole ; choisis un autre fournisseur';
+}
+
+/** Edge, avec un diagnostic lisible quand la connexion est refusée (et une seconde tentative si l'horloge du serveur était décalée). */
+async function edgeRun(text, voice, deps) {
+  try { return await edgeSynth(text, voice, deps); } catch (e) {
+    if (!e.edgeWs) throw e;
+    const d = await edgeDiagnose(deps);
+    if (d.kind !== 'network' && Math.abs(d.skew) > 30_000) {
+      try { return await edgeSynth(text, voice, { ...deps, skew: d.skew }); } catch { /* le diagnostic ci-dessous explique */ }
+    }
+    throw new Error(edgeHint(d));
+  }
 }
 
 // Google Traduction : une requête GET par morceau d'au plus 180 caractères, les MP3 se mettent bout à bout.
@@ -254,7 +289,7 @@ export async function synthesize({ provider, voice, text, key = null }, deps = {
   if (p.keyed && !key) throw new Error(`Aucune clé API ${p.label.split(' (')[0]} : ajoute-la dans l'onglet Promotion`);
   const clean = String(text ?? '').replace(/\s+/g, ' ').trim();
   if (!clean) throw new Error('Texte vide');
-  const run = provider === 'edge' ? edgeSynth(clean, voice, deps) : provider === 'google' ? googleSynth(clean, voice, deps)
+  const run = provider === 'edge' ? edgeRun(clean, voice, deps) : provider === 'google' ? googleSynth(clean, voice, deps)
     : provider === 'elevenlabs' ? elevenSynth(clean, voice, { ...deps, key }) : googleCloudSynth(clean, voice, { ...deps, key });
   const audio = await withTimeout(run, VOICE.timeoutMs, `Service de voix ${p.label}`);
   if (audio.length < 200) throw new Error('Le service de voix a renvoyé un audio vide');

@@ -11,7 +11,7 @@ import { addProject } from './helpers/users.js';
 import { Worker, latestJobs } from '../src/services/jobs.js';
 import { makeHandlers } from '../src/handlers.js';
 import { SceneError } from '../src/services/promovideo.js';
-import { VOICE_PROVIDERS, listVoices, parseVoiceParams, extractVoiceScript, planVoice, edgeGec, edgeSsml, googleChunks, synthesize, audioDuration, mixVoice, voiceCatalog } from '../src/services/voiceover.js';
+import { VOICE_PROVIDERS, listVoices, edgeDiagnose, edgeHint, parseVoiceParams, extractVoiceScript, planVoice, edgeGec, edgeSsml, googleChunks, synthesize, audioDuration, mixVoice, voiceCatalog } from '../src/services/voiceover.js';
 
 const hasFfmpeg = spawnSync('ffmpeg', ['-version']).status === 0;
 const skipFf = !hasFfmpeg && "ffmpeg n'est pas installé";
@@ -90,13 +90,44 @@ test('Edge : dialogue WebSocket simulé (config, SSML, trames audio, fin de tour
   assert.match(sent[1], /Path:ssml[\s\S]*Bonjour à tous/);
 });
 
-test('Edge refusé : erreur lisible, sans texte du projet ; Google : refus HTTP signalé', async () => {
-  class Refuse { constructor() { setTimeout(() => this.onerror(), 0); } close() {} }
-  await assert.rejects(synthesize({ provider: 'edge', voice: 'fr-FR-DeniseNeural', text: 'secret du projet' }, { WS: Refuse }), (e) => /Connexion refusée/.test(e.message) && !/secret/.test(e.message));
+const down = async () => { throw new Error('ENOTFOUND'); };
+const status = (code, date) => async () => ({ ok: code < 400, status: code, headers: { get: (h) => (h === 'date' ? date : null) } });
+
+test('Edge refusé : le diagnostic dit pourquoi (réseau, horloge, protocole), sans le texte du projet ; Google : refus HTTP signalé', async () => {
+  let tries = 0;
+  class Refuse { constructor() { tries++; setTimeout(() => this.onerror(), 0); } close() {} }
+  const say = (fetchImpl) => synthesize({ provider: 'edge', voice: 'fr-FR-DeniseNeural', text: 'secret du projet' }, { WS: Refuse, fetchImpl });
+  await assert.rejects(say(down), (e) => /ne joint pas speech\.platform\.bing\.com/.test(e.message) && !/secret/.test(e.message));
+  await assert.rejects(say(status(403)), /a refusé la requête \(code 403\)[\s\S]*changé son protocole/);
+  await assert.rejects(say(status(200)), /répond mais refuse la connexion vocale/);
+  tries = 0;
+  const late = new Date(Date.now() + 10 * 60_000).toUTCString();
+  await assert.rejects(say(status(403, late)), /horloge du serveur est décalée de (9|10) min/);
+  assert.equal(tries, 2, 'horloge décalée : une seconde tentative avec l\'heure de Microsoft');
+  assert.deepEqual(await edgeDiagnose({ fetchImpl: down }), { kind: 'network' });
+  assert.match(edgeHint({ kind: 'service', skew: 0 }), /WebSocket/);
   await assert.rejects(synthesize({ provider: 'google', voice: 'fr', text: 'Bonjour tout le monde' }, { fetchImpl: async () => ({ ok: false, status: 429 }) }), /refusé la requête \(429\)/);
   const ok = await synthesize({ provider: 'google', voice: 'fr', text: 'Bonjour tout le monde' }, { fetchImpl: async (u) => { assert.match(u, /tl=fr&q=Bonjour/); return { ok: true, arrayBuffer: async () => new Uint8Array(400).buffer }; } });
   assert.equal(ok.length, 400);
   await assert.rejects(synthesize({ provider: 'edge', voice: 'nimporte', text: 'x y' }), /Voix inconnue/);
+});
+
+test('Edge : seconde tentative réussie quand l\'horloge du serveur était décalée', async () => {
+  const urls = [];
+  class Flaky {
+    constructor(url) { urls.push(url); this.n = urls.length; setTimeout(() => (this.n === 1 ? this.onerror() : this.onopen()), 0); }
+    send(m) {
+      if (!/Path:ssml/.test(m)) return;
+      const head = Buffer.from('Path:audio\r\n', 'latin1');
+      const frame = Buffer.concat([Buffer.from([head.length >> 8, head.length & 255]), head, Buffer.alloc(400, 5)]);
+      setTimeout(() => { this.onmessage({ data: frame }); this.onmessage({ data: 'Path:turn.end' }); }, 0);
+    }
+    close() {}
+  }
+  const late = new Date(Date.now() + 10 * 60_000).toUTCString();
+  const audio = await synthesize({ provider: 'edge', voice: 'fr-FR-DeniseNeural', text: 'Bonjour à tous' }, { WS: Flaky, fetchImpl: status(403, late) });
+  assert.equal(audio.length, 400);
+  assert.notEqual(urls[0].match(/Sec-MS-GEC=([0-9A-F]+)/)[1], urls[1].match(/Sec-MS-GEC=([0-9A-F]+)/)[1], 'jeton recalculé avec l\'heure de Microsoft');
 });
 
 test('mixage ffmpeg réel : voix posées aux bons instants, image intacte, durée de la vidéo conservée', { skip: skipFf }, async () => {
