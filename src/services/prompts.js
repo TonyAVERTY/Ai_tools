@@ -85,9 +85,11 @@ Structure : 150 à 180 mots maximum, 4 à 5 courts paragraphes, un mail commerci
 2. Présentation du produit : son nom, ce que c'est en une phrase simple, et pour qui. Donne les mots exacts de la fiche, pas un slogan.
 3. Ce qu'il apporte : 2 à 3 bénéfices concrets, chacun vérifiable dans la fiche (une fonction précise, un cas d'usage, un gain de temps ou de clients), en phrases courtes ou en lignes commençant par un tiret (texte brut). Ajoute en une phrase comment ça marche ou comment on démarre, et le prix ou l'offre SEULEMENT s'ils figurent dans la fiche.
 4. Un seul appel à l'action, facile : répondre « oui » pour recevoir une démonstration ou plus de détails, ou « pas maintenant ». Si une adresse de site est indiquée sous « Site du produit », écris {{site}} UNE fois, sur sa propre ligne juste avant la signature (« Pour voir le produit : {{site}} »), jamais l'adresse en clair ; sinon n'écris aucune adresse. Pas de proposition d'appel téléphonique ni de visio.
-5. Signature : prénom ou nom de l'expéditeur, puis le nom du produit.
+5. Signature sur deux lignes : {{expediteur}} seul sur la première, le nom du produit seul sur la seconde. Jamais de virgule ni de tiret entre les deux.
 
 Objet : 4 à 7 mots, en minuscules sauf noms propres, sans point d'exclamation, sans mot de spam (gratuit, offre, urgent, promo, garanti), une question ou un fait, jamais une promesse. Il peut citer le produit ou le bénéfice, comme le ferait un collègue.
+
+Ponctuation : n'écris jamais de virgule, de point-virgule ni de tiret collé juste avant ou juste après une variable {{…}}, et ne commence aucune ligne par une virgule (une variable vide laisserait un texte cassé). Une variable ne doit jamais être la seule chose qui rende une phrase correcte.
 
 Style : phrases courtes, aucune formule creuse (« solution innovante », « leader », « révolutionner »), aucune pression, ni gras ni mise en forme autre que les tirets des bénéfices. N'invente aucun chiffre, client, résultat, prix ni délai absents de la fiche. Écris comme une personne qui écrit à une personne, avec l'envie de faire découvrir quelque chose d'utile.`,
     byModel: {
@@ -559,6 +561,30 @@ Site du produit : ${site ? `${site} (mets {{site}} dans le mail, pas l'adresse)`
 ${instructions('template', custom, { ton: profile.ton || 'direct et chaleureux', expediteur: senderName || '{{expediteur}}' }, model)}
 Ne mets PAS de lien de désinscription (ajouté automatiquement).
 Réponds UNIQUEMENT avec : {"subject":"...","body":"..."}`,
+  };
+}
+
+/**
+ * Relecture d'un mail avant enregistrement : Claude corrige la langue et la ponctuation sans toucher au fond.
+ * Consigne interne (non modifiable) : le résultat n'est retenu que s'il garde les mêmes variables et adresses (services/mailcheck.js).
+ */
+export function reviewMailPrompt({ subject, body }) {
+  return {
+    system: SYSTEM_FR,
+    prompt: `RELECTURE DU MAIL. Tu es relecteur : tu corriges un mail commercial avant son envoi, sans le réécrire.
+Corrige uniquement : fautes d'orthographe, de grammaire et d'accord, ponctuation (virgule ou point en trop ou manquant, espace avant une virgule, virgule en début de ligne), phrases coupées ou incomplètes, répétitions, signature mal formée, mauvaise typographie française (« oui », espace avant : ? !).
+Règles strictes :
+- Garde exactement les variables {{entreprise}}, {{ville}}, {{accroche}}, {{expediteur}}, {{site}} telles quelles, en même nombre, et n'en ajoute aucune.
+- Garde les adresses web, les chiffres, les prix et les noms propres tels quels. N'invente rien.
+- Garde la structure (paragraphes, lignes commençant par un tiret) et le ton ; la longueur reste proche.
+- Aucune ligne ne commence par une virgule ou un point-virgule.
+Si le mail est déjà correct, renvoie-le inchangé avec une liste de corrections vide.
+
+Objet : ${subject}
+Corps :
+${body}
+
+Réponds UNIQUEMENT avec : {"subject":"...","body":"...","corrections":["correction faite, en quelques mots", "..."]}`,
   };
 }
 
