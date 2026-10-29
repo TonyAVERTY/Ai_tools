@@ -31,3 +31,7 @@ Avec un **abonnement**, la carte montre deux barres : **Session de 5 h** et **Se
 - « Claude usage limit reached » : le quota du compte Claude est atteint → attendre la remise à zéro indiquée.
 - « Anthropic limite les relevés : nouvel essai dans une minute » : seulement l'affichage des limites, rien n'est cassé.
 - Aucun job IA ne démarre : vérifier « Mon compte → Liaison Claude → État ».
+
+## Quand Claude se déconnecte tout seul
+Si Claude refuse ton accès pendant une tâche (jeton d'abonnement expiré ou révoqué, clé API supprimée), ou si le serveur ne peut plus lire ton secret de liaison (après un changement de la clé de chiffrement du serveur), la liaison est marquée **invalide** et une fenêtre **« Claude est déconnecté »** s'ouvre sur la page où tu te trouves. Elle propose le bouton **Reconnecter Claude**, qui ouvre la page de liaison, et **Plus tard** pour la fermer (elle ne revient pas sur la même page ; en changeant de page, la page de liaison s'affiche d'office tant que Claude n'est pas relié). Les tâches IA restent à l'arrêt jusqu'à la reconnexion, puis tu peux relancer celles qui ont échoué (par exemple **Analyser**).
+

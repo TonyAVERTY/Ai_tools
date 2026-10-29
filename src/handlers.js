@@ -12,7 +12,7 @@ import { linkedinAccount, saveDraft, recentDrafts } from './linkedin.js';
 import { followupCandidates, followupSubject, isBusinessHours } from './services/followup.js';
 import { EMAIL_RE, createTransport, buildProspectMail, allowedToSend, makeMessageId } from './services/mailer.js';
 import { unsubToken } from './crypto.js';
-import { resolveCredentials } from './claudelink.js';
+import { resolveCredentials, isAuthRefusal, markLinkInvalid } from './claudelink.js';
 import { userRepoRoot, userChatRoot } from './users.js';
 import { quotaAlerts } from './services/budget.js';
 import { notify } from './services/notify.js';
@@ -117,15 +117,27 @@ export function makeClaude(app) {
     const cred = await resolveCredentials(app, userId); // refuse sans liaison valide (dernier garde-fou)
     // Profil de l'utilisateur (secteur, métier…) : une donnée de plus dans les consignes système, sauf pour le Support (qui répond d'après la documentation)
     const system = o.noProfile ? o.system : `${o.system ?? ''}${profileBlock(await getProfile(db, userId))}` || undefined;
-    const r = await runClaude({
-      bin: cfg.claudeBin, ...o, system,
-      sandbox: cfg.sandbox, secretEnv: cred.secretEnv,
-      // Les clones lus sont ceux du propriétaire du projet (page IA : projet d'équipe joint, accès vérifié par l'appelant) ;
-      // les pièces jointes lues en plus sont toujours dans le dossier de CET utilisateur.
-      allowedRoot: o.allowedRoot ?? userRepoRoot(cfg, o.repoOwnerId ?? userId),
-      extraRoot: userChatRoot(cfg, userId),
-    });
-    if (!r.ok) console.warn(claudeDiagnostic({ userId, cred, cfg, cwd: o.cwd, r }));
+    // Accès refusé par Claude (jeton expiré, clé révoquée) : la liaison devient invalide et l'interface demande de se reconnecter
+    const refused = async () => { if (await markLinkInvalid(db, userId)) console.warn(`[claude] accès refusé : liaison de l'utilisateur ${Number(userId)} marquée invalide`); };
+    let r;
+    try {
+      r = await runClaude({
+        bin: cfg.claudeBin, ...o, system,
+        sandbox: cfg.sandbox, secretEnv: cred.secretEnv,
+        // Les clones lus sont ceux du propriétaire du projet (page IA : projet d'équipe joint, accès vérifié par l'appelant) ;
+        // les pièces jointes lues en plus sont toujours dans le dossier de CET utilisateur.
+        allowedRoot: o.allowedRoot ?? userRepoRoot(cfg, o.repoOwnerId ?? userId),
+        extraRoot: userChatRoot(cfg, userId),
+      });
+    } catch (e) {
+      if (isAuthRefusal(e.message)) await refused();
+      throw e;
+    }
+    if (!r.ok) {
+      console.warn(claudeDiagnostic({ userId, cred, cfg, cwd: o.cwd, r }));
+      // Un message d'erreur d'authentification est court ; un long texte (analyse tronquée qui parle d'un « 401 » dans le code) n'en est pas un
+      if (r.subtype !== 'error_max_turns' && String(r.text ?? '').length < 400 && isAuthRefusal(`${r.text} ${r.subtype}`)) await refused();
+    }
     // État du quota d'abonnement (session 5h + semaine), affiché dans la carte « Consommation Claude ». Une clé API n'en a pas.
     const w = cred.mode === 'api_key' ? null : rateLimitWindows(r.rateLimit);
     if (w) {
