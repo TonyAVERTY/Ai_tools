@@ -211,6 +211,14 @@ test('configuration : INACTIVE_ACCOUNT_MONTHS (24 par défaut) et SMTP du serveu
   const full = { SYSTEM_SMTP_HOST: 'smtp.x.fr', SYSTEM_SMTP_USER: 'u', SYSTEM_SMTP_PASSWORD: 'p', SYSTEM_SMTP_FROM: 'n@x.fr' };
   assert.deepEqual(withEnv(full, () => loadConfig().systemSmtp), { host: 'smtp.x.fr', port: 587, user: 'u', pass: 'p', fromEmail: 'n@x.fr' });
   assert.throws(() => withEnv({ SYSTEM_SMTP_HOST: 'smtp.x.fr' }, loadConfig), /incomplètes/);
+  // Les 3 adresses : expéditeur, contact en reply-to, boîte d'erreur avec le même mot de passe
+  const trio = { ...full, SYSTEM_SMTP_REPLY_TO: 'contact@x.fr', SYSTEM_SMTP_ERROR_USER: 'erreur@x.fr' };
+  const cfg = withEnv(trio, () => { const c = loadConfig(); return { s: c.systemSmtp, e: c.errorSmtp }; });
+  assert.equal(cfg.s.replyTo, 'contact@x.fr');
+  assert.deepEqual(cfg.e, { ...cfg.s, user: 'erreur@x.fr', fromEmail: 'erreur@x.fr' });
+  assert.equal(cfg.e.pass, 'p');
+  assert.equal(withEnv(full, () => loadConfig().errorSmtp), null);
+  assert.equal(withEnv({ SYSTEM_SMTP_ERROR_USER: 'erreur@x.fr' }, () => loadConfig().errorSmtp), null, 'sans SMTP principal, rien');
 });
 
 test('politique de confidentialité : la suppression automatique est annoncée comme en place, avec la durée configurée', async () => {

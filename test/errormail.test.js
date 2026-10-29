@@ -80,3 +80,12 @@ test('secrets masqués ; limite horaire ; rien sans SMTP ou sans administrateur 
   const origErr = console.error; console.error = () => {};
   try { assert.deepEqual(await reportError(ko, new Error('y')), { sent: false, reason: 'envoi-impossible' }); } finally { console.error = origErr; }
 });
+
+test('alerte d\'erreur : part de la boîte erreur@ quand elle est configurée', async () => {
+  const sent = [];
+  const app = { cfg: { systemSmtp: SMTP, errorSmtp: { ...SMTP, user: 'erreur@x.test', fromEmail: 'erreur@x.test' }, adminEmails: ['a@b.fr'] },
+    createTransport: (c) => ({ sendMail: async (m) => { sent.push({ user: c.user, from: m.from }); }, close() {} }),
+    resolveHost: async () => [{ address: '93.184.216.34', family: 4 }] };
+  assert.equal((await reportError(app, new Error('boîte dédiée'))).sent, true);
+  assert.deepEqual(sent, [{ user: 'erreur@x.test', from: 'erreur@x.test' }]);
+});
