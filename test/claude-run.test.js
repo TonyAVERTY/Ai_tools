@@ -53,7 +53,7 @@ test('un utilisateur ne lance jamais un job avec le secret d\'un autre (secret r
   await enqueue(s.db, { userId: a.id, projectId: pa, type: 'template' });
   await enqueue(s.db, { userId: b.id, projectId: pb, type: 'template' });
   while (await w.tick()) { /* vide la file */ }
-  assert.deepEqual(readFileSync(log, 'utf8').trim().split('\n'), [KEY_A, KEY_B], 'chaque job a tourné avec la clé de SON utilisateur');
+  assert.deepEqual(readFileSync(log, 'utf8').trim().split('\n'), [KEY_A, KEY_A, KEY_B, KEY_B], 'chaque job (rédaction puis relecture) a tourné avec la clé de SON utilisateur');
   assert.equal((await latestJobs(s.db, pa)).template.status, 'done');
   assert.equal((await latestJobs(s.db, pb)).template.status, 'done');
 });

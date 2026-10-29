@@ -1,3 +1,4 @@
+import { reviewMail } from './services/mailcheck.js';
 import { projectChecklist } from './checklist.js';
 import { now, getSetting, setSetting } from './db.js';
 import { encrypt, decrypt, encryptJson, decryptJson, verifyUnsubToken } from './crypto.js';
@@ -569,8 +570,11 @@ export function registerRoutes(router, app) {
     // Relance : objet facultatif (vide = "Re: <objet du 1er mail>", même fil de discussion)
     if (!body || (kind === 'initial' && !subject)) throw new HttpError(400, kind === 'initial' ? 'Objet et corps requis' : 'Corps requis');
     const status = b.mode === 'validate' ? 'validated' : 'draft';
+    // Un modèle cassé (variable inconnue, ligne qui commence par une virgule…) ne peut pas être validé, donc pas envoyé
+    const check = reviewMail({ subject: [subject, subjectB].filter(Boolean).join('\n'), body });
+    if (status === 'validated' && check.errors.length) throw new HttpError(400, `Modèle à corriger avant validation : ${check.errors.join(' ')}`, { expose: true });
     await saveTemplate(db, p.id, kind, { subject, subjectB, body, status, html: asBool(b.html) });
-    json(res, { ok: true, status });
+    json(res, { ok: true, status, warnings: check.warnings });
   });
 
   router.post('/api/projects/:id/smtp', async (ctx) => {

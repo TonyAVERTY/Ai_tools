@@ -641,6 +641,7 @@
       if (type === 'analyze') { box.innerHTML = ''; return; } // la fiche projet affichée juste au-dessus est le résultat
       const r = job.result || {};
       let txt = `${name} terminé(e).`;
+      if (type === 'template') txt = r.reviewed ? `Modèle rédigé et relu : ${r.corrections?.length ? r.corrections.join(' ; ') : 'rien à corriger'}.` : 'Modèle rédigé (la relecture n\'a pas pu être faite : relis-le toi-même).';
       if (type === 'prospect') txt = `Recherche terminée : ${r.found} nouveau(x) prospect(s) sur ${r.requested} demandés.`;
       if (type === 'send') txt = `Envoi terminé : ${r.sent} envoyé(s), ${r.failed} échec(s).`;
       if (type === 'followup') txt = r.postponed ? 'Relances reportées au prochain créneau (lun-ven 9h-18h).' : `Relances terminées : ${r.sent} envoyée(s), ${r.failed} échec(s).`;

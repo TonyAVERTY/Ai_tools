@@ -149,3 +149,6 @@ Claude a refusé ton accès (jeton expiré ou révoqué, clé API supprimée). C
 ## Le mail de prospection ne contient pas le lien de mon site
 Renseigne l'adresse dans **En-tête → Site du produit** (puis **Enregistrer le site**), clique sur **Générer avec l'IA** dans « Modèle de mail » : le nouveau texte contient `{{site}}`, remplacée à l'envoi par ton adresse. Un modèle déjà généré avant cela n'a pas `{{site}}` : régénère-le, ou ajoute toi-même `{{site}}` dans le corps, puis **Valider le modèle** de nouveau. L'**Aperçu** montre le lien tel qu'il partira.
 
+## « Modèle à corriger avant validation » ou une virgule en début de ligne dans le mail
+Le bouton **Valider le modèle** refuse un modèle cassé : variable inconnue ou mal fermée (`{{site` sans les deux accolades), ligne qui commence par une virgule ou un point-virgule. Corrige la ligne indiquée (le message donne son numéro), puis valide de nouveau. Une virgule en début de ligne vient souvent d'une variable vide, par exemple `{{expediteur}}, MonProduit` sans **Nom expéditeur** réglé : renseigne le **Nom expéditeur** dans **Configuration du projet → SMTP**, ou mets la variable et le nom du produit sur deux lignes. À l'envoi et dans l'aperçu, ces restes sont de toute façon retirés. Si **Générer avec l'IA** dit « la relecture n'a pas pu être faite », relis le mail toi-même avant de le valider.
+

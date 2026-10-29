@@ -177,7 +177,7 @@ test('site du produit : enregistré, normalisé, refusé s\'il est invalide, ré
   // sans site : l'aperçu avertit, la variable reste vide
   const none = await (await prev(u, pid, { kind: 'initial', subject: 'S', body: 'Voir : {{site}}' })).json();
   assert.ok(none.warnings.some((w) => /Aucun site n'est renseigné/.test(w)));
-  assert.match(none.text, /Voir :\n/);
+  assert.doesNotMatch(none.text, /Voir/, "la ligne dont la variable est vide disparaît au lieu de partir cassée");
   // adresse sans schéma : https:// ajouté, barre finale retirée
   const ok = await site(u, '  monproduit.fr/  ');
   assert.equal(ok.status, 200);
