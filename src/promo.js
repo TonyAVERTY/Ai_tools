@@ -11,6 +11,7 @@ import { budgetState } from './services/budget.js';
 import { userPromoRoot } from './users.js';
 import { PROMO, FORMATS, parsePromoParams, promoSupported } from './services/promovideo.js';
 import { PROMO_STYLES } from './services/promokit.js';
+import { voiceCatalog, parseVoiceParams, sampleFor, VOICE_PROVIDERS } from './services/voiceover.js';
 
 const nameOf = (id) => `${Number(id)}.mp4`;
 export const promoFile = (cfg, userId, id) => join(userPromoRoot(cfg, userId), nameOf(id));
@@ -63,9 +64,28 @@ export function registerPromoRoutes(router, app, { project, aiOpts }) {
       limits: { fps: PROMO.fps, seconds: PROMO.seconds, maxFrames: PROMO.maxFrames, maxSubject: PROMO.maxSubject, maxVideos: PROMO.maxVideos },
       formats: Object.entries(FORMATS).map(([id, f]) => ({ id, label: f.label })),
       styles: [{ id: 'auto', label: 'Automatique' }, ...Object.entries(PROMO_STYLES).map(([id, st]) => ({ id, label: st.label }))],
+      voices: voiceCatalog(),
       videos: await listVideos(db, p.id),
     });
   });
+
+  // Extrait d'écoute d'une voix (l'élément audio de la page le lit directement) : mis en cache, car chaque appel interroge le service de voix
+  const samples = new Map();
+  router.get('/api/promo/voice-sample', async (ctx) => {
+    const provider = ctx.url.searchParams.get('provider') || '';
+    const voice = ctx.url.searchParams.get('voice') || '';
+    if (!VOICE_PROVIDERS[provider]?.voices.some((x) => x.id === voice)) throw new HttpError(400, 'Voix inconnue', { expose: true });
+    const key = `${provider}/${voice}`;
+    let audio = samples.get(key);
+    if (!audio) {
+      try { audio = await (app.sampleVoice || sampleFor)(provider, voice); } catch (e) { throw new HttpError(502, `${VOICE_PROVIDERS[provider].label} ne répond pas : ${e.message}`, { expose: true }); }
+      if (samples.size >= 60) samples.delete(samples.keys().next().value);
+      samples.set(key, audio);
+    }
+    ctx.res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Content-Length': audio.length, 'Cache-Control': 'private, max-age=3600', 'X-Content-Type-Options': 'nosniff' });
+    ctx.res.end(audio);
+  }, LIMIT);
+
 
   router.post('/api/projects/:id/promo/generate', async (ctx) => {
     const p = await project(ctx);
@@ -75,12 +95,15 @@ export function registerPromoRoutes(router, app, { project, aiOpts }) {
     if (!p.profile) throw new HttpError(400, "Analyse le projet d'abord", { expose: true });
     const params = parsePromoParams(b);
     if (params.error) throw new HttpError(400, params.error, { expose: true });
+    const vp = parseVoiceParams(b);
+    if (vp.error) throw new HttpError(400, vp.error, { expose: true });
+    if (vp.voice) Object.assign(params, { voice: true, voiceProvider: vp.voice.provider, voiceName: vp.voice.voice });
     if ((await countVideos(db, p.userId)) >= PROMO.maxVideos) throw new HttpError(409, `Tu as déjà ${PROMO.maxVideos} vidéos : supprime-en une avant d'en produire une autre.`, { expose: true });
     await assertCanRunAi(db, p.userId, aiOpts);
     const r = await enqueue(db, { userId: p.userId, projectId: p.id, type: 'promo_video', params }, aiOpts);
     const budget = await budgetState(db, p.userId);
     json(ctx.res, { ...r, budgetBlocked: budget.blocked ? budget.reason : null });
-  }, LIMIT);
+  }, { limit: 'promo_voice' });
 
   // Lecture (aperçu et téléchargement) : toute personne qui a accès au projet ; type figé, jamais interprété par le navigateur
   router.get('/api/promo/:vid/file', async ({ req, res, params, session, url }) => {

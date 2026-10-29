@@ -1304,16 +1304,28 @@
           <label class="field"><span class="lbl">Format</span><span class="sel"><select name="format">${s.formats.map((f) => `<option value="${esc(f.id)}">${esc(f.label)}</option>`).join('')}</select>${icon('down')}</span></label>
         </div>
         <label class="field"><span class="lbl">Style</span><span class="sel"><select name="style">${s.styles.map((f) => `<option value="${esc(f.id)}">${esc(f.label)}</option>`).join('')}</select>${icon('down')}</span></label>
+        <label class="check"><input type="checkbox" name="voice" data-promo-voice-toggle><span>Ajouter une voix</span></label>
+        <div class="promo-voice" data-promo-voice hidden>
+          <div class="grid2">
+            <label class="field"><span class="lbl">Fournisseur</span><span class="sel"><select name="voiceProvider">${s.voices.map((p) => `<option value="${esc(p.id)}">${esc(p.label)}</option>`).join('')}</select>${icon('down')}</span></label>
+            <label class="field"><span class="lbl">Voix</span><span class="sel"><select name="voiceName">${voiceOptions(s.voices[0])}</select>${icon('down')}</span></label>
+          </div>
+          <div class="row"><button type="button" class="btn small" data-promo-sample>${icon('play')}Écouter un extrait</button><span class="hint" data-promo-sample-state role="status"></span></div>
+          <audio data-promo-audio preload="none"></audio>
+          <p class="muted small">La voix lit un texte écrit par Claude, dans la langue de la voix choisie. Ce texte est envoyé au fournisseur pour être lu : services gratuits, sans clé, qui peuvent changer ou refuser des demandes.</p>
+        </div>
         <p class="hint" data-promo-count></p>
         <div class="row"><button class="btn primary" data-promo-go>${icon('film')}Générer la vidéo</button></div>
       </form>
       <p class="muted small">Claude écrit la scène, elle est ensuite dessinée image par image sur le serveur : compte quelques minutes selon la durée et le nombre d'images par seconde. Les consignes se modifient dans les Réglages (« Vidéo de promotion »).</p>`
       : '<p class="muted">Analyse d\'abord le projet : Claude s\'appuie sur sa fiche pour concevoir la vidéo.</p>';
+    voiceCatalogs.set(box, s.voices);
     box.innerHTML = `${form}${s.videos.length ? `<div class="pv-list">${s.videos.map((v) => promoVideoCard(v, s, id)).join('')}</div>` : (s.hasProfile ? '<p class="muted small">Aucune vidéo pour l\'instant.</p>' : '')}`;
     promoCount(box);
   }
 
   // Nombre d'images à produire, et message clair si la limite est dépassée (le serveur la contrôle aussi)
+  const voiceOptions = (p) => (p ? p.voices.map((v) => `<option value="${esc(v.id)}">${esc(v.label)}</option>`).join('') : '');
   function promoCount(box) {
     const f = $('[data-promo-form]', box);
     if (!f) return;
@@ -1325,6 +1337,35 @@
     $('[data-promo-go]', f).disabled = bad;
   }
 
+  // Voix : la case montre les choix ; changer de fournisseur remplace la liste des voix ; l'extrait se lit depuis le serveur (qui le garde en cache)
+  const voiceCatalogs = new WeakMap();
+  listen(document, 'change', (e) => {
+    const f = e.target.closest('[data-promo-form]');
+    if (!f) return;
+    if (e.target.matches('[data-promo-voice-toggle]')) $('[data-promo-voice]', f).hidden = !e.target.checked;
+    if (e.target.name === 'voiceProvider') {
+      const cat = voiceCatalogs.get(f.closest('[data-promo]'));
+      f.voiceName.innerHTML = voiceOptions(cat?.find((p) => p.id === e.target.value));
+    }
+  });
+  listen(document, 'click', async (e) => {
+    const b = e.target.closest('[data-promo-sample]');
+    if (!b) return;
+    const f = b.closest('[data-promo-form]');
+    const state = $('[data-promo-sample-state]', f);
+    const url = `/api/promo/voice-sample?provider=${encodeURIComponent(f.voiceProvider.value)}&voice=${encodeURIComponent(f.voiceName.value)}`;
+    b.disabled = true;
+    state.textContent = 'Chargement de l\'extrait…';
+    try {
+      const r = await fetch(url, { credentials: 'same-origin' });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'Extrait indisponible');
+      const audio = $('[data-promo-audio]', f);
+      audio.src = url;
+      await audio.play();
+      state.textContent = 'Lecture…';
+      audio.onended = () => { state.textContent = ''; };
+    } catch (err) { state.textContent = err.message; } finally { b.disabled = false; }
+  });
   listen(document, 'input', (e) => { const b = e.target.closest('[data-promo-form]'); if (b) promoCount(b.closest('[data-promo]')); });
   listen(document, 'submit', async (e) => {
     const f = e.target.closest('[data-promo-form]');
@@ -1334,7 +1375,7 @@
     const btn = $('[data-promo-go]', f);
     btn.disabled = true;
     try {
-      const r = await api(`/api/projects/${proj.dataset.id}/promo/generate`, { subject: f.subject.value, fps: Number(f.fps.value), seconds: Number(f.seconds.value), format: f.format.value, style: f.style.value });
+      const r = await api(`/api/projects/${proj.dataset.id}/promo/generate`, { subject: f.subject.value, fps: Number(f.fps.value), seconds: Number(f.seconds.value), format: f.format.value, style: f.style.value, voice: f.voice.checked, voiceProvider: f.voiceProvider.value, voiceName: f.voiceName.value });
       toast(r.budgetBlocked ? `En file, mais ${r.budgetBlocked}` : r.existing ? 'Une vidéo est déjà en cours de production' : 'Claude conçoit la vidéo…', r.budgetBlocked ? 'error' : 'ok');
       refreshProject(proj);
     } catch (err) { toast(err.message, 'error'); }
