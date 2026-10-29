@@ -169,3 +169,32 @@ test('aperçu avec un vrai prospect : ses données, son lien de désinscription 
   const other = await addProject(s.db, u.id, { name: 'Autre', gitUrl: 'https://github.com/u/autre.git' });
   assert.equal((await prev(u, other, { body: 'x', prospectId: id })).status, 404, 'un prospect d\'un autre projet n\'est pas prévisualisable ici');
 });
+
+test('site du produit : enregistré, normalisé, refusé s\'il est invalide, réservé aux gestionnaires ; {{site}} dans l\'aperçu', async () => {
+  const { u, pid } = await setup();
+  const site = (who, v) => who.post(`/api/projects/${pid}/site`, { site_url: v });
+  const stored = async () => (await s.db.prepare('SELECT site_url FROM projects WHERE id = ?').get(pid)).site_url;
+  // sans site : l'aperçu avertit, la variable reste vide
+  const none = await (await prev(u, pid, { kind: 'initial', subject: 'S', body: 'Voir : {{site}}' })).json();
+  assert.ok(none.warnings.some((w) => /Aucun site n'est renseigné/.test(w)));
+  assert.match(none.text, /Voir :\n/);
+  // adresse sans schéma : https:// ajouté, barre finale retirée
+  const ok = await site(u, '  monproduit.fr/  ');
+  assert.equal(ok.status, 200);
+  assert.equal((await ok.json()).siteUrl, 'https://monproduit.fr');
+  assert.equal(await stored(), 'https://monproduit.fr');
+  const d = await (await prev(u, pid, { kind: 'initial', subject: 'S', body: 'Voir le produit : {{site}}' })).json();
+  assert.match(d.text, /Voir le produit : https:\/\/monproduit\.fr\n/);
+  assert.ok(!d.warnings.some((w) => /Aucun site/.test(w)));
+  // adresses refusées : autre schéma, identifiants, sans point, illisible
+  for (const bad of ['javascript:alert(1)', 'ftp://x.fr', 'https://user:mdp@x.fr', 'localhost', 'pas une adresse', `https://x.fr/${'a'.repeat(300)}`]) {
+    assert.equal((await site(u, bad)).status, 400, bad);
+  }
+  assert.equal(await stored(), 'https://monproduit.fr', 'un refus ne change rien');
+  // un autre compte ne le modifie pas ; vide = retiré
+  assert.equal((await site(await s.newUser(), 'https://autre.fr')).status, 404);
+  assert.equal(await stored(), 'https://monproduit.fr');
+  assert.equal((await (await site(u, '')).json()).siteUrl, '');
+  assert.equal(await stored(), null);
+});
+

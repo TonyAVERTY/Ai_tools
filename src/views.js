@@ -388,7 +388,7 @@ function templateForm(p, kind) {
   return `<form data-action="template" data-kind="${kind}" data-id="${p.id}" class="tpl">
       <div class="row"><h4>${initial ? 'Modèle de mail' : 'Modèle de relance'} <span data-tpl-state></span></h4>
         <button type="button" class="btn small" data-run="${job}" data-id="${p.id}">Générer avec l'IA</button></div>
-      <p class="muted small">Variables : {{entreprise}} {{ville}}${initial ? ' {{accroche}}' : ''} {{expediteur}}. Le lien de désinscription est ajouté automatiquement.</p>
+      <p class="muted small">Variables : {{entreprise}} {{ville}}${initial ? ' {{accroche}}' : ''} {{expediteur}} {{site}}. Le lien de désinscription est ajouté automatiquement.</p>
       <label>Objet${initial ? '' : ' <span class="muted small">(vide = « Re: » + objet du premier mail, dans le même fil)</span>'}<input name="subject"></label>
       ${initial ? '<label>Objet B <span class="muted small">(optionnel : test A/B, les envois alternent entre les deux objets)</span><input name="subjectB"></label>' : ''}
       <label>Corps<textarea name="body" rows="${initial ? 9 : 5}"></textarea></label>
@@ -450,6 +450,11 @@ function projectItem(p, smtp, dbCfg, imap, { open = false, stats = null } = {}) 
   ${acc('header', 'git', 'En-tête', 'Dépôt Git et fiche projet', `
   <div class="field"><span class="lbl">Dépôt Git</span><div class="ro">${ic('lock', 'ic-s')}<span>${esc(p.gitUrl)}</span><span class="badge">lecture seule</span></div></div>
   <p class="muted small" data-todo-restore hidden><button type="button" class="link" data-todo-restore-btn>Afficher la mise en route</button> (la liste « config » que tu as retirée de ce projet)</p>
+  ${p.access !== 'member' ? `<form data-action="site" data-id="${p.id}" class="site-form">
+    <label class="field"><span class="lbl">Site du produit</span><input name="site_url" maxlength="300" inputmode="url" autocomplete="off" placeholder="https://monproduit.fr" value="${esc(p.siteUrl || '')}"></label>
+    <p class="muted small">Cette adresse est ajoutée dans les mails de prospection à la place de <code>{{site}}</code>. Laisse vide pour ne pas en mettre.</p>
+    <div class="row"><button class="btn small">Enregistrer le site</button></div>
+  </form>` : ''}
   ${profile ? `<section class="profile fiche">
     <div class="fiche-h"><b>Fiche projet</b></div>
     <p>${esc(profile.resume)}</p><p class="meta"><span>Analysé le ${fmtDate(p.profileAt)}</span><span>Commit <code>${esc((p.profileCommit || '').slice(0, 8))}</code></span><span>${esc(profile.stack || '')}</span></p>

@@ -494,6 +494,23 @@ export function registerRoutes(router, app) {
     json(res, { ok: true });
   });
 
+  // Site du produit : écrit dans les mails de prospection par {{site}}. Vide = retiré. Seules les adresses http(s) sont acceptées.
+  router.post('/api/projects/:id/site', async (ctx) => {
+    const p = await project(ctx, { need: 'admin' });
+    const b = await readBody(ctx.req);
+    const raw = String(b.site_url ?? '').trim();
+    let value = '';
+    if (raw) {
+      let u;
+      try { u = new URL(/^[a-z][a-z0-9+.-]*:/i.test(raw) ? raw : `https://${raw}`); } catch { throw new HttpError(400, "Adresse du site invalide : écris-la comme https://monproduit.fr"); }
+      if (!['http:', 'https:'].includes(u.protocol) || !u.hostname.includes('.') || u.username || u.password) throw new HttpError(400, "Adresse du site invalide : écris-la comme https://monproduit.fr");
+      value = u.href.replace(/\/$/, '');
+      if (value.length > 300) throw new HttpError(400, 'Adresse du site trop longue (300 caractères au plus)');
+    }
+    await db.prepare('UPDATE projects SET site_url = ? WHERE id = ?').run(value || null, p.id);
+    json(ctx.res, { ok: true, siteUrl: value });
+  });
+
   const jobRoute = (type, paramsOf = () => ({}), guard = () => {}) => async (ctx) => {
     const { req, res } = ctx;
     const p = await project(ctx);
