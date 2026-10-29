@@ -560,7 +560,8 @@ Site du produit : ${site ? `${site} (mets {{site}} dans le mail, pas l'adresse)`
 
 ${instructions('template', custom, { ton: profile.ton || 'direct et chaleureux', expediteur: senderName || '{{expediteur}}' }, model)}
 Ne mets PAS de lien de désinscription (ajouté automatiquement).
-Réponds UNIQUEMENT avec : {"subject":"...","body":"..."}`,
+Objet B (test A/B) : écris aussi un second objet qui respecte les mêmes règles que l'objet, mais avec un angle différent (si l'objet A est une question, B énonce un fait ; si A parle du bénéfice, B nomme le produit ou le métier du destinataire). Ce n'est jamais une simple reformulation de A.
+Réponds UNIQUEMENT avec : {"subject":"...","subject_b":"...","body":"..."}`,
   };
 }
 
@@ -568,7 +569,7 @@ Réponds UNIQUEMENT avec : {"subject":"...","body":"..."}`,
  * Relecture d'un mail avant enregistrement : Claude corrige la langue et la ponctuation sans toucher au fond.
  * Consigne interne (non modifiable) : le résultat n'est retenu que s'il garde les mêmes variables et adresses (services/mailcheck.js).
  */
-export function reviewMailPrompt({ subject, body }) {
+export function reviewMailPrompt({ subject, subjectB = '', body }) {
   return {
     system: SYSTEM_FR,
     prompt: `RELECTURE DU MAIL. Tu es relecteur : tu corriges un mail commercial avant son envoi, sans le réécrire.
@@ -580,11 +581,11 @@ Règles strictes :
 - Aucune ligne ne commence par une virgule ou un point-virgule.
 Si le mail est déjà correct, renvoie-le inchangé avec une liste de corrections vide.
 
-Objet : ${subject}
+Objet : ${subject}${subjectB ? `\nObjet B : ${subjectB}` : ''}
 Corps :
 ${body}
 
-Réponds UNIQUEMENT avec : {"subject":"...","body":"...","corrections":["correction faite, en quelques mots", "..."]}`,
+Réponds UNIQUEMENT avec : {"subject":"...",${subjectB ? '"subject_b":"...",' : ''}"body":"...","corrections":["correction faite, en quelques mots", "..."]}`,
   };
 }
 

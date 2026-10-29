@@ -155,3 +155,6 @@ Le bouton **Valider le modèle** refuse un modèle cassé : variable inconnue ou
 ## « Modèle en échec : Expected property name or '}' in JSON … »
 Claude avait cité une variable (comme `{{site}}`) dans une phrase avant de donner le mail, et l'application a pris cette accolade pour le début du mail. C'est corrigé : l'application ignore maintenant ce qui n'est pas du JSON valide et retient le vrai mail. Si tu vois encore ce message, clique de nouveau sur **Générer avec l'IA** : Claude répond un peu différemment à chaque fois.
 
+## L'Objet B est vide après « Générer avec l'IA »
+Claude n'a pas proposé de second objet, ou l'a rendu identique à l'objet A : il n'y a alors pas de test A/B. Clique de nouveau sur **Générer avec l'IA**, ou écris toi-même l'**Objet B** (les envois alternent ensuite entre A et B ; le taux de réponse de chaque objet s'affiche sous le bouton Envoyer).
+

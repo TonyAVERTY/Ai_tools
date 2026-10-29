@@ -66,7 +66,8 @@ test('consignes modifiées : « tous les modèles » ou une gamme ; la gamme pri
   assert.doesNotMatch(t('opus'), /Jamais de tutoiement/);
   assert.match(t('sonnet'), /Jamais de tutoiement/, 'les autres gammes héritent de « tous les modèles »');
   for (const m of ['haiku', 'opus']) {
-    assert.match(t(m), /Réponds UNIQUEMENT avec : \{"subject":"\.\.\.","body":"\.\.\."\}/, 'format imposé');
+    assert.match(t(m), /Réponds UNIQUEMENT avec : \{"subject":"\.\.\.","subject_b":"\.\.\.","body":"\.\.\."\}/, 'format imposé, objet B compris');
+    assert.match(t(m), /Objet B \(test A\/B\)[^\n]*angle différent/, 'objet B : règle imposée');
     assert.match(t(m), /Ne mets PAS de lien de désinscription/, 'lien de désinscription : règle imposée');
   }
   const p = prospectPrompt({ profile, target, count: 3, exclude: [], custom, model: 'haiku' }).system;
