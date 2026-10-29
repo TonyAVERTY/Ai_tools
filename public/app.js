@@ -689,7 +689,6 @@
       if (an.status === 'done') { toast('Analyse terminée'); reload(); return; }
       if (an.status === 'error') toast(`Analyse en échec : ${an.error}`, 'error');
     }
-    if (an?.status === 'error' && !s.hasProfile) $('.profile p', el).outerHTML = `<p class="error small">${esc(an.error)}</p>`;
 
     // Modèle de mail : on ne remplace le formulaire que s'il a changé côté serveur
     st.tplStamp ||= {};

@@ -34,6 +34,23 @@ await p.locator('.jobs-btn').click();
 await p.waitForFunction(() => /42 %/.test(document.querySelector('[data-jobs-list]')?.textContent || ''), null, { timeout: 8000 }).catch(() => {});
 ok(/Analyse/.test(await p.locator('[data-jobs-list]').innerText()) && /42 %/.test(await p.locator('[data-jobs-list]').innerText()), 'menu Activité : Analyse 42 %');
 ok(errs.length === 0, `aucune erreur JS ${errs.join(' | ')}`);
+
+// Analyse en échec sur un projet sans fiche : le message d'erreur s'affiche dans l'en-tête, sans erreur JavaScript
+const u2 = await s.newUser();
+const pid2 = await addProject(s.db, u2.userId ?? u2.id, { name: 'EnEchec' });
+await s.db.prepare('INSERT INTO jobs(user_id, project_id, type, status, error, created_at, started_at, finished_at) VALUES(?, ?, ?, ?, ?, ?, ?, ?)')
+  .run(u2.userId ?? u2.id, pid2, 'analyze', 'error', "Git : EACCES: permission denied, mkdir '/data/repos/1'", now(), now(), now());
+const ctx2 = await b.newContext({ viewport: { width: 1280, height: 900 } });
+const [n2, v2] = u2.cookie.split('=');
+await ctx2.addCookies([{ name: n2, value: v2, url: s.base }]);
+const p2 = await ctx2.newPage();
+const errs2 = [];
+p2.on('pageerror', (e) => errs2.push(e.message));
+await p2.goto(`${s.base}/`);
+await p2.evaluate(() => { document.querySelector('details.project').open = true; });
+await p2.waitForTimeout(1500);
+ok(/en échec/.test(await p2.locator('[data-job="analyze"]').first().innerText()), 'analyse en échec : message affiché dans l\'en-tête');
+ok(errs2.length === 0, `analyse en échec : aucune erreur JS ${errs2.join(' | ')}`);
 await b.close();
 await s.close();
 console.log(bad ? `${bad} ÉCHEC(S)` : 'TOUT EST BON');
