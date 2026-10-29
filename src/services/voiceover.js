@@ -1,8 +1,11 @@
 // Voix off des vidéos de promotion. Claude écrit, avec la scène, un petit script (« voix ») : des phrases avec l'instant où elles commencent.
-// Ce module le valide, le fait lire par un fournisseur de synthèse vocale GRATUIT et SANS CLÉ, puis ffmpeg pose les voix sur la bande-son de la vidéo.
-//  - edge   : voix neuronales de Microsoft Edge (lecture à voix haute), bonne qualité, plusieurs voix par langue ;
-//  - google : voix de Google Traduction, plus simple (une voix par langue).
-// Ces deux services ne sont pas des API officielles : ils peuvent changer ou refuser des requêtes. Le texte lu est envoyé au fournisseur choisi.
+// Ce module le valide, le fait lire par un fournisseur de synthèse vocale, puis ffmpeg pose les voix sur la bande-son de la vidéo.
+//  - edge       : voix neuronales de Microsoft Edge (lecture à voix haute), gratuit et sans clé, bonne qualité ;
+//  - elevenlabs : les voix les plus naturelles, avec la clé API de l'utilisateur (plan gratuit mensuel) ;
+//  - googlecloud: voix Google Cloud (Chirp 3 HD, Neural2, Studio), avec la clé API de l'utilisateur (quota gratuit mensuel) ;
+//  - google     : voix de Google Traduction, gratuit et sans clé, la plus simple (une voix par langue).
+// Edge et Google Traduction ne sont pas des API officielles : ils peuvent changer ou refuser des requêtes. Le texte lu est envoyé au fournisseur choisi.
+// Les clés sont chiffrées en base, jamais réaffichées, jamais dans un message d'erreur ni un journal.
 // Aucun appel réseau n'est fait ailleurs que dans `synthesize` (remplaçable dans les tests).
 import { createHash, randomUUID } from 'node:crypto';
 import { spawn } from 'node:child_process';
@@ -20,37 +23,56 @@ const SAMPLES = {
 };
 
 const v = (id, label, lang) => ({ id, label, lang });
+export const VOICE_LANGS = Object.entries(LANGS).map(([id, label]) => ({ id, label: label[0].toUpperCase() + label.slice(1) }));
 export const VOICE_PROVIDERS = {
   edge: {
     label: 'Microsoft Edge (gratuit)',
     voices: [
+      v('fr-FR-VivienneMultilingualNeural', 'Vivienne · français, féminine (très naturelle)', 'fr'), v('fr-FR-RemyMultilingualNeural', 'Rémy · français, masculine (très naturelle)', 'fr'),
+      v('fr-FR-LucienMultilingualNeural', 'Lucien · français, masculine (très naturelle)', 'fr'),
       v('fr-FR-DeniseNeural', 'Denise · français, féminine', 'fr'), v('fr-FR-HenriNeural', 'Henri · français, masculine', 'fr'),
-      v('fr-FR-VivienneMultilingualNeural', 'Vivienne · français, féminine', 'fr'), v('fr-FR-RemyMultilingualNeural', 'Rémy · français, masculine', 'fr'),
       v('fr-BE-CharlineNeural', 'Charline · français de Belgique, féminine', 'fr'), v('fr-CA-SylvieNeural', 'Sylvie · français du Canada, féminine', 'fr'),
+      v('en-US-AvaMultilingualNeural', 'Ava · anglais américain, féminine (très naturelle)', 'en'), v('en-US-AndrewMultilingualNeural', 'Andrew · anglais américain, masculine (très naturelle)', 'en'),
       v('en-US-JennyNeural', 'Jenny · anglais américain, féminine', 'en'), v('en-US-GuyNeural', 'Guy · anglais américain, masculine', 'en'),
       v('en-GB-SoniaNeural', 'Sonia · anglais britannique, féminine', 'en'), v('en-GB-RyanNeural', 'Ryan · anglais britannique, masculine', 'en'),
       v('es-ES-ElviraNeural', 'Elvira · espagnol, féminine', 'es'), v('es-ES-AlvaroNeural', 'Álvaro · espagnol, masculine', 'es'),
+      v('de-DE-SeraphinaMultilingualNeural', 'Seraphina · allemand, féminine (très naturelle)', 'de'), v('de-DE-FlorianMultilingualNeural', 'Florian · allemand, masculine (très naturelle)', 'de'),
       v('de-DE-KatjaNeural', 'Katja · allemand, féminine', 'de'), v('de-DE-ConradNeural', 'Conrad · allemand, masculine', 'de'),
       v('it-IT-ElsaNeural', 'Elsa · italien, féminine', 'it'), v('it-IT-DiegoNeural', 'Diego · italien, masculine', 'it'),
       v('pt-BR-FranciscaNeural', 'Francisca · portugais, féminine', 'pt'), v('pt-PT-DuarteNeural', 'Duarte · portugais, masculine', 'pt'),
     ],
   },
+  // Voix très naturelles : la clé de l'utilisateur ouvre la liste de ses voix ; une voix ElevenLabs parle toutes les langues (modèle multilingue)
+  elevenlabs: { label: 'ElevenLabs (clé gratuite)', keyed: true, multilingual: true, keyUrl: 'elevenlabs.io', keyHelp: 'Crée un compte gratuit sur elevenlabs.io, ouvre ton profil → « API Keys », crée une clé et colle-la ici.' },
+  googlecloud: { label: 'Google Cloud (clé gratuite)', keyed: true, keyUrl: 'console.cloud.google.com', keyHelp: 'Dans console.cloud.google.com : active « Cloud Text-to-Speech API », puis Identifiants → Créer des identifiants → Clé API, et colle-la ici.' },
   google: {
     label: 'Google Traduction (gratuit)',
     voices: [v('fr', 'Français', 'fr'), v('en', 'Anglais', 'en'), v('es', 'Espagnol', 'es'), v('de', 'Allemand', 'de'), v('it', 'Italien', 'it'), v('pt', 'Portugais', 'pt')],
   },
 };
 
-export const voiceCatalog = () => Object.entries(VOICE_PROVIDERS).map(([id, p]) => ({ id, label: p.label, voices: p.voices }));
-const findVoice = (provider, id) => VOICE_PROVIDERS[provider]?.voices.find((x) => x.id === id) || null;
+/** Catalogue pour la page : les voix des fournisseurs à clé viennent de leur API (une fois la clé enregistrée). `keys` : { fournisseur: 4 derniers caractères }. */
+export const voiceCatalog = (keys = {}) => Object.entries(VOICE_PROVIDERS).map(([id, p]) => ({
+  id, label: p.label, keyed: !!p.keyed, multilingual: !!p.multilingual, keyHelp: p.keyHelp || null,
+  keyLast4: p.keyed ? (keys[id] || null) : null, voices: p.voices || null,
+}));
+const findVoice = (provider, id) => VOICE_PROVIDERS[provider]?.voices?.find((x) => x.id === id) || null;
 export const langName = (lang) => LANGS[lang] || 'français';
+const VOICE_ID = /^[A-Za-z0-9_.-]{1,80}$/;
 
 /** Choix du formulaire → `{ provider, voice, lang }`, `null` (pas de voix), ou une erreur lisible. */
 export function parseVoiceParams(b = {}) {
   if (!(b.voice === true || b.voice === 'true' || b.voice === 1 || b.voice === '1' || b.voice === 'on')) return { voice: null };
   const provider = String(b.voiceProvider ?? '');
-  if (!VOICE_PROVIDERS[provider]) return { error: 'Voix : choisis un fournisseur dans la liste.' };
-  const found = findVoice(provider, String(b.voiceName ?? ''));
+  const p = VOICE_PROVIDERS[provider];
+  if (!p) return { error: 'Voix : choisis un fournisseur dans la liste.' };
+  const id = String(b.voiceName ?? '');
+  if (p.keyed) {
+    if (!VOICE_ID.test(id)) return { error: 'Voix : choisis une voix dans la liste.' };
+    const lang = p.multilingual ? (LANGS[b.voiceLang] ? String(b.voiceLang) : 'fr') : (LANGS[id.slice(0, 2)] ? id.slice(0, 2) : 'fr');
+    return { voice: { provider, voice: id, lang } };
+  }
+  const found = findVoice(provider, id);
   if (!found) return { error: 'Voix : choisis une voix dans la liste.' };
   return { voice: { provider, voice: found.id, lang: found.lang } };
 }
@@ -173,18 +195,74 @@ async function googleSynth(text, lang, { fetchImpl = fetch } = {}) {
   return Buffer.concat(bufs);
 }
 
+// Fournisseurs à clé : appels REST officiels. La clé voyage dans un en-tête, jamais dans l'adresse ; les erreurs ne la citent jamais.
+const keyedFetch = async (fetchImpl, url, init, label) => {
+  let res;
+  try { res = await fetchImpl(url, init); } catch { throw new Error(`${label} ne répond pas`); }
+  if (res.status === 401 || res.status === 403) throw new Error(`${label} a refusé la clé API (vérifie-la, ou son quota)`);
+  if (res.status === 429) throw new Error(`${label} : quota ou débit dépassé`);
+  if (!res.ok) throw new Error(`${label} a refusé la requête (${res.status})`);
+  return res;
+};
+
+async function elevenSynth(text, voice, { key, fetchImpl = fetch }) {
+  const res = await keyedFetch(fetchImpl, `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voice)}?output_format=mp3_44100_128`, {
+    method: 'POST', headers: { 'xi-api-key': key, 'Content-Type': 'application/json', Accept: 'audio/mpeg' },
+    body: JSON.stringify({ text, model_id: 'eleven_multilingual_v2', voice_settings: { stability: 0.5, similarity_boost: 0.8, style: 0.2, use_speaker_boost: true } }),
+  }, 'ElevenLabs');
+  return Buffer.from(await res.arrayBuffer());
+}
+
+async function googleCloudSynth(text, voice, { key, fetchImpl = fetch }) {
+  const res = await keyedFetch(fetchImpl, 'https://texttospeech.googleapis.com/v1/text:synthesize', {
+    method: 'POST', headers: { 'X-Goog-Api-Key': key, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ input: { text }, voice: { languageCode: voice.split('-').slice(0, 2).join('-'), name: voice }, audioConfig: { audioEncoding: 'MP3', sampleRateHertz: 24000 } }),
+  }, 'Google Cloud');
+  return Buffer.from(String((await res.json())?.audioContent || ''), 'base64');
+}
+
+/** Voix proposées par un fournisseur à clé (c'est aussi le test de la clé : refusée, la liste échoue). */
+export async function listVoices(provider, { key, fetchImpl = fetch } = {}) {
+  if (provider === 'elevenlabs') {
+    const res = await keyedFetch(fetchImpl, 'https://api.elevenlabs.io/v1/voices', { headers: { 'xi-api-key': key } }, 'ElevenLabs');
+    const sex = { female: 'féminine', male: 'masculine' };
+    return ((await res.json())?.voices || []).filter((x) => VOICE_ID.test(String(x.voice_id))).map((x) => {
+      const l = x.labels || {};
+      const tags = [sex[l.gender] || l.gender, l.accent, l.descriptive || l.description].filter(Boolean).join(', ');
+      return v(x.voice_id, `${x.name}${tags ? ` · ${tags}` : ''}`, 'fr');
+    }).sort((a, b) => a.label.localeCompare(b.label, 'fr'));
+  }
+  if (provider === 'googlecloud') {
+    const out = [];
+    for (const code of ['fr-FR', 'en-US', 'en-GB', 'es-ES', 'de-DE', 'it-IT', 'pt-BR']) {
+      const res = await keyedFetch(fetchImpl, `https://texttospeech.googleapis.com/v1/voices?languageCode=${code}`, { headers: { 'X-Goog-Api-Key': key } }, 'Google Cloud');
+      for (const x of (await res.json())?.voices || []) {
+        const m = /(Chirp3-HD|Chirp-HD|Studio|Neural2)/.exec(x.name || '');
+        if (!m || !VOICE_ID.test(x.name)) continue;
+        out.push({ ...v(x.name, `${x.name.split('-').slice(2).join(' ')} · ${x.ssmlGender === 'FEMALE' ? 'féminine' : x.ssmlGender === 'MALE' ? 'masculine' : 'neutre'}${/Chirp/.test(m[1]) ? ' (très naturelle)' : ''}`, code.slice(0, 2)), rank: /Chirp/.test(m[1]) ? 0 : m[1] === 'Studio' ? 1 : 2 });
+      }
+    }
+    return out.sort((a, b) => a.lang.localeCompare(b.lang) || a.rank - b.rank || a.label.localeCompare(b.label)).map(({ rank, ...x }) => x);
+  }
+  throw new Error('Ce fournisseur n\'a pas de liste de voix');
+}
+
 /** Texte → MP3 (Buffer). Les erreurs réseau remontent avec le nom du service ; jamais de clé ni de texte dans le message. */
-export async function synthesize({ provider, voice, text }, deps = {}) {
-  if (!findVoice(provider, voice)) throw new Error('Voix inconnue');
+export async function synthesize({ provider, voice, text, key = null }, deps = {}) {
+  const p = VOICE_PROVIDERS[provider];
+  if (!p || (p.voices ? !findVoice(provider, voice) : !VOICE_ID.test(String(voice)))) throw new Error('Voix inconnue');
+  if (p.keyed && !key) throw new Error(`Aucune clé API ${p.label.split(' (')[0]} : ajoute-la dans l'onglet Promotion`);
   const clean = String(text ?? '').replace(/\s+/g, ' ').trim();
   if (!clean) throw new Error('Texte vide');
-  const audio = await withTimeout(provider === 'edge' ? edgeSynth(clean, voice, deps) : googleSynth(clean, voice, deps), VOICE.timeoutMs, `Service de voix ${VOICE_PROVIDERS[provider].label}`);
+  const run = provider === 'edge' ? edgeSynth(clean, voice, deps) : provider === 'google' ? googleSynth(clean, voice, deps)
+    : provider === 'elevenlabs' ? elevenSynth(clean, voice, { ...deps, key }) : googleCloudSynth(clean, voice, { ...deps, key });
+  const audio = await withTimeout(run, VOICE.timeoutMs, `Service de voix ${p.label}`);
   if (audio.length < 200) throw new Error('Le service de voix a renvoyé un audio vide');
   return audio;
 }
 
 /** Extrait d'écoute : phrase courte dans la langue de la voix. */
-export const sampleFor = (provider, voice) => synthesize({ provider, voice, text: SAMPLES[findVoice(provider, voice)?.lang] || VOICE.sampleText });
+export const sampleFor = ({ provider, voice, lang, key }, deps) => synthesize({ provider, voice, key, text: SAMPLES[findVoice(provider, voice)?.lang || lang] || VOICE.sampleText }, deps);
 
 // ---------- ffmpeg ----------
 
