@@ -8,6 +8,7 @@
 // demande du recul et du jugement. L'utilisateur peut remplacer le texte pour tous les modèles ou pour une seule gamme.
 import { modelFamily, modelLabel, PROMPT_SCOPES, FAMILY_LABELS } from './models.js';
 import { withSkills, skillsBlock } from './skills.js';
+import { pickStyle, styleBrief, exampleFor } from './promokit.js';
 
 const PROMO_HTML_MAX = 60000;
 const SYSTEM_FR = 'Tu travailles pour un outil interne. Réponds en français. Va droit au but : pas de politesse, pas de récapitulatif, pas de commentaire autour de la réponse demandée.';
@@ -273,27 +274,29 @@ Si la ville ou le secteur sont lisibles sur le site, renvoie-les ; sinon, laisse
   },
   promo: {
     label: 'Vidéo de promotion (design motion)',
-    fixed: "Le contrat technique (document HTML autonome, fonction renderFrame(t), dimensions, durée) est imposé, ainsi que les données du projet et le sujet demandé.",
+    fixed: "Le contrat technique (document HTML autonome, fonction renderFrame(t), dimensions, durée), la direction artistique choisie dans le formulaire (couleurs exactes), la boîte à outils d'animation et la scène de référence sont imposés, ainsi que les données du projet, l'adresse du site et le sujet demandé.",
     vars: ['duree', 'fps', 'format', 'ton'],
     text: `Conçois une vidéo de promotion en design motion de [[duree]] secondes, à [[fps]] images par seconde, au format [[format]]. Ton : [[ton]].
+Le but : une AFFICHE ANIMÉE qu'on a envie de regarder jusqu'au bout et de partager, pas une suite de diapositives. On doit comprendre en quelques secondes ce qu'est le produit, pour qui, et ce qu'il change.
 
 Direction artistique :
-- Un seul message par vidéo, dit en peu de mots. Chaque plan tient quelques secondes et porte une idée : l'accroche (le problème, nommé avec les mots du public), la promesse (ce que le produit change), 2 ou 3 bénéfices concrets, puis un plan final avec le nom du produit et l'appel à l'action.
-- Textes courts : 8 mots au plus par ligne, 2 lignes au plus par plan, corps de texte lisible (jamais sous 5 % de la hauteur de l'image). Contraste fort entre texte et fond.
-- Palette restreinte : 1 fond, 1 couleur de texte, 1 ou 2 couleurs d'accent. Une police système en gras pour les titres. Beaucoup d'espace vide : mieux vaut peu d'éléments, bien placés.
-- Mouvement : chaque entrée et chaque sortie est animée avec une courbe d'accélération douce (ease-out à l'entrée, ease-in à la sortie), jamais un mouvement linéaire. Fais entrer les éléments l'un après l'autre avec un léger décalage (stagger) plutôt que tous ensemble. Amplitudes mesurées : un déplacement de 40 à 120 px, un zoom de 0,9 à 1,05, des fondus. Garde toujours quelque chose qui bouge doucement, jamais d'image figée.
-- Formes et illustrations en SVG ou CSS (cartes, pastilles, courbes, curseurs, interfaces simplifiées, icônes dessinées), pour montrer le produit sans copie d'écran.
-- Rythme : répartis la durée entre les plans, laisse 0,4 à 0,8 s de respiration entre deux idées et garde au moins 1,5 s pour le plan final.
+- Remplis l'image. Les éléments principaux sont GRANDS : la maquette ou l'illustration du produit couvre 40 à 60 % de la largeur en vertical (30 % en paysage) ; les titres sont en gras et font au moins 6 % du petit côté de l'image ; jamais un petit objet perdu au milieu d'un grand vide. La composition est centrée verticalement et occupe toute la hauteur : rien n'est collé en haut.
+- Le fond est toujours vivant : le dégradé de la direction artistique, des halos de couleur qui dérivent, une grille ou des formes qui défilent doucement. Jamais de fond blanc uni.
+- Dynamisme : à chaque instant, quelque chose bouge. Les textes arrivent mot par mot (décalage de 0,15 à 0,25 s), les éléments entrent avec un léger dépassement (overshoot) et sortent en glissant et en se floutant, les cartes flottent doucement, les traits se dessinent, les compteurs et les barres avancent. Un plan dure 4 à 6 secondes et le suivant commence 0,3 à 0,6 s avant la fin du précédent : pas de plan vide entre deux.
+- Montre le produit, ne le décris pas : dessine une maquette d'interface simplifiée (écran de téléphone, carte, liste, tableau de bord, notification) qui illustre les vraies idées du produit, en SVG ou CSS. Chaque bénéfice a SA propre illustration ou icône dessinée, liée à ce qu'il dit. Pas de pictogramme générique sans rapport.
+- Scénario : l'accroche (le problème, nommé avec les mots du public), le produit en action, 2 à 4 bénéfices concrets (un par plan), puis le plan final : le nom du produit en très grand, la promesse en une ligne et, si elle est fournie, l'adresse du site dans une pastille. Le plan final reste à l'écran au moins 2 secondes.
+- Textes : 8 mots au plus par ligne, 3 lignes au plus par plan. Titres en 800 ou 900, texte secondaire en 600, contraste fort avec le fond. Un mot clé par titre peut prendre la couleur d'accent.
+- Palette : exactement celle de la direction artistique donnée plus bas, pas d'autre couleur que des nuances de celles-ci.
 
 Contraintes :
-- N'invente RIEN : aucun chiffre, pourcentage, client, témoignage, prix, récompense ni fonctionnalité qui ne figure pas dans les informations fournies. Pas de promesse de résultat.
+- N'invente RIEN : aucun chiffre, pourcentage, client, témoignage, prix, récompense, fonctionnalité, démonstration ni essai qui ne figure pas dans les informations fournies. Pas de promesse de résultat. Un compteur ne montre que des valeurs fournies.
 - Pas de clignotement rapide : jamais plus de 3 changements brusques de luminosité par seconde.
 - Aucun son, aucune image externe : tout est dessiné dans le document.`,
     byModel: {
-      haiku: `Procède par plans : écris d'abord la liste des plans avec leur début et leur fin en secondes (qui totalisent exactement [[duree]] secondes), puis programme chacun. Pour chaque élément : une position de départ, une position d'arrivée, un début et une fin, et une seule fonction d'accélération réutilisée partout. Reste simple : peu d'éléments, des animations de déplacement, de fondu et de zoom, rien de compliqué.`,
-      sonnet: `Pose une grille et des marges communes à tous les plans, puis fais bouger les éléments d'un plan à l'autre pour que la vidéo se lise comme un seul mouvement continu plutôt que comme une suite de diapositives. Soigne les transitions entre plans : un élément du plan qui finit devient l'entrée du suivant.`,
-      opus: `Cherche la métaphore visuelle qui rend le bénéfice évident en deux secondes (un chaos qui s'ordonne, un chemin qui raccourcit, une tâche qui se coche toute seule) et construis toute la vidéo autour d'elle. Donne du caractère au mouvement : légers dépassements (overshoot) à l'arrivée, ralentis sur les mots clés, synchronisation des éléments sur un même temps fort.`,
-      fable: `Vise la vidéo qu'un studio de motion design livrerait : une idée forte, un rythme musical même sans son, une typographie assumée, aucun détail décoratif gratuit. Chaque seconde doit gagner sa place ; si un plan n'apporte rien, retire-le plutôt que de l'allonger.`,
+      haiku: `Ne réinvente rien : copie la boîte à outils et la structure de la scène de référence ci-dessous, puis change seulement le contenu (textes, maquette, nombre de plans) et recale les instants des plans pour qu'ils totalisent exactement [[duree]] secondes (un plan toutes les 4 à 6 secondes). Chaque élément n'est placé que par put(), à partir de t. Garde le fond vivant et les éléments qui flottent.`,
+      sonnet: `Pars de la scène de référence, garde sa boîte à outils et ses proportions, et écris les plans pour CE produit : une maquette qui montre vraiment son idée, des icônes dessinées pour chaque bénéfice. Soigne les transitions : un élément du plan qui finit devient l'entrée du suivant (la carte qui sort devient la carte qui entre). Les plans occupent toute la durée de [[duree]] secondes.`,
+      opus: `Cherche la métaphore visuelle qui rend le bénéfice évident en deux secondes (un chaos qui s'ordonne, un chemin qui raccourcit, une tâche qui se coche toute seule) et construis la vidéo autour d'elle, avec la boîte à outils de la scène de référence. Donne du caractère au mouvement : dépassements à l'arrivée, ralentis sur les mots clés, éléments calés sur un même temps fort.`,
+      fable: `Vise la vidéo qu'un studio de motion design livrerait : une idée forte, un rythme musical même sans son, une typographie assumée, un plan final mémorable. Chaque seconde gagne sa place ; si un plan n'apporte rien, retire-le plutôt que de l'allonger.`,
     },
   },
   support: {
@@ -631,7 +634,8 @@ Réponds UNIQUEMENT avec : {"post":"..."}`,
  * Vidéo de promotion : Claude répond par UN document HTML. La partie technique (renderFrame, dimensions, durée, interdictions) reste dans le code ;
  * seules les consignes de direction artistique se modifient dans les Réglages. `fix` : message d'erreur du rendu précédent, pour une correction.
  */
-export function promoPrompt({ projectName, profile, target, subject = '', seconds, fps, format, width, height, custom, model = null, fix = null }) {
+export function promoPrompt({ projectName, profile, target, subject = '', style = 'auto', site = '', seconds, fps, format, width, height, custom, model = null, fix = null }) {
+  const st = pickStyle(style, `${projectName}|${subject}`);
   const subjectLine = subject
     ? `Sujet demandé : « ${subject} ». La vidéo parle de ce sujet, en lien avec le produit.`
     : 'Aucun sujet précisé : la vidéo présente le projet (ce qu\'il est, pour qui, ce qu\'il change).';
@@ -647,12 +651,19 @@ ${subjectLine}
 
 ${instructions('promo', custom, { duree: seconds, fps, format: `${format} (${width} × ${height} pixels)`, ton: profile.ton || 'direct et chaleureux' }, model)}
 
+${styleBrief(st)}
+Site du produit : ${site ? `${site} (écris-le tel quel dans la pastille du plan final)` : "(aucun : n'écris aucune adresse de site dans la vidéo)"}
+
+Scène de référence (même structure et mêmes proportions : reprends sa boîte à outils, ses mesures en U = 1 % du petit côté, son fond vivant et ses éléments qui flottent ; remplace tout le contenu par celui du projet, adapte les plans à ${seconds} s et à la maquette qui illustre CE produit) :
+${exampleFor(st)}
+
 Contrat technique (obligatoire, la vidéo est produite à partir de ton document) :
 - Réponds UNIQUEMENT avec UN document HTML complet (<!doctype html> … </html>), sans explication ni bloc de code Markdown.
 - La page fait exactement ${width} × ${height} pixels (body sans marge, overflow: hidden). Durée : ${seconds} s, ${fps} images par seconde.
 - Définis window.renderFrame = function (t) { … } où t est le temps en secondes (0 à ${seconds}). Elle est appelée une fois par image, dans l'ordre, et DOIT placer tous les éléments uniquement à partir de t (position, opacité, taille, texte visible) : fonction pure du temps. N'utilise NI setTimeout, NI setInterval, NI requestAnimationFrame, NI animation ou transition CSS, NI Date, NI Math.random sans graine.
 - Tout est dans le document : CSS et script en ligne, formes en SVG ou CSS, canvas 2D si besoin. Aucune adresse http(s), aucune police ni image externe, pas d'iframe, pas de <link>. Polices : font-family: system-ui, "Helvetica Neue", Arial, sans-serif.
 - Au plus ${PROMO_HTML_MAX} caractères. Le document doit rester sobre : pas de milliers de nœuds.
+- La scène est mesurée avant le rendu et renvoyée si elle est vide, minuscule, collée en haut, sur fond blanc ou figée : l'image est occupée à au moins 30 %, les titres font au moins 6 % du petit côté, la composition est centrée, le fond est un dégradé, et quelque chose bouge à chaque instant.
 ${fix ? `\nTa version précédente a été refusée au rendu : ${String(fix).slice(0, 600)}\nCorrige ce problème précisément et renvoie le document complet corrigé.` : ''}`,
   };
 }
