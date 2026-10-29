@@ -59,6 +59,21 @@ test('contrôle d\'un modèle : erreurs bloquantes et avertissements', () => {
   assert.equal(tidyTemplateText('Bonjour \n, Tony ,\n\n\n\nFin  '), 'Bonjour\nTony,\n\nFin');
 });
 
+test('promesses : le mail ne doit proposer que ce que la fiche du projet dit exister', () => {
+  const facts = JSON.stringify([{ resume: 'Carte de fidélité dématérialisée, dès 19 €/mois, sans engagement', arguments: ['scan du QR code'] }]);
+  const mail = { subject: 'Idée', body: 'Répondez « oui » et je vous envoie une démo gratuite, puis un devis ou un rendez-vous. Sans engagement.' };
+  const w = reviewMail({ ...mail, facts }).warnings;
+  assert.ok(w.some((x) => /une démonstration \(« démo »\)/.test(x)), 'démo non prévue par la fiche');
+  assert.ok(w.some((x) => /essai ou une offre gratuite \(« gratuite »\)/.test(x)));
+  assert.ok(w.some((x) => /un devis/.test(x)));
+  assert.ok(w.some((x) => /un appel ou un rendez-vous/.test(x)));
+  assert.ok(!w.some((x) => /garantie ou une absence d'engagement/.test(x)), 'la fiche dit « sans engagement » : pas d\'alerte');
+  // la fiche parle de démonstration : plus d'alerte pour elle
+  assert.ok(!reviewMail({ ...mail, facts: `${facts} démonstration en ligne` }).warnings.some((x) => /démonstration/.test(x)));
+  // sans fiche fournie, aucune alerte de ce type (aucun faux positif)
+  assert.deepEqual(reviewMail(mail).warnings.filter((x) => /fiche du projet/.test(x)), []);
+});
+
 test('relecture de Claude : retenue seulement si variables, adresses et longueur sont conservées', () => {
   const orig = { subject: 'Idée pour {{entreprise}}', body: 'Bonjour {{entreprise}}, voir https://x.fr maintenant.\n\n{{expediteur}}\nMonEspacePro' };
   const fix = (o = {}) => ({ ...orig, corrections: [], ...o });

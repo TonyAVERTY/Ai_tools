@@ -571,7 +571,7 @@ export function registerRoutes(router, app) {
     if (!body || (kind === 'initial' && !subject)) throw new HttpError(400, kind === 'initial' ? 'Objet et corps requis' : 'Corps requis');
     const status = b.mode === 'validate' ? 'validated' : 'draft';
     // Un modèle cassé (variable inconnue, ligne qui commence par une virgule…) ne peut pas être validé, donc pas envoyé
-    const check = reviewMail({ subject: [subject, subjectB].filter(Boolean).join('\n'), body });
+    const check = reviewMail({ subject: [subject, subjectB].filter(Boolean).join('\n'), body, facts: JSON.stringify([p.profile, p.target]) });
     if (status === 'validated' && check.errors.length) throw new HttpError(400, `Modèle à corriger avant validation : ${check.errors.join(' ')}`, { expose: true });
     await saveTemplate(db, p.id, kind, { subject, subjectB, body, status, html: asBool(b.html) });
     json(res, { ok: true, status, warnings: check.warnings });
