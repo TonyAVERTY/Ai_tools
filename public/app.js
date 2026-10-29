@@ -1588,7 +1588,7 @@
         case 'template': {
           data.kind = form.dataset.kind;
           const r = await api(`/api/projects/${id}/template/save`, data);
-          toast(r.status === 'validated' ? 'Modèle validé' : 'Brouillon enregistré');
+          toast(`${r.status === 'validated' ? 'Modèle validé' : 'Brouillon enregistré'}${r.warnings?.length ? ` · À vérifier : ${r.warnings.slice(0, 2).join(' ')}` : ''}`, r.warnings?.length ? 'error' : 'ok');
           break;
         }
         case 'send': {
