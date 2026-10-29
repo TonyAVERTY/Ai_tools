@@ -3,7 +3,7 @@ import { now, getSetting, setSetting } from './db.js';
 import { readdirSync } from 'node:fs';
 import { runClaude, extractJson, rateLimitWindows } from './services/claude.js';
 import { tidyTemplateText, acceptReview } from './services/mailcheck.js';
-import { addUsage } from './services/jobs.js';
+import { addUsage, jobContext } from './services/jobs.js';
 import { syncRepo } from './services/git.js';
 import { normalizeModel } from './services/models.js';
 import { analyzePrompt, prospectPrompt, templatePrompt, reviewMailPrompt, followupTemplatePrompt, evolutionPrompt, linkedinPostPrompt, hookPrompt, auditPrompt, promoPrompt, rolePrompt, parseCustomPrompts, LEVELS } from './services/prompts.js';
@@ -129,6 +129,8 @@ export function makeClaude(app) {
   const { db, cfg } = app;
   return async (userId, o) => {
     const cred = await resolveCredentials(app, userId); // refuse sans liaison valide (dernier garde-fou)
+    const jc = jobContext.getStore();
+    if (jc && o.model) jc.model = o.model; // le job sait quel modèle sert vraiment
     // Profil de l'utilisateur (secteur, métier…) : une donnée de plus dans les consignes système, sauf pour le Support (qui répond d'après la documentation)
     const system = o.noProfile ? o.system : `${o.system ?? ''}${profileBlock(await getProfile(db, userId))}` || undefined;
     // Accès refusé par Claude (jeton expiré, clé révoquée) : la liaison devient invalide et l'interface demande de se reconnecter
