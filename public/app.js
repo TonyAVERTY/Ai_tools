@@ -1303,6 +1303,7 @@
           <label class="field"><span class="lbl">Durée (secondes)</span><input name="seconds" type="number" inputmode="numeric" min="${L.seconds.min}" max="${L.seconds.max}" value="${L.seconds.def}" required></label>
           <label class="field"><span class="lbl">Format</span><span class="sel"><select name="format">${s.formats.map((f) => `<option value="${esc(f.id)}">${esc(f.label)}</option>`).join('')}</select>${icon('down')}</span></label>
         </div>
+        <label class="field"><span class="lbl">Style</span><span class="sel"><select name="style">${s.styles.map((f) => `<option value="${esc(f.id)}">${esc(f.label)}</option>`).join('')}</select>${icon('down')}</span></label>
         <p class="hint" data-promo-count></p>
         <div class="row"><button class="btn primary" data-promo-go>${icon('film')}Générer la vidéo</button></div>
       </form>
@@ -1333,7 +1334,7 @@
     const btn = $('[data-promo-go]', f);
     btn.disabled = true;
     try {
-      const r = await api(`/api/projects/${proj.dataset.id}/promo/generate`, { subject: f.subject.value, fps: Number(f.fps.value), seconds: Number(f.seconds.value), format: f.format.value });
+      const r = await api(`/api/projects/${proj.dataset.id}/promo/generate`, { subject: f.subject.value, fps: Number(f.fps.value), seconds: Number(f.seconds.value), format: f.format.value, style: f.style.value });
       toast(r.budgetBlocked ? `En file, mais ${r.budgetBlocked}` : r.existing ? 'Une vidéo est déjà en cours de production' : 'Claude conçoit la vidéo…', r.budgetBlocked ? 'error' : 'ok');
       refreshProject(proj);
     } catch (err) { toast(err.message, 'error'); }

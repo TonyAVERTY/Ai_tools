@@ -1,17 +1,20 @@
 ---
 nom: video-promo-motion
-titre: Vidéo de promotion en motion design
-resume: Scénario, rythme, lisibilité et contraintes techniques d'une courte vidéo générée en HTML animé.
+titre: Vidéo de promotion : mouvement et technique
+resume: Comment une scène HTML animée par renderFrame(t) bouge bien : temps, courbes, décalages, mouvement continu, transitions et contraintes techniques.
 taches: promo
 ---
-Une vidéo de promotion courte raconte une seule chose : le problème, puis ce que le produit change.
+Une vidéo de promotion est une affiche animée : tout est une fonction du temps `t`, jamais de l'horloge réelle.
 
-Scénario (adapte au temps disponible) :
-- Premières secondes : le problème ou la promesse, en une phrase lisible tout de suite.
-- Milieu : 2 à 3 scènes qui montrent le produit en action avec des formes simples (cartes, lignes, compteurs).
-- Fin : le nom du produit et une action claire, tenue assez longtemps pour être lue.
+Technique (obligatoire) :
+- Un seul document HTML autonome ; `window.renderFrame(t)` place TOUS les éléments à partir de `t` (position, taille, opacité, texte visible). Aucune ressource externe, aucun hasard non déterministe, aucune dépendance à la vitesse de la machine.
+- Mesure en U = 1 % du petit côté de l'image : les tailles se règlent en U, la scène tient alors en vertical, en paysage et en carré.
+- Place chaque élément par transformation (translate, scale, rotate) et opacité ; mesure sa taille une fois, à la création (un élément masqué n'a plus de taille).
 
-Lisibilité : un texte par scène, 8 mots environ, corps de texte grand (lisible sur un téléphone), fort contraste, rien qui bouge pendant qu'on lit. Une seule famille de polices système, deux couleurs maximum plus le fond.
-Rythme : chaque scène dure assez pour être lue (compte une seconde de plus que la lecture à voix haute). Les transitions sont simples (fondu, glissement) et cohérentes.
-Technique : tout est dans un seul document HTML, l'animation dépend uniquement du temps `t` passé à `renderFrame(t)` ; pas de ressource externe, pas de hasard non déterministe, pas de dépendance à l'horloge réelle.
-N'invente aucune statistique, aucun client et aucun logo.
+Mouvement qui donne de la vie :
+- Courbes : ease-out à l'entrée, ease-in-out aux transitions, léger dépassement (overshoot, back) pour les éléments qui « atterrissent », expo pour les grandes entrées. Jamais de mouvement linéaire.
+- Décalage (stagger) : les éléments d'un groupe entrent l'un après l'autre (0,15 à 0,25 s), les mots d'un titre aussi.
+- Mouvement continu : le fond respire (halos qui dérivent, grille qui défile), les cartes flottent de quelques pixels, les compteurs et les barres avancent, les traits se dessinent (stroke-dashoffset). Il n'y a jamais d'image immobile plus de deux secondes.
+- Transitions : le plan suivant commence 0,3 à 0,6 s avant la fin du précédent ; un élément qui sort glisse et se floute, un élément qui entre arrive de la direction opposée. Une transition réutilise un objet (la carte qui sort devient la carte qui entre) plutôt que de couper.
+- Rythme : un plan dure 4 à 6 s ; une idée par plan ; le plan final reste au moins 2 s.
+Pas de clignotement : jamais plus de 3 changements brusques de luminosité par seconde.

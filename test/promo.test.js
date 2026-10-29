@@ -165,7 +165,9 @@ test('prompt modifiable dans les Réglages : le texte de l\'utilisateur remplace
     assert.equal(job.status, 'done', job.error);
     const p = calls().slice(n0)[0].prompt;
     assert.match(p, /Fais une vidéo TRÈS sobre : fond blanc, un seul mot par plan, 5 s\./);
-    assert.doesNotMatch(p, /Direction artistique/);
+    assert.doesNotMatch(p, /Direction artistique :\n- Remplis l'image/, 'le texte de l\'utilisateur remplace les règles par défaut');
+    assert.match(p, /Direction artistique imposée : « [^»]+ »[\s\S]*Couleurs exactes : fond en dégradé #[0-9a-f]{6} → #[0-9a-f]{6}/, 'la direction artistique choisie reste imposée');
+    assert.match(p, /Scène de référence[\s\S]*window\.renderFrame=function\(t\)/, 'la scène de référence reste fournie');
     assert.match(p, /Contrat technique \(obligatoire[\s\S]*720 × 1280 pixels[\s\S]*window\.renderFrame/);
     assert.deepEqual([fake[0].fps, fake[0].seconds, fake[0].width, fake[0].height], [12, 5, 720, 1280], 'rendu demandé avec les réglages choisis');
   } finally { delete s.app.promoSupported; delete s.app.renderPromo; }
