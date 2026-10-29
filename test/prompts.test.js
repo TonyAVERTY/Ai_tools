@@ -14,7 +14,7 @@ const profile = { resume: 'Un outil', proposition_valeur: 'Gagner du temps', arg
 const target = { description: 'TPE', decideur: 'gérant', secteurs: ['a'], zone: 'FR', taille: 'TPE', requetes: ['q'] };
 
 test('sans réglage : consignes poussées, avec leur format de réponse imposé', () => {
-  assert.match(templatePrompt({ profile, target, senderName: 'Tony' }).prompt, /Expéditeur : Tony[\s\S]*120 mots maximum[\s\S]*Objet : 4 à 7 mots[\s\S]*Réponds UNIQUEMENT avec : \{"subject"/);
+  assert.match(templatePrompt({ profile, target, senderName: 'Tony' }).prompt, /Expéditeur : Tony[\s\S]*180 mots maximum[\s\S]*Présentation du produit[\s\S]*Objet : 4 à 7 mots[\s\S]*Réponds UNIQUEMENT avec : \{"subject"/);
   assert.match(followupTemplatePrompt({ profile, senderName: 'Tony' }).prompt, /RELANCE[\s\S]*culpabilisation[\s\S]*Réponds UNIQUEMENT avec : \{"body"/);
   assert.match(linkedinPostPrompt({ profile, target, author: 'Tony' }).prompt, /publié par Tony[\s\S]*Ligne 1 : l'accroche[\s\S]*\{"post"/);
   assert.match(evolutionPrompt({ projectName: 'P', profile, count: 4, level: 'rapide' }).prompt, /Propose 4 évolutions[\s\S]*8 fichiers[\s\S]*bénéfice utilisateur divisé par l'effort[\s\S]*Format Markdown/);
@@ -31,13 +31,13 @@ test('sans réglage : consignes poussées, avec leur format de réponse imposé'
 
 test('par modèle : chaque gamme reçoit son complément ; sans modèle, le texte commun seul', () => {
   const t = (model) => templatePrompt({ profile, target, senderName: 'Tony', model }).prompt;
-  assert.match(t('haiku'), /Reste sous 100 mots/);
-  assert.match(t('claude-haiku-4-5'), /Reste sous 100 mots/, 'un modèle précis suit sa gamme');
+  assert.match(t('haiku'), /Reste sous 150 mots/);
+  assert.match(t('claude-haiku-4-5'), /Reste sous 150 mots/, 'un modèle précis suit sa gamme');
   assert.match(t('sonnet'), /Adapte le registre au décideur/);
   assert.match(t('claude-opus-5-5'), /décideur sceptique/);
   assert.match(t('claude-fable-5-1'), /excellent commercial/);
-  assert.doesNotMatch(t('opus'), /Reste sous 100 mots/);
-  assert.doesNotMatch(t(null), /Reste sous 100 mots|décideur sceptique|excellent commercial|Adapte le registre/);
+  assert.doesNotMatch(t('opus'), /Reste sous 150 mots/);
+  assert.doesNotMatch(t(null), /Reste sous 150 mots|décideur sceptique|excellent commercial|Adapte le registre/);
   // évolution et audit : le modèle vient du niveau choisi quand on ne le donne pas
   assert.match(evolutionPrompt({ projectName: 'P', profile, count: 3, level: 'rapide' }).prompt, /nomme d'abord le fichier/);
   assert.match(evolutionPrompt({ projectName: 'P', profile, count: 3, level: 'approfondi' }).prompt, /gains rapides des paris structurants/);
@@ -54,7 +54,7 @@ test('consignes modifiées : « tous les modèles » ou une gamme ; la gamme pri
   };
   const t = (model) => templatePrompt({ profile, target, senderName: 'Tony', custom, model }).prompt;
   assert.match(t('haiku'), /Écris un mail très court pour Tony, ton direct\. Jamais de tutoiement\./);
-  assert.doesNotMatch(t('haiku'), /120 mots max/);
+  assert.doesNotMatch(t('haiku'), /180 mots max/);
   assert.match(t('claude-opus-4-8'), /Version Opus pour Tony\./, 'la gamme prime');
   assert.doesNotMatch(t('opus'), /Jamais de tutoiement/);
   assert.match(t('sonnet'), /Jamais de tutoiement/, 'les autres gammes héritent de « tous les modèles »');

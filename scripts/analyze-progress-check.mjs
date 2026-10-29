@@ -51,6 +51,26 @@ await p2.evaluate(() => { document.querySelector('details.project').open = true;
 await p2.waitForTimeout(1500);
 ok(/en échec/.test(await p2.locator('[data-job="analyze"]').first().innerText()), 'analyse en échec : message affiché dans l\'en-tête');
 ok(errs2.length === 0, `analyse en échec : aucune erreur JS ${errs2.join(' | ')}`);
+
+// Recherche de prospects en cours : l'activité de Claude et les derniers prospects trouvés s'affichent en direct
+const u3 = await s.newUser();
+const pid3 = await addProject(s.db, u3.userId ?? u3.id, { name: 'Live' });
+await s.db.prepare('UPDATE projects SET profile_json = ?, target_json = ?, target_validated = 1 WHERE id = ?')
+  .run(JSON.stringify({ resume: 'x' }), JSON.stringify({ description: 'd', secteurs: ['s'] }), pid3);
+await s.db.prepare('INSERT INTO jobs(user_id, project_id, type, status, progress_json, created_at, started_at) VALUES(?, ?, ?, ?, ?, ?, ?)')
+  .run(u3.userId ?? u3.id, pid3, 'prospect', 'running', JSON.stringify({ found: 2, target: 10, message: 'Recherche web : « boulangerie Rennes »', pct: 20, recent: [{ company: 'Le Fournil', city: 'Rennes' }, { company: 'Pain Doré', city: '' }] }), now(), now());
+const ctx3 = await b.newContext({ viewport: { width: 1280, height: 900 } });
+const [n3, v3] = u3.cookie.split('=');
+await ctx3.addCookies([{ name: n3, value: v3, url: s.base }]);
+const p3 = await ctx3.newPage();
+const errs3 = [];
+p3.on('pageerror', (e) => errs3.push(e.message));
+await p3.goto(`${s.base}/`);
+await p3.evaluate(() => { const d = document.querySelector('details.project'); d.open = true; document.querySelectorAll('details.project details').forEach((x) => { x.open = true; }); });
+await p3.waitForTimeout(2500);
+const live = await p3.locator('[data-job="prospect"]').first().innerText();
+ok(/Recherche web : « boulangerie Rennes »/.test(live) && /Le Fournil/.test(live) && /Pain Doré/.test(live) && /2\s+prospect/.test(live), 'recherche : activité de Claude et prospects trouvés en direct');
+ok(errs3.length === 0, `recherche : aucune erreur JS ${errs3.join(' | ')}`);
 await b.close();
 await s.close();
 console.log(bad ? `${bad} ÉCHEC(S)` : 'TOUT EST BON');
