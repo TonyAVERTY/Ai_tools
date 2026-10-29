@@ -87,7 +87,16 @@ function systemSmtpConfig() {
   const set = keys.filter((k) => env[k]);
   if (!set.length) return null;
   if (set.length < keys.length) throw new Error(`SMTP du serveur : variables incomplètes (manque ${keys.filter((k) => !env[k]).join(', ')})`);
-  return { host: env.SYSTEM_SMTP_HOST, port: Number(env.SYSTEM_SMTP_PORT || 587), user: env.SYSTEM_SMTP_USER, pass: env.SYSTEM_SMTP_PASSWORD, fromEmail: env.SYSTEM_SMTP_FROM };
+  return {
+    host: env.SYSTEM_SMTP_HOST, port: Number(env.SYSTEM_SMTP_PORT || 587), user: env.SYSTEM_SMTP_USER, pass: env.SYSTEM_SMTP_PASSWORD, fromEmail: env.SYSTEM_SMTP_FROM,
+    ...(env.SYSTEM_SMTP_REPLY_TO ? { replyTo: env.SYSTEM_SMTP_REPLY_TO } : {}), // les réponses aux mails d'AiTools arrivent sur l'adresse de contact
+  };
+}
+
+// Boîte dédiée aux alertes d'erreur (même serveur et même mot de passe que l'expéditeur principal, autre identifiant). Facultative.
+function errorSmtpConfig(base) {
+  if (!base || !env.SYSTEM_SMTP_ERROR_USER) return null;
+  return { ...base, user: env.SYSTEM_SMTP_ERROR_USER, fromEmail: env.SYSTEM_SMTP_ERROR_USER };
 }
 
 function inactiveMonths() {
@@ -120,6 +129,7 @@ export function loadConfig() {
   if (!/^[0-9a-f]{64}$/i.test(secretKey)) {
     throw new Error('SECRET_KEY doit faire 32 octets en hexadécimal (64 caractères)');
   }
+  const systemSmtp = systemSmtpConfig();
   return {
     appUrl: required('APP_URL').replace(/\/$/, ''),
     port: Number(env.PORT || 3100),
@@ -131,7 +141,8 @@ export function loadConfig() {
     apple: appleConfig(),
     recaptcha: recaptchaConfig(),
     linkedin: linkedinConfig(required('APP_URL').replace(/\/$/, '')),
-    systemSmtp: systemSmtpConfig(),
+    systemSmtp,
+    errorSmtp: errorSmtpConfig(systemSmtp),
     inactiveMonths: inactiveMonths(),
     production: env.NODE_ENV === 'production',
     // Développement : autorise les hôtes privés (SMTP local, etc.). En production, seulement pour les administrateurs.

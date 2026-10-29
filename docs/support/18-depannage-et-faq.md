@@ -125,3 +125,5 @@ Les fiches de méthode (voir « Savoir-faire de Claude dans AiTools ») sont des
 - **« L'adresse e-mail n'est pas valide. » / « Le SIRET compte 14 chiffres. »** : corrige le champ, ou laisse-le vide.
 - **J'ai retiré un client par erreur** : ajoute-le de nouveau (**Ajouter un client**). Ses documents n'ont pas été supprimés : ils sont dans « Facturation » (et dans la Comptabilité s'ils y avaient été joints).
 
+## Les mails d'iaboss (invitations, rapports, alertes) : de quelle adresse partent-ils ?
+Ils partent de l'adresse d'envoi du serveur (noreply@iaboss.fr). Si tu réponds à l'un d'eux, ta réponse arrive sur l'adresse de contact (contact@iaboss.fr). Les alertes d'erreur envoyées aux administrateurs partent de la boîte dédiée (erreur@iaboss.fr). Les trois boîtes partagent le même mot de passe, réglé par l'administrateur du serveur : tu n'as rien à configurer dans l'application. Les mails de prospection, eux, partent toujours du SMTP du projet.

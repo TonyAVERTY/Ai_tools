@@ -17,7 +17,7 @@ export function createTransport(smtp) {
     pool: false,
     // Hôte épinglé sur l'IP vérifiée (netguard.js) : le nom reste utilisé pour SNI et la vérification du certificat
     ...(smtp.servername ? { servername: smtp.servername, tls: { servername: smtp.servername } } : {}),
-  });
+  }, smtp.replyTo ? { replyTo: smtp.replyTo } : undefined);
 }
 
 export function fillTemplate(text, vars) {
