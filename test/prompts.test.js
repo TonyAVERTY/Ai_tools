@@ -29,6 +29,14 @@ test('sans réglage : consignes poussées, avec leur format de réponse imposé'
   }
 });
 
+test('vérité : le premier mail ne propose que ce que la fiche dit exister (pas de démonstration inventée)', () => {
+  const p = templatePrompt({ profile, target, senderName: 'Tony' }).prompt;
+  assert.match(p, /ne propose QUE ce qui existe[\s\S]*démonstration, un essai, un devis, un appel ou un rendez-vous seulement si la fiche dit qu'ils existent/);
+  assert.match(p, /Vérité : tout ce que tu écris[\s\S]*Ce que la fiche ne dit pas n'existe pas/);
+  assert.doesNotMatch(p, /pour recevoir une démonstration|je vous envoie \[la suite\]/);
+  assert.doesNotMatch(templatePrompt({ profile, target, senderName: 'Tony', model: 'haiku' }).prompt, /je vous envoie \[la suite\]/, 'le modèle de structure de Haiku ne promet rien non plus');
+});
+
 test('site du produit : le prompt demande {{site}} (jamais l\'adresse en clair) ; sans site, aucune adresse', () => {
   const withSite = templatePrompt({ profile, target, senderName: 'Tony', site: 'https://monproduit.fr' }).prompt;
   assert.match(withSite, /Site du produit : https:\/\/monproduit\.fr \(mets \{\{site\}\} dans le mail, pas l'adresse\)/);

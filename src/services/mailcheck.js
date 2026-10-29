@@ -35,8 +35,21 @@ export function tidyTemplateText(text) {
   return String(text ?? '').split('\n').map((l) => l.replace(/^[ \t]*[,;]+[ \t]*/, '').replace(/[ \t]+,/g, ',').replace(/[ \t]+$/g, '')).join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
-/** Contrôle d'un modèle : `errors` bloquent la validation, `warnings` informent (aperçu). */
-export function reviewMail({ subject = '', body = '' } = {}) {
+// Promesses qu'un mail commercial fait souvent sans que le produit les tienne : signalées quand la fiche du projet n'en parle pas.
+const PROMISES = [
+  [/\bd[ée]mo(nstrations?)?\b/i, 'une démonstration'],
+  [/\bessais?\b|\bgratuit(e|s|ement)?\b/i, 'un essai ou une offre gratuite'],
+  [/rendez-vous|\brdv\b|\bvisio\b|\bappel\b|vous appeler|je vous rappelle/i, 'un appel ou un rendez-vous'],
+  [/\bdevis\b/i, 'un devis'],
+  [/brochure|catalogue|livre blanc/i, 'un document à envoyer'],
+  [/garanti|remboursé|sans engagement/i, 'une garantie ou une absence d\'engagement'],
+];
+
+/**
+ * Contrôle d'un modèle : `errors` bloquent la validation, `warnings` informent (aperçu).
+ * `facts` : texte de la fiche du projet ; une promesse du mail dont la fiche ne parle pas est signalée (le mail ne doit proposer que ce qui existe).
+ */
+export function reviewMail({ subject = '', body = '', facts = '' } = {}) {
   const errors = [];
   const warnings = [];
   for (const k of new Set([...countVars(`${subject}\n${body}`).keys()])) if (!KNOWN_VARS.includes(k)) errors.push(`La variable {{${k}}} n'existe pas (variables : ${KNOWN_VARS.map((v) => `{{${v}}}`).join(' ')}).`);
@@ -46,6 +59,12 @@ export function reviewMail({ subject = '', body = '' } = {}) {
   if (/\{\{[^}]*$|^[^{]*\}\}/m.test(body) || /\[\[|\]\]/.test(body)) errors.push('Une variable est mal fermée ou un crochet [[ ]] est resté dans le texte.');
   if (/\s{2,}[,.;]|,,|\.\.(?!\.)|!!/.test(body)) warnings.push('Ponctuation à revoir : virgules ou points doublés, espace avant une virgule.');
   if (lines.some((l) => /\{\{expediteur\}\}[ \t]*,/.test(l))) warnings.push("La signature « {{expediteur}}, … » sera incomplète si le nom d'expéditeur n'est pas réglé : mets le nom du produit sur une autre ligne.");
+  if (facts) {
+    for (const [re, label] of PROMISES) {
+      const hit = re.exec(`${subject}\n${body}`);
+      if (hit && !re.test(facts)) warnings.push(`Le mail parle de ${label} (« ${hit[0]} ») alors que la fiche du projet n'en parle pas : retire-le si ce n'est pas disponible.`);
+    }
+  }
   const n = words(body);
   if (n > 220) warnings.push(`Le mail fait ${n} mots : au-delà de 200 mots, la réponse devient plus rare.`);
   if (SPAM_WORDS.test(subject)) warnings.push("L'objet contient un mot que les filtres anti-spam repèrent (gratuit, offre, urgent, promo, garanti).");
