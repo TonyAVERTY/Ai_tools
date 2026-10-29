@@ -1,12 +1,13 @@
 // Handlers des jobs en arrière-plan.
 import { now, getSetting, setSetting } from './db.js';
-import { readdirSync } from 'node:fs';
+import { readdirSync, statSync } from 'node:fs';
 import { runClaude, extractJson, rateLimitWindows } from './services/claude.js';
 import { tidyTemplateText, acceptReview } from './services/mailcheck.js';
 import { addUsage, jobContext } from './services/jobs.js';
 import { syncRepo } from './services/git.js';
 import { normalizeModel } from './services/models.js';
 import { analyzePrompt, prospectPrompt, templatePrompt, reviewMailPrompt, followupTemplatePrompt, evolutionPrompt, linkedinPostPrompt, hookPrompt, auditPrompt, promoPrompt, rolePrompt, parseCustomPrompts, LEVELS } from './services/prompts.js';
+import { parseVoiceParams, extractVoiceScript, prepareVoice, cleanVoice, mixVoice, synthesize, langName } from './services/voiceover.js';
 import { PROMO, FORMATS, SceneError, parsePromoParams, extractScene, promoSupported, renderPromo } from './services/promovideo.js';
 import { reserveVideo, finishVideo, removeVideo, countVideos } from './promo.js';
 import { linkedinAccount, saveDraft, recentDrafts } from './linkedin.js';
@@ -603,6 +604,9 @@ export function makeHandlers(app) {
       if (!sup.ok) throw new Error(sup.reason);
       const params = parsePromoParams(ctx.params);
       if (params.error) throw new Error(params.error);
+      const vp = parseVoiceParams(ctx.params);
+      if (vp.error) throw new Error(vp.error);
+      const voice = vp.voice;
       if ((await countVideos(db, userId)) >= PROMO.maxVideos) throw new Error(`Tu as déjà ${PROMO.maxVideos} vidéos : supprime-en une avant d'en produire une autre.`);
       const fmt = FORMATS[params.format];
       const model = await writeModel(userId, await modelOf(userId, 'analyze_model'));
@@ -615,26 +619,51 @@ export function makeHandlers(app) {
           const { prompt, system } = promoPrompt({
             projectName: project.name, profile: project.profile, target: project.target || {}, subject: params.subject, style: params.style, site: project.siteUrl,
             seconds: params.seconds, fps: params.fps, format: params.format, width: fmt.width, height: fmt.height, custom: await custom(userId), model, fix,
+            voice: voice && { ...voice, langName: langName(voice.lang) },
           });
           const r = await creeping(ctx, attempt === 1 ? (params.subject ? 'Claude conçoit la vidéo sur ton sujet…' : 'Claude conçoit la vidéo de présentation du projet…') : 'Claude corrige la scène…', attempt === 1 ? 8 : 40, () => claude(userId, { prompt, system, model, maxTurns: 1, tools: [], signal: ctx.signal }), { to: 44 });
           addUsage(ctx, r);
           if (!r.ok) throw new Error(`La vidéo n'a pas pu être conçue (${r.subtype})${r.text ? ` : ${String(r.text).replace(/\s+/g, ' ').trim().slice(0, 200)}` : ''}`);
+          let prepared = null;
           try {
+            const html = extractScene(r.text);
+            let notes = [];
+            if (voice) {
+              // La voix est préparée AVANT le rendu : un service de voix en panne ou un script trop long ne coûte pas les images
+              await ctx.progress({ message: 'Voix : lecture des phrases…', pct: 44 });
+              prepared = await (app.prepareVoice || prepareVoice)({
+                cfg, segments: extractVoiceScript(html, params.seconds), voice, seconds: params.seconds, synth: app.synthVoice || synthesize, signal: ctx.signal,
+                onProgress: ({ done, total }) => sink.push(() => ctx.progress({ message: `Voix : phrase ${Math.min(done + 1, total)}/${total}`, pct: 44 })),
+              });
+              await sink.flush();
+              if (prepared.overflow > 0.5) {
+                const msg = `La voix dure ${prepared.overflow.toFixed(1)} s de plus que la vidéo (${params.seconds} s) : raccourcis les phrases ou avance leurs instants "t".`;
+                if (attempt === 1) throw new SceneError(msg);
+                notes.push(`Voix coupée en fin de vidéo : ${msg}`);
+              }
+            }
             const out = await (app.renderPromo || renderPromo)({
-              cfg, html: extractScene(r.text), fps: params.fps, seconds: params.seconds, width: fmt.width, height: fmt.height, out: video.path, signal: ctx.signal,
+              cfg, html, fps: params.fps, seconds: params.seconds, width: fmt.width, height: fmt.height, out: video.path, signal: ctx.signal,
               // Première version : refusée si elle est vide, minuscule, figée ou sur fond blanc ; seconde : rendue quand même, avec les constats gardés
               quality: cfg.promoQuality === false ? 'off' : attempt === 1 ? 'strict' : 'warn',
               onProgress: ({ done, total }) => sink.push(() => ctx.progress({ message: `Rendu de la vidéo : image ${done}/${total}`, pct: 45 + Math.round((done / total) * 53) })),
             });
             await sink.flush();
-            await finishVideo(db, video.id, out.bytes);
-            return { ok: true, videoId: video.id, frames: out.frames, attempts: attempt, ...(out.notes?.length ? { notes: out.notes } : {}) };
+            let bytes = out.bytes;
+            if (prepared) {
+              await ctx.progress({ message: 'Ajout de la voix à la vidéo…', pct: 99 });
+              await (app.mixVoice || mixVoice)({ cfg, videoPath: video.path, placed: prepared.placed, seconds: params.seconds, signal: ctx.signal });
+              bytes = statSync(video.path).size;
+            }
+            await finishVideo(db, video.id, bytes);
+            notes = [...notes, ...(out.notes || [])];
+            return { ok: true, videoId: video.id, frames: out.frames, attempts: attempt, ...(voice ? { voice: voice.voice } : {}), ...(notes.length ? { notes } : {}) };
           } catch (e) {
             await sink.flush().catch(() => {});
             if (!(e instanceof SceneError)) throw e;
             if (attempt >= 2) throw new Error(`La scène écrite par Claude ne passe pas au rendu : ${e.message}`);
             fix = e.message;
-          }
+          } finally { cleanVoice(prepared); }
         }
       } catch (e) {
         await removeVideo(app, { id: video.id, user_id: userId });
