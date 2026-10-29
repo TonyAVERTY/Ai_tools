@@ -24,7 +24,8 @@ function acc(key, icon, title, sub, body, { open = false, cls = '' } = {}) {
 </details>`;
 }
 
-const NAV = [['/', 'folder', 'Projets'], ['/mails', 'mail', 'Mails'], ['/calendar', 'clock', 'Calendrier'], ['/compta', 'wallet', 'Comptabilité'], ['/facturation', 'receipt', 'Facturation'], ['/clients', 'user', 'Clients'], ['/team', 'users', 'Équipe']];
+/** Entrées de la barre du haut : chacune doit avoir son étape dans la visite guidée (test/tour.test.js). */
+export const NAV = [['/', 'folder', 'Projets'], ['/mails', 'mail', 'Mails'], ['/calendar', 'clock', 'Calendrier'], ['/compta', 'wallet', 'Comptabilité'], ['/facturation', 'receipt', 'Facturation'], ['/clients', 'user', 'Clients'], ['/team', 'users', 'Équipe']];
 
 export function layout({ title, body, email, scripts = [] }) {
   return `<!doctype html>
