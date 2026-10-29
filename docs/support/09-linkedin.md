@@ -27,3 +27,8 @@ Le post suit une structure : accroche seule sur sa ligne, courts paragraphes, qu
 - Le bouton Publier est grisé : aucune page choisie alors que le compte ne peut pas publier sur le profil.
 - « Connexion expirée » : cliquer **Reconnecter**.
 - Un membre ne voit pas Connecter / Publier : réservé aux administrateurs du projet.
+- « LinkedIn refuse un des droits demandés » : l'application LinkedIn de l'administrateur n'a pas les produits nécessaires. Sur developer.linkedin.com → l'application → onglet **Produits**, ajouter « Sign In with LinkedIn using OpenID Connect » et « Share on LinkedIn » (ou « Community Management API »), attendre leur approbation, puis recommencer la connexion.
+- « LinkedIn refuse l'adresse de retour » : dans l'onglet **Auth** de l'application LinkedIn, ajouter exactement l'adresse affichée dans le message (la valeur de `LINKEDIN_REDIRECT_URI`, par défaut l'adresse du site suivie de `/linkedin/callback`) dans « URL de redirection autorisées ».
+- « LinkedIn ne reconnaît pas l'application » : `LINKEDIN_CLIENT_ID` ou `LINKEDIN_CLIENT_SECRET` est faux dans la configuration du serveur (à corriger par l'administrateur).
+- « LinkedIn a refusé la connexion (code : explication) » : le code donné par LinkedIn est écrit dans le message ; l'administrateur le retrouve aussi dans les journaux du serveur (`[linkedin] connexion refusée par LinkedIn`).
+
