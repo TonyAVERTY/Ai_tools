@@ -35,6 +35,16 @@ test('le mail construit pour l\'envoi n\'a plus de ligne cassée (capture : sign
   assert.match(mail.text, /\nMonEspacePro$/);
 });
 
+test('relecture avec objet B : l\'objet B ne peut ni apparaître, ni disparaître, ni changer de variables', () => {
+  const orig = { subject: 'Idée pour {{entreprise}}', subjectB: 'Carte pour {{entreprise}} ?', body: 'Bonjour {{entreprise}}.\n\n{{expediteur}}\nMonEspacePro' };
+  const fixed = { subject: orig.subject, subject_b: 'Une carte pour {{entreprise}} ?', body: orig.body };
+  assert.equal(acceptReview(orig, fixed), true);
+  assert.equal(acceptReview(orig, { ...fixed, subject_b: 'Une carte ?' }), false, 'variable perdue dans l\'objet B');
+  assert.equal(acceptReview(orig, { ...fixed, subject_b: '' }), false, 'objet B disparu');
+  assert.equal(acceptReview({ ...orig, subjectB: '' }, fixed), false, 'objet B apparu');
+  assert.equal(acceptReview({ ...orig, subjectB: '' }, { subject: orig.subject, body: orig.body }), true);
+});
+
 test('contrôle d\'un modèle : erreurs bloquantes et avertissements', () => {
   assert.deepEqual(reviewMail({ subject: 'Idée', body: 'Bonjour {{entreprise}}.\n\n{{expediteur}}\nMonEspacePro' }), { errors: [], warnings: [] });
   const bad = reviewMail({ subject: 'Offre gratuite {{nom}}', body: 'Bonjour.\n, MonEspacePro\n{{site' });
@@ -78,6 +88,24 @@ test('modèle généré : relu par Claude avant enregistrement, corrections affi
   assert.equal(job.result.reviewed, true);
   assert.deepEqual(job.result.corrections, ['signature sans virgule']);
   assert.match((await getTemplate(s.db, pid, 'initial')).body, /\{\{expediteur\}\}$/);
+  // objet B généré aussi (test A/B) : différent de l'objet A, conservé par la relecture
+  const t = await getTemplate(s.db, pid, 'initial');
+  assert.equal(t.subject, 'Idée pour {{entreprise}}');
+  assert.equal(t.subject_b, 'Une carte de fidélité pour {{entreprise}} ?');
+});
+
+test('objet B identique à l\'objet A (réponse de Claude) : abandonné, pas de test A/B bidon', async () => {
+  const u = await s.newUser();
+  const pid = await addProject(s.db, u.id, { name: 'SameB' });
+  await s.db.prepare('UPDATE projects SET profile_json = ?, target_json = ?, target_validated = 1 WHERE id = ?')
+    .run(JSON.stringify({ resume: 'SAMEB cartes', proposition_valeur: 'v' }), JSON.stringify({ description: 'd', secteurs: ['s'] }), pid);
+  const w = new Worker(s.db, makeHandlers(s.app), { log: { error() {} } });
+  await enqueue(s.db, { userId: u.id, projectId: pid, type: 'template' });
+  while (await w.tick()) { /* file */ }
+  assert.equal((await latestJobs(s.db, pid)).template.status, 'done');
+  const t = await getTemplate(s.db, pid, 'initial');
+  assert.equal(t.subject, 'Idée pour {{entreprise}}');
+  assert.equal(t.subject_b, null);
 });
 
 test('validation : un modèle cassé est refusé (400), un modèle correct passe avec ses avertissements', async () => {

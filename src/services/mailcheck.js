@@ -59,8 +59,9 @@ export function reviewMail({ subject = '', body = '' } = {}) {
  */
 export function acceptReview(original, fixed) {
   if (!fixed || typeof fixed.subject !== 'string' || typeof fixed.body !== 'string') return false;
-  const same = (a, b) => { const x = countVars(a); const y = countVars(b); return x.size === y.size && [...x].every(([k, v]) => y.get(k) === v); };
-  if (!same(`${original.subject}\n${original.body}`, `${fixed.subject}\n${fixed.body}`)) return false;
+  const sameVars = (a, b) => { const x = countVars(a); const y = countVars(b); return x.size === y.size && [...x].every(([k, v]) => y.get(k) === v); };
+  if (!sameVars(`${original.subject}\n${original.subjectB || ''}\n${original.body}`, `${fixed.subject}\n${fixed.subject_b || ''}\n${fixed.body}`)) return false;
+  if (!!original.subjectB !== !!(fixed.subject_b || '').trim()) return false; // l'objet B n'apparaît ni ne disparaît
   const urls = (t) => (String(t).match(/https?:\/\/\S+/g) || []).sort().join('|');
   if (urls(original.body) !== urls(fixed.body)) return false;
   const a = words(original.body);
