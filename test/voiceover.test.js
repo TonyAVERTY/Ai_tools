@@ -11,8 +11,7 @@ import { addProject } from './helpers/users.js';
 import { Worker, latestJobs } from '../src/services/jobs.js';
 import { makeHandlers } from '../src/handlers.js';
 import { SceneError } from '../src/services/promovideo.js';
-import http from 'node:http';
-import { VOICE_PROVIDERS, listVoices, edgeDiagnose, edgeHint, edgeProbe, parseVoiceParams, extractVoiceScript, planVoice, edgeGec, edgeSsml, googleChunks, synthesize, audioDuration, mixVoice, voiceCatalog } from '../src/services/voiceover.js';
+import { VOICE_PROVIDERS, listVoices, parseVoiceParams, extractVoiceScript, planVoice, googleChunks, synthesize, audioDuration, mixVoice, voiceCatalog } from '../src/services/voiceover.js';
 
 const hasFfmpeg = spawnSync('ffmpeg', ['-version']).status === 0;
 const skipFf = !hasFfmpeg && "ffmpeg n'est pas installé";
@@ -20,12 +19,11 @@ const doc = (json) => `<html><body><script type="application/json" id="voix">${j
 
 test('paramètres : sans case rien n\'est lu ; fournisseur et voix doivent exister', () => {
   assert.deepEqual(parseVoiceParams({}), { voice: null });
-  assert.deepEqual(parseVoiceParams({ voice: false, voiceProvider: 'edge' }), { voice: null });
+  assert.deepEqual(parseVoiceParams({ voice: false, voiceProvider: 'google' }), { voice: null });
   assert.match(parseVoiceParams({ voice: true, voiceProvider: 'x' }).error, /fournisseur/);
-  assert.match(parseVoiceParams({ voice: true, voiceProvider: 'edge', voiceName: 'inconnue' }).error, /voix/);
-  assert.deepEqual(parseVoiceParams({ voice: true, voiceProvider: 'edge', voiceName: 'fr-FR-DeniseNeural' }).voice, { provider: 'edge', voice: 'fr-FR-DeniseNeural', lang: 'fr' });
-  assert.deepEqual(parseVoiceParams({ voice: true, voiceProvider: 'google', voiceName: 'en' }).voice, { provider: 'google', voice: 'en', lang: 'en' });
-  assert.deepEqual(voiceCatalog().map((p) => p.id), ['edge', 'elevenlabs', 'googlecloud', 'google']);
+  assert.match(parseVoiceParams({ voice: true, voiceProvider: 'google', voiceName: 'klingon' }).error, /voix/);
+    assert.deepEqual(parseVoiceParams({ voice: true, voiceProvider: 'google', voiceName: 'en' }).voice, { provider: 'google', voice: 'en', lang: 'en' });
+  assert.deepEqual(voiceCatalog().map((p) => p.id), ['google', 'elevenlabs', 'googlecloud', 'azure']);
   for (const p of voiceCatalog()) assert.ok(p.label && (p.keyed ? !p.voices : p.voices.length), p.id);
   // Fournisseurs à clé : identifiant de voix de forme sûre ; langue choisie (ElevenLabs) ou déduite de la voix (Google Cloud)
   assert.deepEqual(parseVoiceParams({ voice: true, voiceProvider: 'elevenlabs', voiceName: 'EXAVITQu4vr4xnSDxMaL', voiceLang: 'es' }).voice, { provider: 'elevenlabs', voice: 'EXAVITQu4vr4xnSDxMaL', lang: 'es' });
@@ -56,97 +54,18 @@ test('placement : jamais deux voix en même temps, dépassement mesuré', () => 
   assert.ok(Math.abs(planVoice([{ t: 8, dur: 4 }], 10).overflow - 2) < 1e-9);
 });
 
-test('Edge : jeton de sécurité sur 5 minutes, SSML échappé ; Google : texte découpé en morceaux courts', () => {
-  const t = Date.UTC(2026, 0, 1, 12, 0, 10);
-  assert.match(edgeGec(t), /^[0-9A-F]{64}$/);
-  assert.equal(edgeGec(t), edgeGec(t + 200_000 - 10_000), 'même fenêtre de 5 minutes');
-  assert.notEqual(edgeGec(t), edgeGec(t + 400_000));
-  const x = edgeSsml('Tom & "Jerry" <b>', 'fr-FR-DeniseNeural');
-  assert.match(x, /xml:lang='fr-FR'/);
-  assert.match(x, /Tom &amp; &quot;Jerry&quot; &lt;b&gt;/);
+
+const status = (code) => async () => ({ ok: code < 400, status: code });
+
+test('Google Traduction : texte découpé en morceaux courts, refus HTTP signalé, voix inconnue refusée', async () => {
   const chunks = googleChunks(`${'Un mot '.repeat(60)}fin.`.trim());
   assert.ok(chunks.length > 1 && chunks.every((c) => c.length <= 180), JSON.stringify(chunks.map((c) => c.length)));
   assert.equal(chunks.join(' ').replace(/\s+/g, ' '), `${'Un mot '.repeat(60)}fin.`.trim());
-});
-
-test('Edge : dialogue WebSocket simulé (config, SSML, trames audio, fin de tour)', async () => {
-  const sent = [];
-  class FakeWS {
-    constructor(url, opts) { this.url = url; this.opts = opts; setTimeout(() => this.onopen(), 0); FakeWS.last = this; }
-    send(m) {
-      sent.push(m);
-      if (/Path:ssml/.test(m)) {
-        const head = Buffer.from('X-RequestId:1\r\nContent-Type:audio/mpeg\r\nPath:audio\r\n', 'latin1');
-        const frame = Buffer.concat([Buffer.from([head.length >> 8, head.length & 255]), head, Buffer.alloc(500, 7)]);
-        setTimeout(() => { this.onmessage({ data: frame }); this.onmessage({ data: 'X-RequestId:1\r\nPath:turn.end\r\n\r\n{}' }); }, 0);
-      }
-    }
-    close() { setTimeout(() => this.onclose?.(), 0); }
-  }
-  const audio = await synthesize({ provider: 'edge', voice: 'fr-FR-DeniseNeural', text: 'Bonjour à tous' }, { WS: FakeWS });
-  assert.equal(audio.length, 500);
-  assert.match(FakeWS.last.url, /TrustedClientToken=.*Sec-MS-GEC=[0-9A-F]{64}/);
-  assert.match(FakeWS.last.opts.headers.Origin, /^chrome-extension:/);
-  assert.match(sent[0], /Path:speech\.config/);
-  assert.match(sent[1], /Path:ssml[\s\S]*Bonjour à tous/);
-});
-
-const down = async () => { throw new Error('ENOTFOUND'); };
-const status = (code, date) => async () => ({ ok: code < 400, status: code, headers: { get: (h) => (h === 'date' ? date : null) } });
-
-test('Edge refusé : le diagnostic dit pourquoi (réseau, horloge, protocole), sans le texte du projet ; Google : refus HTTP signalé', async () => {
-  let tries = 0;
-  class Refuse { constructor() { tries++; setTimeout(() => this.onerror(), 0); } close() {} }
-  const say = (fetchImpl) => synthesize({ provider: 'edge', voice: 'fr-FR-DeniseNeural', text: 'secret du projet' }, { WS: Refuse, fetchImpl, probe: async () => ({ error: 'test' }) });
-  await assert.rejects(say(down), (e) => /ne joint pas speech\.platform\.bing\.com/.test(e.message) && !/secret/.test(e.message));
-  await assert.rejects(say(status(403)), /a refusé la requête \(code 403\)[\s\S]*changé son protocole/);
-  await assert.rejects(say(status(200)), /répond mais refuse la connexion vocale/);
-  await assert.rejects(synthesize({ provider: 'edge', voice: 'fr-FR-DeniseNeural', text: 'x y' }, { WS: Refuse, fetchImpl: status(200), probe: async () => ({ status: 404 }) }), /refuse la connexion vocale \(code 404\)/);
-  tries = 0;
-  const late = new Date(Date.now() + 10 * 60_000).toUTCString();
-  await assert.rejects(say(status(403, late)), /horloge du serveur est décalée de (9|10) min/);
-  assert.equal(tries, 2, 'horloge décalée : une seconde tentative avec l\'heure de Microsoft');
-  assert.deepEqual(await edgeDiagnose({ fetchImpl: down }), { kind: 'network' });
-  assert.match(edgeHint({ kind: 'service', skew: 0 }), /WebSocket/);
-  await assert.rejects(synthesize({ provider: 'google', voice: 'fr', text: 'Bonjour tout le monde' }, { fetchImpl: async () => ({ ok: false, status: 429 }) }), /refusé la requête \(429\)/);
+  await assert.rejects(synthesize({ provider: 'google', voice: 'fr', text: 'Bonjour tout le monde' }, { fetchImpl: status(429) }), /refusé la requête \(429\)/);
   const ok = await synthesize({ provider: 'google', voice: 'fr', text: 'Bonjour tout le monde' }, { fetchImpl: async (u) => { assert.match(u, /tl=fr&q=Bonjour/); return { ok: true, arrayBuffer: async () => new Uint8Array(400).buffer }; } });
   assert.equal(ok.length, 400);
-  await assert.rejects(synthesize({ provider: 'edge', voice: 'nimporte', text: 'x y' }), /Voix inconnue/);
-});
-
-test('Edge : la sonde relève le code de la poignée de main (403, 101) et le diagnostic le dit', async () => {
-  const refuser = http.createServer((q, r) => { r.writeHead(403, { 'x-test': 'oui' }); r.end('refusé par le test'); });
-  const opener = http.createServer();
-  opener.on('upgrade', (q, sock) => { sock.write('HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n'); setTimeout(() => sock.destroy(), 20); });
-  await Promise.all([refuser, opener].map((x) => new Promise((res) => x.listen(0, '127.0.0.1', res))));
-  const to = (srv) => (o) => http.request({ ...o, hostname: '127.0.0.1', port: srv.address().port });
-  try {
-    const refused = await edgeProbe({ request: to(refuser) });
-    assert.equal(refused.status, 403);
-    assert.match(refused.body, /refusé par le test/);
-    assert.match(edgeHint(await edgeDiagnose({ fetchImpl: status(200), probe: () => edgeProbe({ request: to(refuser) }) })), /refuse la connexion vocale \(code 403\)/);
-    assert.equal((await edgeProbe({ request: to(opener) })).status, 101);
-  } finally { refuser.close(); opener.close(); }
-  assert.deepEqual(await edgeProbe({ request: (o) => http.request({ ...o, hostname: '127.0.0.1', port: 1 }) }), { error: 'ECONNREFUSED' });
-  assert.match(edgeHint({ kind: 'service', skew: 0, ws: 101 }), /s'ouvre en test/);
-});
-
-test('Edge : seconde tentative réussie quand l\'horloge du serveur était décalée', async () => {
-  const urls = [];
-  class Flaky {
-    constructor(url) { urls.push(url); this.n = urls.length; setTimeout(() => (this.n === 1 ? this.onerror() : this.onopen()), 0); }
-    send(m) {
-      if (!/Path:ssml/.test(m)) return;
-      const head = Buffer.from('Path:audio\r\n', 'latin1');
-      const frame = Buffer.concat([Buffer.from([head.length >> 8, head.length & 255]), head, Buffer.alloc(400, 5)]);
-      setTimeout(() => { this.onmessage({ data: frame }); this.onmessage({ data: 'Path:turn.end' }); }, 0);
-    }
-    close() {}
-  }
-  const late = new Date(Date.now() + 10 * 60_000).toUTCString();
-  const audio = await synthesize({ provider: 'edge', voice: 'fr-FR-DeniseNeural', text: 'Bonjour à tous' }, { WS: Flaky, fetchImpl: status(403, late) });
-  assert.equal(audio.length, 400);
-  assert.notEqual(urls[0].match(/Sec-MS-GEC=([0-9A-F]+)/)[1], urls[1].match(/Sec-MS-GEC=([0-9A-F]+)/)[1], 'jeton recalculé avec l\'heure de Microsoft');
+  await assert.rejects(synthesize({ provider: 'google', voice: 'nimporte', text: 'x y' }), /Voix inconnue/);
+  await assert.rejects(synthesize({ provider: 'edge', voice: 'fr-FR-DeniseNeural', text: 'x y' }), /Voix inconnue/, 'le service d\'Edge n\'est plus proposé');
 });
 
 test('mixage ffmpeg réel : voix posées aux bons instants, image intacte, durée de la vidéo conservée', { skip: skipFf }, async () => {
@@ -202,14 +121,14 @@ function fakes({ overflow = 0 } = {}) {
 const unfake = () => { for (const k of ['promoSupported', 'renderPromo', 'synthVoice', 'prepareVoice', 'mixVoice']) delete s.app[k]; };
 const gen = (u, pid, body) => u.post(`/api/projects/${pid}/promo/generate`, body);
 const runJob = async (pid) => { await worker.tick(); return (await latestJobs(s.db, pid)).promo_video; };
-const VOICE = { voice: true, voiceProvider: 'edge', voiceName: 'en-US-JennyNeural' };
+const VOICE = { voice: true, voiceProvider: 'google', voiceName: 'en' };
 
 test('route : fournisseur ou voix inconnus refusés ; sans la case, aucun paramètre de voix n\'est gardé', async () => {
   const { u, pid } = await setup();
   s.app.promoSupported = () => ({ ok: true });
   try {
     assert.equal((await gen(u, pid, { voice: true, voiceProvider: 'x', voiceName: 'y' })).status, 400);
-    assert.equal((await gen(u, pid, { voice: true, voiceProvider: 'edge', voiceName: 'y' })).status, 400);
+    assert.equal((await gen(u, pid, { voice: true, voiceProvider: 'google', voiceName: 'y' })).status, 400);
     const log = fakes();
     assert.equal((await gen(u, pid, { fps: 10, seconds: 4 })).status, 200);
     const job = await runJob(pid);
@@ -227,12 +146,12 @@ test('vidéo avec voix : le prompt demande le script dans la langue de la voix, 
     const job = await runJob(pid);
     assert.equal(job.status, 'done', job.error);
     const result = job.result;
-    assert.equal(result.voice, 'en-US-JennyNeural');
+    assert.equal(result.voice, 'en');
     assert.equal(log.prepared, 1);
     assert.equal(log.rendered.length, 1);
     assert.equal(log.mixed.length, 1);
     assert.deepEqual(log.mixed[0].placed.map((p) => p.text), ['Bonjour', 'Au revoir']);
-    assert.equal(log.synth[0].provider, 'edge');
+    assert.equal(log.synth[0].provider, 'google');
   } finally { unfake(); }
 });
 
@@ -265,7 +184,7 @@ test('voix trop longue : corrigée une fois par Claude, puis acceptée avec une 
 test('service de voix en panne : tâche en erreur lisible, aucune vidéo laissée', async () => {
   const { u, pid } = await setup();
   const log = fakes();
-  s.app.prepareVoice = async () => { throw new Error('Microsoft Edge (gratuit) : délai dépassé'); };
+  s.app.prepareVoice = async () => { throw new Error('Google Traduction (gratuit) : délai dépassé'); };
   try {
     await gen(u, pid, { fps: 10, seconds: 6, ...VOICE });
     const job = await runJob(pid);
@@ -281,36 +200,36 @@ test('extrait d\'écoute : audio MP3, mis en cache, voix inconnue refusée, conn
   let n = 0;
   s.app.sampleVoice = async () => { n++; return Buffer.alloc(300, 1); };
   try {
-    const url = '/api/promo/voice-sample?provider=edge&voice=fr-FR-HenriNeural';
+    const url = '/api/promo/voice-sample?provider=google&voice=fr';
     const r = await u.get(url);
     assert.equal(r.status, 200);
     assert.equal(r.headers.get('content-type'), 'audio/mpeg');
     assert.equal((await r.arrayBuffer()).byteLength, 300);
     await u.get(url);
     assert.equal(n, 1, 'second appel servi depuis le cache');
-    assert.equal((await u.get('/api/promo/voice-sample?provider=edge&voice=nimporte')).status, 400);
+    assert.equal((await u.get('/api/promo/voice-sample?provider=google&voice=nimporte')).status, 400);
     assert.equal((await u.get('/api/promo/voice-sample?provider=x&voice=y')).status, 400);
     assert.equal((await s.anon.get(url)).status, 401);
     s.app.sampleVoice = async () => { throw new Error('délai dépassé'); };
-    const bad = await u.get('/api/promo/voice-sample?provider=google&voice=fr');
+    const bad = await u.get('/api/promo/voice-sample?provider=google&voice=de');
     assert.equal(bad.status, 502);
     assert.match((await bad.json()).error, /Google Traduction \(gratuit\) ne répond pas : délai dépassé/);
   } finally { delete s.app.sampleVoice; }
-  assert.ok(VOICE_PROVIDERS.edge && VOICE_PROVIDERS.google);
+  assert.ok(VOICE_PROVIDERS.google && VOICE_PROVIDERS.azure && !VOICE_PROVIDERS.edge);
 });
 
 test('l\'état de l\'onglet liste les fournisseurs et leurs voix', async () => {
   const { u, pid } = await setup();
   const st = await (await u.get(`/api/projects/${pid}/promo`)).json();
-  assert.deepEqual(st.voices.map((p) => p.id), ['edge', 'elevenlabs', 'googlecloud', 'google']);
-  assert.ok(st.voices[0].voices.some((v) => v.id === 'fr-FR-DeniseNeural'));
+  assert.deepEqual(st.voices.map((p) => p.id), ['google', 'elevenlabs', 'googlecloud', 'azure']);
+  assert.ok(st.voices[0].voices.some((v) => v.id === 'fr'));
 });
 
 test('prompt : le contrat de voix apparaît seulement avec une voix, dans sa langue, avec la forme du script', async () => {
   const { promoPrompt } = await import('../src/services/prompts.js');
   const base = { projectName: 'Fidélio', profile: JSON.parse(PROFILE), target: {}, seconds: 30, fps: 30, format: 'vertical', width: 720, height: 1280, custom: {} };
   assert.doesNotMatch(promoPrompt(base).prompt, /VOIX OFF/);
-  const p = promoPrompt({ ...base, voice: { provider: 'edge', voice: 'es-ES-ElviraNeural', lang: 'es', langName: 'espagnol' } }).prompt;
+  const p = promoPrompt({ ...base, voice: { provider: 'google', voice: 'es', lang: 'es', langName: 'espagnol' } }).prompt;
   assert.match(p, /VOIX OFF : une voix lira la vidéo en espagnol/);
   assert.match(p, /<script type="application\/json" id="voix">\[\{"t":0\.4/);
   assert.match(p, /72 mots au plus pour 30 s/);
@@ -359,7 +278,7 @@ test('clé API : essayée avant d\'être gardée, chiffrée en base, jamais renv
   const calls = [];
   s.app.listVoices = async (provider, { key }) => { calls.push([provider, key]); if (key.startsWith('bad')) throw new Error('ElevenLabs a refusé la clé API (vérifie-la, ou son quota)'); return [{ id: 'v1', label: 'Voix un', lang: 'fr' }]; };
   try {
-    assert.equal((await u.post('/api/promo/voice-key', { provider: 'edge', key: KEY })).status, 400, 'fournisseur sans clé');
+    assert.equal((await u.post('/api/promo/voice-key', { provider: 'google', key: KEY })).status, 400, 'fournisseur sans clé');
     assert.equal((await u.post('/api/promo/voice-key', { provider: 'elevenlabs', key: 'court' })).status, 400);
     assert.equal((await u.post('/api/promo/voice-key', { provider: 'elevenlabs', key: 'a b c d e f g h i j k l m n' })).status, 400);
     const bad = await u.post('/api/promo/voice-key', { provider: 'elevenlabs', key: 'bad_key_1234567890abcdef' });
@@ -412,5 +331,67 @@ test('vidéo avec une voix ElevenLabs : la clé du compte est transmise à la sy
     assert.equal(log.synth[0].key, KEY);
     assert.equal(log.synth[0].provider, 'elevenlabs');
     assert.ok(!JSON.stringify(job).includes(KEY), 'la clé n\'apparaît pas dans la tâche');
+  } finally { unfake(); delete s.app.listVoices; }
+});
+
+// ---------- Microsoft Azure AI Speech (clé + région) ----------
+test('Azure : clé dans l\'en-tête, région dans l\'adresse, SSML échappé, erreurs sans la clé ; région obligatoire', async () => {
+  let seen;
+  const fetchImpl = async (url, init) => { seen = { url, init }; return jsonRes({}); };
+  const audio = await synthesize({ provider: 'azure', voice: 'fr-FR-VivienneMultilingualNeural', text: 'Tom & <Jerry>', key: KEY, region: 'francecentral' }, { fetchImpl });
+  assert.equal(audio.length, 500);
+  assert.equal(seen.url, 'https://francecentral.tts.speech.microsoft.com/cognitiveservices/v1');
+  assert.equal(seen.init.headers['Ocp-Apim-Subscription-Key'], KEY);
+  assert.ok(!seen.url.includes(KEY));
+  assert.equal(seen.init.headers['Content-Type'], 'application/ssml+xml');
+  assert.match(seen.init.body, /xml:lang='fr-FR'><voice name='fr-FR-VivienneMultilingualNeural'>Tom &amp; &lt;Jerry&gt;<\/voice>/);
+  await assert.rejects(synthesize({ provider: 'azure', voice: 'fr-FR-DeniseNeural', text: 'x y z', key: KEY, region: 'francecentral' }, { fetchImpl: async () => jsonRes({}, 401) }), (e) => /Microsoft Azure a refusé la clé API/.test(e.message) && !e.message.includes(KEY));
+  await assert.rejects(synthesize({ provider: 'azure', voice: 'fr-FR-DeniseNeural', text: 'x y z', key: KEY }), /Aucune région Microsoft Azure/);
+  await assert.rejects(synthesize({ provider: 'azure', voice: 'fr-FR-DeniseNeural', text: 'x y z', key: KEY, region: 'evil.com/x' }), /Aucune région/, 'région de forme sûre uniquement');
+  await assert.rejects(synthesize({ provider: 'azure', voice: 'fr-FR-DeniseNeural', text: 'x y z', region: 'westeurope' }), /Aucune clé API Microsoft Azure/);
+  assert.match(parseVoiceParams({ voice: true, voiceProvider: 'azure', voiceName: 'de-DE-KatjaNeural' }).voice.lang, /de/);
+});
+
+test('Azure : liste des voix (langues gérées, neuronales seulement, multilingues en premier)', async () => {
+  let seen;
+  const voices = await listVoices('azure', { key: KEY, region: 'westeurope', fetchImpl: async (url, init) => { seen = { url, init }; return jsonRes([
+    { ShortName: 'fr-FR-DeniseNeural', LocalName: 'Denise', Locale: 'fr-FR', LocaleName: 'français (France)', Gender: 'Female' },
+    { ShortName: 'fr-FR-VivienneMultilingualNeural', LocalName: 'Vivienne', Locale: 'fr-FR', LocaleName: 'français (France)', Gender: 'Female' },
+    { ShortName: 'fr-FR-Old-Standard', Locale: 'fr-FR', Gender: 'Male' },
+    { ShortName: 'ja-JP-NanamiNeural', Locale: 'ja-JP', Gender: 'Female' },
+  ]); } });
+  assert.equal(seen.url, 'https://westeurope.tts.speech.microsoft.com/cognitiveservices/voices/list');
+  assert.equal(seen.init.headers['Ocp-Apim-Subscription-Key'], KEY);
+  assert.deepEqual(voices.map((x) => x.id), ['fr-FR-VivienneMultilingualNeural', 'fr-FR-DeniseNeural']);
+  assert.match(voices[0].label, /très naturelle/);
+  await assert.rejects(listVoices('azure', { key: KEY, region: 'a b' }), /région/);
+});
+
+test('Azure : région demandée avec la clé, gardée avec elle, rendue à la page, effacée au retrait, transmise à la synthèse', async () => {
+  const u = await s.newUser();
+  const calls = [];
+  s.app.listVoices = async (provider, o) => { calls.push([provider, o.region]); return [{ id: 'fr-FR-DeniseNeural', label: 'Denise', lang: 'fr' }]; };
+  try {
+    assert.equal((await u.post('/api/promo/voice-key', { provider: 'azure', key: KEY })).status, 400, 'région absente');
+    assert.equal((await u.post('/api/promo/voice-key', { provider: 'azure', key: KEY, region: 'Mauvaise Région!' })).status, 400);
+    const ok = await u.post('/api/promo/voice-key', { provider: 'azure', key: KEY, region: ' FranceCentral ' });
+    assert.equal(ok.status, 200);
+    assert.equal((await ok.json()).region, 'francecentral');
+    assert.deepEqual(calls.at(-1), ['azure', 'francecentral']);
+    const pid = await addProject(s.db, u.id, { name: 'P', gitUrl: 'https://github.com/u/p.git' });
+    const az = (await (await u.get(`/api/projects/${pid}/promo`)).json()).voices.find((p) => p.id === 'azure');
+    assert.deepEqual([az.keyed, az.needsRegion, az.keyLast4, az.region], [true, true, KEY.slice(-4), 'francecentral']);
+    // la synthèse reçoit clé ET région
+    const log = fakes();
+    await s.db.prepare('UPDATE projects SET profile_json = ? WHERE id = ?').run(PROFILE, pid);
+    await gen(u, pid, { fps: 10, seconds: 6, voice: true, voiceProvider: 'azure', voiceName: 'fr-FR-DeniseNeural' });
+    const job = await runJob(pid);
+    assert.equal(job.status, 'done', job.error);
+    assert.equal(log.synth[0].region, 'francecentral');
+    assert.equal(log.synth[0].key, KEY);
+    unfake();
+    assert.equal((await u.post('/api/promo/voice-key/delete', { provider: 'azure' })).status, 200);
+    const gone = (await (await u.get(`/api/projects/${pid}/promo`)).json()).voices.find((p) => p.id === 'azure');
+    assert.deepEqual([gone.keyLast4, gone.region], [null, null]);
   } finally { unfake(); delete s.app.listVoices; }
 });
