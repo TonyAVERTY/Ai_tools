@@ -1135,4 +1135,10 @@ export const MIGRATIONS = [
       { sql: 'ALTER TABLE billing_invoices ADD COLUMN meta_json TEXT NULL', when: colMissing('billing_invoices', 'meta_json') },
     ],
   },
+  {
+    // Adresse du site du produit : insérée dans les mails de prospection par la variable {{site}}.
+    name: 'project_site_url',
+    sqlite: ['ALTER TABLE projects ADD COLUMN site_url TEXT'],
+    mysql: [{ sql: 'ALTER TABLE projects ADD COLUMN site_url VARCHAR(300) NULL', when: colMissing('projects', 'site_url') }],
+  },
 ];

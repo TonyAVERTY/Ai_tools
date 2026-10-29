@@ -280,7 +280,7 @@ export function makeHandlers(app) {
         inReplyTo = orig?.message_id;
       }
       const mail = buildProspectMail({
-        template, prospect: p, smtp: project.smtp, unsubUrl, subject, inReplyTo,
+        template, prospect: p, smtp: project.smtp, site: project.siteUrl, unsubUrl, subject, inReplyTo,
         messageId: makeMessageId(project.smtp.fromEmail), readReceipt, footer, html: !!template.html,
       });
       try {
@@ -446,7 +446,7 @@ export function makeHandlers(app) {
       if (!project.profile) throw new Error('Analyse le projet d\'abord');
       await ctx.progress({ message: 'Rédaction du modèle par Claude…', pct: 40 });
       const model = await writeModel(userId, 'haiku');
-      const { prompt, system } = templatePrompt({ profile: project.profile, target: project.target || {}, senderName: project.smtp?.fromName, custom: await custom(userId), model });
+      const { prompt, system } = templatePrompt({ profile: project.profile, target: project.target || {}, senderName: project.smtp?.fromName, site: project.siteUrl, custom: await custom(userId), model });
       const r = await creeping(ctx, 'Rédaction du modèle par Claude…', 40, () => claude(userId, { prompt, system, model, maxTurns: 1, tools: [], signal: ctx.signal }));
       addUsage(ctx, r);
       const t = extractJson(r.text);
