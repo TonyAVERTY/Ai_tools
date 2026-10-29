@@ -5,6 +5,8 @@ import { fillBody, fillSubject, tidyTemplateText, reviewMail, acceptReview } fro
 import { buildProspectMail } from '../src/services/mailer.js';
 import { Worker, latestJobs, enqueue } from '../src/services/jobs.js';
 import { makeHandlers } from '../src/handlers.js';
+import { readFileSync } from 'node:fs';
+import { setSetting } from '../src/db.js';
 import { makeClaudeBin } from './helpers/claude-bin.js';
 import { startApp } from './helpers/server.js';
 import { addProject } from './helpers/users.js';
@@ -33,6 +35,16 @@ test('le mail construit pour l\'envoi n\'a plus de ligne cassée (capture : sign
   assert.ok(!mail.text.split('\n').some((l) => /^\s*,/.test(l)), mail.text);
   assert.doesNotMatch(mail.text, /Pour voir le produit/);
   assert.match(mail.text, /\nMonEspacePro$/);
+});
+
+test('relecture avec objet B : l\'objet B ne peut ni apparaître, ni disparaître, ni changer de variables', () => {
+  const orig = { subject: 'Idée pour {{entreprise}}', subjectB: 'Carte pour {{entreprise}} ?', body: 'Bonjour {{entreprise}}.\n\n{{expediteur}}\nMonEspacePro' };
+  const fixed = { subject: orig.subject, subject_b: 'Une carte pour {{entreprise}} ?', body: orig.body };
+  assert.equal(acceptReview(orig, fixed), true);
+  assert.equal(acceptReview(orig, { ...fixed, subject_b: 'Une carte ?' }), false, 'variable perdue dans l\'objet B');
+  assert.equal(acceptReview(orig, { ...fixed, subject_b: '' }), false, 'objet B disparu');
+  assert.equal(acceptReview({ ...orig, subjectB: '' }, fixed), false, 'objet B apparu');
+  assert.equal(acceptReview({ ...orig, subjectB: '' }, { subject: orig.subject, body: orig.body }), true);
 });
 
 test('contrôle d\'un modèle : erreurs bloquantes et avertissements', () => {
@@ -78,6 +90,43 @@ test('modèle généré : relu par Claude avant enregistrement, corrections affi
   assert.equal(job.result.reviewed, true);
   assert.deepEqual(job.result.corrections, ['signature sans virgule']);
   assert.match((await getTemplate(s.db, pid, 'initial')).body, /\{\{expediteur\}\}$/);
+  // objet B généré aussi (test A/B) : différent de l'objet A, conservé par la relecture
+  const t = await getTemplate(s.db, pid, 'initial');
+  assert.equal(t.subject, 'Idée pour {{entreprise}}');
+  assert.equal(t.subject_b, 'Une carte de fidélité pour {{entreprise}} ?');
+});
+
+test('le modèle choisi dans les Réglages sert vraiment, et il est affiché : résultat du job et avancement', async () => {
+  s.app.cfg.claudeBin = makeClaudeBin(s.tmp, { fixture: 'spy-claude.js', env: { PROMPT_SPY_FILE: `${s.tmp}/models.log` } });
+  const u = await s.newUser();
+  const pid = await addProject(s.db, u.id, { name: 'Modele' });
+  await s.db.prepare('UPDATE projects SET profile_json = ?, target_json = ?, target_validated = 1 WHERE id = ?')
+    .run(JSON.stringify({ resume: 'Cartes', proposition_valeur: 'v' }), JSON.stringify({ description: 'd', secteurs: ['s'] }), pid);
+  await setSetting(s.db, u.id, 'write_model', 'claude-sonnet-5-5');
+  const w = new Worker(s.db, makeHandlers(s.app), { log: { error() {} } });
+  await enqueue(s.db, { userId: u.id, projectId: pid, type: 'template' });
+  while (await w.tick()) { /* file */ }
+  const job = (await latestJobs(s.db, pid)).template;
+  assert.equal(job.status, 'done', job.error);
+  assert.equal(job.result.model, 'claude-sonnet-5-5', 'le modèle réglé est celui du job');
+  assert.match(job.progress.model, /Sonnet/, 'et il figure dans l\'avancement');
+  const calls = readFileSync(`${s.tmp}/models.log`, 'utf8').trim().split('\n').map((l) => JSON.parse(l));
+  assert.ok(calls.length >= 1 && calls.every((c) => c.model === 'claude-sonnet-5-5'), 'le CLI a reçu --model claude-sonnet-5-5 (rédaction et relecture)');
+});
+
+test('objet B identique à l\'objet A (réponse de Claude) : abandonné, pas de test A/B bidon', async () => {
+  s.app.cfg.claudeBin = makeClaudeBin(s.tmp, { name: 'claude-sameb' });
+  const u = await s.newUser();
+  const pid = await addProject(s.db, u.id, { name: 'SameB' });
+  await s.db.prepare('UPDATE projects SET profile_json = ?, target_json = ?, target_validated = 1 WHERE id = ?')
+    .run(JSON.stringify({ resume: 'SAMEB cartes', proposition_valeur: 'v' }), JSON.stringify({ description: 'd', secteurs: ['s'] }), pid);
+  const w = new Worker(s.db, makeHandlers(s.app), { log: { error() {} } });
+  await enqueue(s.db, { userId: u.id, projectId: pid, type: 'template' });
+  while (await w.tick()) { /* file */ }
+  assert.equal((await latestJobs(s.db, pid)).template.status, 'done');
+  const t = await getTemplate(s.db, pid, 'initial');
+  assert.equal(t.subject, 'Idée pour {{entreprise}}');
+  assert.equal(t.subject_b, null);
 });
 
 test('validation : un modèle cassé est refusé (400), un modèle correct passe avec ses avertissements', async () => {

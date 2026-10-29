@@ -22,7 +22,7 @@ Pourquoi : Claude adapte son vocabulaire, ses exemples et son niveau de détail 
 ## 3. Créer le premier projet
 1. Page **Projets** → bouton **Nouveau projet**.
 2. **Nom** : le nom du produit. **Dépôt Git** : l'adresse du dépôt, par exemple `https://github.com/utilisateur/projet.git`. Le lien ne pourra plus être modifié ensuite.
-3. Clique **Créer et analyser**. Le dépôt est cloné (en lecture seule) puis analysé une fois par Claude (modèle Sonnet) : l'analyse produit la fiche projet et une cible proposée. Compte quelques minutes.
+3. Clique **Créer et analyser**. Le dépôt est cloné (en lecture seule) puis analysé une fois par Claude (avec le modèle d'analyse choisi dans Réglages → Modèles IA, Haiku par défaut) : l'analyse produit la fiche projet et une cible proposée. Compte quelques minutes.
 4. Dépôt privé ou autre serveur Git : ajoute d'abord un token dans **Réglages → Dépôts Git**.
 
 ## 4. Valider la cible

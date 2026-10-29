@@ -61,8 +61,8 @@ const lines = prompt.includes('proposer TROIS exemples de devis') ? [billQuotes(
   : prompt.includes('ENVDUMP') ? ['```json\n' + JSON.stringify({ env: process.env, cwd: process.cwd() }) + '\n```']
   : prompt.includes('fiche commerciale') ? ['```json\n' + JSON.stringify(profile) + '\n```']
   : prompt.includes('mail de RELANCE') ? ['{"body":"Petite relance : toujours partant, {{entreprise}} ?"}']
-  : prompt.includes('RELECTURE DU MAIL') ? [JSON.stringify({ subject: 'Idée pour {{entreprise}}', body: '{{accroche}}\n\nBonjour {{entreprise}} à {{ville}}.\n\n{{expediteur}}', corrections: ['signature sans virgule'] })]
-  : prompt.includes('email de prospection') ? ['{"subject":"Idée pour {{entreprise}}","body":"{{accroche}}\\n\\nBonjour {{entreprise}} à {{ville}}.\\n\\n{{expediteur}}"}']
+  : prompt.includes('RELECTURE DU MAIL') ? [JSON.stringify({ subject: 'Idée pour {{entreprise}}', ...(prompt.includes('Objet B :') ? { subject_b: 'Une carte de fidélité pour {{entreprise}} ?' } : {}), body: '{{accroche}}\n\nBonjour {{entreprise}} à {{ville}}.\n\n{{expediteur}}', corrections: ['signature sans virgule'] })]
+  : prompt.includes('email de prospection') ? [JSON.stringify({ subject: 'Idée pour {{entreprise}}', subject_b: prompt.includes('SAMEB') ? 'idée pour {{entreprise}}' : 'Une carte de fidélité pour {{entreprise}} ?', body: '{{accroche}}\n\nBonjour {{entreprise}} à {{ville}}.\n\n{{expediteur}}' })]
   : prompt.includes('évolutions') ? ['### 1. Export CSV\n- **Pourquoi** : pratique']
   : prompt.includes('prospects')
   ? ['Je cherche...', 'PROSPECT {"company":"Boulangerie Le Fournil","email":"contact@fournil.fr","website":"https://fournil.fr","city":"Rennes","sector":"boulangerie","hook":"Votre fidélité client mérite mieux que le carton.","source":"https://fournil.fr/contact","score":8}',
