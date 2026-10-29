@@ -9,6 +9,8 @@ import { parseParisLocal, toParisLocal, eventLinks } from '../src/events.js';
 import { createFeed } from '../src/services/ical.js';
 
 // Vendredi 23 octobre 2026, 12 h à Paris
+/** Un créneau dans quelques jours, quelle que soit la date du jour (un événement ne peut pas être créé dans le passé). */
+const soon = (days, hm = '15:00') => `${toParisLocal(Math.floor(Date.now() / 1000) + days * 86400).slice(0, 10)}T${hm}`;
 const RX = Math.floor(new Date('2026-10-23T10:00:00Z').getTime() / 1000);
 const paris = (ts) => toParisLocal(ts);
 
@@ -106,16 +108,16 @@ test('réponse avec une date : l\'API et la page Mails proposent l\'ajout, prér
 test('ajouter depuis la réponse : événement créé une seule fois, liens Google et .ics, dans l\'agenda et le flux iCal', async () => {
   const u = await s.newUser();
   const { rep, pid, x } = await world(u);
-  const r = await u.post(`/api/replies/${rep}/event`, { title: 'Appel avec Dupont (corrigé)', when: '2026-10-27T15:00', minutes: 45 });
+  const r = await u.post(`/api/replies/${rep}/event`, { title: 'Appel avec Dupont (corrigé)', when: soon(5), minutes: 45 });
   assert.equal(r.status, 201);
   const out = await r.json();
   assert.equal(out.event.title, 'Appel avec Dupont (corrigé)');
-  assert.equal(out.event.startsAt, parseParisLocal('2026-10-27T15:00'));
+  assert.equal(out.event.startsAt, parseParisLocal(soon(5)));
   assert.equal(out.event.minutes, 45);
   assert.deepEqual([out.event.projectId, out.event.prospectId, out.event.replyId], [pid, x, rep]);
   assert.match(out.event.links.google, /^https:\/\/calendar\.google\.com\/calendar\/render\?action=TEMPLATE/);
   // deuxième ajout : le même événement, pas un doublon
-  const again = await (await u.post(`/api/replies/${rep}/event`, { title: 'Autre', when: '2026-10-28T10:00' })).json();
+  const again = await (await u.post(`/api/replies/${rep}/event`, { title: 'Autre', when: soon(6, '10:00') })).json();
   assert.equal(again.existing, true);
   assert.equal(Number((await s.db.prepare('SELECT COUNT(*) n FROM calendar_events WHERE reply_id = ?').get(rep)).n), 1);
   // la réponse montre l'événement ajouté, plus la proposition
@@ -130,8 +132,8 @@ test('ajouter depuis la réponse : événement créé une seule fois, liens Goog
   assert.match(ics.headers.get('content-disposition'), /attachment/);
   const txt = (await ics.text()).replace(/\r\n /g, '');
   assert.match(txt, /SUMMARY:Appel avec Dupont \(corrigé\)/);
-  assert.match(txt, /DTSTART:20261027T140000Z/, '15 h à Paris = 14 h UTC (heure d\'été)'.replace('14 h UTC (heure d\'été)', '14 h UTC'));
-  assert.match(txt, /DTEND:20261027T144500Z/);
+  assert.match(txt, new RegExp(`DTSTART:${new Date(parseParisLocal(soon(5)) * 1000).toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z')}`), 'DTSTART en UTC, calculé depuis l\'heure de Paris');
+  assert.match(txt, new RegExp(`DTEND:${new Date((parseParisLocal(soon(5)) + 45 * 60) * 1000).toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z')}`));
   // le flux iCal secret contient l'événement
   const token = await createFeed(s.app, u.id);
   const feed = (await (await fetch(`${s.base}/cal/${token}.ics`)).text()).replace(/\r\n /g, '');
@@ -142,14 +144,14 @@ test('validation et isolation : titre vide, date impossible ou lointaine refusé
   const u = await s.newUser(), v = await s.newUser();
   const { rep } = await world(u);
   const post = (body, who = u) => who.post(`/api/replies/${rep}/event`, body);
-  assert.equal((await post({ title: '', when: '2026-10-27T15:00' })).status, 400);
+  assert.equal((await post({ title: '', when: soon(5) })).status, 400);
   assert.equal((await post({ title: 'x', when: 'demain' })).status, 400);
   assert.equal((await post({ title: 'x', when: '2026-02-31T10:00' })).status, 400);
   assert.equal((await post({ title: 'x', when: '2099-01-01T10:00' })).status, 400, 'au plus trois ans');
   assert.equal((await post({ title: 'x', when: '2020-01-01T10:00' })).status, 400, 'pas dans le passé lointain');
-  assert.equal((await post({ title: 'x', when: '2026-10-27T15:00' }, v)).status, 404, 'réponse d\'un autre compte');
+  assert.equal((await post({ title: 'x', when: soon(5) }, v)).status, 404, 'réponse d\'un autre compte');
   assert.equal((await s.anon.post(`/api/replies/${rep}/event`, {})).status, 401);
-  const ok = await (await post({ title: 'Mon événement', when: '2026-10-27T15:00', minutes: 7 })).json();
+  const ok = await (await post({ title: 'Mon événement', when: soon(5), minutes: 7 })).json();
   assert.equal(ok.event.minutes, 30, 'durée inconnue : 30 min');
   assert.equal((await v.get(`/calendar/event/${ok.event.id}.ics`, { headers: { accept: '*/*' } })).status, 404, '.ics d\'un autre compte');
   await v.post(`/calendar/events/${ok.event.id}/delete`, {}, { form: true });
