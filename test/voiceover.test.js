@@ -2,7 +2,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, existsSync, rmSync, statSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, readFileSync, mkdirSync, existsSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { startApp } from './helpers/server.js';
@@ -11,7 +11,7 @@ import { addProject } from './helpers/users.js';
 import { Worker, latestJobs } from '../src/services/jobs.js';
 import { makeHandlers } from '../src/handlers.js';
 import { SceneError } from '../src/services/promovideo.js';
-import { VOICE_PROVIDERS, listVoices, parseVoiceParams, extractVoiceScript, planVoice, googleChunks, synthesize, audioDuration, mixVoice, voiceCatalog } from '../src/services/voiceover.js';
+import { VOICE_PROVIDERS, listVoices, piperVoices, localStatus, localConfig, resetLocalStatus, audioType, parseVoiceParams, extractVoiceScript, planVoice, googleChunks, synthesize, audioDuration, mixVoice, voiceCatalog } from '../src/services/voiceover.js';
 
 const hasFfmpeg = spawnSync('ffmpeg', ['-version']).status === 0;
 const skipFf = !hasFfmpeg && "ffmpeg n'est pas installé";
@@ -23,8 +23,9 @@ test('paramètres : sans case rien n\'est lu ; fournisseur et voix doivent exist
   assert.match(parseVoiceParams({ voice: true, voiceProvider: 'x' }).error, /fournisseur/);
   assert.match(parseVoiceParams({ voice: true, voiceProvider: 'google', voiceName: 'klingon' }).error, /voix/);
     assert.deepEqual(parseVoiceParams({ voice: true, voiceProvider: 'google', voiceName: 'en' }).voice, { provider: 'google', voice: 'en', lang: 'en' });
-  assert.deepEqual(voiceCatalog().map((p) => p.id), ['google', 'elevenlabs', 'googlecloud', 'azure']);
-  for (const p of voiceCatalog()) assert.ok(p.label && (p.keyed ? !p.voices : p.voices.length), p.id);
+  assert.deepEqual(voiceCatalog().map((p) => p.id), ['google', 'piper', 'espeak', 'elevenlabs', 'googlecloud', 'azure']);
+  for (const p of voiceCatalog()) assert.ok(p.label && (p.keyed ? !p.voices : p.voices), p.id);
+  assert.deepEqual(voiceCatalog().filter((p) => !p.keyed).map((p) => p.id), ['google', 'piper', 'espeak'], 'trois fournisseurs sans clé');
   // Fournisseurs à clé : identifiant de voix de forme sûre ; langue choisie (ElevenLabs) ou déduite de la voix (Google Cloud)
   assert.deepEqual(parseVoiceParams({ voice: true, voiceProvider: 'elevenlabs', voiceName: 'EXAVITQu4vr4xnSDxMaL', voiceLang: 'es' }).voice, { provider: 'elevenlabs', voice: 'EXAVITQu4vr4xnSDxMaL', lang: 'es' });
   assert.equal(parseVoiceParams({ voice: true, voiceProvider: 'elevenlabs', voiceName: 'abc', voiceLang: 'xx' }).voice.lang, 'fr');
@@ -221,7 +222,7 @@ test('extrait d\'écoute : audio MP3, mis en cache, voix inconnue refusée, conn
 test('l\'état de l\'onglet liste les fournisseurs et leurs voix', async () => {
   const { u, pid } = await setup();
   const st = await (await u.get(`/api/projects/${pid}/promo`)).json();
-  assert.deepEqual(st.voices.map((p) => p.id), ['google', 'elevenlabs', 'googlecloud', 'azure']);
+  assert.deepEqual(st.voices.map((p) => p.id), ['google', 'piper', 'espeak', 'elevenlabs', 'googlecloud', 'azure']);
   assert.ok(st.voices[0].voices.some((v) => v.id === 'fr'));
 });
 
@@ -394,4 +395,99 @@ test('Azure : région demandée avec la clé, gardée avec elle, rendue à la pa
     const gone = (await (await u.get(`/api/projects/${pid}/promo`)).json()).voices.find((p) => p.id === 'azure');
     assert.deepEqual([gone.keyLast4, gone.region], [null, null]);
   } finally { unfake(); delete s.app.listVoices; }
+});
+
+// ---------- Voix locales : Piper et eSpeak NG (sans clé, sur le serveur) ----------
+import { chmodSync } from 'node:fs';
+
+/** Faux programmes de voix : écrivent un vrai WAV (ffmpeg) et notent leurs arguments, pour tester le lancement réel sans installer Piper. */
+function fakeTools(dir) {
+  const log = join(dir, 'args.log');
+  const script = (name, flag) => {
+    const f = join(dir, name);
+    writeFileSync(f, `#!/bin/sh\nprintf '%s\\n' "$*" >> '${log}'\nout=''\nwhile [ $# -gt 0 ]; do if [ "$1" = '${flag}' ]; then out="$2"; fi; shift; done\nexec ffmpeg -v error -y -f lavfi -i sine=frequency=300:duration=1 "$out"\n`);
+    chmodSync(f, 0o755);
+    return f;
+  };
+  return { log, espeakBin: script('espeak-ng', '-w'), piperBin: script('piper', '-f') };
+}
+
+test('Piper : voix installées lues sur le disque (modèle + fiche .json, langues gérées, noms sûrs)', () => {
+  const files = ['fr_FR-siwis-medium.onnx', 'fr_FR-siwis-medium.onnx.json', 'fr_FR-tom-medium.onnx', 'en_US-lessac-high.onnx', 'en_US-lessac-high.onnx.json', 'ja_JP-x-low.onnx', 'ja_JP-x-low.onnx.json', 'notes.txt', 'fr_FR-a b-low.onnx', 'fr_FR-a b-low.onnx.json'];
+  const v = piperVoices('/voix', { list: () => files });
+  assert.deepEqual(v.map((x) => [x.id, x.lang]), [['en_US-lessac-high', 'en'], ['fr_FR-siwis-medium', 'fr']]);
+  assert.match(v[1].label, /Siwis · français \(FR\), qualité medium/);
+  assert.deepEqual(piperVoices('/absent', { list: () => { throw new Error('ENOENT'); } }), []);
+});
+
+test('voix locales : disponibilité selon les programmes et les voix installées, réglages du serveur', () => {
+  resetLocalStatus();
+  const ok = () => ({ status: 0 });
+  const ko = () => ({ status: 1 });
+  const cfg = { piperBin: '/opt/piper/bin/python3', piperVoicesDir: '/voix', espeakBin: 'espeak-ng' };
+  const list = () => ['fr_FR-siwis-medium.onnx', 'fr_FR-siwis-medium.onnx.json'];
+  const st = localStatus(cfg, { run: ok, list });
+  assert.equal(st.piper.ok, true);
+  assert.equal(st.piper.voices[0].id, 'fr_FR-siwis-medium');
+  assert.equal(st.espeak.ok, true);
+  assert.equal(st.espeak.voices.length, VOICE_PROVIDERS.espeak.voices.length);
+  assert.equal(localStatus(cfg, { run: ko, list }).piper.ok, false, 'programme absent ou en panne');
+  assert.equal(localStatus({ ...cfg, piperVoicesDir: '' }, { run: ok, list }).piper.ok, false, 'aucun dossier de voix');
+  assert.equal(localStatus(cfg, { run: ok, list: () => [] }).piper.ok, false, 'aucune voix installée');
+  assert.deepEqual(localConfig({}, { PIPER_BIN: '/p', PIPER_VOICES_DIR: '/v', ESPEAK_BIN: '/e' }), { piperBin: '/p', piperVoicesDir: '/v', espeakBin: '/e' });
+  assert.deepEqual(localConfig({}, {}), { piperBin: 'piper', piperVoicesDir: '', espeakBin: 'espeak-ng' });
+  const cat = voiceCatalog({}, {}, { piper: { ok: false, voices: [] }, espeak: st.espeak });
+  const piper = cat.find((p) => p.id === 'piper');
+  assert.deepEqual([piper.local, piper.available, piper.voices], [true, false, []]);
+  assert.match(piper.unavailable, /Piper n'est pas installé/);
+  assert.equal(cat.find((p) => p.id === 'espeak').available, true);
+  assert.equal(audioType(Buffer.from('RIFFxxxx')).mime, 'audio/wav');
+  assert.equal(audioType(Buffer.from('ID3xxxx')).mime, 'audio/mpeg');
+});
+
+test('voix locales : lancement réel (sans shell), texte après « -- », WAV rendu, voix non installée refusée', { skip: skipFf }, async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'voix-local-'));
+  try {
+    const { log, espeakBin, piperBin } = fakeTools(dir);
+    const voices = join(dir, 'voices');
+    mkdirSync(voices);
+    writeFileSync(join(voices, 'fr_FR-siwis-medium.onnx'), 'x');
+    writeFileSync(join(voices, 'fr_FR-siwis-medium.onnx.json'), '{}');
+    const cfg = { espeakBin, piperBin, piperVoicesDir: voices };
+    const hostile = '--version; rm -rf / $(id) `id` "quote"';
+    const wav = await synthesize({ provider: 'espeak', voice: 'fr+f3', text: hostile }, { cfg });
+    assert.equal(audioType(wav).ext, 'wav');
+    const pw = await synthesize({ provider: 'piper', voice: 'fr_FR-siwis-medium', text: 'Bonjour à tous' }, { cfg });
+    assert.equal(audioType(pw).ext, 'wav');
+    const args = readFileSync(log, 'utf8').trim().split('\n');
+    assert.match(args[0], /^-v fr\+f3 -s 150 -w \S+voix\.wav -- --version; rm -rf \/ \$\(id\) `id` "quote"$/, 'le texte reste un seul argument, après « -- »');
+    assert.match(args[1], /^-m fr_FR-siwis-medium --data-dir \S+voices -f \S+voix\.wav -- Bonjour à tous$/);
+    await assert.rejects(synthesize({ provider: 'piper', voice: 'fr_FR-inconnue-low', text: 'x y' }, { cfg }), /pas installée/);
+    await assert.rejects(synthesize({ provider: 'piper', voice: '../../etc/passwd', text: 'x y' }, { cfg }), /Voix inconnue/);
+    await assert.rejects(synthesize({ provider: 'espeak', voice: 'fr', text: 'x y' }, { cfg: { espeakBin: join(dir, 'absent') } }), /ne démarre pas/);
+    // le WAV se mixe comme un MP3
+    const video = join(dir, 'v.mp4');
+    spawnSync('ffmpeg', ['-v', 'error', '-y', '-f', 'lavfi', '-i', 'color=c=blue:s=160x90:r=10:d=3', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-an', video]);
+    const f = join(dir, '0.wav');
+    writeFileSync(f, wav);
+    await mixVoice({ cfg: {}, videoPath: video, placed: [{ file: f, start: 0.5 }], seconds: 3 });
+    assert.equal(spawnSync('ffprobe', ['-v', 'error', '-select_streams', 'a', '-show_entries', 'stream=codec_name', '-of', 'csv=p=0', video]).stdout.toString().trim(), 'aac');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('voix locales : l\'état de l\'onglet les indique, l\'extrait est servi en WAV', async () => {
+  const { u, pid } = await setup();
+  s.app.localStatus = () => ({ piper: { ok: false, voices: [] }, espeak: { ok: true, voices: VOICE_PROVIDERS.espeak.voices } });
+  s.app.sampleVoice = async () => Buffer.concat([Buffer.from('RIFF'), Buffer.alloc(300)]);
+  try {
+    const st = await (await u.get(`/api/projects/${pid}/promo`)).json();
+    const piper = st.voices.find((p) => p.id === 'piper');
+    assert.deepEqual([piper.available, piper.voices.length], [false, 0]);
+    assert.match(piper.unavailable, /administrateur/);
+    assert.equal(st.voices.find((p) => p.id === 'espeak').available, true);
+    const r = await u.get('/api/promo/voice-sample?provider=espeak&voice=fr%2Bf3');
+    assert.equal(r.status, 200);
+    assert.equal(r.headers.get('content-type'), 'audio/wav');
+    assert.equal((await u.get('/api/promo/voice-sample?provider=piper&voice=..%2F..%2Fx')).status, 400, 'nom de voix Piper de forme sûre uniquement');
+  } finally { delete s.app.localStatus; delete s.app.sampleVoice; }
 });

@@ -636,7 +636,7 @@ export function makeHandlers(app) {
               const region = VOICE_PROVIDERS[voice.provider].region ? await getVoiceRegion(app, userId, voice.provider) : null;
               const synth = app.synthVoice || synthesize;
               prepared = await (app.prepareVoice || prepareVoice)({
-                cfg, segments: extractVoiceScript(html, params.seconds), voice, seconds: params.seconds, synth: (o) => synth({ ...o, key, region }), signal: ctx.signal,
+                cfg, segments: extractVoiceScript(html, params.seconds), voice, seconds: params.seconds, synth: (o) => synth({ ...o, key, region }, { cfg }), signal: ctx.signal,
                 onProgress: ({ done, total }) => sink.push(() => ctx.progress({ message: `Voix : phrase ${Math.min(done + 1, total)}/${total}`, pct: 44 })),
               });
               await sink.flush();

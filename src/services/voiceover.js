@@ -3,13 +3,15 @@
 //  - google      : voix de Google Traduction, gratuit et sans clé, la plus simple (une voix par langue) ; service non officiel, il peut changer ou refuser des requêtes ;
 //  - elevenlabs  : les voix les plus naturelles, avec la clé API de l'utilisateur (plan gratuit mensuel) ;
 //  - googlecloud : voix Google Cloud (Chirp 3 HD, Neural2, Studio), avec la clé API de l'utilisateur (quota gratuit mensuel) ;
+//  - piper       : Piper, voix neuronales libres qui tournent SUR le serveur (hors ligne, sans clé, rien ne sort du serveur) ; à installer par l'administrateur ;
+//  - espeak      : eSpeak NG, synthèse locale très simple (robotique mais toujours disponible : un paquet à installer) ;
 //  - azure       : Microsoft Azure AI Speech (voix neuronales dont les « Multilingual »), avec la clé et la région de l'utilisateur (niveau gratuit F0).
 // Le service de lecture à voix haute de Microsoft Edge n'est volontairement PAS utilisé : Microsoft le réserve à son navigateur (jeton propre à Edge : un client tiers
 // reçoit un 403) et ne le propose pas aux applications ; la voie officielle de Microsoft, ce sont les voix Azure ci-dessus. Le texte lu est envoyé au fournisseur choisi.
 // Les clés sont chiffrées en base, jamais réaffichées, jamais dans un message d'erreur ni un journal.
 // Aucun appel réseau n'est fait ailleurs que dans `synthesize` (remplaçable dans les tests).
-import { spawn } from 'node:child_process';
-import { mkdtempSync, writeFileSync, rmSync, renameSync } from 'node:fs';
+import { spawn, spawnSync } from 'node:child_process';
+import { mkdtempSync, writeFileSync, readFileSync, readdirSync, rmSync, renameSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { SceneError } from './promovideo.js';
@@ -29,6 +31,17 @@ export const VOICE_PROVIDERS = {
     label: 'Google Traduction (gratuit)',
     voices: [v('fr', 'Français', 'fr'), v('en', 'Anglais', 'en'), v('es', 'Espagnol', 'es'), v('de', 'Allemand', 'de'), v('it', 'Italien', 'it'), v('pt', 'Portugais', 'pt')],
   },
+  // Voix locales : exécutées par le serveur lui-même (aucun appel réseau, aucune clé). Disponibles seulement si l'administrateur les a installées.
+  piper: { label: 'Piper (voix locale, gratuit)', local: true, installHelp: 'Piper n\'est pas installé sur ce serveur : l\'administrateur doit l\'installer (voir la documentation du Support, « Voix locales ») puis renseigner PIPER_BIN et PIPER_VOICES_DIR.' },
+  espeak: {
+    label: 'eSpeak NG (voix locale, simple)', local: true, installHelp: 'eSpeak NG n\'est pas installé sur ce serveur : l\'administrateur doit installer le paquet espeak-ng.',
+    voices: [
+      v('fr', 'Français · voix masculine', 'fr'), v('fr+f3', 'Français · voix féminine', 'fr'), v('en-us', 'Anglais américain · voix masculine', 'en'), v('en-us+f3', 'Anglais américain · voix féminine', 'en'),
+      v('en-gb', 'Anglais britannique · voix masculine', 'en'), v('es', 'Espagnol · voix masculine', 'es'), v('es+f3', 'Espagnol · voix féminine', 'es'),
+      v('de', 'Allemand · voix masculine', 'de'), v('de+f3', 'Allemand · voix féminine', 'de'), v('it', 'Italien · voix masculine', 'it'), v('it+f3', 'Italien · voix féminine', 'it'),
+      v('pt-br', 'Portugais · voix masculine', 'pt'), v('pt-br+f3', 'Portugais · voix féminine', 'pt'),
+    ],
+  },
   // Voix très naturelles : la clé de l'utilisateur ouvre la liste de ses voix ; une voix ElevenLabs parle toutes les langues (modèle multilingue)
   elevenlabs: { label: 'ElevenLabs (clé gratuite)', keyed: true, multilingual: true, keyUrl: 'elevenlabs.io', keyHelp: 'Crée un compte gratuit sur elevenlabs.io, ouvre ton profil → « API Keys », crée une clé et colle-la ici.' },
   googlecloud: { label: 'Google Cloud (clé gratuite)', keyed: true, keyUrl: 'console.cloud.google.com', keyHelp: 'Dans console.cloud.google.com : active « Cloud Text-to-Speech API », puis Identifiants → Créer des identifiants → Clé API, et colle-la ici.' },
@@ -37,9 +50,11 @@ export const VOICE_PROVIDERS = {
 };
 
 /** Catalogue pour la page : les voix des fournisseurs à clé viennent de leur API (une fois la clé enregistrée). `keys` : { fournisseur: 4 derniers caractères }. */
-export const voiceCatalog = (keys = {}, regions = {}) => Object.entries(VOICE_PROVIDERS).map(([id, p]) => ({
+export const voiceCatalog = (keys = {}, regions = {}, locals = {}) => Object.entries(VOICE_PROVIDERS).map(([id, p]) => ({
   id, label: p.label, keyed: !!p.keyed, multilingual: !!p.multilingual, needsRegion: !!p.region, keyHelp: p.keyHelp || null,
-  keyLast4: p.keyed ? (keys[id] || null) : null, region: p.region ? (regions[id] || null) : null, voices: p.voices || null,
+  keyLast4: p.keyed ? (keys[id] || null) : null, region: p.region ? (regions[id] || null) : null,
+  local: !!p.local, available: p.local ? !!locals[id]?.ok : true, unavailable: p.local && !locals[id]?.ok ? p.installHelp : null,
+  voices: p.local ? (locals[id]?.ok ? locals[id].voices : []) : (p.voices || null),
 }));
 const REGION_RE = /^[a-z0-9]{3,30}$/;
 export const REGION = { test: (r) => typeof r === 'string' && REGION_RE.test(r) }; // « null » ou un nombre ne sont pas une région
@@ -54,7 +69,7 @@ export function parseVoiceParams(b = {}) {
   const p = VOICE_PROVIDERS[provider];
   if (!p) return { error: 'Voix : choisis un fournisseur dans la liste.' };
   const id = String(b.voiceName ?? '');
-  if (p.keyed) {
+  if (p.keyed || (p.local && !p.voices)) {
     if (!VOICE_ID.test(id)) return { error: 'Voix : choisis une voix dans la liste.' };
     const lang = p.multilingual ? (LANGS[b.voiceLang] ? String(b.voiceLang) : 'fr') : (LANGS[id.slice(0, 2)] ? id.slice(0, 2) : 'fr');
     return { voice: { provider, voice: id, lang } };
@@ -212,7 +227,81 @@ export async function listVoices(provider, { key, region = null, fetchImpl = fet
   throw new Error('Ce fournisseur n\'a pas de liste de voix');
 }
 
-/** Texte → MP3 (Buffer). Les erreurs réseau remontent avec le nom du service ; jamais de clé ni de texte dans le message. */
+// ---------- Voix locales (Piper, eSpeak NG) ----------
+
+/** Outils locaux : réglages du compte serveur (variables d'environnement), jamais choisis par un utilisateur. */
+export const localConfig = (cfg = {}, env = process.env) => ({
+  piperBin: cfg.piperBin || env.PIPER_BIN || 'piper',
+  piperVoicesDir: cfg.piperVoicesDir || env.PIPER_VOICES_DIR || '',
+  espeakBin: cfg.espeakBin || env.ESPEAK_BIN || 'espeak-ng',
+});
+const isPython = (bin) => /(^|\/)python[\d.]*$/.test(bin);
+const piperArgs = (bin) => (isPython(bin) ? ['-m', 'piper'] : []); // « python -m piper » (installation pip) ou un exécutable piper
+
+/** Voix Piper installées : un fichier `<nom>.onnx` avec son `<nom>.onnx.json`, dans les langues gérées. */
+export function piperVoices(dir, { list = readdirSync } = {}) {
+  let names;
+  try { names = list(dir); } catch { return []; }
+  const set = new Set(names);
+  const out = [];
+  for (const f of names) {
+    if (!f.endsWith('.onnx')) continue;
+    const id = f.slice(0, -5);
+    const lang = id.slice(0, 2);
+    if (!VOICE_ID.test(id) || !set.has(`${f}.json`) || !LANGS[lang]) continue;
+    const [loc, name, quality] = id.split('-');
+    out.push(v(id, `${(name || id).replace(/^./, (c) => c.toUpperCase())} · ${LANGS[lang]}${/_/.test(loc || '') ? ` (${loc.split('_')[1]})` : ''}${quality ? `, qualité ${quality}` : ''}`, lang));
+  }
+  return out.sort((a, b) => a.lang.localeCompare(b.lang) || a.label.localeCompare(b.label, 'fr'));
+}
+
+const works = (bin, args, run = spawnSync) => { try { return run(bin, args, { stdio: 'ignore', timeout: 8000 }).status === 0; } catch { return false; } };
+
+/** Disponibilité des voix locales (gardée une minute : elle interroge le disque et lance les programmes). */
+let localCache = null;
+export function localStatus(cfg, { run = spawnSync, list = readdirSync, now = Date.now } = {}) {
+  const c = localConfig(cfg);
+  const key = JSON.stringify(c);
+  if (localCache && localCache.key === key && localCache.at > now() - 60_000 && run === spawnSync) return localCache.value;
+  const piper = c.piperVoicesDir ? piperVoices(c.piperVoicesDir, { list }) : [];
+  const value = {
+    piper: works(c.piperBin, [...piperArgs(c.piperBin), '--help'], run) && piper.length ? { ok: true, voices: piper } : { ok: false, voices: [] },
+    espeak: works(c.espeakBin, ['--version'], run) ? { ok: true, voices: VOICE_PROVIDERS.espeak.voices } : { ok: false, voices: [] },
+  };
+  if (run === spawnSync) localCache = { key, at: now(), value };
+  return value;
+}
+export const resetLocalStatus = () => { localCache = null; };
+
+/** Lance un programme local sans shell ; renvoie ce qu'il a écrit dans le fichier de sortie. */
+function localRun(bin, args, outFile, { run = spawn, timeoutMs = 60_000 } = {}) {
+  return new Promise((resolve, reject) => {
+    let child;
+    try { child = run(bin, args, { stdio: ['ignore', 'ignore', 'pipe'], timeout: timeoutMs }); } catch { return reject(new Error('Le programme de voix locale ne démarre pas')); }
+    let err = '';
+    child.stderr?.on('data', (d) => { err = (err + d).slice(-500); });
+    child.on('error', () => reject(new Error('Le programme de voix locale ne démarre pas')));
+    child.on('close', (code) => (code === 0 ? resolve(readFileSync(outFile)) : reject(new Error(`La voix locale a échoué (code ${code})`))));
+  });
+}
+
+async function localSynth(provider, voice, text, { cfg = {}, run } = {}) {
+  const c = localConfig(cfg);
+  const dir = mkdtempSync(join(tmpdir(), 'aitools-tts-'));
+  const out = join(dir, 'voix.wav');
+  try {
+    if (provider === 'piper') {
+      if (!piperVoices(c.piperVoicesDir).some((x) => x.id === voice)) throw new Error('Cette voix Piper n\'est pas installée sur le serveur');
+      return await localRun(c.piperBin, [...piperArgs(c.piperBin), '-m', voice, '--data-dir', c.piperVoicesDir, '-f', out, '--', text], out, { run });
+    }
+    return await localRun(c.espeakBin, ['-v', voice, '-s', '150', '-w', out, '--', text], out, { run });
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+}
+
+/** Type du son produit : les voix locales rendent du WAV, les services du MP3. */
+export const audioType = (buf) => (buf.subarray(0, 4).toString('latin1') === 'RIFF' ? { ext: 'wav', mime: 'audio/wav' } : { ext: 'mp3', mime: 'audio/mpeg' });
+
+/** Texte → son (Buffer : MP3 des services, WAV des voix locales). Les erreurs réseau remontent avec le nom du service ; jamais de clé ni de texte dans le message. */
 export async function synthesize({ provider, voice, text, key = null, region = null }, deps = {}) {
   const p = VOICE_PROVIDERS[provider];
   if (!p || (p.voices ? !findVoice(provider, voice) : !VOICE_ID.test(String(voice)))) throw new Error('Voix inconnue');
@@ -220,9 +309,9 @@ export async function synthesize({ provider, voice, text, key = null, region = n
   if (p.region && !REGION.test(region)) throw new Error(`Aucune région ${p.label.split(' (')[0]} : ajoute-la dans l'onglet Promotion`);
   const clean = String(text ?? '').replace(/\s+/g, ' ').trim();
   if (!clean) throw new Error('Texte vide');
-  const run = provider === 'google' ? googleSynth(clean, voice, deps)
+  const run = p.local ? localSynth(provider, voice, clean, deps) : provider === 'google' ? googleSynth(clean, voice, deps)
     : provider === 'elevenlabs' ? elevenSynth(clean, voice, { ...deps, key }) : provider === 'azure' ? azureSynth(clean, voice, { ...deps, key, region }) : googleCloudSynth(clean, voice, { ...deps, key });
-  const audio = await withTimeout(run, VOICE.timeoutMs, `Service de voix ${p.label}`);
+  const audio = await withTimeout(run, p.local ? 70_000 : VOICE.timeoutMs, `Service de voix ${p.label}`);
   if (audio.length < 200) throw new Error('Le service de voix a renvoyé un audio vide');
   return audio;
 }
@@ -267,8 +356,9 @@ export async function prepareVoice({ cfg, segments, voice, seconds, synth = synt
     for (let i = 0; i < segments.length; i++) {
       if (signal?.aborted) throw new Error('Annulé');
       onProgress({ done: i, total: segments.length });
-      const file = join(dir, `${i}.mp3`);
-      writeFileSync(file, await synth({ provider: voice.provider, voice: voice.voice, text: segments[i].text }));
+      const audio = await synth({ provider: voice.provider, voice: voice.voice, text: segments[i].text });
+      const file = join(dir, `${i}.${audioType(audio).ext}`);
+      writeFileSync(file, audio);
       parts.push({ t: segments[i].t, text: segments[i].text, file, dur: await audioDuration(cfg, file) });
     }
     onProgress({ done: segments.length, total: segments.length });

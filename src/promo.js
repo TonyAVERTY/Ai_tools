@@ -12,7 +12,7 @@ import { budgetState } from './services/budget.js';
 import { userPromoRoot } from './users.js';
 import { PROMO, FORMATS, parsePromoParams, promoSupported } from './services/promovideo.js';
 import { PROMO_STYLES } from './services/promokit.js';
-import { voiceCatalog, parseVoiceParams, sampleFor, listVoices, VOICE_PROVIDERS, VOICE_LANGS, REGION } from './services/voiceover.js';
+import { voiceCatalog, parseVoiceParams, sampleFor, listVoices, VOICE_PROVIDERS, VOICE_LANGS, REGION, localStatus, audioType } from './services/voiceover.js';
 
 // Clés API des fournisseurs de voix : chiffrées dans les réglages du compte, jamais renvoyées (seuls les 4 derniers caractères le sont)
 const keyName = (provider) => `voice_key_${provider}`;
@@ -83,7 +83,7 @@ export function registerPromoRoutes(router, app, { project, aiOpts }) {
       limits: { fps: PROMO.fps, seconds: PROMO.seconds, maxFrames: PROMO.maxFrames, maxSubject: PROMO.maxSubject, maxVideos: PROMO.maxVideos },
       formats: Object.entries(FORMATS).map(([id, f]) => ({ id, label: f.label })),
       styles: [{ id: 'auto', label: 'Automatique' }, ...Object.entries(PROMO_STYLES).map(([id, st]) => ({ id, label: st.label }))],
-      voices: voiceCatalog(...Object.values(await voiceKeyHints(app, p.userId))),
+      voices: voiceCatalog(...Object.values(await voiceKeyHints(app, p.userId)), (app.localStatus || localStatus)(cfg)),
       voiceLangs: VOICE_LANGS,
       canManageKeys: p.access !== 'member',
       videos: await listVideos(db, p.id),
@@ -155,11 +155,11 @@ export function registerPromoRoutes(router, app, { project, aiOpts }) {
     const ck = `${provider}/${voice}/${lang}`;
     let audio = samples.get(ck);
     if (!audio) {
-      try { audio = await (app.sampleVoice || sampleFor)({ provider, voice, lang, ...creds }); } catch (e) { throw fail(provider, e); }
+      try { audio = await (app.sampleVoice || sampleFor)({ provider, voice, lang, ...creds }, { cfg }); } catch (e) { throw fail(provider, e); }
       if (samples.size >= 60) samples.delete(samples.keys().next().value);
       samples.set(ck, audio);
     }
-    ctx.res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Content-Length': audio.length, 'Cache-Control': 'private, max-age=3600', 'X-Content-Type-Options': 'nosniff' });
+    ctx.res.writeHead(200, { 'Content-Type': audioType(audio).mime, 'Content-Length': audio.length, 'Cache-Control': 'private, max-age=3600', 'X-Content-Type-Options': 'nosniff' });
     ctx.res.end(audio);
   }, { limit: 'promo_voice' });
 
