@@ -127,26 +127,37 @@ export function rateLimitWindows(info) {
   return { fiveHour, sevenDay };
 }
 
-// Extrait le premier objet JSON d'une réponse (Claude entoure parfois de ```json)
+// Extrait le premier objet (ou tableau) JSON valide d'une réponse (Claude entoure parfois de ```json, ou ajoute une phrase avant).
+// Un « { » qui n'ouvre pas du JSON (une variable {{site}} citée dans la phrase d'introduction) est ignoré : on essaie le suivant.
 export function extractJson(text) {
   const fenced = /```(?:json)?\s*([\s\S]*?)```/.exec(text);
-  const src = fenced ? fenced[1] : text;
-  const start = src.search(/[[{]/);
-  if (start < 0) throw new Error('Aucun JSON dans la réponse de Claude');
-  const open = src[start];
-  const close = open === '{' ? '}' : ']';
-  let depth = 0, inStr = false, escNext = false;
-  for (let i = start; i < src.length; i++) {
-    const c = src[i];
-    if (inStr) {
-      if (escNext) escNext = false;
-      else if (c === '\\') escNext = true;
-      else if (c === '"') inStr = false;
-      continue;
+  const src = fenced ? fenced[1] : String(text ?? '');
+  let from = 0;
+  let any = false;
+  for (let tries = 0; tries < 300; tries++) {
+    const rel = src.slice(from).search(/[[{]/);
+    if (rel < 0) break;
+    const start = from + rel;
+    any = true;
+    const open = src[start];
+    const close = open === '{' ? '}' : ']';
+    let depth = 0, inStr = false, escNext = false;
+    for (let i = start; i < src.length; i++) {
+      const c = src[i];
+      if (inStr) {
+        if (escNext) escNext = false;
+        else if (c === '\\') escNext = true;
+        else if (c === '"') inStr = false;
+        continue;
+      }
+      if (c === '"') inStr = true;
+      else if (c === open) depth++;
+      else if (c === close && --depth === 0) {
+        try { return JSON.parse(src.slice(start, i + 1)); } catch { /* pas du JSON : on passe au « { » suivant */ }
+        break;
+      }
     }
-    if (c === '"') inStr = true;
-    else if (c === open) depth++;
-    else if (c === close && --depth === 0) return JSON.parse(src.slice(start, i + 1));
+    from = start + 1;
   }
-  throw new Error('JSON incomplet dans la réponse de Claude');
+  throw new Error(any ? 'JSON incomplet dans la réponse de Claude' : 'Aucun JSON dans la réponse de Claude');
 }
