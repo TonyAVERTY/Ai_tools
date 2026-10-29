@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { setSetting, getSetting, now } from '../src/db.js';
+import { toolActivity } from '../src/handlers.js';
 import { testDb } from './helpers/db.js';
 import { Worker, enqueue, latestJobs } from '../src/services/jobs.js';
 import { makeHandlers, parseProspectLine } from '../src/handlers.js';
@@ -351,3 +352,14 @@ test('audit du dépôt, accroche régénérée, consignes personnalisées transm
     assert.equal((await run(s, 'template')).status, 'done', 'retour au défaut');
   } finally { rmSync(s.tmp, { recursive: true, force: true }); }
 });
+
+test('activité de Claude en direct : recherche web, site lu (nom d\'hôte seulement), fichier lu ; rien pour le reste', () => {
+  assert.equal(toolActivity('WebSearch', { query: 'boulangerie  artisanale\nRennes' }), 'Recherche web : « boulangerie artisanale Rennes »');
+  assert.equal(toolActivity('WebFetch', { url: 'https://www.exemple.fr/contact?token=secret#x' }), 'Lecture du site exemple.fr');
+  assert.equal(toolActivity('WebFetch', { url: 'pas une url' }), "Lecture d'une page web");
+  assert.equal(toolActivity('Read', { file_path: '/data/repos/1/src/app.js' }), 'Lecture de src/app.js');
+  assert.equal(toolActivity('Grep', { pattern: 'x' }), 'Recherche dans le code');
+  assert.equal(toolActivity('Bash', { command: 'ls' }), null);
+  assert.ok(toolActivity('WebSearch', { query: 'x'.repeat(300) }).length <= 90);
+});
+

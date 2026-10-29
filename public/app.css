@@ -1374,3 +1374,6 @@ body.tour-active { padding-bottom: var(--tour-pad, 0px); }
   .pill { flex: 1 1 0; min-width: 0; justify-content: center; padding: 0 4px; font-size: .875rem; }
   .pill .ic { display: none; }
 }
+.live-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 2px; font-size: .8125rem; }
+.live-list li { padding-left: 14px; position: relative; color: var(--text); }
+.live-list li::before { content: ''; position: absolute; left: 2px; top: .55em; width: 6px; height: 6px; border-radius: 50%; background: var(--ok); }
