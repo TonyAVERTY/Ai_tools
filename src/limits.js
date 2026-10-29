@@ -23,6 +23,8 @@ export const RATE_LIMITS = {
   poste: { user: { max: 40, windowMs: HOUR } },
   // Vidéos de promotion : un rendu coûte un appel Claude et plusieurs minutes de processeur
   promo: { user: { max: 20, windowMs: HOUR } },
+  // Extraits d'écoute des voix : chacun interroge un service de voix extérieur (mis en cache côté serveur)
+  promo_voice: { user: { max: 60, windowMs: 10 * MIN } },
   // Abonnement iCal (lien secret) : un agenda interroge au plus quelques fois par heure
   ical: { ip: { max: 60, windowMs: 10 * MIN } },
   // API (mode développeur) : par adresse avant authentification, par compte ensuite
