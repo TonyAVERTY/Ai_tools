@@ -68,8 +68,23 @@
     });
     if (r.status === 401) { location.href = '/login'; throw new Error('Session expirée'); }
     const data = await r.json().catch(() => ({}));
+    if (r.status === 403 && data.code === 'link_required') showReconnect();
     if (!r.ok) throw new Error(data.error || `Erreur ${r.status}`);
     return data;
+  }
+
+  // Accès Claude refusé ou perdu (jeton expiré, révoqué) : une fenêtre propose de se reconnecter, une seule fois par page
+  function showReconnect() {
+    if ($('dialog.reconnect') || /^\/(link|account)(\/|$)/.test(location.pathname)) return;
+    const dlg = document.createElement('dialog');
+    dlg.className = 'prospect-dialog modal reconnect';
+    dlg.setAttribute('aria-labelledby', 'reconnect-title');
+    dlg.innerHTML = `<h2 id="reconnect-title"><svg class="ic" aria-hidden="true" viewBox="0 0 24 24"><use href="#i-alert"></use></svg>Claude est déconnecté</h2>
+      <p>Ton accès Claude n'est plus valide (jeton expiré ou révoqué). Tant qu'il n'est pas relié de nouveau, les tâches IA sont à l'arrêt.</p>
+      <div class="row"><a class="btn primary" href="/link">Reconnecter Claude</a><button type="button" class="btn" data-close>Plus tard</button></div>`;
+    dlg.addEventListener('click', (ev) => { if (ev.target === dlg || ev.target.closest('[data-close]')) dlg.close(); });
+    document.body.append(dlg);
+    dlg.showModal();
   }
 
   function toast(msg, kind = 'ok') {

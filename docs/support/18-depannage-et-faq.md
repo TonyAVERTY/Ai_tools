@@ -139,3 +139,10 @@ Non. Les clics répétés sur un même bouton (double clic, rafale) sont ignoré
 
 ## « Analyse en échec : Git : EACCES: permission denied, mkdir '/data/repos/…' »
 Le serveur ne peut pas écrire dans son dossier de données (réglage `DATA_DIR` de l'administrateur) : les dépôts ne peuvent donc pas être clonés. C'est à l'administrateur du serveur de pointer `DATA_DIR` vers un dossier qui appartient à l'utilisateur qui fait tourner iaboss, puis de redémarrer. Une fois corrigé, clique de nouveau sur **Analyser**.
+
+## « Analyse en échec : Secret de liaison illisible : relie de nouveau ton accès Claude »
+Le serveur ne peut pas déchiffrer ton accès Claude : le plus souvent, l'administrateur a changé la clé de chiffrement (`SECRET_KEY`) après ta liaison. La fenêtre « Claude est déconnecté » apparaît alors : clique sur **Reconnecter Claude** et relie de nouveau ton accès (jeton d'abonnement ou clé API), puis relance l'analyse. Rien d'autre n'est perdu.
+
+## La fenêtre « Claude est déconnecté » s'affiche
+Claude a refusé ton accès (jeton expiré ou révoqué, clé API supprimée). Clique sur **Reconnecter Claude** pour relier un nouvel accès ; **Plus tard** ferme simplement la fenêtre.
+

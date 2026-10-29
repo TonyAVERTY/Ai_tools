@@ -5,12 +5,12 @@ import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { now, getSetting, setSetting } from '../src/db.js';
-import { decrypt } from '../src/crypto.js';
+import { decrypt, encrypt } from '../src/crypto.js';
 import { enqueue, Worker, jobRefusal } from '../src/services/jobs.js';
 import { AI_JOBS } from '../src/services/budget.js';
 import { makeClaude } from '../src/handlers.js';
 import {
-  LINK_REQUIRED_MESSAGE, CONSENT_VERSION, CONSENT_CHECKBOX, aiRefusal, validateApiKey, getLinkState, hasUsableLink,
+  LINK_REQUIRED_MESSAGE, LINK_INVALID_MESSAGE, CONSENT_VERSION, CONSENT_CHECKBOX, aiRefusal, validateApiKey, getLinkState, hasUsableLink,
 } from '../src/claudelink.js';
 import { HttpError } from '../src/http.js';
 import { startApp } from './helpers/server.js';
@@ -296,6 +296,35 @@ test('garde « compte relié » à chaque couche : route, enqueue, worker, wrapp
   const claude = makeClaude({ ...s.app, cfg: { ...s.app.cfg, claudeBin: '/inexistant/claude' } });
   await assert.rejects(claude(bare.id, { prompt: 'x' }), { status: 403, message: LINK_REQUIRED_MESSAGE });
   await assert.rejects(claude(999999, { prompt: 'x' }), { status: 403, message: 'Compte supprimé' });
+});
+
+test('accès refusé par Claude en cours de route : la liaison devient invalide, plus de job IA, l\'API répond « link_required »', async () => {
+  const link = { v: 1, mode: 'subscription_token', valid: true, linked_at: 1, validated_at: 1, secret_enc: encrypt(s.app.cfg.secretKey, `${TOKEN}REVOKED`) };
+  const u = await s.newUser({ link });
+  const claude = makeClaude({ ...s.app, cfg: { ...s.app.cfg, claudeBin: makeClaudeBin(s.tmp, { name: 'claude-revoked' }) } });
+  const r = await claude(u.id, { prompt: 'bonjour', maxTurns: 1, tools: [] });
+  assert.equal(r.ok, false);
+  assert.equal((await getLinkState(s.db, u.id)).valid, false);
+  assert.equal(await aiRefusal(s.db, u.id), LINK_INVALID_MESSAGE);
+  const sys = await u.get('/api/system');
+  assert.equal(sys.status, 403);
+  assert.equal((await sys.json()).code, 'link_required');
+  // une réponse qui n'est pas un refus d'accès (quota atteint) ne touche pas à la liaison
+  const ok = await s.newUser({ link: { ...link, secret_enc: encrypt(s.app.cfg.secretKey, TOKEN) } });
+  const q = await claude(ok.id, { prompt: 'QUOTAERR', maxTurns: 1, tools: [] });
+  assert.equal(q.ok, false);
+  assert.equal((await getLinkState(s.db, ok.id)).valid, true);
+});
+
+test('secret de liaison illisible (SECRET_KEY changée) : la liaison devient invalide, l\'interface demande de se reconnecter', async () => {
+  const link = { v: 1, mode: 'subscription_token', valid: true, linked_at: 1, validated_at: 1, secret_enc: encrypt(Buffer.alloc(32, 9), TOKEN) };
+  const u = await s.newUser({ link });
+  const claude = makeClaude({ ...s.app, cfg: { ...s.app.cfg, claudeBin: '/inexistant/claude' } });
+  await assert.rejects(claude(u.id, { prompt: 'x' }), { status: 403, message: /illisible/ });
+  assert.equal((await getLinkState(s.db, u.id)).valid, false);
+  const sys = await u.get('/api/system');
+  assert.equal(sys.status, 403);
+  assert.equal((await sys.json()).code, 'link_required');
 });
 
 test('liaison invalide ou compte suspendu : aucun job IA', async () => {

@@ -32,6 +32,9 @@ const TOKEN_RE = /^[A-Za-z0-9_.-]{20,800}$/;
 const MODELS_URL = 'https://api.anthropic.com/v1/models';
 const SECRET_ENV = { api_key: 'ANTHROPIC_API_KEY', subscription_token: 'CLAUDE_CODE_OAUTH_TOKEN' };
 
+/** Réponse de Claude qui signifie « ton accès est refusé » (jeton expiré ou révoqué, clé invalide) : au sens strict, jamais une panne réseau. */
+export const isAuthRefusal = (text) => /invalid (bearer )?token|invalid (x-)?api[ _-]?key|authentication_error|please run \/login|not logged in|oauth token (has )?(expired|been revoked)|token (has )?(expired|been revoked)|invalid.{0,20}credential|unauthori[sz]ed|\b401\b/i.test(String(text ?? ''));
+
 const truthy = (v) => v === true || v === 'true' || v === 'on' || v === '1' || v === 1;
 
 async function readLink(db, userId) {
@@ -42,6 +45,14 @@ async function readLink(db, userId) {
 
 async function writeLink(db, userId, link) {
   await db.prepare('UPDATE users SET claude_link_json = ? WHERE id = ?').run(link ? JSON.stringify(link) : null, Number(userId));
+}
+
+/** Un job a reçu un refus d'authentification : la liaison est marquée invalide (le secret reste en base), l'interface demande de se reconnecter. */
+export async function markLinkInvalid(db, userId) {
+  const link = await readLink(db, userId);
+  if (!link?.mode || !link.valid) return false;
+  await writeLink(db, userId, { ...link, valid: false, last_test_at: now() });
+  return true;
 }
 
 /** Forme exposée à l'interface : jamais le secret, seulement ses 4 derniers caractères pour la clé API. */
@@ -104,7 +115,11 @@ export async function resolveCredentials(app, userId) {
   const link = await readLink(app.db, userId);
   let secret;
   try { secret = decrypt(app.cfg.secretKey, link.secret_enc); }
-  catch { throw new HttpError(403, 'Secret de liaison illisible : relie de nouveau ton accès Claude'); }
+  catch {
+    // Clé SECRET_KEY changée ou secret abîmé : la liaison est inutilisable, l'interface propose de se reconnecter
+    await markLinkInvalid(app.db, userId);
+    throw new HttpError(403, 'Secret de liaison illisible : relie de nouveau ton accès Claude');
+  }
   if (!secret) throw new HttpError(403, LINK_REQUIRED_MESSAGE);
   return { mode: link.mode, secretEnv: { [SECRET_ENV[link.mode]]: secret } };
 }
@@ -148,7 +163,7 @@ export async function validateSubscriptionToken(app, token) {
   const said = String(r.text ?? '').replace(/\s+/g, ' ').trim().slice(0, 240) || `(sans texte, ${r.subtype ?? 'erreur'})`;
   console.warn(`Vérification du jeton d'abonnement refusée (${r.subtype ?? 'erreur'}) : ${said}`);
   // Refus d'authentification, au sens strict : on n'invalide la liaison que pour ces réponses-là
-  if (/invalid (bearer )?token|authentication_error|please run \/login|oauth token (has )?(expired|been revoked)|token (has )?(expired|been revoked)|invalid.{0,20}credential|unauthori[sz]ed|\b401\b/i.test(`${r.text} ${r.subtype}`)) {
+  if (isAuthRefusal(`${r.text} ${r.subtype}`)) {
     throw new HttpError(400, `Jeton refusé par Claude (invalide ou expiré). Réponse de Claude : ${said}`);
   }
   throw new HttpError(502, `Le jeton n'a pas pu être vérifié : Claude a répondu « ${said} ». Réessaie plus tard.`, { expose: true });
