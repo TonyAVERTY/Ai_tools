@@ -51,6 +51,19 @@ function makeSink() {
   };
 }
 
+/**
+ * Ce que Claude est en train de faire, en une phrase pour l'écran (null = rien à montrer). Jamais de contenu sensible :
+ * une recherche web est affichée telle quelle (c'est le sujet du projet), une page lue seulement par son nom d'hôte.
+ */
+export function toolActivity(name, input = {}) {
+  const clip = (t, n = 70) => { const v = String(t ?? '').replace(/\s+/g, ' ').trim(); return v.length > n ? `${v.slice(0, n - 1)}…` : v; };
+  if (name === 'WebSearch' && input.query) return `Recherche web : « ${clip(input.query)} »`;
+  if (name === 'WebFetch' && input.url) { try { return `Lecture du site ${new URL(input.url).hostname.replace(/^www\./, '')}`; } catch { return 'Lecture d\'une page web'; } }
+  if (name === 'Read' && input.file_path) return `Lecture de ${clip(String(input.file_path).split('/').slice(-2).join('/'), 50)}`;
+  if (name === 'Grep' || name === 'Glob') return 'Recherche dans le code';
+  return null;
+}
+
 // Avancement d'une phase Claude : de `from` à `to` % au fil des messages, sur `maxTurns` au plus (estimation)
 const turnPct = (from, to, n, maxTurns) => Math.round(from + (to - from) * Math.min(1, n / Math.max(1, maxTurns)));
 
@@ -310,11 +323,13 @@ export function makeHandlers(app) {
     const { prompt, system } = rolePrompt({ role, task, projectName: project.name, profile: project.profile, target: project.target || {}, notes, custom: await custom(userId), model, repoFacts: dir ? factsOf(dir) : '' });
     const maxTurns = task.repo ? 14 : task.web ? 10 : 1;
     const sink = makeSink();
+    let turn = 0;
     const r = await claude(userId, {
       prompt, system, model, maxTurns, signal: ctx.signal,
       ...(dir ? { cwd: dir } : {}),
       tools: task.repo ? ['Read', 'Glob', 'Grep'] : task.web ? ['WebSearch', 'WebFetch'] : [],
-      onTurn: (n) => sink.push(() => ctx.progress({ message: `${task.label} · étape ${n}…`, pct: turnPct(10, 95, n, maxTurns) })),
+      onTurn: (n) => { turn = n; sink.push(() => ctx.progress({ message: `${task.label} · étape ${n}…`, pct: turnPct(10, 95, n, maxTurns) })); },
+      onTool: (name, input) => { const a = toolActivity(name, input); if (a) sink.push(() => ctx.progress({ message: `${task.label} : ${a}`, pct: turnPct(10, 95, turn, maxTurns) })); },
     });
     await sink.flush();
     addUsage(ctx, r);
@@ -335,9 +350,11 @@ export function makeHandlers(app) {
       const model = await modelOf(userId, 'analyze_model');
       const { prompt, system } = analyzePrompt(project.name, await custom(userId), model, factsOf(dir));
       const sink = makeSink();
+      let turn = 0;
       const r = await claude(userId, {
         prompt, system, cwd: dir, model, maxTurns: 20, tools: ['Read', 'Glob', 'Grep'], signal: ctx.signal,
-        onTurn: (n) => sink.push(() => ctx.progress({ message: `Lecture du code par Claude (étape ${n})…`, pct: turnPct(10, 95, n, 20) })),
+        onTurn: (n) => { turn = n; sink.push(() => ctx.progress({ message: `Lecture du code par Claude (étape ${n})…`, pct: turnPct(10, 95, n, 20) })); },
+        onTool: (name, input) => { const a = toolActivity(name, input); if (a) sink.push(() => ctx.progress({ message: a, pct: turnPct(10, 95, turn, 20) })); },
       });
       await sink.flush();
       addUsage(ctx, r);
@@ -379,10 +396,11 @@ export function makeHandlers(app) {
       let pending = '';
       let turns = 0;
       let message = 'Recherche en cours…';
+      const recent = []; // derniers prospects ajoutés, montrés en direct dans la carte de la recherche
       const maxTurns = Math.min(80, count * 3 + 10);
       // Le plus avancé des deux : prospects trouvés, ou messages de Claude consommés
       const report = () => ctx.progress({
-        found, target: count, message,
+        found, target: count, message, recent,
         pct: Math.min(99, Math.max(Math.round((found / count) * 100), turnPct(0, 90, turns, maxTurns))),
       });
       const onText = (text) => {
@@ -400,6 +418,8 @@ export function makeHandlers(app) {
               room--;
               found++;
               message = `${found}/${count} — ${p.company}`;
+              recent.push({ company: p.company, city: p.city || '' });
+              if (recent.length > 5) recent.shift();
               await report();
             }
           }
@@ -412,6 +432,7 @@ export function makeHandlers(app) {
         prompt, system, model, tools: ['WebSearch', 'WebFetch'],
         maxTurns, onText, signal: ctx.signal,
         onTurn: (n) => { turns = n; sink.push(report); },
+        onTool: (name, input) => { const a = toolActivity(name, input); if (a) { message = a; sink.push(report); } },
       });
       onText('\n');
       await sink.flush();

@@ -623,11 +623,14 @@
     if (ACTIVE.includes(job.status)) {
       const extra = type === 'prospect' && p.found !== undefined
         ? `<strong>${p.found}</strong> prospect(s) trouvé(s) sur ${p.target}` : '';
+      // Derniers prospects ajoutés, en direct (le plus récent en haut)
+      const live = type === 'prospect' && p.recent?.length
+        ? `<ul class="live-list">${[...p.recent].reverse().map((r) => `<li>${esc(r.company)}${r.city ? ` <span class="muted">· ${esc(r.city)}</span>` : ''}</li>`).join('')}</ul>` : '';
       const running = job.status === 'running';
       const v = pctOf(p) ?? (running ? null : 0);
       box.innerHTML = `<div class="running"><span class="spinner"></span>
         <div><div class="run-head"><span>${esc(p.message || (running ? 'En cours…' : 'En file d\'attente…'))}</span>${v !== null ? `<strong class="jpct">${v} %</strong>` : ''}</div>
-          ${extra ? `<div class="small">${extra}</div>` : ''}${progressBar(job)}</div>
+          ${extra ? `<div class="small">${extra}</div>` : ''}${progressBar(job)}${live}</div>
         <button class="btn small" data-cancel="${job.id}">Annuler</button></div>`;
       paintBars(box);
     } else if (job.status === 'error') {
@@ -765,7 +768,7 @@
 
     if (s.checklist) setChecklist(id, s.checklist);
     state.set(id, st);
-    schedule(el, running.length ? 4000 : 30_000);
+    schedule(el, running.length ? 2500 : 30_000);
   }
 
   function schedule(el, ms) {
