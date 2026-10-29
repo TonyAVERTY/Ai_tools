@@ -29,6 +29,13 @@ test('sans réglage : consignes poussées, avec leur format de réponse imposé'
   }
 });
 
+test('site du produit : le prompt demande {{site}} (jamais l\'adresse en clair) ; sans site, aucune adresse', () => {
+  const withSite = templatePrompt({ profile, target, senderName: 'Tony', site: 'https://monproduit.fr' }).prompt;
+  assert.match(withSite, /Site du produit : https:\/\/monproduit\.fr \(mets \{\{site\}\} dans le mail, pas l'adresse\)/);
+  assert.match(withSite, /Variables disponibles dans le mail : \{\{entreprise\}\}, \{\{ville\}\}, \{\{site\}\}/);
+  assert.match(templatePrompt({ profile, target, senderName: 'Tony' }).prompt, /Site du produit : \(aucun : n'écris aucune adresse de site\)/);
+});
+
 test('par modèle : chaque gamme reçoit son complément ; sans modèle, le texte commun seul', () => {
   const t = (model) => templatePrompt({ profile, target, senderName: 'Tony', model }).prompt;
   assert.match(t('haiku'), /Reste sous 150 mots/);

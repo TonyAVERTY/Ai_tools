@@ -146,3 +146,6 @@ Le serveur ne peut pas déchiffrer ton accès Claude : le plus souvent, l'admini
 ## La fenêtre « Claude est déconnecté » s'affiche
 Claude a refusé ton accès (jeton expiré ou révoqué, clé API supprimée). Clique sur **Reconnecter Claude** pour relier un nouvel accès ; **Plus tard** ferme simplement la fenêtre.
 
+## Le mail de prospection ne contient pas le lien de mon site
+Renseigne l'adresse dans **En-tête → Site du produit** (puis **Enregistrer le site**), clique sur **Générer avec l'IA** dans « Modèle de mail » : le nouveau texte contient `{{site}}`, remplacée à l'envoi par ton adresse. Un modèle déjà généré avant cela n'a pas `{{site}}` : régénère-le, ou ajoute toi-même `{{site}}` dans le corps, puis **Valider le modèle** de nouveau. L'**Aperçu** montre le lien tel qu'il partira.
+

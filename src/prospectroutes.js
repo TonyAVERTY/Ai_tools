@@ -12,7 +12,7 @@ import { quotaFor, planLimitError, withUserLock } from './services/plans.js';
 import { unsubToken } from './crypto.js';
 
 export const MAX_SCORE = 10;
-const VARS = ['entreprise', 'ville', 'accroche', 'expediteur'];
+const VARS = ['entreprise', 'ville', 'accroche', 'expediteur', 'site'];
 
 const httpUrl = (v, max = 300) => {
   const s = String(v ?? '').trim();
@@ -160,11 +160,11 @@ export function registerProspectRoutes(router, app, { project }) {
     let subject = template.subject;
     if (kind === 'followup') {
       const first = await getTemplate(db, p.id, 'initial');
-      subject = followupSubject(template, { subject: fillTemplate(first?.subject || '', { entreprise: person.company, ville: person.city || '', accroche: person.hook || '', expediteur: smtp.fromName }) });
+      subject = followupSubject(template, { subject: fillTemplate(first?.subject || '', { entreprise: person.company, ville: person.city || '', accroche: person.hook || '', expediteur: smtp.fromName, site: p.siteUrl }) });
     }
     const unsubUrl = prospect ? `${cfg.appUrl}/u/${encodeURIComponent(person.email)}/${unsubToken(cfg.secretKey, person.email)}` : `${cfg.appUrl}/u/exemple`;
     const footer = (await getSetting(db, p.userId, 'mail_footer', '1')) !== '0'; // l'aperçu montre ce qui partira, pied de page compris ou non
-    const mail = buildProspectMail({ template: { ...template, subject }, prospect: person, smtp, unsubUrl, subject, readReceipt: false, footer, html: asBool(b.html) });
+    const mail = buildProspectMail({ template: { ...template, subject }, prospect: person, smtp, site: p.siteUrl, unsubUrl, subject, readReceipt: false, footer, html: asBool(b.html) });
     // Points d'attention : ce qu'on ne voit pas toujours à la relecture
     const warnings = [];
     const used = [...String(template.subject + ' ' + body).matchAll(/\{\{\s*(\w+)\s*\}\}/g)].map((m) => m[1]);
@@ -172,6 +172,7 @@ export function registerProspectRoutes(router, app, { project }) {
     if (kind === 'initial' && used.includes('accroche') && !person.hook) warnings.push("Ce prospect n'a pas d'accroche : {{accroche}} restera vide.");
     if (used.includes('ville') && !person.city) warnings.push('Ce prospect n\'a pas de ville : {{ville}} restera vide.');
     if (used.includes('expediteur') && !smtp.fromName) warnings.push("Le nom d'expéditeur n'est pas réglé (Configuration du projet) : {{expediteur}} restera vide.");
+    if (used.includes('site') && !p.siteUrl) warnings.push("Aucun site n'est renseigné pour ce projet (section En-tête) : {{site}} restera vide.");
     if (!p.smtp?.fromEmail) warnings.push("Aucune adresse d'envoi n'est réglée pour ce projet : l'expéditeur affiché est un exemple.");
     if (!mail.subject) warnings.push("L'objet est vide.");
     if (!footer) warnings.push('Le pied de page est retiré (Réglages → Garde-fous) : ce mail part sans lien « Ne plus recevoir de messages » ni origine de l\'adresse.');
