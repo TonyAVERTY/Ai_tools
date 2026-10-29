@@ -634,7 +634,15 @@ Réponds UNIQUEMENT avec : {"post":"..."}`,
  * Vidéo de promotion : Claude répond par UN document HTML. La partie technique (renderFrame, dimensions, durée, interdictions) reste dans le code ;
  * seules les consignes de direction artistique se modifient dans les Réglages. `fix` : message d'erreur du rendu précédent, pour une correction.
  */
-export function promoPrompt({ projectName, profile, target, subject = '', style = 'auto', site = '', seconds, fps, format, width, height, custom, model = null, fix = null }) {
+/** Voix off : le script que Claude écrit avec la scène (lu ensuite par un fournisseur de synthèse vocale). */
+function voiceContract(voice, seconds) {
+  const lang = voice.langName || 'français';
+  const words = Math.max(6, Math.round(seconds * 2.4));
+  return `- VOIX OFF : une voix lira la vidéo en ${lang}. Ajoute dans le <body> un script de données, exactement de cette forme : <script type="application/json" id="voix">[{"t":0.4,"texte":"Première phrase."},{"t":5,"texte":"Deuxième phrase."}]</script> où "t" est la seconde (0 à ${seconds}) où la phrase COMMENCE. Une phrase par plan, calée sur le moment où le plan apparaît ; une phrase se dit à environ 2,5 mots par seconde et doit finir avant la phrase suivante (laisse une demi-seconde de respiration). Au total, ${words} mots au plus pour ${seconds} s ; la dernière phrase se termine au moins 1 s avant la fin. Le texte est dit à voix haute : écris comme on parle, en toutes lettres (pas d'abréviation, pas de symbole, pas d'émoji, pas de balise), avec le nom du produit et la promesse, sans rien inventer. Les textes affichés dans la vidéo sont eux aussi en ${lang}, et la voix dit l'essentiel de ce qui s'affiche (elle ne le lit pas mot à mot).
+`;
+}
+
+export function promoPrompt({ projectName, profile, target, subject = '', style = 'auto', site = '', seconds, fps, format, width, height, custom, model = null, fix = null, voice = null }) {
   const st = pickStyle(style, `${projectName}|${subject}`);
   const subjectLine = subject
     ? `Sujet demandé : « ${subject} ». La vidéo parle de ce sujet, en lien avec le produit.`
@@ -664,7 +672,7 @@ Contrat technique (obligatoire, la vidéo est produite à partir de ton document
 - Tout est dans le document : CSS et script en ligne, formes en SVG ou CSS, canvas 2D si besoin. Aucune adresse http(s), aucune police ni image externe, pas d'iframe, pas de <link>. Polices : font-family: system-ui, "Helvetica Neue", Arial, sans-serif.
 - Au plus ${PROMO_HTML_MAX} caractères. Le document doit rester sobre : pas de milliers de nœuds.
 - La scène est mesurée avant le rendu et renvoyée si elle est vide, minuscule, collée en haut, sur fond blanc ou figée : l'image est occupée à au moins 30 %, les titres font au moins 6 % du petit côté, la composition est centrée, le fond est un dégradé, et quelque chose bouge à chaque instant.
-${fix ? `\nTa version précédente a été refusée au rendu : ${String(fix).slice(0, 600)}\nCorrige ce problème précisément et renvoie le document complet corrigé.` : ''}`,
+${voice ? voiceContract(voice, seconds) : ''}${fix ? `\nTa version précédente a été refusée au rendu : ${String(fix).slice(0, 600)}\nCorrige ce problème précisément et renvoie le document complet corrigé.` : ''}`,
   };
 }
 

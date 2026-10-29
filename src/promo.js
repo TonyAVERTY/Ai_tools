@@ -3,7 +3,8 @@
 import { createReadStream, existsSync, mkdirSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { HttpError, json, readBody } from './http.js';
-import { now } from './db.js';
+import { now, getSetting, setSetting } from './db.js';
+import { encrypt, decrypt } from './crypto.js';
 import { getProject } from './projects.js';
 import { enqueue } from './services/jobs.js';
 import { assertCanRunAi } from './claudelink.js';
@@ -11,6 +12,19 @@ import { budgetState } from './services/budget.js';
 import { userPromoRoot } from './users.js';
 import { PROMO, FORMATS, parsePromoParams, promoSupported } from './services/promovideo.js';
 import { PROMO_STYLES } from './services/promokit.js';
+import { voiceCatalog, parseVoiceParams, sampleFor, listVoices, VOICE_PROVIDERS, VOICE_LANGS } from './services/voiceover.js';
+
+// Clés API des fournisseurs de voix : chiffrées dans les réglages du compte, jamais renvoyées (seuls les 4 derniers caractères le sont)
+const keyName = (provider) => `voice_key_${provider}`;
+export async function getVoiceKey(app, userId, provider) {
+  const enc = await getSetting(app.db, userId, `${keyName(provider)}_enc`);
+  try { return enc ? decrypt(app.cfg.secretKey, enc) : null; } catch { return null; } // illisible (SECRET_KEY changée) : à ressaisir
+}
+async function voiceKeyHints(app, userId) {
+  const out = {};
+  for (const [id, p] of Object.entries(VOICE_PROVIDERS)) if (p.keyed && await getVoiceKey(app, userId, id)) out[id] = (await getSetting(app.db, userId, `${keyName(id)}_last4`)) || '••••';
+  return out;
+}
 
 const nameOf = (id) => `${Number(id)}.mp4`;
 export const promoFile = (cfg, userId, id) => join(userPromoRoot(cfg, userId), nameOf(id));
@@ -63,9 +77,81 @@ export function registerPromoRoutes(router, app, { project, aiOpts }) {
       limits: { fps: PROMO.fps, seconds: PROMO.seconds, maxFrames: PROMO.maxFrames, maxSubject: PROMO.maxSubject, maxVideos: PROMO.maxVideos },
       formats: Object.entries(FORMATS).map(([id, f]) => ({ id, label: f.label })),
       styles: [{ id: 'auto', label: 'Automatique' }, ...Object.entries(PROMO_STYLES).map(([id, st]) => ({ id, label: st.label }))],
+      voices: voiceCatalog(await voiceKeyHints(app, p.userId)),
+      voiceLangs: VOICE_LANGS,
+      canManageKeys: p.access !== 'member',
       videos: await listVideos(db, p.id),
     });
   });
+
+  const keyedProvider = (provider) => {
+    if (!VOICE_PROVIDERS[provider]?.keyed) throw new HttpError(400, 'Ce fournisseur de voix n\'a pas de clé', { expose: true });
+    return provider;
+  };
+  const needKey = async (ctx, provider) => {
+    const key = await getVoiceKey(app, ctx.session.userId, provider);
+    if (!key) throw new HttpError(400, `Ajoute d'abord ta clé API ${VOICE_PROVIDERS[provider].label.split(' (')[0]}`, { expose: true });
+    return key;
+  };
+  const fail = (provider, e) => {
+    const name = VOICE_PROVIDERS[provider].label.split(' (')[0];
+    return new HttpError(502, e.message.includes(name) ? e.message : `${VOICE_PROVIDERS[provider].label} ne répond pas : ${e.message}`, { expose: true });
+  };
+
+  // Voix d'un fournisseur à clé : demandées à son API avec la clé de la personne (gardées 10 minutes)
+  const voiceLists = new Map();
+  router.get('/api/promo/voices', async (ctx) => {
+    const provider = keyedProvider(ctx.url.searchParams.get('provider') || '');
+    const key = await needKey(ctx, provider);
+    const ck = `${ctx.session.userId}/${provider}`;
+    let hit = voiceLists.get(ck);
+    if (!hit || hit.at < Date.now() - 10 * 60_000) {
+      try { hit = { at: Date.now(), voices: await (app.listVoices || listVoices)(provider, { key }) }; } catch (e) { throw fail(provider, e); }
+      voiceLists.set(ck, hit);
+    }
+    json(ctx.res, { voices: hit.voices });
+  }, { limit: 'promo_voice' });
+
+  // Enregistrer une clé : elle est essayée (liste des voix) avant d'être gardée chiffrée ; elle n'est jamais renvoyée
+  router.post('/api/promo/voice-key', async (ctx) => {
+    const b = await readBody(ctx.req);
+    const provider = keyedProvider(String(b.provider || ''));
+    const key = String(b.key ?? '').trim();
+    if (key.length < 16 || key.length > 200 || /\s/.test(key)) throw new HttpError(400, 'Cette clé API n\'a pas la bonne forme : colle-la en entier, sans espace', { expose: true });
+    let voices;
+    try { voices = await (app.listVoices || listVoices)(provider, { key }); } catch (e) { throw fail(provider, e); }
+    await setSetting(db, ctx.session.userId, `${keyName(provider)}_enc`, encrypt(cfg.secretKey, key));
+    await setSetting(db, ctx.session.userId, `${keyName(provider)}_last4`, key.slice(-4));
+    voiceLists.set(`${ctx.session.userId}/${provider}`, { at: Date.now(), voices });
+    json(ctx.res, { ok: true, keyLast4: key.slice(-4), voices });
+  }, { limit: 'promo_voice' });
+
+  router.post('/api/promo/voice-key/delete', async (ctx) => {
+    const provider = keyedProvider(String((await readBody(ctx.req)).provider || ''));
+    await setSetting(db, ctx.session.userId, `${keyName(provider)}_enc`, null);
+    await setSetting(db, ctx.session.userId, `${keyName(provider)}_last4`, null);
+    voiceLists.delete(`${ctx.session.userId}/${provider}`);
+    json(ctx.res, { ok: true });
+  });
+
+  // Extrait d'écoute d'une voix (l'élément audio de la page le lit directement) : mis en cache, car chaque appel interroge le service de voix
+  const samples = new Map();
+  router.get('/api/promo/voice-sample', async (ctx) => {
+    const sp = ctx.url.searchParams;
+    const vp = parseVoiceParams({ voice: true, voiceProvider: sp.get('provider') || '', voiceName: sp.get('voice') || '', voiceLang: sp.get('lang') || '' });
+    if (vp.error) throw new HttpError(400, 'Voix inconnue', { expose: true });
+    const { provider, voice, lang } = vp.voice;
+    const key = VOICE_PROVIDERS[provider].keyed ? await needKey(ctx, provider) : null;
+    const ck = `${provider}/${voice}/${lang}`;
+    let audio = samples.get(ck);
+    if (!audio) {
+      try { audio = await (app.sampleVoice || sampleFor)({ provider, voice, lang, key }); } catch (e) { throw fail(provider, e); }
+      if (samples.size >= 60) samples.delete(samples.keys().next().value);
+      samples.set(ck, audio);
+    }
+    ctx.res.writeHead(200, { 'Content-Type': 'audio/mpeg', 'Content-Length': audio.length, 'Cache-Control': 'private, max-age=3600', 'X-Content-Type-Options': 'nosniff' });
+    ctx.res.end(audio);
+  }, { limit: 'promo_voice' });
 
   router.post('/api/projects/:id/promo/generate', async (ctx) => {
     const p = await project(ctx);
@@ -75,12 +161,15 @@ export function registerPromoRoutes(router, app, { project, aiOpts }) {
     if (!p.profile) throw new HttpError(400, "Analyse le projet d'abord", { expose: true });
     const params = parsePromoParams(b);
     if (params.error) throw new HttpError(400, params.error, { expose: true });
+    const vp = parseVoiceParams(b);
+    if (vp.error) throw new HttpError(400, vp.error, { expose: true });
+    if (vp.voice) Object.assign(params, { voice: true, voiceProvider: vp.voice.provider, voiceName: vp.voice.voice, voiceLang: vp.voice.lang });
     if ((await countVideos(db, p.userId)) >= PROMO.maxVideos) throw new HttpError(409, `Tu as déjà ${PROMO.maxVideos} vidéos : supprime-en une avant d'en produire une autre.`, { expose: true });
     await assertCanRunAi(db, p.userId, aiOpts);
     const r = await enqueue(db, { userId: p.userId, projectId: p.id, type: 'promo_video', params }, aiOpts);
     const budget = await budgetState(db, p.userId);
     json(ctx.res, { ...r, budgetBlocked: budget.blocked ? budget.reason : null });
-  }, LIMIT);
+  }, { limit: 'promo_voice' });
 
   // Lecture (aperçu et téléchargement) : toute personne qui a accès au projet ; type figé, jamais interprété par le navigateur
   router.get('/api/promo/:vid/file', async ({ req, res, params, session, url }) => {
