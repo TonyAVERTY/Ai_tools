@@ -613,7 +613,7 @@ export function makeHandlers(app) {
         for (let attempt = 1; ; attempt++) {
           await ctx.progress({ message: attempt === 1 ? (params.subject ? 'Claude conçoit la vidéo sur ton sujet…' : 'Claude conçoit la vidéo de présentation du projet…') : 'Claude corrige la scène…', pct: attempt === 1 ? 8 : 40 });
           const { prompt, system } = promoPrompt({
-            projectName: project.name, profile: project.profile, target: project.target || {}, subject: params.subject,
+            projectName: project.name, profile: project.profile, target: project.target || {}, subject: params.subject, style: params.style, site: project.siteUrl,
             seconds: params.seconds, fps: params.fps, format: params.format, width: fmt.width, height: fmt.height, custom: await custom(userId), model, fix,
           });
           const r = await creeping(ctx, attempt === 1 ? (params.subject ? 'Claude conçoit la vidéo sur ton sujet…' : 'Claude conçoit la vidéo de présentation du projet…') : 'Claude corrige la scène…', attempt === 1 ? 8 : 40, () => claude(userId, { prompt, system, model, maxTurns: 1, tools: [], signal: ctx.signal }), { to: 44 });
@@ -622,11 +622,13 @@ export function makeHandlers(app) {
           try {
             const out = await (app.renderPromo || renderPromo)({
               cfg, html: extractScene(r.text), fps: params.fps, seconds: params.seconds, width: fmt.width, height: fmt.height, out: video.path, signal: ctx.signal,
+              // Première version : refusée si elle est vide, minuscule, figée ou sur fond blanc ; seconde : rendue quand même, avec les constats gardés
+              quality: cfg.promoQuality === false ? 'off' : attempt === 1 ? 'strict' : 'warn',
               onProgress: ({ done, total }) => sink.push(() => ctx.progress({ message: `Rendu de la vidéo : image ${done}/${total}`, pct: 45 + Math.round((done / total) * 53) })),
             });
             await sink.flush();
             await finishVideo(db, video.id, out.bytes);
-            return { ok: true, videoId: video.id, frames: out.frames, attempts: attempt };
+            return { ok: true, videoId: video.id, frames: out.frames, attempts: attempt, ...(out.notes?.length ? { notes: out.notes } : {}) };
           } catch (e) {
             await sink.flush().catch(() => {});
             if (!(e instanceof SceneError)) throw e;
