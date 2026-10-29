@@ -857,7 +857,8 @@ input.copy { font-family: var(--mono); font-size: .8125rem; }
 @keyframes fx-flash { 0% { background: color-mix(in srgb, var(--accent-2) 38%, transparent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-2) 45%, transparent); } 100% { background: transparent; box-shadow: 0 0 0 3px transparent; } }
 @media (prefers-reduced-motion: reduce) { .jitem.new { animation: none; } }
 /* Page défilée : le menu « Activité » reste visible, épinglé en haut à droite */
-body.hdr-off .jobs { position: fixed; top: 10px; right: 12px; z-index: 60; padding: 3px; background: var(--card); border: 1px solid var(--line-strong); border-radius: 999px; box-shadow: var(--shadow-3); }
+body.hdr-off .jobs { position: fixed; top: 10px; right: 12px; z-index: 60; }
+body.hdr-off .jobs-btn { box-shadow: var(--shadow-3); }
 
 /* ---------- Navigation sans rafraîchissement (public/ajax.js) : filet de chargement en haut de page ---------- */
 html.nav-busy { cursor: progress; }
