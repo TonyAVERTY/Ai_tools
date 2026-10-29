@@ -461,14 +461,13 @@
     const running = j.status === 'running';
     const v = pctOf(p) ?? (running ? null : 0); // le pourcentage s'affiche aussi pour une tâche en attente (0 %)
     const state = scheduled ? `Programmé ${fmtWhen(j.runAfter)}` : running ? `Démarré ${ago(j.startedAt)}` : 'En file d\'attente';
-    const modelNote = p.model ? ` · modèle ${p.model}` : '';
     const msg = p.message || (running ? 'En cours…' : '');
     return `<div class="jitem j-${scheduled ? 'scheduled' : j.status}${isNew ? ' new' : ''}">
       <div class="jrow">${scheduled ? '<span class="moon" aria-hidden="true"></span>' : running ? '<span class="pulse" aria-hidden="true"></span>' : '<span class="dot-wait" aria-hidden="true"></span>'}
-        <strong>${esc(LABELS[j.type] || j.label || j.type)}</strong><span class="jproj">${j.project ? esc(j.project) : ''}</span>${v !== null ? `<span class="jpct">${v} %</span>` : ''}</div>
+        <strong>${esc(LABELS[j.type] || j.label || j.type)}</strong>${p.model ? `<span class="jmodel" title="Modèle utilisé">${esc(p.model)}</span>` : ''}<span class="jproj">${j.project ? esc(j.project) : ''}</span>${v !== null ? `<span class="jpct">${v} %</span>` : ''}</div>
       ${msg ? `<div class="jmsg small muted">${esc(msg)}</div>` : ''}
       ${progressBar(j)}
-      <div class="jmeta small muted"><span>${esc(state)}${esc(modelNote)}</span>
+      <div class="jmeta small muted"><span>${esc(state)}</span>
         <span>${j.projectId ? `<button type="button" class="link small" data-goto="${j.projectId}">Voir</button> · ` : ''}<button type="button" class="link small" data-cancel="${j.id}">Annuler</button></span></div>
     </div>`;
   }

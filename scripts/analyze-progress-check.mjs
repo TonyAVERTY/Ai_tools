@@ -33,7 +33,7 @@ ok(/42 %/.test(await box.innerText()) && /Lecture du code/.test(await box.innerT
 await p.locator('.jobs-btn').click();
 await p.waitForFunction(() => /42 %/.test(document.querySelector('[data-jobs-list]')?.textContent || ''), null, { timeout: 8000 }).catch(() => {});
 ok(/Analyse/.test(await p.locator('[data-jobs-list]').innerText()) && /42 %/.test(await p.locator('[data-jobs-list]').innerText()), 'menu Activité : Analyse 42 %');
-ok(/modèle Sonnet 5\.5/.test(await p.locator('[data-jobs-list]').innerText()), 'menu Activité : le modèle utilisé est affiché');
+ok(/Sonnet 5\.5/.test(await p.locator('[data-jobs-list] .jrow .jmodel').first().innerText()), 'menu Activité : le modèle utilisé est à côté du job');
 ok(/Modèle : Sonnet 5\.5/.test(await box.innerText()), 'page du projet : le modèle utilisé est affiché');
 ok(errs.length === 0, `aucune erreur JS ${errs.join(' | ')}`);
 
