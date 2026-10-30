@@ -11,7 +11,6 @@ import { VOICE_PROVIDERS, parseVoiceParams, extractVoiceScript, prepareVoice, cl
 import { PROMO, FORMATS, SCENE_REFUSED, SceneError, parsePromoParams, extractScene, promoSupported, renderPromo } from './services/promovideo.js';
 import { reviewPromo } from './services/promoqa.js';
 import { createJobStream } from './services/jobstream.js';
-import { inspectAudio } from './services/audioquality.js';
 import { reserveVideo, finishVideo, removeVideo, countVideos, keepScene, takeScene, getVoiceKey, getVoiceRegion } from './promo.js';
 import { linkedinAccount, saveDraft, recentDrafts } from './linkedin.js';
 import { followupCandidates, followupSubject, isBusinessHours } from './services/followup.js';
@@ -682,25 +681,21 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
             });
             await sink.flush();
             let bytes = out.bytes;
-            let audioReport=null;
             if (prepared) {
               await ctx.progress({ message: 'Ajout de la voix à la vidéo…', pct: 99 });
               await (app.mixVoice || mixVoice)({ cfg, videoPath: video.path, placed: prepared.placed, seconds: params.seconds, signal: ctx.signal });
               bytes = statSync(video.path).size;
-              await ctx.progress({message:'Contrôle de la piste audio finale…',pct:99});
-              audioReport=await (app.inspectAudio||inspectAudio)(cfg,video.path,{signal:ctx.signal});
             }
             const quality = await (app.reviewPromo || reviewPromo)({
               cfg, videoPath: video.path, seconds: params.seconds, width: fmt.width, height: fmt.height,
               voiceSegments, placed: prepared?.placed || [], model, extraRoot: userChatRoot(cfg, userId), signal: ctx.signal,
-              audioReport,
               onProgress: (p) => sink.push(() => ctx.progress({ message: typeof p === 'string' ? p : p.message, pct: 99 })),
               runAgent: async (options) => { const result = await claude(userId, options); addUsage(ctx, result); return result; },
             });
             await sink.flush();
             await finishVideo(db, video.id, bytes);
             notes = [...notes, ...(out.notes || [])];
-            return { ok: true, videoId: video.id, frames: out.frames, attempts: attempt, qualityReviews: quality.reviews, ...(audioReport ? { audioReport } : {}), ...(voice ? { voice: voice.voice } : {}), ...(notes.length ? { notes } : {}) };
+            return { ok: true, videoId: video.id, frames: out.frames, attempts: attempt, qualityReviews: quality.reviews, ...(voice ? { voice: voice.voice } : {}), ...(notes.length ? { notes } : {}) };
           } catch (e) {
             await sink.flush().catch(() => {});
             if (!(e instanceof SceneError)) throw e;
