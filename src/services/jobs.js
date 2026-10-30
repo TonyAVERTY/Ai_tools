@@ -4,6 +4,7 @@ import { now } from '../db.js';
 import { modelLabel } from './models.js';
 import { HttpError } from '../http.js';
 import { SCENE_REFUSED } from './promovideo.js';
+import { reviewVerdict } from './promoqa.js';
 import { AI_JOBS } from './budget.js';
 import { getUser } from '../users.js';
 import { aiRefusal, assertCanRunAi } from '../claudelink.js';
@@ -95,17 +96,22 @@ export async function cancelJob(db, userId, jobId) {
   if (!r.changes && !(await db.prepare('SELECT 1 FROM jobs WHERE id = ? AND user_id = ?').get(jobId, userId))) throw new HttpError(404, 'Job introuvable');
 }
 
-/** Une relance conserve la tâche en échec et repasse par les plafonds et autorisations habituels. */
+/**
+ * Une relance conserve la tâche en échec et repasse par les plafonds et autorisations habituels.
+ * Une vidéo livrée avec les avertissements des agents (tâche terminée) peut aussi être relancée ou corrigée.
+ */
 export async function retryJob(db, userId, jobId, opts = {}, { fix = false } = {}) {
   const job = await db.prepare('SELECT * FROM jobs WHERE id = ? AND user_id = ?').get(jobId, userId);
   if (!job) throw new HttpError(404, 'Job introuvable');
-  if (job.status !== 'error') throw new HttpError(409, 'Seule une tâche en échec peut être relancée');
+  const warnings = job.status === 'done' && job.type === 'promo_video' ? (JSON.parse(job.result_json || '{}').qualityWarnings || []) : [];
+  if (job.status !== 'error' && !warnings.length) throw new HttpError(409, 'Seule une tâche en échec peut être relancée');
   const params = JSON.parse(job.params_json || '{}');
   if (fix) {
     // Correction : le verdict du contrôle repart chez Claude avec la dernière scène (seule une scène refusée est corrigeable)
     const error = String(job.error ?? '');
-    if (job.type !== 'promo_video' || !error.startsWith(SCENE_REFUSED)) throw new HttpError(409, 'Cette erreur ne se corrige pas automatiquement : utilise « Réessayer »', { expose: true });
-    Object.assign(params, { fix: error.slice(SCENE_REFUSED.length), fixScene: job.id });
+    const verdict = warnings.length ? reviewVerdict(warnings) : (job.type === 'promo_video' && error.startsWith(SCENE_REFUSED) ? error.slice(SCENE_REFUSED.length) : '');
+    if (!verdict) throw new HttpError(409, 'Cette erreur ne se corrige pas automatiquement : utilise « Réessayer »', { expose: true });
+    Object.assign(params, { fix: verdict, fixScene: job.id });
   }
   return enqueue(db, { userId, projectId: job.project_id, type: job.type, params }, opts);
 }
