@@ -3,6 +3,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { now } from '../db.js';
 import { modelLabel } from './models.js';
 import { HttpError } from '../http.js';
+import { SCENE_REFUSED } from './promovideo.js';
 import { AI_JOBS } from './budget.js';
 import { getUser } from '../users.js';
 import { aiRefusal, assertCanRunAi } from '../claudelink.js';
@@ -95,11 +96,18 @@ export async function cancelJob(db, userId, jobId) {
 }
 
 /** Une relance conserve la tâche en échec et repasse par les plafonds et autorisations habituels. */
-export async function retryJob(db, userId, jobId, opts = {}) {
+export async function retryJob(db, userId, jobId, opts = {}, { fix = false } = {}) {
   const job = await db.prepare('SELECT * FROM jobs WHERE id = ? AND user_id = ?').get(jobId, userId);
   if (!job) throw new HttpError(404, 'Job introuvable');
   if (job.status !== 'error') throw new HttpError(409, 'Seule une tâche en échec peut être relancée');
-  return enqueue(db, { userId, projectId: job.project_id, type: job.type, params: JSON.parse(job.params_json || '{}') }, opts);
+  const params = JSON.parse(job.params_json || '{}');
+  if (fix) {
+    // Correction : le verdict du contrôle repart chez Claude avec la dernière scène (seule une scène refusée est corrigeable)
+    const error = String(job.error ?? '');
+    if (job.type !== 'promo_video' || !error.startsWith(SCENE_REFUSED)) throw new HttpError(409, 'Cette erreur ne se corrige pas automatiquement : utilise « Réessayer »', { expose: true });
+    Object.assign(params, { fix: error.slice(SCENE_REFUSED.length), fixScene: job.id });
+  }
+  return enqueue(db, { userId, projectId: job.project_id, type: job.type, params }, opts);
 }
 
 /** Derniers jobs d'un projet (le projet doit déjà avoir été vérifié comme appartenant à l'utilisateur). */

@@ -8,11 +8,11 @@ import { syncRepo } from './services/git.js';
 import { normalizeModel } from './services/models.js';
 import { analyzePrompt, prospectPrompt, templatePrompt, reviewMailPrompt, followupTemplatePrompt, evolutionPrompt, linkedinPostPrompt, hookPrompt, auditPrompt, promoPrompt, rolePrompt, parseCustomPrompts, LEVELS } from './services/prompts.js';
 import { VOICE_PROVIDERS, parseVoiceParams, extractVoiceScript, prepareVoice, cleanVoice, mixVoice, synthesize, langName } from './services/voiceover.js';
-import { PROMO, FORMATS, SceneError, parsePromoParams, extractScene, promoSupported, renderPromo } from './services/promovideo.js';
+import { PROMO, FORMATS, SCENE_REFUSED, SceneError, parsePromoParams, extractScene, promoSupported, renderPromo } from './services/promovideo.js';
 import { reviewPromo } from './services/promoqa.js';
 import { createJobStream } from './services/jobstream.js';
 import { inspectAudio } from './services/audioquality.js';
-import { reserveVideo, finishVideo, removeVideo, countVideos, getVoiceKey, getVoiceRegion } from './promo.js';
+import { reserveVideo, finishVideo, removeVideo, countVideos, keepScene, takeScene, getVoiceKey, getVoiceRegion } from './promo.js';
 import { linkedinAccount, saveDraft, recentDrafts } from './linkedin.js';
 import { followupCandidates, followupSubject, isBusinessHours } from './services/followup.js';
 import { EMAIL_RE, createTransport, buildProspectMail, allowedToSend, makeMessageId } from './services/mailer.js';
@@ -633,9 +633,10 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
       const video = await reserveVideo(app, { userId, projectId: project.id, subject: params.subject, fps: params.fps, seconds: params.seconds, format: params.format, width: fmt.width, height: fmt.height });
       const sink = makeSink();
       try {
-        let fix = null;
-        let previousScene = '';
-        for (let attempt = 1; ; attempt++) {
+        // « Corriger » relance le job avec le verdict du contrôle et la dernière scène refusée
+        let fix = String(ctx.params.fix ?? '').slice(0, 6000) || null;
+        let previousScene = fix ? takeScene(cfg, userId, ctx.params.fixScene) : '';
+        for (let attempt = fix ? 2 : 1; ; attempt++) {
           await ctx.progress({ message: attempt === 1 ? (params.subject ? 'Claude conçoit la vidéo sur ton sujet…' : 'Claude conçoit la vidéo de présentation du projet…') : 'Claude corrige la scène…', pct: attempt === 1 ? 8 : 40 });
           const { prompt, system } = promoPrompt({
             projectName: project.name, profile: project.profile, target: project.target || {}, subject: params.subject, style: params.style, site: project.siteUrl,
@@ -703,7 +704,10 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
           } catch (e) {
             await sink.flush().catch(() => {});
             if (!(e instanceof SceneError)) throw e;
-            if (attempt >= 3) throw new Error(`La scène écrite par Claude ne passe pas au rendu : ${e.message}`);
+            if (attempt >= 3) {
+              keepScene(cfg, userId, ctx.job.id, previousScene);
+              throw new Error(`${SCENE_REFUSED}${e.message}`);
+            }
             fix = e.message;
           } finally { cleanVoice(prepared); }
         }
