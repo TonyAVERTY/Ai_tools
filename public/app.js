@@ -143,6 +143,7 @@
     return m < 1 ? "à l'instant" : m < 60 ? `il y a ${m} min` : m < 1440 ? `il y a ${Math.round(m / 60)} h` : `il y a ${Math.round(m / 1440)} j`;
   };
   const pct = (x) => `${Math.round(x * 100)} %`;
+  const tokenText = (value) => `${Math.max(0, Number(value) || 0).toLocaleString('fr-FR')} tokens`;
   const ACTIVE = ['queued', 'running'];
   const LABELS = {
     analyze: 'Analyse', prospect: 'Recherche', template: 'Modèle', send: 'Envoi', evolution: 'Évolutions',
@@ -480,16 +481,17 @@
     const scheduled = j.status === 'queued' && j.runAfter && j.runAfter * 1000 > Date.now();
     const running = j.status === 'running';
     const v = pctOf(p) ?? (running ? null : 0); // le pourcentage s'affiche aussi pour une tâche en attente (0 %)
-    const state = scheduled ? `Programmé ${fmtWhen(j.runAfter)}` : running ? `Démarré ${ago(j.startedAt)}` : 'En file d\'attente';
-    const msg = p.message || (running ? 'En cours…' : '');
+    const state = j.status === 'error' ? 'En échec' : scheduled ? `Programmé ${fmtWhen(j.runAfter)}` : running ? `Démarré ${ago(j.startedAt)}` : 'En file d\'attente';
+    const msg = j.status === 'error' ? j.error || 'La tâche a échoué' : p.message || (running ? 'En cours…' : '');
     return `<div class="jitem j-${scheduled ? 'scheduled' : j.status}${isNew ? ' new' : ''}">
       <div class="jrow">${scheduled ? '<span class="moon" aria-hidden="true"></span>' : running ? '<span class="pulse" aria-hidden="true"></span>' : '<span class="dot-wait" aria-hidden="true"></span>'}
         <strong>${esc(LABELS[j.type] || j.label || j.type)}</strong>${p.model ? `<span class="jmodel" title="Modèle utilisé">${esc(p.model)}</span>` : ''}<span class="jproj">${j.project ? esc(j.project) : ''}</span>${v !== null ? `<span class="jpct">${v} %</span>` : ''}</div>
       ${msg ? `<div class="jmsg small muted">${esc(msg)}</div>` : ''}
       ${progressBar(j)}
       ${remainingTime(j) ? `<div class="small muted">${esc(remainingTime(j))}</div>` : ''}
+      <div class="small muted">${tokenText(j.tokensUsed)}</div>
       <div class="jmeta small muted"><span>${esc(state)}</span>
-        <span>${j.canViewLogs !== false ? `<a class="link small" href="/jobs/${j.id}">Voir</a> · ` : ''}<button type="button" class="link small" data-cancel="${j.id}">Annuler</button></span></div>
+        <span>${j.canViewLogs !== false ? `<a class="link small" href="/jobs/${j.id}">Voir</a> · ${j.status === 'error' ? `<button type="button" class="link small" data-retry="${j.id}">Réessayer</button>` : ''}` : ''}${ACTIVE.includes(j.status) ? `<button type="button" class="link small" data-cancel="${j.id}">Annuler</button>` : ''}</span></div>
     </div>`;
   }
 
@@ -505,11 +507,12 @@
     jobsBox.hidden = !list.length;
     if (!list.length) { if (jobsOpen()) toggleJobs(false); return; }
     $('.spin-inline', jobsBtn).hidden = !s.queue;
+    const failed = list.filter((j) => j.status === 'error').length;
     $('[data-jobs-count]', jobsBtn).textContent = s.queue
       ? `${plural(s.queue, 'job')}${s.scheduled ? ` · ${s.scheduled} cette nuit` : ''}`
-      : `${plural(s.scheduled, 'programmé')} cette nuit`;
+      : s.scheduled ? `${plural(s.scheduled, 'programmé')} cette nuit` : `${plural(failed, 'échec')}`;
     const running = list.filter((j) => j.status === 'running').length;
-    $('[data-jobs-sub]', jobsPop).textContent = `${running} en cours · ${list.length - running} en attente`;
+    $('[data-jobs-sub]', jobsPop).textContent = `${running} en cours · ${list.filter((j) => j.status === 'queued').length} en attente${failed ? ` · ${plural(failed, 'échec')}` : ''}`;
     // Redessine seulement si le contenu change : sinon l'animation d'apparition rejouerait à chaque poll
     const html = list.map((j) => jobItem(j, fresh.has(j.id))).join('');
     const box = $('[data-jobs-list]', jobsPop);
@@ -666,6 +669,9 @@
         const meter = $('[data-console-progress]', consoleBox);
         if (meter) { if (typeof r.progress?.pct === 'number') meter.value = Math.max(0, Math.min(100, r.progress.pct)); else if (r.status === 'done') meter.value = 100; else meter.removeAttribute('value'); }
         consoleBox.dataset.status = r.status;
+        setText('[data-console-tokens]', tokenText(r.tokensUsed));
+        const retry = $('[data-retry]', consoleBox);
+        if (retry) retry.hidden = r.status !== 'error';
         if (r.entries.length) {
           if ((cursor && r.firstId > cursor + 1) || (!cursor && r.firstId > 1)) output.append(document.createTextNode('[Début du journal abrégé]\n'));
           for (const entry of r.entries) {
@@ -691,6 +697,16 @@
       const link = document.createElement('a');
       link.className = 'btn small'; link.href = `/jobs/${job.id}`; link.textContent = 'Voir';
       box.append(link);
+    }
+    if (box && job) {
+      let usage = $('[data-job-tokens]', box);
+      if (!usage) { usage = document.createElement('p'); usage.dataset.jobTokens = ''; usage.className = 'small muted'; box.append(usage); }
+      usage.textContent = tokenText(job.tokensUsed);
+      if (job.status === 'error' && job.canViewLogs !== false && !$('[data-retry]', box)) {
+        const retry = document.createElement('button');
+        retry.type = 'button'; retry.className = 'btn small primary'; retry.dataset.retry = job.id; retry.textContent = 'Réessayer';
+        box.append(retry);
+      }
     }
   }
   function renderJobContent(box, job, type) {
@@ -1597,6 +1613,22 @@
   $$('details[data-acc="recap"]').forEach((d) => d.addEventListener('toggle', () => { if (d.open) loadRecap(d.closest('.project')); }));
 
   listen(document, 'click', async (e) => {
+    const retry = e.target.closest('[data-retry]');
+    if (retry) {
+      if (retry.disabled) return;
+      retry.disabled = true; retry.textContent = 'Relance…';
+      const failure = $('[data-retry-error]');
+      if (failure) failure.hidden = true;
+      try {
+        const result = await api(`/api/jobs/${retry.dataset.retry}/retry`, {});
+        location.href = `/jobs/${result.id}`;
+      } catch (err) {
+        if (failure) { failure.textContent = err.message; failure.hidden = false; }
+        else toast(err.message, 'error');
+        retry.disabled = false; retry.textContent = 'Réessayer';
+      }
+      return;
+    }
     const copy = e.target.closest('[data-copy-md]');
     if (copy) {
       const md = copy.closest('.job')?._markdown || '';

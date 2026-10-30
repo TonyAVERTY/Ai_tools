@@ -44,6 +44,10 @@ export async function enqueue(db, { userId, projectId, type, params = {}, runAft
   if (running) return { id: running.id, existing: true };
   // Plafonds du plan : compter puis écrire dans la même section critique (deux requêtes simultanées ne passent pas toutes deux)
   return withUserLock(user.id, async () => {
+    const active = projectId == null
+      ? await db.prepare("SELECT id FROM jobs WHERE user_id = ? AND project_id IS NULL AND type = ? AND status IN ('queued','running')").get(user.id, type)
+      : await db.prepare("SELECT id FROM jobs WHERE project_id = ? AND type = ? AND status IN ('queued','running')").get(projectId, type);
+    if (active) return { id: active.id, existing: true };
     if (AI_JOBS.has(type)) await assertRoom(db, user, 'aiJobs');
     if (MAIL_JOBS.has(type)) {
       await assertRoom(db, user, 'mails');
@@ -79,6 +83,14 @@ export async function cancelJob(db, userId, jobId) {
   if (!r.changes && !(await db.prepare('SELECT 1 FROM jobs WHERE id = ? AND user_id = ?').get(jobId, userId))) throw new HttpError(404, 'Job introuvable');
 }
 
+/** Une relance conserve la tâche en échec et repasse par les plafonds et autorisations habituels. */
+export async function retryJob(db, userId, jobId, opts = {}) {
+  const job = await db.prepare('SELECT * FROM jobs WHERE id = ? AND user_id = ?').get(jobId, userId);
+  if (!job) throw new HttpError(404, 'Job introuvable');
+  if (job.status !== 'error') throw new HttpError(409, 'Seule une tâche en échec peut être relancée');
+  return enqueue(db, { userId, projectId: job.project_id, type: job.type, params: JSON.parse(job.params_json || '{}') }, opts);
+}
+
 /** Derniers jobs d'un projet (le projet doit déjà avoir été vérifié comme appartenant à l'utilisateur). */
 export async function latestJobs(db, projectId) {
   const rows = await db.prepare(`
@@ -89,6 +101,7 @@ export async function latestJobs(db, projectId) {
   for (const r of rows) {
     out[r.type] = {
       id: r.id, status: r.status, error: r.error,
+      tokensUsed: Number(r.tokens_in || 0) + Number(r.tokens_out || 0),
       progress: r.progress_json ? JSON.parse(r.progress_json) : null,
       result: r.result_json ? JSON.parse(r.result_json) : null,
       createdAt: r.created_at, startedAt: r.started_at, finishedAt: r.finished_at, runAfter: r.run_after,
@@ -336,6 +349,7 @@ export class Worker {
     const ctrl = new AbortController();
     this.running.set(job.id, { job, ctrl });
     const journal = createJobLog(this.db, job.id);
+    let usageWrite = Promise.resolve();
     journal.append('status', 'Démarrage de la tâche');
     const ctx = {
       job,
@@ -346,6 +360,11 @@ export class Worker {
       log: (kind, text) => journal.append(kind, text),
       cancelled: () => this.isCancelled(job.id),
       usage: { costUsd: 0, tokensIn: 0, tokensOut: 0 },
+      persistUsage: () => {
+        const u = { ...ctx.usage };
+        usageWrite = usageWrite.then(() => this.db.prepare('UPDATE jobs SET cost_usd = ?, tokens_in = ?, tokens_out = ? WHERE id = ?').run(u.costUsd, u.tokensIn, u.tokensOut, job.id));
+        usageWrite.catch(() => {});
+      },
     };
     // Annulation depuis l'UI : on surveille la BDD (une erreur ici ne doit jamais faire tomber le process)
     const watch = setInterval(() => {
@@ -361,6 +380,7 @@ export class Worker {
         const out = await jobContext.run(ctx, () => handler(ctx));
         journal.append('status', (await this.isCancelled(job.id)) ? 'Tâche annulée' : 'Tâche terminée');
         await journal.flush();
+        await usageWrite.catch(() => {});
         const result = ctx.model && out && typeof out === 'object' && !Array.isArray(out) ? { ...out, model: ctx.model } : out;
         if (!(await this.isCancelled(job.id))) {
           await this.db.prepare("UPDATE jobs SET status='done', result_json=?, finished_at=?, cost_usd=?, tokens_in=?, tokens_out=? WHERE id=?")
@@ -370,6 +390,7 @@ export class Worker {
       } catch (e) {
         journal.append('error', e.message);
         await journal.flush().catch(() => {});
+        await usageWrite.catch(() => {});
         this.log.error(`[job ${job.id} ${job.type}]`, e.message);
         if (!(await this.isCancelled(job.id))) {
           await this.db.prepare("UPDATE jobs SET status='error', error=?, finished_at=?, cost_usd=?, tokens_in=?, tokens_out=? WHERE id=?")
@@ -379,6 +400,7 @@ export class Worker {
       }
     } finally {
       if (ctrl.signal.aborted) journal.append('status', 'Tâche annulée');
+      await usageWrite.catch(() => {});
       await journal.flush().catch(() => {});
       clearInterval(watch);
       this.running.delete(job.id);
@@ -394,6 +416,7 @@ export function addUsage(ctx, r) {
   ctx.usage.costUsd += r.costUsd || 0;
   ctx.usage.tokensIn += r.tokensIn || 0;
   ctx.usage.tokensOut += r.tokensOut || 0;
+  ctx.persistUsage?.();
 }
 
 // Conso des 30 derniers jours, pour la jauge (comptée à la fin du job, comme le budget)

@@ -248,7 +248,7 @@ async function shot(cdp, t) {
   let r;
   try {
     r = await cdp.send('Runtime.evaluate', {
-      expression: `(async () => { await window.renderFrame(${Number(t)}); return location.href; })()`,
+      expression: `(async () => { await document.fonts.ready; await window.renderFrame(${Number(t)}); await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); return location.href; })()`,
       awaitPromise: true, returnByValue: true,
     }, PROMO.frameTimeoutMs);
   } catch (e) { throw frozen(e); }
@@ -262,6 +262,32 @@ async function shot(cdp, t) {
   try { s = await cdp.send('Page.captureScreenshot', { format: 'jpeg', quality: 90, fromSurface: true, optimizeForSpeed: true }); }
   catch (e) { throw cdp.navigated ? new SceneError('La scène a quitté la page : rendu refusé.') : frozen(e); }
   return Buffer.from(s.data, 'base64');
+}
+
+/** Tolérer le bruit de rasterisation, pas un changement de composition. */
+export function rasterDifference(a, b) {
+  if (!a?.length || a.length !== b?.length) throw new Error('Comparaison des images impossible');
+  let changed = 0, total = 0;
+  for (let i = 0; i < a.length; i += 4) {
+    const delta = (Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2])) / 3;
+    total += delta;
+    if (delta > 12) changed++;
+  }
+  const pixels = a.length / 4;
+  return { changedRatio: changed / pixels, mean: total / pixels, different: changed / pixels > 0.015 && total / pixels > 0.5 };
+}
+
+export async function visiblyDifferent(cdp, a, b) {
+  if (a.equals(b)) return false;
+  const expression = `(async () => {
+    const decode = async src => { const img = new Image(); img.src = src; await img.decode();
+      const canvas = document.createElement('canvas'); canvas.width = 160; canvas.height = Math.max(1, Math.round(160 * img.height / img.width));
+      const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, canvas.width, canvas.height); return ctx.getImageData(0, 0, canvas.width, canvas.height).data; };
+    return (${rasterDifference.toString()})(await decode("data:image/jpeg;base64,${a.toString('base64')}"), await decode("data:image/jpeg;base64,${b.toString('base64')}"));
+  })()`;
+  const result = await cdp.send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
+  if (result.exceptionDetails || typeof result.result?.value?.different !== 'boolean') throw new SceneError('Le contrôle de stabilité des images est indisponible.');
+  return result.result.value.different;
 }
 
 
@@ -443,7 +469,9 @@ export async function renderPromo({ cfg, html, fps, seconds, width, height, out,
     // leur état, sinon d'anciens titres restent visibles dans les images suivantes.
     const reset = await shot(cdp, 0);
     const middleAgain = await shot(cdp, seconds / 2);
-    if (!a.equals(reset) || !b.equals(middleAgain)) throw new SceneError("État visuel non déterministe : revenir au même instant change l'image. Dans renderFrame(t), réinitialise la visibilité, les textes et les transformations de TOUS les plans à chaque appel ; aucun élément d'un ancien plan ne doit rester affiché.");
+    const badStart = await visiblyDifferent(cdp, a, reset);
+    const badMiddle = await visiblyDifferent(cdp, b, middleAgain);
+    if (badStart || badMiddle) throw new SceneError(`État visuel non déterministe : la composition change réellement à ${badStart ? '0' : (seconds / 2).toFixed(2)} s après un retour depuis un autre plan. Dans renderFrame(t), réinitialise explicitement l'opacité et les transformations de chaque élément AVANT d'afficher le plan courant. Utilise des conditions complètes (if/else), masque les plans inactifs et évite les opérations cumulatives (+=, *=) sur leur position. Renvoie le document corrigé.`);
     // Qualité visuelle : 'strict' renvoie la scène à Claude si elle est vide, minuscule, figée ou sur fond blanc ; 'warn' rend quand même et garde les constats
     let notes = [];
     if (quality !== 'off') {
