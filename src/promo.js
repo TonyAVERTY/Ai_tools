@@ -41,7 +41,8 @@ const view = (r) => ({
 });
 
 export async function listVideos(db, projectId) {
-  return (await db.prepare('SELECT * FROM promo_videos WHERE project_id = ? ORDER BY id DESC').all(projectId)).map(view);
+  // La réservation et le fichier existent pendant les contrôles ; seule finishVideo autorise leur publication.
+  return (await db.prepare("SELECT * FROM promo_videos WHERE project_id = ? AND size > 0 AND file <> '' ORDER BY id DESC").all(projectId)).map(view);
 }
 
 export const countVideos = async (db, userId) => Number((await db.prepare('SELECT COUNT(*) n FROM promo_videos WHERE user_id = ?').get(userId)).n);
@@ -184,7 +185,7 @@ export function registerPromoRoutes(router, app, { project, aiOpts }) {
   // Lecture (aperçu et téléchargement) : toute personne qui a accès au projet ; type figé, jamais interprété par le navigateur
   router.get('/api/promo/:vid/file', async ({ req, res, params, session, url }) => {
     const r = await db.prepare('SELECT * FROM promo_videos WHERE id = ?').get(Number(params.vid) || 0);
-    if (!r || !r.file) throw new HttpError(404, 'Vidéo introuvable');
+    if (!r || !r.file || Number(r.size) <= 0) throw new HttpError(404, 'Vidéo introuvable');
     await getProject(app, r.project_id, { userId: session.userId }); // 404 si le projet n'est pas le sien ni partagé avec lui
     const path = promoFile(cfg, r.user_id, r.id);
     if (!existsSync(path)) throw new HttpError(404, 'Vidéo introuvable');
@@ -219,3 +220,4 @@ export function registerPromoRoutes(router, app, { project, aiOpts }) {
     json(ctx.res, { ok: true });
   }, LIMIT);
 }
+
