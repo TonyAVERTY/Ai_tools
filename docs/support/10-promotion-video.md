@@ -77,8 +77,8 @@ Les deux revues utilisent le modèle sélectionné pour la vidéo et consomment 
 
 ## Nettoyage et contrôle de la voix
 
-Chaque phrase générée est nettoyée automatiquement avant d'être placée sur la vidéo : filtre des très basses fréquences, réduction modérée du bruit et normalisation du niveau sonore. La durée est mesurée après traitement pour conserver la synchronisation. Une voix silencieuse, trop faible ou saturée est refusée.
+Chaque phrase générée est nettoyée automatiquement avant d'être placée sur la vidéo : filtre des très basses fréquences, réduction modérée du bruit et normalisation du niveau sonore. La durée est mesurée après traitement pour conserver la synchronisation. Le niveau sonore n'est pas un motif de refus : aucune vidéo n'est bloquée à cause du son.
 
-Après assemblage, la piste audio du MP4 est contrôlée de nouveau. Quand la vidéo contient une voix, un troisième agent Claude reçoit le rapport de niveau et le spectrogramme de cette piste, avec les horaires des phrases. Il peut signaler un défaut technique visible et bloquer la livraison. Cette revue ajoute du temps et du quota IA.
+Le MP4 final n'est contrôlé que sur l'image (deux agents Claude : mise en page et mouvement). La piste audio n'est ni mesurée ni relue par un agent.
 
-Claude n'écoute pas le fichier : son contrôle repose sur les mesures et le spectrogramme. La réduction de bruit ne garantit pas l'élimination de tout bruit ni la qualité de prononciation ; un extrait doit toujours être écouté avant publication.
+Personne ne vérifie le son à ta place. La réduction de bruit ne garantit pas l'élimination de tout bruit ni la qualité de prononciation ; un extrait doit toujours être écouté avant publication.
