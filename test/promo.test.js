@@ -1,7 +1,7 @@
 // Onglet Promotion : état, validation, production d'une vidéo (faux Claude + vrai rendu Chromium/ffmpeg), lecture, suppression, prompt modifiable.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { startApp } from './helpers/server.js';
@@ -11,8 +11,9 @@ import { Worker, latestJobs } from '../src/services/jobs.js';
 import { makeHandlers } from '../src/handlers.js';
 import { setSetting, now } from '../src/db.js';
 import { userPromoRoot, deleteUser } from '../src/users.js';
-import { PROMO, promoSupported } from '../src/services/promovideo.js';
+import { PROMO, promoSupported, renderPromo, SceneError } from '../src/services/promovideo.js';
 import { PROMPT_DEFS } from '../src/services/prompts.js';
+import { reserveVideo, finishVideo, removeVideo } from '../src/promo.js';
 
 const chromium = process.env.CHROMIUM_BIN || spawnSync('sh', ['-c', 'ls /opt/pw-browsers/chromium-*/chrome-linux/chrome 2>/dev/null | head -1']).stdout.toString().trim() || undefined;
 let s, spy, worker;
@@ -20,10 +21,14 @@ before(async () => {
   s = await startApp({ cfg: { chromiumBin: chromium } });
   spy = join(s.tmp, 'promo.log');
   s.app.cfg.claudeBin = makeClaudeBin(s.tmp, { fixture: 'spy-claude.js', env: { PROMPT_SPY_FILE: spy } });
+  // Les petites scènes factices vérifient le transport MP4 ; la qualité réelle et les agents ont leurs tests dédiés.
+  s.app.renderPromo = renderFixture;
+  s.app.reviewPromo = async () => ({ reviews: [{ role: 'layout', approved: true }, { role: 'motion', approved: true }] });
   worker = new Worker(s.db, makeHandlers(s.app), { log: { error: () => {} } });
 });
 after(async () => { await s.close(); });
 const supported = promoSupported({ chromiumBin: chromium });
+const renderFixture = (options) => renderPromo({ ...options, quality: 'off' });
 const calls = () => (existsSync(spy) ? readFileSync(spy, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []);
 const PROFILE = JSON.stringify({ resume: 'Cartes de fidélité digitales.', proposition_valeur: 'Fidélisez sans carton.', arguments: ['simple'], ton: 'direct' });
 async function setup(opts = {}) {
@@ -34,6 +39,13 @@ async function setup(opts = {}) {
 }
 const gen = (u, pid, body) => u.post(`/api/projects/${pid}/promo/generate`, body);
 const runJob = async (pid) => { await worker.tick(); return (await latestJobs(s.db, pid)).promo_video; };
+// Ces tests ciblent les portes de publication, indépendamment du CLI et de la limite de ligne de commande Windows.
+const runQualityJob = async (pid) => {
+  const html = '<!doctype html><html><body><script type="application/json" id="voix">[{"t":0.5,"texte":"Bonjour"},{"t":3,"texte":"Au revoir"}]</script><script>window.renderFrame=function(t){};</script></body></html>';
+  const local = new Worker(s.db, makeHandlers(s.app, { claude: async () => ({ ok: true, text: html }) }), { log: { error: () => {} } });
+  await local.tick();
+  return (await latestJobs(s.db, pid)).promo_video;
+};
 
 test('état de l\'onglet : limites, formats, aucune vidéo ; section présente dans la page du projet ; prompt éditable dans les Réglages', async () => {
   const { u, pid } = await setup();
@@ -170,7 +182,75 @@ test('prompt modifiable dans les Réglages : le texte de l\'utilisateur remplace
     assert.match(p, /Scène de référence[\s\S]*window\.renderFrame=function\(t\)/, 'la scène de référence reste fournie');
     assert.match(p, /Contrat technique \(obligatoire[\s\S]*720 × 1280 pixels[\s\S]*window\.renderFrame/);
     assert.deepEqual([fake[0].fps, fake[0].seconds, fake[0].width, fake[0].height], [12, 5, 720, 1280], 'rendu demandé avec les réglages choisis');
-  } finally { delete s.app.promoSupported; delete s.app.renderPromo; }
+  } finally { delete s.app.promoSupported; s.app.renderPromo = renderFixture; }
+});
+
+test('contrôle strict à chaque tentative : trois refus, aucune vidéo livrée même si promoQuality est désactivé', async () => {
+  const { u, pid } = await setup();
+  const attempts = [];
+  s.app.promoSupported = () => ({ ok: true });
+  s.app.renderPromo = async (options) => { attempts.push(options.quality); throw new SceneError('Texte coupé à 2 s'); };
+  try {
+    await gen(u, pid, { fps: 10, seconds: 3 });
+    const job = await runQualityJob(pid);
+    assert.equal(job.status, 'error');
+    assert.match(job.error, /Texte coupé/);
+    assert.deepEqual(attempts, ['strict', 'strict', 'strict']);
+    assert.equal(Number((await s.db.prepare('SELECT COUNT(*) n FROM promo_videos WHERE project_id = ?').get(pid)).n), 0);
+  } finally { delete s.app.promoSupported; s.app.renderPromo = renderFixture; }
+});
+
+test('refus des agents du MP4 : correction bornée, jamais marqué prêt', async () => {
+  const { u, pid } = await setup();
+  const originalReview = s.app.reviewPromo;
+  let reviews = 0;
+  s.app.promoSupported = () => ({ ok: true });
+  s.app.renderPromo = async () => ({ frames: 30, bytes: 10 });
+  s.app.reviewPromo = async () => { reviews++; throw new SceneError('Agent montage : texte et voix désynchronisés à 1 s'); };
+  try {
+    await gen(u, pid, { fps: 10, seconds: 3 });
+    const job = await runQualityJob(pid);
+    assert.equal(job.status, 'error');
+    assert.equal(reviews, 3);
+    assert.match(job.error, /désynchronisés/);
+    assert.equal(Number((await s.db.prepare('SELECT COUNT(*) n FROM promo_videos WHERE project_id = ?').get(pid)).n), 0);
+  } finally { delete s.app.promoSupported; s.app.renderPromo = renderFixture; s.app.reviewPromo = originalReview; }
+});
+
+test('fichier déjà rendu mais pas encore approuvé : absent de la liste et inaccessible', async () => {
+  const { u, pid } = await setup();
+  const pending = await reserveVideo(s.app, { userId: u.id, projectId: pid, subject: 'Contrôle', fps: 10, seconds: 3, format: 'carre', width: 720, height: 720 });
+  writeFileSync(pending.path, Buffer.from('MP4 EN ATTENTE DE CONTROLE'));
+  try {
+    assert.deepEqual((await (await u.get(`/api/projects/${pid}/promo`)).json()).videos, []);
+    assert.equal((await u.get(`/api/promo/${pending.id}/file`)).status, 404);
+    assert.equal((await u.get(`/api/promo/${pending.id}/file?download=1`)).status, 404);
+    await finishVideo(s.db, pending.id, readFileSync(pending.path).length);
+    assert.equal((await (await u.get(`/api/projects/${pid}/promo`)).json()).videos.length, 1);
+    assert.equal((await u.get(`/api/promo/${pending.id}/file`)).status, 200);
+  } finally { await removeVideo(s.app, { id: pending.id, user_id: u.id }); }
+});
+
+for (const failure of ['overflow', 'shift']) test(`voix ${failure} : trois corrections puis refus avant rendu`, async () => {
+  const { u, pid } = await setup();
+  let prepared = 0;
+  let rendered = 0;
+  s.app.promoSupported = () => ({ ok: true });
+  s.app.prepareVoice = async ({ segments }) => {
+    prepared++;
+    return { overflow: failure === 'overflow' ? 0.3 : 0, placed: segments.map((part, i) => ({ ...part, dur: 1, start: part.t + (failure === 'shift' && i === 1 ? 0.3 : 0) })) };
+  };
+  s.app.renderPromo = async () => { rendered++; return { frames: 60, bytes: 10 }; };
+  try {
+    const response = await gen(u, pid, { fps: 10, seconds: 6, voice: true, voiceProvider: 'google', voiceName: 'fr' });
+    assert.equal(response.status, 200, await response.clone().text());
+    const job = await runQualityJob(pid);
+    assert.equal(job.status, 'error');
+    assert.match(job.error, failure === 'overflow' ? /La voix dure/ : /Désynchronisation voix\/texte/);
+    assert.equal(prepared, 3);
+    assert.equal(rendered, 0);
+    assert.equal(Number((await s.db.prepare('SELECT COUNT(*) n FROM promo_videos WHERE project_id = ?').get(pid)).n), 0);
+  } finally { delete s.app.promoSupported; delete s.app.prepareVoice; s.app.renderPromo = renderFixture; }
 });
 
 test('supprimer le projet efface ses vidéos ; supprimer le compte efface le dossier', { skip: !supported.ok && supported.reason }, async () => {

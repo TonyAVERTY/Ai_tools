@@ -117,9 +117,10 @@ function fakes({ overflow = 0 } = {}) {
   s.app.synthVoice = async (o) => { log.synth.push(o); return Buffer.alloc(400); };
   s.app.prepareVoice = async (o) => { log.prepared++; const dir = mkdtempSync(join(tmpdir(), 'aitools-voix-')); await o.synth({ provider: o.voice.provider, voice: o.voice.voice, text: o.segments[0].text }); return { dir, placed: o.segments.map((x) => ({ ...x, file: 'x', start: x.t, end: x.t + 1 })), overflow: typeof overflow === 'function' ? overflow(log.prepared) : overflow }; };
   s.app.mixVoice = async (o) => { log.mixed.push(o); };
+  s.app.reviewPromo = async () => ({ reviews: [{ reviewer: 'layout', approved: true }, { reviewer: 'motion', approved: true }] });
   return log;
 }
-const unfake = () => { for (const k of ['promoSupported', 'renderPromo', 'synthVoice', 'prepareVoice', 'mixVoice']) delete s.app[k]; };
+const unfake = () => { for (const k of ['promoSupported', 'renderPromo', 'synthVoice', 'prepareVoice', 'mixVoice', 'reviewPromo']) delete s.app[k]; };
 const gen = (u, pid, body) => u.post(`/api/projects/${pid}/promo/generate`, body);
 const runJob = async (pid) => { await worker.tick(); return (await latestJobs(s.db, pid)).promo_video; };
 const VOICE = { voice: true, voiceProvider: 'google', voiceName: 'en' };
@@ -168,17 +169,18 @@ test('script de voix oublié : renvoyé une fois à Claude, puis accepté', asyn
   } finally { unfake(); }
 });
 
-test('voix trop longue : corrigée une fois par Claude, puis acceptée avec une remarque', async () => {
+test('voix toujours trop longue : trois tentatives, aucune troncature ni vidéo livrée', async () => {
   const { u, pid } = await setup();
   const log = fakes({ overflow: 3 });
   try {
     await gen(u, pid, { fps: 10, seconds: 6, ...VOICE });
     const job = await runJob(pid);
-    assert.equal(job.status, 'done', job.error);
-    const r = job.result;
-    assert.equal(r.attempts, 2);
-    assert.match(r.notes.join(' '), /Voix coupée en fin de vidéo/);
-    assert.equal(log.rendered.length, 1, 'une seule vidéo rendue (la première version est refusée avant le rendu)');
+    assert.equal(job.status, 'error');
+    assert.match(job.error, /La voix dure 3.0 s de plus/);
+    assert.equal(log.prepared, 3);
+    assert.equal(log.rendered.length, 0, 'chaque version est refusée avant le rendu');
+    assert.equal(log.mixed.length, 0);
+    assert.deepEqual((await (await u.get(`/api/projects/${pid}/promo`)).json()).videos, []);
   } finally { unfake(); }
 });
 
@@ -233,7 +235,7 @@ test('prompt : le contrat de voix apparaît seulement avec une voix, dans sa lan
   const p = promoPrompt({ ...base, voice: { provider: 'google', voice: 'es', lang: 'es', langName: 'espagnol' } }).prompt;
   assert.match(p, /VOIX OFF : une voix lira la vidéo en espagnol/);
   assert.match(p, /<script type="application\/json" id="voix">\[\{"t":0\.4/);
-  assert.match(p, /72 mots au plus pour 30 s/);
+  assert.match(p, /60 mots au plus pour 30 s/);
 });
 
 // ---------- Fournisseurs à clé (ElevenLabs, Google Cloud) ----------

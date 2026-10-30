@@ -37,32 +37,41 @@ Piper et eSpeak NG s'installent sur le serveur d'AiTools, une fois pour toutes. 
   Ensuite « Piper (voix locale, gratuit) » liste les voix présentes dans le dossier (les langues gérées : français, anglais, espagnol, allemand, italien, portugais). Le test se fait avec « Écouter un extrait ». La disponibilité est revérifiée toutes les minutes : ajouter une voix dans le dossier suffit, sans redémarrage.
 
 ## Comment la voix est fabriquée
-Quand « Ajouter une voix » est cochée, Claude écrit en plus de la scène un **script de voix** : une phrase par plan, avec la seconde où elle commence. Le serveur le vérifie, fait lire chaque phrase par le fournisseur choisi (étape « Voix : phrase N/M » dans « Activité »), puis pose les voix sur la vidéo (« Ajout de la voix à la vidéo… »). Deux voix ne se chevauchent jamais : une phrase trop longue repousse la suivante. Si la voix dépasse la durée de la vidéo, Claude doit raccourcir ses phrases (un seul essai) ; au second essai la fin est coupée et une remarque le signale. Sans la case, la vidéo reste sans son.
+Quand « Ajouter une voix » est cochée, Claude écrit en plus de la scène un **script de voix** : une phrase par plan, avec la seconde où elle commence. Le serveur mesure la durée réelle de chaque phrase avant le rendu. Si une phrase repousse la suivante de plus de 0,15 seconde ou dépasse la vidéo de plus de 0,15 seconde, la scène est renvoyée pour correction : les phrases doivent être raccourcies et les plans synchronisés. Une voix trop longue n'est pas acceptée au dernier essai. Le serveur pose ensuite les phrases sur la vidéo (« Ajout de la voix à la vidéo… »). Sans la case, la vidéo reste sans son.
 **Confidentialité** : le texte lu (écrit par Claude d'après la fiche du projet) est envoyé au fournisseur choisi pour être transformé en audio. Google Traduction est un service gratuit non officiel, sans clé : il peut changer, être lent ou refuser des demandes. Piper et eSpeak NG ne contactent aucun service : elles s'exécutent sur le serveur. ElevenLabs, Google Cloud et Microsoft Azure sont utilisés avec ta clé, selon les conditions et le quota que tu as chez eux.
 
 ## Les vidéos produites
 Chaque vidéo apparaît dans la liste de l'onglet avec un lecteur, son sujet (« Présentation du projet » si aucun), sa durée, ses images par seconde, son format, son poids et sa date. Boutons **Télécharger** (fichier MP4) et **Supprimer** (réservé aux administrateurs du projet). Les vidéos sont visibles par les personnes qui ont accès au projet. 20 vidéos au plus par compte : en supprimer une pour en produire une nouvelle. Elles sont supprimées avec le projet ou le compte.
 
 ## Comment ça marche (pour comprendre les erreurs)
-Claude écrit une scène animée, sans aucun outil. Elle est ensuite dessinée **image par image** sur le serveur d'AiTools (navigateur sans interface, sans accès au réseau, dans un bac à sable) puis assemblée en MP4 (H.264). Si la scène écrite par Claude a un défaut (erreur de code, rien qui bouge…), elle lui est renvoyée **une fois** avec le message d'erreur pour correction.
+Claude écrit une scène animée, sans aucun outil. Elle est ensuite dessinée **image par image** sur le serveur d'AiTools (navigateur sans interface, sans accès au réseau, dans un bac à sable) puis assemblée en MP4 (H.264). Si la scène écrite par Claude a un défaut, elle lui est renvoyée avec les constats pour correction, dans une limite de **trois versions au total**. Le modèle sélectionné reste le même ; aucun passage silencieux à un modèle plus coûteux.
 
 ## Ce que la vidéo contient
 Claude compose une affiche animée : un fond vivant (halos qui dérivent, grille discrète), de grands titres qui entrent mot par mot, des maquettes d'écran dessinées qui montent, trois bénéfices avec leurs icônes, puis un plan final avec le nom du produit et, si le projet en a un, l'adresse du site (« Site du produit » dans la configuration du projet). Les plans se répartissent sur toute la durée. Rien n'est inventé : pas de chiffre, de client ni de démonstration qui ne figure pas dans la fiche du projet. Les savoir-faire « direction artistique », « mouvement » et « scénario » de la vidéo sont lus automatiquement (voir « Savoir-faire de Claude »).
 
-## Contrôle qualité automatique
-Avant de dessiner les images, le serveur **mesure** la scène (taille des titres et des textes, remplissage de l'image, position verticale du contenu, fond blanc uni, écrans vides, dernier plan, éléments qui bougent). Au premier essai, une scène trop vide, trop statique ou mal cadrée est renvoyée à Claude avec la liste précise des défauts ; au second essai, elle est rendue quand même et les remarques restent dans le résultat de la tâche (« notes »).
+## Contrôle qualité avant livraison
+La scène est d'abord mesurée dans le navigateur : lisibilité, débordements, occupation, cadrage, fond, dernier plan et mouvement. Les erreurs restent bloquantes à chaque tentative : la dernière version n'est pas acceptée simplement avec une remarque.
+
+Après assemblage de la vidéo, **deux agents IA distincts** inspectent des captures horodatées réellement extraites du MP4 :
+- **Lisibilité et mise en page** : textes coupés, superpositions, tailles, contraste, marges et défauts d'affichage.
+- **Mouvement et synchronisation** : enchaînement des plans, dynamisme du contenu, temps de lecture, correspondance avec les phrases et leurs instants réels.
+
+Un refus est renvoyé au générateur avec les secondes concernées et les corrections demandées. Après trois versions refusées, la tâche échoue et la vidéo n'est pas présentée comme prête. Les captures couvrent plusieurs instants et les transitions ; ce contrôle réduit les défauts, mais reste un examen par échantillons et ne garantit pas chaque image. La tâche « Activité » indique les étapes de contrôle.
 
 ## Modifier les consignes
+
+Les deux revues utilisent le modèle sélectionné pour la vidéo et consomment du quota IA en plus de sa conception. Elles ajoutent du temps à la génération ; aucun modèle plus coûteux n'est activé automatiquement. La synchronisation est vérifiée à partir des captures et des durées mesurées de la narration, sans écoute du son par les agents.
 **Réglages → Prompts IA → « Vidéo de promotion (design motion) »** : la direction artistique (ton, rythme, mouvements, palette) est modifiable, par gamme de modèle. Le contrat technique (document HTML, dimensions, durée) reste automatique pour ne pas casser le rendu.
 
 ## Problèmes fréquents
 - « Chromium n'est pas installé sur ce serveur » / « ffmpeg n'est pas installé » : l'onglet est indisponible tant que l'administrateur du service n'a pas installé ces outils.
-- « La scène écrite par Claude ne passe pas au rendu : … » : Claude n'a pas réussi à produire une scène valable après une correction → relancer, ou changer de modèle (Opus ou Fable pour des scènes plus complexes) dans Réglages.
-- « La scène … est Trop de vide / Image figée / Titres trop petits » : le contrôle qualité a refusé deux fois la scène ; relancer, choisir un style précis ou un modèle plus puissant (Opus ou Fable).
+- « La scène écrite par Claude ne passe pas au rendu : … » : Claude n'a pas réussi à produire une scène valable après trois versions → relancer, simplifier le sujet ou choisir explicitement un autre modèle dans Réglages.
+- « La scène … est Trop de vide / Image figée / Titres trop petits » : le contrôle qualité refuse la scène ; les constats sont renvoyés pour correction, puis la tâche échoue si les défauts persistent après trois versions.
 - « ElevenLabs a refusé la clé API (vérifie-la, ou son quota) » / « Google Cloud a refusé la clé API » / « Microsoft Azure a refusé la clé API » (avec Azure : vérifier aussi que la région est bien celle de la ressource, sinon « Microsoft Azure ne répond pas ») : la clé est fausse, révoquée, sans l'API activée (Google Cloud : « Cloud Text-to-Speech API ») ou le quota gratuit du mois est épuisé. Retirer la clé et en enregistrer une nouvelle, ou attendre le renouvellement du quota. « quota ou débit dépassé » : trop de demandes d'un coup ou quota épuisé.
 - « Aucune clé API ElevenLabs : ajoute-la dans l'onglet Promotion du projet » : la voix choisie demande une clé que le propriétaire du projet n'a pas enregistrée (ou devenue illisible après un changement de la clé de chiffrement du serveur : la saisir de nouveau).
 - « Microsoft Edge (gratuit) ne répond pas » ou « Google Traduction a refusé la requête » : le service de voix est indisponible ou bloque le serveur. Essayer un autre fournisseur ou relancer plus tard ; sans la case « Ajouter une voix », la vidéo se fait quand même. L'administrateur doit autoriser la sortie du serveur vers les fournisseurs (Google Traduction : translate.google.com ; ElevenLabs : api.elevenlabs.io ; Google Cloud : texttospeech.googleapis.com ; Microsoft Azure : la région de ta ressource, par exemple francecentral.tts.speech.microsoft.com).
-- « Il manque le script de la voix » / « La voix dure … de plus que la vidéo » : Claude a mal formé ou trop allongé la voix ; c'est renvoyé une fois pour correction. Si ça persiste, augmenter la durée de la vidéo ou changer de modèle.
+- « Il manque le script de la voix » / « La voix dure … de plus que la vidéo » : Claude a mal formé ou trop allongé la voix ; elle est renvoyée pour correction. Si cela persiste après trois versions, augmenter la durée de la vidéo ou simplifier le sujet.
 - « Tu as déjà 20 vidéos » : supprimer une vidéo.
 - Le job reste en attente : plafond de jobs IA atteint, quota Claude serré ou charge du serveur ; le message dans « Activité » donne la raison.
 - La vidéo ne se lit pas dans le navigateur : la télécharger et l'ouvrir avec un lecteur vidéo.
+

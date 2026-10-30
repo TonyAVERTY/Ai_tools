@@ -22,3 +22,10 @@ Vérité : n'invente aucun chiffre, pourcentage, client, témoignage, prix, réc
 Relis avant de rendre : chaque texte vient des informations du projet, aucun texte d'exemple ne reste, le dernier plan est à l'écran jusqu'à la fin.
 
 Voix off (quand une voix est demandée) : un script de voix accompagne la scène, une phrase par plan, calée sur l'apparition du plan. On parle à 2,5 mots par seconde : une phrase de 12 mots demande 5 s. La voix dit l'essentiel, pas tout ce qui est écrit ; elle écrit en toutes lettres (jamais de sigle, de symbole ni d'émoji), dans la langue de la voix, et finit au moins 1 s avant la fin. Le dernier plan dit le nom du produit et la promesse.
+
+Synchronisation vérifiable :
+- Un plan = une idée affichée = une phrase de voix. Le même tableau de débuts de plans sert aux textes, illustrations et au script de voix ; ne maintiens pas deux chronologies différentes.
+- Le titre du plan est déjà lisible au début de sa phrase, reste présent pendant cette phrase et sa marge de lecture, puis sort avant la phrase du plan suivant.
+- Réserve une marge de respiration suffisante : le serveur mesure la durée réelle des phrases. Si une phrase repousse la suivante ou déborde, raccourcis le texte ; ne te contente pas d'avancer artificiellement les timestamps ni de couper le son.
+- Pour une vidéo courte, moins de plans et moins de mots. Une durée de 3 à 6 secondes ne permet pas accroche, produit, trois bénéfices et final : une promesse concrète et le nom suffisent.
+- Texte libre, nom long et URL : raccourcis, répartis sur des lignes, réserve la place ; ne dépasse jamais la zone visible pour conserver une phrase.

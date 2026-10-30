@@ -9,6 +9,7 @@ import { normalizeModel } from './services/models.js';
 import { analyzePrompt, prospectPrompt, templatePrompt, reviewMailPrompt, followupTemplatePrompt, evolutionPrompt, linkedinPostPrompt, hookPrompt, auditPrompt, promoPrompt, rolePrompt, parseCustomPrompts, LEVELS } from './services/prompts.js';
 import { VOICE_PROVIDERS, parseVoiceParams, extractVoiceScript, prepareVoice, cleanVoice, mixVoice, synthesize, langName } from './services/voiceover.js';
 import { PROMO, FORMATS, SceneError, parsePromoParams, extractScene, promoSupported, renderPromo } from './services/promovideo.js';
+import { reviewPromo } from './services/promoqa.js';
 import { reserveVideo, finishVideo, removeVideo, countVideos, getVoiceKey, getVoiceRegion } from './promo.js';
 import { linkedinAccount, saveDraft, recentDrafts } from './linkedin.js';
 import { followupCandidates, followupSubject, isBusinessHours } from './services/followup.js';
@@ -189,9 +190,8 @@ export function makeSync(app) {
   };
 }
 
-export function makeHandlers(app) {
+export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
   const { db, cfg } = app;
-  const claude = makeClaude(app);
   // Dépôts Git (GitHub ou serveur perso) : l'hôte est revérifié à chaque synchronisation, git se connecte à l'adresse vérifiée
   const sync = makeSync(app);
   // Consignes modifiées par l'utilisateur (Réglages) : celles du compte qui lance le job
@@ -595,7 +595,7 @@ export function makeHandlers(app) {
     },
 
     // Vidéo de promotion : Claude écrit une scène animée, Chromium la rend image par image, ffmpeg produit le MP4.
-    // Une scène refusée au rendu (erreur de code, rien qui bouge…) est renvoyée une fois à Claude avec le message d'erreur.
+    // Trois tentatives au plus ; le rendu et les deux revues du MP4 doivent tous être acceptés avant livraison.
     async promo_video(ctx) {
       const userId = ctx.job.user_id;
       const project = await getProject(app, ctx.job.project_id, { userId });
@@ -614,19 +614,22 @@ export function makeHandlers(app) {
       const sink = makeSink();
       try {
         let fix = null;
+        let previousScene = '';
         for (let attempt = 1; ; attempt++) {
           await ctx.progress({ message: attempt === 1 ? (params.subject ? 'Claude conçoit la vidéo sur ton sujet…' : 'Claude conçoit la vidéo de présentation du projet…') : 'Claude corrige la scène…', pct: attempt === 1 ? 8 : 40 });
           const { prompt, system } = promoPrompt({
             projectName: project.name, profile: project.profile, target: project.target || {}, subject: params.subject, style: params.style, site: project.siteUrl,
-            seconds: params.seconds, fps: params.fps, format: params.format, width: fmt.width, height: fmt.height, custom: await custom(userId), model, fix,
+            seconds: params.seconds, fps: params.fps, format: params.format, width: fmt.width, height: fmt.height, custom: await custom(userId), model, fix, previousScene,
             voice: voice && { ...voice, langName: langName(voice.lang) },
           });
           const r = await creeping(ctx, attempt === 1 ? (params.subject ? 'Claude conçoit la vidéo sur ton sujet…' : 'Claude conçoit la vidéo de présentation du projet…') : 'Claude corrige la scène…', attempt === 1 ? 8 : 40, () => claude(userId, { prompt, system, model, maxTurns: 1, tools: [], signal: ctx.signal }), { to: 44 });
           addUsage(ctx, r);
           if (!r.ok) throw new Error(`La vidéo n'a pas pu être conçue (${r.subtype})${r.text ? ` : ${String(r.text).replace(/\s+/g, ' ').trim().slice(0, 200)}` : ''}`);
           let prepared = null;
+          const voiceSegments = [];
           try {
             const html = extractScene(r.text);
+            previousScene = html;
             let notes = [];
             if (voice) {
               // La voix est préparée AVANT le rendu : un service de voix en panne ou un script trop long ne coûte pas les images
@@ -635,21 +638,25 @@ export function makeHandlers(app) {
               if (VOICE_PROVIDERS[voice.provider].keyed && !key) throw new Error(`Aucune clé API ${VOICE_PROVIDERS[voice.provider].label.split(' (')[0]} : ajoute-la dans l'onglet Promotion du projet`);
               const region = VOICE_PROVIDERS[voice.provider].region ? await getVoiceRegion(app, userId, voice.provider) : null;
               const synth = app.synthVoice || synthesize;
+              voiceSegments.push(...extractVoiceScript(html, params.seconds));
               prepared = await (app.prepareVoice || prepareVoice)({
-                cfg, segments: extractVoiceScript(html, params.seconds), voice, seconds: params.seconds, synth: (o) => synth({ ...o, key, region }, { cfg }), signal: ctx.signal,
+                cfg, segments: voiceSegments, voice, seconds: params.seconds, synth: (o) => synth({ ...o, key, region }, { cfg }), signal: ctx.signal,
                 onProgress: ({ done, total }) => sink.push(() => ctx.progress({ message: `Voix : phrase ${Math.min(done + 1, total)}/${total}`, pct: 44 })),
               });
               await sink.flush();
-              if (prepared.overflow > 0.5) {
+              if (prepared.overflow > 0.15) {
                 const msg = `La voix dure ${prepared.overflow.toFixed(1)} s de plus que la vidéo (${params.seconds} s) : raccourcis les phrases ou avance leurs instants "t".`;
-                if (attempt === 1) throw new SceneError(msg);
-                notes.push(`Voix coupée en fin de vidéo : ${msg}`);
+                throw new SceneError(msg);
+              }
+              const shifted = prepared.placed.find((part, i) => Math.abs(part.start - voiceSegments[i].t) > 0.15);
+              if (shifted) {
+                throw new SceneError(`Désynchronisation voix/texte : une phrase doit être repoussée à ${shifted.start.toFixed(2)} s. Raccourcis les phrases précédentes et garde les textes visibles pendant toute leur lecture ; aucun décalage de plus de 0,15 s n'est accepté.`);
               }
             }
             const out = await (app.renderPromo || renderPromo)({
               cfg, html, fps: params.fps, seconds: params.seconds, width: fmt.width, height: fmt.height, out: video.path, signal: ctx.signal,
-              // Première version : refusée si elle est vide, minuscule, figée ou sur fond blanc ; seconde : rendue quand même, avec les constats gardés
-              quality: cfg.promoQuality === false ? 'off' : attempt === 1 ? 'strict' : 'warn',
+              // Aucun essai ne peut contourner le contrôle de publication.
+              quality: 'strict',
               onProgress: ({ done, total }) => sink.push(() => ctx.progress({ message: `Rendu de la vidéo : image ${done}/${total}`, pct: 45 + Math.round((done / total) * 53) })),
             });
             await sink.flush();
@@ -659,13 +666,20 @@ export function makeHandlers(app) {
               await (app.mixVoice || mixVoice)({ cfg, videoPath: video.path, placed: prepared.placed, seconds: params.seconds, signal: ctx.signal });
               bytes = statSync(video.path).size;
             }
+            const quality = await (app.reviewPromo || reviewPromo)({
+              cfg, videoPath: video.path, seconds: params.seconds, width: fmt.width, height: fmt.height,
+              voiceSegments, placed: prepared?.placed || [], model, extraRoot: userChatRoot(cfg, userId), signal: ctx.signal,
+              onProgress: (p) => sink.push(() => ctx.progress({ message: typeof p === 'string' ? p : p.message, pct: 99 })),
+              runAgent: async (options) => { const result = await claude(userId, options); addUsage(ctx, result); return result; },
+            });
+            await sink.flush();
             await finishVideo(db, video.id, bytes);
             notes = [...notes, ...(out.notes || [])];
-            return { ok: true, videoId: video.id, frames: out.frames, attempts: attempt, ...(voice ? { voice: voice.voice } : {}), ...(notes.length ? { notes } : {}) };
+            return { ok: true, videoId: video.id, frames: out.frames, attempts: attempt, qualityReviews: quality.reviews, ...(voice ? { voice: voice.voice } : {}), ...(notes.length ? { notes } : {}) };
           } catch (e) {
             await sink.flush().catch(() => {});
             if (!(e instanceof SceneError)) throw e;
-            if (attempt >= 2) throw new Error(`La scène écrite par Claude ne passe pas au rendu : ${e.message}`);
+            if (attempt >= 3) throw new Error(`La scène écrite par Claude ne passe pas au rendu : ${e.message}`);
             fix = e.message;
           } finally { cleanVoice(prepared); }
         }
@@ -765,3 +779,4 @@ export function makeHandlers(app) {
     },
   };
 }
+

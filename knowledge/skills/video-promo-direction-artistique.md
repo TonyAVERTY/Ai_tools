@@ -17,3 +17,13 @@ Couleurs : celles de la direction choisie, pas d'autres (fond en dégradé, text
 
 Illustrations : dessinées en SVG ou CSS, avec un trait et des arrondis cohérents. Montre le produit : maquette d'écran, carte, liste, tableau de bord, notification, avec les vraies idées du produit. Chaque bénéfice a son icône ou son dessin propre, lié à ce qu'il dit.
 À éviter : fond blanc, petits pictogrammes perdus, texte de moins de 3 % du petit côté, plus de trois couleurs, clip-art générique, ombres lourdes, décor sans rapport avec le produit.
+
+Avant livraison :
+- Chaque texte a une largeur maximale et une hauteur suffisante. Retour à la ligne autorisé ; pas de white-space: nowrap pour une phrase libre, un nom de produit ou une URL longue. Si le texte ne tient pas avec une taille lisible, raccourcis-le.
+- Aucun titre ne chevauche une autre ligne, une maquette ou le titre sortant. Les éléments de plans différents ne doivent pas rester visibles ensemble après la transition.
+- Regarde la taille finale 720 px, pas uniquement un grand écran : texte secondaire au moins 3,5 U, vraie hiérarchie, contraste suffisant sur tout le fond traversé.
+- Garde les titres stables pendant leur lecture ; l'action de la maquette et les transitions apportent l'énergie. Ne confonds pas agitation et dynamisme.
+- Une vidéo refusée par le contrôle de lisibilité ou de montage doit être corrigée. Une seconde version présentant les mêmes défauts ne devient pas publiable par défaut.
+
+- Icônes : uniquement des tracés SVG intégrés ou des formes CSS. Pas d'emoji, de symbole Unicode décoratif ni de police d'icônes : leur glyphe peut manquer et devenir un carré vide. Chaque tracé contraste avec sa surface.
+- Une maquette d'écran contient dès son entrée des éléments propres, espacés et lisibles. Ne superpose pas plusieurs libellés au même coin ; le téléphone vide n'est pas une démonstration du produit.
