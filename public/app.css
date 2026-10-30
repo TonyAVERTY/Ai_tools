@@ -1424,3 +1424,6 @@ body.tour-active { padding-bottom: var(--tour-pad, 0px); }
 .console-summary progress::-webkit-progress-bar { background:#eae6f5; border-radius:99px; }
 .console-summary progress::-webkit-progress-value { background:#8b75df; border-radius:99px; }
 .console-summary progress::-moz-progress-bar { background:#8b75df; border-radius:99px; }
+.console-tokens { font-size:.8rem; font-weight:650; color:var(--text,#172033); font-variant-numeric:tabular-nums; }
+.job-console[data-status=error] .console-live { background:#fff0ef; color:#a13c33; border-color:#f3cbc7; }
+.job-console[data-status=error] progress { accent-color:#d66d67; }
