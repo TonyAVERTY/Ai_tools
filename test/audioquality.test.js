@@ -9,12 +9,11 @@ import {prepareVoice,cleanVoice,audioDuration} from '../src/services/voiceover.j
 const ffmpeg=process.env.FFMPEG_AUDIO_TEST||'ffmpeg', cfg={ffmpegBin:ffmpeg};
 const available=spawnSync(ffmpeg,['-version']).status===0;
 const run=(args)=>{const r=spawnSync(ffmpeg,args,{encoding:'utf8'});assert.equal(r.status,0,r.stderr);return r.stderr;};
-test('contrôle audio : silence, saturation et rapport absent refusés',()=>{
- assert.throws(()=>parseAudioReport('mean_volume: -inf dB\nmax_volume: -inf dB'),/voix absente/);
- assert.throws(()=>parseAudioReport('mean_volume: -10 dB\nmax_volume: 0 dB'),/saturation/);
- assert.throws(()=>parseAudioReport('aucune mesure'),/voix absente/);
+test('mesure audio : jamais de refus, niveaux absents ramenés à null',()=>{
  assert.deepEqual(parseAudioReport('mean_volume: -20 dB\nmax_volume: -2 dB'),{meanDb:-20,peakDb:-2,noiseFloorDb:null});
- assert.equal(parseAudioReport('mean_volume: -10 dB\nmax_volume: 0 dB',{allowClipping:true}).peakDb,0,'une voix brute à 0 dB se mesure, le nettoyage la ramène sous le plafond');
+ assert.equal(parseAudioReport('mean_volume: -10 dB\nmax_volume: 0 dB').peakDb,0,'une voix saturée n\'est pas refusée');
+ assert.deepEqual(parseAudioReport('mean_volume: -inf dB\nmax_volume: -inf dB'),{meanDb:null,peakDb:null,noiseFloorDb:null},'silence : mesuré, pas refusé');
+ assert.equal(parseAudioReport('aucune mesure').meanDb,null);
 });
 test('FFmpeg réel : nettoyage, niveau, rejet du silence, durée et spectrogramme', {skip:!available&&'FFmpeg absent'}, async()=>{
  const dir=mkdtempSync(join(tmpdir(),'audio-qa-test-'));let prepared;
@@ -29,14 +28,14 @@ test('FFmpeg réel : nettoyage, niveau, rejet du silence, durée et spectrogramm
   assert.ok(Math.abs(await audioDuration(cfg,input)-await audioDuration(cfg,output))<.1);
   await audioSpectrum(cfg,output,join(dir,'spectrum.png'));
   assert.ok(existsSync(join(dir,'spectrum.png')));
-  // voix brute au maximum (pic à 0 dB) : acceptée avant nettoyage, ressort sous le plafond
+  // voix brute au maximum (pic à 0 dB) : jamais refusée, le nettoyage la ramène sous le plafond
   const hot=join(dir,'hot.wav'),hotClean=join(dir,'hot-clean.wav');
   run(['-v','error','-y','-f','lavfi','-i','aevalsrc=1.0*sin(2*PI*440*t):s=48000:d=3',hot]);
-  await assert.rejects(inspectAudio(cfg,hot),/saturation/);
+  assert.equal((await inspectAudio(cfg,hot)).peakDb,0);
   const hotReport=await cleanAudio(cfg,hot,hotClean);
   assert.ok(hotReport.cleaned&&hotReport.peakDb<-.1,'pic après nettoyage : '+hotReport.peakDb);
   run(['-v','error','-y','-f','lavfi','-i','anullsrc=r=48000:cl=mono','-t','1',silent]);
-  await assert.rejects(inspectAudio(cfg,silent),/voix absente/);
+  assert.ok((await inspectAudio(cfg,silent)).meanDb<-60,'silence : mesuré, pas refusé');
   prepared=await prepareVoice({cfg,segments:[{t:0,text:'Une phrase de test.'}],voice:{provider:'piper',voice:'test'},seconds:5,synth:async()=>readFileSync(input)});
   assert.ok(prepared.placed[0].file.endsWith('.clean.wav'));
   assert.ok(prepared.placed[0].audioReport.cleaned);
