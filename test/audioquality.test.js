@@ -14,6 +14,7 @@ test('contrôle audio : silence, saturation et rapport absent refusés',()=>{
  assert.throws(()=>parseAudioReport('mean_volume: -10 dB\nmax_volume: 0 dB'),/saturation/);
  assert.throws(()=>parseAudioReport('aucune mesure'),/voix absente/);
  assert.deepEqual(parseAudioReport('mean_volume: -20 dB\nmax_volume: -2 dB'),{meanDb:-20,peakDb:-2,noiseFloorDb:null});
+ assert.equal(parseAudioReport('mean_volume: -10 dB\nmax_volume: 0 dB',{allowClipping:true}).peakDb,0,'une voix brute à 0 dB se mesure, le nettoyage la ramène sous le plafond');
 });
 test('FFmpeg réel : nettoyage, niveau, rejet du silence, durée et spectrogramme', {skip:!available&&'FFmpeg absent'}, async()=>{
  const dir=mkdtempSync(join(tmpdir(),'audio-qa-test-'));let prepared;
@@ -28,6 +29,12 @@ test('FFmpeg réel : nettoyage, niveau, rejet du silence, durée et spectrogramm
   assert.ok(Math.abs(await audioDuration(cfg,input)-await audioDuration(cfg,output))<.1);
   await audioSpectrum(cfg,output,join(dir,'spectrum.png'));
   assert.ok(existsSync(join(dir,'spectrum.png')));
+  // voix brute au maximum (pic à 0 dB) : acceptée avant nettoyage, ressort sous le plafond
+  const hot=join(dir,'hot.wav'),hotClean=join(dir,'hot-clean.wav');
+  run(['-v','error','-y','-f','lavfi','-i','aevalsrc=1.0*sin(2*PI*440*t):s=48000:d=3',hot]);
+  await assert.rejects(inspectAudio(cfg,hot),/saturation/);
+  const hotReport=await cleanAudio(cfg,hot,hotClean);
+  assert.ok(hotReport.cleaned&&hotReport.peakDb<-.1,'pic après nettoyage : '+hotReport.peakDb);
   run(['-v','error','-y','-f','lavfi','-i','anullsrc=r=48000:cl=mono','-t','1',silent]);
   await assert.rejects(inspectAudio(cfg,silent),/voix absente/);
   prepared=await prepareVoice({cfg,segments:[{t:0,text:'Une phrase de test.'}],voice:{provider:'piper',voice:'test'},seconds:5,synth:async()=>readFileSync(input)});
