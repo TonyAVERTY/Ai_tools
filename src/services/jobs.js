@@ -90,7 +90,7 @@ export async function latestJobs(db, projectId) {
       id: r.id, status: r.status, error: r.error,
       progress: r.progress_json ? JSON.parse(r.progress_json) : null,
       result: r.result_json ? JSON.parse(r.result_json) : null,
-      createdAt: r.created_at, finishedAt: r.finished_at, runAfter: r.run_after,
+      createdAt: r.created_at, startedAt: r.started_at, finishedAt: r.finished_at, runAfter: r.run_after,
     };
   }
   return out;
