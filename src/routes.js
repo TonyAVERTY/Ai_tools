@@ -760,7 +760,7 @@ export function registerRoutes(router, app) {
       <div class="console-facts"><span>Modèle<strong data-console-model>—</strong></span><span>Temps écoulé<strong data-console-elapsed>—</strong></span></div>
       <p class="console-tokens" data-console-tokens>0 tokens</p>
       <p class="small muted" data-console-remaining></p>
-      <button type="button" class="btn primary" data-retry="${job.id}" hidden>Réessayer</button><p class="small error" data-retry-error role="alert" hidden></p>
+      <button type="button" class="btn primary" data-retry="${job.id}" hidden>Réessayer</button><button type="button" class="btn primary" data-retry="${job.id}" data-fix hidden>Corriger</button><p class="small error" data-retry-error role="alert" hidden></p>
       <p class="small muted" data-console-updated>En attente des premières informations</p><p class="small muted">Les étapes et les sorties arrivent ici dès leur réception.</p></aside>
       <section class="console-feed"><div class="console-feed-head"><h2>Fil d’activité</h2><label><input type="checkbox" data-console-follow checked> Suivre le direct</label></div>
       <div class="job-console-output" data-console-output tabindex="0" aria-label="Journal de la tâche"><p data-console-empty class="console-empty">Claude prépare la tâche. Ses prochaines actions apparaîtront ici.</p></div></section></div></section>` }));
@@ -775,8 +775,9 @@ export function registerRoutes(router, app) {
       progress: job.progress_json ? JSON.parse(job.progress_json) : null,
       entries: log.filter((e) => e.id > after), firstId: log[0]?.id || 0 });
   });
-  router.post('/api/jobs/:id/retry', async ({ res, params, session }) => {
-    json(res, await retryJob(db, session.userId, Number(params.id) || 0, aiOpts));
+  router.post('/api/jobs/:id/retry', async ({ req, res, params, session }) => {
+    const b = await readBody(req);
+    json(res, await retryJob(db, session.userId, Number(params.id) || 0, aiOpts, { fix: b?.fix === true }));
   });
   router.post('/api/jobs/:id/cancel', async ({ res, params, session }) => {
     const id = Number(params.id);
