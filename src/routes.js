@@ -755,24 +755,27 @@ export function registerRoutes(router, app) {
 
   // Les sorties détaillées restent privées au propriétaire du job.
   const ownJobConsole = async (params, session) => {
-    const job = await db.prepare('SELECT id, type, status, error, progress_json, log_json FROM jobs WHERE id = ? AND user_id = ?').get(Number(params.id) || 0, session.userId);
+    const job = await db.prepare('SELECT id, type, status, error, progress_json, log_json, created_at, started_at, finished_at FROM jobs WHERE id = ? AND user_id = ?').get(Number(params.id) || 0, session.userId);
     if (!job) throw new HttpError(404, 'Job introuvable');
     return job;
   };
   router.get('/jobs/:id', async ({ res, params, session }) => {
     const job = await ownJobConsole(params, session);
-    html(res, layout({ title: 'Console de la tâche', email: session.email, body: `<a href="/">← Retour aux projets</a><h1>Console de la tâche #${job.id}</h1>
-      <section data-job-console="${job.id}" class="job-console">
-      <p data-console-status role="status">Chargement du journal…</p>
-      <p class="small muted">Étapes, outils utilisés et sorties de Claude. Le journal se met à jour automatiquement.</p>
-      <label><input type="checkbox" data-console-follow checked> Suivre les nouvelles lignes</label>
-      <pre class="job-console-output" data-console-output tabindex="0" aria-label="Journal de la tâche"></pre></section>` }));
+    html(res, layout({ title: 'Suivi de la tâche', email: session.email, body: `<section data-job-console="${job.id}" class="job-console">
+      <a class="console-back" href="/">← Tous les projets</a>
+      <header class="console-heading"><div><p class="console-eyebrow">ESPACE DE TRAVAIL · TÂCHE #${job.id}</p><h1 data-console-title>Claude au travail</h1><p class="muted">Suivez la création, étape par étape.</p></div><span class="console-live" data-console-live>Connexion…</span></header>
+      <div class="console-grid"><aside class="console-summary"><span class="console-eyebrow">ACTIVITÉ ACTUELLE</span><p data-console-status role="status">Connexion au journal…</p>
+      <progress data-console-progress max="100" value="0" aria-label="Progression de la tâche"></progress>
+      <div class="console-facts"><span>Modèle<strong data-console-model>—</strong></span><span>Temps écoulé<strong data-console-elapsed>—</strong></span></div>
+      <p class="small muted" data-console-updated>En attente des premières informations</p><p class="small muted">Les étapes et les sorties arrivent ici dès leur réception.</p></aside>
+      <section class="console-feed"><div class="console-feed-head"><h2>Fil d’activité</h2><label><input type="checkbox" data-console-follow checked> Suivre le direct</label></div>
+      <div class="job-console-output" data-console-output tabindex="0" aria-label="Journal de la tâche"><p data-console-empty class="console-empty">Claude prépare la tâche. Ses prochaines actions apparaîtront ici.</p></div></section></div></section>` }));
   });
   router.get('/api/jobs/:id/log', async ({ res, params, session, url }) => {
     const job = await ownJobConsole(params, session);
     const after = Math.max(0, Number(url.searchParams.get('after')) || 0);
     const log = JSON.parse(job.log_json || '[]');
-    json(res, { id: job.id, type: job.type, status: job.status, error: job.error,
+    json(res, { id: job.id, type: job.type, status: job.status, error: job.error, startedAt: job.started_at, finishedAt: job.finished_at,
       progress: job.progress_json ? JSON.parse(job.progress_json) : null,
       entries: log.filter((e) => e.id > after), firstId: log[0]?.id || 0 });
   });
