@@ -489,7 +489,7 @@
       ${progressBar(j)}
       ${remainingTime(j) ? `<div class="small muted">${esc(remainingTime(j))}</div>` : ''}
       <div class="jmeta small muted"><span>${esc(state)}</span>
-        <span>${j.projectId ? `<button type="button" class="link small" data-goto="${j.projectId}">Voir</button> · ` : ''}<button type="button" class="link small" data-cancel="${j.id}">Annuler</button></span></div>
+        <span>${j.canViewLogs !== false ? `<a class="link small" href="/jobs/${j.id}">Détails</a> · ` : ''}${j.projectId ? `<button type="button" class="link small" data-goto="${j.projectId}">Voir</button> · ` : ''}<button type="button" class="link small" data-cancel="${j.id}">Annuler</button></span></div>
     </div>`;
   }
 
@@ -623,8 +623,49 @@
       .catch(() => {});
   }
 
+  // Console : conserver les lignes et la sélection pendant les rafraîchissements.
+  const consoleBox = $('[data-job-console]');
+  if (consoleBox) {
+    const output = $('[data-console-output]', consoleBox);
+    const status = $('[data-console-status]', consoleBox);
+    const labels = { queued: 'En attente', running: 'En cours', done: 'Terminée', error: 'En échec', cancelled: 'Annulée' };
+    let cursor = 0, busy = false, terminal = false;
+    const pollConsole = async () => {
+      if (busy || terminal || disposed) return;
+      busy = true;
+      try {
+        const r = await api(`/api/jobs/${consoleBox.dataset.jobConsole}/log?after=${cursor}`);
+        if (disposed) return;
+        status.textContent = `${labels[r.status] || r.status}${r.progress?.message && ACTIVE.includes(r.status) ? ' · ' + r.progress.message : ''}`;
+        if (r.entries.length) {
+          if ((cursor && r.firstId > cursor + 1) || (!cursor && r.firstId > 1)) output.append(document.createTextNode('[Début du journal abrégé]\n'));
+          for (const entry of r.entries) {
+            const time = new Date(entry.at).toLocaleTimeString('fr-FR', { timeZone: 'Europe/Paris' });
+            output.append(document.createTextNode(`[${time}] ${entry.text}\n\n`));
+            cursor = entry.id;
+          }
+          if (output.textContent.length > 160_000) output.textContent = '[Anciennes lignes abrégées]\n' + output.textContent.slice(-120_000);
+          if ($('[data-console-follow]', consoleBox).checked) output.scrollTop = output.scrollHeight;
+        }
+        if (!cursor && !ACTIVE.includes(r.status)) output.textContent = r.error || 'Aucun journal enregistré pour cette tâche ancienne.';
+        terminal = !ACTIVE.includes(r.status);
+        if (r.error && terminal) status.textContent += ' · ' + r.error;
+      } catch (err) { if (!disposed) status.textContent = 'Connexion interrompue : ' + err.message + ' — nouvelle tentative…'; }
+      finally { busy = false; if (!terminal && !disposed) later(pollConsole, 1500); }
+    };
+    pollConsole();
+  }
+
   // ---------- Rendu d'un job ----------
   function renderJob(box, job, type) {
+    renderJobContent(box, job, type);
+    if (box && job && job.canViewLogs !== false && !box.querySelector(`a[href="/jobs/${job.id}"]`)) {
+      const link = document.createElement('a');
+      link.className = 'btn small'; link.href = `/jobs/${job.id}`; link.textContent = 'Détails';
+      box.append(link);
+    }
+  }
+  function renderJobContent(box, job, type) {
     if (!box) return;
     const name = LABELS[type] || box.dataset.label || 'Tâche';
     if (!job) { box.innerHTML = ''; box._sig = ''; return; }
@@ -639,7 +680,7 @@
       const at = new Date(job.runAfter * 1000).toLocaleString('fr-FR', { weekday: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
       box.innerHTML = `<div class="running scheduled"><span class="moon" aria-hidden="true"></span>
         <div><div>${name} programmé(e) : ${esc(at)}</div><div class="small muted">Démarrage la nuit, quand ton quota Claude est libre.</div></div>
-        <button class="btn small" data-cancel="${job.id}">Annuler</button></div>`;
+        ${job.canViewLogs !== false ? `<a class="btn small" href="/jobs/${job.id}">Détails</a>` : ''}<button class="btn small" data-cancel="${job.id}">Annuler</button></div>`;
       return;
     }
     if (ACTIVE.includes(job.status)) {
@@ -653,7 +694,7 @@
       box.innerHTML = `<div class="running"><span class="spinner"></span>
         <div><div class="run-head"><span>${esc(p.message || (running ? 'En cours…' : 'En file d\'attente…'))}</span>${v !== null ? `<strong class="jpct">${v} %</strong>` : ''}</div>
           ${extra ? `<div class="small">${extra}</div>` : ''}${progressBar(job)}${remaining ? `<div class="small muted">${esc(remaining)}</div>` : ''}${p.model ? `<div class="small muted">Modèle : ${esc(p.model)}</div>` : ''}${live}</div>
-        <button class="btn small" data-cancel="${job.id}">Annuler</button></div>`;
+        ${job.canViewLogs !== false ? `<a class="btn small" href="/jobs/${job.id}">Détails</a>` : ''}<button class="btn small" data-cancel="${job.id}">Annuler</button></div>`;
       paintBars(box);
     } else if (job.status === 'error') {
       box.innerHTML = `<p class="error small">${name} en échec : ${esc(job.error)}</p>`;
@@ -2430,3 +2471,5 @@
   listen(document, 'change', (e) => { if (e.target.matches('[data-autosubmit]')) e.target.form.requestSubmit(); });
 
 })();
+
+
