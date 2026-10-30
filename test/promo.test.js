@@ -161,7 +161,29 @@ test('scène toujours fautive : job en erreur lisible, aucune ligne ni fichier l
   assert.match(job.error, /La scène écrite par Claude ne passe pas au rendu : La scène doit définir window\.renderFrame/);
   assert.equal(Number((await s.db.prepare('SELECT COUNT(*) n FROM promo_videos WHERE project_id = ?').get(pid)).n), 0);
   const dir = userPromoRoot(s.app.cfg, u.id);
-  assert.deepEqual(existsSync(dir) ? readdirSync(dir) : [], []);
+  // seule la dernière scène reste, pour « Corriger »
+  assert.deepEqual(existsSync(dir) ? readdirSync(dir) : [], [`scene-${job.id}.html`]);
+});
+
+test('« Corriger » : le verdict du contrôle repart chez Claude, seule une scène refusée est corrigeable', { skip: !supported.ok && supported.reason }, async () => {
+  const { u, pid } = await setup();
+  await gen(u, pid, { subject: 'SCENEFOREVER', fps: 10, seconds: 3 });
+  const failed = await runJob(pid);
+  assert.equal(failed.status, 'error');
+  const n0 = calls().length;
+  const reply = await u.post(`/api/jobs/${failed.id}/retry`, { fix: true });
+  assert.equal(reply.status, 200);
+  const { id } = await reply.json();
+  const params = JSON.parse((await s.db.prepare('SELECT params_json FROM jobs WHERE id = ?').get(id)).params_json);
+  assert.match(params.fix, /^La scène doit définir window\.renderFrame/);
+  assert.equal(params.fixScene, failed.id);
+  await worker.tick();
+  const c = calls().slice(n0);
+  assert.match(c[0].prompt, /Ta version précédente a été refusée au rendu : La scène doit définir window\.renderFrame/, 'la première demande contient déjà le verdict');
+  assert.equal(c.length, 2, 'deux essais de correction');
+  // une autre erreur ne se corrige pas
+  await s.db.prepare("UPDATE jobs SET status = 'error', error = 'Analyse le projet d''abord' WHERE id = ?").run(id);
+  assert.equal((await u.post(`/api/jobs/${id}/retry`, { fix: true })).status, 409);
 });
 
 test('prompt modifiable dans les Réglages : le texte de l\'utilisateur remplace la direction artistique, le contrat technique reste', async () => {
