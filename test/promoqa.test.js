@@ -62,6 +62,16 @@ test('refus de rendu et panne technique nettoient aussi les captures', async () 
       return { ok: true, text: JSON.stringify({ approved: false, issues: [{ severity: 'major', time: 1.5, problem: 'Titre masqué', fix: 'Séparer les plans' }] }) };
     } }), /Titre masqué/);
     assert.deepEqual(readdirSync(root), []);
+    // dernière tentative : le refus des agents devient un avertissement, la vidéo est livrée
+    const last = await reviewPromo({ ...options, final: true, runAgent: async (o) => {
+      for (const file of o.prompt.matchAll(/\d+\.\d{3} s : (.+\.jpg)/g)) o.onTool('Read', { file_path: file[1] });
+      return { ok: true, text: JSON.stringify({ approved: false, issues: [{ severity: 'major', time: 1.5, problem: 'Titre masqué', fix: 'Séparer les plans' }] }) };
+    } });
+    assert.equal(last.warnings.length, 2);
+    assert.equal(last.warnings[0].issues[0].problem, 'Titre masqué');
+    // un contrôle incomplet reste bloquant même à la dernière tentative
+    await assert.rejects(reviewPromo({ ...options, final: true, runAgent: async () => ({ ok: true, text: '{"approved":true,"issues":[]}' }) }), /pas inspecté/);
+    assert.deepEqual(readdirSync(root), []);
     await assert.rejects(reviewPromo({ ...options, captureFrame: async () => { throw new Error('ffmpeg indisponible'); }, runAgent: async () => { throw new Error('ne doit pas être appelé'); } }), /ffmpeg indisponible/);
     assert.deepEqual(readdirSync(root), []);
     await assert.rejects(reviewPromo({ ...options, signal: AbortSignal.abort(), runAgent: async () => { throw new Error('ne doit pas être appelé'); } }), /Annulé/);

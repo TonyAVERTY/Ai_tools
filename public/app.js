@@ -796,6 +796,12 @@
           <button type="button" class="btn small" data-poste-view="${esc(type.slice(6))}">${icon('eye')}Voir le résultat</button></div>`;
         return;
       }
+      if (type === 'promo_video' && r.qualityWarnings?.length) {
+        const items = r.qualityWarnings.flatMap((w) => (w.issues.length ? w.issues.map((x) => `${Number(x.time).toFixed(2)} s : ${x.problem}`) : ['un agent de contrôle n\'a pas approuvé le rendu']));
+        box.innerHTML = `<p class="ok small">${esc(txt)} Les agents de contrôle ont relevé des défauts : la vidéo est dans la liste ci-dessous, regarde-la, télécharge-la ou relance.</p><ul class="small muted">${items.map((i) => `<li>${esc(i)}</li>`).join('')}</ul>
+          <div class="row"><button type="button" class="btn small primary" data-retry="${job.id}">Réessayer</button><button type="button" class="btn small primary" data-retry="${job.id}" data-fix>Corriger</button></div>`;
+        return;
+      }
       box.innerHTML = `<p class="ok small">${esc(txt)}</p>`;
     }
   }
