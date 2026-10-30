@@ -3,7 +3,7 @@ import { now, getSetting, setSetting } from './db.js';
 import { readdirSync, statSync } from 'node:fs';
 import { runClaude, extractJson, rateLimitWindows } from './services/claude.js';
 import { tidyTemplateText, acceptReview } from './services/mailcheck.js';
-import { addUsage, jobContext } from './services/jobs.js';
+import { addUsage, jobContext, liveJobUsage } from './services/jobs.js';
 import { syncRepo } from './services/git.js';
 import { normalizeModel } from './services/models.js';
 import { analyzePrompt, prospectPrompt, templatePrompt, reviewMailPrompt, followupTemplatePrompt, evolutionPrompt, linkedinPostPrompt, hookPrompt, auditPrompt, promoPrompt, rolePrompt, parseCustomPrompts, LEVELS } from './services/prompts.js';
@@ -141,10 +141,14 @@ export function makeClaude(app) {
     let r;
     let hasOutput = false;
     const stream = jc?.log ? createJobStream(jc.log, Object.values(cred.secretEnv || {})) : null;
+    const usage = jc?.usage ? liveJobUsage(jc) : null;
+    let usageTimer = null, pendingUsage = null;
+    const flushUsage = () => { clearTimeout(usageTimer); usageTimer = null; if (pendingUsage) { usage?.update(pendingUsage); pendingUsage = null; } };
     jc?.log?.('model', `Modèle : ${o.model || 'haiku'}`);
     try {
       r = await runClaude({
         bin: cfg.claudeBin, ...o, system,
+        onUsage: (u) => { pendingUsage = u; if (!usageTimer) usageTimer = setTimeout(flushUsage, 500); o.onUsage?.(u); },
         onDelta: stream ? (text) => { hasOutput = true; stream.delta(text); o.onDelta?.(text); } : o.onDelta,
         onActivity: jc ? (text) => { jc.log?.('activity', text); o.onActivity?.(text); } : o.onActivity,
         onText: (text) => { hasOutput = true; stream?.block(text); o.onText?.(text); },
@@ -158,10 +162,13 @@ export function makeClaude(app) {
       });
     } catch (e) {
       stream?.finish();
+      flushUsage();
       if (isAuthRefusal(e.message)) await refused();
       throw e;
     }
     stream?.finish();
+    flushUsage();
+    usage?.finish(r);
     if (!hasOutput && r.text) jc?.log?.('output', r.text);
     if (!r.ok) {
       console.warn(claudeDiagnostic({ userId, cred, cfg, cwd: o.cwd, r }));

@@ -2,6 +2,7 @@
 // et parse le flux stream-json pour remonter la progression en direct.
 import { spawn } from 'node:child_process';
 import { prepareLaunch } from './sandbox.js';
+import { createLiveUsage } from './liveusage.js';
 
 export const MODELS = { rapide: 'haiku', normal: 'sonnet', approfondi: 'opus' };
 
@@ -39,7 +40,7 @@ export function runClaude(o) {
   if (o.system) args.push('--append-system-prompt', o.system);
   // Conversation : uniquement les outils de lecture demandés (aucun par défaut), pas de session enregistrée
   if (o.chat) args.push('--tools', (o.tools || []).join(','), '--no-session-persistence', '--disable-slash-commands', '--include-partial-messages');
-  else if (o.onDelta || o.onActivity) args.push('--include-partial-messages');
+  else if (o.onDelta || o.onActivity || o.onUsage) args.push('--include-partial-messages');
   for (const d of o.extraDirs || []) args.push('--add-dir', d);
 
   const launch = prepareLaunch({
@@ -58,6 +59,7 @@ export function runClaude(o) {
     let rateLimit = null;
     let turns = 0;
     const texts = [];
+    const trackUsage = createLiveUsage(o.onUsage);
 
     const timer = setTimeout(() => child.kill('SIGTERM'), o.timeoutMs || 30 * 60_000);
     o.signal?.addEventListener('abort', () => child.kill('SIGTERM'), { once: true });
@@ -77,6 +79,7 @@ export function runClaude(o) {
     function handle(line) {
       let ev;
       try { ev = JSON.parse(line); } catch { return; }
+      trackUsage(ev);
       if (ev.type === 'stream_event') {
         if (ev.event?.type === 'content_block_start' && ev.event.content_block?.type === 'thinking') o.onActivity?.('Claude réfléchit à la prochaine étape…');
         // Texte en cours d'écriture (option --include-partial-messages) : transmis tel quel, le texte final vient du résultat
