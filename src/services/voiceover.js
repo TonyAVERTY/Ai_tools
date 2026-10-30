@@ -15,6 +15,7 @@ import { mkdtempSync, writeFileSync, readFileSync, readdirSync, rmSync, renameSy
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { SceneError } from './promovideo.js';
+import { cleanAudio } from './audioquality.js';
 
 export const VOICE = { maxSegments: 20, maxSegmentChars: 240, maxTotalChars: 1500, gap: 0.2, sampleText: 'Bonjour, voici ma voix pour ta vidéo de promotion.', timeoutMs: 20_000 };
 
@@ -349,7 +350,7 @@ export function audioDuration(cfg, file) {
 /**
  * Synthétise chaque phrase, mesure sa durée et la place. Renvoie `{ dir, placed, overflow }` ; `dir` contient les MP3 (à effacer avec `cleanVoice`).
  */
-export async function prepareVoice({ cfg, segments, voice, seconds, synth = synthesize, onProgress = () => {}, signal }) {
+export async function prepareVoice({ cfg, segments, voice, seconds, synth = synthesize, onProgress = () => {}, signal, clean = cleanAudio }) {
   const dir = mkdtempSync(join(tmpdir(), 'aitools-voix-'));
   try {
     const parts = [];
@@ -359,7 +360,10 @@ export async function prepareVoice({ cfg, segments, voice, seconds, synth = synt
       const audio = await synth({ provider: voice.provider, voice: voice.voice, text: segments[i].text });
       const file = join(dir, `${i}.${audioType(audio).ext}`);
       writeFileSync(file, audio);
-      parts.push({ t: segments[i].t, text: segments[i].text, file, dur: await audioDuration(cfg, file) });
+      onProgress({done:i,total:segments.length,stage:'clean'});
+      const cleaned=join(dir,`${i}.clean.wav`);
+      const audioReport=await clean(cfg,file,cleaned,{signal});
+      parts.push({ t: segments[i].t, text: segments[i].text, file:cleaned, audioReport, dur: await audioDuration(cfg, cleaned) });
     }
     onProgress({ done: segments.length, total: segments.length });
     return { dir, ...planVoice(parts, seconds) };
