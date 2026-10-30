@@ -50,3 +50,8 @@ Le menu Activité se rafraîchit automatiquement toutes les secondes lorsqu'il e
 
 Les tokens fournis par le flux Claude sont enregistrés pendant l'appel (entrées, cache et sorties), sans attendre sa fin. Les mesures provisoires restent comptées si la tâche est annulée ; le résultat final n'est pas ajouté une seconde fois. Lorsque Claude ne fournit pas encore de nouveaux compteurs, la dernière mesure réelle reste affichée : aucun nombre n'est estimé à partir du texte. Le bouton **Annuler** reste disponible pendant le suivi.
 
+### Temps restant
+
+Le temps restant est calculé par étape et affiché en minutes et secondes, dès le démarrage. Pour la vidéo, la prévision tient compte de la durée, du nombre d'images par seconde, du format, de la voix et du modèle. Elle comprend la conception, les phrases audio, le rendu, l'assemblage et les deux revues finales.
+
+Les durées se calibrent sur les dernières tâches réussies du même compte et du même type. Pendant le rendu, le débit des images réellement produites précise le temps restant. Le pourcentage animé pendant un appel Claude n'est plus utilisé comme une vitesse. Sans historique, la mention « estimation initiale » est affichée ; si une étape prend plus de temps, la prévision est réajustée plutôt que de promettre une fin immédiate.
