@@ -10,6 +10,7 @@ import { analyzePrompt, prospectPrompt, templatePrompt, reviewMailPrompt, follow
 import { VOICE_PROVIDERS, parseVoiceParams, extractVoiceScript, prepareVoice, cleanVoice, mixVoice, synthesize, langName } from './services/voiceover.js';
 import { PROMO, FORMATS, SceneError, parsePromoParams, extractScene, promoSupported, renderPromo } from './services/promovideo.js';
 import { reviewPromo } from './services/promoqa.js';
+import { createJobStream } from './services/jobstream.js';
 import { reserveVideo, finishVideo, removeVideo, countVideos, getVoiceKey, getVoiceRegion } from './promo.js';
 import { linkedinAccount, saveDraft, recentDrafts } from './linkedin.js';
 import { followupCandidates, followupSubject, isBusinessHours } from './services/followup.js';
@@ -139,11 +140,14 @@ export function makeClaude(app) {
     const refused = async () => { if (await markLinkInvalid(db, userId)) console.warn(`[claude] accès refusé : liaison de l'utilisateur ${Number(userId)} marquée invalide`); };
     let r;
     let hasOutput = false;
+    const stream = jc?.log ? createJobStream(jc.log, Object.values(cred.secretEnv || {})) : null;
     jc?.log?.('model', `Modèle : ${o.model || 'haiku'}`);
     try {
       r = await runClaude({
         bin: cfg.claudeBin, ...o, system,
-        onText: (text) => { hasOutput = true; jc?.log?.('output', text); o.onText?.(text); },
+        onDelta: stream ? (text) => { hasOutput = true; stream.delta(text); o.onDelta?.(text); } : o.onDelta,
+        onActivity: jc ? (text) => { jc.log?.('activity', text); o.onActivity?.(text); } : o.onActivity,
+        onText: (text) => { hasOutput = true; stream?.block(text); o.onText?.(text); },
         onTool: (name, input) => { jc?.log?.('tool', toolActivity(name, input) || `Outil : ${name}`); o.onTool?.(name, input); },
         onTurn: (n) => { jc?.log?.('turn', `Claude · étape ${n}`); o.onTurn?.(n); },
         sandbox: cfg.sandbox, secretEnv: cred.secretEnv,
@@ -153,9 +157,11 @@ export function makeClaude(app) {
         extraRoot: userChatRoot(cfg, userId),
       });
     } catch (e) {
+      stream?.finish();
       if (isAuthRefusal(e.message)) await refused();
       throw e;
     }
+    stream?.finish();
     if (!hasOutput && r.text) jc?.log?.('output', r.text);
     if (!r.ok) {
       console.warn(claudeDiagnostic({ userId, cred, cfg, cwd: o.cwd, r }));

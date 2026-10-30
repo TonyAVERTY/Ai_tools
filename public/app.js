@@ -489,7 +489,7 @@
       ${progressBar(j)}
       ${remainingTime(j) ? `<div class="small muted">${esc(remainingTime(j))}</div>` : ''}
       <div class="jmeta small muted"><span>${esc(state)}</span>
-        <span>${j.canViewLogs !== false ? `<a class="link small" href="/jobs/${j.id}">Détails</a> · ` : ''}${j.projectId ? `<button type="button" class="link small" data-goto="${j.projectId}">Voir</button> · ` : ''}<button type="button" class="link small" data-cancel="${j.id}">Annuler</button></span></div>
+        <span>${j.canViewLogs !== false ? `<a class="link small" href="/jobs/${j.id}">Voir</a> · ` : ''}<button type="button" class="link small" data-cancel="${j.id}">Annuler</button></span></div>
     </div>`;
   }
 
@@ -630,6 +630,26 @@
     const status = $('[data-console-status]', consoleBox);
     const labels = { queued: 'En attente', running: 'En cours', done: 'Terminée', error: 'En échec', cancelled: 'Annulée' };
     let cursor = 0, busy = false, terminal = false;
+    let lastDelta = null;
+    const setText = (selector, text) => { const node = $(selector, consoleBox); if (node) node.textContent = text; };
+    const addEntry = (entry) => {
+      $('[data-console-empty]', consoleBox)?.remove();
+      if (entry.kind === 'delta' && lastDelta?.isConnected) { lastDelta.textContent += entry.text; return; }
+      const types = { output: 'Sortie de Claude', delta: 'Claude écrit', tool: 'Outil utilisé', turn: 'Nouvelle étape', model: 'Modèle', status: 'État de la tâche', progress: 'Progression', error: 'Erreur', activity: 'Activité de réflexion' };
+      const article = document.createElement('article');
+      article.className = 'console-entry';
+      article.dataset.kind = Object.hasOwn(types, entry.kind) ? entry.kind : 'status';
+      const head = document.createElement('div'); head.className = 'console-entry-head';
+      const label = document.createElement('strong'); label.textContent = types[entry.kind] || 'Activité';
+      const time = document.createElement('time'); time.textContent = new Date(entry.at).toLocaleTimeString('fr-FR', { timeZone: 'Europe/Paris' });
+      head.append(label, time); article.append(head);
+      const text = document.createElement(['delta', 'output'].includes(entry.kind) ? 'pre' : 'p'); text.textContent = entry.text;
+      if (entry.kind === 'output' && entry.text.length > 1200) {
+        const detail = document.createElement('details'), summary = document.createElement('summary');
+        summary.textContent = 'Afficher la sortie complète'; detail.append(summary, text); article.append(detail);
+      } else article.append(text);
+      output.append(article); lastDelta = entry.kind === 'delta' ? text : null;
+    };
     const pollConsole = async () => {
       if (busy || terminal || disposed) return;
       busy = true;
@@ -637,21 +657,29 @@
         const r = await api(`/api/jobs/${consoleBox.dataset.jobConsole}/log?after=${cursor}`);
         if (disposed) return;
         status.textContent = `${labels[r.status] || r.status}${r.progress?.message && ACTIVE.includes(r.status) ? ' · ' + r.progress.message : ''}`;
+        setText('[data-console-title]', LABELS[r.type] || 'Suivi de la tâche');
+        setText('[data-console-live]', ACTIVE.includes(r.status) ? '● En direct' : labels[r.status] || r.status);
+        setText('[data-console-model]', r.progress?.model || '—');
+        const elapsed = r.startedAt ? Math.max(0, Math.floor(((r.finishedAt || Date.now() / 1000) - r.startedAt))) : 0;
+        setText('[data-console-elapsed]', r.startedAt ? `${Math.floor(elapsed / 60)} min ${String(elapsed % 60).padStart(2, '0')} s` : 'En attente');
+        setText('[data-console-updated]', 'Actualisé à ' + new Date().toLocaleTimeString('fr-FR'));
+        const meter = $('[data-console-progress]', consoleBox);
+        if (meter) { if (typeof r.progress?.pct === 'number') meter.value = Math.max(0, Math.min(100, r.progress.pct)); else if (r.status === 'done') meter.value = 100; else meter.removeAttribute('value'); }
+        consoleBox.dataset.status = r.status;
         if (r.entries.length) {
           if ((cursor && r.firstId > cursor + 1) || (!cursor && r.firstId > 1)) output.append(document.createTextNode('[Début du journal abrégé]\n'));
           for (const entry of r.entries) {
-            const time = new Date(entry.at).toLocaleTimeString('fr-FR', { timeZone: 'Europe/Paris' });
-            output.append(document.createTextNode(`[${time}] ${entry.text}\n\n`));
+            addEntry(entry);
             cursor = entry.id;
           }
-          if (output.textContent.length > 160_000) output.textContent = '[Anciennes lignes abrégées]\n' + output.textContent.slice(-120_000);
+          while (output.childElementCount > 400 || (output.textContent.length > 160_000 && output.childElementCount > 1)) output.firstChild.remove();
           if ($('[data-console-follow]', consoleBox).checked) output.scrollTop = output.scrollHeight;
         }
         if (!cursor && !ACTIVE.includes(r.status)) output.textContent = r.error || 'Aucun journal enregistré pour cette tâche ancienne.';
         terminal = !ACTIVE.includes(r.status);
         if (r.error && terminal) status.textContent += ' · ' + r.error;
-      } catch (err) { if (!disposed) status.textContent = 'Connexion interrompue : ' + err.message + ' — nouvelle tentative…'; }
-      finally { busy = false; if (!terminal && !disposed) later(pollConsole, 1500); }
+      } catch (err) { if (!disposed) { status.textContent = 'Connexion interrompue : ' + err.message + ' — nouvelle tentative…'; setText('[data-console-live]', 'Reconnexion…'); } }
+      finally { busy = false; if (!terminal && !disposed) later(pollConsole, 800); }
     };
     pollConsole();
   }
@@ -661,7 +689,7 @@
     renderJobContent(box, job, type);
     if (box && job && job.canViewLogs !== false && !box.querySelector(`a[href="/jobs/${job.id}"]`)) {
       const link = document.createElement('a');
-      link.className = 'btn small'; link.href = `/jobs/${job.id}`; link.textContent = 'Détails';
+      link.className = 'btn small'; link.href = `/jobs/${job.id}`; link.textContent = 'Voir';
       box.append(link);
     }
   }
@@ -680,7 +708,7 @@
       const at = new Date(job.runAfter * 1000).toLocaleString('fr-FR', { weekday: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
       box.innerHTML = `<div class="running scheduled"><span class="moon" aria-hidden="true"></span>
         <div><div>${name} programmé(e) : ${esc(at)}</div><div class="small muted">Démarrage la nuit, quand ton quota Claude est libre.</div></div>
-        ${job.canViewLogs !== false ? `<a class="btn small" href="/jobs/${job.id}">Détails</a>` : ''}<button class="btn small" data-cancel="${job.id}">Annuler</button></div>`;
+        ${job.canViewLogs !== false ? `<a class="btn small" href="/jobs/${job.id}">Voir</a>` : ''}<button class="btn small" data-cancel="${job.id}">Annuler</button></div>`;
       return;
     }
     if (ACTIVE.includes(job.status)) {
@@ -694,7 +722,7 @@
       box.innerHTML = `<div class="running"><span class="spinner"></span>
         <div><div class="run-head"><span>${esc(p.message || (running ? 'En cours…' : 'En file d\'attente…'))}</span>${v !== null ? `<strong class="jpct">${v} %</strong>` : ''}</div>
           ${extra ? `<div class="small">${extra}</div>` : ''}${progressBar(job)}${remaining ? `<div class="small muted">${esc(remaining)}</div>` : ''}${p.model ? `<div class="small muted">Modèle : ${esc(p.model)}</div>` : ''}${live}</div>
-        ${job.canViewLogs !== false ? `<a class="btn small" href="/jobs/${job.id}">Détails</a>` : ''}<button class="btn small" data-cancel="${job.id}">Annuler</button></div>`;
+        ${job.canViewLogs !== false ? `<a class="btn small" href="/jobs/${job.id}">Voir</a>` : ''}<button class="btn small" data-cancel="${job.id}">Annuler</button></div>`;
       paintBars(box);
     } else if (job.status === 'error') {
       box.innerHTML = `<p class="error small">${name} en échec : ${esc(job.error)}</p>`;
@@ -2471,5 +2499,6 @@
   listen(document, 'change', (e) => { if (e.target.matches('[data-autosubmit]')) e.target.form.requestSubmit(); });
 
 })();
+
 
 
