@@ -530,7 +530,7 @@
       // Les lignes n'apparaissent en fondu qu'à l'ouverture, pas à chaque mise à jour
       jobsPop.classList.add('fresh');
       setTimeout(() => jobsPop.classList.remove('fresh'), 600);
-      refreshSys();
+      refreshActivity();
     }
   }
   jobsBtn?.addEventListener('click', () => toggleJobs());
@@ -592,6 +592,30 @@
   }
 
   let sysTimer;
+  let activityTimerId, activityRequest = null, activityBusy = false;
+  function refreshActivity() {
+    clearTimeout(activityTimerId);
+    if (!jobsBox || disposed || document.hidden) return Promise.resolve();
+    if (activityRequest) return activityRequest;
+    activityRequest = (async () => {
+      try {
+        const response = await fetch('/api/jobs/activity', { headers: { Accept: 'application/json' }, cache: 'no-store', signal: AbortSignal.timeout(8000) });
+        if (response.status === 401) { location.href = '/login'; return; }
+        if (!response.ok) throw new Error('Relevé indisponible');
+        const snapshot = await response.json();
+        if (disposed) return;
+        activityBusy = snapshot.queue > 0;
+        renderJobsMenu(snapshot);
+      } catch { /* garder la dernière mesure, puis retenter automatiquement */ }
+      finally {
+        activityRequest = null;
+        if (!disposed) activityTimerId = later(refreshActivity, jobsOpen() ? 1000 : activityBusy ? 2000 : 10_000);
+      }
+    })();
+    return activityRequest;
+  }
+  refreshActivity();
+  listen(document, 'visibilitychange', () => { if (!document.hidden) refreshActivity(); });
   // Page « Relier Claude » sans accès utilisable : le serveur refuse ces relevés (403). On ne les demande pas, et on réessaie vite (la page change une fois Claude relié).
   const unlinked = () => !!document.querySelector('[data-nolink]');
   async function refreshSys() {
@@ -601,7 +625,6 @@
     try {
       const s = await api('/api/system');
       for (const box of $$('[data-usage-claude]')) { box.innerHTML = usageClaude(s); box.hidden = false; const card = box.closest('[data-claude-card]'); if (card) card.hidden = !box.innerHTML.trim(); }
-      renderJobsMenu(s);
       busy = s.queue > 0;
     } catch { /* silencieux */ }
     // Plus réactif quand quelque chose tourne ou que le menu est ouvert
@@ -620,7 +643,7 @@
   }
   // Le menu s'ouvre d'abord : les traits pointillés et l'agent vont jusqu'à la ligne de la nouvelle tâche, dans la liste
   function launched(trigger) {
-    refreshSys()
+    refreshActivity()
       .then(() => { showActivity(); return new Promise((r) => setTimeout(r, 240)); })
       .then(() => window.AiFx?.launch(trigger, $('.jitem.new', jobsPop) || $('.jitem', jobsPop)))
       .catch(() => {});
@@ -1656,6 +1679,7 @@
       const proj = cancel.closest('.project');
       if (proj) refreshProject(proj);
       else $$('details.project[open]').forEach((el) => refreshProject(el));
+      refreshActivity();
       refreshSys();
       return;
     }

@@ -1,3 +1,4 @@
+import { activitySnapshot } from './services/activity.js';
 import { reviewMail } from './services/mailcheck.js';
 import { projectChecklist } from './checklist.js';
 import { now, getSetting, setSetting } from './db.js';
@@ -387,30 +388,16 @@ export function registerRoutes(router, app) {
   }, { limit: 'mail_send' });
 
   // Barre du haut : uniquement les jobs, l'usage et les quotas de l'utilisateur courant (la température du serveur, réservée aux admins)
+  router.get('/api/jobs/activity', async ({res,session}) => { json(res, await activitySnapshot(db,session.userId)); });
   router.get('/api/system', async ({ res, session }) => {
     const userId = session.userId;
     // Les jobs de l'utilisateur, plus ceux des projets que ses équipes partagent avec lui
-    const teamIds = await memberTeamIds(db, userId);
-    const mine = teamIds.length ? `(j.user_id = ? OR p.team_id IN (${teamIds.map(() => '?').join(',')}))` : 'j.user_id = ?';
-    const mineArgs = [userId, ...teamIds];
-    const queue = (await db.prepare(`SELECT COUNT(*) n FROM jobs j LEFT JOIN projects p ON p.id = j.project_id WHERE ${mine} AND (j.status = 'running'
-      OR (j.status = 'queued' AND (j.run_after IS NULL OR j.run_after <= ?)))`).get(...mineArgs, now())).n;
-    const scheduled = (await db.prepare(`SELECT COUNT(*) n FROM jobs j LEFT JOIN projects p ON p.id = j.project_id WHERE ${mine} AND j.status = 'queued' AND j.run_after > ?`).get(...mineArgs, now())).n;
+    const { queue, scheduled, jobs } = await activitySnapshot(db, userId);
     const link = await getLinkState(db, userId);
     // Le quota d'abonnement n'existe qu'en mode abonnement : relevé en direct chez Anthropic (il compte aussi ce que la personne
     // fait avec son Claude en dehors d'AiTools), à défaut la dernière mesure d'un job. Jamais de barre en mode clé API.
     const quota = link?.mode === MODES.api_key ? null : await currentClaudeQuota(app, userId);
     // Détail pour le menu « jobs » de la barre du haut : en cours d'abord, puis la file, puis les programmés
-    const jobs = (await db.prepare(`SELECT j.id, j.user_id, j.type, j.status, j.error, j.tokens_in, j.tokens_out, j.progress_json, j.run_after, j.started_at, j.created_at, p.id pid, p.name project
-      FROM jobs j LEFT JOIN projects p ON p.id = j.project_id
-      WHERE ${mine} AND (j.status IN ('queued','running') OR (j.status = 'error' AND j.created_at > ${now() - 86400}
-        AND NOT EXISTS (SELECT 1 FROM jobs newer WHERE newer.user_id = j.user_id AND newer.type = j.type AND newer.id > j.id AND (newer.project_id = j.project_id OR (newer.project_id IS NULL AND j.project_id IS NULL)))))
-      ORDER BY j.status = 'running' DESC, j.status = 'error' ASC, COALESCE(j.run_after, 0), j.id LIMIT 20`).all(...mineArgs)).map((r) => ({
-      id: r.id, type: r.type, label: roleTaskByJob(r.type)?.label, status: r.status, error: r.error, projectId: r.pid, project: r.project, canViewLogs: Number(r.user_id) === Number(session.userId),
-      tokensUsed: Number(r.tokens_in || 0) + Number(r.tokens_out || 0),
-      progress: r.progress_json ? JSON.parse(r.progress_json) : null,
-      runAfter: r.run_after, startedAt: r.started_at, createdAt: r.created_at,
-    }));
     json(res, {
       temp: session.user.isAdmin ? cpuTemp() : null, queue, scheduled, jobs, usage: await usageSummary(db, userId), budget: await budgetState(db, userId),
       claudeRateLimit: quota, linkMode: link?.mode ?? null, linkValid: link ? !!link.valid : null,
