@@ -30,6 +30,9 @@ export const FORMATS = {
   carre: { label: 'Carré 1:1', width: 720, height: 720 },
 };
 
+/** Début du message d'échec d'une vidéo dont la scène a été refusée trois fois : sert aussi à reconnaître l'erreur corrigeable. */
+export const SCENE_REFUSED = 'La scène écrite par Claude ne passe pas au rendu : ';
+
 export class SceneError extends Error {
   constructor(message) { super(message); this.name = 'SceneError'; }
 }

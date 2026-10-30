@@ -685,8 +685,8 @@
         consoleBox.dataset.status = r.status;
         setText('[data-console-tokens]', tokenText(r.tokensUsed));
         setText('[data-console-remaining]', remainingTime(r));
-        const retry = $('[data-retry]', consoleBox);
-        if (retry) retry.hidden = r.status !== 'error';
+        const fixable = r.type === 'promo_video' && /^La scène écrite par Claude ne passe pas au rendu/.test(r.error || '');
+        for (const retry of $$('[data-retry]', consoleBox)) retry.hidden = r.status !== 'error' || ('fix' in retry.dataset && !fixable);
         if (r.entries.length) {
           if ((cursor && r.firstId > cursor + 1) || (!cursor && r.firstId > 1)) output.append(document.createTextNode('[Début du journal abrégé]\n'));
           for (const entry of r.entries) {
@@ -721,6 +721,11 @@
         const retry = document.createElement('button');
         retry.type = 'button'; retry.className = 'btn small primary'; retry.dataset.retry = job.id; retry.textContent = 'Réessayer';
         box.append(retry);
+        if (type === 'promo_video' && /^La scène écrite par Claude ne passe pas au rendu/.test(job.error || '')) {
+          const fix = document.createElement('button');
+          fix.type = 'button'; fix.className = 'btn small primary'; fix.dataset.retry = job.id; fix.dataset.fix = ''; fix.textContent = 'Corriger';
+          box.append(fix);
+        }
       }
     }
   }
@@ -1631,16 +1636,18 @@
     const retry = e.target.closest('[data-retry]');
     if (retry) {
       if (retry.disabled) return;
-      retry.disabled = true; retry.textContent = 'Relance…';
+      const fix = 'fix' in retry.dataset;
+      const label = retry.textContent;
+      retry.disabled = true; retry.textContent = fix ? 'Correction…' : 'Relance…';
       const failure = $('[data-retry-error]');
       if (failure) failure.hidden = true;
       try {
-        const result = await api(`/api/jobs/${retry.dataset.retry}/retry`, {});
+        const result = await api(`/api/jobs/${retry.dataset.retry}/retry`, fix ? { fix: true } : {});
         location.href = `/jobs/${result.id}`;
       } catch (err) {
         if (failure) { failure.textContent = err.message; failure.hidden = false; }
         else toast(err.message, 'error');
-        retry.disabled = false; retry.textContent = 'Réessayer';
+        retry.disabled = false; retry.textContent = label;
       }
       return;
     }
