@@ -39,3 +39,8 @@ Seul le propriétaire du job peut ouvrir cette console. Les anciennes tâches n'
 
 
 La page présente un fil de cartes horodatées et un résumé de la tâche (progression, modèle et temps écoulé). Les sorties longues se déplient à la demande. Lorsque Claude signale une phase de réflexion, une carte indique cette activité ; le raisonnement interne n'est pas enregistré ni affiché. Le suivi reçoit les fragments de texte, puis actualise l'écran environ toutes les 800 ms.
+### Réessayer et consommation
+
+Une tâche en échec propose **Réessayer** dans son récapitulatif et sa page de suivi. Une nouvelle tâche reprend les paramètres d'origine ; l'ancienne conserve son erreur et son journal. Les autorisations, les plafonds et la liaison Claude sont revérifiés. Les échecs des dernières 24 heures restent dans Activité jusqu'à une nouvelle tâche du même type sur le même projet.
+
+La consommation s'affiche sous la forme **12 345 tokens**, en cumulant les tokens d'entrée et de sortie retournés par Claude pour les appels de la tâche. Le compteur se met à jour après chaque appel et reste visible en cas d'échec. Aucun pourcentage de limite n'est affiché.

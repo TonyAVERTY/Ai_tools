@@ -36,7 +36,7 @@ import { registerPosteRoutes } from './posteroutes.js';
 import { isRoleJob, roleTaskByJob } from './services/roles.js';
 import { registerProspectRoutes } from './prospectroutes.js';
 import { dashboardPage, settingsPage, unsubPage, accountPage, linkPage, layout } from './views.js';
-import { enqueue, latestJobs, cancelJob, usageSummary } from './services/jobs.js';
+import { enqueue, latestJobs, cancelJob, retryJob, usageSummary } from './services/jobs.js';
 import { validateGitUrl, removeRepo } from './services/git.js';
 import { fetchRecap, clearRecapCache, validateSelect } from './services/recap.js';
 import { sendPause, pauseMessage as pauseMessageOf } from './services/abuse.js';
@@ -401,11 +401,13 @@ export function registerRoutes(router, app) {
     // fait avec son Claude en dehors d'AiTools), à défaut la dernière mesure d'un job. Jamais de barre en mode clé API.
     const quota = link?.mode === MODES.api_key ? null : await currentClaudeQuota(app, userId);
     // Détail pour le menu « jobs » de la barre du haut : en cours d'abord, puis la file, puis les programmés
-    const jobs = (await db.prepare(`SELECT j.id, j.user_id, j.type, j.status, j.progress_json, j.run_after, j.started_at, j.created_at, p.id pid, p.name project
+    const jobs = (await db.prepare(`SELECT j.id, j.user_id, j.type, j.status, j.error, j.tokens_in, j.tokens_out, j.progress_json, j.run_after, j.started_at, j.created_at, p.id pid, p.name project
       FROM jobs j LEFT JOIN projects p ON p.id = j.project_id
-      WHERE ${mine} AND j.status IN ('queued','running')
-      ORDER BY j.status = 'running' DESC, COALESCE(j.run_after, 0), j.id LIMIT 20`).all(...mineArgs)).map((r) => ({
-      id: r.id, type: r.type, label: roleTaskByJob(r.type)?.label, status: r.status, projectId: r.pid, project: r.project, canViewLogs: Number(r.user_id) === Number(session.userId),
+      WHERE ${mine} AND (j.status IN ('queued','running') OR (j.status = 'error' AND j.created_at > ${now() - 86400}
+        AND NOT EXISTS (SELECT 1 FROM jobs newer WHERE newer.user_id = j.user_id AND newer.type = j.type AND newer.id > j.id AND (newer.project_id = j.project_id OR (newer.project_id IS NULL AND j.project_id IS NULL)))))
+      ORDER BY j.status = 'running' DESC, j.status = 'error' ASC, COALESCE(j.run_after, 0), j.id LIMIT 20`).all(...mineArgs)).map((r) => ({
+      id: r.id, type: r.type, label: roleTaskByJob(r.type)?.label, status: r.status, error: r.error, projectId: r.pid, project: r.project, canViewLogs: Number(r.user_id) === Number(session.userId),
+      tokensUsed: Number(r.tokens_in || 0) + Number(r.tokens_out || 0),
       progress: r.progress_json ? JSON.parse(r.progress_json) : null,
       runAfter: r.run_after, startedAt: r.started_at, createdAt: r.created_at,
     }));
@@ -755,7 +757,7 @@ export function registerRoutes(router, app) {
 
   // Les sorties détaillées restent privées au propriétaire du job.
   const ownJobConsole = async (params, session) => {
-    const job = await db.prepare('SELECT id, type, status, error, progress_json, log_json, created_at, started_at, finished_at FROM jobs WHERE id = ? AND user_id = ?').get(Number(params.id) || 0, session.userId);
+    const job = await db.prepare('SELECT id, type, status, error, tokens_in, tokens_out, progress_json, log_json, created_at, started_at, finished_at FROM jobs WHERE id = ? AND user_id = ?').get(Number(params.id) || 0, session.userId);
     if (!job) throw new HttpError(404, 'Job introuvable');
     return job;
   };
@@ -767,6 +769,8 @@ export function registerRoutes(router, app) {
       <div class="console-grid"><aside class="console-summary"><span class="console-eyebrow">ACTIVITÉ ACTUELLE</span><p data-console-status role="status">Connexion au journal…</p>
       <progress data-console-progress max="100" value="0" aria-label="Progression de la tâche"></progress>
       <div class="console-facts"><span>Modèle<strong data-console-model>—</strong></span><span>Temps écoulé<strong data-console-elapsed>—</strong></span></div>
+      <p class="console-tokens" data-console-tokens>0 tokens</p>
+      <button type="button" class="btn primary" data-retry="${job.id}" hidden>Réessayer</button><p class="small error" data-retry-error role="alert" hidden></p>
       <p class="small muted" data-console-updated>En attente des premières informations</p><p class="small muted">Les étapes et les sorties arrivent ici dès leur réception.</p></aside>
       <section class="console-feed"><div class="console-feed-head"><h2>Fil d’activité</h2><label><input type="checkbox" data-console-follow checked> Suivre le direct</label></div>
       <div class="job-console-output" data-console-output tabindex="0" aria-label="Journal de la tâche"><p data-console-empty class="console-empty">Claude prépare la tâche. Ses prochaines actions apparaîtront ici.</p></div></section></div></section>` }));
@@ -776,8 +780,12 @@ export function registerRoutes(router, app) {
     const after = Math.max(0, Number(url.searchParams.get('after')) || 0);
     const log = JSON.parse(job.log_json || '[]');
     json(res, { id: job.id, type: job.type, status: job.status, error: job.error, startedAt: job.started_at, finishedAt: job.finished_at,
+      tokensUsed: Number(job.tokens_in || 0) + Number(job.tokens_out || 0),
       progress: job.progress_json ? JSON.parse(job.progress_json) : null,
       entries: log.filter((e) => e.id > after), firstId: log[0]?.id || 0 });
+  });
+  router.post('/api/jobs/:id/retry', async ({ res, params, session }) => {
+    json(res, await retryJob(db, session.userId, Number(params.id) || 0, aiOpts));
   });
   router.post('/api/jobs/:id/cancel', async ({ res, params, session }) => {
     const id = Number(params.id);
