@@ -110,24 +110,15 @@
     });
   }
   const pctOf = (p) => (typeof p?.pct === 'number' ? Math.max(0, Math.min(100, Math.round(p.pct))) : null);
-  // Estimation à partir de l'avancement mesuré ; jamais de compte à rebours pour la file.
+  // Compte à rebours à partir de la prévision des étapes calculée par le serveur.
   const remainingTime = (job, nowMs = Date.now()) => {
     if (job.status !== 'running') return '';
-    const pct = job.progress?.pct;
-    const started = Number(job.startedAt);
-    const elapsed = nowMs / 1000 - started;
-    if (!Number.isFinite(started) || started <= 0 || !Number.isFinite(elapsed) || elapsed < 10 ||
-        typeof pct !== 'number' || !Number.isFinite(pct) || pct <= 0) return 'Temps restant : estimation en cours…';
-    if (pct >= 100) return 'Finalisation en cours…';
-    const seconds = elapsed * (100 - pct) / pct;
-    if (!Number.isFinite(seconds)) return 'Temps restant : estimation en cours…';
-    if (seconds < 60) return 'Temps restant estimé : moins d’une minute';
-    const minutes = Math.ceil(seconds / 60);
-    if (minutes < 60) return `Temps restant estimé : environ ${minutes} min`;
-    const rounded = Math.ceil(minutes / 5) * 5;
-    const hours = Math.floor(rounded / 60);
-    const rest = rounded % 60;
-    return `Temps restant estimé : environ ${hours} h${rest ? ` ${rest} min` : ''}`;
+    const eta = job.eta;
+    if (!eta || !Number.isFinite(eta.remainingSeconds)) return 'Temps restant : estimation en cours…';
+    const seconds = Math.max(1, Math.ceil(eta.remainingSeconds - Math.max(0, nowMs / 1000 - eta.estimatedAt)));
+    const minutes = Math.floor(seconds / 60), rest = seconds % 60;
+    const duration = minutes >= 60 ? Math.floor(minutes / 60) + ' h ' + String(minutes % 60).padStart(2,'0') + ' min' : minutes ? minutes + ' min ' + String(rest).padStart(2,'0') + ' s' : seconds + ' s';
+    return 'Temps restant estimé : ' + duration + (eta.revised ? ' · réajusté' : eta.source === 'initial' ? ' · estimation initiale' : '');
   };
 
   const progressBar = (job) => {
@@ -693,6 +684,7 @@
         if (meter) { if (typeof r.progress?.pct === 'number') meter.value = Math.max(0, Math.min(100, r.progress.pct)); else if (r.status === 'done') meter.value = 100; else meter.removeAttribute('value'); }
         consoleBox.dataset.status = r.status;
         setText('[data-console-tokens]', tokenText(r.tokensUsed));
+        setText('[data-console-remaining]', remainingTime(r));
         const retry = $('[data-retry]', consoleBox);
         if (retry) retry.hidden = r.status !== 'error';
         if (r.entries.length) {

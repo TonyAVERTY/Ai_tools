@@ -9,6 +9,7 @@ import { aiRefusal, assertCanRunAi } from '../claudelink.js';
 import { loadRatio } from './load.js';
 import { LOAD } from '../limits.js';
 import { createJobLog } from './joblog.js';
+import { attachJobEta } from './jobeta.js';
 import { assertRoom, recordUsage, withUserLock, MAIL_JOBS } from './plans.js';
 import { sendPause, pauseMessage } from './abuse.js';
 
@@ -108,10 +109,12 @@ export async function latestJobs(db, projectId) {
     JOIN (SELECT type, MAX(id) id FROM jobs WHERE project_id = ? GROUP BY type) lj ON lj.id = j.id
   `).all(projectId);
   const out = {};
+  await attachJobEta(db, rows);
   for (const r of rows) {
     out[r.type] = {
       id: r.id, status: r.status, error: r.error,
       tokensUsed: Number(r.tokens_in || 0) + Number(r.tokens_out || 0),
+      eta:r.eta||null,
       progress: r.progress_json ? JSON.parse(r.progress_json) : null,
       result: r.result_json ? JSON.parse(r.result_json) : null,
       createdAt: r.created_at, startedAt: r.started_at, finishedAt: r.finished_at, runAfter: r.run_after,
