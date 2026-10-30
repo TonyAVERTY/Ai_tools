@@ -8,6 +8,7 @@ import { getUser } from '../users.js';
 import { aiRefusal, assertCanRunAi } from '../claudelink.js';
 import { loadRatio } from './load.js';
 import { LOAD } from '../limits.js';
+import { createJobLog } from './joblog.js';
 import { assertRoom, recordUsage, withUserLock, MAIL_JOBS } from './plans.js';
 import { sendPause, pauseMessage } from './abuse.js';
 
@@ -334,12 +335,15 @@ export class Worker {
   async runJob(job) {
     const ctrl = new AbortController();
     this.running.set(job.id, { job, ctrl });
+    const journal = createJobLog(this.db, job.id);
+    journal.append('status', 'Démarrage de la tâche');
     const ctx = {
       job,
       params: JSON.parse(job.params_json || '{}'),
       signal: ctrl.signal,
       // Le modèle réellement utilisé (réglage de l'utilisateur) est joint à chaque avancement : « Modèle : Sonnet » dans Activité et sur le projet
-      progress: (p) => setProgress(this.db, job.id, ctx.model ? { ...p, model: modelLabel(ctx.model) } : p),
+      progress: (p) => { journal.append('progress', p.message); return setProgress(this.db, job.id, ctx.model ? { ...p, model: modelLabel(ctx.model) } : p); },
+      log: (kind, text) => journal.append(kind, text),
       cancelled: () => this.isCancelled(job.id),
       usage: { costUsd: 0, tokensIn: 0, tokensOut: 0 },
     };
@@ -355,6 +359,8 @@ export class Worker {
       }
       try {
         const out = await jobContext.run(ctx, () => handler(ctx));
+        journal.append('status', (await this.isCancelled(job.id)) ? 'Tâche annulée' : 'Tâche terminée');
+        await journal.flush();
         const result = ctx.model && out && typeof out === 'object' && !Array.isArray(out) ? { ...out, model: ctx.model } : out;
         if (!(await this.isCancelled(job.id))) {
           await this.db.prepare("UPDATE jobs SET status='done', result_json=?, finished_at=?, cost_usd=?, tokens_in=?, tokens_out=? WHERE id=?")
@@ -362,6 +368,8 @@ export class Worker {
           this.emit('onFinish', job, { status: 'done', result });
         }
       } catch (e) {
+        journal.append('error', e.message);
+        await journal.flush().catch(() => {});
         this.log.error(`[job ${job.id} ${job.type}]`, e.message);
         if (!(await this.isCancelled(job.id))) {
           await this.db.prepare("UPDATE jobs SET status='error', error=?, finished_at=?, cost_usd=?, tokens_in=?, tokens_out=? WHERE id=?")
@@ -370,6 +378,8 @@ export class Worker {
         }
       }
     } finally {
+      if (ctrl.signal.aborted) journal.append('status', 'Tâche annulée');
+      await journal.flush().catch(() => {});
       clearInterval(watch);
       this.running.delete(job.id);
       const left = (this.busyUsers.get(Number(job.user_id)) || 1) - 1;

@@ -35,7 +35,7 @@ import { registerPromoRoutes, removeProjectVideos } from './promo.js';
 import { registerPosteRoutes } from './posteroutes.js';
 import { isRoleJob, roleTaskByJob } from './services/roles.js';
 import { registerProspectRoutes } from './prospectroutes.js';
-import { dashboardPage, settingsPage, unsubPage, accountPage, linkPage } from './views.js';
+import { dashboardPage, settingsPage, unsubPage, accountPage, linkPage, layout } from './views.js';
 import { enqueue, latestJobs, cancelJob, usageSummary } from './services/jobs.js';
 import { validateGitUrl, removeRepo } from './services/git.js';
 import { fetchRecap, clearRecapCache, validateSelect } from './services/recap.js';
@@ -401,11 +401,11 @@ export function registerRoutes(router, app) {
     // fait avec son Claude en dehors d'AiTools), à défaut la dernière mesure d'un job. Jamais de barre en mode clé API.
     const quota = link?.mode === MODES.api_key ? null : await currentClaudeQuota(app, userId);
     // Détail pour le menu « jobs » de la barre du haut : en cours d'abord, puis la file, puis les programmés
-    const jobs = (await db.prepare(`SELECT j.id, j.type, j.status, j.progress_json, j.run_after, j.started_at, j.created_at, p.id pid, p.name project
+    const jobs = (await db.prepare(`SELECT j.id, j.user_id, j.type, j.status, j.progress_json, j.run_after, j.started_at, j.created_at, p.id pid, p.name project
       FROM jobs j LEFT JOIN projects p ON p.id = j.project_id
       WHERE ${mine} AND j.status IN ('queued','running')
       ORDER BY j.status = 'running' DESC, COALESCE(j.run_after, 0), j.id LIMIT 20`).all(...mineArgs)).map((r) => ({
-      id: r.id, type: r.type, label: roleTaskByJob(r.type)?.label, status: r.status, projectId: r.pid, project: r.project,
+      id: r.id, type: r.type, label: roleTaskByJob(r.type)?.label, status: r.status, projectId: r.pid, project: r.project, canViewLogs: Number(r.user_id) === Number(session.userId),
       progress: r.progress_json ? JSON.parse(r.progress_json) : null,
       runAfter: r.run_after, startedAt: r.started_at, createdAt: r.created_at,
     }));
@@ -455,6 +455,7 @@ export function registerRoutes(router, app) {
     const p = await project(ctx);
     const userId = p.userId; // un membre agit comme le propriétaire : ses plafonds, ses réglages
     const jobs = await latestJobs(db, p.id);
+    for (const j of Object.values(jobs)) j.canViewLogs = Number(p.userId) === Number(ctx.session.userId);
     // Rendu côté serveur (échappé) : le front n'injecte jamais le Markdown brut de Claude
     if (jobs.evolution?.result?.markdown) jobs.evolution.result.html = evolutionHtml(jobs.evolution.result.markdown);
     if (jobs.audit?.result?.markdown) jobs.audit.result.html = evolutionHtml(jobs.audit.result.markdown);
@@ -752,6 +753,29 @@ export function registerRoutes(router, app) {
     catch (e) { throw new HttpError(400, e.message); }
   });
 
+  // Les sorties détaillées restent privées au propriétaire du job.
+  const ownJobConsole = async (params, session) => {
+    const job = await db.prepare('SELECT id, type, status, error, progress_json, log_json FROM jobs WHERE id = ? AND user_id = ?').get(Number(params.id) || 0, session.userId);
+    if (!job) throw new HttpError(404, 'Job introuvable');
+    return job;
+  };
+  router.get('/jobs/:id', async ({ res, params, session }) => {
+    const job = await ownJobConsole(params, session);
+    html(res, layout({ title: 'Console de la tâche', email: session.email, body: `<a href="/">← Retour aux projets</a><h1>Console de la tâche #${job.id}</h1>
+      <section data-job-console="${job.id}" class="job-console">
+      <p data-console-status role="status">Chargement du journal…</p>
+      <p class="small muted">Étapes, outils utilisés et sorties de Claude. Le journal se met à jour automatiquement.</p>
+      <label><input type="checkbox" data-console-follow checked> Suivre les nouvelles lignes</label>
+      <pre class="job-console-output" data-console-output tabindex="0" aria-label="Journal de la tâche"></pre></section>` }));
+  });
+  router.get('/api/jobs/:id/log', async ({ res, params, session, url }) => {
+    const job = await ownJobConsole(params, session);
+    const after = Math.max(0, Number(url.searchParams.get('after')) || 0);
+    const log = JSON.parse(job.log_json || '[]');
+    json(res, { id: job.id, type: job.type, status: job.status, error: job.error,
+      progress: job.progress_json ? JSON.parse(job.progress_json) : null,
+      entries: log.filter((e) => e.id > after), firstId: log[0]?.id || 0 });
+  });
   router.post('/api/jobs/:id/cancel', async ({ res, params, session }) => {
     const id = Number(params.id);
     const job = await db.prepare('SELECT j.user_id, p.team_id FROM jobs j LEFT JOIN projects p ON p.id = j.project_id WHERE j.id = ?').get(id);
@@ -762,3 +786,4 @@ export function registerRoutes(router, app) {
     json(res, { ok: true });
   });
 }
+
