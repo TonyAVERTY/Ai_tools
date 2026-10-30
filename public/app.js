@@ -110,6 +110,26 @@
     });
   }
   const pctOf = (p) => (typeof p?.pct === 'number' ? Math.max(0, Math.min(100, Math.round(p.pct))) : null);
+  // Estimation à partir de l'avancement mesuré ; jamais de compte à rebours pour la file.
+  const remainingTime = (job, nowMs = Date.now()) => {
+    if (job.status !== 'running') return '';
+    const pct = job.progress?.pct;
+    const started = Number(job.startedAt);
+    const elapsed = nowMs / 1000 - started;
+    if (!Number.isFinite(started) || started <= 0 || !Number.isFinite(elapsed) || elapsed < 10 ||
+        typeof pct !== 'number' || !Number.isFinite(pct) || pct <= 0) return 'Temps restant : estimation en cours…';
+    if (pct >= 100) return 'Finalisation en cours…';
+    const seconds = elapsed * (100 - pct) / pct;
+    if (!Number.isFinite(seconds)) return 'Temps restant : estimation en cours…';
+    if (seconds < 60) return 'Temps restant estimé : moins d’une minute';
+    const minutes = Math.ceil(seconds / 60);
+    if (minutes < 60) return `Temps restant estimé : environ ${minutes} min`;
+    const rounded = Math.ceil(minutes / 5) * 5;
+    const hours = Math.floor(rounded / 60);
+    const rest = rounded % 60;
+    return `Temps restant estimé : environ ${hours} h${rest ? ` ${rest} min` : ''}`;
+  };
+
   const progressBar = (job) => {
     // En file ou programmé : 0 % (barre vide, pas d'animation « indéterminée ») ; seul un job qui tourne sans mesure reste indéterminé
     const v = pctOf(job.progress) ?? (job.status === 'running' ? null : 0);
@@ -467,6 +487,7 @@
         <strong>${esc(LABELS[j.type] || j.label || j.type)}</strong>${p.model ? `<span class="jmodel" title="Modèle utilisé">${esc(p.model)}</span>` : ''}<span class="jproj">${j.project ? esc(j.project) : ''}</span>${v !== null ? `<span class="jpct">${v} %</span>` : ''}</div>
       ${msg ? `<div class="jmsg small muted">${esc(msg)}</div>` : ''}
       ${progressBar(j)}
+      ${remainingTime(j) ? `<div class="small muted">${esc(remainingTime(j))}</div>` : ''}
       <div class="jmeta small muted"><span>${esc(state)}</span>
         <span>${j.projectId ? `<button type="button" class="link small" data-goto="${j.projectId}">Voir</button> · ` : ''}<button type="button" class="link small" data-cancel="${j.id}">Annuler</button></span></div>
     </div>`;
@@ -610,7 +631,8 @@
     const p = job.progress || {};
     const later = job.status === 'queued' && job.runAfter && job.runAfter * 1000 > Date.now();
     // Rien n'a changé : on ne touche pas au DOM (sinon les animations d'apparition rejoueraient à chaque poll)
-    const sig = `${job.id}|${job.status}|${later}|${JSON.stringify(p)}`;
+    const remaining = remainingTime(job);
+    const sig = `${job.id}|${job.status}|${later}|${remaining}|${JSON.stringify(p)}`;
     if (box._sig === sig) return;
     box._sig = sig;
     if (later) {
@@ -630,7 +652,7 @@
       const v = pctOf(p) ?? (running ? null : 0);
       box.innerHTML = `<div class="running"><span class="spinner"></span>
         <div><div class="run-head"><span>${esc(p.message || (running ? 'En cours…' : 'En file d\'attente…'))}</span>${v !== null ? `<strong class="jpct">${v} %</strong>` : ''}</div>
-          ${extra ? `<div class="small">${extra}</div>` : ''}${progressBar(job)}${p.model ? `<div class="small muted">Modèle : ${esc(p.model)}</div>` : ''}${live}</div>
+          ${extra ? `<div class="small">${extra}</div>` : ''}${progressBar(job)}${remaining ? `<div class="small muted">${esc(remaining)}</div>` : ''}${p.model ? `<div class="small muted">Modèle : ${esc(p.model)}</div>` : ''}${live}</div>
         <button class="btn small" data-cancel="${job.id}">Annuler</button></div>`;
       paintBars(box);
     } else if (job.status === 'error') {
