@@ -43,4 +43,10 @@ La page présente un fil de cartes horodatées et un résumé de la tâche (prog
 
 Une tâche en échec propose **Réessayer** dans son récapitulatif et sa page de suivi. Une nouvelle tâche reprend les paramètres d'origine ; l'ancienne conserve son erreur et son journal. Les autorisations, les plafonds et la liaison Claude sont revérifiés. Les échecs des dernières 24 heures restent dans Activité jusqu'à une nouvelle tâche du même type sur le même projet.
 
-La consommation s'affiche sous la forme **12 345 tokens**, en cumulant les tokens d'entrée et de sortie retournés par Claude pour les appels de la tâche. Le compteur se met à jour après chaque appel et reste visible en cas d'échec. Aucun pourcentage de limite n'est affiché.
+La consommation s'affiche sous la forme **12 345 tokens**, en cumulant les tokens d'entrée et de sortie retournés par Claude pour les appels de la tâche. Le compteur se met à jour pendant les appels lorsque Claude fournit ses mesures, puis à leur fin, et reste visible en cas d'échec. Aucun pourcentage de limite n'est affiché.
+### Suivi pendant la génération
+
+Le menu Activité se rafraîchit automatiquement toutes les secondes lorsqu'il est ouvert, toutes les deux secondes lorsqu'une tâche tourne et que le menu est fermé. Ce relevé léger ne dépend pas du service de quota Claude. Le retour sur un onglet déclenche aussi une mise à jour.
+
+Les tokens fournis par le flux Claude sont enregistrés pendant l'appel (entrées, cache et sorties), sans attendre sa fin. Les mesures provisoires restent comptées si la tâche est annulée ; le résultat final n'est pas ajouté une seconde fois. Lorsque Claude ne fournit pas encore de nouveaux compteurs, la dernière mesure réelle reste affichée : aucun nombre n'est estimé à partir du texte. Le bouton **Annuler** reste disponible pendant le suivi.
+
