@@ -138,9 +138,14 @@ export function makeClaude(app) {
     // Accès refusé par Claude (jeton expiré, clé révoquée) : la liaison devient invalide et l'interface demande de se reconnecter
     const refused = async () => { if (await markLinkInvalid(db, userId)) console.warn(`[claude] accès refusé : liaison de l'utilisateur ${Number(userId)} marquée invalide`); };
     let r;
+    let hasOutput = false;
+    jc?.log?.('model', `Modèle : ${o.model || 'haiku'}`);
     try {
       r = await runClaude({
         bin: cfg.claudeBin, ...o, system,
+        onText: (text) => { hasOutput = true; jc?.log?.('output', text); o.onText?.(text); },
+        onTool: (name, input) => { jc?.log?.('tool', toolActivity(name, input) || `Outil : ${name}`); o.onTool?.(name, input); },
+        onTurn: (n) => { jc?.log?.('turn', `Claude · étape ${n}`); o.onTurn?.(n); },
         sandbox: cfg.sandbox, secretEnv: cred.secretEnv,
         // Les clones lus sont ceux du propriétaire du projet (page IA : projet d'équipe joint, accès vérifié par l'appelant) ;
         // les pièces jointes lues en plus sont toujours dans le dossier de CET utilisateur.
@@ -151,6 +156,7 @@ export function makeClaude(app) {
       if (isAuthRefusal(e.message)) await refused();
       throw e;
     }
+    if (!hasOutput && r.text) jc?.log?.('output', r.text);
     if (!r.ok) {
       console.warn(claudeDiagnostic({ userId, cred, cfg, cwd: o.cwd, r }));
       // Un message d'erreur d'authentification est court ; un long texte (analyse tronquée qui parle d'un « 401 » dans le code) n'en est pas un

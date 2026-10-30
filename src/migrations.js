@@ -1141,4 +1141,10 @@ export const MIGRATIONS = [
     sqlite: ['ALTER TABLE projects ADD COLUMN site_url TEXT'],
     mysql: [{ sql: 'ALTER TABLE projects ADD COLUMN site_url VARCHAR(300) NULL', when: colMissing('projects', 'site_url') }],
   },
+  {
+    name: 'job_console',
+    sqlite: ['ALTER TABLE jobs ADD COLUMN log_json TEXT'],
+    mysql: [{ sql: 'ALTER TABLE jobs ADD COLUMN log_json MEDIUMTEXT NULL', when: colMissing('jobs', 'log_json') }],
+  },
 ];
+

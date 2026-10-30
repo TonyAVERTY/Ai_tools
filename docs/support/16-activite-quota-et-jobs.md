@@ -31,3 +31,9 @@ Les alertes (quota proche de la limite à 80 % puis 95 %, budget atteint, job te
 
 ## Erreurs de job
 Un job qui échoue affiche son message (« Job en erreur » dans Activité et dans la section du projet). Les causes fréquentes : liaison Claude à revalider, quota ou budget atteint, SMTP ou adresse de réception manquants, dépôt Git inaccessible (token manquant dans Réglages → Dépôts Git), plafond de l'offre atteint.
+## Console d'une tâche
+
+Dans Activité et le récapitulatif d'une tâche, **Détails** ouvre sa console. Elle affiche les étapes horodatées, le modèle, les outils utilisés, les sorties de Claude et les erreurs. Les nouvelles lignes arrivent automatiquement ; décocher **Suivre les nouvelles lignes** permet de relire tranquillement. Le journal reste consultable depuis le récapitulatif après la fin de la tâche.
+
+Seul le propriétaire du job peut ouvrir cette console. Les anciennes tâches n'ont pas de journal rétroactif. Pour limiter le stockage, les sorties très longues et le début des journaux volumineux sont abrégés avec une mention explicite. Le journal montre les actions et les sorties disponibles, pas le raisonnement interne de Claude.
+
