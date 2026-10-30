@@ -279,6 +279,7 @@ const MEASURE = String.raw`(async (times) => {
   for (const t of times) {
     await window.renderFrame(t);
     const items = [];
+    const textRects = [], clipped = [], collisions = [];
     let bgSolid = null, bgGradient = false;
     const all = document.body.querySelectorAll('*');
     for (let i = 0; i < all.length; i++) {
@@ -305,9 +306,33 @@ const MEASURE = String.raw`(async (times) => {
       else if (el instanceof SVGElement && SHAPES.has(el.tagName.toLowerCase())) type = 'shape';
       else if (alpha(cs.backgroundColor) > 0.04 || (img && img !== 'none') || (parseFloat(cs.borderTopWidth) > 0 && alpha(cs.borderTopColor) > 0.1)) type = 'box';
       if (!type) continue;
+      // Mesurer les glyphes eux-mêmes, avant découpe au viewport. Les entrées/sorties
+      // à faible opacité ne comptent pas comme un texte établi et lisible.
+      if (type === 'text' && op >= 0.85) {
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        const tr = range.getBoundingClientRect();
+        const label = el.textContent.trim().replace(/\s+/g, ' ').slice(0, 100);
+        let cut = tr.left < -2 || tr.top < -2 || tr.right > W + 2 || tr.bottom > H + 2;
+        for (let parent = el; parent && parent !== document.body; parent = parent.parentElement) {
+          const pc = getComputedStyle(parent), pr = parent.getBoundingClientRect();
+          if (/(hidden|clip|scroll|auto)/.test(pc.overflowX) && (tr.left < pr.left - 2 || tr.right > pr.right + 2)) cut = true;
+          if (/(hidden|clip|scroll|auto)/.test(pc.overflowY) && (tr.top < pr.top - 2 || tr.bottom > pr.bottom + 2)) cut = true;
+        }
+        if (cut) clipped.push(label);
+        if (tr.width > 2 && tr.height > 2) textRects.push({ el, r: tr, label });
+      }
       // Halos et grilles de fond : décor, pas contenu
       if (type === 'box' && (/radial-gradient/.test(img) || (/gradient/.test(img) && w >= W * 0.8))) continue;
       items.push({ i, type, x, y, w, h, fs });
+    }
+    for (let i = 0; i < textRects.length; i++) for (let j = i + 1; j < textRects.length; j++) {
+      const a = textRects[i], b = textRects[j];
+      if (a.el.contains(b.el) || b.el.contains(a.el)) continue;
+      const w = Math.min(a.r.right, b.r.right) - Math.max(a.r.left, b.r.left);
+      const h = Math.min(a.r.bottom, b.r.bottom) - Math.max(a.r.top, b.r.top);
+      const area = Math.min(a.r.width * a.r.height, b.r.width * b.r.height);
+      if (w > 3 && h > 3 && w * h > area * 0.2) collisions.push(a.label + ' / ' + b.label);
     }
     const cells = new Set();
     for (const it of items) {
@@ -320,6 +345,7 @@ const MEASURE = String.raw`(async (times) => {
     const fonts = items.filter((n) => n.type === 'text').map((n) => n.fs);
     const bodyBg = getComputedStyle(document.body).backgroundColor;
     out.push({ t, cover: cells.size / (GX * GY), cy, maxFont: fonts.length ? Math.max(...fonts) : 0, minFont: fonts.length ? Math.min(...fonts) : 0,
+      clipped: clipped.slice(0, 10), collisions: collisions.slice(0, 10),
       count: items.length, boxes: items.map((n) => [n.i, Math.round(n.x), Math.round(n.y), Math.round(n.w), Math.round(n.h)]),
       bg: { solid: bgSolid || (alpha(bodyBg) > 0.9 ? bodyBg : null), gradient: bgGradient, lum: lum(bgSolid || bodyBg) } });
   }
@@ -336,7 +362,14 @@ const pct = (x) => `${Math.round(x * 100)} %`;
 export function judgeScene(metrics, { width, height }) {
   const errors = [];
   const notes = [];
-  if (!metrics?.length) return { errors, notes };
+  if (!metrics?.length) return { errors: ['Contrôle visuel impossible : aucune mesure de la scène.'], notes };
+  for (const [field, label] of [['clipped', 'Texte coupé ou hors cadre'], ['collisions', 'Textes superposés']]) {
+    const bad = metrics.filter((m) => m[field]?.length);
+    if (bad.length >= 2 || metrics.at(-1)?.[field]?.length) {
+      const examples = [...new Set(bad.flatMap((m) => m[field]))].slice(0, 3);
+      errors.push(`${label} à ${bad[0].t?.toFixed(2) ?? '?'} s : ${examples.join(' ; ')}. Corrige les dimensions, les retours à la ligne et la visibilité des plans.`);
+    }
+  }
   const cover = median(metrics.map((m) => m.cover));
   const maxFont = median(metrics.filter((m) => m.maxFont > 0).map((m) => m.maxFont));
   const minFonts = metrics.filter((m) => m.minFont > 0).map((m) => m.minFont).sort((a, b) => a - b);
@@ -406,6 +439,11 @@ export async function renderPromo({ cfg, html, fps, seconds, width, height, out,
     const b = await shot(cdp, seconds / 2);
     const c = await shot(cdp, Math.max(0, seconds - 1 / fps));
     if (a.equals(b) && b.equals(c)) throw new SceneError("La scène ne bouge pas : renderFrame(t) doit modifier l'affichage en fonction de t (début, milieu et fin identiques).");
+    // Le contrôle saute dans le temps avant le rendu : tous les plans doivent réinitialiser
+    // leur état, sinon d'anciens titres restent visibles dans les images suivantes.
+    const reset = await shot(cdp, 0);
+    const middleAgain = await shot(cdp, seconds / 2);
+    if (!a.equals(reset) || !b.equals(middleAgain)) throw new SceneError("État visuel non déterministe : revenir au même instant change l'image. Dans renderFrame(t), réinitialise la visibilité, les textes et les transformations de TOUS les plans à chaque appel ; aucun élément d'un ancien plan ne doit rester affiché.");
     // Qualité visuelle : 'strict' renvoie la scène à Claude si elle est vide, minuscule, figée ou sur fond blanc ; 'warn' rend quand même et garde les constats
     let notes = [];
     if (quality !== 'off') {
@@ -443,3 +481,4 @@ export async function renderPromo({ cfg, html, fps, seconds, width, height, out,
 
 /** Dossier de travail laissé par un rendu interrompu : rien à faire (le profil Chromium est dans /tmp), gardé pour les tests. */
 export const leftovers = () => readdirSync(tmpdir()).filter((n) => n.startsWith('aitools-chromium-'));
+
