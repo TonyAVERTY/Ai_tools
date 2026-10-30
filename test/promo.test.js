@@ -222,7 +222,40 @@ test('contrôle strict à chaque tentative : trois refus, aucune vidéo livrée 
   } finally { delete s.app.promoSupported; s.app.renderPromo = renderFixture; }
 });
 
-test('refus des agents du MP4 : correction bornée, jamais marqué prêt', async () => {
+test('agents du MP4 toujours en refus : les deux premières versions sont corrigées, la troisième est livrée avec avertissements', async () => {
+  const { u, pid } = await setup();
+  const originalReview = s.app.reviewPromo;
+  const finals = [];
+  s.app.promoSupported = () => ({ ok: true });
+  s.app.renderPromo = async () => ({ frames: 30, bytes: 10 });
+  s.app.reviewPromo = async (o) => {
+    finals.push(o.final);
+    if (!o.final) throw new SceneError('Agent montage : texte et voix désynchronisés à 0,8 s');
+    return { reviews: [], warnings: [{ reviewer: 'motion', issues: [{ severity: 'major', time: 5.2, problem: 'Texte en retard', fix: 'Avancer' }] }] };
+  };
+  try {
+    await gen(u, pid, { fps: 10, seconds: 3 });
+    const job = await runQualityJob(pid);
+    assert.equal(job.status, 'done', job.error);
+    assert.deepEqual(finals, [false, false, true]);
+    assert.equal(job.result.qualityWarnings[0].issues[0].problem, 'Texte en retard');
+    assert.equal((await (await u.get(`/api/projects/${pid}/promo`)).json()).videos.length, 1, 'la vidéo est livrée');
+    // la vidéo livrée avec avertissements se corrige ou se relance depuis la tâche terminée
+    const reply = await u.post(`/api/jobs/${job.id}/retry`, { fix: true });
+    assert.equal(reply.status, 200);
+    const newId = (await reply.json()).id;
+    const fixed = JSON.parse((await s.db.prepare('SELECT params_json FROM jobs WHERE id = ?').get(newId)).params_json);
+    assert.match(fixed.fix, /^Contrôle du MP4 final refusé : motion : 5\.20 s — Texte en retard Correction : Avancer/);
+    assert.equal(fixed.fixScene, job.id);
+    assert.equal(existsSync(join(userPromoRoot(s.app.cfg, u.id), `scene-${job.id}.html`)), true, 'dernière scène gardée pour Corriger');
+    await s.db.prepare("DELETE FROM jobs WHERE id = ?").run(newId);
+    // une tâche terminée sans avertissement ne se relance pas
+    await s.db.prepare("UPDATE jobs SET result_json = '{}' WHERE id = ?").run(job.id);
+    assert.equal((await u.post(`/api/jobs/${job.id}/retry`, {})).status, 409);
+  } finally { delete s.app.promoSupported; s.app.renderPromo = renderFixture; s.app.reviewPromo = originalReview; }
+});
+
+test('contrôle des agents en erreur à chaque tentative (hors simple refus) : correction bornée, jamais marqué prêt', async () => {
   const { u, pid } = await setup();
   const originalReview = s.app.reviewPromo;
   let reviews = 0;

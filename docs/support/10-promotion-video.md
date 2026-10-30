@@ -56,7 +56,7 @@ Après assemblage de la vidéo, **deux agents IA distincts** inspectent des capt
 - **Lisibilité et mise en page** : textes coupés, superpositions, tailles, contraste, marges et défauts d'affichage.
 - **Mouvement et synchronisation** : enchaînement des plans, dynamisme du contenu, temps de lecture, correspondance avec les phrases et leurs instants réels.
 
-Un refus est renvoyé au générateur avec les secondes concernées et les corrections demandées. Après trois versions refusées, la tâche échoue et la vidéo n'est pas présentée comme prête. Les captures couvrent plusieurs instants et les transitions ; ce contrôle réduit les défauts, mais reste un examen par échantillons et ne garantit pas chaque image. La tâche « Activité » indique les étapes de contrôle.
+Un refus est renvoyé au générateur avec les secondes concernées et les corrections demandées. À la troisième version, si les agents refusent encore, la vidéo est tout de même livrée : la tâche affiche « Les agents de contrôle ont relevé des défauts » avec la liste de leurs constats (secondes et problème). La vidéo reste dans la liste : tu peux la regarder, la **Télécharger**, ou cliquer sur « Réessayer » (nouvelle génération) ou « Corriger » (Claude reçoit les constats et la dernière scène). Les erreurs de rendu et de scène, elles, restent bloquantes. Les captures couvrent plusieurs instants et les transitions ; ce contrôle réduit les défauts, mais reste un examen par échantillons et ne garantit pas chaque image. La tâche « Activité » indique les étapes de contrôle.
 
 ## Modifier les consignes
 

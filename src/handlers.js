@@ -689,13 +689,16 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
             const quality = await (app.reviewPromo || reviewPromo)({
               cfg, videoPath: video.path, seconds: params.seconds, width: fmt.width, height: fmt.height,
               voiceSegments, placed: prepared?.placed || [], model, extraRoot: userChatRoot(cfg, userId), signal: ctx.signal,
+              final: attempt >= 3, // dernière version : les agents avertissent au lieu de bloquer
               onProgress: (p) => sink.push(() => ctx.progress({ message: typeof p === 'string' ? p : p.message, pct: 99 })),
               runAgent: async (options) => { const result = await claude(userId, options); addUsage(ctx, result); return result; },
             });
             await sink.flush();
             await finishVideo(db, video.id, bytes);
+            // Livrée avec avertissements : on garde la scène pour que « Corriger » reparte d'elle
+            if (quality.warnings?.length) keepScene(cfg, userId, ctx.job.id, previousScene);
             notes = [...notes, ...(out.notes || [])];
-            return { ok: true, videoId: video.id, frames: out.frames, attempts: attempt, qualityReviews: quality.reviews, ...(voice ? { voice: voice.voice } : {}), ...(notes.length ? { notes } : {}) };
+            return { ok: true, videoId: video.id, frames: out.frames, attempts: attempt, qualityReviews: quality.reviews, ...(quality.warnings?.length ? { qualityWarnings: quality.warnings } : {}), ...(voice ? { voice: voice.voice } : {}), ...(notes.length ? { notes } : {}) };
           } catch (e) {
             await sink.flush().catch(() => {});
             if (!(e instanceof SceneError)) throw e;

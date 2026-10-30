@@ -34,6 +34,9 @@ export function reviewTimes(seconds, segments = [], limit = 64) {
   return [...times].sort((a, b) => a - b);
 }
 
+/** Constats des agents → texte renvoyé à Claude (refus) ou à « Corriger » (avertissements d'une vidéo livrée). */
+export const reviewVerdict = (failed) => `Contrôle du MP4 final refusé : ${failed.map((r) => `${r.reviewer} : ${r.issues.length ? r.issues.map((x) => `${x.time.toFixed(2)} s — ${x.problem} Correction : ${x.fix}`).join(' ; ') : 'rendu non approuvé, retravailler la scène'}`).join('\n')}`.slice(0, 6000);
+
 /** Un verdict invalide ou des problèmes majeurs ne valent jamais approbation. */
 export function parseVideoReview(text, reviewer) {
   let r;
@@ -60,8 +63,12 @@ function capture(cfg, videoPath, time, out, signal) {
   });
 }
 
-/** runAgent est le lanceur Claude habituel du compte ; extraRoot est son userChatRoot. */
-export async function reviewPromo({ cfg, videoPath, seconds, width, height, voiceSegments = [], placed = [], audioReport=null, model, runAgent, signal, onProgress = () => {}, extraRoot, captureFrame = capture, captureSpectrum=audioSpectrum }) {
+/**
+ * runAgent est le lanceur Claude habituel du compte ; extraRoot est son userChatRoot.
+ * `final` (dernière tentative) : un refus des agents ne fait plus échouer la tâche, la vidéo est livrée avec leurs constats dans `warnings`.
+ * Un contrôle incomplet (images non inspectées, verdict illisible) reste bloquant.
+ */
+export async function reviewPromo({ cfg, videoPath, seconds, width, height, voiceSegments = [], placed = [], audioReport=null, model, runAgent, signal, onProgress = () => {}, extraRoot, captureFrame = capture, captureSpectrum=audioSpectrum, final = false }) {
   if (!extraRoot || typeof runAgent !== 'function') throw new Error('Configuration du contrôle vidéo manquante');
   const root = resolve(extraRoot);
   mkdirSync(root, { recursive: true });
@@ -98,7 +105,8 @@ export async function reviewPromo({ cfg, videoPath, seconds, width, height, voic
       reviews.push(parseVideoReview(r.text, reviewer.id));
     }
     const failed = reviews.filter((r) => !r.approved);
-    if (failed.length) throw new SceneError(`Contrôle du MP4 final refusé : ${failed.map((r) => `${r.reviewer} : ${r.issues.length ? r.issues.map((x) => `${x.time.toFixed(2)} s — ${x.problem} Correction : ${x.fix}`).join(' ; ') : 'rendu non approuvé, retravailler la scène'}`).join('\n')}`.slice(0, 6000));
+    if (failed.length && final) return { reviews, warnings: failed.map(({ reviewer, issues }) => ({ reviewer, issues })) };
+    if (failed.length) throw new SceneError(reviewVerdict(failed));
     return { reviews };
   } finally { rmSync(dir, { recursive: true, force: true }); }
 }
