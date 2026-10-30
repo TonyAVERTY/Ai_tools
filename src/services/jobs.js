@@ -14,6 +14,16 @@ import { sendPause, pauseMessage } from './abuse.js';
 
 // Job en cours d'exécution, retrouvé par le wrapper claude() : c'est lui qui dit quel modèle a réellement servi (affiché dans l'avancement et le résultat)
 export const jobContext = new AsyncLocalStorage();
+const recordedUsage = new WeakMap();
+export function liveJobUsage(ctx) {
+  let input = 0, output = 0;
+  const update = (u) => {
+    const tin = Math.max(input, Number(u.tokensIn) || 0), tout = Math.max(output, Number(u.tokensOut) || 0);
+    ctx.usage.tokensIn += tin - input; ctx.usage.tokensOut += tout - output;
+    input = tin; output = tout; ctx.persistUsage?.();
+  };
+  return { update, finish(r) { update(r); ctx.usage.costUsd += r.costUsd || 0; ctx.persistUsage?.(); recordedUsage.set(r, ctx); } };
+}
 
 /**
  * Met un job en file pour un utilisateur. Point de passage obligé de toutes les routes et tâches de fond :
@@ -413,6 +423,7 @@ export class Worker {
 
 // Ajoute la conso d'un appel Claude au job courant
 export function addUsage(ctx, r) {
+  if (recordedUsage.get(r) === ctx) return;
   ctx.usage.costUsd += r.costUsd || 0;
   ctx.usage.tokensIn += r.tokensIn || 0;
   ctx.usage.tokensOut += r.tokensOut || 0;
