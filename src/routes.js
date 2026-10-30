@@ -1,4 +1,5 @@
 import { activitySnapshot } from './services/activity.js';
+import { attachJobEta } from './services/jobeta.js';
 import { reviewMail } from './services/mailcheck.js';
 import { projectChecklist } from './checklist.js';
 import { now, getSetting, setSetting } from './db.js';
@@ -744,8 +745,9 @@ export function registerRoutes(router, app) {
 
   // Les sorties détaillées restent privées au propriétaire du job.
   const ownJobConsole = async (params, session) => {
-    const job = await db.prepare('SELECT id, type, status, error, tokens_in, tokens_out, progress_json, log_json, created_at, started_at, finished_at FROM jobs WHERE id = ? AND user_id = ?').get(Number(params.id) || 0, session.userId);
+    const job = await db.prepare('SELECT id, user_id, type, params_json, status, error, tokens_in, tokens_out, progress_json, log_json, created_at, started_at, finished_at FROM jobs WHERE id = ? AND user_id = ?').get(Number(params.id) || 0, session.userId);
     if (!job) throw new HttpError(404, 'Job introuvable');
+    await attachJobEta(db,[job]);
     return job;
   };
   router.get('/jobs/:id', async ({ res, params, session }) => {
@@ -757,6 +759,7 @@ export function registerRoutes(router, app) {
       <progress data-console-progress max="100" value="0" aria-label="Progression de la tâche"></progress>
       <div class="console-facts"><span>Modèle<strong data-console-model>—</strong></span><span>Temps écoulé<strong data-console-elapsed>—</strong></span></div>
       <p class="console-tokens" data-console-tokens>0 tokens</p>
+      <p class="small muted" data-console-remaining></p>
       <button type="button" class="btn primary" data-retry="${job.id}" hidden>Réessayer</button><p class="small error" data-retry-error role="alert" hidden></p>
       <p class="small muted" data-console-updated>En attente des premières informations</p><p class="small muted">Les étapes et les sorties arrivent ici dès leur réception.</p></aside>
       <section class="console-feed"><div class="console-feed-head"><h2>Fil d’activité</h2><label><input type="checkbox" data-console-follow checked> Suivre le direct</label></div>
@@ -768,6 +771,7 @@ export function registerRoutes(router, app) {
     const log = JSON.parse(job.log_json || '[]');
     json(res, { id: job.id, type: job.type, status: job.status, error: job.error, startedAt: job.started_at, finishedAt: job.finished_at,
       tokensUsed: Number(job.tokens_in || 0) + Number(job.tokens_out || 0),
+      eta:job.eta||null,
       progress: job.progress_json ? JSON.parse(job.progress_json) : null,
       entries: log.filter((e) => e.id > after), firstId: log[0]?.id || 0 });
   });
