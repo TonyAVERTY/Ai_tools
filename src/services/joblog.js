@@ -10,7 +10,7 @@ export function createJobLog(db, jobId, initial = []) {
   return {
     append(kind, value) {
       let text = safeLogText(value);
-      if (!text.trim() || (kind === 'progress' && text === lastProgress)) return;
+      if ((!text.trim() && kind !== 'delta') || !text || (kind === 'progress' && text === lastProgress)) return;
       if (kind === 'progress') lastProgress = text;
       if (text.length > 20_000) text = text.slice(0, 20_000) + '\n[Sortie longue abrégée]';
       entries.push({ id: ++sequence, at: Date.now(), kind, text });

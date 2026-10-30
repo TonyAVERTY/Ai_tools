@@ -39,6 +39,7 @@ export function runClaude(o) {
   if (o.system) args.push('--append-system-prompt', o.system);
   // Conversation : uniquement les outils de lecture demandés (aucun par défaut), pas de session enregistrée
   if (o.chat) args.push('--tools', (o.tools || []).join(','), '--no-session-persistence', '--disable-slash-commands', '--include-partial-messages');
+  else if (o.onDelta || o.onActivity) args.push('--include-partial-messages');
   for (const d of o.extraDirs || []) args.push('--add-dir', d);
 
   const launch = prepareLaunch({
@@ -77,6 +78,7 @@ export function runClaude(o) {
       let ev;
       try { ev = JSON.parse(line); } catch { return; }
       if (ev.type === 'stream_event') {
+        if (ev.event?.type === 'content_block_start' && ev.event.content_block?.type === 'thinking') o.onActivity?.('Claude réfléchit à la prochaine étape…');
         // Texte en cours d'écriture (option --include-partial-messages) : transmis tel quel, le texte final vient du résultat
         const d = ev.event?.type === 'content_block_delta' ? ev.event.delta : null;
         if (d?.type === 'text_delta' && d.text) o.onDelta?.(redact(d.text));
