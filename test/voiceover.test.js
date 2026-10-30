@@ -118,9 +118,10 @@ function fakes({ overflow = 0 } = {}) {
   s.app.prepareVoice = async (o) => { log.prepared++; const dir = mkdtempSync(join(tmpdir(), 'aitools-voix-')); await o.synth({ provider: o.voice.provider, voice: o.voice.voice, text: o.segments[0].text }); return { dir, placed: o.segments.map((x) => ({ ...x, file: 'x', start: x.t, end: x.t + 1 })), overflow: typeof overflow === 'function' ? overflow(log.prepared) : overflow }; };
   s.app.mixVoice = async (o) => { log.mixed.push(o); };
   s.app.reviewPromo = async () => ({ reviews: [{ reviewer: 'layout', approved: true }, { reviewer: 'motion', approved: true }] });
+  s.app.inspectAudio = async () => ({meanDb:-20,peakDb:-2,noiseFloorDb:null});
   return log;
 }
-const unfake = () => { for (const k of ['promoSupported', 'renderPromo', 'synthVoice', 'prepareVoice', 'mixVoice', 'reviewPromo']) delete s.app[k]; };
+const unfake = () => { for (const k of ['promoSupported', 'renderPromo', 'synthVoice', 'prepareVoice', 'mixVoice', 'reviewPromo', 'inspectAudio']) delete s.app[k]; };
 const gen = (u, pid, body) => u.post(`/api/projects/${pid}/promo/generate`, body);
 const runJob = async (pid) => { await worker.tick(); return (await latestJobs(s.db, pid)).promo_video; };
 const VOICE = { voice: true, voiceProvider: 'google', voiceName: 'en' };

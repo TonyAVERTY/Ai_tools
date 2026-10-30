@@ -5,6 +5,22 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { reviewTimes, parseVideoReview, reviewPromo } from '../src/services/promoqa.js';
 
+test('voix : troisième agent sur spectrogramme, défaut audio bloquant',async()=>{
+ const root=mkdtempSync(join(tmpdir(),'audio-review-'));
+ const roles=[];
+ const options={cfg:{},videoPath:'final.mp4',seconds:3,width:720,height:720,extraRoot:root,audioReport:{meanDb:-20,peakDb:-2},captureFrame:async()=>{},captureSpectrum:async()=>{},runAgent:async o=>{
+  const isAudio=o.prompt.includes('Examine le rapport de niveau sonore');
+  roles.push(isAudio?'audio':'video');
+  for(const f of o.prompt.matchAll(/\d+\.\d{3} s : (.+\.(?:jpg|png))/g))o.onTool('Read',{file_path:f[1]});
+  return {ok:true,text:JSON.stringify({approved:!isAudio,issues:isAudio?[{severity:'major',time:1,problem:'Bruit continu visible dans la pause',fix:'Régénérer et nettoyer la voix'}]:[]})};
+ }};
+ try{
+  await assert.rejects(reviewPromo(options),/Bruit continu/);
+  assert.deepEqual(roles,['video','video','audio']);
+  assert.deepEqual(readdirSync(root),[]);
+ }finally{rmSync(root,{recursive:true,force:true});}
+});
+
 test('échantillonnage borné, fin et voisinage des phrases', () => {
   const t = reviewTimes(15, [{ t: 3 }]);
   assert.ok(t.includes(2.85) && t.includes(3.15) && t.includes(14.9));
