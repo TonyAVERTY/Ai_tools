@@ -58,6 +58,7 @@ test('ajax.js est servi, chargé sur les pages de l\'application après app.js, 
     const page = await html(u, path);
     assert.match(page, /\/static\/ajax\.js\?v=\w+/, path);
     assert.ok(page.indexOf('/static/app.js') < page.indexOf('/static/ajax.js'), `${path} : app.js avant ajax.js`);
+    assert.ok(page.indexOf('/static/app.js') < page.indexOf('/static/app-recap.js') && page.indexOf('/static/app-recap.js') < page.indexOf('/static/ajax.js'), `${path} : app-recap.js entre app.js et ajax.js`);
   }
   for (const path of ['/tarifs', '/docs', '/login', '/page-inconnue']) assert.doesNotMatch(await html(s.anon, path), /ajax\.js/, `${path} : pas de navigation douce`);
 });

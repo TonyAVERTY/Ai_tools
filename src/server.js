@@ -47,6 +47,7 @@ const STATIC = {
   '/static/responsive.css': asset('responsive.css', 'text/css; charset=utf-8', 3600),
   '/static/responsive.js': asset('responsive.js', 'text/javascript; charset=utf-8', 3600),
   '/static/app.js': asset('app.js', 'text/javascript; charset=utf-8', 3600),
+  '/static/app-recap.js': asset('app-recap.js', 'text/javascript; charset=utf-8', 3600),
   '/static/captcha.js': asset('captcha.js', 'text/javascript; charset=utf-8', 3600),
   '/static/facturation.js': asset('facturation.js', 'text/javascript; charset=utf-8', 3600),
   '/static/clients.js': asset('clients.js', 'text/javascript; charset=utf-8', 3600),
