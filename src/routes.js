@@ -745,7 +745,7 @@ export function registerRoutes(router, app) {
 
   // Les sorties détaillées restent privées au propriétaire du job.
   const ownJobConsole = async (params, session) => {
-    const job = await db.prepare('SELECT id, user_id, type, params_json, status, error, tokens_in, tokens_out, progress_json, log_json, created_at, started_at, finished_at FROM jobs WHERE id = ? AND user_id = ?').get(Number(params.id) || 0, session.userId);
+    const job = await db.prepare('SELECT id, user_id, type, params_json, status, error, tokens_in, tokens_out, progress_json, result_json, log_json, created_at, started_at, finished_at FROM jobs WHERE id = ? AND user_id = ?').get(Number(params.id) || 0, session.userId);
     if (!job) throw new HttpError(404, 'Job introuvable');
     await attachJobEta(db,[job]);
     return job;
@@ -772,6 +772,7 @@ export function registerRoutes(router, app) {
     json(res, { id: job.id, type: job.type, status: job.status, error: job.error, startedAt: job.started_at, finishedAt: job.finished_at,
       tokensUsed: Number(job.tokens_in || 0) + Number(job.tokens_out || 0),
       eta:job.eta||null,
+      qualityWarnings: (() => { try { return (JSON.parse(job.result_json || '{}').qualityWarnings || []).length; } catch { return 0; } })(),
       progress: job.progress_json ? JSON.parse(job.progress_json) : null,
       entries: log.filter((e) => e.id > after), firstId: log[0]?.id || 0 });
   });
