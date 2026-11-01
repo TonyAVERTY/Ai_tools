@@ -26,7 +26,7 @@ Pourquoi : Claude adapte son vocabulaire, ses exemples et son niveau de détail 
 4. Dépôt privé ou autre serveur Git : ajoute d'abord un token dans **Réglages → Dépôts Git**.
 
 ## 4. Valider la cible
-Quand l'analyse est finie, la section **Cible** s'ouvre avec le badge « à valider ». Relis la description, la zone, la taille, le décideur, les secteurs et les requêtes de recherche, corrige si besoin, puis clique **Valider la cible**. Le badge devient « validée ».
+Quand l'analyse est finie, la section **Cible** s'ouvre avec le badge « à valider ». Relis la description, la zone, la taille, le décideur, les secteurs et les requêtes de recherche, corrige si besoin, puis clique **Valider la cible**. Le badge « à valider » disparaît et la coche verte apparaît sur la section.
 
 ## 5. Chercher des prospects
 Dans **Prospecter → Recherche de prospects** : choisis « Prospects à chercher » (de 1 à 50), « Quand » (Maintenant ou Cette nuit, 1h-6h), puis **Lancer la recherche**.
