@@ -583,10 +583,13 @@
   }
 
   let sysTimer;
+  // Page « Relier Claude » sans accès utilisable : le serveur refuse ces relevés (403). On ne les demande pas, et on réessaie vite (la page change une fois Claude relié).
+  const unlinked = () => !!document.querySelector('[data-nolink]');
   let activityTimerId, activityRequest = null, activityBusy = false;
   function refreshActivity() {
     clearTimeout(activityTimerId);
     if (!jobsBox || disposed || document.hidden) return Promise.resolve();
+    if (unlinked()) { activityTimerId = later(refreshActivity, 4000); return Promise.resolve(); }
     if (activityRequest) return activityRequest;
     activityRequest = (async () => {
       try {
@@ -607,8 +610,6 @@
   }
   refreshActivity();
   listen(document, 'visibilitychange', () => { if (!document.hidden) refreshActivity(); });
-  // Page « Relier Claude » sans accès utilisable : le serveur refuse ces relevés (403). On ne les demande pas, et on réessaie vite (la page change une fois Claude relié).
-  const unlinked = () => !!document.querySelector('[data-nolink]');
   async function refreshSys() {
     clearTimeout(sysTimer);
     if (unlinked()) { sysTimer = later(refreshSys, 4000); return; }
