@@ -33,3 +33,24 @@ jobs:
         run: npm test
         env:
           CHROMIUM_BIN: /usr/bin/google-chrome
+
+  # Vérifications d'interface dans un vrai navigateur (scripts/*-check.mjs et responsive-audit), en parallèle des tests
+  ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - name: Installer ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+      - run: npm ci
+      # Playwright n'est pas une dépendance du projet : seul le pilote est installé, avec le Chrome de l'image
+      - run: npm install --no-save playwright-core@1.63.0
+      - name: Vérifications d'interface
+        run: npm run ui:check
+        env:
+          PLAYWRIGHT_CHROMIUM: /usr/bin/google-chrome
+          CHROMIUM_BIN: /usr/bin/google-chrome
