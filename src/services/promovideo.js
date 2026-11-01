@@ -212,8 +212,13 @@ async function openBrowser(cfg, { width, height, signal }) {
         if (m) { clearTimeout(timer); resolve({ port: m[2] }); }
       });
     });
-    const list = await (await fetch(`http://127.0.0.1:${wsUrl.port}/json/list`, { signal: AbortSignal.timeout(10_000) })).json();
-    const page = list.find((t) => t.type === 'page');
+    // La page n'existe pas toujours au moment où Chromium annonce DevTools : on attend un peu avant de conclure qu'il n'y en a pas
+    let page = null;
+    for (let i = 0; i < 25 && !page; i++) {
+      const list = await (await fetch(`http://127.0.0.1:${wsUrl.port}/json/list`, { signal: AbortSignal.timeout(10_000) })).json();
+      page = list.find((t) => t.type === 'page');
+      if (!page) await new Promise((r) => setTimeout(r, 200));
+    }
     if (!page) throw new Error('Chromium : aucune page disponible');
     cdp = new Cdp(page.webSocketDebuggerUrl);
     await cdp.ready;
@@ -254,7 +259,7 @@ async function shot(cdp, t) {
       expression: `(async () => { await document.fonts.ready; await window.renderFrame(${Number(t)}); await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))); return location.href; })()`,
       awaitPromise: true, returnByValue: true,
     }, PROMO.frameTimeoutMs);
-  } catch (e) { throw frozen(e); }
+  } catch (e) { throw cdp.navigated || /navigated or closed/.test(e.message) ? new SceneError('La scène a quitté la page : rendu refusé.') : frozen(e); }
   if (cdp.navigated) throw new SceneError('La scène a quitté la page : rendu refusé.');
   if (r.exceptionDetails) {
     const d = r.exceptionDetails;

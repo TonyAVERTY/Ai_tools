@@ -76,7 +76,8 @@ test('rendu réel : MP4 H.264 de la bonne durée, progression, scènes fautives 
     };
     await refused(SCENE.replace(/e\.style[^;]*;/g, ''), /ne bouge pas/);
     await refused(SCENE.replace('var e=', "throw new Error('boum');var e="), /renderFrame\(0\.00\) a échoué : Error: boum/);
-    await refused(SCENE.replace('var e=', "location.href='data:text/html,x';var e="), /quitté la page|bloque l'affichage/);
+    // (une navigation vers data: est déjà bloquée par les Chromium récents : la scène reste alors sur sa page et le rendu est inoffensif)
+    await refused(SCENE.replace('var e=', "location.href='about:blank';var e="), /quitté la page|bloque l'affichage/);
     // annulation : le rendu s'arrête et ne laisse rien
     const ctl = new AbortController();
     const p = renderPromo({ cfg, html: SCENE, fps: 30, seconds: 30, width: 160, height: 160, out: join(dir, 'c.mp4'), signal: ctl.signal, onProgress: ({ done }) => { if (done > 3) ctl.abort(); } });
