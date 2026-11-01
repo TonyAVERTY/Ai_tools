@@ -54,3 +54,37 @@ jobs:
         env:
           PLAYWRIGHT_CHROMIUM: /usr/bin/google-chrome
           CHROMIUM_BIN: /usr/bin/google-chrome
+
+  # Les mêmes tests sur un vrai MariaDB : la production tourne sur MySQL/MariaDB, les autres jobs ne voient que SQLite (migrations comprises)
+  mysql:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - name: Installer ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+      - run: npm ci
+      - name: Tests sur MariaDB
+        run: npm run test:mysql
+        env:
+          TEST_DB_HOST: 127.0.0.1
+          TEST_DB_USER: root
+          TEST_DB_PASSWORD: test
+          TEST_DB_NAME: aitools_test
+          CHROMIUM_BIN: /usr/bin/google-chrome

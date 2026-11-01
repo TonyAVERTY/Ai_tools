@@ -23,7 +23,7 @@ La visite guidée du tableau de bord (`src/tour.js`, `TOUR_STEPS`) fait découvr
 
 ## Autres règles du dépôt
 
-- **Migrations** (`src/migrations.js`) : on ajoute **toujours à la fin** de la liste (la version est l'index). Jamais d'insertion au milieu : une base déjà migrée sauterait la migration. Les `ALTER TABLE` MySQL doivent être rejouables (`when: colMissing(…)`). Les tests de migration ne tournent que sur SQLite : le dire dans la PR.
+- **Migrations** (`src/migrations.js`) : on ajoute **toujours à la fin** de la liste (la version est l'index). Jamais d'insertion au milieu : une base déjà migrée sauterait la migration. Les `ALTER TABLE` MySQL doivent être rejouables (`when: colMissing(…)`). La CI rejoue toute la suite sur MariaDB 10.11 (job `mysql`, `npm run test:mysql`) ; MySQL 8 n'est pas testé : le dire dans la PR si la migration y change quelque chose.
 - **CSP stricte** : aucun `style="…"` ni `<script>` en ligne dans le HTML, aucune ressource externe. Les couleurs viennent des jetons de `public/tokens.css` (jamais en dur dans `public/site.css`).
 - **Icônes** : `src/icons.js` (sprite par page) ; une icône utilisée doit exister.
 - **Secrets** : jamais dans le dépôt ni dans les journaux ; chiffrés en base ; jamais réaffichés.
