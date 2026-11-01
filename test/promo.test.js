@@ -222,7 +222,7 @@ test('contrôle strict à chaque tentative : trois refus, aucune vidéo livrée 
   } finally { delete s.app.promoSupported; s.app.renderPromo = renderFixture; }
 });
 
-test('agents du MP4 toujours en refus : les deux premières versions sont corrigées, la troisième est livrée avec avertissements', async () => {
+test('agents du MP4 toujours en refus : la première version est corrigée, la deuxième est livrée avec avertissements', async () => {
   const { u, pid } = await setup();
   const originalReview = s.app.reviewPromo;
   const finals = [];
@@ -237,7 +237,7 @@ test('agents du MP4 toujours en refus : les deux premières versions sont corrig
     await gen(u, pid, { fps: 10, seconds: 3 });
     const job = await runQualityJob(pid);
     assert.equal(job.status, 'done', job.error);
-    assert.deepEqual(finals, [false, false, true]);
+    assert.deepEqual(finals, [false, true]);
     assert.equal(job.result.qualityWarnings[0].issues[0].problem, 'Texte en retard');
     assert.equal((await (await u.get(`/api/projects/${pid}/promo`)).json()).videos.length, 1, 'la vidéo est livrée');
     // la vidéo livrée avec avertissements se corrige ou se relance depuis la tâche terminée
