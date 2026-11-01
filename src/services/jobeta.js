@@ -18,7 +18,7 @@ function defaults(job) {
  if(job.type==='promo_video'){
   const frames=Math.max(30,Math.min(1800,(Number(p.fps)||30)*(Number(p.seconds)||15)));
   const voice=[true,1,'1','true','on'].includes(p.voice), duration=Number(p.seconds)||15;
-  return {compose:240*factor*Math.sqrt(duration/15),voice:voice?Math.max(30,duration*2):0,render:frames*.3*(p.format==='carre'?.5625:1),mix:voice?10:0,layout:120*factor,motion:120*factor,audio:voice?60*factor:0};
+  return {compose:240*factor*Math.sqrt(duration/15),voice:voice?Math.max(30,duration*2):0,render:frames*.3*(p.format==='carre'?.5625:1),mix:voice?10:0,layout:120*factor,motion:120*factor};
  }
  const count=Math.max(1,Math.min(100,Number(p.count)||Number(p.target)||1));
  return {work:({analyze:180,audit:240,evolution:240,prospect:300,template:90,send:60,followup:60}[job.type]||120)*factor*(job.type==='prospect'?Math.max(1,count/20):1)};

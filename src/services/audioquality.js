@@ -23,6 +23,3 @@ export async function cleanAudio(cfg,input,output,{signal}={}){
  await command(cfg,['-v','error','-y','-i',input,'-map','0:a:0','-vn','-af',VOICE_FILTER,'-ar','48000','-ac','1','-c:a','pcm_s16le',output],signal);
  return {...await inspectAudio(cfg,output,{signal}),source,cleaned:true,noiseReductionDb:8,normalizationLufs:-16};
 }
-export async function audioSpectrum(cfg,videoPath,output,signal){
- await command(cfg,['-v','error','-y','-i',videoPath,'-filter_complex','[0:a:0]showspectrumpic=s=960x360:legend=1[s]','-map','[s]','-frames:v','1',output],signal);
-}

@@ -4,7 +4,7 @@ import {spawnSync} from 'node:child_process';
 import {mkdtempSync,readFileSync,existsSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {cleanAudio,inspectAudio,parseAudioReport,audioSpectrum} from '../src/services/audioquality.js';
+import {cleanAudio,inspectAudio,parseAudioReport} from '../src/services/audioquality.js';
 import {prepareVoice,cleanVoice,audioDuration} from '../src/services/voiceover.js';
 const ffmpeg=process.env.FFMPEG_AUDIO_TEST||'ffmpeg', cfg={ffmpegBin:ffmpeg};
 const available=spawnSync(ffmpeg,['-version']).status===0;
@@ -26,8 +26,6 @@ test('FFmpeg réel : nettoyage, niveau, rejet du silence, durée et spectrogramm
   const before=band(input,440)-band(input,50),after=band(output,440)-band(output,50);
   assert.ok(after>before+3,`Rapport signal/ronflement : ${before} -> ${after}`);
   assert.ok(Math.abs(await audioDuration(cfg,input)-await audioDuration(cfg,output))<.1);
-  await audioSpectrum(cfg,output,join(dir,'spectrum.png'));
-  assert.ok(existsSync(join(dir,'spectrum.png')));
   // voix brute au maximum (pic à 0 dB) : jamais refusée, le nettoyage la ramène sous le plafond
   const hot=join(dir,'hot.wav'),hotClean=join(dir,'hot-clean.wav');
   run(['-v','error','-y','-f','lavfi','-i','aevalsrc=1.0*sin(2*PI*440*t):s=48000:d=3',hot]);
