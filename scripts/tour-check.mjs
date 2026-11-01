@@ -17,7 +17,7 @@ const open = async (u, vp, scheme = 'dark', extra = {}) => {
   const ctx = await b.newContext({ viewport: vp, colorScheme: scheme, ...extra });
   const [name, value] = u.cookie.split('=');
   await ctx.addCookies([{ name, value, url: s.base }]);
-  await ctx.route('**/*', (route) => { const r = route.request(); const h = { ...r.headers() }; if (r.method() === 'POST') h.origin = APP_URL; route.continue({ headers: h }); });
+  await ctx.route('**/*', async (route) => { const r = route.request(); if (r.method() !== 'POST') return route.continue(); /* Chromium ignore un Origin réécrit par continue() : on passe par fetch() */ await route.fulfill({ response: await route.fetch({ headers: { ...r.headers(), origin: APP_URL }, maxRedirects: 0 }) }); });
   // Un relevé du quota Claude (fictif) : la carte « Consommation Claude » n'existe qu'avec une mesure, l'étape qui l'éclaire en dépend
   await ctx.route('**/api/system', async (route) => {
     const j = await (await route.fetch()).json();

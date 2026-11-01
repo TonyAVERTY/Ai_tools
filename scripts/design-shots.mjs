@@ -51,7 +51,7 @@ async function run(label, paths, cookie) {
   for (const sz of SIZES) {
     const ctx = await b.newContext({ viewport: { width: sz.width, height: sz.height }, deviceScaleFactor: 1, colorScheme: process.env.SCHEME === 'dark' ? 'dark' : 'light' });
     if (cookie) { const [name, value] = u.cookie.split('='); await ctx.addCookies([{ name, value, url: s.base }]); }
-    await ctx.route('**/*', (route) => { const r = route.request(); const h = { ...r.headers() }; if (r.method() === 'POST') h.origin = APP_URL; route.continue({ headers: h }); });
+    await ctx.route('**/*', async (route) => { const r = route.request(); if (r.method() !== 'POST') return route.continue(); /* Chromium ignore un Origin réécrit par continue() : on passe par fetch() */ await route.fulfill({ response: await route.fetch({ headers: { ...r.headers(), origin: APP_URL }, maxRedirects: 0 }) }); });
     const page = await ctx.newPage();
     for (const path of paths) {
       if (only && !(only === 'projets' ? path === '/' : path.includes(only))) continue;
