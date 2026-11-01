@@ -7,6 +7,7 @@ import { now } from '../../src/db.js';
 import { createApp } from '../../src/server.js';
 import { hashSid } from '../../src/crypto.js';
 import { testDb } from './db.js';
+import { nextSeq } from './users.js';
 import { addUser, TEST_SECRET_KEY } from './users.js';
 import { RateLimiter } from '../../src/ratelimit.js';
 import { RATE_LIMITS } from '../../src/limits.js';
@@ -51,9 +52,8 @@ export async function startApp({ cfg = {}, worker = false, rateLimit = false, cr
   });
 
   /** Crée un compte avec une session ouverte. */
-  let n = 0;
   const newUser = async (opts = {}) => {
-    n++;
+    const n = nextSeq(); // compteur commun avec addUser : plusieurs applications d'un même fichier partagent la base en MySQL
     const email = opts.email || `user${n}@test.fr`;
     const id = await addUser(app.db, { ...opts, email });
     // Les questions de la première connexion (voir userprofile.js) ne gênent pas les autres tests ; `firstLogin: true` les garde

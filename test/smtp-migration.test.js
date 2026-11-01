@@ -2,10 +2,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { MIGRATIONS, setSetting, getSetting } from '../src/db.js';
-import { testDb } from './helpers/db.js';
+import { testDb, USING_MYSQL } from './helpers/db.js';
 import { addUser, addProject } from './helpers/users.js';
 
-test('SMTP global : copié dans les projets qui n\'avaient pas le leur, puis supprimé ; celui d\'un autre compte n\'est jamais copié', async () => {
+// Rejoue la variante SQLite de la migration (m.sqlite) : sur MySQL, la variante MySQL s'applique d'elle-même à l'ouverture de chaque base de test
+test('SMTP global : copié dans les projets qui n\'avaient pas le leur, puis supprimé ; celui d\'un autre compte n\'est jamais copié', { skip: USING_MYSQL && 'variante SQLite de la migration' }, async () => {
   const db = await testDb();
   const a = await addUser(db), b = await addUser(db);
   const sans = await addProject(db, a, { name: 'sans' });
