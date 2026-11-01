@@ -22,6 +22,7 @@ import { layout } from './views.js';
 import { homePage, notFoundPage } from './site/pages.js';
 import { withViewer } from './site/layout.js';
 import { reportError } from './services/errormail.js';
+import { installCrashGuards } from './crashguard.js';
 import { purgePendingUploads, sweepRunDirs } from './chatfiles.js';
 import { securityHeaders, robotsHeaderFor, cspFor } from './site/seo.js';
 import { hasUsableLink, isLinkExempt, LINK_REQUIRED_MESSAGE } from './claudelink.js';
@@ -137,6 +138,7 @@ export async function createApp(cfg, { db, worker = true, createTransport, fetch
         }
         checkOrigin(req, cfg);
         if (route.limit) app.limiter.enforce(route.limit, { ip, userId: session.userId });
+        else if (!isRead) app.limiter.enforce('write', { ip, userId: session.userId });
         // Onboarding bloquant : sans liaison Claude valide, seules la liaison, Mon compte et la déconnexion répondent
         // Un membre d'une équipe travaille avec l'accès Claude du propriétaire des projets partagés : il n'en a pas besoin du sien
         if (!isLinkExempt(req.method, url.pathname) && !(await hasUsableLink(db, session.userId, { cliModeEnabled: cfg.cliModeEnabled !== false }))
@@ -233,6 +235,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   try { mkdirSync(join(cfg.dataDir, 'repos'), { recursive: true }); accessSync(cfg.dataDir, fsConstants.W_OK); }
   catch (e) { console.error(`DATA_DIR (${cfg.dataDir}) n'est pas inscriptible par cet utilisateur : ${e.code || e.message}. Les analyses de projet échoueront. Pose DATA_DIR sur un dossier qui t'appartient (ex. DATA_DIR=./data).`); }
   const app = await createApp(cfg);
+  installCrashGuards(app);
   app.server.listen(cfg.port, cfg.host, () => console.log(`AiTools sur http://${cfg.host}:${cfg.port} (${cfg.appUrl})`));
   const shutdown = () => app.close().then(() => process.exit(0), (e) => { console.error(e); process.exit(1); });
   process.on('SIGTERM', shutdown);
