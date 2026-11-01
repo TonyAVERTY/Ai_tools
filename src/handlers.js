@@ -209,6 +209,9 @@ export function makeSync(app) {
   };
 }
 
+// Rondes de contrôle des agents (2 agents par ronde, plusieurs centaines de milliers de tokens) : la scène, la voix et le rendu gardent leurs 3 essais
+const REVIEW_ROUNDS = 2;
+
 export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
   const { db, cfg } = app;
   // Dépôts Git (GitHub ou serveur perso) : l'hôte est revérifié à chaque synchronisation, git se connecte à l'adresse vérifiée
@@ -689,7 +692,7 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
             const quality = await (app.reviewPromo || reviewPromo)({
               cfg, videoPath: video.path, seconds: params.seconds, width: fmt.width, height: fmt.height,
               voiceSegments, placed: prepared?.placed || [], model, extraRoot: userChatRoot(cfg, userId), signal: ctx.signal,
-              final: attempt >= 3, // dernière version : les agents avertissent au lieu de bloquer
+              final: attempt >= REVIEW_ROUNDS, // dernière ronde : les agents avertissent au lieu de bloquer
               onProgress: (p) => sink.push(() => ctx.progress({ message: typeof p === 'string' ? p : p.message, pct: 99 })),
               runAgent: async (options) => { const result = await claude(userId, options); addUsage(ctx, result); return result; },
             });
