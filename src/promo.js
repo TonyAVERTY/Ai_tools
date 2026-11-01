@@ -1,6 +1,6 @@
 // Onglet Promotion : vidéos de design motion d'un projet. Données (table promo_videos), fichiers MP4 dans le dossier de l'utilisateur
 // propriétaire du projet, routes. Le rendu lui-même est dans services/promovideo.js, lancé par le job `promo_video`.
-import { createReadStream, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { createReadStream, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { HttpError, json, readBody } from './http.js';
 import { now, getSetting, setSetting } from './db.js';
@@ -37,8 +37,14 @@ export const promoFile = (cfg, userId, id) => join(userPromoRoot(cfg, userId), n
 
 // Dernière scène d'un job en échec, gardée pour que « Corriger » reparte d'elle plutôt que de zéro
 const sceneFile = (cfg, userId, jobId) => join(userPromoRoot(cfg, userId), `scene-${Number(jobId)}.html`);
+const SCENE_KEEP_MS = 7 * 86_400_000; // au-delà, « Corriger » repart du verdict seul
 export function keepScene(cfg, userId, jobId, html) {
   mkdirSync(userPromoRoot(cfg, userId), { recursive: true });
+  // Les scènes que personne n'a reprises ne s'accumulent pas : on efface les anciennes à chaque nouvelle
+  for (const name of readdirSync(userPromoRoot(cfg, userId))) {
+    const file = join(userPromoRoot(cfg, userId), name);
+    if (/^scene-\d+\.html$/.test(name)) { try { if (Date.now() - statSync(file).mtimeMs > SCENE_KEEP_MS) rmSync(file, { force: true }); } catch { /* déjà parti */ } }
+  }
   writeFileSync(sceneFile(cfg, userId, jobId), String(html ?? ''));
 }
 /** Scène gardée d'un job (puis effacée), chaîne vide s'il n'y en a pas. */
