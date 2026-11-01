@@ -12,6 +12,8 @@ const HOUR = 60 * MIN;
  * Une requête passe seulement si toutes les portées de la règle l'acceptent.
  */
 export const RATE_LIMITS = {
+  // Toute écriture d'un compte connecté sur une route sans règle propre : large pour un humain (une par seconde en moyenne), étroit pour une boucle
+  write: { user: { max: 600, windowMs: 10 * MIN } },
   // Événements de l'agenda (ajout, suppression)
   event: { user: { max: 60, windowMs: 10 * MIN } },
   chat: { user: { max: 40, windowMs: 10 * MIN } },
