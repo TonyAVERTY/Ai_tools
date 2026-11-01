@@ -81,7 +81,12 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
       - run: npm ci
       - name: Tests sur MariaDB
-        run: npm run test:mysql
+        # Le détail des échecs est répété en fin de journal : sinon il se perd au milieu de ~4 500 lignes
+        run: |
+          npm run test:mysql 2>&1 | tee mysql-tests.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" != "0" ]; then echo "=== ÉCHECS ==="; grep -E "^not ok" -A14 mysql-tests.log | head -150; fi
+          exit "$status"
         env:
           TEST_DB_HOST: 127.0.0.1
           TEST_DB_USER: root
