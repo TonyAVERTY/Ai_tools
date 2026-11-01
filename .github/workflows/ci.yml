@@ -1,0 +1,35 @@
+# Vérifie chaque PR et chaque push sur develop/main : syntaxe puis tests (comme le hook .githooks/pre-commit).
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [develop, main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      # Les tests de la vidéo de promotion ont besoin de ffmpeg et d'un Chromium (sinon ils sont ignorés ou échouent)
+      - name: Installer ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+      - run: npm ci
+      - run: npm run lint
+      # Un fichier de test à la fois : plusieurs Chromium en parallèle rendent les tests de rendu instables
+      - name: Tests
+        run: node --no-warnings=ExperimentalWarning --test --test-concurrency=1 "test/**/*.test.js"
+        env:
+          CHROMIUM_BIN: /usr/bin/google-chrome
