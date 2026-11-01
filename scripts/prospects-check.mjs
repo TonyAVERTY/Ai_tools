@@ -16,7 +16,7 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   const ctx = await b.newContext({ viewport: vp });
   const [name, value] = u.cookie.split('=');
   await ctx.addCookies([{ name, value, url: s.base }]);
-  await ctx.route('**/*', (route) => { const r = route.request(); const h = { ...r.headers() }; if (r.method() === 'POST') h.origin = APP_URL; route.continue({ headers: h }); });
+  await ctx.route('**/*', async (route) => { const r = route.request(); if (r.method() !== 'POST') return route.continue(); /* Chromium ignore un Origin réécrit par continue() : on passe par fetch() */ await route.fulfill({ response: await route.fetch({ headers: { ...r.headers(), origin: APP_URL }, maxRedirects: 0 }) }); });
   const p = await ctx.newPage();
   const errs = [];
   p.on('pageerror', (e) => errs.push(e.message));
@@ -54,6 +54,7 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   await p.fill(`${tpl} [name=subject]`, 'Bonjour {{entreprise}}');
   await p.fill(`${tpl} [name=subjectB]`, 'Une idée pour {{entreprise}}');
   await p.fill(`${tpl} [name=body]`, 'Bonjour,\n\n{{accroche}}\n\n{{expediteur}}');
+  await p.locator(`${tpl} label.opt:has([name=html])`).click(); // sans cette case le mail part en texte simple : l'aperçu n'a pas d'iframe
   await p.locator(`${tpl} [data-tpl-preview]`).click();
   await p.waitForSelector('dialog.mailprev[open] iframe');
   const sandbox = await p.locator('dialog.mailprev iframe').getAttribute('sandbox');
