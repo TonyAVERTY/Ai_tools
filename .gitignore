@@ -34,3 +34,6 @@ tmp/
 Thumbs.db
 .vscode/
 .idea/
+
+# Captures produites par les vérifications d'interface (npm run ui:check)
+gen-*.png

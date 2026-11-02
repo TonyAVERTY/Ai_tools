@@ -11,8 +11,9 @@
     "start": "node --env-file=.env --no-warnings=ExperimentalWarning src/server.js",
     "dev": "node --env-file=.env --watch --no-warnings=ExperimentalWarning src/server.js",
     "lint": "node scripts/check-syntax.js",
-    "test": "node --no-warnings=ExperimentalWarning --test \"test/**/*.test.js\"",
-    "test:mysql": "node --no-warnings=ExperimentalWarning --test --test-concurrency=1 \"test/**/*.test.js\"",
+    "test": "node scripts/run-tests.js",
+    "ui:check": "node scripts/run-ui-checks.js",
+    "test:mysql": "node --no-warnings=ExperimentalWarning --import ./scripts/test-setup.js --test --test-concurrency=1 \"test/**/*.test.js\"",
     "migrate:sqlite": "node --env-file=.env --no-warnings=ExperimentalWarning scripts/migrate-sqlite-to-mysql.js",
     "check": "npm run lint && npm run test",
     "hooks": "git config core.hooksPath .githooks"
