@@ -464,7 +464,7 @@ function projectItem(p, smtp, dbCfg, imap, { open = false, stats = null } = {}) 
   <div class="job" data-job="analyze"></div>`, { open: true })}
 
   ${profile ? acc('target', 'target',
-    `Cible ${p.targetValidated ? '<span class="badge ok">validée</span>' : '<span class="badge warn">à valider</span>'}`,
+    `Cible${p.targetValidated ? '' : ' <span class="badge warn">à valider</span>'}`, // une cible validée est signalée par la coche verte de la section
     esc((p.target?.description || '').slice(0, 120)), targetForm(p), { open: !p.targetValidated, cls: 'target-acc' }) : ''}
 
   <div class="accs">

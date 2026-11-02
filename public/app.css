@@ -1399,6 +1399,7 @@ body.tour-active { padding-bottom: var(--tour-pad, 0px); }
 .console-summary,.console-feed { background:var(--surface,#fff); border:1px solid var(--border,#e0e5ed); border-radius:18px; box-shadow:0 5px 24px #14223d05; overflow:hidden; }
 .console-summary { padding:1.4rem; position:sticky; top:1rem; }
 .console-summary [data-console-status] { font-size:.95rem; font-weight:600; line-height:1.6; overflow-wrap:anywhere; margin:.8rem 0 1.1rem; }
+.console-summary [data-retry] { margin:.6rem .7rem .6rem 0; }
 .console-summary progress { display:block; width:100%; height:6px; border:0; border-radius:99px; accent-color:#7260da; overflow:hidden; margin:1rem 0 1.5rem; }
 .console-facts { display:grid; gap:1rem; margin:1rem 0 1.5rem; }
 .console-facts span { display:flex; justify-content:space-between; align-items:center; font-size:.75rem; color:var(--muted,#64748b); gap:.6rem; }
