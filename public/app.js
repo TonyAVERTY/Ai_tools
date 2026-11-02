@@ -691,8 +691,10 @@
         consoleBox.dataset.status = r.status;
         setText('[data-console-tokens]', tokenText(r.tokensUsed));
         setText('[data-console-remaining]', remainingTime(r));
-        const fixable = r.type === 'promo_video' && /^La scène écrite par Claude ne passe pas au rendu/.test(r.error || '');
-        for (const retry of $$('[data-retry]', consoleBox)) retry.hidden = r.status !== 'error' || ('fix' in retry.dataset && !fixable);
+        // Vidéo livrée avec les avertissements des agents : elle se relance ou se corrige comme une scène refusée
+        const warned = r.type === 'promo_video' && r.status === 'done' && r.qualityWarnings > 0;
+        const fixable = warned || (r.type === 'promo_video' && /^La scène écrite par Claude ne passe pas au rendu/.test(r.error || ''));
+        for (const retry of $$('[data-retry]', consoleBox)) retry.hidden = !(r.status === 'error' || warned) || ('fix' in retry.dataset && !fixable);
         if (r.entries.length) {
           if ((cursor && r.firstId > cursor + 1) || (!cursor && r.firstId > 1)) output.append(document.createTextNode('[Début du journal abrégé]\n'));
           for (const entry of r.entries) {
