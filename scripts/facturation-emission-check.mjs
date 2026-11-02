@@ -28,7 +28,7 @@ async function freshProject(name) {
 for (const w of [1280, 390]) {
   await freshProject(`projet${w}`);
   const ctx = await b.newContext({ viewport: { width: w, height: 900 } }); const [n, v] = u.cookie.split('=');
-  await ctx.addCookies([{ name: n, value: v, url: s.base }]); await ctx.route('**/*', (route) => { const r = route.request(); const h = { ...r.headers() }; if (r.method() === 'POST') h.origin = APP_URL; route.continue({ headers: h }); });
+  await ctx.addCookies([{ name: n, value: v, url: s.base }]); await ctx.route('**/*', async (route) => { const r = route.request(); if (r.method() !== 'POST') return route.continue(); /* Chromium ignore un Origin réécrit par continue() : on passe par fetch() */ await route.fulfill({ response: await route.fetch({ headers: { ...r.headers(), origin: APP_URL }, maxRedirects: 0 }) }); });
   const p = await ctx.newPage(); const errs = [];
   p.on('pageerror', (e) => errs.push(e.message)); p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
   const wait = () => p.waitForTimeout(900);

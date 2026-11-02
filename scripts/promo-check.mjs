@@ -2,6 +2,7 @@
 // Nécessite Playwright (PLAYWRIGHT_MODULE, PLAYWRIGHT_CHROMIUM) ; le même Chromium sert au rendu des vidéos. Sortie « TOUT EST BON » attendue.
 import { spawnSync } from 'node:child_process';
 import { startApp, APP_URL } from '../test/helpers/server.js';
+import { renderPromo } from '../src/services/promovideo.js';
 import { makeClaudeBin } from '../test/helpers/claude-bin.js';
 import { addProject } from '../test/helpers/users.js';
 
@@ -9,6 +10,10 @@ const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright-c
 const exe = process.env.PLAYWRIGHT_CHROMIUM;
 const s = await startApp({ cfg: { chromiumBin: exe }, worker: true });
 s.app.cfg.claudeBin = makeClaudeBin(s.tmp, { fixture: 'fake-claude.js' });
+// Les agents de contrôle de l'image ont leur propre vérification (promo-quality-check.mjs) : ici on contrôle l'interface, pas leur verdict
+s.app.reviewPromo = async () => ({ reviews: [] });
+// La scène factice du faux Claude est volontairement minimale : le contrôle de qualité du rendu (promo-quality-check.mjs) est coupé ici
+s.app.renderPromo = (options) => renderPromo({ ...options, quality: 'off' });
 // Extrait d'écoute : un vrai MP3 d'une seconde (le service de voix n'est jamais appelé)
 const sample = spawnSync('ffmpeg', ['-v', 'error', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=1', '-f', 'mp3', '-'], { maxBuffer: 1 << 20 }).stdout;
 s.app.sampleVoice = async () => sample;
@@ -25,7 +30,7 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   const ctx = await b.newContext({ viewport: vp });
   const [name, value] = u.cookie.split('=');
   await ctx.addCookies([{ name, value, url: s.base }]);
-  await ctx.route('**/*', (route) => { const r = route.request(); const h = { ...r.headers() }; if (r.method() === 'POST') h.origin = APP_URL; route.continue({ headers: h }); });
+  await ctx.route('**/*', async (route) => { const r = route.request(); if (r.method() !== 'POST') return route.continue(); /* Chromium ignore un Origin réécrit par continue() : on passe par fetch() */ await route.fulfill({ response: await route.fetch({ headers: { ...r.headers(), origin: APP_URL }, maxRedirects: 0 }) }); });
   const p = await ctx.newPage();
   const errs = [];
   p.on('pageerror', (e) => errs.push(e.message));
