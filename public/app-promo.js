@@ -1,7 +1,7 @@
 // Promotion d'un projet : formulaire de la vidéo, choix de la voix, vidéos produites, clés des fournisseurs de voix.
 // Chargé après app.js, qui expose ses outils communs dans window.AiTools ; ajax.js relance ce script à chaque navigation, comme app.js.
 (() => {
-  const { $, $$, api, esc, go, icon, liDay, listen, loadLinkedin, refreshProject, toast } = window.AiTools;
+  const { $, $$, api, esc, go, icon, liDay, listen, refreshProject, toast } = window.AiTools;
   const mo = (n) => (n >= 1048576 ? `${(n / 1048576).toFixed(1).replace('.', ',')} Mo` : `${Math.max(1, Math.round(n / 1024))} Ko`);
 
   // ---------- Promotion ----------
@@ -205,7 +205,7 @@
     if (q.get('li') === 'ok') toast('Compte LinkedIn relié au projet');
     else toast(q.get('m') || 'Connexion LinkedIn impossible', 'error');
     const proj = $(`details.project[data-id="${q.get('p')}"]`);
-    if (proj) { proj.open = true; const acc = $('details[data-acc="linkedin"]', proj); if (acc) { acc.open = true; loadLinkedin(proj); } }
+    if (proj) { proj.open = true; const acc = $('details[data-acc="linkedin"]', proj); if (acc) { acc.open = true; window.AiTools.loadLinkedin?.(proj); } }
   })();
 
   window.AiTools.loadPromo = loadPromo;
