@@ -1,7 +1,7 @@
 // Onglet Promotion : état, validation, production d'une vidéo (faux Claude + vrai rendu Chromium/ffmpeg), lecture, suppression, prompt modifiable.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, writeFileSync, utimesSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { startApp } from './helpers/server.js';
@@ -13,7 +13,7 @@ import { setSetting, now } from '../src/db.js';
 import { userPromoRoot, deleteUser } from '../src/users.js';
 import { PROMO, promoSupported, renderPromo, SceneError } from '../src/services/promovideo.js';
 import { PROMPT_DEFS } from '../src/services/prompts.js';
-import { reserveVideo, finishVideo, removeVideo } from '../src/promo.js';
+import { reserveVideo, finishVideo, removeVideo, keepScene, takeScene } from '../src/promo.js';
 
 const chromium = process.env.CHROMIUM_BIN || spawnSync('sh', ['-c', 'ls /opt/pw-browsers/chromium-*/chrome-linux/chrome 2>/dev/null | head -1']).stdout.toString().trim() || undefined;
 let s, spy, worker;
@@ -222,7 +222,7 @@ test('contrôle strict à chaque tentative : trois refus, aucune vidéo livrée 
   } finally { delete s.app.promoSupported; s.app.renderPromo = renderFixture; }
 });
 
-test('agents du MP4 toujours en refus : les deux premières versions sont corrigées, la troisième est livrée avec avertissements', async () => {
+test('agents du MP4 toujours en refus : la première version est corrigée, la deuxième est livrée avec avertissements', async () => {
   const { u, pid } = await setup();
   const originalReview = s.app.reviewPromo;
   const finals = [];
@@ -237,9 +237,11 @@ test('agents du MP4 toujours en refus : les deux premières versions sont corrig
     await gen(u, pid, { fps: 10, seconds: 3 });
     const job = await runQualityJob(pid);
     assert.equal(job.status, 'done', job.error);
-    assert.deepEqual(finals, [false, false, true]);
+    assert.deepEqual(finals, [false, true]);
     assert.equal(job.result.qualityWarnings[0].issues[0].problem, 'Texte en retard');
     assert.equal((await (await u.get(`/api/projects/${pid}/promo`)).json()).videos.length, 1, 'la vidéo est livrée');
+    // la page de suivi sait que la tâche terminée porte des avertissements (boutons Réessayer / Corriger)
+    assert.equal((await (await u.get(`/api/jobs/${job.id}/log`)).json()).qualityWarnings, 1);
     // la vidéo livrée avec avertissements se corrige ou se relance depuis la tâche terminée
     const reply = await u.post(`/api/jobs/${job.id}/retry`, { fix: true });
     assert.equal(reply.status, 200);
@@ -325,4 +327,19 @@ test('supprimer le projet efface ses vidéos ; supprimer le compte efface le dos
   assert.ok(existsSync(userPromoRoot(s.app.cfg, u.id)));
   await deleteUser(s.app, u.id);
   assert.equal(existsSync(userPromoRoot(s.app.cfg, u.id)), false, 'dossier du compte supprimé');
+});
+
+test('scènes gardées pour « Corriger » : relues puis effacées, et celles de plus de 7 jours ne s\'accumulent pas', async () => {
+  const { u } = await setup();
+  const dir = userPromoRoot(s.app.cfg, u.id);
+  mkdirSync(dir, { recursive: true });
+  const old = join(dir, 'scene-901.html');
+  writeFileSync(old, '<html>ancienne</html>');
+  const ancient = (Date.now() - 8 * 86_400_000) / 1000;
+  utimesSync(old, ancient, ancient);
+  keepScene(s.app.cfg, u.id, 902, '<html>récente</html>');
+  assert.equal(existsSync(old), false, 'la scène de plus de 7 jours est effacée');
+  assert.equal(takeScene(s.app.cfg, u.id, 902), '<html>récente</html>');
+  assert.equal(existsSync(join(dir, 'scene-902.html')), false, 'effacée après lecture');
+  assert.equal(takeScene(s.app.cfg, u.id, 902), '', 'rien à relire');
 });
