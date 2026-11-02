@@ -1,6 +1,6 @@
-// Vérifie dans un vrai navigateur les sections d'un projet qui vivent dans leur propre fichier (public/app-recap.js, public/app-promo.js) :
+// Vérifie dans un vrai navigateur les sections d'un projet qui vivent dans leur propre fichier (public/app-recap.js, app-promo.js, app-linkedin.js) :
 // le « Récapitulatif » se charge à l'ouverture, affiche les indicateurs et dessine les courbes (SVG), bascule 30 / 90 jours, se rafraîchit ;
-// la « Promotion » affiche son formulaire ; et — point clé du découpage de app.js — les deux fonctionnent encore après une navigation sans
+// la « Promotion » affiche son formulaire ; « LinkedIn » charge son contenu ; et — point clé du découpage de app.js — les deux fonctionnent encore après une navigation sans
 // rechargement (ajax.js relance app.js puis chaque fichier).
 // Nécessite Playwright (PLAYWRIGHT_MODULE, PLAYWRIGHT_CHROMIUM). Sortie « TOUT EST BON » attendue.
 import { startApp, APP_URL } from '../test/helpers/server.js';
@@ -54,9 +54,20 @@ async function openPromo(tag) {
   ok(await p.locator('[data-promo-form] input[name="fps"]').inputValue() === '30', `${tag} le formulaire de la Promotion s'affiche (30 images/s par défaut)`);
 }
 
+async function openLinkedin(tag) {
+  await p.waitForSelector('html[data-nav="ready"]');
+  const project = p.locator('details.project').first();
+  if (!(await project.evaluate((d) => d.open))) await project.locator('summary').first().click();
+  await p.locator('details[data-acc="linkedin"] > summary').click();
+  // « Chargement… » est remplacé par le contenu de la section (compte à relier, ou message d'absence de configuration)
+  await p.waitForFunction(() => { const b = document.querySelector('[data-linkedin]'); return b && b.textContent.trim().length > 0 && !/^Chargement…$/.test(b.textContent.trim()); }, null, { timeout: 15000 });
+  ok(true, `${tag} la section LinkedIn s'est chargée : « ${(await p.locator('[data-linkedin]').innerText()).trim().replace(/\s+/g, ' ').slice(0, 60)}… »`);
+}
+
 await p.goto(`${s.base}/`);
 await openRecap('1re page :');
 await openPromo('1re page :');
+await openLinkedin('1re page :');
 // 30 → 90 jours
 await p.locator('[data-days="90"]').click();
 await p.waitForSelector('[data-days="90"][aria-pressed="true"]');
@@ -78,8 +89,10 @@ await p.waitForSelector('html[data-nav="ready"]');
 ok(await p.evaluate(() => window.__marker) === 'vivante', 'aller-retour sans rechargement de la page');
 ok(await p.evaluate(() => typeof window.AiTools?.loadRecap) === 'function', 'app-recap.js a été relancé : window.AiTools.loadRecap existe');
 ok(await p.evaluate(() => typeof window.AiTools?.loadPromo) === 'function', 'app-promo.js a été relancé : window.AiTools.loadPromo existe');
+ok(await p.evaluate(() => typeof window.AiTools?.loadLinkedin) === 'function', 'app-linkedin.js a été relancé : window.AiTools.loadLinkedin existe');
 await openRecap('après navigation :');
 await openPromo('après navigation :');
+await openLinkedin('après navigation :');
 ok(errs.length === 0, `aucune erreur console${errs.length ? ` : ${errs.join(' | ')}` : ''}`);
 await b.close(); await s.close();
 console.log(bad ? `\n${bad} échec(s)` : '\nTOUT EST BON');
