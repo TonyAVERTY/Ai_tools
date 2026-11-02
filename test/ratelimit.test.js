@@ -198,8 +198,9 @@ test('chaque règle citée par une route existe, et les points sensibles sont to
     const routes = s.app.router.routes;
     const used = new Set(routes.map((r) => r.limit).filter(Boolean));
     for (const rule of used) assert.ok(RATE_LIMITS[rule], `règle ${rule} absente de src/limits.js`);
-    // « admin » n'est branchée qu'avec le back-office, « api » (par compte) qu'après l'authentification d'un jeton
-    for (const rule of Object.keys(RATE_LIMITS).filter((r) => !['admin', 'api'].includes(r))) assert.ok(used.has(rule), `règle ${rule} sans route`);
+    // « admin » n'est branchée qu'avec le back-office, « api » (par compte) qu'après l'authentification d'un jeton,
+    // « write » s'applique d'office à toute écriture connectée sans règle propre (voir le test suivant)
+    for (const rule of Object.keys(RATE_LIMITS).filter((r) => !['admin', 'api', 'write'].includes(r))) assert.ok(used.has(rule), `règle ${rule} sans route`);
     const find = (method, path) => routes.find((r) => r.method === method && r.re.test(path));
     for (const [m, p] of [
       ['GET', '/auth/google'], ['GET', '/auth/apple'], ['GET', '/auth/google/callback'], ['POST', '/auth/apple/callback'],
@@ -208,5 +209,19 @@ test('chaque règle citée par une route existe, et les points sensibles sont to
       ['POST', '/api/report/send'], ['POST', '/api/notify/test'], ['POST', '/api/projects'], ['POST', '/account/delete'],
       ['POST', '/api/projects/1/imap'], ['GET', '/api/v1/me'], ['POST', '/api/v1/projects/1/jobs'], ['POST', '/api/projects/1/inbox/check'], ['GET', '/api/projects/1/recap'],
     ]) assert.ok(find(m, p)?.limit, `${m} ${p} sans limite`);
+  } finally { await s.close(); }
+});
+
+test('écritures : toute route sans règle propre est limitée par compte, les lectures et les autres comptes restent libres', async () => {
+  const s = await startApp({ rateLimit: true });
+  try {
+    const u = await s.newUser(), other = await s.newUser();
+    const max = RATE_LIMITS.write.user.max;
+    for (let i = 0; i < max; i++) assert.equal((await u.post('/api/jobs/999999/retry', {})).status, 404, `écriture ${i + 1}`);
+    const r = await u.post('/api/jobs/999999/retry', {});
+    assert.equal(r.status, 429);
+    assert.ok(Number(r.headers.get('retry-after')) >= 1);
+    assert.equal((await u.get('/api/system')).status, 200, 'les lectures ne sont pas limitées');
+    assert.equal((await other.post('/api/jobs/999999/retry', {})).status, 404, 'un autre compte garde son compteur');
   } finally { await s.close(); }
 });
