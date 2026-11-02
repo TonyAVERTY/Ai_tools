@@ -158,8 +158,8 @@ test('synchronisation Git : deux jobs du même dépôt ne se chevauchent pas, de
     let first = true;
     s.app.syncRepo = async () => { if (first) { first = false; throw new Error('réseau'); } return 'ok'; };
     const [a, b] = await Promise.allSettled([sync(u.id, 'https://github.com/u/c.git', '/tmp/x/c'), sync(u.id, 'https://github.com/u/c.git', '/tmp/x/c')]);
-    assert.equal(a.status, 'rejected');
-    assert.equal(b.status, 'fulfilled', 'l\'échec du premier ne bloque pas le second');
+    // Lequel des deux atteint syncRepo en premier dépend de la vitesse de la base (SQLite : toujours le premier, MySQL : au gré des requêtes)
+    assert.deepEqual([a.status, b.status].sort(), ['fulfilled', 'rejected'], 'l\'échec de l\'un ne bloque pas l\'autre');
   } finally { await s.close(); }
 });
 
@@ -238,7 +238,15 @@ test('la limite par compte est celle de son offre : avec le garde-fou par défau
 test('aucune limite globale : 10 comptes à 1 job chacun tournent tous en même temps, sans réglage de plafond', async () => {
   const { db, users } = await world(10);
   const st = probe();
-  const w = new Worker(db, { prospect: st.handler }, { pollMs: 10, log, parallel: async () => 1 });
+  // Chaque job attend que les 10 soient démarrés : le test vérifie l'absence de plafond, pas la vitesse de la base (sur MySQL, démarrer
+  // le dixième job prend plus que les 60 ms que dure un job, et le premier avait déjà fini)
+  let started = 0;
+  const handler = async (ctx) => {
+    started++;
+    for (const t0 = Date.now(); started < users.length && Date.now() - t0 < 5000;) await sleep(10);
+    return st.handler(ctx);
+  };
+  const w = new Worker(db, { prospect: handler }, { pollMs: 10, log, parallel: async () => 1 });
   assert.equal(w.maxJobs, Infinity);
   for (const u of users) await q(db, u, 'prospect');
   await w.start();

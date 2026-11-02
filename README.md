@@ -391,7 +391,7 @@ Par défaut ils tournent sur SQLite en mémoire, sans rien à installer. Pour le
 TEST_DB_HOST=127.0.0.1 TEST_DB_USER=root TEST_DB_PASSWORD=... TEST_DB_NAME=aitools_test npm run test:mysql
 ```
 
-Utilise une base **dédiée aux tests** : toutes ses tables sont supprimées à chaque test. `test:mysql` force l'exécution des fichiers un par un, car ils partagent la même base.
+Chaque test crée sa propre base temporaire `<TEST_DB_NAME>_<pid>_<n>` (comme un SQLite en mémoire) et la supprime en fin de fichier : l'utilisateur doit pouvoir faire `CREATE DATABASE` et `DROP DATABASE`, et `TEST_DB_NAME` n'est qu'un préfixe. `test:mysql` exécute les fichiers un par un (environ 5 minutes). La CI le lance sur MariaDB 10.11 (job `mysql`).
 
 Les tests d'isolation (`test/isolation.test.js`), de connexion (`test/auth.test.js`, fournisseurs simulés), de suppression de compte, de blocage des jobs IA et de migration des données existantes tournent avec le reste de la suite.
 
