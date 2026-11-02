@@ -108,7 +108,7 @@ test('boutons : tout bouton affiché par l\'application est cité dans la docume
     for (const l of labelsOf(html)) check(l, p, missing);
   }
   // Modèles de boutons écrits en JavaScript (rendus côté navigateur)
-  for (const f of ['public/app.js', 'public/chat.js']) {
+  for (const f of ['public/app.js', 'public/app-recap.js', 'public/chat.js']) {
     const js = read(f);
     for (const m of js.matchAll(/<button[^>]*>(?:<svg[\s\S]*?<\/svg>|\$\{icon\([^)]*\)\})?([^<>${}`]{3,70})<\/button>/g)) { const l = norm(m[1]); if (l.length >= 3 && !GENERIC.has(l)) check(l, f, missing); }
     for (const m of js.matchAll(/class="btn[^"]*"[^>]*>(?:\$\{icon\([^)]*\)\})?([^<>${}`]{3,70})<\/(?:a|button)>/g)) { const l = norm(m[1]); if (l.length >= 3 && !GENERIC.has(l)) check(l, f, missing); }
