@@ -340,7 +340,7 @@ test('page : le sélecteur « Publier sur » est servi par le front, sans style 
   for (const path of [`/api/projects/${p}/linkedin`, `/api/projects/${p}/linkedin/pages`]) {
     assert.ok(!(await (await owner.get(path)).text()).includes(TOKEN), path);
   }
-  const js = await (await fetch(`${both.base}/static/app.js`)).text();
+  const js = await (await fetch(`${both.base}/static/app-linkedin.js`)).text(); // la section LinkedIn vit dans son propre fichier
   assert.match(js, /data-li-pages/);
   assert.match(js, /data-li-target-save/);
   assert.match(js, /Publier sur \$\{esc\(acc\.target \? acc\.target\.name : 'LinkedIn'\)\}/);
