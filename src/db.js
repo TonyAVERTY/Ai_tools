@@ -91,7 +91,8 @@ class MysqlDb extends MysqlExecutor {
     }
   }
 
-  close() { return this.pool.end(); }
+  // Idempotent : une fermeture en double (arrêt de l'application puis nettoyage des tests) ne doit pas échouer
+  close() { return (this.closing ??= this.pool.end()); }
 }
 
 async function openMysql(cfg, opts) {
