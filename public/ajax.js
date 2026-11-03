@@ -181,6 +181,12 @@
     busy(false);
     const doc = new DOMParser().parseFromString(text, 'text/html');
     if (method !== 'GET' && !res.ok) { onFail(); toast(errorText(doc, res.status)); return; } // erreur de formulaire : on reste là, rien n'est perdu
+    // Le serveur refuse la saisie en redirigeant vers la même page avec « ?e=… » : remplacer la page viderait le formulaire. Même traitement qu'une erreur 4xx :
+    // on reste là, les champs gardent ce qui a été saisi, l'erreur s'affiche en notification. Une redirection vers une autre page (ou sans « e ») est une navigation normale.
+    if (method !== 'GET' && res.redirected) {
+      const back = new URL(res.url);
+      if (back.origin === location.origin && back.pathname === location.pathname && back.searchParams.get('e')) { onFail(); toast(back.searchParams.get('e')); return; }
+    }
     if (!compatible(doc)) { if (method === 'GET' || res.redirected) location.assign(res.url); else { onFail(); toast('Réponse inattendue : recharge la page.'); } return; }
     await swap(doc, res.url, { push, keepScroll, y });
   }
