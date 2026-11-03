@@ -286,7 +286,7 @@ export function linkPage({ user, link, cliModeEnabled, error, start = false }) {
       ${notice}
       ${box}
       <p class="hint">Un lien de connexion va s'afficher. Tu te connectes à Claude, puis tu recopies ici le petit code qu'il te montre : AiTools récupère le jeton tout seul. Texte d'avertissement version ${esc(CONSENT_VERSION)}.</p>
-      <div class="modal-f"><button type="button" class="btn" data-close-dialog>Annuler</button><button class="btn primary" data-consent-submit disabled><span class="spin-inline" hidden></span><span data-label>Continuer</span></button></div>
+      <div class="modal-f"><button type="button" class="btn" data-close-dialog>Annuler</button><button class="btn primary" data-consent-submit disabled><span data-label>Continuer</span></button></div>
       <p class="hint" role="status" data-claude-status></p>
       ${pctBlock('Préparation du lien de connexion')}
       <p class="msg msg-err" role="alert" data-claude-error hidden></p>
@@ -298,7 +298,7 @@ export function linkPage({ user, link, cliModeEnabled, error, start = false }) {
       <p><strong>2.</strong> Copie le code que Claude affiche, puis reviens ici : il est reconnu tout seul (sinon, colle-le dans le champ).</p>
       <form class="cfg" data-claude-code>
         <label class="field"><span class="lbl">Code affiché par Claude</span><input name="code" autocomplete="off" spellcheck="false" required></label>
-        <button class="btn primary"><span class="spin-inline" hidden></span><span data-label>Terminer la connexion</span></button>
+        <button class="btn primary"><span data-label>Terminer la connexion</span></button>
         ${pctBlock('Récupération de ton jeton')}
       </form>
       <p class="msg msg-err" role="alert" data-claude-error2 hidden></p>
@@ -769,7 +769,7 @@ ${saved ? banner('ok', 'Réglages enregistrés', { strong: true }) : ''}
       <div class="gitrow-head"><span class="srv-n">${ic('git')}<span class="badge">github.com</span></span></div>
       <label class="field"><span class="lbl">Token (dépôts privés, lecture seule)</span><input name="github_token" type="password" placeholder="${s.github_token_set ? '•••••• (inchangé)' : 'github_pat_…'}" autocomplete="new-password"></label>
       <div class="row">
-        <button type="button" class="btn" data-github-test><span class="spin-inline" hidden></span><span data-label>Tester ce token</span></button>
+        <button type="button" class="btn" data-github-test><span data-label>Tester ce token</span></button>
         <span class="hint">Teste le token tapé ci-dessus, sinon celui qui est enregistré. Rien n'est modifié.</span>
       </div>
       <div class="gittest" data-github-result role="status" aria-live="polite" hidden></div>
