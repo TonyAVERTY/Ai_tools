@@ -45,6 +45,7 @@ ${iconLinks()}
 <script src="${assetUrl('/static/app-recap.js')}" defer></script>
 <script src="${assetUrl('/static/app-promo.js')}" defer></script>
 <script src="${assetUrl('/static/app-linkedin.js')}" defer></script>
+<script src="${assetUrl('/static/app-prospects.js')}" defer></script>
 <script src="${assetUrl('/static/responsive.js')}" defer></script>
 <script src="${assetUrl('/static/fx.js')}" defer></script>
 <script src="${assetUrl('/static/ajax.js')}" defer></script>
