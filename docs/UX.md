@@ -16,6 +16,17 @@ Réutilise ce qui existe ; n'ajoute pas un second mécanisme pour le même besoi
 - À utiliser pour **le résultat d'une action sur la page où l'on est**. Pour un résultat affiché après un rechargement ou une redirection, ou un
   état qui doit rester lisible, voir les bandeaux (`.msg msg-ok / msg-err`).
 
+## Bandeaux de résultat : `banner(kind, texte)` (`src/banner.js`)
+
+- Pour ce qui s'affiche dans la page après un rechargement ou une redirection (« Réglages enregistrés », erreur d'un formulaire, avertissement) :
+  `banner('ok' | 'err' | 'warn', texte)`. Une seule apparence (`.msg msg-ok | msg-err | msg-warn`), une icône avec le texte, `role="alert"` pour une
+  erreur et `role="status"` sinon. Le texte est échappé. **N'écris pas un bandeau à la main** : `test/banner.test.js` échoue.
+- Une erreur est un bandeau `err` (jamais `warn` : un avertissement dit « attention », une erreur dit « ça n'a pas marché »).
+- Seule exception : un conteneur que le navigateur remplit (caché au départ, ex. `data-claude-error`) garde son balisage `class="msg msg-err" … hidden`.
+- Phrase complète avec point final dans un bandeau (« Ta situation est enregistrée. ») ; court et sans point dans un toast (« Prospect ajouté »).
+- Les bulles du chat s'appellent `.chat-msg` : `.msg` est réservé au bandeau.
+- Hors périmètre : `public/site.css` a sa propre classe `.msg` pour le site public (connexion).
+
 ## Erreurs
 
 Une erreur dit **ce qui s'est passé** et **quoi faire** ; jamais « Failed to fetch », un code brut ni une trace.
@@ -33,9 +44,9 @@ Une erreur dit **ce qui s'est passé** et **quoi faire** ; jamais « Failed to f
 
 ## Ce qui reste à harmoniser (lots suivants)
 
-Bandeaux de résultat (`.msg` redéfini pour le chat), indicateur dans le bouton occupé, squelettes de chargement, « Réessayer » sur les erreurs de chargement,
+Indicateur dans le bouton occupé, squelettes de chargement, « Réessayer » sur les erreurs de chargement,
 boîte de confirmation commune à la place des `confirm()` natifs, convention rédactionnelle complète.
 
 ## Tests
 
-`scripts/notifications-check.mjs` (Chromium, 1280 et 390 px) couvre ce qui précède ; lance-le avec `npm run ui:check -- notifications`.
+`scripts/notifications-check.mjs` et `scripts/banners-check.mjs` (Chromium, 1280 et 390 px, clair et sombre pour les bandeaux) couvrent ce qui précède ; lance-les avec `npm run ui:check -- notifications` ou `-- banners`.
