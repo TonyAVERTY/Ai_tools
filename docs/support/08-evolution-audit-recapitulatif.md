@@ -15,7 +15,7 @@ Rien n'est modifié dans le dépôt. Les consignes se modifient dans **Réglages
 
 ## Récapitulatif (propriétaires et administrateurs)
 Chiffres du produit et de la prospection, avec courbes.
-- **Utilisateurs**, **Clients payants**, **Revenu total** : lus dans la base de données du projet (voir « Configuration du projet → Base de données (récapitulatif) »). Mis en cache 10 minutes ; bouton **Rafraîchir**.
+- **Utilisateurs**, **Clients payants**, **Revenu total** : lus dans la base de données du projet, d'après les tables que tu as choisies (voir « Configuration du projet → Base de données (récapitulatif) » : **Se connecter et analyser**, puis tes listes de tables, sans aucune requête à écrire). Mis en cache 10 minutes ; bouton **Rafraîchir**.
 - **Prospection** : **Trouvés**, **Contactés**, **Réponses**, **Convertis**.
 - **Coût IA du projet** (équivalent API), uniquement avec une clé API : avec un abonnement Claude, rien n'est facturé en plus et aucun montant n'est affiché.
 - **Courbes** sur 30 ou 90 jours : utilisateurs, clients payants et revenu (une photo quotidienne est prise automatiquement, plus une à chaque ouverture), mails envoyés et réponses par semaine. Les graphiques ont des infobulles au survol et une vue tableau (« Voir les données »).
