@@ -1,7 +1,9 @@
-// Vérifie dans un vrai navigateur l'ajout manuel d'un prospect, la modification et la suppression depuis la fiche, et l'aperçu du mail (A/B, texte).
+// Vérifie dans un vrai navigateur (public/app-prospects.js) l'ajout manuel d'un prospect, la modification et la suppression depuis la fiche, l'aperçu du mail
+// (A/B, texte), la vue tableau (Kanban) avec un vrai glisser-déposer entre deux statuts, et le fonctionnement après une navigation sans rechargement.
 // Nécessite Playwright (PLAYWRIGHT_MODULE, PLAYWRIGHT_CHROMIUM). Sortie « TOUT EST BON » attendue.
 import { startApp, APP_URL } from '../test/helpers/server.js';
 import { addProject } from '../test/helpers/users.js';
+import { now } from '../src/db.js';
 
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright-core');
 const exe = process.env.PLAYWRIGHT_CHROMIUM;
@@ -68,6 +70,35 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   ok(await p.locator('dialog.mailprev .pv-text').isVisible(), `${tag} l'onglet Version texte s'affiche`);
   ok(!(await p.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)), `${tag} pas de défilement horizontal avec l'aperçu ouvert`);
   await p.screenshot({ path: process.env.SHOT_DIR ? `${process.env.SHOT_DIR}/preview-${vp.width}.png` : undefined }).catch(() => {});
+  await p.keyboard.press('Escape'); // ferme l'aperçu
+  // vue tableau : un prospect glissé d'une colonne à l'autre change de statut côté serveur
+  const kanbanEmail = `kanban-${vp.width}@atelier.fr`;
+  const kanbanName = `Atelier Kanban ${vp.width}`; // un nom par largeur : le prospect du premier passage reste dans la base
+  await s.db.prepare("INSERT INTO prospects(project_id, company, email, status, created_at) VALUES(?, ?, ?, 'new', ?)").run(pid, kanbanName, kanbanEmail, now());
+  await p.locator('[data-view-mode="board"]').click();
+  await p.waitForSelector('[data-card]', { timeout: 10000 });
+  ok(await p.locator('[data-card]').filter({ hasText: kanbanName }).count() === 1, `${tag} la vue tableau affiche le prospect`);
+  await p.locator('[data-card]').filter({ hasText: kanbanName }).dragTo(p.locator('[data-drop="sent"]'));
+  let status = '';
+  for (let i = 0; i < 40 && status !== 'sent'; i++) { status = (await s.db.prepare('SELECT status FROM prospects WHERE email = ?').get(kanbanEmail)).status; if (status !== 'sent') await new Promise((r) => setTimeout(r, 150)); }
+  ok(status === 'sent', `${tag} glisser-déposer : le statut passe de « new » à « ${status} »`);
+  await p.locator('[data-view-mode="list"]').click();
+  // navigation sans rechargement, puis retour : les écouteurs du fichier doivent être posés de nouveau
+  await p.evaluate(() => { window.__marker = 'vivante'; });
+  await p.locator('.pills a.pill', { hasText: 'Calendrier' }).click();
+  await p.waitForURL(/calendar/);
+  await p.waitForSelector('html[data-nav="ready"]');
+  await p.locator('.pills a.pill', { hasText: 'Projets' }).click();
+  await p.waitForURL((url) => url.pathname === '/');
+  await p.waitForSelector('html[data-nav="ready"]');
+  ok(await p.evaluate(() => window.__marker) === 'vivante', `${tag} aller-retour sans rechargement de la page`);
+  if (!(await p.locator('details.project').evaluate((d) => d.open))) await p.locator('details.project > summary').click();
+  for (const k of ['prospect', 'prospects']) await p.evaluate((x) => { const d = document.querySelector(`details[data-acc="${x}"]`); if (d) d.open = true; }, k);
+  await p.waitForSelector(`[data-prospects] >> text=${kanbanName}`, { timeout: 10000 });
+  await p.locator(`[data-prospects] >> text=${kanbanName}`).first().click();
+  await p.waitForSelector('dialog[open] form[data-dlg="edit"]', { timeout: 10000 });
+  ok(true, `${tag} après navigation : la liste se recharge et la fiche d'un prospect s'ouvre`);
+  await p.keyboard.press('Escape');
   ok(errs.length === 0, `${tag} aucune erreur console${errs.length ? ` : ${errs.join(' | ')}` : ''}`);
   await ctx.close();
 }
