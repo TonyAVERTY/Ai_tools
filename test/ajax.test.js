@@ -49,6 +49,13 @@ before(async () => { s = await startApp(); });
 after(async () => { await s.close(); });
 const html = (u, p) => u.get(p, { headers: { accept: 'text/html' } }).then((r) => r.text());
 
+test('ajax.js : une erreur de saisie renvoyée par « ?e= » sur la même page garde le formulaire (comme une erreur 4xx)', () => {
+  assert.match(ajax, /method !== 'GET' && res\.redirected/, 'seulement après un envoi redirigé');
+  assert.match(ajax, /back\.pathname === location\.pathname && back\.searchParams\.get\('e'\)/, 'même page, avec un message « e »');
+  assert.match(ajax, /back\.searchParams\.get\('e'\)\) \{ onFail\(\); toast\(back\.searchParams\.get\('e'\)\); return; \}/, 'le bouton se réactive et l\'erreur s\'affiche en notification, sans remplacer la page');
+  assert.ok(ajax.indexOf('res.redirected) {') < ajax.indexOf('await swap(doc, res.url'), 'la règle passe avant le remplacement de la page');
+});
+
 test('ajax.js est servi, chargé sur les pages de l\'application après app.js, et jamais sur le site public ni la connexion', async () => {
   const u = await s.newUser();
   const r = await s.anon.get('/static/ajax.js', { headers: { accept: '*/*' } });

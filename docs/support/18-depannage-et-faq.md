@@ -23,6 +23,7 @@ Après une action, une notification apparaît en bas à droite. Un **succès** (
 - « **Erreur interne : réessaie dans un instant.** » : le serveur a rencontré un problème. Recommence ; si cela se répète, signale-le avec l'heure.
 - « **Tu n'as pas accès à cette action.** » : ton rôle sur le projet ne le permet pas (voir « Équipe »).
 - « **Introuvable : recharge la page.** » : l'élément a été supprimé ou déplacé depuis l'affichage de la page.
+- **Quand tu envoies un formulaire et que l'application le refuse** (par exemple « Le SIRET compte 14 chiffres (laisse vide pour un particulier). » dans « Ajouter un client », ou « Choisis une date entre hier et dans trois ans » dans « Ajouter un événement »), tu restes sur la page : **ce que tu as saisi est conservé**, le formulaire reste ouvert et le bouton redevient utilisable. Corrige le champ indiqué puis renvoie. Si la page s'est rechargée et que les champs sont vides, ton navigateur n'a pas pu envoyer le formulaire sans recharger (JavaScript désactivé, ou envoi d'un fichier) : ressaisis-les.
 - « **Ta session a expiré : reconnecte-toi.** » : tu reviens à la page de connexion ; après la connexion, retourne sur la page où tu étais.
 
 ## Se connecter et analyser la base : une erreur s'affiche, ou aucune table n'est recommandée
