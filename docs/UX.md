@@ -42,11 +42,23 @@ Une erreur dit **ce qui s'est passé** et **quoi faire** ; jamais « Failed to f
 - Erreur : une phrase qui commence par ce qui n'a pas marché, suivie de la suite à donner après « : » (« Connexion impossible : réessaie dans un instant. »).
 - On tutoie ; on garde les termes métier de l'application.
 
+## Attente et actions en cours
+
+- **Une action lancée par un bouton** : le bouton devient *occupé*. `api()` (`public/app.js`) pose `aria-busy="true"` sur le bouton cliqué ; le CSS
+  (`.btn[aria-busy="true"]::before`) affiche un anneau devant le libellé, sans changer le texte ni la largeur de la page. Le bouton est bloqué (un double
+  envoi est impossible) et libéré à la fin, **y compris sur échec**. Rien à écrire par bouton.
+- Un bouton que ton code désactive avant l'appel (`b.disabled = true; await api(...)`) est marqué occupé quand même ; `api()` ne le réactive pas : c'est à toi.
+- N'embarque jamais un spinner caché dans un bouton pour l'afficher à la main.
+- **Un contenu qui se charge** : l'anneau commun, `.spinner` (grand, seul) ou `.spin-inline` (petit, devant un texte). Il n'y a qu'un seul anneau
+  (plus d'arc SVG ni de `.spin`).
+- Mouvement réduit : l'anneau reste visible, immobile.
+- Une opération longue (job) montre sa progression dans une barre (`.bar`), pas un anneau.
+
 ## Ce qui reste à harmoniser (lots suivants)
 
-Indicateur dans le bouton occupé, squelettes de chargement, « Réessayer » sur les erreurs de chargement,
+Squelettes de chargement, « Réessayer » sur les erreurs de chargement,
 boîte de confirmation commune à la place des `confirm()` natifs, convention rédactionnelle complète.
 
 ## Tests
 
-`scripts/notifications-check.mjs` et `scripts/banners-check.mjs` (Chromium, 1280 et 390 px, clair et sombre pour les bandeaux) couvrent ce qui précède ; lance-les avec `npm run ui:check -- notifications` ou `-- banners`.
+`scripts/notifications-check.mjs`, `scripts/banners-check.mjs` et `scripts/busy-check.mjs` (Chromium, 1280 et 390 px, clair et sombre pour les bandeaux) couvrent ce qui précède ; lance-les avec `npm run ui:check -- notifications`, `-- banners` ou `-- busy`.
