@@ -7,6 +7,7 @@ import { fmtEur } from './services/accounting.js';
 import { STATUSES } from './services/crm.js';
 import { DOC_BY_KEY } from './services/billing.js';
 import { banner } from './banner.js';
+import { loadingBlock } from './loading.js';
 
 const day = (ts) => (ts ? new Date(ts * 1000).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Europe/Paris' }) : '—');
 const dayTime = (ts) => (ts ? new Date(ts * 1000).toLocaleString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' }) : '—');
@@ -80,7 +81,7 @@ export function clientsPage({ email, rows, openId, flash }) {
           </form></details>
         <a class="btn small" href="/clients/projet/${r.id}/export.csv" data-noajax>${ic('file')}Exporter les clients (CSV)</a>
       </div>
-      <div class="cl-lists" data-cl-lists aria-live="polite"><p class="muted cl-empty">Chargement…</p></div>
+      <div class="cl-lists" data-cl-lists aria-live="polite">${loadingBlock()}</div>
     </div></details>`).join('');
   const body = `<div class="bill-page" data-clients>
   <section class="card"><div class="row-between"><div><h1>Clients</h1>

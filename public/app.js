@@ -69,7 +69,7 @@
   }
 
   // Outils communs pour les fichiers public/app-*.js (chargés après celui-ci)
-  Object.assign(window.AiTools, { $, $$, api, esc, every, formData, go, icon, liDay, listen, refreshProject, httpErrorText, networkErrorText, toLogin, confirmBox });
+  Object.assign(window.AiTools, { $, $$, api, esc, every, formData, go, icon, liDay, listen, refreshProject, httpErrorText, networkErrorText, toLogin, confirmBox, loadingHtml });
 
   // Une erreur dit ce qui s'est passé et quoi faire ensuite : jamais « Failed to fetch » ni un code brut. Le message du serveur, quand il y en a un, passe en premier.
   function httpErrorText(status) {
@@ -145,6 +145,11 @@
       dlg.showModal();
       (risky ? no : yes).focus();
     });
+  }
+
+  // Contenu qui se charge : l'anneau commun devant « Chargement… » (même balisage que src/loading.js)
+  function loadingHtml(text = 'Chargement…', { small = false } = {}) {
+    return `<span class="loading${small ? ' small' : ''}" role="status"><span class="${small ? 'spin-inline' : 'spinner'}" aria-hidden="true"></span><span>${esc(text)}</span></span>`;
   }
 
   function toast(msg, kind = 'ok') {
