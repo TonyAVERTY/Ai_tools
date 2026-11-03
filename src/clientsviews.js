@@ -155,7 +155,7 @@ export function prospectSheetPage({ email, project: p, sheet, flash }) {
   const body = `<div class="bill-page" data-client-sheet>
   <section class="card"><p><a class="link" href="/clients?projet=${p.id}">${ic('back')} Tous les clients</a></p>
     <div class="row-between"><div><h1>${esc(x.company)}</h1><p class="muted small">Prospect de « ${esc(p.name)} » · <span class="badge">${esc(STATUSES[x.status] || x.status)}</span></p></div>
-      <div class="row-actions"><form method="post" action="/clients/p/${x.id}/client" data-confirm="Passer ce prospect en client ? Il passe au statut « Client » et une fiche client est créée."><button class="btn primary">${ic('check')}Passer en client</button></form></div></div>
+      <div class="row-actions"><form method="post" action="/clients/p/${x.id}/client" data-confirm="Passer ce prospect en client ? Il passe au statut « Client » et une fiche client est créée." data-confirm-label="Passer en client"><button class="btn primary">${ic('check')}Passer en client</button></form></div></div>
     ${flashOf(flash)}</section>
   <section class="card bill-sec" aria-labelledby="t-pi"><h2 id="t-pi">Informations</h2>
     <dl class="cl-dl"><div><dt>E-mail</dt><dd>${esc(x.email)}</dd></div><div><dt>Site internet</dt><dd>${x.website ? esc(x.website) : '—'}</dd></div><div><dt>Ville</dt><dd>${esc(x.city || '—')}</dd></div>
