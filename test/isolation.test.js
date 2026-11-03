@@ -58,6 +58,8 @@ test('IDOR : B ne peut lire ni modifier aucune ressource de A (404 partout)', as
     ['POST', `/api/projects/${pa}/imap`, { host: 'evil.example' }],
     ['POST', `/api/projects/${pa}/inbox/check`, {}],
     ['POST', `/api/projects/${pa}/db`, { type: 'mysql', host: 'evil.example', sql_users: 'SELECT 1' }],
+    ['POST', `/api/projects/${pa}/db/analyze`, { type: 'mysql', host: 'evil.example', database: 'x' }],
+    ['POST', `/api/projects/${pa}/db`, { type: 'mysql', users_table: 'users' }],
     ['POST', `/api/projects/${pa}/template/save`, { kind: 'initial', subject: 'pirate', body: 'pirate' }],
     ['POST', `/api/projects/${pa}/analyze`, {}],
     ['POST', `/api/projects/${pa}/template`, {}],

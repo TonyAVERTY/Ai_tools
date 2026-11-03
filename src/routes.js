@@ -41,6 +41,7 @@ import { dashboardPage, settingsPage, unsubPage, accountPage, linkPage, layout }
 import { enqueue, latestJobs, cancelJob, retryJob, usageSummary } from './services/jobs.js';
 import { validateGitUrl, removeRepo } from './services/git.js';
 import { fetchRecap, clearRecapCache, validateSelect } from './services/recap.js';
+import { analyzeDb, resolveKpi, explainDbError } from './services/dbschema.js';
 import { sendPause, pauseMessage as pauseMessageOf } from './services/abuse.js';
 import { guardTarget, pinDb, pinGit } from './netguard.js';
 import { checkGithubToken } from './githubcheck.js';
@@ -613,19 +614,59 @@ export function registerRoutes(router, app) {
     catch (e) { throw new HttpError(502, e.message); }
   }, { limit: 'conn_test' });
 
+  // Connexion à la base : les champs du formulaire, le mot de passe laissé vide gardant celui qui est enregistré
+  const dbConnection = (b, stored) => ({
+    type: b.type === 'pg' ? 'pg' : 'mysql', host: String(b.host || '').trim(), port: b.port ? int(b.port, 1, 65535, null) : null,
+    database: String(b.database || '').trim(), user: String(b.user || '').trim(), password: b.password || stored?.password || '',
+    ssl: b.ssl === 'on' || b.ssl === true,
+  });
+  // Les tables choisies, sous la forme que le navigateur envoie (et que analyzeDb / resolveKpi attendent)
+  const KPI_FIELDS = ['users_table', 'clients_table', 'revenue_table', 'revenue_column', 'revenue_unit'];
+  const choiceOf = (b) => Object.fromEntries(KPI_FIELDS.map((k) => [k, String(b[k] || '')]));
+  const choiceFromKpi = (kpi) => ({ users_table: kpi?.users?.table || '', clients_table: kpi?.clients?.table || '', revenue_table: kpi?.revenue?.table || '', revenue_column: kpi?.revenue?.amountColumn || '', revenue_unit: kpi?.revenue ? (kpi.revenue.cents ? 'cents' : 'euros') : '' });
+  const sameChoice = (a, c) => KPI_FIELDS.every((k) => (a[k] || '') === (c[k] || '') || (k === 'revenue_unit' || k === 'revenue_column') && !a.revenue_table && !c.revenue_table);
+
+  // « Se connecter et analyser » : lit le schéma (lecture seule), propose les tables, chiffre un aperçu. Rien n'est enregistré.
+  router.post('/api/projects/:id/db/analyze', async (ctx) => {
+    const { req, res } = ctx;
+    const p = await project(ctx, { need: 'admin', secrets: true });
+    const b = await readBody(req);
+    const conn = dbConnection(b, p.dbCfg);
+    const picked = choiceOf(b);
+    try {
+      const target = await pinDb(app, p.userId, conn);
+      json(res, { ok: true, ...(await analyzeDb(target, KPI_FIELDS.some((k) => picked[k]) ? picked : null)) });
+    } catch (e) {
+      // Une connexion refusée par SA base n'est pas une panne d'AiTools : 400 (un 5xx serait masqué en « Erreur interne » et la raison se perdrait)
+      throw new HttpError(e.status && e.status < 500 ? e.status : 400, e.status && e.status < 500 ? e.message : explainDbError(e));
+    }
+  }, { limit: 'conn_test' });
+
   router.post('/api/projects/:id/db', async (ctx) => {
     const { req, res } = ctx;
-    const p = await project(ctx, { need: 'admin' });
+    const p = await project(ctx, { need: 'admin', secrets: true });
     const b = await readBody(req);
+    // Anciennes requêtes écrites à la main (clients de l'API) : toujours acceptées si elles sont envoyées, toujours vérifiées
     for (const k of ['sql_users', 'sql_clients', 'sql_revenue']) {
       try { validateSelect(b[k]); } catch (e) { throw new HttpError(400, `${k} : ${e.message}`); }
     }
     if (String(b.host || '').trim()) await guardTarget(app, p.userId, b.type === 'pg' ? 'pg' : 'mysql', String(b.host).trim(), b.port ? int(b.port, 1, 65535, 3306) : (b.type === 'pg' ? 5432 : 3306), { lenient: true });
+    // Tables choisies : on ne se reconnecte que si la sélection a changé (corriger un mot de passe ne doit pas exiger une base joignable)
+    let kpiPatch = {};
+    if (KPI_FIELDS.some((k) => k in b) && !sameChoice(choiceOf(b), choiceFromKpi(p.dbCfg?.kpi))) {
+      const picked = choiceOf(b);
+      if (!KPI_FIELDS.some((k) => picked[k])) kpiPatch = { kpi: {}, sql_users: '', sql_clients: '', sql_revenue: '' };
+      else {
+        try { kpiPatch = { kpi: await resolveKpi(await pinDb(app, p.userId, dbConnection(b, p.dbCfg)), picked), sql_users: '', sql_clients: '', sql_revenue: '' }; }
+        catch (e) { throw new HttpError(e.status && e.status < 500 ? e.status : 400, e.status && e.status < 500 ? e.message : explainDbError(e)); }
+      }
+    }
     await saveSecretConfig(app, p.id, 'db_enc', {
       type: b.type === 'pg' ? 'pg' : 'mysql', host: String(b.host || '').trim(), port: b.port ? int(b.port, 1, 65535, null) : null,
       database: String(b.database || '').trim(), user: String(b.user || '').trim(), password: b.password || '',
       ssl: b.ssl === 'on' || b.ssl === true,
-      sql_users: b.sql_users || '', sql_clients: b.sql_clients || '', sql_revenue: b.sql_revenue || '',
+      ...Object.fromEntries(['sql_users', 'sql_clients', 'sql_revenue'].filter((k) => k in b).map((k) => [k, b[k] || ''])),
+      ...kpiPatch,
     }, 'password');
     clearRecapCache(p.id);
     json(res, { ok: true });
