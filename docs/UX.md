@@ -47,9 +47,30 @@ Un formulaire que le serveur refuse **garde ses champs, reste à l'écran et le 
 
 ## Rédaction
 
-- Succès : **« Nom + participe passé »** (« Prospect ajouté », « SMTP enregistré », « Note supprimée »). Pas de « ! », pas de « avec succès ».
-- Erreur : une phrase qui commence par ce qui n'a pas marché, suivie de la suite à donner après « : » (« Connexion impossible : réessaie dans un instant. »).
-- On tutoie ; on garde les termes métier de l'application.
+Tout ce que l'application écrit à l'utilisateur suit ces règles. `test/wording.test.js` vérifie celles qui se mesurent (marquées ✔) ; le reste se relit à la main.
+
+**Registre**
+- ✔ **On tutoie** l'utilisateur (« tes prospects », « ton projet »). Seuls les mails écrits **pour** un prospect ou un client (prospection, relance, devis) vouvoient. Un exemple de mail montré dans l'interface vouvoie aussi, objet compris.
+- On garde les termes métier de l'application (« Cible », « Mise en route », « Prospects »), partout les mêmes.
+
+**Messages**
+- ✔ **Succès** : « Nom + participe passé » (« Prospect ajouté », « SMTP enregistré », « Note supprimée »). **Sans point final**, sans « ! », sans « avec succès ».
+- ✔ **Erreur** : une phrase qui dit ce qui n'a pas marché, puis la suite à donner après « : » (« Connexion impossible : réessaie dans un instant. »). Elle **finit par un point** : `api()` (le message de l'erreur qu'il lance, donc tout ce qui affiche `err.message` :
+  notification, bloc « Réessayer », formulaire, chat), `toast(…, 'error')` et `banner('err', …)` l'ajoutent si le message n'en a pas (`window.AiTools.sentence(msg)`),
+  inutile de réécrire les messages du serveur. Un message affiché sans passer par l'un d'eux (un `fetch` direct) appelle `sentence()` lui-même. Pas de « ! », jamais de code ni de trace.
+- **Avertissement** (`warn`) : « attention », pas « ça n'a pas marché » (voir « Bandeaux de résultat »).
+- Une consigne dit quoi faire (« Choisis une voix »), pas ce qui manque (« Aucune voix choisie »).
+
+**Boutons et liens**
+- Un **verbe à l'infinitif** + l'objet quand il faut le préciser (« Ajouter un client », « Enregistrer », « Envoyer un test »). Une majuscule initiale, pas de point, pas de « ! ».
+- **Enregistrer** (jamais « Sauvegarder »), **Modifier** (jamais « Éditer »), **Envoyer** pour un mail. Une tâche porte le verbe de ce qu'elle fait (« Analyser le projet », « Générer la vidéo », « Lancer la recherche »).
+- **Ajouter** un élément dans une liste qui existe (une ligne, une note, un prospect, un événement) ; **Créer** quelque chose qui n'existait pas comme objet à part (un compte, une équipe, un jeton).
+- **Annuler** abandonne ce qu'on était en train de faire sans rien changer ; **Fermer** ferme une information ou une fenêtre sans enjeu.
+- **Supprimer** détruit une donnée pour de bon ; **Retirer** enlève un élément d'une liste ou coupe un lien sans détruire ce à quoi il renvoie (« Retirer ce client de la liste » : ses documents restent) ;
+  **Effacer** vide un champ ou remet à zéro ; **Déconnecter** coupe la liaison avec un service externe. Ces verbes déclenchent la confirmation « danger » (voir « Confirmer une action sensible »).
+
+**Typographie**
+- ✔ Pas de « avec succès » ni de « ! » dans un message. À relire à la main : « … » (un seul caractère) plutôt que trois points ; « guillemets français » pour citer un libellé de l'écran ; « 1 Mo », « 64 % » avec une espace.
 
 ## Attente et actions en cours
 
@@ -82,7 +103,7 @@ Un formulaire que le serveur refuse **garde ses champs, reste à l'écran et le 
 
 ## Ce qui reste à harmoniser (lots suivants)
 
-Convention rédactionnelle complète.
+Les animations : à valider une par une avec le propriétaire du produit (élément, comportement actuel, proposition, valeur pour l'utilisateur, coût) avant tout code.
 
 ## Tests
 
