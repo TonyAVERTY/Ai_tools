@@ -110,10 +110,15 @@ Tout ce que l'application écrit à l'utilisateur suit ces règles. `test/wordin
 - Un gain de performance s'annonce mesuré : avant et après, sur plusieurs passes (bureau et téléphone ralenti). Un essai qui n'apporte rien est abandonné, pas gardé « au cas où » (changement de page : lancer l'animation
   après la relance des scripts n'a pas réduit les saccades et retardait le contenu de 40 à 140 ms).
 - `scripts/motion-check.mjs` vérifie dans Chromium que ces animations bougent et ne déclenchent aucune mise en page.
-
-## Ce qui reste à harmoniser (lots suivants)
-
-Retours d'action validés mais pas encore faits : enfoncement des boutons au clic, fondu du contenu chargé après coup, coche d'une étape de « Mise en route » qui apparaît, surlignage d'une ligne ajoutée.
+- **Retours d'action** (une fois, jamais en boucle ; tous dans le bloc « sans mouvement réduit » de `app.css`, donc absents quand l'utilisateur demande moins de mouvement) :
+  - un bouton `.btn` s'enfonce au clic (`:active`, échelle .97 en 80 ms) ;
+  - le contenu qui arrive à la place du cercle de chargement ou du bloc « Réessayer » apparaît en fondu de 150 ms (`.reveal`, opacité seule). C'est un observateur par zone (`LOAD_ZONES` dans `app.js`) : pour une nouvelle zone qui se charge
+    après coup, ajoute son sélecteur à cette liste. Un cercle remplacé par un autre cercle, ou une mise à jour ultérieure de la zone, ne fait pas de fondu ;
+  - la coche d'une étape de « Mise en route » qui vient d'être faite, et le badge « config ✓ » quand tout l'est, apparaissent d'un petit saut (`wiz-pop`) : jamais au premier affichage, seulement pour ce qui vient de changer ;
+  - la ligne qu'on vient d'ajouter (prospect en vue liste, événement du calendrier, note d'une fiche prospect) est surlignée 1,5 s (`.row-new`, le style des nouvelles tâches du menu « Activité »). Côté serveur, la redirection porte le numéro
+    (`?nouveau=ID` pour un événement ; `?ok=note` pour une note, la plus récente est surlignée) ; un numéro qui n'est pas dans la liste du compte ne surligne rien.
+  - `scripts/feedback-check.mjs` vérifie tout cela dans Chromium, en mouvement normal et réduit ; `test/feedback.test.js` vérifie le surlignage côté serveur.
+- Non retenu : un liseré qui se vide sur la notification pour montrer le temps restant (proposé, pas validé : du bruit visuel de plus).
 
 ## Tests
 

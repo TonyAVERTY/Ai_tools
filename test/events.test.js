@@ -164,8 +164,8 @@ test('page Calendrier : ajouter un événement à la main, le voir dans le mois 
   const form = (body, who = u) => who.post('/calendar/events', body, { form: true });
   const r = await form({ title: '<b>Zorglub</b> client', date: `${Y}-11-04`, time: '09:30', minutes: '60', notes: 'Penser à l\'offre' });
   assert.equal(r.status, 303);
-  assert.equal(r.headers.get('location'), `/calendar?m=${Y}-11`);
   const e = await s.db.prepare('SELECT * FROM calendar_events WHERE user_id = ?').get(u.id);
+  assert.equal(r.headers.get('location'), `/calendar?m=${Y}-11&nouveau=${e.id}`, 'le mois de l\'événement, et son numéro pour le surligner (test/feedback.test.js)');
   assert.deepEqual([e.title, Number(e.starts_at), Number(e.minutes), e.notes], ['<b>Zorglub</b> client', parseParisLocal(`${Y}-11-04T09:30`), 60, 'Penser à l\'offre']);
   const page = await (await html(u, `/calendar?m=${Y}-11`)).text();
   assert.match(page, /09:30<\/span> &lt;b&gt;Zorglub&lt;\/b&gt; client/);
