@@ -830,7 +830,7 @@
     const running = Object.entries(jobs).filter(([, j]) => ACTIVE.includes(j.status));
     $('[data-state]', el).innerHTML = running.length
       ? `<span class="spin-inline"></span>${esc(running.map(([t, j]) => { const v = pctOf(j.progress); return `${LABELS[t] || $(`[data-job="${t}"]`, el)?.dataset.label || 'Tâche'}${v !== null ? ` ${v} %` : ''}`; }).join(', '))}`
-      : `<span class="muted small">${s.stats.total || 0} prospect(s)</span>`;
+      : ''; // au repos : rien, les chiffres sont déjà dans la ligne du projet (projectFacts)
 
     // Fin d'un post LinkedIn → on recharge la zone pour afficher le brouillon
     const li = jobs.linkedin_post;
