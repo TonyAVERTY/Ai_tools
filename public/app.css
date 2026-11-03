@@ -291,6 +291,11 @@ form.send { display: flex; margin: 0; padding: 0; border: 0; }
 .spin-inline { width: 12px; height: 12px; margin-right: 6px; vertical-align: -1px; }
 /* Bouton occupé : le même anneau, devant le texte, sans changer la largeur du libellé. L'anneau reste visible (immobile) si le mouvement réduit est demandé. */
 .btn[aria-busy="true"]::before { content: ""; flex: none; width: 14px; height: 14px; border: 2px solid var(--line-strong); border-top-color: var(--accent); border-radius: 50%; animation: spin .9s linear infinite; }
+/* Contenu qui se charge : l'anneau devant « Chargement… » */
+.loading { display: flex; align-items: center; gap: 10px; padding: 6px 0; color: var(--muted); }
+.loading .spin-inline { margin-right: 0; }
+.loading.small { font-size: .875rem; padding: 4px 0; }
+.chat-projlist .loading { margin: 8px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .spinner, .spin-inline, .btn[aria-busy="true"]::before { animation: none; } }
 .moon { width: 18px; height: 18px; border-radius: 50%; box-shadow: inset -5px -3px 0 0 var(--accent); flex: none; transform: rotate(-20deg); }

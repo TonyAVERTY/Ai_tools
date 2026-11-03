@@ -4,6 +4,7 @@ import { esc } from './http.js';
 import { ic } from './icons.js';
 import { layout } from './views.js';
 import { RECOMMENDED, OTHERS } from './services/models.js';
+import { loadingBlock } from './loading.js';
 
 const SUPPORT_SUGGESTIONS = [
   'Comment relier mon compte Claude ?',
@@ -80,7 +81,7 @@ export function chatPage({ email, mode = 'claude', priced = false, conversations
         <button type="button" class="btn icon-btn" data-chat-attach aria-label="Joindre une photo, une vidéo ou un fichier" title="Joindre une photo, une vidéo ou un fichier">${ic('clip')}</button>
         ${support ? '' : `<details class="chat-proj" data-chat-projmenu>
           <summary class="btn icon-btn" aria-label="Joindre un projet AiTools" title="Joindre un projet AiTools">${ic('folder')}</summary>
-          <div class="chat-projlist" data-chat-projlist role="menu" aria-label="Projets AiTools"><p class="muted small">Chargement…</p></div>
+          <div class="chat-projlist" data-chat-projlist role="menu" aria-label="Projets AiTools">${loadingBlock('Chargement…', { small: true })}</div>
         </details>`}
         <label class="sr-only" for="chat-input">Ton message</label>
         <textarea id="chat-input" name="message" rows="1" maxlength="${max}" placeholder="${support ? 'Pose ta question sur AiTools…' : 'Écris à Claude…'}  (Entrée pour envoyer, Maj+Entrée pour un retour à la ligne)" data-chat-input></textarea>

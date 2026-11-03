@@ -1,7 +1,7 @@
 // Récap d'un projet : indicateurs et courbes d'historique (SVG maison : pas de lib externe, CSP stricte).
 // Chargé après app.js, qui expose ses outils communs dans window.AiTools ; ajax.js relance ce script à chaque navigation, comme app.js.
 (() => {
-  const { $, $$, api, esc, every, listen } = window.AiTools;
+  const { $, $$, api, esc, every, listen, loadingHtml } = window.AiTools;
 
   // ---------- Courbes (SVG maison : pas de lib externe, CSP stricte) ----------
   // Dessinées à la largeur réelle du conteneur (1 unité = 1 px) pour que les textes restent lisibles sur mobile.
@@ -150,7 +150,7 @@
   // ---------- Récap ----------
   async function loadRecap(proj, force = false) {
     const box = $('[data-recap]', proj);
-    box.innerHTML = '<p class="muted"><span class="spin-inline"></span>Chargement…</p>';
+    box.innerHTML = loadingHtml();
     try {
       const r = await api(`/api/projects/${proj.dataset.id}/recap${force ? '?force' : ''}`);
       const b = r.business;
