@@ -49,8 +49,10 @@ Une erreur dit **ce qui s'est passé** et **quoi faire** ; jamais « Failed to f
   envoi est impossible) et libéré à la fin, **y compris sur échec**. Rien à écrire par bouton.
 - Un bouton que ton code désactive avant l'appel (`b.disabled = true; await api(...)`) est marqué occupé quand même ; `api()` ne le réactive pas : c'est à toi.
 - N'embarque jamais un spinner caché dans un bouton pour l'afficher à la main.
-- **Un contenu qui se charge** : l'anneau commun, `.spinner` (grand, seul) ou `.spin-inline` (petit, devant un texte). Il n'y a qu'un seul anneau
-  (plus d'arc SVG ni de `.spin`).
+- **Un contenu qui se charge** : toujours **l'anneau commun devant « Chargement… »**, jamais du texte seul et pas de squelette (choix fait avec le propriétaire du produit). Côté serveur :
+  `loadingBlock()` (`src/loading.js`) pour un bloc de page, `loadingBlock('Chargement…', { small: true })` pour une liste ou une ligne ; côté navigateur : `window.AiTools.loadingHtml(texte, { small })`.
+  Même balisage : `<span class="loading" role="status">` avec `.spinner` (grand) ou `.spin-inline` (petit). `test/loading.test.js` échoue si un « Chargement… » s'écrit sans son anneau.
+  Il n'y a qu'un seul anneau dans l'application (plus d'arc SVG ni de `.spin`).
 - Mouvement réduit : l'anneau reste visible, immobile.
 - Une opération longue (job) montre sa progression dans une barre (`.bar`), pas un anneau.
 
@@ -67,9 +69,8 @@ Une erreur dit **ce qui s'est passé** et **quoi faire** ; jamais « Failed to f
 
 ## Ce qui reste à harmoniser (lots suivants)
 
-Squelettes de chargement, « Réessayer » sur les erreurs de chargement,
-convention rédactionnelle complète.
+« Réessayer » sur les erreurs de chargement, convention rédactionnelle complète.
 
 ## Tests
 
-`scripts/notifications-check.mjs`, `scripts/banners-check.mjs` et `scripts/busy-check.mjs` et `scripts/confirm-check.mjs` (Chromium, 1280 et 390 px, clair et sombre pour les bandeaux) couvrent ce qui précède ; lance-les avec `npm run ui:check -- notifications`, `-- banners`, `-- busy` ou `-- confirm`.
+`scripts/notifications-check.mjs`, `scripts/banners-check.mjs` et `scripts/busy-check.mjs`, `scripts/confirm-check.mjs` et `scripts/loading-check.mjs` (Chromium, 1280 et 390 px, clair et sombre pour les bandeaux) couvrent ce qui précède ; lance-les avec `npm run ui:check -- notifications`, `-- banners`, `-- busy`, `-- confirm` ou `-- loading`.
