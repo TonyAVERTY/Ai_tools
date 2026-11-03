@@ -6,6 +6,7 @@ import { ic } from './icons.js';
 import { fmtEur } from './services/accounting.js';
 import { STATUSES } from './services/crm.js';
 import { DOC_BY_KEY } from './services/billing.js';
+import { banner } from './banner.js';
 
 const day = (ts) => (ts ? new Date(ts * 1000).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Europe/Paris' }) : '—');
 const dayTime = (ts) => (ts ? new Date(ts * 1000).toLocaleString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' }) : '—');
@@ -16,8 +17,8 @@ const STATE = { pending: ['À encaisser', 'warn'], paid: ['Payée', 'ok'], devis
 
 const flashOf = (flash) => {
   const notes = { cree: 'Client ajouté.', maj: 'Les informations du client sont enregistrées.', converti: 'Le prospect est maintenant un client.', note: 'Note ajoutée.', retire: 'Client retiré de la liste.' };
-  if (flash.error) return `<p class="cmp-flash warn" role="alert">${ic('alert')} ${esc(flash.error)}</p>`;
-  return flash.ok && notes[flash.ok] ? `<p class="cmp-flash ok" role="status">${esc(notes[flash.ok])}</p>` : '';
+  if (flash.error) return banner('err', flash.error);
+  return flash.ok && notes[flash.ok] ? banner('ok', notes[flash.ok]) : '';
 };
 
 // ---------- Lignes de la liste (aussi servies en fragment HTML) ----------

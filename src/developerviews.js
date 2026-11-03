@@ -4,6 +4,7 @@ import { layout } from './views.js';
 import { ic } from './icons.js';
 import { SCOPES } from './apitokens.js';
 import { API_ENDPOINTS } from './apiv1.js';
+import { banner } from './banner.js';
 
 /** Une valeur à copier telle quelle (adresse, commande) : monospace, bouton « Copier » (public/app.js, [data-copy-cmd]). */
 const cmd = (label, text) => `<div class="cmd"><span class="lbl">${label}</span><div class="cmd-b"><pre><code>${esc(text)}</code></pre><button type="button" class="btn small" data-copy-cmd aria-label="Copier : ${esc(label)}">${ic('copy')}Copier</button></div></div>`;
@@ -22,7 +23,7 @@ ${newToken ? `<section class="card" role="status">
 </section>` : ''}
 <section class="card">
   <div class="card-h"><h2>Jetons d'API</h2><p>Un jeton donne accès à ton compte avec les droits cochés, et à rien d'autre. Garde-le secret : ne le mets jamais dans une page web, un dépôt ou un message. ${max} jetons au plus.</p></div>
-  ${error ? `<p class="msg msg-err" role="alert">${esc(error)}</p>` : ''}
+  ${error ? banner('err', error) : ''}
   ${tokens.length ? `<div class="table-wrap"><table><thead><tr><th>Nom</th><th>Début</th><th>Droits</th><th>Créé</th><th>Dernier usage</th><th><span class="sr-only">Action</span></th></tr></thead><tbody>
     ${tokens.map((t) => `<tr><td>${esc(t.name)}</td><td><code>${esc(t.prefix)}…</code></td><td>${t.scopes.map((s) => `<span class="badge">${esc(s)}</span>`).join(' ')}</td><td>${esc(day(t.createdAt))}</td><td>${esc(day(t.lastUsedAt))}</td>
       <td><form method="post" action="/developer/tokens/${t.id}/revoke" data-confirm="Supprimer le jeton « ${esc(t.name)} » ? Les scripts ou Claude qui l'utilisent perdront l'accès tout de suite. Cette action est définitive."><button class="btn small danger" aria-label="Supprimer le jeton ${esc(t.name)}">${ic('trash')}Supprimer</button></form></td></tr>`).join('')}

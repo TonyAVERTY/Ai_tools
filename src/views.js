@@ -9,6 +9,7 @@ import { GIT_SERVER_TYPES, MAX_GIT_SERVERS } from './gitservers.js';
 import { ROLES, MAX_NOTES, rolesOfSection } from './services/roles.js';
 import { tourJson } from './tour.js';
 import { MODE_LABELS, CONSENT_TEXT, CONSENT_CHECKBOX, CONSENT_VERSION } from './claudelink.js';
+import { banner } from './banner.js';
 
 const fmtDate = (ts) => (ts ? new Date(ts * 1000).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' }) : '—');
 
@@ -214,7 +215,7 @@ export function accountPage({ user, error, link = null, consent = null, notice =
     <span class="sp"><b>${esc(user.email)}</b><span class="hint">Connecté avec ${esc(PROVIDER_NAMES[user.provider] || '—')}, sans mot de passe</span></span></div>
   ${user.isAdmin ? '<div class="row"><a class="btn small" href="/admin">Administration</a></div>' : ''}
 </section>
-${notice ? `<p class="${notice.ok ? 'msg msg-ok' : 'msg msg-err'}" role="status">${esc(notice.text)}</p>` : ''}
+${notice ? banner(notice.ok ? 'ok' : 'err', notice.text) : ''}
 ${usagePanel(usage)}
 ${linkSection(link, consent, quota)}
 <section class="card">
@@ -233,7 +234,7 @@ ${linkSection(link, consent, quota)}
 <section class="card danger">
   <div class="card-h"><h2>Zone de danger</h2></div>
   <p class="card-d">Supprimer ton compte efface définitivement ton compte et toutes tes données : projets, prospects, notes, modèles de mail, journaux d'envoi, lignes de comptabilité et leurs justificatifs, jobs, réglages et clones du code. Les adresses qui ont demandé à ne plus être contactées restent dans la liste d'opposition commune. Cette action est irréversible.</p>
-  ${error ? `<p class="msg msg-err" role="alert">${esc(error)}</p>` : ''}
+  ${error ? banner('err', error) : ''}
   <form method="post" action="/account/delete" class="cfg">
     <label class="field"><span class="lbl">Pour confirmer, saisis ton email (${esc(user.email)})</span><input name="confirm" type="email" required autocomplete="off"></label>
     <div class="row"><button class="btn danger-fill">${ic('trash')}Supprimer mon compte et mes données</button></div>
@@ -309,7 +310,7 @@ export function linkPage({ user, link, cliModeEnabled, error, start = false }) {
     body: `<div class="narrow"${!link || !link.valid ? ' data-nolink' : ''}>
 <h1 class="h1">Relier Claude</h1>
 ${intro}
-${error ? `<p class="msg msg-err" role="alert">${esc(error)}</p>` : ''}
+${error ? banner('err', error) : ''}
 <section class="panel link-main" aria-labelledby="h-key">
   <div class="panel-h"><h2 id="h-key">Clé API Anthropic</h2><span class="badge ok">${ic('check')}Recommandée</span></div>
   <p>Crée une clé sur console.anthropic.com puis colle-la ici. Elle est vérifiée sans consommer de tokens, chiffrée, et ne sera plus jamais affichée (seuls ses 4 derniers caractères le seront). Tu paies à l'usage, directement chez Anthropic.</p>
@@ -724,7 +725,7 @@ export function settingsPage({ email, s, saved }) {
 </ol></nav>
 <div class="settings-main">
 <h1 class="h1">Réglages</h1>
-${saved ? `<p class="ok-box" role="status">${ic('check')}<span><b>Réglages enregistrés</b></span></p>` : ''}
+${saved ? banner('ok', 'Réglages enregistrés', { strong: true }) : ''}
 <form method="post" action="/settings" class="settings-form">
 
 <section class="card" id="notif" aria-labelledby="t-notif">
@@ -857,7 +858,7 @@ export function unsubPage({ email, done, valid }) {
   return layout({
     title: 'Désinscription',
     body: `<section class="login card">
-${!valid ? '<p class="error">Lien invalide.</p>'
+${!valid ? banner('err', 'Lien invalide.')
   : done ? `<p>C'est fait : <strong>${esc(email)}</strong> ne sera plus contacté.</p>`
   : `<p>Ne plus recevoir de messages à <strong>${esc(email)}</strong> ?</p>
      <form method="post"><button class="btn primary">Confirmer la désinscription</button></form>`}
