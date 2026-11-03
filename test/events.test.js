@@ -160,21 +160,22 @@ test('validation et isolation : titre vide, date impossible ou lointaine refusé
 
 test('page Calendrier : ajouter un événement à la main, le voir dans le mois et dans « À venir », le supprimer ; échappement', async () => {
   const u = await s.newUser(), v = await s.newUser();
+  const Y = new Date().getFullYear() + 2; // un événement « à venir » quelle que soit la date de lancement du test
   const form = (body, who = u) => who.post('/calendar/events', body, { form: true });
-  const r = await form({ title: '<b>Zorglub</b> client', date: '2026-11-04', time: '09:30', minutes: '60', notes: 'Penser à l\'offre' });
+  const r = await form({ title: '<b>Zorglub</b> client', date: `${Y}-11-04`, time: '09:30', minutes: '60', notes: 'Penser à l\'offre' });
   assert.equal(r.status, 303);
-  assert.equal(r.headers.get('location'), '/calendar?m=2026-11');
+  assert.equal(r.headers.get('location'), `/calendar?m=${Y}-11`);
   const e = await s.db.prepare('SELECT * FROM calendar_events WHERE user_id = ?').get(u.id);
-  assert.deepEqual([e.title, Number(e.starts_at), Number(e.minutes), e.notes], ['<b>Zorglub</b> client', parseParisLocal('2026-11-04T09:30'), 60, 'Penser à l\'offre']);
-  const page = await (await html(u, '/calendar?m=2026-11')).text();
+  assert.deepEqual([e.title, Number(e.starts_at), Number(e.minutes), e.notes], ['<b>Zorglub</b> client', parseParisLocal(`${Y}-11-04T09:30`), 60, 'Penser à l\'offre']);
+  const page = await (await html(u, `/calendar?m=${Y}-11`)).text();
   assert.match(page, /09:30<\/span> &lt;b&gt;Zorglub&lt;\/b&gt; client/);
   assert.doesNotMatch(page, /<b>Zorglub<\/b>/);
   assert.match(page, /class="cal-ev event"/);
   assert.match(page, /calendar\.google\.com/);
   assert.match(page, /Ajouter à mon calendrier/);
-  assert.doesNotMatch(await (await html(v, '/calendar?m=2026-11')).text(), /Zorglub/, 'isolation');
+  assert.doesNotMatch(await (await html(v, `/calendar?m=${Y}-11`)).text(), /Zorglub/, 'isolation');
   // erreurs : retour sur la page avec le message
-  const bad = await form({ title: '', date: '2026-11-04', time: '09:30' });
+  const bad = await form({ title: '', date: `${Y}-11-04`, time: '09:30' });
   assert.match(decodeURIComponent(bad.headers.get('location')), /^\/calendar\?e=Donne un titre/);
   assert.equal((await form({ title: 'x', date: '2026-02-31', time: '09:30' })).status, 303);
   assert.equal(Number((await s.db.prepare('SELECT COUNT(*) n FROM calendar_events WHERE user_id = ?').get(u.id)).n), 1);
