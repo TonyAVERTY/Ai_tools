@@ -5,9 +5,18 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { banner } from '../src/banner.js';
 
+test('banner : une erreur finit par un point (jamais doublé), un succès et un avertissement restent tels quels', () => {
+  const span = (html) => html.match(/<span>(.*)<\/span>/)[1];
+  assert.equal(span(banner('err', 'Choisis ta situation pour continuer')), 'Choisis ta situation pour continuer.');
+  for (const done of ['Choisis une date.', 'Vraiment ?', 'Attention…', 'Zut !']) assert.equal(span(banner('err', done)), done, `« ${done} » : rien à ajouter`);
+  assert.equal(span(banner('ok', 'Réglages enregistrés')), 'Réglages enregistrés', 'un succès (« Nom + participe passé ») n\'a pas de point');
+  assert.equal(span(banner('warn', 'Informations légales incomplètes')), 'Informations légales incomplètes');
+  assert.equal(span(banner('err', '<b>x</b>')), '&lt;b&gt;x&lt;/b&gt;.', 'le point s\'ajoute avant l\'échappement : le texte reste échappé');
+});
+
 test('banner : classe, icône et rôle selon le type (alert pour une erreur, status sinon)', () => {
   assert.match(banner('ok', 'Réglages enregistrés'), /^<p class="msg msg-ok" role="status"><svg class="ic"[^>]*><use href="#i-check"><\/use><\/svg><span>Réglages enregistrés<\/span><\/p>$/);
-  assert.match(banner('err', 'Impossible d\'envoyer'), /^<p class="msg msg-err" role="alert">.*#i-alert.*<span>Impossible d&#39;envoyer<\/span><\/p>$/); // l'apostrophe est échappée
+  assert.match(banner('err', 'Impossible d\'envoyer'), /^<p class="msg msg-err" role="alert">.*#i-alert.*<span>Impossible d&#39;envoyer\.<\/span><\/p>$/); // l'apostrophe est échappée ; l'erreur finit par un point
   assert.match(banner('warn', 'Informations légales incomplètes'), /^<p class="msg msg-warn" role="status">.*#i-alert/);
   assert.match(banner('ok', 'Enregistré', { strong: true }), /<span><b>Enregistré<\/b><\/span>/);
   assert.throws(() => banner('succes', 'x'), /type inconnu/);

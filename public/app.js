@@ -183,7 +183,7 @@
     t.setAttribute('role', kind === 'error' ? 'alert' : 'status');
     const text = document.createElement('span');
     text.className = 'toast-t';
-    text.textContent = msg;
+    text.textContent = kind === 'error' && !/[.!?…]$/.test(msg) ? `${msg}.` : msg; // une erreur est une phrase : elle finit par un point (un succès, « Nom + participe passé », n'en a pas)
     const x = document.createElement('button');
     x.type = 'button'; x.className = 'toast-x'; x.setAttribute('aria-label', 'Fermer la notification'); x.textContent = '×';
     x.addEventListener('click', () => close(t));
