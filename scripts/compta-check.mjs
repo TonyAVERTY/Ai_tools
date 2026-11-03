@@ -62,7 +62,7 @@ for (const [vp, scheme, tag] of [[{ width: 1280, height: 900 }, 'light', '1280px
   await wizard(p, ['Micro-entrepreneur', 'Prestations de services', 'Je ne facture pas la TVA', 'Chaque trimestre']);
   await p.waitForSelector('.wiz-end.show'); // la scène de fin « Ta situation est enregistrée »…
   await p.waitForSelector('.wiz-end', { state: 'detached' }); // … laisse la place à la page
-  await p.waitForSelector('.cmp-flash.ok');
+  await p.waitForSelector('.msg.msg-ok');
   await p.waitForSelector('html[data-nav="ready"]');
   ok(await p.getByRole('heading', { name: 'Tes chiffres' }).isVisible() && await p.getByText('Ma situation').count() === 0, `${tag} la situation est enregistrée : le reste de la page apparaît, sans ligne « Ma situation »`);
 
@@ -97,7 +97,7 @@ for (const [vp, scheme, tag] of [[{ width: 1280, height: 900 }, 'light', '1280px
   await wizard(p, ['', '', 'Je facture la TVA', '']);
   await p.waitForSelector('.wiz-end.show'); // la scène de fin « Ta situation est enregistrée »…
   await p.waitForSelector('.wiz-end', { state: 'detached' }); // … laisse la place à la page
-  await p.waitForSelector('.cmp-flash.ok');
+  await p.waitForSelector('.msg.msg-ok');
   await p.waitForSelector('html[data-nav="ready"]');
   await p.getByRole('button', { name: 'Ajouter une ligne' }).first().click();
   await dlg.waitFor({ state: 'visible' });

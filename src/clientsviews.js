@@ -6,6 +6,7 @@ import { ic } from './icons.js';
 import { fmtEur } from './services/accounting.js';
 import { STATUSES } from './services/crm.js';
 import { DOC_BY_KEY } from './services/billing.js';
+import { banner } from './banner.js';
 
 const day = (ts) => (ts ? new Date(ts * 1000).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Europe/Paris' }) : '—');
 const dayTime = (ts) => (ts ? new Date(ts * 1000).toLocaleString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' }) : '—');
@@ -16,8 +17,8 @@ const STATE = { pending: ['À encaisser', 'warn'], paid: ['Payée', 'ok'], devis
 
 const flashOf = (flash) => {
   const notes = { cree: 'Client ajouté.', maj: 'Les informations du client sont enregistrées.', converti: 'Le prospect est maintenant un client.', note: 'Note ajoutée.', retire: 'Client retiré de la liste.' };
-  if (flash.error) return `<p class="cmp-flash warn" role="alert">${ic('alert')} ${esc(flash.error)}</p>`;
-  return flash.ok && notes[flash.ok] ? `<p class="cmp-flash ok" role="status">${esc(notes[flash.ok])}</p>` : '';
+  if (flash.error) return banner('err', flash.error);
+  return flash.ok && notes[flash.ok] ? banner('ok', notes[flash.ok]) : '';
 };
 
 // ---------- Lignes de la liste (aussi servies en fragment HTML) ----------
@@ -154,7 +155,7 @@ export function prospectSheetPage({ email, project: p, sheet, flash }) {
   const body = `<div class="bill-page" data-client-sheet>
   <section class="card"><p><a class="link" href="/clients?projet=${p.id}">${ic('back')} Tous les clients</a></p>
     <div class="row-between"><div><h1>${esc(x.company)}</h1><p class="muted small">Prospect de « ${esc(p.name)} » · <span class="badge">${esc(STATUSES[x.status] || x.status)}</span></p></div>
-      <div class="row-actions"><form method="post" action="/clients/p/${x.id}/client" data-confirm="Passer ce prospect en client ? Il passe au statut « Client » et une fiche client est créée."><button class="btn primary">${ic('check')}Passer en client</button></form></div></div>
+      <div class="row-actions"><form method="post" action="/clients/p/${x.id}/client" data-confirm="Passer ce prospect en client ? Il passe au statut « Client » et une fiche client est créée." data-confirm-label="Passer en client"><button class="btn primary">${ic('check')}Passer en client</button></form></div></div>
     ${flashOf(flash)}</section>
   <section class="card bill-sec" aria-labelledby="t-pi"><h2 id="t-pi">Informations</h2>
     <dl class="cl-dl"><div><dt>E-mail</dt><dd>${esc(x.email)}</dd></div><div><dt>Site internet</dt><dd>${x.website ? esc(x.website) : '—'}</dd></div><div><dt>Ville</dt><dd>${esc(x.city || '—')}</dd></div>

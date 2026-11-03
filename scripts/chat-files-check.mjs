@@ -40,11 +40,11 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   ok(await p.locator('.tray-project').count() === 1, `${tag} projet joint visible`);
   await p.fill('textarea', 'ECHO regarde');
   await p.keyboard.press('Enter');
-  await p.waitForSelector('.msg.bot .bubble:not(.streaming)', { timeout: 15000 });
+  await p.waitForSelector('.chat-msg.bot .bubble:not(.streaming)', { timeout: 15000 });
   await p.waitForFunction(() => document.querySelector('[data-chat-stop]').hidden, null, { timeout: 15000 });
-  ok(await p.locator('.msg.user .att').count() >= 1, `${tag} pièces jointes affichées dans le message`);
+  ok(await p.locator('.chat-msg.user .att').count() >= 1, `${tag} pièces jointes affichées dans le message`);
   ok(await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${tag} pas de défilement horizontal`);
-  const img = p.locator('.msg.user img').first();
+  const img = p.locator('.chat-msg.user img').first();
   if (await img.count()) ok(await img.evaluate((i) => i.complete && i.naturalWidth > 0), `${tag} aperçu image chargé (CSP ok)`);
   ok(errs.length === 0, `${tag} aucune erreur console ${errs.join(' | ')}`);
   await ctx.close();
