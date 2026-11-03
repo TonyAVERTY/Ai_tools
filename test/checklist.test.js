@@ -121,13 +121,18 @@ test('sans clés LinkedIn : la liste n\'en parle pas', async () => {
   assert.ok(!c.steps.some((x) => x.key === 'linkedin'));
 });
 
-test('page : le tableau de bord contient la liste et la pastille, sans style en ligne', async () => {
+test('page : la liste est une section du projet (badge « config » cliquable), sans panneau flottant ni style en ligne', async () => {
   const u = await user(s);
   await addProject(s.db, u.id, { name: 'Mon projet' });
   const html = await (await u.get('/', { headers: { accept: 'text/html' } })).text();
-  assert.match(html, /<aside class="todo" id="todo" aria-label="Mise en route du projet" hidden>/);
-  assert.match(html, /data-cfg/);
-  assert.doesNotMatch(html.match(/<aside class="todo"[^>]*>/)[0], /style=/);
+  // la section « Mise en route » est la première du projet, avec son contenu rempli par le navigateur
+  assert.match(html, /<details class="acc anim setup-acc" data-acc="setup"[^>]*>\s*<summary>[^]*?Mise en route[^]*?<div class="setup" data-setup>/);
+  assert.ok(html.indexOf('data-acc="setup"') < html.indexOf('data-acc="header"'), 'la première section du projet');
+  // le badge est un vrai bouton (clavier, lecteur d'écran)
+  assert.match(html, /<button type="button" class="pcfg badge" data-cfg[^>]*>/);
+  // plus aucun panneau qui flotte, plus de lien pour le récupérer
+  assert.doesNotMatch(html, /id="todo"|class="todo"|data-todo-restore|Afficher la mise en route/);
+  assert.doesNotMatch(html.match(/<details class="acc anim setup-acc"[^>]*>/)[0], /style=/);
   const empty = await user(s);
-  assert.doesNotMatch(await (await empty.get('/', { headers: { accept: 'text/html' } })).text(), /id="todo"/, 'pas de projet : pas de liste');
+  assert.doesNotMatch(await (await empty.get('/', { headers: { accept: 'text/html' } })).text(), /data-acc="setup"/, 'pas de projet : pas de liste');
 });

@@ -44,7 +44,6 @@ for (const vp of [{ width: 1280, height: 900 }, { width: 390, height: 844 }]) {
   const ctx = await b.newContext({ viewport: vp });
   const [name, value] = u.cookie.split('=');
   await ctx.addCookies([{ name, value, url: s.base }]);
-  await ctx.addInitScript(() => { try { localStorage.setItem('todo-min', '1'); } catch { /* ignore */ } });
   const [addHits, evHits] = await slowRoute(ctx, [{ pattern: /\/api\/projects\/\d+\/prospects$/ }, { pattern: /\/api\/replies\/\d+\/event$/ }]);
   const p = await ctx.newPage();
   const errs = [];
@@ -87,7 +86,6 @@ for (const vp of [{ width: 1280, height: 900 }, { width: 390, height: 844 }]) {
   // 3) échec : l'état occupé disparaît et le bouton redevient utilisable
   const ctxF = await b.newContext({ viewport: vp });
   await ctxF.addCookies([{ name, value, url: s.base }]);
-  await ctxF.addInitScript(() => { try { localStorage.setItem('todo-min', '1'); } catch { /* ignore */ } });
   await slowRoute(ctxF, [{ pattern: /\/api\/projects\/\d+\/prospects$/, ms: 600, fail: true }]);
   const pf = await ctxF.newPage();
   await pf.goto(`${s.base}/`); await pf.waitForSelector('[data-pform-toggle]', { state: 'attached' });
@@ -102,7 +100,6 @@ for (const vp of [{ width: 1280, height: 900 }, { width: 390, height: 844 }]) {
   // 4) mouvement réduit : l'anneau reste visible mais immobile
   const ctxR = await b.newContext({ viewport: vp, reducedMotion: 'reduce' });
   await ctxR.addCookies([{ name, value, url: s.base }]);
-  await ctxR.addInitScript(() => { try { localStorage.setItem('todo-min', '1'); } catch { /* ignore */ } });
   await slowRoute(ctxR, [{ pattern: /\/api\/projects\/\d+\/prospects$/ }]);
   const pr = await ctxR.newPage();
   await pr.goto(`${s.base}/`); await pr.waitForSelector('[data-pform-toggle]', { state: 'attached' });

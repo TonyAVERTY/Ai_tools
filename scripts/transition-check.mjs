@@ -1,5 +1,5 @@
 // Vérifie dans un vrai navigateur les transitions de page : vers la droite dans la barre du haut = le contenu arrive par la droite, vers la gauche = par la gauche,
-// hors onglets = fondu vers le haut, même page = rien ; pas de défilement horizontal ; mouvement réduit respecté ; la liste « Mise en route » ne saute pas.
+// hors onglets = fondu vers le haut, même page = rien ; pas de défilement horizontal ; mouvement réduit respecté.
 // Nécessite Playwright (PLAYWRIGHT_MODULE, PLAYWRIGHT_CHROMIUM). Sortie « TOUT EST BON » attendue.
 import { startApp, APP_URL } from '../test/helpers/server.js';
 import { addProject } from '../test/helpers/users.js';
@@ -56,16 +56,6 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   await p.goto(`${s.base}/mails`); await p.waitForSelector('html[data-nav="ready"]');
   r = await go(p, pill('Mails'), '/mails');
   ok(r === null, `${tag} cliquer sur la page déjà ouverte : aucune animation`);
-  // La liste « Mise en route » ne bouge pas (position fixe) : vérifié sur le tableau de bord pendant l'animation
-  await p.locator('.pills a.pill', { hasText: 'Mails' }).waitFor();
-  await p.evaluate(() => { window.__todo = []; });
-  const click = p.locator('.pills a.pill', { hasText: 'Projets' }).click();
-  await p.waitForSelector('#contenu > .page[data-move]', { timeout: 5000 }).catch(() => {});
-  const todo = await p.locator('#todo').evaluate((e) => { const r = e.getBoundingClientRect(); return { bottom: Math.round(innerHeight - r.bottom), hidden: e.hidden }; }).catch(() => null);
-  await click;
-  await p.waitForTimeout(900);
-  const after = await p.locator('#todo').evaluate((e) => { const r = e.getBoundingClientRect(); return { bottom: Math.round(innerHeight - r.bottom), hidden: e.hidden }; }).catch(() => null);
-  ok(!todo || todo.hidden || after.hidden || todo.bottom === after.bottom, `${tag} la liste « Mise en route » reste à sa place pendant la transition (bas ${todo?.bottom} → ${after?.bottom})`);
   ok(errs.length === 0, `${tag} aucune erreur console${errs.length ? ` : ${errs.join(' | ')}` : ''}`);
   await ctx.close();
 }

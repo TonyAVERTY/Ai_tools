@@ -38,7 +38,6 @@ try {
     const ctx = await b.newContext({ viewport: vp });
     const [name, value] = u.cookie.split('=');
     await ctx.addCookies([{ name, value, url: s.base }]);
-    await ctx.addInitScript(() => { try { localStorage.setItem('todo-min', '1'); } catch { /* ignore */ } });
     await ctx.route('**/*', async (route) => { const r = route.request(); if (r.method() !== 'POST') return route.continue(); await route.fulfill({ response: await route.fetch({ headers: { ...r.headers(), origin: APP_URL }, maxRedirects: 0 }) }); });
     const p = await ctx.newPage();
     const errs = [];
