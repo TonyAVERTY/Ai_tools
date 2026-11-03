@@ -36,12 +36,16 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
 
   // Suppression : refus puis accord
   const row = p.locator('tr', { hasText: `Jeton ${vp.width}` });
-  p.once('dialog', (d) => d.dismiss());
   await row.locator('button.danger').click();
+  await p.locator('dialog.confirm').waitFor();
+  await p.getByRole('button', { name: 'Annuler' }).click();
   await p.waitForTimeout(400);
   ok((await p.locator('tr', { hasText: `Jeton ${vp.width}` }).count()) === 1, `${tag} un refus garde le jeton`);
-  p.once('dialog', async (d) => { ok(/Supprimer le jeton « Jeton \d+ »/.test(d.message()), `${tag} la confirmation nomme le jeton`); await d.accept(); });
   await row.locator('button.danger').click();
+  await p.locator('dialog.confirm').waitFor();
+  ok(/Supprimer le jeton « Jeton \d+ »/.test(await p.locator('dialog.confirm h2').innerText()), `${tag} la confirmation nomme le jeton`);
+  ok(await p.locator('dialog.confirm [data-yes]').evaluate((b) => b.classList.contains('danger-fill')), `${tag} le bouton de suppression est en rouge`);
+  await p.locator('dialog.confirm [data-yes]').click();
   await p.waitForFunction((n) => ![...document.querySelectorAll('tr')].some((tr) => tr.textContent.includes(n)), `Jeton ${vp.width}`, { timeout: 5000 }).catch(() => {});
   ok((await p.locator('tr', { hasText: `Jeton ${vp.width}` }).count()) === 0, `${tag} un accord supprime le jeton`);
 
