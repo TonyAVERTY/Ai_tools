@@ -56,7 +56,7 @@ export async function agendaUpcoming(db, ids, userId, { at = now(), limit = 8 } 
 }
 const dayHead = (ts) => new Date(ts * 1000).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Paris' });
 
-export function calendarPage({ email, year, month, byDay, feed, today, agenda = [], error = null }) {
+export function calendarPage({ email, year, month, byDay, feed, today, agenda = [], error = null, fresh = null }) {
   const first = parisParts(parisTime(year, month, 1, 12));
   const lead = (['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].indexOf(first.weekday) + 7) % 7;
   const total = new Date(Date.UTC(year, month, 0)).getUTCDate();
@@ -81,7 +81,7 @@ export function calendarPage({ email, year, month, byDay, feed, today, agenda = 
       return `<div class="ag-act"><a href="${esc(l.google)}" target="_blank" rel="noopener noreferrer">Google Agenda</a><a href="${esc(l.ics)}">Fichier .ics</a>
         <form method="post" action="/calendar/events/${e.event.id}/delete"><button class="ag-del" aria-label="Supprimer ${esc(e.label)}" title="Supprimer">${ic('trash', 'ic-s')}</button></form></div>`;
     })() : '';
-    return `${h}<li class="ag-i"><time datetime="${new Date(e.at * 1000).toISOString()}">${esc(hhmm(e.at))}</time><div><b>${esc(e.label)}</b><span class="td-s">${esc(KIND_LABEL[e.kind] || '')}${e.kind === 'event' ? '' : ` · ${esc(e.project)}`}</span>${e.event?.notes ? `<span class="td-s">${esc(e.event.notes)}</span>` : ''}${acts}</div></li>`;
+    return `${h}<li class="ag-i${fresh && e.event?.id === fresh ? ' row-new' : ''}"><time datetime="${new Date(e.at * 1000).toISOString()}">${esc(hhmm(e.at))}</time><div><b>${esc(e.label)}</b><span class="td-s">${esc(KIND_LABEL[e.kind] || '')}${e.kind === 'event' ? '' : ` · ${esc(e.project)}`}</span>${e.event?.notes ? `<span class="td-s">${esc(e.event.notes)}</span>` : ''}${acts}</div></li>`;
   }).join('');
   const feedBox = icalBox(feed.url, '/calendar');
   return layout({
@@ -134,7 +134,7 @@ export function registerCalendarRoutes(router, app) {
     const ids = (await accessibleProjects(db, session.userId)).map((p) => Number(p.id));
     const token = await feedToken(app, session.userId);
     const agenda = await agendaUpcoming(db, ids, session.userId);
-    html(res, calendarPage({ email: session.email, year, month, byDay: await monthEvents(db, ids, year, month, session.userId), feed: { url: token ? feedUrl(cfg, token) : null }, today: t, agenda, error: url.searchParams.get('e') }));
+    html(res, calendarPage({ email: session.email, year, month, byDay: await monthEvents(db, ids, year, month, session.userId), feed: { url: token ? feedUrl(cfg, token) : null }, today: t, agenda, error: url.searchParams.get('e'), fresh: Number(url.searchParams.get('nouveau')) || null }));
   });
 
   // Retour sur la page d'où vient l'action (liste blanche : jamais une adresse arbitraire)

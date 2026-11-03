@@ -96,9 +96,11 @@ export function clientsPage({ email, rows, openId, flash }) {
 
 // ---------- Fiche d'un échange (client ou prospect) ----------
 
-function timeline(items) {
+/** `freshNote` : on vient d'ajouter une note, la plus récente (la première du fil) est surlignée un instant. */
+function timeline(items, { freshNote = false } = {}) {
   if (!items.length) return '<p class="muted">Aucun échange pour l\'instant : les mails envoyés, les réponses et les notes de ce contact apparaîtront ici.</p>';
-  return `<ol class="cl-tl">${items.map((x) => {
+  const newest = freshNote ? items.findIndex((x) => x.type === 'note') : -1;
+  return `<ol class="cl-tl">${items.map((x, i) => {
     if (x.type === 'sent') {
       return `<li class="cl-tl-i out"><span class="cl-tl-ic">${ic('send')}</span><div><div class="cl-tl-h"><b>${x.kind === 'initial' ? 'Mail envoyé' : 'Relance envoyée'}</b><span class="muted small">${esc(dayTime(x.at))}</span></div>
         <p>${esc(x.subject || '(sans objet)')}</p>${x.error ? `<p class="small err">Échec de l'envoi : ${esc(x.error)}</p>` : x.read ? '<p class="muted small">Lu par le destinataire</p>' : ''}</div></li>`;
@@ -108,7 +110,7 @@ function timeline(items) {
       return `<li class="cl-tl-i in"><span class="cl-tl-ic">${ic('reply')}</span><div><div class="cl-tl-h"><b>Réponse reçue</b><span class="badge ${tone}">${label}</span><span class="muted small">${esc(dayTime(x.at))}</span></div>
         <p><b>${esc(x.subject || '(sans objet)')}</b></p>${x.body ? `<p class="cl-quote">${esc(x.body).replace(/\n/g, '<br>')}</p>` : ''}</div></li>`;
     }
-    return `<li class="cl-tl-i note"><span class="cl-tl-ic">${ic('pen')}</span><div><div class="cl-tl-h"><b>Note</b><span class="muted small">${esc(dayTime(x.at))}</span></div><p>${esc(x.body).replace(/\n/g, '<br>')}</p></div></li>`;
+    return `<li class="cl-tl-i note${i === newest ? ' row-new' : ''}"><span class="cl-tl-ic">${ic('pen')}</span><div><div class="cl-tl-h"><b>Note</b><span class="muted small">${esc(dayTime(x.at))}</span></div><p>${esc(x.body).replace(/\n/g, '<br>')}</p></div></li>`;
   }).join('')}</ol>`;
 }
 
@@ -165,7 +167,7 @@ export function prospectSheetPage({ email, project: p, sheet, flash }) {
   <section class="card bill-sec" id="echanges" aria-labelledby="t-pe"><h2 id="t-pe">Échanges</h2>
     <form method="post" action="/clients/p/${x.id}/note" class="cl-note-f"><label class="field" for="pn"><span class="lbl">Ajouter une note</span><textarea id="pn" name="body" rows="2" maxlength="2000" required placeholder="Un appel, un rendez-vous, une remarque…"></textarea></label>
       <div class="row-actions"><button class="btn">Ajouter la note</button></div></form>
-    ${timeline(sheet.exchanges)}</section>
+    ${timeline(sheet.exchanges, { freshNote: flash.ok === 'note' })}</section>
 </div>`;
   return layout({ title: `${x.company} · Clients`, email, body, scripts: [] });
 }

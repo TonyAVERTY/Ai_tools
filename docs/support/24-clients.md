@@ -24,7 +24,7 @@ Ouvre un client pour voir :
 - **Retirer ce client** (avec confirmation) l'enlève de la liste. Les documents déjà générés restent dans « Facturation » et dans la Comptabilité.
 
 ## 3. La fiche prospect et « Passer en client »
-Un prospect a sa fiche : e-mail, site internet, ville, secteur, score, origine de l'adresse, accroche, et ses **Échanges** (mêmes mails, réponses et notes que ci-dessus). **Ajouter une note** y enregistre un appel, un rendez-vous ou une remarque.
+Un prospect a sa fiche : e-mail, site internet, ville, secteur, score, origine de l'adresse, accroche, et ses **Échanges** (mêmes mails, réponses et notes que ci-dessus). **Ajouter une note** y enregistre un appel, un rendez-vous ou une remarque ; la note ajoutée est surlignée un instant dans les **Échanges**.
 **Passer en client** (avec confirmation) passe le prospect au statut « Client » et crée sa fiche client, reliée au prospect : tu retrouves tous ses échanges depuis la fiche client. Un prospect déjà client n'est jamais dupliqué.
 
 ## Si ça ne marche pas

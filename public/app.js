@@ -170,6 +170,26 @@
     box.replaceChildren(wrap);
   }
 
+  // Contenu chargé après coup : le cercle (ou le bloc « Réessayer ») cède la place au contenu par un fondu de 150 ms (opacité seule, une fois). Seul ce passage est animé :
+  // une mise à jour ultérieure de la zone (rafraîchissement, nouvelle donnée) ne clignote pas.
+  const LOAD_ZONES = '[data-recap], [data-promo], [data-linkedin], [data-setup], [data-cl-lists], [data-chat-projlist], [data-charts]';
+  for (const zone of $$(LOAD_ZONES)) {
+    const watch = new MutationObserver((list) => {
+      if (!list.some((m) => [...m.removedNodes].some((n) => n.nodeType === 1 && n.matches('.loading, .load-error')))) return;
+      if (zone.querySelector(':scope > .loading, :scope > .load-error')) return; // un cercle remplacé par un autre cercle (ou par « Réessayer » qui relance) : pas de fondu
+      zone.classList.remove('reveal'); void zone.offsetWidth; zone.classList.add('reveal');
+    });
+    watch.observe(zone, { childList: true });
+    cleanups.push(() => watch.disconnect());
+  }
+  // Les classes d'animation ponctuelle se retirent d'elles-mêmes (pour pouvoir rejouer) : fondu, coche, badge, ligne ajoutée
+  listen(document, 'animationend', (e) => {
+    const t = e.target;
+    if (e.animationName === 'reveal') t.classList.remove('reveal');
+    else if (e.animationName === 'wiz-pop') { t.classList.remove('pop'); t.closest?.('li.just-done')?.classList.remove('just-done'); }
+    else if (e.animationName === 'fx-flash') t.classList.remove('row-new');
+  });
+
   function toast(msg, kind = 'ok') {
     let box = document.querySelector('.toasts');
     if (!box) { box = document.createElement('div'); box.className = 'toasts'; document.body.append(box); }
@@ -1045,15 +1065,16 @@
   const DOT = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="8"/></svg>';
 
   function setChecklist(id, c) {
+    const was = checklists.get(String(id)); // l'état précédent : une étape qui vient d'être faite ou « tout est fait » se remarque, pas ce qui l'était déjà au chargement
     checklists.set(String(id), c);
     const el = $(`details.project[data-id="${id}"]`);
     if (!el) return;
-    markChecklist(el, c);
+    markChecklist(el, c, was);
     renderSetup(el, c);
   }
 
   // Badge « config 5/9 » sur la ligne du projet, coche sur chaque section dont toutes les étapes sont faites
-  function markChecklist(el, c) {
+  function markChecklist(el, c, was) {
     const byAcc = {};
     for (const s of c.steps) if (s.acc) (byAcc[s.acc] ||= []).push(s);
     for (const [acc, list] of Object.entries(byAcc)) {
@@ -1067,6 +1088,7 @@
     badge.classList.toggle('ok', c.complete);
     badge.classList.toggle('warn', !c.ready);
     badge.setAttribute('aria-label', c.complete ? 'Mise en route terminée' : `Mise en route : ${c.done} étape${c.done > 1 ? 's' : ''} sur ${c.total}. Voir la liste`);
+    if (was && !was.complete && c.complete) { badge.classList.remove('pop'); void badge.offsetWidth; badge.classList.add('pop'); } // tout vient d'être fait : « config ✓ » apparaît d'un petit saut
   }
 
   // La section « Mise en route » du projet : titre, avancement et lignes ; masquée une fois tout fait. Redessinée seulement si le contenu change.
@@ -1081,7 +1103,17 @@
     const html = `<ul>${c.steps.map((s) => `<li class="${s.done ? 'done' : ''}">${s.done ? TICK : DOT}<div>
       <button type="button" class="setup-go" data-setup-go="${esc(s.key)}">${esc(s.label)}</button>${s.optional ? '<span class="setup-opt">facultatif</span>' : ''}
       ${s.done ? '' : `<span class="muted small">${esc(s.hint)}</span>`}</div></li>`).join('')}</ul>`;
+    // Les étapes faites depuis le dernier affichage : leur coche apparaît d'un petit saut (jamais au premier affichage, ni pour ce qui l'était déjà)
+    const done = new Set(c.steps.filter((s) => s.done).map((s) => s.key));
+    const fresh = body._done ? [...done].filter((k) => !body._done.has(k)) : [];
+    body._done = done;
     if (body._html !== html) { body._html = html; body.innerHTML = html; }
+    for (const key of fresh) {
+      const li = $(`[data-setup-go="${key}"]`, body)?.closest('li');
+      if (!li) continue;
+      li.classList.add('just-done');
+      later(() => li.classList.remove('just-done'), 4000); // la section est repliée par défaut : sans personne devant, l'animation ne démarre pas, on ne la garde pas pour plus tard
+    }
   }
 
   async function loadChecklist(el) {
