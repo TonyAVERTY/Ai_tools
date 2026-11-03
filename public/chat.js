@@ -145,11 +145,14 @@
 
   // Projets dont on peut joindre le code (liste chargée à la première ouverture)
   let projectsLoaded = false;
-  projMenu?.addEventListener('toggle', async () => {
-    if (!projMenu.open || projectsLoaded) return;
-    projList.innerHTML = window.AiTools.loadingHtml('Chargement…', { small: true });
+  async function loadProjects() {
+    const T = window.AiTools;
+    projList.innerHTML = T.loadingHtml('Chargement…', { small: true });
     try {
       const r = await fetch('/api/chat/projects', { headers: { Accept: 'application/json' } });
+      if (r.status === 401) return T.toLogin();
+      // Sans ce test, une erreur du serveur s'affichait comme « Aucun projet dont tu puisses joindre le code »
+      if (!r.ok) return T.loadFailed(projList, T.httpErrorText(r.status), loadProjects, { small: true });
       const d = await r.json();
       projectsLoaded = true;
       projList.replaceChildren();
@@ -161,8 +164,9 @@
         if (!p.analyzed) b.append(el('small', 'muted', 'pas encore analysé'));
         projList.append(b);
       }
-    } catch { projList.replaceChildren(el('p', 'muted small', 'Impossible de charger les projets.')); }
-  });
+    } catch { T.loadFailed(projList, T.networkErrorText(), loadProjects, { small: true }); }
+  }
+  projMenu?.addEventListener('toggle', () => { if (projMenu.open && !projectsLoaded) loadProjects(); });
   projList?.addEventListener('click', (e) => {
     const b = e.target.closest('[data-project-pick]');
     if (!b) return;
