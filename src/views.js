@@ -480,7 +480,6 @@ function projectItem(p, smtp, dbCfg, imap, { open = false, stats = null } = {}) 
   // « En-tête » (dépôt, site, fiche, sortie de l'analyse) : en haut et ouvert tant que le projet n'est pas analysé, puis replié en bas, juste avant « Configuration ».
   const headerAcc = acc('header', 'git', 'En-tête', 'Dépôt Git et fiche projet', `
   <div class="field"><span class="lbl">Dépôt Git</span><div class="ro">${ic('lock', 'ic-s')}<span>${esc(p.gitUrl)}</span><span class="badge">lecture seule</span></div></div>
-  <p class="muted small" data-todo-restore hidden><button type="button" class="link" data-todo-restore-btn>Afficher la mise en route</button> (la liste « config » que tu as retirée de ce projet)</p>
   ${p.access !== 'member' ? `<form data-action="site" data-id="${p.id}" class="site-form">
     <label class="field"><span class="lbl">Site du produit</span><input name="site_url" maxlength="300" inputmode="url" autocomplete="off" placeholder="https://monproduit.fr" value="${esc(p.siteUrl || '')}"></label>
     <p class="muted small">Cette adresse est ajoutée dans les mails de prospection à la place de <code>{{site}}</code>. Laisse vide pour ne pas en mettre.</p>
@@ -492,8 +491,9 @@ function projectItem(p, smtp, dbCfg, imap, { open = false, stats = null } = {}) 
   </section>` : ''}
   <div class="job" data-job="analyze"></div>`, { open: !profile });
   return `<details class="project anim" data-id="${p.id}"${open ? ' open' : ''}>
-<summary><span class="pname">${esc(p.name)}</span>${p.access !== 'owner' ? `<span class="badge" title="Projet partagé par ${esc(p.ownerEmail || '')}">équipe de ${esc(p.ownerEmail || '')}</span>` : p.teamId ? '<span class="badge ok">partagé</span>' : ''}<span class="pcfg badge" data-cfg title="Afficher la liste de mise en route" hidden></span><button type="button" class="btn small secondary prean" data-run="analyze" data-id="${p.id}"${profile ? ' data-reanalyze' : ''} title="${profile ? "Relancer l'analyse du dépôt" : "Lancer l'analyse du dépôt"}" aria-label="${profile ? 'Réanalyser' : 'Analyser'} le projet">${ic(profile ? 'repeat' : 'spark')}<span>${profile ? 'Réanalyser' : 'Analyser'}</span></button><span class="pstate" data-state></span>${projectFacts(stats)}</summary>
+<summary><span class="pname">${esc(p.name)}</span>${p.access !== 'owner' ? `<span class="badge" title="Projet partagé par ${esc(p.ownerEmail || '')}">équipe de ${esc(p.ownerEmail || '')}</span>` : p.teamId ? '<span class="badge ok">partagé</span>' : ''}<button type="button" class="pcfg badge" data-cfg title="Voir la liste « Mise en route »" hidden></button><button type="button" class="btn small secondary prean" data-run="analyze" data-id="${p.id}"${profile ? ' data-reanalyze' : ''} title="${profile ? "Relancer l'analyse du dépôt" : "Lancer l'analyse du dépôt"}" aria-label="${profile ? 'Réanalyser' : 'Analyser'} le projet">${ic(profile ? 'repeat' : 'spark')}<span>${profile ? 'Réanalyser' : 'Analyser'}</span></button><span class="pstate" data-state></span>${projectFacts(stats)}</summary>
 <div class="pbody"><div class="pcard">
+  ${acc('setup', 'target', 'Mise en route', 'Ce qu\'il reste à faire avant ton premier envoi', `<div class="setup" data-setup>${loadingBlock()}</div>`, { cls: 'setup-acc' })}
   ${profile ? '' : headerAcc}
 
   ${profile ? acc('target', 'target',
@@ -646,7 +646,6 @@ ${usageKpis(usage)}
 </section>
 <aside class="col-s">${claudePanel()}</aside>
 </div>
-${projects.length ? '<aside class="todo" id="todo" aria-label="Mise en route du projet" hidden></aside>' : ''}
 ${tour ? `<script type="application/json" id="tour-data" data-mode="${esc(tour)}">${tourJson()}</script>` : ''}`,
   });
 }
