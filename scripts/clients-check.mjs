@@ -65,8 +65,8 @@ for (const [vp, scheme, tag] of [[{ width: 1280, height: 900 }, 'light', '1280px
   await p.locator('[name="body"]').fill('Appel prévu jeudi'); await p.getByRole('button', { name: 'Ajouter la note' }).click(); await wait();
   ok(await p.locator('.cl-tl p', { hasText: 'Appel prévu jeudi' }).isVisible(), `${tag} note ajoutée`);
   await noScroll('fiche prospect'); await shot(p, `clients-4-prospect-${vp.width}`);
-  p.once('dialog', (d) => d.accept());
-  await p.getByRole('button', { name: 'Passer en client' }).click(); await wait();
+  await p.getByRole('button', { name: 'Passer en client' }).first().click();
+  await p.locator('dialog.confirm [data-yes]').click(); await wait(); // la confirmation est une boîte de l'application
   ok(await p.getByRole('heading', { name: 'Cabinet Dupont', level: 1 }).isVisible() && /maintenant un client/.test(await p.locator('body').innerText()), `${tag} le prospect devient client`);
   ok(await p.locator('.cl-quote', { hasText: 'Intéressé, appelez-moi jeudi.' }).isVisible(), `${tag} ses échanges sont sur la fiche client`);
   await noScroll('fiche client issue du prospect'); await shot(p, `clients-5-converti-${vp.width}`);
