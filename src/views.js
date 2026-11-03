@@ -11,6 +11,7 @@ import { tourJson } from './tour.js';
 import { describeKpi } from './services/dbschema.js';
 import { MODE_LABELS, CONSENT_TEXT, CONSENT_CHECKBOX, CONSENT_VERSION } from './claudelink.js';
 import { banner } from './banner.js';
+import { loadingBlock } from './loading.js';
 
 const fmtDate = (ts) => (ts ? new Date(ts * 1000).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' }) : '—');
 
@@ -597,15 +598,15 @@ function projectItem(p, smtp, dbCfg, imap, { open = false, stats = null } = {}) 
     <div class="job" data-job="audit"></div>`, { cls: 'main' }) : ''}
 
   ${acc('linkedin', 'linkedin', 'LinkedIn', 'Relie un compte, Claude écrit des posts, tu relis et publies', `
-    <div class="linkedin" data-linkedin><p class="muted">Chargement…</p></div>
+    <div class="linkedin" data-linkedin>${loadingBlock()}</div>
     <div class="job" data-job="linkedin_post"></div>`, { cls: 'main' })}
 
   ${acc('promo', 'film', 'Promotion', 'Claude conçoit une vidéo de design motion pour présenter ton projet', `
-    <div class="promo" data-promo><p class="muted">Chargement…</p></div>
+    <div class="promo" data-promo>${loadingBlock()}</div>
     <div class="job" data-job="promo_video"></div>`, { cls: 'main' })}
 
   ${p.access !== 'member' ? acc('recap', 'chart', 'Récapitulatif', 'Chiffres business, prospection et courbes', `
-    <div class="recap" data-recap><p class="muted">Chargement…</p></div>`, { cls: 'main' }) : ''}
+    <div class="recap" data-recap>${loadingBlock()}</div>`, { cls: 'main' }) : ''}
 
   ${acc('postes', 'users', 'Postes et tâches IA', 'Les postes d\'une entreprise, chacun avec ses tâches faites par l\'IA', postesBody(p), { cls: 'main' })}
   </div>
