@@ -221,6 +221,7 @@ dl.account dd { margin: 0; overflow-wrap: anywhere; font-weight: 600; }
 .project[open] > summary::before { transform: rotate(45deg); }
 .pname { font-weight: 600; font-size: 1rem; flex: 1 1 140px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pcfg { cursor: pointer; }
+.pstate:empty { display: none; }
 .pstate { display: inline-flex; align-items: center; font-size: .875rem; color: var(--muted); flex-basis: 100%; padding-left: 26px; }
 .pbody { border-top: 1px solid var(--line); padding: 14px; }
 details > summary { cursor: pointer; list-style: none; }
