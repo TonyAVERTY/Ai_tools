@@ -826,6 +826,13 @@
     const jobs = s.jobs;
     for (const type of ['analyze', 'prospect', 'template', 'send', 'evolution', 'audit', 'followup_template', 'followup', 'linkedin_post', 'promo_video']) renderJob($(`[data-job="${type}"]`, el), jobs[type], type);
     for (const box of $$('[data-job^="poste_"]', el)) renderJob(box, jobs[box.dataset.job], box.dataset.job);
+    // « En-tête » est replié une fois le projet analysé : une analyse qui échoue y affiche son erreur, on l'ouvre (une fois par échec, pour ne pas rouvrir ce qu'on vient de fermer)
+    const analyzeJob = jobs.analyze;
+    if (analyzeJob && analyzeJob.status === 'error' && st.analyzeErrorOpened !== analyzeJob.id) {
+      st.analyzeErrorOpened = analyzeJob.id;
+      const head = $('details[data-acc="header"]', el);
+      if (head) head.open = true;
+    }
 
     const running = Object.entries(jobs).filter(([, j]) => ACTIVE.includes(j.status));
     $('[data-state]', el).innerHTML = running.length
