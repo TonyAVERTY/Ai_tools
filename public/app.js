@@ -69,7 +69,7 @@
   }
 
   // Outils communs pour les fichiers public/app-*.js (chargés après celui-ci)
-  Object.assign(window.AiTools, { $, $$, api, esc, every, formData, go, icon, liDay, listen, refreshProject, httpErrorText, networkErrorText, toLogin, confirmBox, loadingHtml, loadFailed });
+  Object.assign(window.AiTools, { $, $$, api, esc, every, formData, go, icon, liDay, listen, refreshProject, httpErrorText, networkErrorText, toLogin, confirmBox, loadingHtml, loadFailed, sentence });
 
   // Une erreur dit ce qui s'est passé et quoi faire ensuite : jamais « Failed to fetch » ni un code brut. Le message du serveur, quand il y en a un, passe en premier.
   function httpErrorText(status) {
@@ -79,6 +79,8 @@
     if (status >= 500) return 'Erreur interne : réessaie dans un instant.';
     return `Erreur ${status} : recharge la page puis réessaie.`;
   }
+  // Une erreur est une phrase : elle finit par un point (les messages du serveur n'en ont pas toujours). Sans effet si le message finit déjà par « . ! ? … ».
+  function sentence(msg) { const t = String(msg ?? ''); return t && !/[.!?…]$/.test(t) ? `${t}.` : t; } // déclaration (hoistée) : exportée plus haut dans window.AiTools
   function networkErrorText() { return 'Connexion impossible : réessaie dans un instant.'; } // déclaration (hoistée) : exportée plus haut dans window.AiTools
   // Session expirée : on revient à la connexion avec l'explication (la page de connexion affiche déjà `?e=`), plutôt qu'une redirection muette
   function toLogin() { location.href = `/login?e=${encodeURIComponent('Ta session a expiré : reconnecte-toi.')}`; }
@@ -93,7 +95,7 @@
     if (r.status === 401) { toLogin(); throw new Error('Session expirée'); }
     const data = await r.json().catch(() => ({}));
     if (r.status === 403 && data.code === 'link_required') showReconnect();
-    if (!r.ok) throw new Error(data.error || httpErrorText(r.status));
+    if (!r.ok) throw new Error(sentence(data.error || httpErrorText(r.status))); // tout ce qui affiche err.message (toast, bloc « Réessayer », formulaire, chat) reçoit une phrase
     return data;
   }
 
@@ -183,7 +185,7 @@
     t.setAttribute('role', kind === 'error' ? 'alert' : 'status');
     const text = document.createElement('span');
     text.className = 'toast-t';
-    text.textContent = msg;
+    text.textContent = kind === 'error' ? sentence(msg) : msg; // une erreur est une phrase : elle finit par un point (un succès, « Nom + participe passé », n'en a pas)
     const x = document.createElement('button');
     x.type = 'button'; x.className = 'toast-x'; x.setAttribute('aria-label', 'Fermer la notification'); x.textContent = '×';
     x.addEventListener('click', () => close(t));
@@ -1316,7 +1318,7 @@
       btn.disabled = true; // api() marque le bouton occupé (indicateur dans le bouton) puis ne le réactive pas : c'est ici
       try {
         const r = await api('/settings/github/test', { token: field.value });
-        if (!r.ok) { show(`<p class="error">${esc(r.message)}</p>`, 'bad'); return; }
+        if (!r.ok) { show(`<p class="error">${esc(sentence(r.message))}</p>`, 'bad'); return; }
         const projects = r.projects.length
           ? `<h5>Tes projets sur GitHub</h5><ul class="gitprojects">${r.projects.map((p) => {
             const [cls, sign, text] = mark[String(p.access)];

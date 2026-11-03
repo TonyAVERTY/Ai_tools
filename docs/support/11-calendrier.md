@@ -6,7 +6,7 @@ La page **Calendrier** (barre du haut) affiche le mois avec des flèches pour pa
 
 ## Ajouter un événement
 Bloc **Ajouter un événement** : un rendez-vous, un appel ou un rappel. Champs **Titre**, **Date**, **Heure (Paris)**, **Durée** (15 min, 30 min, 45 min, 1 h, 1 h 30, 2 h), **Notes** (facultatif) puis **Ajouter à mon calendrier**.
-Quand un prospect répond avec une date ou accepte un appel, AiTools propose de l'ajouter d'un clic : popup à l'arrivée de la réponse, et vue **Réponses** de la page **Mails** (champs Titre et Date et heure, bouton **Ajouter à mon calendrier**, ainsi que **Google Agenda** et **Fichier .ics**).
+Quand un prospect répond avec une date ou accepte un appel, AiTools propose de l'ajouter d'un clic : popup à l'arrivée de la réponse (elle annonce « *l'expéditeur* t'a répondu », avec l'intention détectée), et vue **Réponses** de la page **Mails** (champs Titre et Date et heure, bouton **Ajouter à mon calendrier**, ainsi que **Google Agenda** et **Fichier .ics**).
 
 ## Agenda externe (Google, Apple, Outlook)
 Bloc **Agenda externe** (aussi dans **Mon compte → Agenda**) : un **lien d'abonnement secret** affiche les prochaines actions, les posts LinkedIn programmés et les événements dans l'agenda habituel.

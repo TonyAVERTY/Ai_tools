@@ -29,7 +29,7 @@
 
   const nearBottom = () => log.scrollHeight - log.scrollTop - log.clientHeight < 120;
   const toBottom = () => log.scrollTo({ top: log.scrollHeight, behavior: 'instant' });
-  const showError = (msg) => { errBox.textContent = msg; errBox.hidden = !msg; };
+  const showError = (msg) => { errBox.textContent = msg ? window.AiTools.sentence(msg) : ''; errBox.hidden = !msg; }; // une erreur finit par un point
   const grow = () => { input.style.height = 'auto'; input.style.height = `${Math.min(input.scrollHeight, 200)}px`; };
   const mo = (n) => (n >= 1048576 ? `${(n / 1048576).toFixed(1).replace('.', ',')} Mo` : `${Math.max(1, Math.round(n / 1024))} Ko`);
   const icon = (name) => `<svg class="ic" aria-hidden="true" viewBox="0 0 24 24"><use href="#i-${name}"></use></svg>`;

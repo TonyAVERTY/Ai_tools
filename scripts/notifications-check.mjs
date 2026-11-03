@@ -38,6 +38,9 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
   const sorted = [...info].sort((x, y) => x.top - y.top);
   ok(sorted.every((t, i) => i === 0 || t.top >= sorted[i - 1].bottom - 1), `${tag} elles sont empilées, aucune ne recouvre l'autre (${info.map((t) => `${t.top}-${t.bottom}`).join(' / ')})`);
   ok(info.every((t) => t.right <= vp.width && t.left >= 0), `${tag} elles tiennent dans l'écran`);
+  const texts = await p.evaluate(() => [...document.querySelectorAll('.toasts .toast')].map((t) => ({ kind: t.classList.contains('error') ? 'error' : 'ok', text: t.querySelector('.toast-t').textContent })));
+  ok(texts.filter((t) => t.kind === 'error').every((t) => /\.$/.test(t.text)) && texts.some((t) => t.text === 'Impossible de joindre le serveur.'), `${tag} une erreur finit par un point, ajouté à l'affichage (« ${texts.find((t) => t.kind === 'error')?.text} »)`);
+  ok(texts.filter((t) => t.kind === 'ok').every((t) => !/[.!]$/.test(t.text)), `${tag} un succès n'a pas de point final (« ${texts.find((t) => t.kind === 'ok')?.text} »)`);
   ok(info[0].role === 'status' && info[2].role === 'alert', `${tag} succès annoncé en « status », erreur en « alert »`);
   ok(info.every((t) => t.close), `${tag} chacune a un bouton de fermeture accessible`);
   await p.locator('.toasts .toast', { hasText: 'Note ajoutée' }).locator('.toast-x').click();
@@ -76,6 +79,13 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
   }
   await p.route('**/api/probe-status', (route) => route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ error: "L'adresse n'est pas valide." }) }));
   ok(await apiError('/api/probe-status') === "L'adresse n'est pas valide.", `${tag} le message du serveur reste prioritaire`);
+  await p.unroute('**/api/probe-status');
+  // un message du serveur sans point final (la plupart) reçoit son point : tout ce qui affiche err.message en profite
+  await p.route('**/api/probe-status', (route) => route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ error: "Donne un titre à l'événement" }) }));
+  ok(await apiError('/api/probe-status') === "Donne un titre à l'événement.", `${tag} un message du serveur sans point reçoit son point`);
+  await p.unroute('**/api/probe-status');
+  await p.route('**/api/probe-status', (route) => route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ error: 'Vraiment ?' }) }));
+  ok(await apiError('/api/probe-status') === 'Vraiment ?', `${tag} jamais de point en double après « ? »`);
   await p.unroute('**/api/probe-status');
 
   // 6) session expirée : retour à la connexion avec l'explication
