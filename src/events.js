@@ -86,13 +86,15 @@ export function registerEventRoutes(router, app) {
   // Formulaire de la page Calendrier
   router.post('/calendar/events', async ({ req, res, session }) => {
     const b = await readBody(req);
+    let id;
     try {
-      await createEvent(db, session.userId, { title: b.title, at: parseParisLocal(`${b.date}T${b.time}`), minutes: b.minutes, notes: b.notes });
+      id = await createEvent(db, session.userId, { title: b.title, at: parseParisLocal(`${b.date}T${b.time}`), minutes: b.minutes, notes: b.notes });
     } catch (e) {
       if (!(e instanceof HttpError)) throw e;
       return redirect(res, `/calendar?e=${encodeURIComponent(e.message)}`);
     }
-    redirect(res, `/calendar?m=${String(b.date).slice(0, 7)}`);
+    // `nouveau` : l'événement qu'on vient d'ajouter, surligné un instant dans « À venir » (la page ne montre que ceux du compte : un autre numéro ne surligne rien)
+    redirect(res, `/calendar?m=${String(b.date).slice(0, 7)}&nouveau=${id}`);
   }, { limit: 'event' });
 
   router.post('/calendar/events/:id/delete', async ({ res, params, session }) => {

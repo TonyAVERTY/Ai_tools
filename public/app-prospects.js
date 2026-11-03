@@ -220,11 +220,11 @@
     const btn = $('button:not([type=button])', form);
     btn.disabled = true;
     try {
-      await api(`/api/projects/${form.dataset.id}/prospects`, formData(form));
+      const added = await api(`/api/projects/${form.dataset.id}/prospects`, formData(form));
       toast('Prospect ajouté');
       form.reset(); form.hidden = true;
       $('[data-pform-toggle]', d).setAttribute('aria-expanded', 'false');
-      loadProspects(d);
+      loadProspects(d, 1, added.id);
     } catch (err) { toast(err.message, 'error'); }
     btn.disabled = false;
   });
@@ -259,7 +259,8 @@
 
   const fmtDay = (ts) => (ts ? new Date(ts * 1000).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', timeZone: 'Europe/Paris' }) : '');
 
-  async function loadProspects(d, page = 1) {
+  // `fresh` : l'identifiant du prospect qu'on vient d'ajouter ; sa ligne est surlignée un instant et amenée à l'écran si elle est cachée (vue liste ; le kanban n'est pas concerné)
+  async function loadProspects(d, page = 1, fresh = null) {
     const proj = d.closest('.project');
     const box = $('[data-prospects]', d);
     const filters = formData($('[data-filters]', d));
@@ -282,6 +283,12 @@
            <span class="small muted">Page ${r.page} / ${r.pages} · ${r.total} prospect(s)</span>
            <button type="button" class="btn small" data-page="${r.page + 1}" ${r.page >= r.pages ? 'disabled' : ''}>→</button>`
         : `<span class="small muted">${r.total} prospect(s)</span>`;
+      const row = fresh ? $(`tr[data-row="${fresh}"]`, box) : null;
+      if (row) {
+        row.classList.add('row-new');
+        setTimeout(() => row.classList.remove('row-new'), 1700); // l'animation la retire déjà ; ceci couvre le mouvement réduit, où elle n'a pas lieu
+        row.scrollIntoView({ block: 'nearest', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+      }
     } catch (err) { box.innerHTML = `<p class="error small">${esc(err.message)}</p>`; }
   }
 
