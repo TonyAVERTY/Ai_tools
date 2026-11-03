@@ -27,7 +27,6 @@ for (const [mode, reduced] of [['normal', 'no-preference'], ['mouvement réduit'
     const ctx = await b.newContext({ viewport: vp, reducedMotion: reduced });
     const [name, value] = u.cookie.split('=');
     await ctx.addCookies([{ name, value, url: s.base }]);
-    await ctx.addInitScript(() => { try { localStorage.setItem('todo-min', '1'); } catch { /* ignore */ } });
     let hold = true;
     await ctx.route('**/*', async (route) => {
       const r = route.request();

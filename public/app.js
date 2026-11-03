@@ -1016,25 +1016,22 @@
   function sessionStorageGet(k) { try { return sessionStorage.getItem(k); } catch { return null; } }
   function sessionStorageSet(k, v) { try { sessionStorage.setItem(k, v); } catch { /* ignore */ } }
 
-  // ---------- Mise en route (liste en bas à gauche) ----------
-  // Montre ce qui est configuré et ce qui reste à faire sur un projet ; chaque ligne ouvre la bonne section. Recalculée côté
-  // serveur à chaque lecture (rien n'est mémorisé ici, sauf « réduite » et « masquée pour ce projet » dans ce navigateur).
-  const todo = $('#todo');
+  // ---------- Mise en route : une section du projet ----------
+  // Ce qui est configuré et ce qui reste à faire, recalculé côté serveur à chaque lecture (rien n'est mémorisé ici). Le badge « config 4/9 » de la ligne du projet
+  // ouvre la section ; chaque ligne ouvre la bonne section du projet, y fait défiler la page et la fait clignoter un instant. Quand tout est fait, la section disparaît.
   const checklists = new Map();
-  let todoFocus = null;
-  const lsGet = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
-  const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch { /* ignore */ } };
   const TICK = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>';
   const DOT = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="8"/></svg>';
 
   function setChecklist(id, c) {
     checklists.set(String(id), c);
     const el = $(`details.project[data-id="${id}"]`);
-    if (el) markChecklist(el, c);
-    if (String(id) === String(todoFocus)) renderTodo();
+    if (!el) return;
+    markChecklist(el, c);
+    renderSetup(el, c);
   }
 
-  // Pastille « config 5/9 » sur le projet, coche sur chaque section dont toutes les étapes sont faites
+  // Badge « config 5/9 » sur la ligne du projet, coche sur chaque section dont toutes les étapes sont faites
   function markChecklist(el, c) {
     const byAcc = {};
     for (const s of c.steps) if (s.acc) (byAcc[s.acc] ||= []).push(s);
@@ -1043,49 +1040,33 @@
       if (sum) sum.classList.toggle('acc-done', list.every((s) => s.done));
     }
     const badge = $('[data-cfg]', el);
-    const off = lsGet(`todo-off-${el.dataset.id}`) === '1';
-    const restore = $('[data-todo-restore]', el);
-    if (restore) restore.hidden = !off || c.complete;
     if (!badge) return;
-    badge.hidden = off; // retirée par la croix : la pastille « config » part avec la liste
+    badge.hidden = false;
     badge.textContent = c.complete ? 'config ✓' : `config ${c.done}/${c.total}`;
     badge.classList.toggle('ok', c.complete);
     badge.classList.toggle('warn', !c.ready);
+    badge.setAttribute('aria-label', c.complete ? 'Mise en route terminée' : `Mise en route : ${c.done} étape${c.done > 1 ? 's' : ''} sur ${c.total}. Voir la liste`);
   }
 
-  function renderTodo() {
-    const id = String(todoFocus);
-    const c = checklists.get(id);
-    if (!todo || !c) return;
-    if (c.complete || lsGet(`todo-off-${id}`) === '1') { todo.hidden = true; return; }
-    const name = $(`details.project[data-id="${id}"] .pname`)?.textContent || '';
-    // Réduite par défaut sur un écran étroit (elle recouvrirait le contenu) ; ensuite le choix de la personne fait foi
-    const pref = lsGet('todo-min');
-    const min = pref === null ? window.innerWidth < 1700 : pref === '1';
-    todo.hidden = false;
-    todo.classList.toggle('min', min);
-    todo.dataset.project = id;
-    todo.innerHTML = `<button type="button" class="todo-head" data-todo-toggle aria-expanded="${!min}">
-      <svg class="ring" viewBox="0 0 44 44" role="img" aria-label="${c.done} étapes sur ${c.total}"><circle class="ring-t" cx="22" cy="22" r="18"></circle><circle class="ring-v" cx="22" cy="22" r="18" stroke-dasharray="${((113.1 * c.done) / c.total).toFixed(2)} 113.1" transform="rotate(-90 22 22)"></circle><text class="ring-x" x="22" y="26" text-anchor="middle">${c.done}/${c.total}</text></svg>
-      <span class="todo-title"><strong>${c.ready ? 'Prêt à prospecter' : 'Mise en route'}</strong><span class="muted small">${esc(name)}</span></span>
-      <span class="chev" aria-hidden="true"></span></button>
-    <button type="button" class="todo-x" data-todo-close aria-label="Retirer la mise en route de ce projet" title="Retirer la mise en route (masque aussi « config »)"><span aria-hidden="true">×</span></button>
-    <div class="todo-body">
-      <ul>${c.steps.map((s) => `<li class="${s.done ? 'done' : ''}">${s.done ? TICK : DOT}<div>
-        <button type="button" class="todo-go" data-todo-go="${esc(s.key)}">${esc(s.label)}</button>${s.optional ? '<span class="todo-opt">facultatif</span>' : ''}
-        ${s.done ? '' : `<span class="muted small">${esc(s.hint)}</span>`}</div></li>`).join('')}</ul>
-      <button type="button" class="todo-hide muted small" data-todo-hide>Masquer pour ce projet</button>
-    </div>`;
+  // La section « Mise en route » du projet : titre, avancement et lignes ; masquée une fois tout fait. Redessinée seulement si le contenu change.
+  function renderSetup(el, c) {
+    const acc = $('details[data-acc="setup"]', el);
+    if (!acc) return;
+    acc.hidden = !!c.complete;
+    $('.acc-title', acc).textContent = c.ready ? 'Prêt à prospecter' : 'Mise en route';
+    const sub = $('.acc-sub', acc);
+    if (sub) sub.textContent = `${c.done} étape${c.done > 1 ? 's' : ''} sur ${c.total}`;
+    const body = $('[data-setup]', acc);
+    const html = `<ul>${c.steps.map((s) => `<li class="${s.done ? 'done' : ''}">${s.done ? TICK : DOT}<div>
+      <button type="button" class="setup-go" data-setup-go="${esc(s.key)}">${esc(s.label)}</button>${s.optional ? '<span class="setup-opt">facultatif</span>' : ''}
+      ${s.done ? '' : `<span class="muted small">${esc(s.hint)}</span>`}</div></li>`).join('')}</ul>`;
+    if (body._html !== html) { body._html = html; body.innerHTML = html; }
   }
 
   async function loadChecklist(el) {
     try { setChecklist(el.dataset.id, await api(`/api/projects/${el.dataset.id}/checklist`)); } catch { /* la liste est un confort : on se tait */ }
   }
-
-  function focusTodo(el) {
-    todoFocus = el.dataset.id;
-    if (checklists.has(todoFocus)) renderTodo(); else loadChecklist(el);
-  }
+  $$('details.project').forEach((el) => el.addEventListener('toggle', () => { if (el.open && !checklists.has(el.dataset.id)) loadChecklist(el); }));
 
   // Ouvre la section de l'étape (et ses parents), y fait défiler la page et la fait clignoter un instant
   function todoGo(el, step) {
@@ -1099,50 +1080,26 @@
     setTimeout(() => target.classList.remove('flash'), 1800);
   }
 
-  // Retirer la liste d'un projet (croix ou « Masquer ») : elle et la pastille « config » disparaissent ; « Afficher la mise en route » la rend
-  function hideTodo(id) {
-    lsSet(`todo-off-${id}`, '1');
-    if (todo) todo.hidden = true;
-    const el = $(`details.project[data-id="${id}"]`);
-    const c = checklists.get(String(id));
-    if (el && c) markChecklist(el, c);
-  }
-  function restoreTodo(el) {
-    lsSet(`todo-off-${el.dataset.id}`, '0');
-    lsSet('todo-min', '0');
-    const c = checklists.get(el.dataset.id);
-    if (c) markChecklist(el, c);
-    focusTodo(el);
-    renderTodo();
-  }
-
-  if (todo) {
-    const projects = $$('details.project');
-    const start = $('details.project[open]') || projects[0];
-    if (start) focusTodo(start);
-    projects.forEach((el) => el.addEventListener('toggle', () => { if (el.open) focusTodo(el); }));
-    // La pastille « config » du projet rappelle la liste, même après l'avoir masquée
-    listen(document, 'click', (e) => {
-      const badge = e.target.closest('[data-cfg]');
-      const el = badge?.closest('details.project');
-      if (!el) return;
+  // Le badge « config » ouvre la section du projet ; une ligne de la liste ouvre l'étape
+  listen(document, 'click', (e) => {
+    const badge = e.target.closest('[data-cfg]');
+    if (badge) {
       e.preventDefault();
-      restoreTodo(el);
-    });
-    listen(document, 'click', (e) => {
-      const b = e.target.closest('[data-todo-restore-btn]');
-      if (b) restoreTodo(b.closest('details.project'));
-    });
-    todo.addEventListener('click', (e) => {
-      const id = todo.dataset.project;
-      const el = $(`details.project[data-id="${id}"]`);
-      if (e.target.closest('[data-todo-toggle]')) { lsSet('todo-min', todo.classList.contains('min') ? '0' : '1'); renderTodo(); return; }
-      if (e.target.closest('[data-todo-hide],[data-todo-close]')) { hideTodo(id); return; }
-      const go = e.target.closest('[data-todo-go]');
-      const step = go && checklists.get(id)?.steps.find((s) => s.key === go.dataset.todoGo);
-      if (step && el) todoGo(el, step);
-    });
-  }
+      const el = badge.closest('details.project');
+      const acc = el && $('details[data-acc="setup"]', el);
+      if (!acc || acc.hidden) return;
+      el.open = true;
+      acc.open = true;
+      const calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      acc.scrollIntoView({ behavior: calm ? 'auto' : 'smooth', block: 'start' });
+      $('summary', acc).focus({ preventScroll: true });
+      return;
+    }
+    const go = e.target.closest('[data-setup-go]');
+    const el = go?.closest('details.project');
+    const step = el && checklists.get(el.dataset.id)?.steps.find((s) => s.key === go.dataset.setupGo);
+    if (step) todoGo(el, step);
+  });
 
   // ---------- Réglages : ajouter un serveur Git ----------
   // GitHub est toujours là. Le « + » propose le type de serveur, puis ajoute une ligne URL + token (le formulaire reste un POST classique).
@@ -1361,6 +1318,9 @@
     const d = sum?.parentElement;
     const body = sum?.nextElementSibling;
     if (!d?.matches('details.anim') || !body || reduceMotion.matches) return;
+    // Un bouton ou un lien dans l'en-tête de la section (badge « config », « Analyser ») agit, il ne replie pas la section
+    const control = e.target.closest('button, a, input, select, label');
+    if (control && sum.contains(control)) return;
     e.preventDefault();
     d._anim?.cancel();
     const opening = !d.open || d.classList.contains('closing');
