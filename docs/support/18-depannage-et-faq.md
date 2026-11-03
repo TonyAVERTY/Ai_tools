@@ -10,6 +10,14 @@ Lire le message « En attente : … » dans le menu **Activité**. Raisons possi
 ## « Plafond atteint » ou refus de création
 Un plafond mensuel de l'offre (projets, prospects, mails, jobs IA, places d'équipe) est atteint. Le compteur est dans « Mon compte → Usage du mois » ; les plafonds se renouvellent le 1er du mois. Voir « Offres, plafonds et limites » et la page Tarifs.
 
+## Un message s'affiche en bas à droite : que veut-il dire ?
+Après une action, une notification apparaît en bas à droite. Un **succès** (« Prospect ajouté », « SMTP enregistré ») disparaît tout seul après quelques secondes. Une **erreur** reste plus longtemps (environ 8 secondes) ; la croix **×** la ferme tout de suite. Plusieurs notifications s'empilent (trois au plus) et le même message ne s'affiche qu'une fois.
+- « **Connexion impossible : réessaie dans un instant.** » : l'application n'a pas pu joindre le serveur (réseau coupé ou serveur indisponible). Rien n'a été enregistré : vérifie ta connexion puis recommence.
+- « **Erreur interne : réessaie dans un instant.** » : le serveur a rencontré un problème. Recommence ; si cela se répète, signale-le avec l'heure.
+- « **Tu n'as pas accès à cette action.** » : ton rôle sur le projet ne le permet pas (voir « Équipe »).
+- « **Introuvable : recharge la page.** » : l'élément a été supprimé ou déplacé depuis l'affichage de la page.
+- « **Ta session a expiré : reconnecte-toi.** » : tu reviens à la page de connexion ; après la connexion, retourne sur la page où tu étais.
+
 ## « Trop de requêtes : réessaie dans … »
 Le serveur limite le rythme des actions pour se protéger d'une boucle ou d'un abus. Une action isolée n'est jamais concernée : le message apparaît seulement après un très grand nombre d'enregistrements ou de clics en peu de temps (plus de 600 écritures en 10 minutes pour un même compte, avec des seuils plus bas sur certaines actions comme les vidéos, le chat ou la liaison Claude). Attends la durée indiquée dans le message, puis recommence. Les lectures (consulter une page, une liste) ne sont pas limitées. Si le message revient en usage normal, signale-le à l'administrateur.
 

@@ -3,6 +3,7 @@
 import { esc } from './http.js';
 import { layout } from './views.js';
 import { ic } from './icons.js';
+import { banner } from './banner.js';
 import {
   KINDS, KIND_BY_KEY, CATEGORIES, METHODS, VAT_RATES, REGIMES, ACTIVITIES, VAT_MODES, FREQUENCIES, REFERENCE,
   categoryLabel, methodLabel, fmtEur, dayLabel,
@@ -80,7 +81,7 @@ function guideBlock(g, d) {
       ${d.settings.complete && d.settings.regime !== 'unknown' ? `<form method="get" action="/compta" class="inline-form"><label class="sr-only" for="decl-p">Période à déclarer</label>
         <select id="decl-p" name="declarer" data-autosubmit>${d.declOptions.map(([p, l]) => opt(p, l, p === g.period)).join('')}</select><noscript><button class="btn small">Afficher</button></noscript></form>` : ''}</div>
     ${deadline}
-    ${g.done ? `<p class="cmp-flash ok" role="status">${ic('check')} Tu as indiqué avoir fait cette déclaration.</p>` : ''}
+    ${g.done ? banner('ok', 'Tu as indiqué avoir fait cette déclaration.') : ''}
     <p class="lbl">Comment faire, pas à pas</p>
     <ol class="cmp-steps">${g.steps.map((s) => `<li>${esc(s)}</li>`).join('')}</ol>
     ${where ? `<div class="row-actions">${where}</div>` : ''}
@@ -158,8 +159,8 @@ export function accountingPage(d) {
   const exportHref = (extra = {}) => `/compta/export?${new URLSearchParams({ periode: d.periodValue, ...extra }).toString()}`;
   const hasAny = d.count > 0;
 
-  const flash = d.error ? `<p class="cmp-flash warn" role="alert">${ic('alert')} ${esc(d.error)}</p>` : d.saved === 'situation' ? '<p class="cmp-flash ok" role="status">Ta situation est enregistrée.</p>'
-    : d.saved === 'payee' ? '<p class="cmp-flash ok" role="status">Facture marquée payée : elle compte maintenant dans tes chiffres.</p>' : d.saved === 'supprimee' ? '<p class="cmp-flash ok" role="status">Ligne supprimée.</p>' : d.saved === 'declaration' ? '<p class="cmp-flash ok" role="status">C\'est noté.</p>' : '';
+  const flash = d.error ? banner('err', d.error) : d.saved === 'situation' ? banner('ok', 'Ta situation est enregistrée.')
+    : d.saved === 'payee' ? banner('ok', 'Facture marquée payée : elle compte maintenant dans tes chiffres.') : d.saved === 'supprimee' ? banner('ok', 'Ligne supprimée.') : d.saved === 'declaration' ? banner('ok', 'C\'est noté.') : '';
 
   const nextCard = d.next ? `<section class="card cmp-next" aria-labelledby="t-next">
       <div><h2 id="t-next">Prochaine déclaration</h2>
