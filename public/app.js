@@ -66,16 +66,31 @@
   }
 
   // Outils communs pour les fichiers public/app-*.js (chargés après celui-ci)
-  Object.assign(window.AiTools, { $, $$, api, esc, every, formData, go, icon, liDay, listen, refreshProject });
+  Object.assign(window.AiTools, { $, $$, api, esc, every, formData, go, icon, liDay, listen, refreshProject, httpErrorText, networkErrorText, toLogin });
+
+  // Une erreur dit ce qui s'est passé et quoi faire ensuite : jamais « Failed to fetch » ni un code brut. Le message du serveur, quand il y en a un, passe en premier.
+  function httpErrorText(status) {
+    if (status === 403) return "Tu n'as pas accès à cette action.";
+    if (status === 404) return 'Introuvable : recharge la page.';
+    if (status === 429) return 'Trop de demandes : attends un instant puis réessaie.';
+    if (status >= 500) return 'Erreur interne : réessaie dans un instant.';
+    return `Erreur ${status} : recharge la page puis réessaie.`;
+  }
+  function networkErrorText() { return 'Connexion impossible : réessaie dans un instant.'; } // déclaration (hoistée) : exportée plus haut dans window.AiTools
+  // Session expirée : on revient à la connexion avec l'explication (la page de connexion affiche déjà `?e=`), plutôt qu'une redirection muette
+  function toLogin() { location.href = `/login?e=${encodeURIComponent('Ta session a expiré : reconnecte-toi.')}`; }
 
   async function call(path, body) {
-    const r = await fetch(path, body === undefined ? { headers: { Accept: 'application/json' } } : {
-      method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(body),
-    });
-    if (r.status === 401) { location.href = '/login'; throw new Error('Session expirée'); }
+    let r;
+    try {
+      r = await fetch(path, body === undefined ? { headers: { Accept: 'application/json' } } : {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(body),
+      });
+    } catch { throw new Error(networkErrorText()); }
+    if (r.status === 401) { toLogin(); throw new Error('Session expirée'); }
     const data = await r.json().catch(() => ({}));
     if (r.status === 403 && data.code === 'link_required') showReconnect();
-    if (!r.ok) throw new Error(data.error || `Erreur ${r.status}`);
+    if (!r.ok) throw new Error(data.error || httpErrorText(r.status));
     return data;
   }
 
@@ -93,12 +108,31 @@
     dlg.showModal();
   }
 
+  // Notifications d'une action : empilées dans un conteneur (sinon deux messages se superposent), annoncées aux lecteurs d'écran
+  // (alert pour une erreur, status sinon), fermables, sans doublon (le même message ne s'empile pas : sa durée repart), trois au plus.
+  // Une erreur reste 8 s (le temps de la lire), le reste 4,2 s.
   function toast(msg, kind = 'ok') {
+    let box = document.querySelector('.toasts');
+    if (!box) { box = document.createElement('div'); box.className = 'toasts'; document.body.append(box); }
+    const key = `${kind}|${msg}`;
+    const arm = (t) => { clearTimeout(t._timer); t._timer = setTimeout(() => close(t), kind === 'error' ? 8000 : 4200); };
+    const close = (t) => { clearTimeout(t._timer); t.classList.add('out'); setTimeout(() => t.remove(), 300); };
+    const same = [...box.children].find((t) => t.dataset.key === key);
+    if (same) { arm(same); return; }
+    while (box.children.length >= 3) box.firstElementChild.remove();
     const t = document.createElement('div');
     t.className = `toast ${kind}`;
-    t.textContent = msg;
-    document.body.append(t);
-    setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 300); }, 4200);
+    t.dataset.key = key;
+    t.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+    const text = document.createElement('span');
+    text.className = 'toast-t';
+    text.textContent = msg;
+    const x = document.createElement('button');
+    x.type = 'button'; x.className = 'toast-x'; x.setAttribute('aria-label', 'Fermer la notification'); x.textContent = '×';
+    x.addEventListener('click', () => close(t));
+    t.append(text, x);
+    box.append(t);
+    arm(t);
   }
 
   // Barres de progression : la largeur passe par le CSSOM (la CSP interdit les attributs style="").
@@ -600,7 +634,7 @@
     activityRequest = (async () => {
       try {
         const response = await fetch('/api/jobs/activity', { headers: { Accept: 'application/json' }, cache: 'no-store', signal: AbortSignal.timeout(8000) });
-        if (response.status === 401) { location.href = '/login'; return; }
+        if (response.status === 401) { toLogin(); return; }
         if (!response.ok) throw new Error('Relevé indisponible');
         const snapshot = await response.json();
         if (disposed) return;
