@@ -16,12 +16,10 @@ const TARGET = JSON.stringify({ description: 'TPE du bâtiment', secteurs: ['plo
 const failJob = (uid, pid, msg) => s.db.prepare('INSERT INTO jobs(user_id, project_id, type, status, error, created_at, started_at, finished_at) VALUES(?, ?, ?, ?, ?, ?, ?, ?)').run(uid, pid, 'analyze', 'error', msg, now(), now(), now());
 const waitFor = async (fn, ms = 6000) => { const end = Date.now() + ms; while (Date.now() < end) { if (await fn()) return true; await new Promise((r) => setTimeout(r, 120)); } return false; };
 
-async function open(u, vp, { todo = false } = {}) {
+async function open(u, vp) {
   const ctx = await b.newContext({ viewport: vp });
   const [name, value] = u.cookie.split('=');
   await ctx.addCookies([{ name, value, url: s.base }]);
-  // liste « Mise en route » : dépliée seulement pour le test qui l'utilise (dépliée, elle recouvre le bas du contenu et intercepte les clics)
-  await ctx.addInitScript((open) => { try { localStorage.setItem('todo-min', open ? '0' : '1'); } catch { /* ignore */ } }, todo);
   const p = await ctx.newPage();
   const errs = [];
   p.on('pageerror', (e) => errs.push(e.message));
@@ -58,15 +56,16 @@ for (const vp of [{ width: 1280, height: 900 }, { width: 390, height: 844 }]) {
   const u2 = await s.newUser();
   const pid2 = await addProject(s.db, u2.id, { name: 'Analysé' });
   await s.db.prepare('UPDATE projects SET profile_json = ?, target_json = ?, target_validated = 1 WHERE id = ?').run(PROFILE, TARGET, pid2);
-  ({ ctx, p, errs } = await open(u2, vp, { todo: true }));
+  ({ ctx, p, errs } = await open(u2, vp));
   ok(!(await isOpen(p, 'header')), `${tag} analysé : En-tête replié`);
   ok(await isOpen(p, 'prospect') && await isOpen(p, 'search'), `${tag} cible validée : Prospecter et sa recherche sont ouverts`);
   ok(await order(p, 'prospect', 'header') && await order(p, 'header', 'config'), `${tag} analysé : En-tête descendu, juste avant Configuration`);
   ok(!(await p.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)), `${tag} pas de défilement horizontal`);
 
   // 3) la liste « Mise en route » retrouve En-tête à sa nouvelle place et l'ouvre
-  await p.waitForSelector('[data-todo-go="analyze"]', { timeout: 8000 });
-  await p.locator('[data-todo-go="analyze"]').click();
+  await p.waitForSelector('[data-cfg]:not([hidden])', { timeout: 8000 });
+  await p.locator('[data-cfg]').click(); // le badge « config » ouvre la section « Mise en route » du projet
+  await p.locator('[data-setup-go="analyze"]').click();
   ok(await waitFor(() => isOpen(p, 'header')), `${tag} « Mise en route → Analyser le projet » ouvre En-tête, même replié en bas`);
   ok(await p.locator('details[data-acc="header"] >> text=Site du produit').first().isVisible(), `${tag} le champ « Site du produit » est visible une fois En-tête ouvert`);
   ok(errs.length === 0, `${tag} analysé : aucune erreur console${errs.length ? ` : ${errs.join(' | ')}` : ''}`);

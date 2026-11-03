@@ -22,7 +22,6 @@ for (const scheme of ['light', 'dark']) {
     const ctx = await b.newContext({ viewport: vp, colorScheme: scheme });
     const [name, value] = u.cookie.split('=');
     await ctx.addCookies([{ name, value, url: s.base }]);
-    await ctx.addInitScript(() => { try { localStorage.setItem('todo-min', '1'); } catch { /* ignore */ } });
     let posts = 0;
     await ctx.route('**/*', async (route) => { const r = route.request(); if (r.method() !== 'POST') return route.continue(); if (/\/api\/projects\/\d+\/delete$/.test(r.url()) || /\/delete/.test(r.url())) posts++; await route.fulfill({ response: await route.fetch({ headers: { ...r.headers(), origin: APP_URL }, maxRedirects: 0 }) }); });
     const p = await ctx.newPage();
