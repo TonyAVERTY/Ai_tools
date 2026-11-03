@@ -113,8 +113,8 @@ await p.locator('details.ia-menu a[href="/chat"]').click();
 await p.waitForURL('**/chat'); await ready();
 await p.fill('[data-chat-input]', 'ECHO page IA en navigation douce');
 await p.keyboard.press('Enter');
-await p.waitForSelector('.msg.bot .msg-actions', { timeout: 15000 }).catch(async () => { console.log('   état du fil :', (await p.locator('[data-chat-log]').innerText()).slice(0, 200), '| erreurs :', errs); });
-check((await p.locator('.msg.bot .bubble').last().innerText()).includes('Écho'), 'page IA ouverte sans rechargement : envoi et réponse');
+await p.waitForSelector('.chat-msg.bot .msg-actions', { timeout: 15000 }).catch(async () => { console.log('   état du fil :', (await p.locator('[data-chat-log]').innerText()).slice(0, 200), '| erreurs :', errs); });
+check((await p.locator('.chat-msg.bot .bubble').last().innerText()).includes('Écho'), 'page IA ouverte sans rechargement : envoi et réponse');
 await p.locator('.pills a.pill', { hasText: 'Mails' }).click();
 await p.waitForURL('**/mails'); await ready();
 await p.locator('details.ia-menu > summary').hover();
@@ -122,8 +122,8 @@ await p.locator('details.ia-menu a[href="/chat"]').click();
 await p.waitForURL('**/chat'); await ready();
 await p.fill('[data-chat-input]', 'ECHO deuxième visite');
 await p.keyboard.press('Enter');
-await p.waitForFunction(() => document.querySelectorAll('.msg.bot .msg-actions').length >= 1, null, { timeout: 15000 });
-check((await p.locator('.msg.bot .bubble').last().innerText()).includes('Écho : ECHO deuxième visite'), 'page IA : revenir dessus relance bien son script');
+await p.waitForFunction(() => document.querySelectorAll('.chat-msg.bot .msg-actions').length >= 1, null, { timeout: 15000 });
+check((await p.locator('.chat-msg.bot .bubble').last().innerText()).includes('Écho : ECHO deuxième visite'), 'page IA : revenir dessus relance bien son script');
 
 // 7. rechargement doux (remplace location.reload d'app.js) : défilement conservé
 await p.goto(`${s.base}/`);

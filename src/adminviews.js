@@ -1,6 +1,7 @@
 // Page /admin : comptes (identité, liaison, usage du mois) et journal d'audit. Aucune donnée métier.
 import { esc } from './http.js';
 import { layout } from './views.js';
+import { banner } from './banner.js';
 
 const fmt = (ts) => (ts ? new Date(ts * 1000).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' }) : '—');
 const PROVIDERS = { google: 'Google', apple: 'Apple' };
@@ -44,8 +45,8 @@ export function adminPage({ user, list, audit, q = '', notice = null, error = nu
     title: 'Administration', email: user.email,
     body: `<div class="stack"><h1>Administration</h1>
 <p class="muted">Comptes et compteurs d'usage uniquement : aucun accès aux prospects, mails ni notes des utilisateurs.</p>
-${notice ? `<p class="ok" role="status">${esc(notice)}</p>` : ''}
-${error ? `<p class="error" role="alert">${esc(error)}</p>` : ''}
+${notice ? banner('ok', notice) : ''}
+${error ? banner('err', error) : ''}
 <section class="card">
   <form method="get" action="/admin" class="inline admin-search"><label class="field"><span class="lbl">Rechercher un email</span><input name="q" type="search" value="${esc(q)}" maxlength="100" placeholder="nom@exemple.fr"></label> <button class="btn small">Chercher</button></form>
   <p class="muted small">${list.total} compte${list.total > 1 ? 's' : ''}${list.pages > 1 ? `, page ${list.page} sur ${list.pages}` : ''}</p>
