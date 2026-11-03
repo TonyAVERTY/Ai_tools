@@ -11,6 +11,6 @@ const KINDS = { ok: { icon: 'check', role: 'status' }, err: { icon: 'alert', rol
 export function banner(kind, text, { strong = false } = {}) {
   const k = KINDS[kind];
   if (!k) throw new Error(`banner : type inconnu « ${kind} »`);
-  const t = esc(text);
+  const t = esc(kind === 'err' && !/[.!?…]$/.test(String(text)) ? `${text}.` : text); // une erreur est une phrase : elle finit par un point (comme le toast d'erreur)
   return `<p class="msg msg-${kind}" role="${k.role}">${ic(k.icon)}<span>${strong ? `<b>${t}</b>` : t}</span></p>`;
 }
