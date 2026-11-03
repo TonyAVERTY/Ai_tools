@@ -147,7 +147,7 @@
   let projectsLoaded = false;
   projMenu?.addEventListener('toggle', async () => {
     if (!projMenu.open || projectsLoaded) return;
-    projList.replaceChildren(el('p', 'muted small', 'Chargement…'));
+    projList.innerHTML = window.AiTools.loadingHtml('Chargement…', { small: true });
     try {
       const r = await fetch('/api/chat/projects', { headers: { Accept: 'application/json' } });
       const d = await r.json();
