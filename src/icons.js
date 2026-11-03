@@ -36,7 +36,6 @@ const SYMBOLS = {
   help: '<circle cx="12" cy="12" r="9"></circle><path d="M9.5 9.6a2.6 2.6 0 1 1 3.7 2.3c-.8.4-1.2 1-1.2 1.9"></path><path d="M12 17h.01"></path>',
   globe: '<circle cx="12" cy="12" r="9"></circle><path d="M3 12h18"></path><path d="M12 3c2.5 2.6 3.8 5.6 3.8 9S14.5 18.4 12 21c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"></path>',
   link: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"></path><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"></path>',
-  load: '<path d="M12 3a9 9 0 1 0 9 9"></path>',
   lock: '<rect x="5" y="11" width="14" height="9" rx="3"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path>',
   mail: '<rect x="3" y="5" width="18" height="14" rx="3"></rect><path d="m4 8 8 6 8-6"></path>',
   out: '<path d="M9 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h3"></path><path d="M16 8l4 4-4 4M20 12H9"></path>',
@@ -72,5 +71,5 @@ ${gradient('g-ring', 44)}
 ${Object.entries(SYMBOLS).map(([k, d]) => `<symbol id="i-${k}" viewBox="0 0 24 24">${d}</symbol>`).join('\n')}
 </svg>`;
 
-/** Icône du sprite : `ic('check')`, ou `ic('load', 'spin')` pour ajouter une classe. Décorative (le mot est toujours écrit à côté). */
+/** Icône du sprite : `ic('check')`, ou `ic('lock', 'ic-s')` pour ajouter une classe. Décorative (le mot est toujours écrit à côté). */
 export const ic = (name, cls = '') => `<svg class="ic${cls ? ` ${cls}` : ''}" aria-hidden="true" viewBox="0 0 24 24"><use href="#i-${name}"></use></svg>`;

@@ -285,9 +285,10 @@ form.send { display: flex; margin: 0; padding: 0; border: 0; }
 .spinner, .spin-inline { display: inline-block; border: 2px solid var(--line-strong); border-top-color: var(--accent); border-radius: 50%; animation: spin .9s linear infinite; flex: none; }
 .spinner { width: 22px; height: 22px; border-width: 3px; }
 .spin-inline { width: 12px; height: 12px; margin-right: 6px; vertical-align: -1px; }
-.spin { animation: spin .9s linear infinite; }
+/* Bouton occupé : le même anneau, devant le texte, sans changer la largeur du libellé. L'anneau reste visible (immobile) si le mouvement réduit est demandé. */
+.btn[aria-busy="true"]::before { content: ""; flex: none; width: 14px; height: 14px; border: 2px solid var(--line-strong); border-top-color: var(--accent); border-radius: 50%; animation: spin .9s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .spinner, .spin-inline, .spin { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .spinner, .spin-inline, .btn[aria-busy="true"]::before { animation: none; } }
 .moon { width: 18px; height: 18px; border-radius: 50%; box-shadow: inset -5px -3px 0 0 var(--accent); flex: none; transform: rotate(-20deg); }
 .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
 .kpi { padding: 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card-2); }
