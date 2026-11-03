@@ -452,8 +452,12 @@ figure.chart figcaption { font-size: .9375rem; font-weight: 600; margin-bottom: 
 .pcfg.badge { margin: 0; }
 
 /* ---------- Notifications ---------- */
-.toast { position: fixed; right: 16px; bottom: 84px; z-index: 40; max-width: min(420px, calc(100vw - 32px)); display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border-radius: var(--radius); background: var(--card); color: var(--text); border: 1px solid var(--ok); box-shadow: var(--shadow-3); font-weight: 600; font-size: .9375rem; transition: opacity var(--t-slow), transform var(--t-slow); }
+.toasts { position: fixed; right: 16px; bottom: 84px; z-index: 40; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; max-width: min(420px, calc(100vw - 32px)); pointer-events: none; }
+.toast { position: relative; pointer-events: auto; max-width: 100%; display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border-radius: var(--radius); background: var(--card); color: var(--text); border: 1px solid var(--ok); box-shadow: var(--shadow-3); font-weight: 600; font-size: .9375rem; transition: opacity var(--t-slow), transform var(--t-slow); }
 .toast.error { border-color: var(--err); }
+.toast-t { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.toast-x { flex: none; width: 24px; height: 24px; margin: -2px -4px -2px 0; padding: 0; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 50%; background: transparent; color: var(--muted); font: inherit; font-size: 1.125rem; line-height: 1; cursor: pointer; }
+.toast-x:hover { background: var(--bg-sunk); color: var(--text); }
 .toast.out { opacity: 0; transform: translateY(8px); }
 
 /* ---------- Réglages ---------- */
@@ -546,7 +550,7 @@ input.copy { font-family: var(--mono); font-size: .8125rem; }
   .todo.min { width: 64px; height: 64px; border-radius: 999px; }
   .todo.min .todo-head { min-height: 62px; padding: 0 9px; }
   .todo.min .todo-title, .todo.min .chev { display: none; }
-  .toast { bottom: 24px; }
+  .toasts { bottom: 24px; }
 }
 
 @media (max-width: 899px) {
