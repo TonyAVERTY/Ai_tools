@@ -28,6 +28,8 @@ La visite guidée du tableau de bord (`src/tour.js`, `TOUR_STEPS`) fait découvr
 - **CSP stricte** : aucun `style="…"` ni `<script>` en ligne dans le HTML, aucune ressource externe. Les couleurs viennent des jetons de `public/tokens.css` (jamais en dur dans `public/site.css`).
 - **Rédaction de l'interface** (`docs/UX.md`, « Rédaction ») : on tutoie ; un succès se dit « Nom + participe passé » sans point ni « ! » ; une erreur dit ce qui n'a pas marché puis la suite après « : » (le point final est ajouté à l'affichage) ;
   boutons à l'infinitif (Enregistrer, Ajouter / Créer, Supprimer / Retirer / Effacer ont chacun leur sens). `test/wording.test.js` échoue sur « avec succès », un « ! », un point sur un succès ou un « vous » : corrige le texte, ne contourne pas le test.
+- **Animations** (`docs/UX.md`, « Animations ») : aucune n'est ajoutée, changée ni retirée sans l'accord du propriétaire du produit, présentée une par une ; une animation en boucle n'anime que `transform` et `opacity` (`test/motion.test.js`) ;
+  un gain de performance s'annonce mesuré avant et après.
 - **Icônes** : `src/icons.js` (sprite par page) ; une icône utilisée doit exister.
 - **Secrets** : jamais dans le dépôt ni dans les journaux ; chiffrés en base ; jamais réaffichés.
 - **Isolation** : toute donnée métier est filtrée par `user_id` ; un compte ne voit jamais celles d'un autre (réponse « introuvable »).
