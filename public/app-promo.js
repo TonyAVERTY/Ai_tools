@@ -1,7 +1,7 @@
 // Promotion d'un projet : formulaire de la vidéo, choix de la voix, vidéos produites, clés des fournisseurs de voix.
 // Chargé après app.js, qui expose ses outils communs dans window.AiTools ; ajax.js relance ce script à chaque navigation, comme app.js.
 (() => {
-  const { $, $$, api, confirmBox, esc, go, icon, liDay, listen, refreshProject, toast } = window.AiTools;
+  const { $, $$, api, confirmBox, esc, go, icon, liDay, listen, loadingHtml, refreshProject, toast } = window.AiTools;
   const mo = (n) => (n >= 1048576 ? `${(n / 1048576).toFixed(1).replace('.', ',')} Mo` : `${Math.max(1, Math.round(n / 1024))} Ko`);
 
   // ---------- Promotion ----------
@@ -111,7 +111,7 @@
     voiceSync(f);
     if (!p?.keyed || !p.keyLast4 || p.voices) return;
     const state = $('[data-promo-sample-state]', f);
-    state.textContent = 'Chargement des voix…';
+    state.innerHTML = loadingHtml('Chargement des voix…', { small: true });
     try { p.voices = (await api(`/api/promo/voices?provider=${encodeURIComponent(p.id)}`)).voices; state.textContent = ''; } catch (err) { state.textContent = err.message; }
     if (voiceProvider(f) === p) voiceSync(f);
   }
@@ -154,7 +154,7 @@
     const state = $('[data-promo-sample-state]', f);
     const url = `/api/promo/voice-sample?provider=${encodeURIComponent(f.voiceProvider.value)}&voice=${encodeURIComponent(f.voiceName.value)}&lang=${encodeURIComponent(f.voiceLang.value)}`;
     b.disabled = true;
-    state.textContent = 'Chargement de l\'extrait…';
+    state.innerHTML = loadingHtml('Chargement de l\'extrait…', { small: true });
     try {
       const r = await fetch(url, { credentials: 'same-origin' });
       if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'Extrait indisponible');
