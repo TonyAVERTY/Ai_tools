@@ -282,7 +282,7 @@ export function howPage({ appUrl, apple = false }) {
     <p>Il écrit ensuite un mail court, un deuxième objet pour comparer, et une relance. Tu relis, tu ajustes, tu valides, puis tu confirmes chaque lot (100 mails au plus), envoyé depuis ta boîte avec une pause au hasard entre deux mails. La relance est facultative, il n'y en a qu'une. Les réponses se suivent dans le tableau de bord.</p>`,
       mock: shot('Maquette : recherche de contacts à 64 %, brouillon de mail à valider', `<div class="sh-h"><span class="sh-t">Atelier Exemple</span>${badge('b-ok', 'check', 'Cible validée')}</div>
     <div><div class="prog-h"><span>Recherche de contacts</span><span>64 %</span></div><div class="track"><div class="bar"></div></div></div>
-    <div class="mail"><span class="mail-s">Objet : une idée pour ton atelier</span><span class="mail-p">Bonjour, j'ai vu votre atelier à Vannes…</span></div>
+    <div class="mail"><span class="mail-s">Objet : une idée pour votre atelier</span><span class="mail-p">Bonjour, j'ai vu votre atelier à Vannes…</span></div>
     <div class="btns"><span class="btn btn-secondary">Relire</span><span class="btn btn-primary">${ic('send')}Valider l'envoi</span></div>`),
     }),
   ].join('\n\n');

@@ -69,7 +69,7 @@
     el.className = 'reply-pop';
     const sum = document.createElement('summary');
     const who = document.createElement('strong'); who.textContent = r.from;
-    sum.append(who, ' vous a apporté une réponse');
+    sum.append(who, ' t\'a répondu');
     const badge = document.createElement('span'); badge.className = 'badge'; badge.textContent = r.intentLabel; sum.append(' ', badge);
     const close = document.createElement('button'); close.type = 'button'; close.className = 'reply-x'; close.setAttribute('aria-label', 'Fermer'); close.textContent = '×';
     close.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); el.remove(); markSeen(r.id).then(pollReplies); });
