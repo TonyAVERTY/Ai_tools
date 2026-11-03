@@ -43,7 +43,7 @@
 
   const errorText = (doc, status) => {
     const t = doc.querySelector('.card p, main p')?.textContent?.trim();
-    return t || (status >= 500 ? 'Erreur interne : réessaie dans un instant.' : `Erreur ${status}`);
+    return t || window.AiTools?.httpErrorText?.(status) || (status >= 500 ? 'Erreur interne : réessaie dans un instant.' : `Erreur ${status}`);
   };
 
   async function download(res) {
@@ -109,7 +109,7 @@
     const [a, z] = [tabOf(fromPath), tabOf(u.pathname)];
     const move = keepScroll || fromPath === u.pathname ? null : a >= 0 && z >= 0 ? (z > a ? 'right' : 'left') : 'up';
     const savedY = scrollY; // le contenu est remplacé d'un coup : la page peut être raccourcie un instant, on garde la valeur d'avant
-    const toasts = [...document.querySelectorAll('.toast')];
+    const toastBox = document.querySelector('.toasts'); // les notifications en cours survivent à la navigation
     // Le fond animé reste tel quel pendant le remplacement : pas de clignotement
     const bg = document.getElementById('bg');
     document.title = doc.title;
@@ -118,7 +118,7 @@
     if (keep) document.body.classList.add('hdr-off');
     document.body.innerHTML = doc.body.innerHTML;
     if (bg && document.getElementById('bg')) document.getElementById('bg').replaceWith(bg);
-    for (const t of toasts) document.body.append(t);
+    if (toastBox) document.body.append(toastBox);
     if (push) {
       history.replaceState({ ...history.state, y: scrollY }, '');
       if (next === here()) history.replaceState({ y: 0 }, '', url); else history.pushState({ y: 0 }, '', url);
@@ -158,7 +158,7 @@
       busy(false);
       if (method === 'GET') { location.assign(url); return; }
       onFail();
-      toast('Connexion impossible : réessaie dans un instant.');
+      toast(window.AiTools?.networkErrorText?.() || 'Connexion impossible : réessaie dans un instant.');
       return;
     }
     if (mine !== seq) return;
