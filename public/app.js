@@ -41,7 +41,7 @@
   // (public/fx.js). Un seul point d'accroche, ici : toute route qui met un job en file passe par api().
   const LAUNCH = /^\/api\/(projects\/\d+\/(analyze|template|followup_template|prospect|evolution|code-review|send|linkedin\/generate|promo\/generate|poste\/\w+)|prospects\/\d+\/hook)$/;
   let lastTrigger = null; // le bouton cliqué (ou validé au clavier) juste avant
-  listen(document, 'click', (e) => { const t = e.target.closest?.('button, a.btn, label.btn'); if (t) lastTrigger = t; }, true);
+  listen(document, 'click', (e) => { const t = e.target.closest?.('button, a.btn, label.btn'); if (t && !t.closest('dialog.confirm')) lastTrigger = t; }, true);
   listen(document, 'submit', (e) => { lastTrigger = e.submitter || $('button:not([type=button])', e.target) || lastTrigger; }, true);
 
   // Anti-double-clic : un clic répété sur un bouton (2e, 3e clic d'une série rapide) est ignoré, sauf bouton marqué data-repeat
@@ -69,7 +69,7 @@
   }
 
   // Outils communs pour les fichiers public/app-*.js (chargés après celui-ci)
-  Object.assign(window.AiTools, { $, $$, api, esc, every, formData, go, icon, liDay, listen, refreshProject, httpErrorText, networkErrorText, toLogin });
+  Object.assign(window.AiTools, { $, $$, api, esc, every, formData, go, icon, liDay, listen, refreshProject, httpErrorText, networkErrorText, toLogin, confirmBox });
 
   // Une erreur dit ce qui s'est passé et quoi faire ensuite : jamais « Failed to fetch » ni un code brut. Le message du serveur, quand il y en a un, passe en premier.
   function httpErrorText(status) {
@@ -114,6 +114,39 @@
   // Notifications d'une action : empilées dans un conteneur (sinon deux messages se superposent), annoncées aux lecteurs d'écran
   // (alert pour une erreur, status sinon), fermables, sans doublon (le même message ne s'empile pas : sa durée repart), trois au plus.
   // Une erreur reste 8 s (le temps de la lire), le reste 4,2 s.
+  // Confirmation d'une action sensible : une boîte de l'application (jamais window.confirm, qui sort du thème, du clavier et du libellé).
+  // Le message s'écrit « Question ? Conséquence. » : la question devient le titre, la suite le détail. Le bouton porte le verbe de l'action
+  // (« Supprimer », « Publier »…), rouge quand on supprime ou retire ; « Annuler » est le choix par défaut dans ce cas. Échap ou un clic à côté annule.
+  // Renvoie une promesse : `if (!(await confirmBox('Supprimer cette note ?'))) return;`
+  const DANGER_VERB = /^(Supprimer|Effacer|Retirer|Déconnecter)\b/;
+  function confirmBox(message, { confirm: label, danger } = {}) {
+    if (document.querySelector('dialog.confirm')) return Promise.resolve(false);
+    const text = String(message).trim().replace(/ \?/g, '\u00a0?'); // espace insécable avant « ? » : le point d'interrogation ne tombe jamais seul à la ligne
+    const cut = /^([^]*?\?)\s+([^]*)$/.exec(text);
+    const title = cut ? cut[1] : text;
+    const detail = cut ? cut[2].trim() : '';
+    const verb = DANGER_VERB.exec(title)?.[1];
+    const risky = danger ?? !!verb;
+    return new Promise((resolve) => {
+      const dlg = document.createElement('dialog');
+      dlg.className = 'prospect-dialog modal confirm';
+      dlg.setAttribute('aria-labelledby', 'confirm-t');
+      const h = document.createElement('h2'); h.id = 'confirm-t'; h.textContent = title; dlg.append(h);
+      if (detail) { dlg.setAttribute('aria-describedby', 'confirm-d'); const p = document.createElement('p'); p.id = 'confirm-d'; p.className = 'confirm-d'; p.textContent = detail; dlg.append(p); }
+      const row = document.createElement('div'); row.className = 'modal-f';
+      const no = document.createElement('button'); no.type = 'button'; no.className = 'btn'; no.textContent = 'Annuler';
+      const yes = document.createElement('button'); yes.type = 'button'; yes.className = `btn ${risky ? 'danger-fill' : 'primary'}`; yes.dataset.yes = ''; yes.textContent = label || verb || 'Confirmer';
+      no.addEventListener('click', () => dlg.close('no'));
+      yes.addEventListener('click', () => dlg.close('yes'));
+      row.append(no, yes); dlg.append(row);
+      dlg.addEventListener('click', (ev) => { if (ev.target === dlg) dlg.close('no'); });
+      dlg.addEventListener('close', () => { const ok = dlg.returnValue === 'yes'; dlg.remove(); resolve(ok); });
+      document.body.append(dlg);
+      dlg.showModal();
+      (risky ? no : yes).focus();
+    });
+  }
+
   function toast(msg, kind = 'ok') {
     let box = document.querySelector('.toasts');
     if (!box) { box = document.createElement('div'); box.className = 'toasts'; document.body.append(box); }
@@ -1177,9 +1210,15 @@
     catch { const r = document.createRange(); r.selectNodeContents(code); getSelection().removeAllRanges(); getSelection().addRange(r); toast('Sélectionné : copie-le avec Ctrl+C', 'error'); }
   });
   // Action définitive : un formulaire qui porte data-confirm demande confirmation avant de partir
-  listen(document, 'submit', (e) => {
-    const msg = e.target.dataset?.confirm;
-    if (msg && !confirm(msg)) e.preventDefault();
+  listen(document, 'submit', async (e) => {
+    const form = e.target;
+    const msg = form.dataset?.confirm;
+    if (!msg || form.dataset.action || form.dataset.confirmed === '1') return; // data-action : voir « Formulaires » plus bas (une seule confirmation)
+    e.preventDefault();
+    if (!(await confirmBox(msg, { confirm: form.dataset.confirmLabel }))) return;
+    form.dataset.confirmed = '1';
+    form.requestSubmit(e.submitter || undefined); // même envoi qu'avant, avec le même bouton, sans redemander
+    delete form.dataset.confirmed;
   });
 
   // ---------- Réglages : prompts par gamme de modèle ----------
@@ -1372,7 +1411,7 @@
     if (runBtn) {
       e.preventDefault(); // le bouton « Réanalyser » est dans la ligne du projet : il ne doit pas la replier
       const { run, id } = runBtn.dataset;
-      if (run === 'analyze' && runBtn.hasAttribute('data-reanalyze') && !confirm('Relancer l\'analyse complète du repo ? (consomme du quota Claude)')) return;
+      if (run === 'analyze' && runBtn.hasAttribute('data-reanalyze') && !(await confirmBox('Relancer l\'analyse complète du dépôt ?\nElle consomme du quota Claude.', { confirm: 'Relancer' }))) return;
       try {
         const r = await api(`/api/projects/${id}/${run}`, {});
         toast(r.existing ? 'Déjà en cours' : 'Lancé');
@@ -1488,7 +1527,7 @@
     const off = e.target.closest('[data-footer-off]');
     const on = e.target.closest('[data-footer-on]');
     if (!off && !on) return;
-    if (off && !confirm(FOOTER_RISK)) return;
+    if (off && !(await confirmBox(FOOTER_RISK, { confirm: 'Retirer le pied de page' }))) return;
     const box = (off || on).closest('[data-footer-opt]');
     const btn = off || on;
     btn.disabled = true;
@@ -1512,7 +1551,7 @@
     if (!form) return;
     e.preventDefault();
     const { action, id, confirm: question } = form.dataset;
-    if (question && !confirm(question)) return;
+    if (question && !(await confirmBox(question, { confirm: form.dataset.confirmLabel }))) return;
     const data = formData(form);
     if (e.submitter?.name) data[e.submitter.name] = e.submitter.value;
     const proj = form.closest('.project');
@@ -1536,13 +1575,13 @@
           break;
         }
         case 'evolution': {
-          if (data.level === 'approfondi' && !confirm('Le niveau approfondi utilise Opus et consomme beaucoup de quota. Continuer ?')) break;
+          if (data.level === 'approfondi' && !(await confirmBox('Utiliser le niveau approfondi ?\nIl utilise Opus et consomme beaucoup de quota.', { confirm: 'Utiliser' }))) break;
           const r = await api(`/api/projects/${id}/evolution`, data);
           toast(r.budgetBlocked ? `En file, mais ${r.budgetBlocked}` : r.existing ? 'Une recherche est déjà prévue ou en cours' : data.when === 'night' ? 'Évolutions programmées cette nuit' : 'Recherche d\'évolutions lancée', r.budgetBlocked ? 'error' : 'ok');
           break;
         }
         case 'audit': {
-          if (data.level === 'approfondi' && !confirm('Le niveau approfondi utilise Opus et consomme beaucoup de quota. Continuer ?')) break;
+          if (data.level === 'approfondi' && !(await confirmBox('Utiliser le niveau approfondi ?\nIl utilise Opus et consomme beaucoup de quota.', { confirm: 'Utiliser' }))) break;
           const r = await api(`/api/projects/${id}/code-review`, data);
           toast(r.budgetBlocked ? `En file, mais ${r.budgetBlocked}` : r.existing ? 'Un audit est déjà prévu ou en cours' : 'Audit lancé', r.budgetBlocked ? 'error' : 'ok');
           break;
@@ -1561,7 +1600,7 @@
         case 'send': {
           const n = Number(data.count);
           const advice = warmupNotice(JSON.parse(form.dataset.warmup || '{}'), n);
-          if (!confirm(`Envoyer ${n} mail(s) de prospection maintenant ?\nIls partiront espacés de quelques dizaines de secondes.${advice ? `\n\n${advice}` : ''}`)) break;
+          if (!(await confirmBox(`Envoyer ${n} mail${n > 1 ? 's' : ''} de prospection maintenant ?\nIls partiront espacés de quelques dizaines de secondes.${advice ? `\n\n${advice}` : ''}`, { confirm: 'Envoyer' }))) break;
           await api(`/api/projects/${id}/send`, { count: n, confirm: true });
           toast('Envoi lancé');
           break;

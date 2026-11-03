@@ -1,7 +1,7 @@
 // Promotion d'un projet : formulaire de la vidéo, choix de la voix, vidéos produites, clés des fournisseurs de voix.
 // Chargé après app.js, qui expose ses outils communs dans window.AiTools ; ajax.js relance ce script à chaque navigation, comme app.js.
 (() => {
-  const { $, $$, api, esc, go, icon, liDay, listen, refreshProject, toast } = window.AiTools;
+  const { $, $$, api, confirmBox, esc, go, icon, liDay, listen, refreshProject, toast } = window.AiTools;
   const mo = (n) => (n >= 1048576 ? `${(n / 1048576).toFixed(1).replace('.', ',')} Mo` : `${Math.max(1, Math.round(n / 1024))} Ko`);
 
   // ---------- Promotion ----------
@@ -145,7 +145,7 @@
     if (e.target.closest('[data-promo-key-save]')) return saveVoiceKey(f);
     if (e.target.closest('[data-promo-key-remove]')) {
       const p = voiceProvider(f);
-      if (!confirm(`Retirer la clé ${p.label.split(' (')[0]} ? Il faudra la coller de nouveau pour reprendre ses voix.`)) return;
+      if (!(await confirmBox(`Retirer la clé ${p.label.split(' (')[0]} ?\nIl faudra la coller de nouveau pour reprendre ses voix.`))) return;
       try { await api('/api/promo/voice-key/delete', { provider: p.id }); p.keyLast4 = null; p.region = null; p.voices = null; voiceSync(f); } catch (err) { $('[data-promo-sample-state]', f).textContent = err.message; }
       return;
     }
@@ -189,7 +189,7 @@
   listen(document, 'click', async (e) => {
     const t = e.target.closest('[data-pv-delete]');
     if (!t) return;
-    if (!confirm('Supprimer cette vidéo ? Le fichier sera effacé.')) return;
+    if (!(await confirmBox('Supprimer cette vidéo ?\nLe fichier sera effacé.'))) return;
     try {
       await api(`/api/projects/${t.dataset.id}/promo/${t.dataset.pvDelete}/delete`, {});
       loadPromo(t.closest('.project'));

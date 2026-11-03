@@ -28,16 +28,17 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   if (process.env.SHOT_DIR) await p.screenshot({ path: `${process.env.SHOT_DIR}/footer-${vp.width}.png` });
 
   // Annuler la confirmation : rien ne change
-  let asked = '';
-  p.once('dialog', (d) => { asked = d.message(); d.dismiss(); });
   await p.locator('[data-footer-off]').click();
+  await p.locator('dialog.confirm').waitFor();
+  const asked = await p.locator('dialog.confirm').innerText();
+  await p.getByRole('button', { name: 'Annuler' }).click();
   await p.waitForTimeout(400);
   ok(/RGPD/.test(asked) && /Spam/.test(asked), `${tag} une confirmation rappelle les risques avant le retrait`);
   ok(await p.locator('[data-footer-off]').isVisible(), `${tag} annuler ne change rien`);
 
   // Confirmer
-  p.once('dialog', (d) => d.accept());
   await p.locator('[data-footer-off]').click();
+  await p.locator('dialog.confirm [data-yes]').click();
   await p.waitForSelector('[data-footer-on]:not([hidden])');
   ok(/Retiré/.test(await p.locator('[data-footer-state]').innerText()) && await p.locator('[data-footer-off]').isHidden(), `${tag} confirmé : le pied de page est retiré, « Remettre… » apparaît`);
   await p.reload();
@@ -46,9 +47,10 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
 
   // Remettre : sans confirmation
   let popped = false;
-  p.on('dialog', (d) => { popped = true; d.dismiss(); });
+  p.on('dialog', (d) => { popped = true; d.dismiss(); }); // une boîte native, quelle qu'elle soit, est une erreur
   await p.locator('[data-footer-on]').click();
   await p.waitForSelector('[data-footer-off]:not([hidden])');
+  popped = popped || (await p.locator('dialog.confirm').count()) > 0;
   ok(!popped, `${tag} remettre le pied de page ne demande pas de confirmation`);
   ok(!(await p.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)), `${tag} pas de défilement horizontal`);
   ok(errs.length === 0, `${tag} aucune erreur console${errs.length ? ` : ${errs.join(' | ')}` : ''}`);

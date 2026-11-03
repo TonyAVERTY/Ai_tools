@@ -47,8 +47,8 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   ok(true, `${tag} la modification (ville) est enregistrée et visible dans la liste`);
   ok(!(await p.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)), `${tag} pas de défilement horizontal avec la fiche ouverte`);
   // suppression
-  p.once('dialog', (d) => d.accept());
   await p.locator('dialog[open] [data-del-prospect]').click();
+  await p.locator('dialog.confirm [data-yes]').click();
   await p.waitForFunction(() => !document.querySelector('[data-prospects]')?.textContent.includes('Boulangerie Neuve'));
   ok(true, `${tag} le prospect supprimé disparaît de la liste`);
   // aperçu
