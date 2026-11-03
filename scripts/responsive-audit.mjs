@@ -62,6 +62,15 @@ const probe = (W) => {
     const box = el.closest('.card, section, form'); const r = el.getBoundingClientRect();
     if (box && r.width && r.right > box.getBoundingClientRect().right + 1) culprits.push(`${el.tagName.toLowerCase()}[${el.type || el.name}] sort de sa carte (+${Math.round(r.right - box.getBoundingClientRect().right)}px)`);
   }
+  // Un libellé d'onglet du haut ne doit jamais dépasser de sa case (sinon il recouvre l'onglet voisin, sans faire défiler la page : la mesure de page ne le voit pas)
+  for (const a of document.querySelectorAll('.pills a.pill')) {
+    const shown = [...a.querySelectorAll('.pill-l, .pill-s')].find((e) => getComputedStyle(e).display !== 'none' && e.getBoundingClientRect().width > 2);
+    const node = shown || [...a.childNodes].find((n) => n.nodeType === 3 && n.textContent.trim());
+    if (!node) continue;
+    const rg = document.createRange(); rg.selectNodeContents(node);
+    const extra = rg.getBoundingClientRect().width - a.getBoundingClientRect().width;
+    if (extra > 0.5) culprits.push(`onglet « ${node.textContent.trim()} » plus large que sa case (+${Math.round(extra)}px)`);
+  }
   return { over: Math.max(over, culprits.length ? 1 : 0), culprits: culprits.slice(0, 8), scrollers: scrollers.slice(0, 6), small };
 };
 for (const w of WIDTHS) {
