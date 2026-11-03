@@ -157,7 +157,7 @@
     state.innerHTML = loadingHtml('Chargement de l\'extrait…', { small: true });
     try {
       const r = await fetch(url, { credentials: 'same-origin' });
-      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'Extrait indisponible');
+      if (!r.ok) throw new Error(window.AiTools.sentence((await r.json().catch(() => ({}))).error || 'Extrait indisponible'));
       const audio = $('[data-promo-audio]', f);
       audio.src = url;
       await audio.play();

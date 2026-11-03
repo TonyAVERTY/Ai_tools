@@ -55,8 +55,9 @@ Tout ce que l'application écrit à l'utilisateur suit ces règles. `test/wordin
 
 **Messages**
 - ✔ **Succès** : « Nom + participe passé » (« Prospect ajouté », « SMTP enregistré », « Note supprimée »). **Sans point final**, sans « ! », sans « avec succès ».
-- ✔ **Erreur** : une phrase qui dit ce qui n'a pas marché, puis la suite à donner après « : » (« Connexion impossible : réessaie dans un instant. »). Elle **finit par un point** : `toast(…, 'error')` et `banner('err', …)` l'ajoutent
-  si le message n'en a pas, inutile de réécrire les messages du serveur. Pas de « ! », jamais de code ni de trace.
+- ✔ **Erreur** : une phrase qui dit ce qui n'a pas marché, puis la suite à donner après « : » (« Connexion impossible : réessaie dans un instant. »). Elle **finit par un point** : `api()` (le message de l'erreur qu'il lance, donc tout ce qui affiche `err.message` :
+  notification, bloc « Réessayer », formulaire, chat), `toast(…, 'error')` et `banner('err', …)` l'ajoutent si le message n'en a pas (`window.AiTools.sentence(msg)`),
+  inutile de réécrire les messages du serveur. Un message affiché sans passer par l'un d'eux (un `fetch` direct) appelle `sentence()` lui-même. Pas de « ! », jamais de code ni de trace.
 - **Avertissement** (`warn`) : « attention », pas « ça n'a pas marché » (voir « Bandeaux de résultat »).
 - Une consigne dit quoi faire (« Choisis une voix »), pas ce qui manque (« Aucune voix choisie »).
 

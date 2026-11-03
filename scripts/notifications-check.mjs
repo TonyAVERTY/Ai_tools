@@ -80,6 +80,13 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
   await p.route('**/api/probe-status', (route) => route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ error: "L'adresse n'est pas valide." }) }));
   ok(await apiError('/api/probe-status') === "L'adresse n'est pas valide.", `${tag} le message du serveur reste prioritaire`);
   await p.unroute('**/api/probe-status');
+  // un message du serveur sans point final (la plupart) reçoit son point : tout ce qui affiche err.message en profite
+  await p.route('**/api/probe-status', (route) => route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ error: "Donne un titre à l'événement" }) }));
+  ok(await apiError('/api/probe-status') === "Donne un titre à l'événement.", `${tag} un message du serveur sans point reçoit son point`);
+  await p.unroute('**/api/probe-status');
+  await p.route('**/api/probe-status', (route) => route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ error: 'Vraiment ?' }) }));
+  ok(await apiError('/api/probe-status') === 'Vraiment ?', `${tag} jamais de point en double après « ? »`);
+  await p.unroute('**/api/probe-status');
 
   // 6) session expirée : retour à la connexion avec l'explication
   await ctx.clearCookies();
