@@ -5,6 +5,7 @@ import { esc } from './http.js';
 import { layout } from './views.js';
 import { ic } from './icons.js';
 import { LEGAL_FIELDS, LEGAL_SECTIONS, DOC_KINDS, DOC_BY_KEY, LAYOUTS, stageLabel, legalMissing, DOC_VARIABLES } from './services/billing.js';
+import { banner } from './banner.js';
 
 const CTA = { legal: 'Compléter les informations', generate: 'Générer un modèle de document', choose: 'Choisir mon devis', docs_pending: 'Suivre la préparation', validate: 'Valider mes documents', ready: 'Voir mes documents' };
 const host = (u) => String(u || '').replace(/^https?:\/\//, '').replace(/\.git$/, '').slice(0, 80);
@@ -213,12 +214,12 @@ export function billingProjectPage({ email, project: p, legal, errors, suggestio
   const failed = !running ? Object.values(jobs).filter((j) => j.status === 'error' && Number(j.finishedAt || 0) >= lastDoc).sort((a, b) => b.finishedAt - a.finishedAt)[0] : null;
   const notes = { legal: 'Informations enregistrées.', legal_incomplet: 'Informations enregistrées : il en manque encore pour continuer.', quotes: 'Claude rédige tes trois exemples de devis…', refine: 'Claude affine le document selon ta demande…', docs: 'Devis validé : Claude prépare les documents…', valide: 'Document validé.', emis: 'Document émis : le PDF est prêt, et la facture est dans ta Comptabilité, à encaisser.', emis_devis: 'Devis émis : le PDF est prêt.',  reset: 'Tout est effacé : tu repars du début (tes informations légales sont conservées).' };
   const runPct = typeof running?.progress?.pct === 'number' ? Math.max(0, Math.min(100, Math.round(running.progress.pct))) : 0;
-  const banner = running ? `<div class="bill-run" role="status"><span class="spinner" aria-hidden="true"></span><div class="bill-run-b"><div class="bill-run-h"><b>Claude travaille…</b><strong class="jpct" data-bill-pct>${runPct} %</strong></div>
+  const statusBar = running ? `<div class="bill-run" role="status"><span class="spinner" aria-hidden="true"></span><div class="bill-run-b"><div class="bill-run-h"><b>Claude travaille…</b><strong class="jpct" data-bill-pct>${runPct} %</strong></div>
     <span class="muted small" data-bill-msg>${esc(running.progress?.message || 'Cela prend une à deux minutes.')}</span>
     <div class="bar" role="progressbar" aria-label="Avancement" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${runPct}" data-bill-bar><span class="w-${Math.round(runPct / 5) * 5}" data-bill-fill></span></div></div></div>`
-    : failed ? `<p class="cmp-flash warn" role="alert">${ic('alert')} La dernière demande à Claude a échoué : ${esc(failed.error || 'erreur inconnue')}. Tu peux réessayer.</p>`
-      : flash.error ? `<p class="cmp-flash warn" role="alert">${ic('alert')} ${esc(flash.error)}</p>`
-        : flash.ok && notes[flash.ok] ? `<p class="cmp-flash ${flash.ok === 'legal_incomplet' ? 'warn' : 'ok'}" role="status">${esc(notes[flash.ok])}</p>` : '';
+    : failed ? banner('err', `La dernière demande à Claude a échoué : ${failed.error || 'erreur inconnue'}. Tu peux réessayer.`)
+      : flash.error ? banner('err', flash.error)
+        : flash.ok && notes[flash.ok] ? banner(flash.ok === 'legal_incomplet' ? 'warn' : 'ok', notes[flash.ok]) : '';
   const finalsCount = stage.finalsValidated;
   const ready = stage.stage === 'ready';
   const sections = [legalForm(p, legal, errors, suggestions, stage.stage === 'legal')];
@@ -237,7 +238,7 @@ export function billingProjectPage({ email, project: p, legal, errors, suggestio
   const body = `<div class="bill-page" data-bill data-bill-project="${p.id}" data-busy="${stage.busy ? '1' : '0'}">
   <section class="card"><p><a class="link" href="/facturation">${ic('back')} Tous les projets</a></p>
     <div class="row-between"><div><h1>Facturation : ${esc(p.name)}</h1><p class="muted small">${esc(host(p.gitUrl))}</p></div></div>
-    ${stepper(stage.steps, stageStep[stage.stage])}${banner}</section>
+    ${stepper(stage.steps, stageStep[stage.stage])}${statusBar}</section>
   ${done}
   ${ready ? [issueSection(p, docs, clients, invoices, selectedKind, selectedClientId), invoicesSection(invoices)].join('\n  ') : ''}
   ${sections.join('\n  ')}

@@ -48,9 +48,9 @@ for (const vp of [{ width: 1280, height: 800, mouse: true }, { width: 390, heigh
   ok(await p.locator('[data-chat-projmenu]').count() === 0, `${tag} pas de projet joint dans le Support`);
   await p.fill('textarea', 'ECHO Comment relier Claude ?');
   await p.keyboard.press('Enter');
-  await p.waitForSelector('.msg.bot .bubble:not(.streaming)', { timeout: 15000 });
+  await p.waitForSelector('.chat-msg.bot .bubble:not(.streaming)', { timeout: 15000 });
   await p.waitForFunction(() => document.querySelector('[data-chat-stop]').hidden, null, { timeout: 15000 });
-  ok(/Comment relier Claude/.test(await p.locator('.msg.bot .bubble').last().textContent()), `${tag} la réponse s'affiche`);
+  ok(/Comment relier Claude/.test(await p.locator('.chat-msg.bot .bubble').last().textContent()), `${tag} la réponse s'affiche`);
   ok(/\/support\/\d+$/.test(p.url()), `${tag} adresse de la conversation sous /support`);
   ok(await p.locator('[data-chat-list] a[href^="/support/"]').count() >= 1, `${tag} la conversation est dans la liste du Support`);
   if (process.env.SHOTS) await p.screenshot({ path: `${process.env.SHOTS}/support-${vp.width}.png` });

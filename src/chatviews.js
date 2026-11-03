@@ -31,8 +31,8 @@ export const attachmentHtml = (a) => {
 };
 
 const bubble = (m) => (m.role === 'user'
-  ? `<article class="msg user" data-id="${m.id}">${m.attachments?.length ? `<div class="atts">${m.attachments.map(attachmentHtml).join('')}</div>` : ''}<div class="bubble">${esc(m.content)}</div></article>`
-  : `<article class="msg bot" data-id="${m.id}"><div class="bubble md">${m.html}</div>
+  ? `<article class="chat-msg user" data-id="${m.id}">${m.attachments?.length ? `<div class="atts">${m.attachments.map(attachmentHtml).join('')}</div>` : ''}<div class="bubble">${esc(m.content)}</div></article>`
+  : `<article class="chat-msg bot" data-id="${m.id}"><div class="bubble md">${m.html}</div>
       <div class="msg-actions"><button type="button" class="link small" data-chat-copy data-md="${esc(m.content)}">${ic('copy')}Copier</button></div></article>`);
 
 // Le « $ » relatif n'apparaît qu'avec une clé API (facturée à l'usage) : avec un abonnement, on ne montre que la gamme (économe, intermédiaire…)
