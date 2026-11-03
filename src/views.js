@@ -8,6 +8,7 @@ import { SPRITE, ic } from './icons.js';
 import { GIT_SERVER_TYPES, MAX_GIT_SERVERS } from './gitservers.js';
 import { ROLES, MAX_NOTES, rolesOfSection } from './services/roles.js';
 import { tourJson } from './tour.js';
+import { describeKpi } from './services/dbschema.js';
 import { MODE_LABELS, CONSENT_TEXT, CONSENT_CHECKBOX, CONSENT_VERSION } from './claudelink.js';
 
 const fmtDate = (ts) => (ts ? new Date(ts * 1000).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' }) : '—');
@@ -51,6 +52,7 @@ ${iconLinks()}
 <script src="${assetUrl('/static/app-linkedin.js')}" defer></script>
 <script src="${assetUrl('/static/app-prospects.js')}" defer></script>
 <script src="${assetUrl('/static/app-replies.js')}" defer></script>
+<script src="${assetUrl('/static/app-bdd.js')}" defer></script>
 <script src="${assetUrl('/static/responsive.js')}" defer></script>
 <script src="${assetUrl('/static/fx.js')}" defer></script>
 <script src="${assetUrl('/static/ajax.js')}" defer></script>
@@ -342,6 +344,28 @@ function targetForm(p) {
 </form>`;
 }
 
+/** Choix des tables du Récapitulatif : l'état enregistré. Après « Se connecter et analyser », public/app-bdd.js remplit les listes avec les vraies tables. */
+function bddTables(dbCfg) {
+  const k = dbCfg.kpi || {};
+  const rules = describeKpi(k);
+  const legacy = !Object.keys(k).length && (dbCfg.sql_users || dbCfg.sql_clients || dbCfg.sql_revenue);
+  const sel = (name, label, table) => `<div class="bdd-row"><label>${label}<select name="${name}" data-bdd-sel="${name}"><option value="">Ne pas suivre</option>${table ? `<option value="${esc(table)}" selected>${esc(table)}</option>` : ''}</select></label>
+    <small class="muted" data-bdd-rule="${name.replace('_table', '')}">${esc(rules[name.replace('_table', '')] || '')}</small></div>`;
+  const r = k.revenue;
+  return `<div class="bdd" data-bdd>
+  ${legacy ? '<p class="notice">Ce projet utilise des requêtes personnalisées enregistrées avant. Elles continuent de fonctionner ; choisis tes tables ci-dessous pour les remplacer.</p>' : ''}
+  ${sel('users_table', 'Table des utilisateurs', k.users?.table)}
+  ${sel('clients_table', 'Table des clients payants', k.clients?.table)}
+  ${sel('revenue_table', 'Table des paiements', r?.table)}
+  <div class="grid2 bdd-rev" data-bdd-rev${r ? '' : ' hidden'}>
+    <label>Colonne du montant<select name="revenue_column" data-bdd-sel="revenue_column">${r ? `<option value="${esc(r.amountColumn)}" selected>${esc(r.amountColumn)}</option>` : ''}</select></label>
+    <label>Montants en<select name="revenue_unit" data-bdd-sel="revenue_unit"><option value="euros" ${r && !r.cents ? 'selected' : ''}>euros</option><option value="cents" ${r?.cents ? 'selected' : ''}>centimes</option></select></label>
+  </div>
+  <p class="small" data-bdd-state role="status"></p>
+  <p class="small bdd-preview" data-bdd-preview role="status"></p>
+</div>`;
+}
+
 function configForms(p, smtp, dbCfg, imap) {
   const source = { project: 'Ce projet envoie depuis son adresse (SMTP ci-dessous).', null: "Aucun SMTP : renseigne celui de l'adresse d'envoi de ce projet, sinon rien ne peut partir." }[p.smtpSource ?? 'null'];
   return `<form data-action="smtp" data-id="${p.id}" class="cfg">
@@ -371,7 +395,7 @@ function configForms(p, smtp, dbCfg, imap) {
 </form>
 <form data-action="db" data-id="${p.id}" class="cfg">
   <h4>Base de données (récapitulatif)</h4>
-  <p class="muted small">Utilise un compte en lecture seule. Chaque requête doit renvoyer un seul nombre.</p>
+  <p class="muted small">Utilise un compte en lecture seule. AiTools lit la structure de ta base, te propose les bonnes tables et affiche un aperçu des chiffres : tu n'écris aucune requête.</p>
   <div class="grid3">
     <label>Type<select name="type"><option value="mysql" ${dbCfg.type !== 'pg' ? 'selected' : ''}>MySQL / MariaDB</option><option value="pg" ${dbCfg.type === 'pg' ? 'selected' : ''}>PostgreSQL</option></select></label>
     <label>Hôte<input name="host" value="${esc(dbCfg.host)}"></label>
@@ -381,10 +405,8 @@ function configForms(p, smtp, dbCfg, imap) {
     <label>Mot de passe<input name="password" type="password" placeholder="${dbCfg.passwordSet ? '•••••• (inchangé)' : ''}" autocomplete="new-password"></label>
   </div>
   <label class="check"><input type="checkbox" name="ssl" ${dbCfg.ssl ? 'checked' : ''}> SSL</label>
-  <label>Nb utilisateurs<input name="sql_users" value="${esc(dbCfg.sql_users)}" placeholder="SELECT COUNT(*) FROM users"></label>
-  <label>Nb clients payants<input name="sql_clients" value="${esc(dbCfg.sql_clients)}" placeholder="SELECT COUNT(*) FROM subscriptions WHERE status='active'"></label>
-  <label>Revenu total (€)<input name="sql_revenue" value="${esc(dbCfg.sql_revenue)}" placeholder="SELECT SUM(amount)/100 FROM payments"></label>
-  <button class="btn">Enregistrer BDD</button>
+  ${bddTables(dbCfg)}
+  <div class="row"><button type="button" class="btn" data-bdd-analyze>Se connecter et analyser</button><button class="btn">Enregistrer BDD</button></div>
 </form>
 ${p.access === 'owner' ? `<form data-action="delete" data-id="${p.id}" data-confirm="Supprimer ${esc(p.name)} et tous ses prospects ?" class="cfg">
   <button class="btn danger">${ic('trash')}Supprimer le projet</button>

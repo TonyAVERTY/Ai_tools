@@ -18,6 +18,18 @@ Après une action, une notification apparaît en bas à droite. Un **succès** (
 - « **Introuvable : recharge la page.** » : l'élément a été supprimé ou déplacé depuis l'affichage de la page.
 - « **Ta session a expiré : reconnecte-toi.** » : tu reviens à la page de connexion ; après la connexion, retourne sur la page où tu étais.
 
+## Se connecter et analyser la base : une erreur s'affiche, ou aucune table n'est recommandée
+Sous **Se connecter et analyser** (Configuration du projet → Base de données), le message dit ce qui bloque :
+- « **Connexion refusée : vérifie l'hôte et le port de la base.** » : l'adresse ou le port sont faux, ou la base n'accepte pas les connexions extérieures (pare-feu).
+- « **Hôte introuvable** » : l'adresse n'existe pas. Les adresses internes ou privées sont refusées pour des raisons de sécurité.
+- « **Identifiants refusés : vérifie l'utilisateur et le mot de passe.** » : le compte ou le mot de passe est faux (laisse **Mot de passe** vide pour garder celui qui est enregistré).
+- « **Base introuvable** » / « **Ce compte n'a pas le droit de lire cette base** » : vérifie le nom dans **Base** et les droits de lecture du compte.
+- « **Délai dépassé : la base ne répond pas** » : pare-feu ou mauvais port.
+- « **Aucune table trouvée** » : la base est vide, ou le compte ne voit aucune table.
+- Aucune table n'est marquée « (recommandé) » : tes tables n'ont pas de nom reconnaissable. Choisis-les toi-même dans les listes ; l'aperçu te dit tout de suite si c'est la bonne.
+- L'aperçu du revenu est trop grand ou trop petit d'un facteur 100 : change **Montants en** (euros / centimes).
+- L'aperçu affiche « indisponible » pour un chiffre : le compte ne peut pas lire cette table, ou la colonne choisie n'est pas un nombre.
+
 ## « Trop de requêtes : réessaie dans … »
 Le serveur limite le rythme des actions pour se protéger d'une boucle ou d'un abus. Une action isolée n'est jamais concernée : le message apparaît seulement après un très grand nombre d'enregistrements ou de clics en peu de temps (plus de 600 écritures en 10 minutes pour un même compte, avec des seuils plus bas sur certaines actions comme les vidéos, le chat ou la liaison Claude). Attends la durée indiquée dans le message, puis recommence. Les lectures (consulter une page, une liste) ne sont pas limitées. Si le message revient en usage normal, signale-le à l'administrateur.
 
