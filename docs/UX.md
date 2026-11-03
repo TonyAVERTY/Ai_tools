@@ -53,6 +53,10 @@ Une erreur dit **ce qui s'est passé** et **quoi faire** ; jamais « Failed to f
   `loadingBlock()` (`src/loading.js`) pour un bloc de page, `loadingBlock('Chargement…', { small: true })` pour une liste ou une ligne ; côté navigateur : `window.AiTools.loadingHtml(texte, { small })`.
   Même balisage : `<span class="loading" role="status">` avec `.spinner` (grand) ou `.spin-inline` (petit). `test/loading.test.js` échoue si un « Chargement… » s'écrit sans son anneau.
   Il n'y a qu'un seul anneau dans l'application (plus d'arc SVG ni de `.spin`).
+- **Un contenu qui n'a pas pu se charger** : jamais un cercle qui tourne pour toujours, jamais « Recharge la page » seul. Côté navigateur : `window.AiTools.loadFailed(zone, message, réessayer, { small })`
+  (`public/app.js`) met un bloc `.load-error` (`role="alert"`) avec le message déjà traduit (`err.message` d'`api()`, ou `httpErrorText(status)` / `networkErrorText()` pour un `fetch` direct)
+  et un bouton **Réessayer** qui remet l'anneau puis rappelle `réessayer`. Un `fetch` direct teste `r.ok` (sinon une erreur du serveur passe pour une liste vide) et renvoie à la connexion sur 401.
+  `scripts/retry-check.mjs` le vérifie dans Chromium pour chaque zone (mise en route, LinkedIn, Promotion, Récap, clients, chat).
 - Mouvement réduit : l'anneau reste visible, immobile.
 - Une opération longue (job) montre sa progression dans une barre (`.bar`), pas un anneau.
 
@@ -69,7 +73,7 @@ Une erreur dit **ce qui s'est passé** et **quoi faire** ; jamais « Failed to f
 
 ## Ce qui reste à harmoniser (lots suivants)
 
-« Réessayer » sur les erreurs de chargement, convention rédactionnelle complète.
+Convention rédactionnelle complète, validation des formulaires (valeurs conservées après une erreur).
 
 ## Tests
 

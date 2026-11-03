@@ -24,6 +24,20 @@ test('aucun « Chargement… » écrit sans son anneau dans le code', () => {
   assert.deepEqual(offenders, [], 'utilise loadingBlock() (serveur) ou loadingHtml() (navigateur)');
 });
 
+test('un contenu qui se charge après coup propose « Réessayer » quand il échoue (loadFailed), il n\'écrit plus l\'erreur à la main', () => {
+  const read = (f) => readFileSync(new URL(`../public/${f}`, import.meta.url), 'utf8');
+  for (const f of ['app.js', 'app-linkedin.js', 'app-promo.js', 'app-recap.js', 'clients.js', 'chat.js']) assert.match(read(f), /loadFailed\(/, `${f} : utilise loadFailed`);
+  for (const f of ['app-linkedin.js', 'app-promo.js', 'app-recap.js']) assert.doesNotMatch(read(f), /box\.innerHTML = `<p class="error small">/, `${f} : plus d'erreur de chargement écrite à la main`);
+  // l'assistant lui-même : bloc annoncé, bouton « Réessayer » de type button, message mis en texte (jamais en HTML)
+  const app = read('app.js');
+  const fn = app.slice(app.indexOf('function loadFailed'), app.indexOf('function toast'));
+  assert.match(fn, /setAttribute\('role', 'alert'\)/);
+  assert.match(fn, /textContent = 'Réessayer'/);
+  assert.match(fn, /text\.textContent = message/);
+  assert.doesNotMatch(fn, /innerHTML = .*message/);
+  assert.match(app, /Object\.assign\(window\.AiTools, \{[^}]*loadFailed/);
+});
+
 test('les blocs du projet qui se chargent après coup affichent l\'anneau dès le rendu', async () => {
   const s = await startApp();
   try {
