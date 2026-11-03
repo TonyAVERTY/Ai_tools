@@ -61,6 +61,7 @@ test('ajax.js est servi, chargé sur les pages de l\'application après app.js, 
     assert.ok(page.indexOf('/static/app.js') < page.indexOf('/static/app-recap.js') && page.indexOf('/static/app-recap.js') < page.indexOf('/static/ajax.js'), `${path} : app-recap.js entre app.js et ajax.js`);
     assert.ok(page.indexOf('/static/app-recap.js') < page.indexOf('/static/app-promo.js') && page.indexOf('/static/app-promo.js') < page.indexOf('/static/ajax.js'), `${path} : app-promo.js entre app-recap.js et ajax.js`);
     assert.ok(page.indexOf('/static/app-promo.js') < page.indexOf('/static/app-linkedin.js') && page.indexOf('/static/app-linkedin.js') < page.indexOf('/static/ajax.js'), `${path} : app-linkedin.js entre app-promo.js et ajax.js`);
+    assert.ok(page.indexOf('/static/app-linkedin.js') < page.indexOf('/static/app-prospects.js') && page.indexOf('/static/app-prospects.js') < page.indexOf('/static/ajax.js'), `${path} : app-prospects.js entre app-linkedin.js et ajax.js`);
   }
   for (const path of ['/tarifs', '/docs', '/login', '/page-inconnue']) assert.doesNotMatch(await html(s.anon, path), /ajax\.js/, `${path} : pas de navigation douce`);
 });
