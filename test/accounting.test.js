@@ -190,7 +190,7 @@ test('la page s\'ouvre pour un compte connecté seulement : d\'abord les questio
   assert.doesNotMatch(h, /dis-nous où tu en es/);
   for (const present of [/Ajouter une ligne/, /Faire ma déclaration/, /Tes chiffres/, /Journal des lignes/, /Questions fréquentes/, /Aucune ligne pour l'instant/]) assert.match(h, present);
   assert.doesNotMatch(h, /href="\/compta\/export/, 'rien à exporter sans ligne');
-  assert.match(h, /Comptabilité<\/a>/, 'dans la barre du haut');
+  assert.match(h, /<a class="pill" href="\/compta"[^>]*>(?:(?!<\/a>)[^])*Comptabilité(?:(?!<\/a>)[^])*<\/a>/, 'dans la barre du haut : le lien /compta porte le libellé « Comptabilité » (pas seulement le libellé court)');
 });
 
 test('une ligne exige un justificatif (PDF ou image reconnu à sa signature)', async () => {
