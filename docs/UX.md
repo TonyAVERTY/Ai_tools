@@ -101,9 +101,19 @@ Tout ce que l'application écrit à l'utilisateur suit ces règles. `test/wordin
   `data-confirm-label="Verbe"` quand le verbe de la question ne suffit pas (« Passer en client »). Un formulaire `data-action` n'est confirmé qu'une fois.
 - Ne demande pas de confirmation pour une action réversible ou sans conséquence (remettre le pied de page des mails n'en demande pas).
 
+## Animations
+
+**Aucune animation n'est ajoutée, changée ni retirée sans l'accord du propriétaire du produit**, présentée une par une : l'élément, le comportement actuel, la proposition, la valeur pour l'utilisateur, le coût.
+- **En boucle (`infinite`) : seulement `transform` et `opacity`.** Jamais `left`, `width`, `height` ni `box-shadow` : le navigateur referait la mise en page ou repeindrait à chaque image, pendant toute la durée d'une tâche
+  (mesuré : 181 mises en page en 3 s avec `left` / `width`, aucune avec `transform`). Un halo se fait avec un pseudo-élément dont seule l'opacité varie (`.pulse::after`). `test/motion.test.js` échoue sinon.
+- Courtes (quelques centaines de ms), sans nouvelle dépendance. Le mouvement réduit coupe **toutes** les animations et transitions CSS (règle globale de `tokens.css`) ; une animation écrite en JS (`element.animate`) teste `matchMedia('(prefers-reduced-motion: reduce)')` elle-même.
+- Un gain de performance s'annonce mesuré : avant et après, sur plusieurs passes (bureau et téléphone ralenti). Un essai qui n'apporte rien est abandonné, pas gardé « au cas où » (changement de page : lancer l'animation
+  après la relance des scripts n'a pas réduit les saccades et retardait le contenu de 40 à 140 ms).
+- `scripts/motion-check.mjs` vérifie dans Chromium que ces animations bougent et ne déclenchent aucune mise en page.
+
 ## Ce qui reste à harmoniser (lots suivants)
 
-Les animations : à valider une par une avec le propriétaire du produit (élément, comportement actuel, proposition, valeur pour l'utilisateur, coût) avant tout code.
+Retours d'action validés mais pas encore faits : enfoncement des boutons au clic, fondu du contenu chargé après coup, coche d'une étape de « Mise en route » qui apparaît, surlignage d'une ligne ajoutée.
 
 ## Tests
 

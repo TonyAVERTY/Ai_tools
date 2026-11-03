@@ -61,8 +61,7 @@ async function run(label, paths, cookie) {
         if (path === '/' && cookie && !process.env.CLOSED) { const d = page.locator('details.project').first(); if (!(await d.evaluate((e) => e.open))) await d.locator('> summary').click(); await page.waitForTimeout(400); }
         // Fait défiler la page : les apparitions au défilement (IntersectionObserver) se déclenchent comme pour un visiteur
         await page.evaluate(async () => { const h = document.documentElement.scrollHeight; for (let y = 0; y < h; y += 400) { scrollTo(0, y); await new Promise((r) => setTimeout(r, 60)); } scrollTo(0, 0); await new Promise((r) => setTimeout(r, 500)); });
-        if (process.env.ELEMENT) { // capture d'un bloc seulement (ex. ELEMENT=.dash), sans la mise en route flottante
-          await page.evaluate(() => document.querySelector('.todo')?.remove());
+        if (process.env.ELEMENT) { // capture d'un bloc seulement (ex. ELEMENT=.dash)
           await page.locator(process.env.ELEMENT).first().screenshot({ path: `${out}/${label}-${slug(path)}-${sz.name}.png` });
         } else await page.screenshot({ path: `${out}/${label}-${slug(path)}-${sz.name}.png`, fullPage: !process.env.TOP });
       } catch (e) { console.log('échec', path, sz.name, e.message.split('\n')[0]); }
