@@ -27,6 +27,10 @@ function acc(key, icon, title, sub, body, { open = false, cls = '' } = {}) {
 /** Entrées de la barre du haut : chacune doit avoir son étape dans la visite guidée (test/tour.test.js). */
 export const NAV = [['/', 'folder', 'Projets'], ['/mails', 'mail', 'Mails'], ['/calendar', 'clock', 'Calendrier'], ['/compta', 'wallet', 'Comptabilité'], ['/facturation', 'receipt', 'Facturation'], ['/clients', 'user', 'Clients'], ['/team', 'users', 'Équipe']];
 
+/** Libellé court d'un onglet sur écran étroit (< 450 px) : « Comptabilité » ne tient pas dans sa case. Le nom complet reste dans le HTML pour les lecteurs d'écran. */
+const NAV_SHORT = { '/compta': 'Compta' };
+const pillLabel = (href, label) => (NAV_SHORT[href] ? `<span class="pill-l">${label}</span><span class="pill-s" aria-hidden="true">${NAV_SHORT[href]}</span>` : label);
+
 export function layout({ title, body, email, scripts = [] }) {
   return `<!doctype html>
 <html lang="fr">
@@ -59,7 +63,7 @@ ${email ? `<header class="top">
   <div class="top-in">
     <a class="lockup" href="/" aria-label="AiTools, projets">${brandMark()}<span class="wordmark">AiTools</span></a>
     <nav class="pills" aria-label="Navigation de l'application">
-      ${NAV.map(([href, icon, label]) => `<a class="pill" href="${href}">${ic(icon)}${label}</a>`).join('\n      ')}
+      ${NAV.map(([href, icon, label]) => `<a class="pill" href="${href}">${ic(icon)}${pillLabel(href, label)}</a>`).join('\n      ')}
     </nav>
     <div class="top-r">
       <div class="jobs" id="jobs" hidden>
