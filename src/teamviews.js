@@ -3,6 +3,7 @@ import { esc } from './http.js';
 import { layout } from './views.js';
 import { ic } from './icons.js';
 import { ROLES, ROLE_LABELS } from './teams.js';
+import { banner } from './banner.js';
 
 const fmt = (ts) => (ts ? new Date(ts * 1000).toLocaleDateString('fr-FR', { dateStyle: 'medium', timeZone: 'Europe/Paris' }) : '—');
 const roleSelect = (value, name = 'role') => `<select name="${name}">${ROLES.map((r) => `<option value="${r}"${r === value ? ' selected' : ''}>${ROLE_LABELS[r]}</option>`).join('')}</select>`;
@@ -80,7 +81,7 @@ export function teamPage({ user, owned = null, memberOf = [], canTeam = false, e
   return layout({
     title: 'Équipe', email: user.email,
     body: `<div class="narrow"><h1>Équipe</h1>
-${error ? `<p class="msg msg-err" role="alert">${esc(error)}</p>` : ''}${notice ? `<p class="msg msg-ok" role="status">${esc(notice)}</p>` : ''}
+${error ? banner('err', error) : ''}${notice ? banner('ok', notice) : ''}
 ${owned ? ownerSection(owned) : createSection(canTeam)}
 ${member}</div>`,
   });
@@ -88,11 +89,11 @@ ${member}</div>`,
 
 export function joinPage({ user, token, info, error = null }) {
   const body = !info.ok
-    ? `<section class="card"><h2>Invitation</h2><p class="error">${esc(info.message)}</p><p><a class="btn" href="/">Retour au tableau de bord</a></p></section>`
+    ? `<section class="card"><h2>Invitation</h2>${banner('err', info.message)}<p><a class="btn" href="/">Retour au tableau de bord</a></p></section>`
     : `<section class="card"><h2>Rejoindre l'équipe « ${esc(info.team.name)} »</h2>
   <p>${esc(info.team.ownerEmail)} t'invite en tant que <strong>${esc(ROLE_LABELS[info.role].toLowerCase())}</strong>.</p>
   <p class="muted small">Tu verras les projets qu'il partage avec l'équipe et pourras y travailler avec son accès Claude, son SMTP et ses plafonds. Tu pourras quitter l'équipe à tout moment.</p>
-  ${error ? `<p class="error">${esc(error)}</p>` : ''}
+  ${error ? banner('err', error) : ''}
   <form method="post" action="/team/join/${esc(token)}" class="row-actions"><button class="btn primary">Rejoindre l'équipe</button> <a class="btn" href="/">Pas maintenant</a></form></section>`;
   return layout({ title: 'Invitation', email: user.email, body: `<div class="narrow"><h1>Invitation</h1>${body}</div>` });
 }
