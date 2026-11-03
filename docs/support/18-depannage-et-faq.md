@@ -7,6 +7,13 @@ La liaison Claude est absente ou invalide. Relier un accès (voir « Relier, tes
 ## Mon job reste « En attente »
 Lire le message « En attente : … » dans le menu **Activité**. Raisons possibles : budget IA atteint (clé API) ; quota Claude serré (au-delà de 85 %) ; charge élevée du serveur ; job programmé « Cette nuit » ; déjà un job IA en cours pour le compte. Il repart seul. On peut l'**Annuler** depuis Activité.
 
+## Une section ou une liste n'a pas pu se charger : « Réessayer »
+Quand une partie de la page se charge après coup (la section **Mise en route**, **LinkedIn**, **Promotion** ou **Récapitulatif** d'un projet, la liste de la page **Clients**, le menu **Joindre un projet AiTools** de la page IA), un petit cercle accompagne « Chargement… ». Si la requête échoue, le cercle laisse la place à **un message et un bouton « Réessayer »** : le cercle ne tourne jamais pour toujours.
+1. Lis le message : « **Connexion impossible : réessaie dans un instant.** » (réseau coupé), « **Erreur interne : réessaie dans un instant.** » (problème du serveur), « **Tu n'as pas accès à cette action.** » (ton rôle sur le projet ne le permet pas) ou « **Introuvable : recharge la page.** ».
+2. Clique sur **Réessayer** : le cercle revient et la demande repart. Si elle échoue encore, le message revient et tu peux recliquer.
+3. Si le message persiste après plusieurs essais, recharge la page ; s'il revient, signale-le avec l'heure et le nom de la section.
+Une session expirée ne montre pas ce message : tu reviens directement à la page de connexion (voir « Un message s'affiche en bas à droite »).
+
 ## « Plafond atteint » ou refus de création
 Un plafond mensuel de l'offre (projets, prospects, mails, jobs IA, places d'équipe) est atteint. Le compteur est dans « Mon compte → Usage du mois » ; les plafonds se renouvellent le 1er du mois. Voir « Offres, plafonds et limites » et la page Tarifs.
 

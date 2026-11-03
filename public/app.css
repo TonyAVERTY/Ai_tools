@@ -295,6 +295,10 @@ form.send { display: flex; margin: 0; padding: 0; border: 0; }
 .loading { display: flex; align-items: center; gap: 10px; padding: 6px 0; color: var(--muted); }
 .loading .spin-inline { margin-right: 0; }
 .loading.small { font-size: .875rem; padding: 4px 0; }
+/* Contenu qui n'a pas pu se charger : le message et « Réessayer » (loadFailed, public/app.js) */
+.load-error { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; padding: 6px 0; }
+.load-error p { margin: 0; }
+.load-error.small { padding: 4px 0; }
 .chat-projlist .loading { margin: 8px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .spinner, .spin-inline, .btn[aria-busy="true"]::before { animation: none; } }

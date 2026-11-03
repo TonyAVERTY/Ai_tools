@@ -1,7 +1,7 @@
 // LinkedIn d'un projet : relier un compte, donner une direction, générer / régénérer un post, le relire et le publier.
 // Chargé après app.js, qui expose ses outils communs dans window.AiTools ; ajax.js relance ce script à chaque navigation, comme app.js.
 (() => {
-  const { $, $$, api, confirmBox, esc, liDay, listen, refreshProject, toast } = window.AiTools;
+  const { $, $$, api, confirmBox, esc, liDay, listen, loadFailed, refreshProject, toast } = window.AiTools;
 
   // ---------- LinkedIn ----------
   // Section d'un projet : relier un compte, donner une direction (facultative), générer / régénérer un post, le relire et le publier.
@@ -10,7 +10,7 @@
     const box = $('[data-linkedin]', proj);
     if (!box) return;
     try { renderLinkedin(box, await api(`/api/projects/${proj.dataset.id}/linkedin`), proj.dataset.id); }
-    catch (e) { box.innerHTML = `<p class="error small">${esc(e.message)}</p>`; }
+    catch (e) { loadFailed(box, e.message, () => loadLinkedin(proj)); }
   }
 
   function renderLinkedin(box, s, id) {

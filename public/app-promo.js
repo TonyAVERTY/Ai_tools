@@ -1,7 +1,7 @@
 // Promotion d'un projet : formulaire de la vidéo, choix de la voix, vidéos produites, clés des fournisseurs de voix.
 // Chargé après app.js, qui expose ses outils communs dans window.AiTools ; ajax.js relance ce script à chaque navigation, comme app.js.
 (() => {
-  const { $, $$, api, confirmBox, esc, go, icon, liDay, listen, loadingHtml, refreshProject, toast } = window.AiTools;
+  const { $, $$, api, confirmBox, esc, go, icon, liDay, listen, loadFailed, loadingHtml, refreshProject, toast } = window.AiTools;
   const mo = (n) => (n >= 1048576 ? `${(n / 1048576).toFixed(1).replace('.', ',')} Mo` : `${Math.max(1, Math.round(n / 1024))} Ko`);
 
   // ---------- Promotion ----------
@@ -11,7 +11,7 @@
     const box = $('[data-promo]', proj);
     if (!box) return;
     try { renderPromo(box, await api(`/api/projects/${proj.dataset.id}/promo`), proj.dataset.id); }
-    catch (e) { box.innerHTML = `<p class="error small">${esc(e.message)}</p>`; }
+    catch (e) { loadFailed(box, e.message, () => loadPromo(proj)); }
   }
 
   function promoVideoCard(v, s, id) {
