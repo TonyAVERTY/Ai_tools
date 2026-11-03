@@ -2,7 +2,7 @@
 // suppression) et aperçu du mail. Chargé après app.js, qui expose ses outils communs dans window.AiTools ;
 // ajax.js relance ce script à chaque navigation, comme app.js. Aucune fonction n'est appelée de l'extérieur : tout passe par des écouteurs.
 (() => {
-  const { $, $$, api, esc, formData, icon, listen, toast } = window.AiTools;
+  const { $, $$, api, confirmBox, esc, formData, icon, listen, toast } = window.AiTools;
 
   // ---------- Liste des prospects (mini CRM) ----------
   const STATUS = { new: 'À contacter', sent: 'Contacté', replied: 'A répondu', client: 'Client', refused: 'Refus', bounced: 'Rejeté', invalid: 'Adresse invalide' };
@@ -92,7 +92,7 @@
       if (e.target === dlg || e.target.closest('[data-close]')) { dlg.close(); return; }
       const id = dlg.dataset.id;
       const del = e.target.closest('[data-del-note]');
-      if (del && confirm('Supprimer cette note ?')) {
+      if (del && (await confirmBox('Supprimer cette note ?'))) {
         await api(`/api/prospects/${id}/notes/${del.dataset.delNote}/delete`, {}).catch((err) => toast(err.message, 'error'));
         openProspect(id);
       }
@@ -112,7 +112,7 @@
       }
       if (e.target.closest('[data-del-prospect]')) {
         const name = $('.dlg-head h3', dlg)?.textContent || 'ce prospect';
-        if (!confirm(`Supprimer définitivement « ${name} » ?\nSes notes seront supprimées. Les mails déjà envoyés restent dans la page Mails.`)) return;
+        if (!(await confirmBox(`Supprimer définitivement « ${name} » ?\nSes notes seront supprimées. Les mails déjà envoyés restent dans la page Mails.`))) return;
         try { await api(`/api/prospects/${id}/delete`, {}); dlg.close(); toast('Prospect supprimé'); refreshOpenLists(); }
         catch (err) { toast(err.message, 'error'); }
         return;
@@ -305,7 +305,7 @@
     } catch (err) { box.innerHTML = `<p class="error small">${esc(err.message)}</p>`; }
   }
   const moveProspect = async (d, id, status) => {
-    if (status === 'refused' && !confirm('Marquer en refus ajoute l\'adresse à la liste d\'opposition. Continuer ?')) return;
+    if (status === 'refused' && !(await confirmBox('Marquer ce prospect en refus ?\nSon adresse est ajoutée à la liste d\'opposition.', { confirm: 'Marquer en refus' }))) return;
     try { await api(`/api/prospects/${id}/status`, { status }); toast('Statut mis à jour'); } catch (err) { toast(err.message, 'error'); }
     loadProspects(d);
   };
@@ -355,7 +355,7 @@
   listen(document, 'change', async (e) => {
     const sel = e.target.closest('[data-prospect]');
     if (!sel) return;
-    if (sel.value === 'refused' && !confirm('Marquer en refus ajoute l\'adresse à la liste d\'opposition. Continuer ?')) return;
+    if (sel.value === 'refused' && !(await confirmBox('Marquer ce prospect en refus ?\nSon adresse est ajoutée à la liste d\'opposition.', { confirm: 'Marquer en refus' }))) return;
     try { await api(`/api/prospects/${sel.dataset.prospect}/status`, { status: sel.value }); sel.className = `st-${sel.value}`; toast('Statut mis à jour'); }
     catch (err) { toast(err.message, 'error'); }
     const d = sel.closest('details.prospects');

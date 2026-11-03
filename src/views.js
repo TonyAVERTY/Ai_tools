@@ -387,7 +387,7 @@ function configForms(p, smtp, dbCfg, imap) {
   <label>Revenu total (€)<input name="sql_revenue" value="${esc(dbCfg.sql_revenue)}" placeholder="SELECT SUM(amount)/100 FROM payments"></label>
   <button class="btn">Enregistrer BDD</button>
 </form>
-${p.access === 'owner' ? `<form data-action="delete" data-id="${p.id}" data-confirm="Supprimer ${esc(p.name)} et tous ses prospects ?" class="cfg">
+${p.access === 'owner' ? `<form data-action="delete" data-id="${p.id}" data-confirm="Supprimer ${esc(p.name)} et tous ses prospects ?" data-confirm-label="Supprimer le projet" class="cfg">
   <button class="btn danger">${ic('trash')}Supprimer le projet</button>
 </form>` : ''}`;
 }

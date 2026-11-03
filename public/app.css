@@ -321,6 +321,8 @@ dialog { color: var(--text); }
 .prospect-dialog h2 { font-size: 1.25rem; line-height: 1.3; font-weight: 700; display: flex; gap: 10px; align-items: center; }
 .prospect-dialog h2 .ic { color: var(--warn); }
 .modal-f { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end; }
+.confirm-d { margin: 8px 0 0; color: var(--muted); white-space: pre-line; overflow-wrap: anywhere; }
+.prospect-dialog.confirm .modal-f { margin-top: 20px; }
 .dlg-head { align-items: flex-start; }
 .dlg-head h3 { margin: 0 0 4px; }
 .hook { font-style: italic; border-left: 3px solid var(--accent); padding-left: 10px; margin: 10px 0; }

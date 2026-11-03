@@ -336,7 +336,7 @@
 
     const del = e.target.closest('[data-chat-del]');
     if (del) {
-      if (!confirm('Supprimer cette conversation ? Ses pièces jointes seront supprimées aussi.')) return;
+      if (!(await window.AiTools.confirmBox('Supprimer cette conversation ?\nSes pièces jointes seront supprimées aussi.'))) return;
       const id = del.dataset.chatDel;
       try {
         const r = await fetch(`/api/chat/conversations/${id}/delete`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });

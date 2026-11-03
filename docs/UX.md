@@ -54,11 +54,22 @@ Une erreur dit **ce qui s'est passé** et **quoi faire** ; jamais « Failed to f
 - Mouvement réduit : l'anneau reste visible, immobile.
 - Une opération longue (job) montre sa progression dans une barre (`.bar`), pas un anneau.
 
+## Confirmer une action sensible : `confirmBox(message, { confirm, danger })`
+
+- Une seule boîte, celle de l'application (`window.AiTools.confirmBox`, `public/app.js`). **Jamais `window.confirm`** : `test/confirm.test.js` échoue.
+- Le message s'écrit « **Question ?** Conséquence. » : la question devient le titre de la boîte, la suite le détail (`confirmBox('Supprimer cette note ?')`,
+  `confirmBox('Supprimer cette vidéo ?\nLe fichier sera effacé.')`).
+- Le bouton porte **le verbe de l'action** (« Supprimer », « Publier », « Envoyer »…) et jamais « OK » ; « Annuler » est l'autre choix. Rouge (`danger-fill`)
+  quand on supprime, efface, retire ou déconnecte ; dans ce cas « Annuler » a le focus par défaut. Échap ou un clic à côté annule.
+- JS : `if (!(await confirmBox('…', { confirm: 'Publier' }))) return;`. Formulaire rendu par le serveur : `data-confirm="Question ? Conséquence."`, avec
+  `data-confirm-label="Verbe"` quand le verbe de la question ne suffit pas (« Passer en client »). Un formulaire `data-action` n'est confirmé qu'une fois.
+- Ne demande pas de confirmation pour une action réversible ou sans conséquence (remettre le pied de page des mails n'en demande pas).
+
 ## Ce qui reste à harmoniser (lots suivants)
 
 Squelettes de chargement, « Réessayer » sur les erreurs de chargement,
-boîte de confirmation commune à la place des `confirm()` natifs, convention rédactionnelle complète.
+convention rédactionnelle complète.
 
 ## Tests
 
-`scripts/notifications-check.mjs`, `scripts/banners-check.mjs` et `scripts/busy-check.mjs` (Chromium, 1280 et 390 px, clair et sombre pour les bandeaux) couvrent ce qui précède ; lance-les avec `npm run ui:check -- notifications`, `-- banners` ou `-- busy`.
+`scripts/notifications-check.mjs`, `scripts/banners-check.mjs` et `scripts/busy-check.mjs` et `scripts/confirm-check.mjs` (Chromium, 1280 et 390 px, clair et sombre pour les bandeaux) couvrent ce qui précède ; lance-les avec `npm run ui:check -- notifications`, `-- banners`, `-- busy` ou `-- confirm`.
