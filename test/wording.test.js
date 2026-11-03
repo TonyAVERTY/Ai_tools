@@ -36,7 +36,10 @@ test('une notification de succès écrite en dur n\'a pas de point final (« Nom
 test('une erreur de notification se termine par un point : toast() et banner() l\'ajoutent quand le message n\'en a pas', () => {
   const app = read('public/app.js');
   const toast = app.slice(app.indexOf('function toast('), app.indexOf('function toast(') + 1400);
-  assert.match(toast, /kind === 'error' && !\/\[\.!\?…\]\$\/\.test\(msg\) \? `\$\{msg\}\.` : msg/, 'toast d\'erreur : point final ajouté si absent');
+  assert.match(app, /function sentence\(msg\) \{[^}]*!\/\[\.!\?…\]\$\/\.test\(t\) \? `\$\{t\}\.` : t/, 'sentence() : point final ajouté si absent, jamais doublé');
+  assert.match(toast, /kind === 'error' \? sentence\(msg\) : msg/, 'toast d\'erreur : point final ajouté si absent');
+  assert.match(app, /throw new Error\(sentence\(data\.error \|\| httpErrorText\(r\.status\)\)\)/, 'api() : le message d\'erreur lancé est une phrase, donc tout ce qui affiche err.message aussi');
+  assert.match(app, /Object\.assign\(window\.AiTools, \{[^}]*\bsentence\b/, 'sentence() est exposé comme outil commun');
   assert.match(read('src/banner.js'), /kind === 'err' && !\/\[\.!\?…\]\$\/\.test\(String\(text\)\)/, 'bandeau d\'erreur : point final ajouté si absent');
 });
 
