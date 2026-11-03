@@ -46,7 +46,7 @@ Dès qu'un projet existe, sa section **Mise en route** (la première du projet) 
 - Chaque ligne ouvre la bonne section du projet et y fait défiler la page.
 - Les étapes terminées reçoivent une coche (et sont barrées dans la liste) ; les étapes facultatives sont marquées « facultatif ».
 - La liste se calcule à chaque affichage d'après l'état réel du projet : une étape défaite (par exemple un jeton LinkedIn expiré) redevient « à faire ».
-- Il n'y a plus de panneau qui flotte au-dessus de la page : la liste est une section comme les autres, repliée par défaut. Quand tout est fait, la section disparaît toute seule et le badge devient « config ✓ ».
+- Il n'y a plus de panneau qui flotte au-dessus de la page : la liste est une section comme les autres, repliée par défaut. Quand tout est fait, la section disparaît toute seule et le badge devient « config ✓ ». Quand tu termines une étape alors que la liste est ouverte, sa coche apparaît d'un petit saut ; quand la dernière est faite, le badge « config ✓ » apparaît de la même façon.
 - Un membre d'équipe ne voit pas les étapes SMTP et IMAP (il ne peut pas les régler).
 
 ## Projet unique ou plusieurs projets
