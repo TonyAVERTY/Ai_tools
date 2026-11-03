@@ -82,7 +82,7 @@ Pour rédiger un mail, trouver des idées de posts, réfléchir à une stratégi
 - **Où voir ce que j'ai consommé ?** « Mon compte → Usage du mois », la carte « Consommation Claude » de la page Projets et « Mon compte → Liaison Claude → Limites d'utilisation ».
 - **Comment arrêter les notifications ?** Réglages → Notifications : décocher les événements ou retirer le canal.
 - **Comment supprimer mes données ?** « Mon compte → Zone de danger → Supprimer mon compte et mes données ».
-- **Y a-t-il une application mobile ?** Non : le site s'adapte aux téléphones.
+- **Y a-t-il une application mobile ?** Non : le site s'adapte aux téléphones. Sur un écran étroit, les onglets de la barre du haut tiennent tous sur une ligne et « Comptabilité » s'affiche « Compta » (c'est le même onglet).
 - **Qui contacter si la documentation ne répond pas ?** L'administrateur du service d'AiTools.
 
 ## Claude ignore la méthode attendue ou la réponse sort du cadre
