@@ -53,15 +53,18 @@
   async function api(path, body) {
     const launching = body !== undefined && LAUNCH.test(path);
     if (launching) window.AiFx?.press(lastTrigger);
-    // Le bouton cliqué reste bloqué le temps de l'envoi (les formulaires qui bloquent déjà leurs boutons ne sont pas touchés)
-    const btn = body !== undefined && lastTrigger?.tagName === 'BUTTON' && !lastTrigger.disabled ? lastTrigger : null;
-    if (btn) { btn.disabled = true; btn.setAttribute('aria-busy', 'true'); }
+    // Le bouton cliqué est « occupé » le temps de l'envoi : `aria-busy` affiche l'indicateur dans le bouton (CSS `.btn[aria-busy]`) et le bloque
+    // (anti double envoi). Un bouton que le code a déjà désactivé avant l'appel (la majorité) garde sa logique : on ne fait que le marquer occupé,
+    // et on ne le réactive pas.
+    const btn = body !== undefined && lastTrigger?.tagName === 'BUTTON' && lastTrigger.isConnected ? lastTrigger : null;
+    const lock = !!btn && !btn.disabled;
+    if (btn) { if (lock) btn.disabled = true; btn.setAttribute('aria-busy', 'true'); }
     try {
       const data = await call(path, body);
       if (launching && !data.existing) launched(lastTrigger);
       return data;
     } finally {
-      if (btn) { btn.removeAttribute('aria-busy'); btn.disabled = false; }
+      if (btn) { btn.removeAttribute('aria-busy'); if (lock) btn.disabled = false; }
     }
   }
 
@@ -364,7 +367,7 @@
     let sending = false;
     const busy = (form, on, label) => {
       const btn = $('button:not([type=button])', form);
-      $('.spin-inline', btn).hidden = !on;
+      if (on) btn.setAttribute('aria-busy', 'true'); else btn.removeAttribute('aria-busy'); // l'indicateur est affiché par le CSS (.btn[aria-busy])
       $('[data-label]', btn).textContent = label;
       btn.disabled = on || (form === loginForm && !$('[data-consent]', form).checked);
     };
@@ -1249,9 +1252,7 @@
     const mark = { true: ['ok', '✓', 'accessible avec ce token'], false: ['error', '✗', "pas accessible avec ce token (ajoute ce dépôt à ceux du token)"], null: ['muted', '?', 'non déterminé (liste tronquée)'] };
 
     btn.addEventListener('click', async () => {
-      const spin = $('.spin-inline', btn);
-      btn.disabled = true;
-      spin.hidden = false;
+      btn.disabled = true; // api() marque le bouton occupé (indicateur dans le bouton) puis ne le réactive pas : c'est ici
       try {
         const r = await api('/settings/github/test', { token: field.value });
         if (!r.ok) { show(`<p class="error">${esc(r.message)}</p>`, 'bad'); return; }
@@ -1270,7 +1271,6 @@
         show(`<p class="error">${esc(e.message)}</p>`, 'bad');
       } finally {
         btn.disabled = false;
-        spin.hidden = true;
       }
     });
   })();
