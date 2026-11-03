@@ -18,6 +18,18 @@ Après une action, une notification apparaît en bas à droite. Un **succès** (
 - « **Introuvable : recharge la page.** » : l'élément a été supprimé ou déplacé depuis l'affichage de la page.
 - « **Ta session a expiré : reconnecte-toi.** » : tu reviens à la page de connexion ; après la connexion, retourne sur la page où tu étais.
 
+## Se connecter et analyser la base : une erreur s'affiche, ou aucune table n'est recommandée
+Sous **Se connecter et analyser** (Configuration du projet → Base de données), le message dit ce qui bloque :
+- « **Connexion refusée : vérifie l'hôte et le port de la base.** » : l'adresse ou le port sont faux, ou la base n'accepte pas les connexions extérieures (pare-feu).
+- « **Hôte introuvable** » : l'adresse n'existe pas. Les adresses internes ou privées sont refusées pour des raisons de sécurité.
+- « **Identifiants refusés : vérifie l'utilisateur et le mot de passe.** » : le compte ou le mot de passe est faux (laisse **Mot de passe** vide pour garder celui qui est enregistré).
+- « **Base introuvable** » / « **Ce compte n'a pas le droit de lire cette base** » : vérifie le nom dans **Base** et les droits de lecture du compte.
+- « **Délai dépassé : la base ne répond pas** » : pare-feu ou mauvais port.
+- « **Aucune table trouvée** » : la base est vide, ou le compte ne voit aucune table.
+- Aucune table n'est marquée « (recommandé) » : tes tables n'ont pas de nom reconnaissable. Choisis-les toi-même dans les listes ; l'aperçu te dit tout de suite si c'est la bonne.
+- L'aperçu du revenu est trop grand ou trop petit d'un facteur 100 : change **Montants en** (euros / centimes).
+- L'aperçu affiche « indisponible » pour un chiffre : le compte ne peut pas lire cette table, ou la colonne choisie n'est pas un nombre.
+
 ## Une fenêtre me demande de confirmer
 Avant une action difficile à défaire (supprimer un projet, un prospect, une vidéo ou une conversation, retirer le pied de page des mails, publier un post, envoyer un lot de mails…), AiTools ouvre une fenêtre : le titre est la question, la ligne dessous dit la conséquence. Le bouton porte le nom de l'action (« Supprimer le projet », « Publier »…) et il est **rouge** quand elle supprime ou retire quelque chose. **Annuler**, la touche Échap ou un clic en dehors de la fenêtre abandonnent sans rien changer. Pour une action qui se rattrape facilement, il n'y a pas de confirmation.
 
