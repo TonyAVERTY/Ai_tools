@@ -30,6 +30,9 @@ Sous **Se connecter et analyser** (Configuration du projet → Base de données)
 - L'aperçu du revenu est trop grand ou trop petit d'un facteur 100 : change **Montants en** (euros / centimes).
 - L'aperçu affiche « indisponible » pour un chiffre : le compte ne peut pas lire cette table, ou la colonne choisie n'est pas un nombre.
 
+## Une fenêtre me demande de confirmer
+Avant une action difficile à défaire (supprimer un projet, un prospect, une vidéo ou une conversation, retirer le pied de page des mails, publier un post, envoyer un lot de mails…), AiTools ouvre une fenêtre : le titre est la question, la ligne dessous dit la conséquence. Le bouton porte le nom de l'action (« Supprimer le projet », « Publier »…) et il est **rouge** quand elle supprime ou retire quelque chose. **Annuler**, la touche Échap ou un clic en dehors de la fenêtre abandonnent sans rien changer. Pour une action qui se rattrape facilement, il n'y a pas de confirmation.
+
 ## « Trop de requêtes : réessaie dans … »
 Le serveur limite le rythme des actions pour se protéger d'une boucle ou d'un abus. Une action isolée n'est jamais concernée : le message apparaît seulement après un très grand nombre d'enregistrements ou de clics en peu de temps (plus de 600 écritures en 10 minutes pour un même compte, avec des seuils plus bas sur certaines actions comme les vidéos, le chat ou la liaison Claude). Attends la durée indiquée dans le message, puis recommence. Les lectures (consulter une page, une liste) ne sont pas limitées. Si le message revient en usage normal, signale-le à l'administrateur.
 

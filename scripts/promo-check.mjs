@@ -76,8 +76,8 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   ok(!(await p.content()).includes('sk_test_1234567890abcdefghij'), `${tag} clé : jamais réaffichée dans la page`);
   ok(await p.locator('[data-promo-form]').count() === 1 && await p.locator('.pv').count() === 0, `${tag} clé : Entrée n'a pas lancé la vidéo`);
   if (process.env.SHOTS) await p.locator('details[data-acc="promo"]').screenshot({ path: `${process.env.SHOTS}/promo-key-${vp.width}.png` });
-  p.once('dialog', (d) => d.accept());
   await p.locator('[data-promo-key-remove]').click();
+  await p.locator('dialog.confirm [data-yes]').click();
   await p.waitForFunction(() => !document.querySelector('[data-promo-key-new]').hidden, null, { timeout: 5000 });
   ok(true, `${tag} clé : retirée`);
   await p.selectOption('select[name="voiceProvider"]', 'azure');
@@ -105,8 +105,8 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   ok(await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${tag} pas de défilement horizontal`);
   ok(await p.locator('.pv a[download]').count() === 1, `${tag} lien de téléchargement`);
   if (process.env.SHOTS) await p.locator('details[data-acc="promo"]').screenshot({ path: `${process.env.SHOTS}/promo-${vp.width}.png` });
-  p.once('dialog', (d) => d.accept());
   await p.locator('[data-pv-delete]').click();
+  await p.locator('dialog.confirm [data-yes]').click();
   await p.waitForFunction(() => !document.querySelector('.pv'), null, { timeout: 8000 });
   ok(true, `${tag} suppression`);
   ok(errs.length === 0, `${tag} aucune erreur console ${errs.join(' | ')}`);

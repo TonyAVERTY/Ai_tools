@@ -174,13 +174,13 @@
 
   // ---------- Fil ----------
   function userBubble(text, atts) {
-    const a = el('article', 'msg user');
+    const a = el('article', 'chat-msg user');
     if (atts.length) { const box = el('div', 'atts'); for (const x of atts) box.append(attNode(x)); a.append(box); }
     a.append(el('div', 'bubble', text));
     return a;
   }
   function botBubble() {
-    const a = el('article', 'msg bot');
+    const a = el('article', 'chat-msg bot');
     a.innerHTML = '<div class="bubble md streaming"><span class="typing" aria-label="Claude écrit"><i></i><i></i><i></i></span></div><div class="msg-status muted small" data-status hidden></div>';
     return a;
   }
@@ -336,7 +336,7 @@
 
     const del = e.target.closest('[data-chat-del]');
     if (del) {
-      if (!confirm('Supprimer cette conversation ? Ses pièces jointes seront supprimées aussi.')) return;
+      if (!(await window.AiTools.confirmBox('Supprimer cette conversation ?\nSes pièces jointes seront supprimées aussi.'))) return;
       const id = del.dataset.chatDel;
       try {
         const r = await fetch(`/api/chat/conversations/${id}/delete`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
@@ -351,5 +351,5 @@
   renderTray();
   grow();
   toBottom();
-  if (!log.querySelector('.msg')) input.focus();
+  if (!log.querySelector('.chat-msg')) input.focus();
 })();

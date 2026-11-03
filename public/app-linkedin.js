@@ -1,7 +1,7 @@
 // LinkedIn d'un projet : relier un compte, donner une direction, générer / régénérer un post, le relire et le publier.
 // Chargé après app.js, qui expose ses outils communs dans window.AiTools ; ajax.js relance ce script à chaque navigation, comme app.js.
 (() => {
-  const { $, $$, api, esc, liDay, listen, refreshProject, toast } = window.AiTools;
+  const { $, $$, api, confirmBox, esc, liDay, listen, refreshProject, toast } = window.AiTools;
 
   // ---------- LinkedIn ----------
   // Section d'un projet : relier un compte, donner une direction (facultative), générer / régénérer un post, le relire et le publier.
@@ -92,7 +92,7 @@
         const when = $('[data-li-when]', proj).value;
         if (!when) { toast('Choisis la date et l\'heure de publication', 'error'); return; }
         const at = Math.floor(new Date(when).getTime() / 1000); // l'heure saisie est celle de ton navigateur
-        if (!confirm(`Programmer la publication le ${new Date(at * 1000).toLocaleString('fr-FR', { dateStyle: 'full', timeStyle: 'short' })} ?\nLe post sera publié automatiquement et sera visible publiquement par tout le monde.`)) return;
+        if (!(await confirmBox(`Programmer la publication le ${new Date(at * 1000).toLocaleString('fr-FR', { dateStyle: 'full', timeStyle: 'short' })} ?\nLe post sera publié automatiquement et sera visible publiquement par tout le monde.`, { confirm: 'Programmer' }))) return;
         t.disabled = true;
         await api(`/api/projects/${id}/linkedin/schedule`, { postId: Number(body().dataset.liBody), body: body().value, at, confirm: true });
         toast('Publication programmée');
@@ -103,7 +103,7 @@
         toast('Programmation annulée');
         loadLinkedin(proj);
       } else if (t.matches('[data-li-publish]')) {
-        if (!confirm(`Publier ce post sur ${t.dataset.where || 'LinkedIn'} ? Il sera visible publiquement par tout le monde.`)) return;
+        if (!(await confirmBox(`Publier ce post sur ${t.dataset.where || 'LinkedIn'} ?\nIl sera visible publiquement par tout le monde.`, { confirm: 'Publier' }))) return;
         t.disabled = true;
         await api(`/api/projects/${id}/linkedin/publish`, { postId: Number(body().dataset.liBody), body: body().value, confirm: true });
         toast('Post publié sur LinkedIn');
@@ -130,7 +130,7 @@
         toast(r.target ? `Les posts partiront sur ${r.target.name}` : 'Les posts partiront sur ton profil');
         loadLinkedin(proj);
       } else if (t.matches('[data-li-disconnect]')) {
-        if (!confirm('Déconnecter le compte LinkedIn de ce projet ? Les brouillons sont conservés.')) return;
+        if (!(await confirmBox('Déconnecter le compte LinkedIn de ce projet ?\nLes brouillons sont conservés.'))) return;
         await api(`/api/projects/${id}/linkedin/disconnect`, {});
         loadLinkedin(proj);
       }
