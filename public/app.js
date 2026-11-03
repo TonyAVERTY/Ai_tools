@@ -69,7 +69,7 @@
   }
 
   // Outils communs pour les fichiers public/app-*.js (chargés après celui-ci)
-  Object.assign(window.AiTools, { $, $$, api, esc, every, formData, go, icon, liDay, listen, refreshProject, httpErrorText, networkErrorText, toLogin, confirmBox, loadingHtml });
+  Object.assign(window.AiTools, { $, $$, api, esc, every, formData, go, icon, liDay, listen, refreshProject, httpErrorText, networkErrorText, toLogin, confirmBox, loadingHtml, loadFailed });
 
   // Une erreur dit ce qui s'est passé et quoi faire ensuite : jamais « Failed to fetch » ni un code brut. Le message du serveur, quand il y en a un, passe en premier.
   function httpErrorText(status) {
@@ -150,6 +150,22 @@
   // Contenu qui se charge : l'anneau commun devant « Chargement… » (même balisage que src/loading.js)
   function loadingHtml(text = 'Chargement…', { small = false } = {}) {
     return `<span class="loading${small ? ' small' : ''}" role="status"><span class="${small ? 'spin-inline' : 'spinner'}" aria-hidden="true"></span><span>${esc(text)}</span></span>`;
+  }
+
+  // Un contenu qui n'a pas pu se charger : ce qui s'est passé et un bouton « Réessayer » qui remet le cercle de chargement puis relance `retry`.
+  // `small` : pour une liste ou un menu (texte plus petit). Rien d'écrit en dur : le message arrive déjà traduit (voir httpErrorText).
+  function loadFailed(box, message, retry, { small = false } = {}) {
+    const wrap = document.createElement('div');
+    wrap.className = `load-error${small ? ' small' : ''}`;
+    wrap.setAttribute('role', 'alert');
+    const text = document.createElement('p');
+    text.className = 'error small';
+    text.textContent = message;
+    const again = document.createElement('button');
+    again.type = 'button'; again.className = 'btn small'; again.textContent = 'Réessayer';
+    again.addEventListener('click', () => { box.innerHTML = loadingHtml('Chargement…', { small }); retry(); }, { once: true });
+    wrap.append(text, again);
+    box.replaceChildren(wrap);
   }
 
   function toast(msg, kind = 'ok') {
@@ -896,7 +912,10 @@
   async function refreshProject(el) {
     const id = el.dataset.id;
     let s;
-    try { s = await api(`/api/projects/${id}/status`); } catch (e) { return schedule(el, 30_000); }
+    try { s = await api(`/api/projects/${id}/status`); } catch (e) {
+      if (!checklists.has(id)) setupFailed(el, e); // la liste « Mise en route » arrive avec l'état : sans elle, la section resterait sur son cercle
+      return schedule(el, 30_000);
+    }
     const st = state.get(id) || {};
     const jobs = s.jobs;
     for (const type of ['analyze', 'prospect', 'template', 'send', 'evolution', 'audit', 'followup_template', 'followup', 'linkedin_post', 'promo_video']) renderJob($(`[data-job="${type}"]`, el), jobs[type], type);
@@ -1064,7 +1083,14 @@
   }
 
   async function loadChecklist(el) {
-    try { setChecklist(el.dataset.id, await api(`/api/projects/${el.dataset.id}/checklist`)); } catch { /* la liste est un confort : on se tait */ }
+    try { setChecklist(el.dataset.id, await api(`/api/projects/${el.dataset.id}/checklist`)); } catch (err) { setupFailed(el, err); }
+  }
+  // Sans cela la section « Mise en route » restait sur son cercle de chargement pour toujours. Le badge, lui, reste masqué.
+  function setupFailed(el, err) {
+    const body = $('[data-setup]', el);
+    if (!body) return;
+    body._html = null;
+    loadFailed(body, err.message, () => loadChecklist(el));
   }
   $$('details.project').forEach((el) => el.addEventListener('toggle', () => { if (el.open && !checklists.has(el.dataset.id)) loadChecklist(el); }));
 

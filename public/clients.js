@@ -14,12 +14,15 @@
     const token = String((Number(det.dataset.clReq) || 0) + 1);
     det.dataset.clReq = token; // une réponse plus ancienne que la dernière demande est ignorée
     det.dataset.clLimit = String(limit);
+    const T = window.AiTools;
+    const retry = () => load(det, { limit });
     try {
       const r = await fetch(`/clients/projet/${id}/liste?q=${encodeURIComponent(q)}&limit=${limit}`, { headers: { Accept: 'text/html' } });
       if (det.dataset.clReq !== token) return;
-      box.innerHTML = r.ok ? await r.text() : '<p class="muted cl-empty">Impossible de charger la liste. Recharge la page.</p>';
+      if (r.status === 401) return T.toLogin();
+      if (r.ok) box.innerHTML = await r.text(); else T.loadFailed(box, T.httpErrorText(r.status), retry);
     } catch {
-      if (det.dataset.clReq === token) box.innerHTML = '<p class="muted cl-empty">Connexion interrompue. Recharge la page.</p>';
+      if (det.dataset.clReq === token) T.loadFailed(box, T.networkErrorText(), retry);
     }
   };
 

@@ -1,7 +1,7 @@
 // Récap d'un projet : indicateurs et courbes d'historique (SVG maison : pas de lib externe, CSP stricte).
 // Chargé après app.js, qui expose ses outils communs dans window.AiTools ; ajax.js relance ce script à chaque navigation, comme app.js.
 (() => {
-  const { $, $$, api, esc, every, listen, loadingHtml } = window.AiTools;
+  const { $, $$, api, esc, every, listen, loadFailed, loadingHtml } = window.AiTools;
 
   // ---------- Courbes (SVG maison : pas de lib externe, CSP stricte) ----------
   // Dessinées à la largeur réelle du conteneur (1 unité = 1 px) pour que les textes restent lisibles sur mobile.
@@ -112,7 +112,7 @@
     if (!box) return;
     let h;
     try { h = await api(`/api/projects/${proj.dataset.id}/history?days=${days}`); }
-    catch (err) { box.innerHTML = `<p class="error small">${esc(err.message)}</p>`; return; }
+    catch (err) { loadFailed(box, err.message, () => loadHistory(proj, days)); return; }
     const kpi = (key, title, unit) => {
       const pts = h.daily.filter((d) => d[key] != null);
       return figure('line', title, { unit, xs: pts.map((d) => d.day), ys: pts.map((d) => d[key]) },
@@ -174,7 +174,7 @@
         <button class="btn small" data-recap-refresh>Rafraîchir</button></p>
         <div data-charts></div>`;
       loadHistory(proj);
-    } catch (err) { box.innerHTML = `<p class="error small">${esc(err.message)}</p>`; }
+    } catch (err) { loadFailed(box, err.message, () => loadRecap(proj, force)); }
   }
 
   window.AiTools.loadRecap = loadRecap;
