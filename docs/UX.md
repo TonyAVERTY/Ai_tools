@@ -36,6 +36,15 @@ Une erreur dit **ce qui s'est passé** et **quoi faire** ; jamais « Failed to f
 - Session expirée (401) : retour à `/login?e=…` avec « Ta session a expiré : reconnecte-toi. » (pas de redirection muette).
 - Ne jamais présenter une action comme réussie quand elle a échoué : on affiche le succès **après** la réponse.
 
+## Formulaires : une erreur ne vide jamais ce qui a été saisi
+
+Un formulaire que le serveur refuse **garde ses champs, reste à l'écran et le bouton se réactive** ; l'erreur s'affiche en notification (`public/ajax.js`).
+- Une route qui refuse une saisie répond **4xx** avec un message (`HttpError(400, '…', { expose: true })`) ou **redirige vers la même page avec `?e=message`** : `ajax.js` traite les deux
+  pareil (il ne remplace pas la page, l'adresse ne reçoit pas de « ?e= »). Une redirection vers une **autre** page, ou sans `e`, reste une navigation normale (succès : `?ok=…`).
+- Un formulaire écrit en JS (`api()`) ne vide ses champs **qu'après** la réponse ; le chat remet le texte et les pièces jointes si l'envoi échoue.
+- Sans JavaScript (ou formulaire `data-noajax` / avec fichier), la page est rechargée avec le bandeau d'erreur : les champs sont alors perdus. Ne pas en dépendre.
+- `scripts/forms-keep-check.mjs` le vérifie dans Chromium (Clients, Calendrier, 1280 et 390 px).
+
 ## Rédaction
 
 - Succès : **« Nom + participe passé »** (« Prospect ajouté », « SMTP enregistré », « Note supprimée »). Pas de « ! », pas de « avec succès ».
@@ -73,7 +82,7 @@ Une erreur dit **ce qui s'est passé** et **quoi faire** ; jamais « Failed to f
 
 ## Ce qui reste à harmoniser (lots suivants)
 
-Convention rédactionnelle complète, validation des formulaires (valeurs conservées après une erreur).
+Convention rédactionnelle complète.
 
 ## Tests
 
