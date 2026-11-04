@@ -8,8 +8,8 @@ import { getUser } from './users.js';
 import { runClaude } from './services/claude.js';
 import { AI_JOBS } from './services/budget.js';
 import { getProvider, hasProvider, DEFAULT_PROVIDER } from './services/providers/index.js';
-import { isAuthRefusal } from './services/providers/claude.js';
-export { isAuthRefusal };
+import { isAuthRefusal, validateApiKey } from './services/providers/claude.js';
+export { isAuthRefusal, validateApiKey };
 
 export const MODES = { api_key: 'api_key', subscription_token: 'subscription_token' };
 export const MODE_LABELS = {
@@ -30,9 +30,7 @@ export const CONSENT_TEXT = [
 ];
 export const CONSENT_CHECKBOX = "J'ai compris et j'accepte ce risque";
 
-const API_KEY_RE = /^sk-ant-[A-Za-z0-9_-]{20,400}$/;
 const TOKEN_RE = /^[A-Za-z0-9_.-]{20,800}$/;
-const MODELS_URL = 'https://api.anthropic.com/v1/models';
 
 
 const truthy = (v) => v === true || v === 'true' || v === 'on' || v === '1' || v === 1;
@@ -55,6 +53,12 @@ export async function markLinkInvalid(db, userId) {
   return true;
 }
 
+/** Libellé du mode de connexion d'une liaison brute (colonne en base), pour la liste des comptes de l'administration. */
+export function modeLabelOf(link) {
+  const p = hasProvider(link?.provider ?? DEFAULT_PROVIDER) ? getProvider(link?.provider) : null;
+  return p?.modes[link?.mode]?.label ?? MODE_LABELS[link?.mode] ?? link?.mode;
+}
+
 /** Forme exposée à l'interface : jamais le secret, seulement ses 4 derniers caractères pour la clé API. */
 export function publicLink(link) {
   if (!link?.mode || !MODES[link.mode]) return null; // un ancien mode « serveur » compte comme « pas de liaison »
@@ -62,7 +66,7 @@ export function publicLink(link) {
   const provider = getProvider(link.provider);
   return {
     provider: provider.id, providerLabel: provider.label,
-    mode: link.mode, label: MODE_LABELS[link.mode], valid: !!link.valid,
+    mode: link.mode, label: provider.modes[link.mode]?.label ?? MODE_LABELS[link.mode], valid: !!link.valid,
     linkedAt: link.linked_at ?? null, validatedAt: link.validated_at ?? null, lastTestAt: link.last_test_at ?? null,
     last4: link.mode === 'api_key' ? link.last4 ?? null : null,
     consentAt: link.consent?.at ?? null, consentVersion: link.consent?.version ?? null,
@@ -130,25 +134,6 @@ export async function resolveCredentials(app, userId) {
 
 // ---------- Validation ----------
 
-/**
- * Valide une clé API par un appel qui ne consomme aucun token : GET /v1/models.
- * 401/403 : refusée ; erreur réseau ou réponse inattendue : message distinct (la clé n'est pas jugée).
- * @returns {Promise<void>}
- */
-export async function validateApiKey(key, fetchFn = fetch) {
-  let r;
-  try {
-    r = await fetchFn(MODELS_URL, {
-      headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-      signal: AbortSignal.timeout(10_000),
-    });
-  } catch {
-    throw new HttpError(502, "Impossible de joindre Anthropic pour vérifier la clé (réseau). Réessaie dans un instant.", { expose: true });
-  }
-  if (r.status === 401 || r.status === 403) throw new HttpError(400, 'Clé API refusée par Anthropic');
-  if (!r.ok) throw new HttpError(502, `Anthropic ne répond pas normalement (HTTP ${r.status}) : la clé n'a pas pu être vérifiée. Réessaie plus tard.`, { expose: true });
-}
-
 // Appel minimal du CLI avec le jeton (modèle le plus petit, 1 tour, aucun outil). Ce n'est PAS gratuit : quelques tokens
 // sont décomptés de l'abonnement. Aucune commande du CLI ne vérifie un jeton sans appel au modèle.
 export async function validateSubscriptionToken(app, token) {
@@ -202,12 +187,14 @@ export async function saveLink(app, userId, link) {
   await resetQuotaState(app.db, userId);
 }
 
-/** Mode A : clé API. Validée, chiffrée, jamais réaffichée. */
-export async function linkApiKey(app, userId, apiKey) {
+/** Mode A : clé API (de l'IA choisie : Claude par défaut). Validée, chiffrée, jamais réaffichée. */
+export async function linkApiKey(app, userId, apiKey, providerId = DEFAULT_PROVIDER) {
+  if (!hasProvider(providerId)) throw new HttpError(400, 'IA inconnue');
+  const provider = getProvider(providerId);
   const key = String(apiKey ?? '').trim();
-  if (!API_KEY_RE.test(key)) throw new HttpError(400, 'Clé API invalide (elle commence par sk-ant-)');
-  await (app.validateApiKey || validateApiKey)(key, app.fetch || fetch);
-  await saveLink(app, userId, { mode: MODES.api_key, secret_enc: encrypt(app.cfg.secretKey, key), last4: key.slice(-4) });
+  if (!provider.apiKey.pattern.test(key)) throw new HttpError(400, provider.apiKey.invalidFormat);
+  await (app.validateApiKey || provider.apiKey.validate)(key, app.fetch || fetch);
+  await saveLink(app, userId, { provider: provider.id, mode: MODES.api_key, secret_enc: encrypt(app.cfg.secretKey, key), last4: key.slice(-4) });
 }
 
 /**
@@ -272,7 +259,7 @@ export async function testLink(app, userId) {
     let secret;
     try { secret = decrypt(app.cfg.secretKey, link.secret_enc); } catch { secret = null; }
     if (!secret) { await mark(false); return { ok: false, message: 'Secret illisible : relie de nouveau ton accès Claude' }; }
-    if (link.mode === MODES.api_key) await (app.validateApiKey || validateApiKey)(secret, app.fetch || fetch);
+    if (link.mode === MODES.api_key) await (app.validateApiKey || getProvider(link.provider).apiKey.validate)(secret, app.fetch || fetch);
     else {
       if (app.cfg.cliModeEnabled === false) return { ok: false, message: CLI_DISABLED_MESSAGE };
       await (app.validateToken || ((t) => validateSubscriptionToken(app, t)))(secret);

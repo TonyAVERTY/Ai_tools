@@ -307,7 +307,7 @@ export function registerRoutes(router, app) {
       redirect(res, `/link?e=${encodeURIComponent(e.message)}`);
     }
   };
-  router.post('/link/api-key', linkAction((b, s) => linkApiKey(app, s.userId, b.apiKey)), LINK_LIMIT);
+  router.post('/link/api-key', linkAction((b, s) => linkApiKey(app, s.userId, b.apiKey, b.provider || undefined)), LINK_LIMIT);
   router.post('/link/subscription', linkAction((b, s) => linkSubscriptionToken(app, s.userId, { token: b.token, accept: b.accept })), LINK_LIMIT);
   // Connexion guidée avec Claude (src/claudelogin.js) : le serveur lance le CLI et renvoie le lien de connexion ;
   // l'utilisateur recopie ensuite le petit code affiché par Claude, et le serveur range le jeton qui en sort.
