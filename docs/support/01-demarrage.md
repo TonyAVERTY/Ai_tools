@@ -4,8 +4,8 @@ Résumé : parcours complet pour démarrer (connexion, liaison Claude, premier p
 ## 1. Se connecter
 La connexion se fait avec **Google** (ou Apple quand il est proposé) depuis la page « Connexion » du site : pas de mot de passe à créer. Un compte est créé automatiquement à la première connexion. Une fois connecté, le bouton « Dashboard » du site mène à l'application. Quand on est déconnecté, la racine du site montre la page d'accueil publique.
 
-## 2. Relier son Claude (obligatoire)
-Sans liaison Claude valide, l'application affiche la page « Relier Claude » et rien d'autre (seuls « Mon compte » et la déconnexion répondent). Trois façons de relier : clé API Anthropic (recommandée), « Se connecter avec Claude » (abonnement), ou jeton collé à la main. Détails dans le fichier sur la liaison Claude. Un membre d'équipe qui travaille sur les projets d'un autre n'a pas besoin de sa propre liaison.
+## 2. Relier son IA (obligatoire)
+Sans liaison valide, l'application affiche la page « Relier mon IA » et rien d'autre (seuls « Mon compte » et la déconnexion répondent). Tu y choisis ton IA sur trois cartes (Claude, ChatGPT ou Gemini), puis comment t'y connecter : clé API (recommandée), abonnement ou compte (Claude, ChatGPT), ou clé Google AI Studio (Gemini). Détails dans le fichier sur la liaison de l'IA. Un membre d'équipe qui travaille sur les projets d'un autre n'a pas besoin de sa propre liaison.
 
 ## 2 bis. Faisons connaissance (une seule fois)
 À ta première arrivée sur le tableau de bord (après la liaison Claude), AiTools affiche une page « Faisons connaissance » avec des questions générales sur toi, valables pour tous tes projets : ta fonction, ton niveau technique, ton expérience de la prospection, le niveau de détail que tu préfères dans les réponses, tutoiement ou vouvoiement, ce que tu veux faire avec AiTools, et une précision libre sur ta façon de travailler. Elle ne demande rien sur un projet précis (secteur, taille de l'entreprise, cible) : ces informations se règlent projet par projet, dans la section Cible. Tout est facultatif.

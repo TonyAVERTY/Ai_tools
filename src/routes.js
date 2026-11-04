@@ -38,7 +38,9 @@ import { registerPromoRoutes, removeProjectVideos } from './promo.js';
 import { registerPosteRoutes } from './posteroutes.js';
 import { isRoleJob, roleTaskByJob } from './services/roles.js';
 import { registerProspectRoutes } from './prospectroutes.js';
-import { dashboardPage, settingsPage, unsubPage, accountPage, linkPage, layout } from './views.js';
+import { dashboardPage, settingsPage, unsubPage, accountPage, layout } from './views.js';
+import { linkPage } from './linkviews.js';
+import { availableProviders } from './services/providers/availability.js';
 import { enqueue, latestJobs, cancelJob, retryJob, usageSummary } from './services/jobs.js';
 import { validateGitUrl, removeRepo } from './services/git.js';
 import { fetchRecap, clearRecapCache, validateSelect } from './services/recap.js';
@@ -276,7 +278,7 @@ export function registerRoutes(router, app) {
   router.get('/link', async ({ res, session, url }) => {
     html(res, linkPage({
       user: session.user, link: await getLinkState(db, session.userId), cliModeEnabled, error: url.searchParams.get('e'),
-      start: url.searchParams.get('start') === 'claude',
+      start: url.searchParams.get('start') === 'claude', selected: url.searchParams.get('ia'), available: availableProviders(cfg),
     }));
   });
 
@@ -297,7 +299,7 @@ export function registerRoutes(router, app) {
   }, LINK_LIMIT);
   const wantsJson = (req) => !!req.headers.accept?.includes('json');
   // Formulaire HTML : l'erreur revient sur la page de liaison ; appel JSON : code HTTP + { error }
-  const linkAction = (fn, okTo = '/') => async ({ req, res, session }) => {
+  const linkAction = (fn, okTo = '/', ia = null) => async ({ req, res, session }) => {
     const b = await readBody(req);
     try {
       const out = (await fn(b, session)) || {};
@@ -305,11 +307,13 @@ export function registerRoutes(router, app) {
       redirect(res, okTo);
     } catch (e) {
       if (!(e instanceof HttpError) || wantsJson(req)) throw e;
-      redirect(res, `/link?e=${encodeURIComponent(e.message)}`);
+      // L'erreur revient sur la page de liaison, avec les options de l'IA concernée déjà ouvertes
+      const which = ia || (['claude', 'openai', 'gemini'].includes(b.provider) ? b.provider : 'claude');
+      redirect(res, `/link?ia=${which}&e=${encodeURIComponent(e.message)}`);
     }
   };
   router.post('/link/api-key', linkAction((b, s) => linkApiKey(app, s.userId, b.apiKey, b.provider || undefined)), LINK_LIMIT);
-  router.post('/link/subscription', linkAction((b, s) => linkSubscriptionToken(app, s.userId, { token: b.token, accept: b.accept })), LINK_LIMIT);
+  router.post('/link/subscription', linkAction((b, s) => linkSubscriptionToken(app, s.userId, { token: b.token, accept: b.accept }), '/', 'claude'), LINK_LIMIT);
   // Connexion guidée avec Claude (src/claudelogin.js) : le serveur lance le CLI et renvoie le lien de connexion ;
   // l'utilisateur recopie ensuite le petit code affiché par Claude, et le serveur range le jeton qui en sort.
   router.post('/link/claude/login', async ({ req, res, session }) => {
@@ -330,7 +334,7 @@ export function registerRoutes(router, app) {
     json(res, { ok: true });
   }, LINK_LIMIT);
   // Compte ChatGPT : fichier de connexion de Codex collé (secours) ou connexion guidée par code d'appareil (src/chatgptlogin.js)
-  router.post('/link/chatgpt/auth', linkAction((b, s) => linkChatgptAccount(app, s.userId, { authJson: b.authJson, accept: b.accept, via: 'paste' })), LINK_LIMIT);
+  router.post('/link/chatgpt/auth', linkAction((b, s) => linkChatgptAccount(app, s.userId, { authJson: b.authJson, accept: b.accept, via: 'paste' }), '/', 'openai'), LINK_LIMIT);
   router.post('/link/chatgpt/login', async ({ req, res, session }) => {
     const b = await readBody(req);
     assertLoginConsent(cfg, b.accept); // même exigence que pour l'abonnement Claude : case cochée, avant tout lancement

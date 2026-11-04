@@ -67,7 +67,7 @@ test('réglages : chaque rubrique du sommaire est documentée', () => {
 // Pages de l'application : toute nouvelle page doit être ajoutée ici ET documentée.
 const PAGES = {
   '/': 'Projets', '/chat': 'Claude', '/support': 'Support', '/settings': 'Réglages', '/account': 'Mon compte', '/mails': 'Mails', '/calendar': 'Calendrier',
-  '/team': 'Équipe', '/compta': 'Comptabilité', '/facturation': 'Facturation', '/clients': 'Clients', '/developer': 'Développeur', '/link': 'Relier Claude', '/admin': 'Administration', '/accueil': 'Site internet',
+  '/team': 'Équipe', '/compta': 'Comptabilité', '/facturation': 'Facturation', '/clients': 'Clients', '/developer': 'Développeur', '/link': 'Relier mon IA', '/admin': 'Administration', '/accueil': 'Site internet',
   '/login': 'Connexion', '/fonctionnement': 'Fonctionnement', '/tarifs': 'Tarifs', '/docs': 'Documentation', '/mentions-legales': 'Mentions légales',
   '/confidentialite': 'Politique de confidentialité', '/cgu': 'CGU',
 };
