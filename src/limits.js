@@ -39,6 +39,9 @@ export const RATE_LIMITS = {
   unsub: { ip: { max: 60, windowMs: 10 * MIN } },
   // Liaison Claude : chaque essai de clé ou de jeton coûte un appel réseau chez Anthropic
   link: { user: { max: 10, windowMs: 10 * MIN }, ip: { max: 30, windowMs: 10 * MIN } },
+  // Connexion guidée ChatGPT : la page demande où en est la connexion toutes les 2 s pendant 15 minutes au plus (lecture seule, aucun appel réseau
+  // vers OpenAI). Elle ne doit JAMAIS compter dans « link » ci-dessus, sinon elle l'épuise en quelques secondes.
+  link_poll: { user: { max: 600, windowMs: 10 * MIN }, ip: { max: 900, windowMs: 10 * MIN } },
   // Export / import CSV
   csv: { user: { max: 10, windowMs: 10 * MIN } },
   // Envois : lancement d'un lot, rapport par mail, notification de test

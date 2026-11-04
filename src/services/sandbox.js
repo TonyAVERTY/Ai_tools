@@ -45,6 +45,26 @@ export function resolveBin(bin, pathEnv = process.env.PATH || '') {
   return null;
 }
 
+/**
+ * Dossiers à monter (lecture seule) pour qu'un CLI s'exécute dans le bac à sable, en plus de /usr. Un CLI installé avec npm (Codex, Gemini CLI)
+ * n'est pas un fichier seul : c'est un script Node (« #!/usr/bin/env node ») qui charge son paquet et, pour Codex, son exécutable natif rangé dans
+ * un paquet voisin. Il faut donc monter l'arbre `node_modules` du paquet ET l'installation de Node qui sert à le lancer, sinon le CLI s'arrête sans
+ * rien dire (« module introuvable »). Rien n'est ajouté pour un binaire sous /usr.
+ * @param {string} real  chemin réel du CLI (liens suivis)
+ * @param {string} nodeExec  exécutable Node du serveur (sert au shebang du CLI)
+ */
+export function cliBinds(real, nodeExec = process.execPath) {
+  const out = new Set();
+  if (!real.startsWith('/usr/')) out.add(dirname(real));
+  const pkg = /^(.*\/node_modules)\/(?:@[^/]+\/)?[^/]+\//.exec(real);
+  if (pkg) out.add(pkg[1]);
+  if (pkg || /\.(?:c|m)?js$/.test(real)) {
+    const nodeRoot = dirname(dirname(nodeExec)); // …/bin/node → l'installation de Node (nvm, /opt/node…)
+    if (nodeRoot !== '/' && !nodeRoot.startsWith('/usr')) out.add(nodeRoot);
+  }
+  return [...out];
+}
+
 /** Le chemin est-il à l'intérieur de `root` (ou égal) ? Sert à n'accepter que le dossier de CET utilisateur. */
 export function isInside(root, path) {
   const rel = relative(resolve(root), resolve(path));
@@ -118,7 +138,7 @@ export function bwrapAvailable(bin = 'bwrap') {
  * @param {string[]} [o.roFiles]     fichiers à monter en lecture seule dans le bac à sable (réglages du CLI)
  * @param {string[]} [o.rwDirs]      dossiers temporaires à monter en lecture-écriture (connexion de compte renouvelée par le CLI)
  * @param {object} o.sandbox         cfg.sandbox : { enabled, production, bwrapBin, roBinds }
- * @param {object} [deps]            { parentEnv, hasBwrap, resolveBin } (tests)
+ * @param {object} [deps]            { parentEnv, hasBwrap, resolveBin, nodeExec } (tests)
  */
 export function prepareLaunch(o, deps = {}) {
   const sb = o.sandbox;
@@ -149,7 +169,7 @@ export function prepareLaunch(o, deps = {}) {
   }
   const real = (deps.resolveBin || resolveBin)(o.bin, parentEnv.PATH);
   if (!real) throw new Error(`Exécutable Claude introuvable : ${o.bin}`);
-  const roBinds = [...new Set([...(sb.roBinds || []), ...(real.startsWith('/usr/') ? [] : [dirname(real)])])];
+  const roBinds = [...new Set([...(sb.roBinds || []), ...cliBinds(real, deps.nodeExec)])];
   const bwrap = buildBwrapArgs({
     workDir: cwd, roBinds, extraRo: extraDirs, roFiles: (o.roFiles || []).map((f) => resolve(f)), rwDirs: (o.rwDirs || []).map((d) => resolve(d)), command: [real, ...o.args],
   });

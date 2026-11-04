@@ -340,13 +340,16 @@ export function registerRoutes(router, app) {
     assertLoginConsent(cfg, b.accept); // même exigence que pour l'abonnement Claude : case cochée, avant tout lancement
     json(res, await chatgptLoginsOf(app).start(session.userId));
   }, LINK_LIMIT);
-  router.post('/link/chatgpt/login/status', async ({ req, res, session }) => {
+  // Sondage de la page (toutes les 2 s) : lecture seule, avec sa propre limite, jamais celle de la liaison
+  router.get('/link/chatgpt/login/status', async ({ res, session, url }) => {
+    json(res, chatgptLoginsOf(app).poll(session.userId, url.searchParams.get('id')));
+  }, { limit: 'link_poll' });
+  // Connexion validée sur chatgpt.com : vérifiée par un appel minimal à Codex avant d'être rangée (chiffrée). Une seule requête, comptée dans « link ».
+  router.post('/link/chatgpt/login/finish', async ({ req, res, session }) => {
     const b = await readBody(req);
-    const r = chatgptLoginsOf(app).poll(session.userId, b.id);
-    if (r.state !== 'done') return json(res, r);
-    // Connexion validée sur chatgpt.com : vérifiée par un appel minimal à Codex avant d'être rangée (chiffrée)
-    await linkChatgptAccount(app, session.userId, { authJson: r.authJson, accept: true, via: 'login' });
-    json(res, { state: 'done' });
+    const authJson = chatgptLoginsOf(app).finish(session.userId, b.id);
+    await linkChatgptAccount(app, session.userId, { authJson, accept: true, via: 'login' });
+    json(res, { ok: true });
   }, LINK_LIMIT);
   router.post('/link/chatgpt/login/cancel', async ({ req, res, session }) => {
     chatgptLoginsOf(app).cancel(session.userId, (await readBody(req)).id);
