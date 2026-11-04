@@ -114,20 +114,34 @@ export class ChatgptLogins {
   }
 
   /**
-   * Où en est la connexion ? { state: 'pending' } tant que l'utilisateur n'a pas validé ; { state: 'done', authJson } quand Codex a écrit sa
-   * connexion (la session est alors fermée) ; { state: 'failed', message } si le CLI s'est arrêté sans connexion ; 404 si elle a expiré.
+   * Où en est la connexion ? Lecture seule, appelée toutes les 2 s par la page : { state: 'pending' } tant que l'utilisateur n'a pas validé,
+   * { state: 'ready' } quand Codex a écrit sa connexion (la session reste ouverte jusqu'à `finish`), { state: 'failed', message } si le CLI
+   * s'est arrêté sans connexion (la session est alors fermée) ; 404 si elle a expiré.
    */
   poll(userId, id) {
     const s = this.sessions.get(String(id));
     if (!s || s.userId !== Number(userId)) throw new HttpError(404, 'Connexion expirée : recommence.');
     if (!s.done) return { state: 'pending' };
-    let authJson = null;
-    try { authJson = readFileSync(join(s.home, 'auth.json'), 'utf8'); } catch { /* pas de fichier */ }
+    if (s.ready) return { state: 'ready' };
+    let ok = false;
+    try { ok = !!readFileSync(join(s.home, 'auth.json'), 'utf8').trim() && s.exit === 0; } catch { /* pas de fichier */ }
+    if (ok) { s.ready = true; return { state: 'ready' }; }
     const tail = readableTail(s.out);
     this.#drop(String(id));
-    if (authJson && s.exit === 0) return { state: 'done', authJson };
     console.warn(`Connexion ChatGPT échouée (compte ${userId}, code ${s.exit}) : ${tail}`);
     return { state: 'failed', message: "ChatGPT n'a pas validé la connexion (code refusé, expiré, ou connexion par code d'appareil non activée dans ton compte). Recommence." };
+  }
+
+  /** Une fois la connexion prête : rend le fichier de connexion et ferme la session. 409 tant que l'utilisateur n'a pas validé. */
+  finish(userId, id) {
+    const s = this.sessions.get(String(id));
+    if (!s || s.userId !== Number(userId)) throw new HttpError(404, 'Connexion expirée : recommence.');
+    if (!s.ready) throw new HttpError(409, "La connexion n'est pas encore validée : valide-la sur chatgpt.com.", { expose: true });
+    let authJson = '';
+    try { authJson = readFileSync(join(s.home, 'auth.json'), 'utf8'); } catch { /* signalé ci-dessous */ }
+    this.#drop(String(id));
+    if (!authJson) throw new HttpError(502, "ChatGPT n'a pas renvoyé de connexion utilisable. Recommence.", { expose: true });
+    return authJson;
   }
 }
 
