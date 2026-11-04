@@ -99,7 +99,8 @@ export function runGemini(o) {
         // Tout rôle autre que « user » est du texte de l'IA (le CLI écrit « model » ou « assistant » selon les versions)
         if (ev.role !== 'user' && typeof ev.content === 'string' && ev.content) { answer.push(ev.content); o.onDelta?.(redact(ev.content)); }
       } else if (ev.type === 'tool_use') {
-        o.onTurn?.(++turns);
+        turns += 1;
+        o.onTurn?.(turns);
         o.onTool?.(CLAUDE_NAME[ev.tool_name] || ev.tool_name, toolInput(ev.parameters));
       } else if (ev.type === 'error') {
         if (ev.message) errors.push(String(ev.message));
