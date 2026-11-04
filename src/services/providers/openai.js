@@ -1,9 +1,13 @@
 // Fournisseur d'IA « ChatGPT » (OpenAI) : lance Codex CLI en headless (`codex exec --json`) et traduit son flux vers la forme commune
 // des fournisseurs (voir providers/index.js).
 //
-// Connexion : CLÉ API OPENAI SEULEMENT (variable CODEX_API_KEY, lue par `codex exec`). La connexion par compte ChatGPT repose sur un
-// fichier auth.json que Codex renouvelle lui-même (jeton de rafraîchissement à usage unique, un seul flux de jobs à la fois) : elle
-// demande un traitement à part, qui n'est pas dans ce fournisseur.
+// Connexion, deux modes :
+//  - CLÉ API OPENAI (variable CODEX_API_KEY, lue par `codex exec`) ;
+//  - COMPTE ChatGPT : le fichier auth.json de Codex (`codex login`), gardé chiffré en base. Pour chaque exécution il est écrit dans un
+//    dossier temporaire (CODEX_HOME), monté en lecture-écriture dans le bac à sable, puis relu : Codex renouvelle lui-même ses jetons
+//    (jeton de rafraîchissement à usage unique) et le fichier à jour est rendu à l'appelant (`onAuthFile`). Les exécutions d'un même
+//    compte passent donc l'une après l'autre (services/userlock.js, appliqué par handlers.js). Le shell de Codex n'a PAS le droit de lire
+//    ce dossier : profil de permissions avec `deny` (beta chez OpenAI).
 //
 // Ce que Codex ne sait pas faire comme Claude Code, et ce qu'on en fait :
 //  - il LIT le dépôt avec une commande shell, il n'a pas d'outil « Read » : une tâche qui lit le dépôt garde donc le shell, dans le bac à
@@ -16,12 +20,21 @@
 //  - pas de coût en $ dans le flux : il est estimé d'après services/pricing.js ; pas de quota 5 h / 7 j ;
 //  - le texte n'arrive pas au fil de l'écriture : la réponse finale est transmise d'un bloc.
 import { spawn } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { prepareLaunch } from '../sandbox.js';
 import { estimateCost } from '../pricing.js';
 import { HttpError } from '../../http.js';
 import { SECRET_ENV } from './secretenv.js';
 
 const MODELS_URL = 'https://api.openai.com/v1/models';
+const CATALOG_DEFAULT = 'gpt-6-luna';
+
+/** Jetons d'un fichier de connexion, à masquer. */
+const authSecretValues = (authJson) => {
+  try { const t = JSON.parse(authJson)?.tokens || {}; return [t.access_token, t.refresh_token, t.id_token].filter((v) => typeof v === 'string' && v.length >= 8); } catch { return []; }
+};
 
 /** Réponse qui signifie « accès refusé » (clé invalide, révoquée) : au sens strict, jamais une panne réseau ni un quota épuisé. */
 export const isAuthRefusal = (text) => /invalid_api_key|incorrect api key|invalid api key|authentication[_ ]?(error|failed)|unauthori[sz]ed|\b401\b/i.test(String(text ?? ''));
@@ -36,13 +49,27 @@ export function toolConfig(tools = []) {
   return { shell: reads, web: web ? 'live' : 'disabled' };
 }
 
-/** Arguments du CLI (`-c` : valeurs TOML). */
-export function buildArgs(o) {
+/**
+ * Lecture seule pour les commandes du shell de Codex. Avec une connexion de compte, un profil de permissions (qui ne se combine pas avec
+ * `--sandbox`) lit comme `:read-only` mais REFUSE le dossier de connexion : le shell ne peut pas lire les jetons de l'utilisateur.
+ */
+function sandboxArgs(authHome) {
+  if (!authHome) return ['--sandbox', 'read-only'];
+  return [
+    '-c', 'default_permissions="aitools"',
+    '-c', 'permissions.aitools.extends=":read-only"',
+    '-c', `permissions.aitools.filesystem."${authHome.replace(/(["\\])/g, '\\$1')}"="deny"`,
+  ];
+}
+
+/** Arguments du CLI (`-c` : valeurs TOML). `authHome` : dossier de connexion de compte (CODEX_HOME), s'il y en a un. */
+export function buildArgs(o, authHome = null) {
   const { shell, web } = toolConfig(o.tools);
   const prompt = o.system ? `${o.system}\n\n---\n\n${o.prompt}` : o.prompt;
   const args = [
     'exec', '--json', '--skip-git-repo-check', '--ephemeral', '--ignore-user-config', '--ignore-rules',
-    '--sandbox', 'read-only',
+    ...sandboxArgs(authHome),
+    ...(authHome ? ['-c', 'cli_auth_credentials_store="file"'] : []),
     '-c', `features.shell_tool=${shell}`,
     '-c', `web_search="${web}"`,
     '-c', 'project_doc_max_bytes=0',
@@ -60,11 +87,29 @@ export function buildArgs(o) {
 
 /** Lance Codex CLI. Mêmes options et même résultat que runClaude (services/claude.js). */
 export function runCodex(o) {
-  const launch = prepareLaunch({
-    bin: o.bin || 'codex', args: buildArgs(o), cwd: o.cwd, allowedRoot: o.allowedRoot,
-    secretEnv: o.secretEnv, sandbox: o.sandbox, extraDirs: o.extraDirs, extraRoot: o.extraRoot,
-  });
-  const secrets = Object.values(o.secretEnv || {}).filter((v) => v && v.length >= 8);
+  // Connexion de compte : le fichier est écrit dans un dossier propre à CETTE exécution, relu à la fin (Codex a pu renouveler ses jetons)
+  let authHome = null;
+  if (o.authFile) {
+    authHome = mkdtempSync(join(tmpdir(), 'aitools-codex-home-'));
+    writeFileSync(join(authHome, 'auth.json'), o.authFile, { mode: 0o600 });
+  }
+  const cleanAuth = () => {
+    if (!authHome) return;
+    try {
+      const after = readFileSync(join(authHome, 'auth.json'), 'utf8');
+      if (after.trim() && after.trim() !== o.authFile.trim()) o.onAuthFile?.(after);
+    } catch { /* fichier supprimé par un échec : rien à rendre */ }
+    rmSync(authHome, { recursive: true, force: true });
+  };
+  let launch;
+  try {
+    launch = prepareLaunch({
+      bin: o.bin || 'codex', args: buildArgs(o, authHome), cwd: o.cwd, allowedRoot: o.allowedRoot,
+      secretEnv: o.secretEnv, sandbox: o.sandbox, extraDirs: o.extraDirs, extraRoot: o.extraRoot,
+      ...(authHome ? { extraEnv: { CODEX_HOME: authHome }, rwDirs: [authHome] } : {}),
+    });
+  } catch (e) { cleanAuth(); throw e; }
+  const secrets = [...Object.values(o.secretEnv || {}), ...(o.secrets || [])].filter((v) => v && v.length >= 8);
   const redact = (t) => secrets.reduce((acc, s) => acc.split(s).join('***'), String(t ?? ''));
   const child = spawn(launch.command, launch.args, { cwd: launch.cwd, env: launch.env, stdio: ['ignore', 'pipe', 'pipe'] });
   const maxActions = o.maxTurns || 10;
@@ -76,7 +121,7 @@ export function runCodex(o) {
     const errors = [];
     const timer = setTimeout(() => child.kill('SIGTERM'), o.timeoutMs || 30 * 60_000);
     o.signal?.addEventListener('abort', () => child.kill('SIGTERM'), { once: true });
-    const done = () => { clearTimeout(timer); launch.cleanup(); };
+    const done = () => { clearTimeout(timer); launch.cleanup(); cleanAuth(); };
 
     function handle(line) {
       let ev;
@@ -149,14 +194,44 @@ export async function validateApiKey(key, fetchFn = fetch) {
   if (!r.ok) throw new HttpError(502, `OpenAI ne répond pas normalement (HTTP ${r.status}) : la clé n'a pas pu être vérifiée. Réessaie plus tard.`, { expose: true });
 }
 
+/**
+ * Vérifie une connexion de compte par un appel minimal à Codex (modèle le plus petit, aucun outil) : ce n'est PAS gratuit, quelques tokens
+ * sont décomptés de l'abonnement. Aucune commande de Codex ne vérifie une connexion sans appel au modèle (`codex login status` ne voit
+ * que le fichier). Renvoie le fichier de connexion, renouvelé s'il l'a été. 400 = refus de connexion ; 502 = impossible de juger.
+ */
+export async function validateAccount(app, authJson) {
+  let renewed = null, r;
+  try {
+    r = await runCodex({
+      bin: app.cfg.codexBin, prompt: 'Réponds uniquement : ok', model: CATALOG_DEFAULT, maxTurns: 1, tools: [], timeoutMs: 90_000,
+      sandbox: app.cfg.sandbox, authFile: authJson, secrets: authSecretValues(authJson), onAuthFile: (t) => { renewed = t; },
+    });
+  } catch (e) {
+    console.warn(`Vérification de la connexion ChatGPT : Codex n'a pas pu s'exécuter : ${String(e.message).slice(0, 300)}`);
+    throw new HttpError(502, "Codex n'a pas pu être lancé sur le serveur (bac à sable ou installation). Préviens l'administrateur.", { expose: true });
+  }
+  if (r.ok) return { authFile: renewed };
+  const said = String(r.text ?? '').replace(/\s+/g, ' ').trim().slice(0, 240) || `(sans texte, ${r.subtype ?? 'erreur'})`;
+  console.warn(`Vérification de la connexion ChatGPT refusée (${r.subtype ?? 'erreur'}) : ${said}`);
+  if (isAuthRefusal(`${r.text} ${r.subtype}`) || /refresh token|log ?in again|sign in again|token.*(expired|revoked|reused)/i.test(said)) {
+    throw new HttpError(400, `Connexion refusée par ChatGPT (expirée ou révoquée). Réponse de Codex : ${said}`);
+  }
+  throw new HttpError(502, `La connexion n'a pas pu être vérifiée : Codex a répondu « ${said} ». Réessaie plus tard.`, { expose: true });
+}
+
 export const openaiProvider = {
   id: 'openai',
   label: 'ChatGPT',
   company: 'OpenAI',
-  modes: { api_key: { env: SECRET_ENV.openai.api_key, label: 'Clé API OpenAI' } },
+  modes: {
+    api_key: { env: SECRET_ENV.openai.api_key, label: 'Clé API OpenAI' },
+    // Pas de variable d'environnement : le secret est le fichier de connexion de Codex (`file`), un abonnement (`subscription`)
+    chatgpt_account: { file: true, subscription: true, label: 'Compte ChatGPT' },
+  },
   apiKey: { pattern: /^sk-[A-Za-z0-9_-]{20,300}$/, invalidFormat: 'Clé API invalide (elle commence par sk-)', validate: validateApiKey },
   bin: (cfg) => cfg.codexBin,
   run: runCodex,
+  validateAccount,
   rateLimitWindows: () => null,
   isAuthRefusal,
 };

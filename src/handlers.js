@@ -3,6 +3,7 @@ import { now, getSetting, setSetting } from './db.js';
 import { readdirSync, statSync } from 'node:fs';
 import { extractJson } from './services/claude.js';
 import { getProvider } from './services/providers/index.js';
+import { withUserLock } from './services/userlock.js';
 import { tidyTemplateText, acceptReview } from './services/mailcheck.js';
 import { addUsage, jobContext, liveJobUsage } from './services/jobs.js';
 import { syncRepo } from './services/git.js';
@@ -17,7 +18,7 @@ import { linkedinAccount, saveDraft, recentDrafts } from './linkedin.js';
 import { followupCandidates, followupSubject, isBusinessHours } from './services/followup.js';
 import { EMAIL_RE, createTransport, buildProspectMail, allowedToSend, makeMessageId } from './services/mailer.js';
 import { unsubToken } from './crypto.js';
-import { resolveCredentials, markLinkInvalid, userProvider } from './claudelink.js';
+import { resolveCredentials, markLinkInvalid, userProvider, saveRefreshedAuth } from './claudelink.js';
 import { userRepoRoot, userChatRoot } from './users.js';
 import { quotaAlerts } from './services/budget.js';
 import { notify } from './services/notify.js';
@@ -121,6 +122,7 @@ export function claudeDiagnostic({ userId, cred, cfg, cwd, r }) {
     catch { ctx = 'illisible'; }
   }
   const sb = cfg.sandbox || {};
+  if (cred.authFile) secrets.push(`fichier_de_connexion(len=${String(cred.authFile).length})`);
   return `[claude] échec user=${Number(userId)} mode=${cred.mode} secret=${secrets.join(',') || 'AUCUN'} `
     + `bac_a_sable=${sb.enabled ? 'oui' : 'non'}${sb.production ? '(prod)' : ''} fichiers_claude_du_depot=${ctx} subtype=${r.subtype}`;
 }
@@ -131,8 +133,7 @@ export function claudeDiagnostic({ userId, cred, cfg, cwd, r }) {
  */
 export function makeClaude(app) {
   const { db, cfg } = app;
-  return async (userId, o) => {
-    const cred = await resolveCredentials(app, userId); // refuse sans liaison valide (dernier garde-fou)
+  const claude = async (userId, o, cred) => {
     const provider = getProvider(cred.provider);
     const jc = jobContext.getStore();
     if (jc && o.model) jc.model = o.model; // le job sait quel modèle sert vraiment
@@ -141,8 +142,9 @@ export function makeClaude(app) {
     // Accès refusé par Claude (jeton expiré, clé révoquée) : la liaison devient invalide et l'interface demande de se reconnecter
     const refused = async () => { if (await markLinkInvalid(db, userId)) console.warn(`[claude] accès refusé : liaison de l'utilisateur ${Number(userId)} marquée invalide`); };
     let r;
+    let renewedAuth = null;
     let hasOutput = false;
-    const stream = jc?.log ? createJobStream(jc.log, Object.values(cred.secretEnv || {})) : null;
+    const stream = jc?.log ? createJobStream(jc.log, [...Object.values(cred.secretEnv || {}), ...(cred.secrets || [])]) : null;
     const usage = jc?.usage ? liveJobUsage(jc) : null;
     let usageTimer = null, pendingUsage = null;
     const flushUsage = () => { clearTimeout(usageTimer); usageTimer = null; if (pendingUsage) { usage?.update(pendingUsage); pendingUsage = null; } };
@@ -157,6 +159,8 @@ export function makeClaude(app) {
         onTool: (name, input) => { jc?.log?.('tool', toolActivity(name, input) || `Outil : ${name}`); o.onTool?.(name, input); },
         onTurn: (n) => { jc?.log?.('turn', `Claude · étape ${n}`); o.onTurn?.(n); },
         sandbox: cfg.sandbox, secretEnv: cred.secretEnv,
+        // Connexion de compte : le fichier à utiliser, les jetons à masquer, et la mise à jour que le CLI en fait (jetons renouvelés)
+        ...(cred.authFile ? { authFile: cred.authFile, secrets: cred.secrets, onAuthFile: (text) => { renewedAuth = text; } } : {}),
         // Les clones lus sont ceux du propriétaire du projet (page IA : projet d'équipe joint, accès vérifié par l'appelant) ;
         // les pièces jointes lues en plus sont toujours dans le dossier de CET utilisateur.
         allowedRoot: o.allowedRoot ?? userRepoRoot(cfg, o.repoOwnerId ?? userId),
@@ -165,11 +169,13 @@ export function makeClaude(app) {
     } catch (e) {
       stream?.finish();
       flushUsage();
+      if (renewedAuth) await saveRefreshedAuth(app, userId, cred.linkedAt, renewedAuth);
       if (provider.isAuthRefusal(e.message)) await refused();
       throw e;
     }
     stream?.finish();
     flushUsage();
+    if (renewedAuth) await saveRefreshedAuth(app, userId, cred.linkedAt, renewedAuth);
     usage?.finish(r);
     if (!hasOutput && r.text) jc?.log?.('output', r.text);
     if (!r.ok) {
@@ -191,6 +197,13 @@ export function makeClaude(app) {
       }
     }
     return r;
+  };
+  return async (userId, o) => {
+    const cred = await resolveCredentials(app, userId); // refuse sans liaison valide (dernier garde-fou)
+    if (!cred.authFile) return claude(userId, o, cred);
+    // Connexion de compte : un seul exécutable à la fois par utilisateur (le CLI renouvelle ses jetons, à usage unique), les tâches s'enchaînent.
+    // Les identifiants sont relus DANS la file : le job précédent a pu renouveler le fichier.
+    return withUserLock(userId, async () => claude(userId, o, await resolveCredentials(app, userId)), { signal: o.signal });
   };
 }
 
