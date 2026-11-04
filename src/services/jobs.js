@@ -150,7 +150,7 @@ export async function latestJobs(db, projectId) {
  */
 export class Worker {
   constructor(db, handlers, {
-    maxJobs = Infinity, loadMax = LOAD.defaultMax, load = loadRatio, pollMs = 3000, log = console, clock = now, onFinish, onLoad,
+    maxJobs = Infinity, loadMax = LOAD.defaultMax, load = loadRatio, pollMs = 3000, log = console, clock = now, onFinish, onLoad, onError,
     budget, isAiJob, onBudget, quota, isQuotaSensitive, onQuotaHold, cliModeEnabled = true, parallel,
   } = {}) {
     this.parallel = parallel; // async (userId) => nombre de jobs simultanés permis à CET utilisateur (selon son offre) ; absent = 1
@@ -169,6 +169,7 @@ export class Worker {
     this.onQuotaHold = onQuotaHold;          // (reason, userId) → une notif quand le report commence
     this.quotaBlocked = new Set();
     this.onFinish = onFinish;   // (job, {status, result, error}) → notifications
+    this.onError = onError;     // (job, erreur) → alerte au développeur (services/errormail.js), jamais bloquante
     this.onLoad = onLoad;       // (ratio, userId) → une fois par pause et par utilisateur en attente
     this.loadNotified = new Set();
     this.db = db;
@@ -423,6 +424,7 @@ export class Worker {
           await this.db.prepare("UPDATE jobs SET status='error', error=?, finished_at=?, cost_usd=?, tokens_in=?, tokens_out=? WHERE id=?")
             .run(String(e.message).slice(0, 2000), now(), ctx.usage.costUsd, ctx.usage.tokensIn, ctx.usage.tokensOut, job.id);
           this.emit('onFinish', job, { status: 'error', error: e.message });
+          try { this.onError?.(job, e); } catch { /* l'alerte ne fait jamais échouer le traitement du job */ }
         }
       }
     } finally {
