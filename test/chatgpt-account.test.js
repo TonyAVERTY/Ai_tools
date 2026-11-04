@@ -1,6 +1,6 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, readFileSync, existsSync, readdirSync } from 'node:fs';
+import { mkdtempSync, rmSync, readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { encrypt, decrypt } from '../src/crypto.js';
@@ -10,6 +10,7 @@ import {
 } from '../src/claudelink.js';
 import { getSetting } from '../src/db.js';
 import { extractLoginUrl, extractUserCode, chatgptLoginsOf } from '../src/chatgptlogin.js';
+import { buildArgs } from '../src/services/providers/openai.js';
 import { buildBwrapArgs, buildChildEnv } from '../src/services/sandbox.js';
 import { startApp } from './helpers/server.js';
 import { makeClaudeBin } from './helpers/claude-bin.js';
@@ -105,18 +106,27 @@ test('un job : le fichier est dans un dossier propre au lancement, le shell n\'a
   assert.equal(r.ok, true);
   const d = dumps().slice(before)[0];
   assert.equal(d.auth.tokens.refresh_token, 'ref.' + 'R'.repeat(30));
-  assert.ok(d.codexHome.includes('aitools-codex-home-'));
+  // Le dossier de connexion est dans DATA_DIR/run, jamais dans /tmp : Codex refuse un dossier de connexion sous un dossier temporaire
+  assert.ok(d.codexHome.startsWith(join(s.app.cfg.dataDir, 'run', 'codex-home-')), d.codexHome);
   assert.equal(d.key, null, 'aucune clé API dans l\'environnement');
   assert.ok(!d.argv.includes('--sandbox'), 'le profil de permissions remplace --sandbox (ils ne se combinent pas)');
   const cfg = d.argv.filter((x, i) => d.argv[i - 1] === '-c');
   assert.ok(cfg.includes('default_permissions="aitools"'));
   assert.ok(cfg.includes('permissions.aitools.extends=":read-only"'));
-  assert.ok(cfg.includes(`permissions.aitools.filesystem."${d.codexHome}"="deny"`), 'le dossier de connexion est refusé au shell');
+  assert.ok(cfg.includes(`permissions.aitools.filesystem={"${d.codexHome}"="deny"}`), 'le dossier de connexion est refusé au shell (table en ligne : une clé pointée garde les guillemets dans le chemin)');
+  assert.ok(!cfg.some((x) => /^permissions\.aitools\.filesystem\."/.test(x)), 'jamais en clé pointée entre guillemets : Codex 0.166 la refuse');
   assert.ok(cfg.includes('cli_auth_credentials_store="file"'));
   assert.ok(cfg.includes('features.shell_tool=true'));
   assert.ok(!d.argv.some((a) => /refresh_token|ref\.R/.test(a)), 'aucun jeton dans argv');
   assert.equal(existsSync(d.codexHome), false, 'dossier temporaire supprimé');
-  assert.equal(readdirSync(tmpdir()).filter((f) => f.startsWith('aitools-codex-home-')).length, 0);
+  assert.equal(readdirSync(join(s.app.cfg.dataDir, 'run')).filter((f) => f.startsWith('codex-home-')).length, 0, 'rien ne reste dans DATA_DIR/run');
+  assert.equal((statSync(join(s.app.cfg.dataDir, 'run')).mode & 0o777).toString(8), '700', 'dossier réservé à l\'application');
+});
+
+test('chemin du dossier de connexion : point, guillemet et antislash sont protégés dans la table en ligne', () => {
+  const args = (home) => buildArgs({ prompt: 'x', tools: ['Read'] }, home).filter((x, i, a) => a[i - 1] === '-c' && x.startsWith('permissions.aitools.filesystem='));
+  assert.deepEqual(args('/home/iaboss/htdocs/iaboss.fr/data/run/codex-home-ab'), ['permissions.aitools.filesystem={"/home/iaboss/htdocs/iaboss.fr/data/run/codex-home-ab"="deny"}']);
+  assert.deepEqual(args('/d/a"b\\c'), ['permissions.aitools.filesystem={"/d/a\\"b\\\\c"="deny"}']);
 });
 
 test('jetons renouvelés par Codex : rangés chiffrés, et le job suivant part des nouveaux', async () => {
