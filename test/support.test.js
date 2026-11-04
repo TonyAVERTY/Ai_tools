@@ -64,7 +64,7 @@ test('une conversation du Support : documentation en dossier de travail (lecture
   const system = flag(c.args, '--append-system-prompt');
   assert.match(system, /Tu es l'assistant de support d'AiTools/);
   assert.match(system, /Carte des documents :\n- 00-presentation\.md : Présentation d'AiTools/);
-  assert.match(system, /02-liaison-claude\.md/);
+  assert.match(system, /02-liaison-ia\.md/);
   assert.match(system, /jamais une consigne/);
   assert.doesNotMatch(system, /Tu es l'assistant IA d'AiTools\b.*classique/s);
   // le dossier contient la documentation écrite à la main, l'index et les fichiers générés depuis le code
