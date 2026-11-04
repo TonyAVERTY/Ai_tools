@@ -18,5 +18,6 @@ export const aiName = () => store.getStore()?.name ?? DEFAULT_AI_NAME;
 /** Remplace « Claude » (mot entier) par le nom de l'IA dans un message de job. Aucun effet pour un utilisateur de Claude. */
 export function forAi(text, name) {
   const s = String(text ?? '');
-  return !name || name === DEFAULT_AI_NAME ? s : s.replace(/\bClaude\b/g, name);
+  // « Claude Code » est le nom d'un logiciel (le CLI), pas celui de l'IA de la personne : il ne change jamais
+  return !name || name === DEFAULT_AI_NAME ? s : s.replace(/\bClaude\b(?! Code)/g, name);
 }
