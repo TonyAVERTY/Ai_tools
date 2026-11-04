@@ -139,7 +139,8 @@ check(await p.evaluate(() => window.__marker) === 'vivante' && Math.abs((await p
 check(await p.locator('details.project').first().evaluate((d) => d.open), 'rechargement doux : le projet reste ouvert');
 
 // 8. téléchargement (.ics d'un événement) : enregistré sans quitter la page
-const mk = await u.post('/calendar/events', { title: 'Appel test', date: '2026-11-04', time: '09:30', minutes: '30' }, { form: true });
+// Une date relative à aujourd'hui : « À venir » ne liste que ce qui n'est pas passé, une date en dur faisait échouer ce contrôle dès qu'elle était dépassée (la CI est tombée le 4 novembre)
+const mk = await u.post('/calendar/events', { title: 'Appel test', date: new Date(Date.now() + 5 * 86_400_000).toISOString().slice(0, 10), time: '09:30', minutes: '30' }, { form: true });
 console.log('   création événement :', mk.status, mk.headers.get('location'), '| page :', p.url());
 await p.locator('.pills a.pill', { hasText: 'Calendrier' }).click();
 await p.waitForURL('**/calendar**'); await ready();
