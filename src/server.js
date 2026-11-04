@@ -161,10 +161,9 @@ export async function createApp(cfg, { db, worker = true, createTransport, fetch
       await route.handler({ req, res, url, params: route.params, session, app });
     } catch (e) {
       const status = e.status || 500;
-      if (status >= 500 && !e.expose) {
-        console.error(`[${req.method} ${url.pathname}]`, e);
-        reportError(app, e, { method: req.method, path: url.pathname, userId: session?.userId });
-      }
+      if (status >= 500 && !e.expose) console.error(`[${req.method} ${url.pathname}]`, e);
+      // Toute erreur sauf « introuvable » part par mail au développeur (en arrière-plan, dédoublonnée et limitée : voir services/errormail.js)
+      if (status !== 404) reportError(app, e, { method: req.method, path: url.pathname, userId: session?.userId, status });
       if (res.headersSent) return res.end();
       const msg = status >= 500 && !e.expose ? 'Erreur interne' : e.message;
       for (const [k, v] of Object.entries(e.headers || {})) res.setHeader(k, v);
@@ -186,6 +185,7 @@ export async function createApp(cfg, { db, worker = true, createTransport, fetch
       // Multi jobs : combien de jobs en même temps pour CE compte, selon son offre (1 pour la gratuite)
       parallel: async (userId) => { const u = await getUser(db, userId); return u ? limitsFor(u).parallelJobs : 1; },
       onFinish: (job, r) => notifyJob(app, job, r),
+      onError: (job, e) => reportError(app, e, { method: 'JOB', path: job.type, userId: job.user_id, status: null }),
       budget: (userId) => budgetState(db, userId),
       isAiJob: (type) => AI_JOBS.has(type),
       onBudget: (reason, userId) => notify(app, userId, 'budget', {

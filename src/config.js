@@ -149,6 +149,8 @@ export function loadConfig() {
     allowPrivateHosts: flag(env.ALLOW_PRIVATE_HOSTS, false),
     // Administrateurs : ces adresses seulement (la première est aussi propriétaire des données migrées)
     adminEmails: (env.ADMIN_EMAILS || '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean),
+    // Destinataires des alertes d'erreur (HTML) : l'adresse du développeur, séparées par des virgules ; ERROR_ALERT_TO la remplace
+    errorAlertTo: (env.ERROR_ALERT_TO || 'contact@tony-averty.dev').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean),
     secretKey: Buffer.from(secretKey, 'hex'),
     db: dbConfigFromEnv(env),
     dataDir: resolve(env.DATA_DIR || './data'),
