@@ -11,7 +11,7 @@ import { deleteUser, normalizeEmail, getUser } from './users.js';
 import {
   assertCanRunAi, getLinkState, assertLoginConsent, linkLoginToken, validateSubscriptionToken, linkApiKey, linkSubscriptionToken, unlink, testLink, lastConsent,
   MODES,
-  isPriced,
+  isPriced, userProvider,
 } from './claudelink.js';
 import { loginPage } from './site/pages.js';
 import { registerSiteRoutes } from './site/routes.js';
@@ -52,7 +52,7 @@ import { checkInbox } from './services/inbox.js';
 import { followupPlan } from './services/followup.js';
 import { warmupAdvice } from './services/warmup.js';
 import { PROMPT_DEFS, parseCustomPrompts, promptsView, MAX_CUSTOM } from './services/prompts.js';
-import { normalizeModel, PROMPT_SCOPES } from './services/models.js';
+import { normalizeModel, PROMPT_SCOPES, catalogOf } from './services/models.js';
 import { nextNightSlot } from './services/paris-time.js';
 import { notify, notifyConfig, saveDiscordHooks, publicHooks, EVENTS, MAX_HOOKS } from './services/notify.js';
 import { listChannels, saveChannels, publicChannels, notifyChannels, CHANNEL_TYPES } from './services/channels.js';
@@ -180,8 +180,10 @@ export function registerRoutes(router, app) {
     const userId = session.userId;
     const discord = await notifyConfig(app, userId);
     const promptsRaw = await getSetting(db, userId, 'prompts_json', '');
-    const analyze = normalizeModel(await getSetting(db, userId, 'analyze_model', 'haiku'));
-    const models = { chat: normalizeModel(await getSetting(db, userId, 'chat_model', 'sonnet'), 'sonnet'), analyze, prospect: normalizeModel(await getSetting(db, userId, 'prospect_model', 'haiku')), write: normalizeModel(await getSetting(db, userId, 'write_model', ''), analyze) };
+    const provider = await userProvider(db, userId);
+    const catalog = catalogOf(provider);
+    const analyze = normalizeModel(await getSetting(db, userId, 'analyze_model', catalog.default), undefined, provider);
+    const models = { chat: normalizeModel(await getSetting(db, userId, 'chat_model', catalog.chatDefault), catalog.chatDefault, provider), analyze, prospect: normalizeModel(await getSetting(db, userId, 'prospect_model', catalog.default), undefined, provider), write: normalizeModel(await getSetting(db, userId, 'write_model', ''), analyze, provider) };
     const s = {
       priced: await isPriced(db, userId),
       notify_email: await getSetting(db, userId, 'notify_email', ''),
@@ -201,7 +203,8 @@ export function registerRoutes(router, app) {
       priced: (await getLinkState(db, userId))?.mode === MODES.api_key, // plafonds en $ : seulement avec une clé API
       discord: { hooks: publicHooks(discord.hooks), all: EVENTS, max: MAX_HOOKS },
       channels: publicChannels(await listChannels(app, userId, Object.keys(EVENTS))), canEmail: !!cfg.systemSmtp,
-      prompts: promptsView(parseCustomPrompts(promptsRaw), models),
+      catalog: { recommended: catalog.recommended, others: catalog.others },
+      prompts: promptsView(parseCustomPrompts(promptsRaw), models, provider),
       promptMax: MAX_CUSTOM,
     };
     html(res, settingsPage({ email: session.email, s, saved: url.searchParams.has('ok') }));
@@ -233,7 +236,8 @@ export function registerRoutes(router, app) {
     await set('send_delay_min', String(dmin));
     await set('send_delay_max', String(dmax));
     // Modèles : uniquement ceux du catalogue (services/models.js) ; un champ absent ne change rien
-    for (const k of ['prospect_model', 'analyze_model', 'write_model']) if (b[k] !== undefined) await set(k, normalizeModel(b[k]));
+    const provider = await userProvider(db, userId);
+    for (const k of ['prospect_model', 'analyze_model', 'write_model']) if (b[k] !== undefined) await set(k, normalizeModel(b[k], undefined, provider));
     const money = (v) => { const n = Number(String(v || '').replace(',', '.')); return Number.isFinite(n) && n > 0 ? String(Math.round(n * 100) / 100) : ''; };
     await set('weekly_report', b.weekly_report === 'on' ? '1' : '0');
     // Les cases décochées ne sont pas envoyées : la présence du champ « délais » signale le formulaire complet

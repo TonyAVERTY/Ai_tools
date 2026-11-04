@@ -6,7 +6,7 @@ import { getProvider } from './services/providers/index.js';
 import { tidyTemplateText, acceptReview } from './services/mailcheck.js';
 import { addUsage, jobContext, liveJobUsage } from './services/jobs.js';
 import { syncRepo } from './services/git.js';
-import { normalizeModel } from './services/models.js';
+import { normalizeModel, defaultModelOf, tierEquivalent } from './services/models.js';
 import { analyzePrompt, prospectPrompt, templatePrompt, reviewMailPrompt, followupTemplatePrompt, evolutionPrompt, linkedinPostPrompt, hookPrompt, auditPrompt, promoPrompt, rolePrompt, parseCustomPrompts, LEVELS } from './services/prompts.js';
 import { VOICE_PROVIDERS, parseVoiceParams, extractVoiceScript, prepareVoice, cleanVoice, mixVoice, synthesize, langName } from './services/voiceover.js';
 import { PROMO, FORMATS, SCENE_REFUSED, SceneError, parsePromoParams, extractScene, promoSupported, renderPromo } from './services/promovideo.js';
@@ -17,7 +17,7 @@ import { linkedinAccount, saveDraft, recentDrafts } from './linkedin.js';
 import { followupCandidates, followupSubject, isBusinessHours } from './services/followup.js';
 import { EMAIL_RE, createTransport, buildProspectMail, allowedToSend, makeMessageId } from './services/mailer.js';
 import { unsubToken } from './crypto.js';
-import { resolveCredentials, markLinkInvalid } from './claudelink.js';
+import { resolveCredentials, markLinkInvalid, userProvider } from './claudelink.js';
 import { userRepoRoot, userChatRoot } from './users.js';
 import { quotaAlerts } from './services/budget.js';
 import { notify } from './services/notify.js';
@@ -221,9 +221,9 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
   // Consignes modifiées par l'utilisateur (Réglages) : celles du compte qui lance le job
   const custom = async (userId) => parseCustomPrompts(await getSetting(db, userId, 'prompts_json'));
   // Modèles choisis dans les Réglages (liste de services/models.js ; toute autre valeur retombe sur Haiku)
-  const modelOf = async (userId, key) => normalizeModel(await getSetting(db, userId, key, 'haiku'));
+  const modelOf = async (userId, key) => { const pv = await userProvider(db, userId); return normalizeModel(await getSetting(db, userId, key, defaultModelOf(pv)), undefined, pv); };
   // Rédaction (mails, relances, posts) : son propre réglage ; à défaut, le comportement d'avant (Haiku, et le modèle d'analyse pour LinkedIn)
-  const writeModel = async (userId, legacy) => normalizeModel(await getSetting(db, userId, 'write_model', ''), legacy);
+  const writeModel = async (userId, legacy) => normalizeModel(await getSetting(db, userId, 'write_model', ''), legacy, await userProvider(db, userId));
   const inHours = () => (app.isBusinessHours || isBusinessHours)();
 
   // Premier mail ou relance : mêmes plafonds, mêmes délais, même journal
@@ -739,7 +739,8 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
 
       await ctx.progress({ message: `Recherche de ${count} évolutions (${level})…`, pct: 10 });
       const { prompt, system } = evolutionPrompt({ projectName: project.name, profile: project.profile, count, level, custom: await custom(userId), repoFacts: factsOf(dir) });
-      const { model, maxTurns } = LEVELS[level];
+      const { maxTurns } = LEVELS[level];
+      const model = tierEquivalent(LEVELS[level].model, await userProvider(db, userId));
       const sink = makeSink();
       const r = await claude(userId, {
         prompt, system, cwd: dir, model, maxTurns, tools: ['Read', 'Glob', 'Grep'], signal: ctx.signal,
@@ -771,7 +772,8 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
       await sync(userId, project.gitUrl, dir);
       await ctx.progress({ message: `Audit du code (${level})…`, pct: 10 });
       const { prompt, system } = auditPrompt({ projectName: project.name, level, custom: await custom(userId), repoFacts: factsOf(dir) });
-      const { model, maxTurns } = LEVELS[level];
+      const { maxTurns } = LEVELS[level];
+      const model = tierEquivalent(LEVELS[level].model, await userProvider(db, userId));
       const sink = makeSink();
       const r = await claude(userId, {
         prompt, system, cwd: dir, model, maxTurns, tools: ['Read', 'Glob', 'Grep'], signal: ctx.signal,
