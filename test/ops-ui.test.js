@@ -119,7 +119,7 @@ test('page Développeur : adresse et commande écrites une seule fois et copiabl
   assert.doesNotMatch(await html(other, '/developer'), /Jeton-Prive-42/, 'isolation : les jetons d\'un autre compte ne sont jamais listés');
 });
 
-test('page Relier Claude : la clé API recommandée d\'abord, le risque annoncé sur l\'abonnement, relevés suspendus sans accès utilisable', async () => {
+test('page Relier mon IA (carte Claude) : la clé API recommandée d\'abord, le risque annoncé sur l\'abonnement, relevés suspendus sans accès utilisable', async () => {
   const none = await s.newUser({ admin: false });
   const page = await html(none, '/link');
   assert.ok(page.indexOf('id="h-key"') > 0 && page.indexOf('id="h-key"') < page.indexOf('id="h-alt"'), 'la clé API vient avant les alternatives');
@@ -129,7 +129,7 @@ test('page Relier Claude : la clé API recommandée d\'abord, le risque annoncé
   assert.match(page, /<h3>Jeton collé à la main<\/h3>[^]*?action="\/link\/subscription"/);
   assert.doesNotMatch(page, /optc|TON accès/, 'plus de cartes à pastille d\'icône ni de « TON » en capitales');
   assert.match(page, /<div class="narrow" data-nolink>/, 'sans accès utilisable, la page demande à ne pas interroger les relevés (403)');
-  assert.equal((page.match(/data-pct hidden/g) || []).length, 2, 'une barre de pourcentage pour la préparation du lien, une pour la récupération du jeton');
+  assert.equal((page.match(/data-pct hidden/g) || []).length, 2, 'Claude : une barre pour la préparation du lien, une pour la récupération du jeton (la fenêtre ChatGPT n\'existe pas : Codex n\'est pas installé ici)');
   assert.match(page, /Récupération de ton jeton · estimation/);
   assert.match(page, /role="progressbar"[^>]*aria-valuenow="0"/);
   const linked = await s.newUser({ link: { v: 1, mode: 'api_key', valid: true } });

@@ -1,8 +1,14 @@
 # Dépannage et questions fréquentes
 Résumé : les problèmes les plus fréquents (liaison Claude, jobs bloqués, mails qui ne partent pas ou arrivent en spam, prospects, LinkedIn, vidéo, agenda) avec cause et solution, plus une FAQ.
 
-## Je ne peux rien lancer, la page me renvoie à « Relier Claude »
-La liaison Claude est absente ou invalide. Relier un accès (voir « Relier, tester et déconnecter son accès Claude »). État « À revalider » : Déconnecter puis relier de nouveau.
+## Je ne peux rien lancer, la page me renvoie à « Relier mon IA »
+La liaison de ton IA est absente ou invalide. Relier un accès (voir « Relier, tester et déconnecter son IA (Claude, ChatGPT ou Gemini) »). État « À revalider » : relier de nouveau.
+
+## Gemini : « Clé API refusée par Google », ou mes données de prospects partent chez Google
+La clé est fausse, supprimée ou limitée : crée-en une nouvelle sur aistudio.google.com. Avec une **clé gratuite**, Google peut utiliser les données envoyées pour améliorer ses produits et des personnes peuvent les relire : n'y mets pas de données de prospects, et active la facturation sur ton projet Google pour un vrai usage.
+
+## ChatGPT : aucun lien ne s'affiche, ou mes tâches attendent chacune leur tour
+Aucun lien : active la connexion par code d'appareil dans les paramètres de sécurité de ton compte ChatGPT, ou utilise « Coller le fichier ». Les tâches qui s'enchaînent sont normales avec un compte ChatGPT : une seule tourne à la fois pour ton compte (avec une clé API, elles tournent ensemble).
 
 ## Mon job reste « En attente »
 Lire le message « En attente : … » dans le menu **Activité**. Raisons possibles : budget IA atteint (clé API) ; quota Claude serré (au-delà de 85 %) ; charge élevée du serveur ; job programmé « Cette nuit » ; déjà un job IA en cours pour le compte. Il repart seul. On peut l'**Annuler** depuis Activité.
@@ -87,7 +93,7 @@ Cible trop étroite ou requêtes de recherche trop vagues : revoir la section **
 Dépôt privé : ajouter un token dans **Réglages → Dépôts Git** (lecture seule). Autre serveur Git que GitHub : l'ajouter d'abord (URL du serveur et token). L'adresse doit être publique (les adresses internes sont refusées).
 
 ## L'analyse a échoué ou la fiche est incomplète
-Relancer avec **Analyser** (ou **Réanalyser** si une fiche existe déjà). Vérifier la liaison Claude, le quota Claude, et l'accès au dépôt.
+Relancer avec **Analyser** (ou **Réanalyser** si une fiche existe déjà). Vérifier la liaison de ton IA, son quota (barre de limites de Claude) et l'accès au dépôt.
 
 ## Je ne vois pas certaines sections ou certains boutons
 Ils dépendent du rôle dans le projet : Configuration du projet, Audit, Récapitulatif, connexion LinkedIn et publication sont réservés aux administrateurs et au propriétaire ; supprimer un projet est réservé au propriétaire (voir le fichier sur les projets). Un membre d'équipe ne voit pas le SMTP ni l'IMAP.
