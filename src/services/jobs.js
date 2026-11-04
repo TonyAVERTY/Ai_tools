@@ -7,7 +7,8 @@ import { SCENE_REFUSED } from './promovideo.js';
 import { reviewVerdict } from './promoqa.js';
 import { AI_JOBS } from './budget.js';
 import { getUser } from '../users.js';
-import { aiRefusal, assertCanRunAi } from '../claudelink.js';
+import { aiRefusal, assertCanRunAi, providerLabelOf } from '../claudelink.js';
+import { forAi } from './ainame.js';
 import { loadRatio } from './load.js';
 import { LOAD } from '../limits.js';
 import { createJobLog } from './joblog.js';
@@ -377,6 +378,9 @@ export class Worker {
     const ctrl = new AbortController();
     this.running.set(job.id, { job, ctrl });
     const journal = createJobLog(this.db, job.id);
+    // Dans les messages du job, « Claude » désigne l'IA de la personne : on écrit le nom de la sienne (services/ainame.js)
+    const ai = await providerLabelOf(this.db, job.user_id).catch(() => 'Claude');
+    const say = (t) => forAi(t, ai);
     let usageWrite = Promise.resolve();
     journal.append('status', 'Démarrage de la tâche');
     const ctx = {
@@ -384,8 +388,8 @@ export class Worker {
       params: JSON.parse(job.params_json || '{}'),
       signal: ctrl.signal,
       // Le modèle réellement utilisé (réglage de l'utilisateur) est joint à chaque avancement : « Modèle : Sonnet » dans Activité et sur le projet
-      progress: (p) => { journal.append('progress', p.message); return setProgress(this.db, job.id, ctx.model ? { ...p, model: modelLabel(ctx.model) } : p); },
-      log: (kind, text) => journal.append(kind, text),
+      progress: (p) => { const q = p?.message ? { ...p, message: say(p.message) } : p; journal.append('progress', q.message); return setProgress(this.db, job.id, ctx.model ? { ...q, model: modelLabel(ctx.model) } : q); },
+      log: (kind, text) => journal.append(kind, say(text)),
       cancelled: () => this.isCancelled(job.id),
       usage: { costUsd: 0, tokensIn: 0, tokensOut: 0 },
       persistUsage: () => {
@@ -416,6 +420,7 @@ export class Worker {
           this.emit('onFinish', job, { status: 'done', result });
         }
       } catch (e) {
+        e.message = say(e.message);
         journal.append('error', e.message);
         await journal.flush().catch(() => {});
         await usageWrite.catch(() => {});

@@ -16,7 +16,7 @@ Tout ce que fait l'IA passe par le compte Claude de la personne, jamais par un c
 - **Cible** : le public à démarcher (description, zone, taille, décideur, secteurs, requêtes de recherche). Elle doit être validée avec « Valider la cible ».
 - **Prospect** : une entreprise trouvée, avec son email professionnel, sa source publique, une accroche personnalisée et un score de pertinence de 1 à 10.
 - **Job** : une tâche lancée en arrière-plan (analyse, recherche, envoi, évolution, audit, post LinkedIn, vidéo…). Ses jobs en cours se voient dans « Activité ».
-- **Liaison Claude** : l'accès à Claude relié au compte (voir le fichier sur la liaison Claude).
+- **Mon IA** : l'accès à l'IA reliée au compte, Claude, ChatGPT ou Gemini (voir le fichier sur la liaison de l'IA).
 - **Plafond** : limite mensuelle de l'offre (projets, prospects, mails, jobs IA, places d'équipe) ; voir « Offres, plafonds et limites ».
 - **Liste d'opposition** : adresses qui ne doivent plus être contactées (désinscription, refus, adresse invalide), commune à tous les comptes.
 
@@ -40,7 +40,7 @@ Tout ce que fait l'IA passe par le compte Claude de la personne, jamais par un c
 ## Où trouver quoi
 | Je veux… | Où aller |
 |---|---|
-| Relier ou déconnecter Claude | Avatar → **Mon compte** → « Liaison Claude » |
+| Relier, changer ou déconnecter son IA | Avatar → **Mon compte** → « Mon IA » |
 | Créer un projet | **Projets** → « Nouveau projet » |
 | Configurer l'adresse d'envoi (SMTP) | Dans le projet → « Configuration du projet » |
 | Chercher des prospects | Dans le projet → « Prospecter » → « Recherche de prospects » |

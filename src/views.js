@@ -10,6 +10,7 @@ import { ROLES, MAX_NOTES, rolesOfSection } from './services/roles.js';
 import { tourJson } from './tour.js';
 import { describeKpi } from './services/dbschema.js';
 import { MODE_LABELS } from './claudelink.js';
+import { aiName } from './services/ainame.js';
 import { banner } from './banner.js';
 import { loadingBlock } from './loading.js';
 
@@ -60,7 +61,7 @@ ${iconLinks()}
 <script src="${assetUrl('/static/ajax.js')}" defer></script>
 ${scripts.map((src) => `<script src="${assetUrl(src)}" defer></script>`).join('\n')}
 </head>
-<body class="app">
+<body class="app" data-ai="${esc(aiName())}">
 ${SPRITE}
 <a class="skip" href="#contenu">Aller au contenu</a>
 ${email ? `<header class="top">
@@ -79,9 +80,9 @@ ${email ? `<header class="top">
       </div>
       <a class="ia-link site-link" href="/accueil" data-noajax aria-label="Accès au site internet" title="Accès au site internet">${ic('globe')}<span>Site internet</span></a>
       <details class="ia-menu">
-        <summary class="ia-link" aria-label="Assistant : discuter avec Claude ou demander de l'aide sur AiTools">${ic('spark')}<span>Assistant</span></summary>
+        <summary class="ia-link" aria-label="Assistant : discuter avec ${esc(aiName())} ou demander de l'aide sur AiTools">${ic('spark')}<span>Assistant</span></summary>
         <div class="user-pop ia-pop">
-          <a href="/chat">${ic('spark')}<span class="pop-t">Claude<small>Discute avec ton Claude</small></span></a>
+          <a href="/chat">${ic('spark')}<span class="pop-t">${esc(aiName())}<small>Discute avec ton ${esc(aiName())}</small></span></a>
           <a href="/support">${ic('help')}<span class="pop-t">Support<small>Une question sur AiTools ?</small></span></a>
         </div>
       </details>
@@ -124,11 +125,11 @@ export function usageKpis(u) {
 </section>`;
 }
 
-// Consommation de Claude (quota de l'abonnement ou budget d'une clé API) : rempli par public/app.js à partir de /api/system, masqué tant qu'il est vide
+// Consommation de l'IA (quota de l'abonnement Claude ou budget d'une clé API) : rempli par public/app.js à partir de /api/system, masqué tant qu'il est vide
 export function claudePanel() {
   return `<section class="panel claude-card" aria-labelledby="h-claude-use" data-claude-card hidden>
-  <div class="panel-h"><h2 id="h-claude-use">Consommation Claude</h2></div>
-  <ul class="usage-list usage-claude" data-usage-claude aria-label="Consommation de Claude"></ul>
+  <div class="panel-h"><h2 id="h-claude-use">Consommation ${esc(aiName())}</h2></div>
+  <ul class="usage-list usage-claude" data-usage-claude aria-label="Consommation de ${esc(aiName())}"></ul>
 </section>`;
 }
 
@@ -140,14 +141,14 @@ export function usagePanel(u) {
   return `<section class="panel usage-card" aria-labelledby="h-usage">
   <div class="panel-h"><h2 id="h-usage">Usage du mois</h2><span class="badge">plan ${esc(u.planLabel)}</span></div>
   <ul class="usage-list">${rows}</ul>
-  <div data-claude-card hidden><ul class="usage-list usage-claude" data-usage-claude aria-label="Usage de Claude"></ul></div>
+  <div data-claude-card hidden><ul class="usage-list usage-claude" data-usage-claude aria-label="Usage de ${esc(aiName())}"></ul></div>
   ${full.length ? `<p class="cap" role="alert">${ic('alert')}<span>Plafond atteint : ${full.map((i) => esc(i.label.toLowerCase())).join(', ')}. Rien n'est perdu. <a href="/tarifs">Voir les tarifs</a></span></p>` : u.plan === 'free' ? '<p class="foot-n">Les plafonds se renouvellent le 1er du mois (heure de Paris). <a href="/tarifs">Voir les tarifs</a></p>' : ''}
 </section>`;
 }
 
 const PROVIDER_NAMES = { google: 'Google', apple: 'Apple' };
 
-// Section « Liaison Claude » de Mon compte : état, test, changement de mode, déliaison. Jamais le secret, ni même un masque
+// Section « Mon IA » de Mon compte : état, test, changement de mode, déliaison. Jamais le secret, ni même un masque
 // plus long que les 4 derniers caractères de la clé API.
 const QUOTA_WHY = {
   denied: "Anthropic refuse le relevé en direct avec ce jeton (relie-toi avec « Se connecter avec Claude »).",
@@ -159,9 +160,12 @@ const QUOTA_WHY = {
 const fmtReset = (ts) => new Date(ts * 1000).toLocaleString('fr-FR', { weekday: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
 
 // Limites d'utilisation du compte Claude : session glissante de 5 h et semaine de 7 j (abonnement seulement ; une clé API n'a pas ces limites).
-function claudeLimits(quota, mode) {
+function claudeLimits(quota, link) {
+  const { mode } = link;
   const head = '<h3 class="sub-h">Limites d\'utilisation</h3>';
-  if (mode === 'api_key') return `${head}<p class="hint">Avec une clé API, Anthropic facture ce que tu consommes, à l'usage.</p>`;
+  if (mode === 'api_key') return `${head}<p class="hint">Avec une clé API, ${esc(link.providerCompany)} facture ce que tu consommes, à l'usage.</p>`;
+  // Seul Claude remonte une session de 5 h et une semaine : pour un compte ChatGPT, les limites sont celles de l'abonnement, non mesurées par AiTools
+  if (link.provider !== 'claude') return `${head}<p class="hint">Avec ton compte ${esc(link.providerLabel)}, les limites de ton abonnement s'appliquent. AiTools ne les mesure pas.</p>`;
   const row = (label, w) => {
     if (!w) return '';
     if (w.expired) return `<li class="g"><div class="g-h"><span>${label}</span><span class="g-v muted">remise à zéro</span></div></li>`;
@@ -181,22 +185,23 @@ function claudeLimits(quota, mode) {
 function linkSection(link, consent, quota = null) {
   if (!link) {
     return `<section class="card">
-  <div class="card-h"><h2>Liaison Claude</h2></div>
-  <p class="card-d">Relie un accès Claude pour utiliser l'application : tant qu'il manque, cette page de liaison reste affichée.</p>
-  <div class="row"><a class="btn primary" href="/link">Relier Claude</a></div>
+  <div class="card-h"><h2>Mon IA</h2></div>
+  <p class="card-d">Relie une IA (Claude, ChatGPT ou Gemini) pour utiliser l'application : tant qu'il manque, cette page de liaison reste affichée.</p>
+  <div class="row"><a class="btn primary" href="/link">Relier mon IA</a></div>
 </section>`;
   }
   return `<section class="card">
-  <div class="card-h"><h2>Liaison Claude</h2>${link.valid ? `<span class="badge ok">${ic('check')}${esc(link.label)}</span>` : `<span class="badge err">${ic('alert')}À revalider</span>`}</div>
-  <p class="card-d">Ton accès à Claude est facturé à part, par Anthropic.</p>
+  <div class="card-h"><h2>Mon IA</h2>${link.valid ? `<span class="badge ok">${ic('check')}${esc(link.label)}</span>` : `<span class="badge err">${ic('alert')}À revalider</span>`}</div>
+  <p class="card-d">Ton accès à ${esc(link.providerLabel)} est facturé à part, par ${esc(link.providerCompany)}. <a href="/link">Changer d'IA</a></p>
   <dl class="account">
+    <dt>IA</dt><dd>${esc(link.providerLabel)}</dd>
     <dt>Mode</dt><dd>${esc(link.label)}</dd>
-    <dt>État</dt><dd>${link.valid ? '<span class="ok">Valide</span>' : '<span class="error">À revalider (déconnecte puis relie Claude)</span>'}</dd>
-    ${link.last4 ? `<dt>Clé API</dt><dd>sk-ant-…${esc(link.last4)}</dd>` : ''}
+    <dt>État</dt><dd>${link.valid ? '<span class="ok">Valide</span>' : '<span class="error">À revalider (relie de nouveau ton IA)</span>'}</dd>
+    ${link.last4 ? `<dt>Clé API</dt><dd>${link.provider === 'claude' ? 'sk-ant-' : ''}…${esc(link.last4)}</dd>` : ''}
     <dt>Reliée le</dt><dd>${fmtDate(link.linkedAt)}</dd>
     ${link.consentAt ? `<dt>Risque accepté</dt><dd>${fmtDate(link.consentAt)} (texte ${esc(link.consentVersion)})</dd>` : ''}
   </dl>
-  ${claudeLimits(quota, link.mode)}
+  ${claudeLimits(quota, link)}
   <div class="row-actions">
     <form method="post" action="/link/unlink"><button class="btn danger">Déconnecter</button></form>
   </div>
@@ -363,7 +368,7 @@ const ROLE_SELECT = `<label class="rolesel"><span class="lbl">Poste</span><span 
 /** Section « Postes et tâches IA » : chaque poste avec ses tâches. Les tâches qui lisent le dépôt sont réservées aux administrateurs. */
 function postesBody(p) {
   const member = p.access === 'member';
-  return `<p class="muted small">Chaque tâche fait écrire à Claude un livrable à partir de la fiche du projet : le livrable reste dans AiTools, à toi de l'utiliser. Les précisions sont facultatives. Les chiffres, prix et références que la fiche ne donne pas restent « à compléter ».</p>
+  return `<p class="muted small">Chaque tâche fait écrire à ${esc(aiName())} un livrable à partir de la fiche du projet : le livrable reste dans AiTools, à toi de l'utiliser. Les précisions sont facultatives. Les chiffres, prix et références que la fiche ne donne pas restent « à compléter ».</p>
   <div class="roles">${ROLES.map((r) => `
     <details class="role" data-role="${r.id}">
       <summary><b>${esc(r.label)}</b><span class="muted small">${esc(r.summary)}</span></summary>
@@ -421,7 +426,7 @@ function projectItem(p, smtp, dbCfg, imap, { open = false, stats = null } = {}) 
 
   <div class="accs">
   ${acc('prospect', 'search', 'Prospecter', 'Recherche, modèle de mail, envoi, relances et CRM', `
-    ${acc('search', 'search', 'Recherche de prospects', 'Claude cherche des entreprises qui collent à la cible', `
+    ${acc('search', 'search', 'Recherche de prospects', `${aiName()} cherche des entreprises qui collent à la cible`, `
     <form data-action="prospect" data-id="${p.id}" class="inline">
       <label>Prospects à chercher<input name="count" type="number" min="1" max="50" value="10"></label>
       <label>Quand<select name="when"><option value="now">Maintenant</option><option value="night">Cette nuit (1h-6h)</option></select></label>
@@ -513,14 +518,14 @@ function projectItem(p, smtp, dbCfg, imap, { open = false, stats = null } = {}) 
       <label>Quand<select name="when"><option value="now">Maintenant</option><option value="night">Cette nuit (1h-6h)</option></select></label>
       <button class="btn primary">${ic('shield')}Lancer l'audit</button>
     </form>
-    <p class="muted small">Claude lit le dépôt (sans rien modifier) et signale les défauts de code, de sécurité, de tests et de dépendances, avec le fichier concerné.</p>
+    <p class="muted small">${esc(aiName())} lit le dépôt (sans rien modifier) et signale les défauts de code, de sécurité, de tests et de dépendances, avec le fichier concerné.</p>
     <div class="job" data-job="audit"></div>`, { cls: 'main' }) : ''}
 
-  ${acc('linkedin', 'linkedin', 'LinkedIn', 'Relie un compte, Claude écrit des posts, tu relis et publies', `
+  ${acc('linkedin', 'linkedin', 'LinkedIn', `Relie un compte, ${aiName()} écrit des posts, tu relis et publies`, `
     <div class="linkedin" data-linkedin>${loadingBlock()}</div>
     <div class="job" data-job="linkedin_post"></div>`, { cls: 'main' })}
 
-  ${acc('promo', 'film', 'Promotion', 'Claude conçoit une vidéo de design motion pour présenter ton projet', `
+  ${acc('promo', 'film', 'Promotion', `${aiName()} conçoit une vidéo de design motion pour présenter ton projet`, `
     <div class="promo" data-promo>${loadingBlock()}</div>
     <div class="job" data-job="promo_video"></div>`, { cls: 'main' })}
 
@@ -559,7 +564,7 @@ ${usageKpis(usage)}
   ${projects.length ? projects.map((x) => projectItem(x.project, x.smtp, x.dbCfg, x.imap, { open: projects.length === 1, stats: stats.get(Number(x.project.id)) })).join('\n') : `<div class="empty">
     <span class="empty-i">${ic('folder')}</span>
     <h3>Aucun projet pour l'instant</h3>
-    <p>Crée ton premier projet : donne-lui un nom et l'adresse de son dépôt Git, Claude s'occupe de l'analyser.</p>
+    <p>Crée ton premier projet : donne-lui un nom et l'adresse de son dépôt Git, ${esc(aiName())} s'occupe de l'analyser.</p>
   </div>`}
   </div>
 </section>
@@ -639,6 +644,7 @@ export function settingsPage({ email, s, saved }) {
   // Sélecteur de modèle en deux listes : les recommandés (avec une estimation relative du coût), puis tous les autres, plus compacts et sans estimation
   const priced = !!s.priced; // le « $ » relatif n'a de sens qu'avec une clé API (facturée à l'usage)
   const cat = s.catalog || { recommended: RECOMMENDED, others: OTHERS }; // catalogue de l'IA de l'utilisateur
+  const ai = s.ai || { id: 'claude', name: 'Claude', company: 'Anthropic' };
   const recTier = (m) => (priced ? `${m.tier} · ${m.cost}` : m.tier);
   const model = (name, v, title) => {
     const cur = cat.recommended.find((m) => m.id === v);
@@ -758,9 +764,10 @@ ${saved ? banner('ok', 'Réglages enregistrés', { strong: true }) : ''}
 </section>
 
 <section class="card" id="budget" aria-labelledby="t-budget">
+  ${s.aiSwitch ? `<p class="hint" role="status">Tu es passé de ${esc(s.aiSwitch.from)} à ${esc(s.aiSwitch.to)} le ${fmtDate(s.aiSwitch.at)} : tes choix de modèle sont repartis du modèle par défaut de ${esc(s.aiSwitch.to)}. Tes consignes personnalisées de ${esc(s.aiSwitch.from)} sont gardées, et reviennent si tu y retournes.</p>` : ''}
   <div class="card-h"><h2 id="t-budget">${s.priced ? 'Budget IA' : 'Modèles IA'}</h2>${s.priced
-    ? "<p>Avec ta clé API, chaque job est facturé par Anthropic : en équivalent $ API remonté par Claude Code. Au-delà d'un plafond, les jobs IA attendent sans être perdus ; envois et relances continuent. Renseigne un montant pour activer un plafond.</p>"
-    : "<p>Avec ton abonnement Claude rien n'est facturé en plus : le garde-fou est ton quota Claude (affiché en haut), pas un budget en $.</p>"}</div>
+    ? `<p>Avec ta clé API, chaque job est facturé par ${esc(ai.company)}${ai.id === 'claude' ? ' : en équivalent $ API remonté par Claude Code' : ' : le coût est estimé d\'après les jetons utilisés et la grille de prix du modèle'}. Au-delà d'un plafond, les jobs IA attendent sans être perdus ; envois et relances continuent. Renseigne un montant pour activer un plafond.</p>`
+    : `<p>Avec ton ${ai.id === 'claude' ? 'abonnement Claude' : `compte ${esc(ai.name)}`} rien n'est facturé en plus par AiTools : ${ai.id === 'claude' ? 'le garde-fou est ton quota Claude (affiché en haut)' : 'les limites de ton abonnement s\'appliquent'}, pas un budget en $.</p>`}</div>
   <div class="grid2">
     ${s.priced ? `<label class="field"><span class="lbl">Plafond sur 24 h glissantes</span><span class="unit"><input name="budget_day_usd" inputmode="decimal" value="${esc(s.budget_day_usd)}" placeholder="ex. 2"><span>$</span></span></label>
     <label class="field"><span class="lbl">Plafond sur 30 jours glissants</span><span class="unit"><input name="budget_month_usd" inputmode="decimal" value="${esc(s.budget_month_usd)}" placeholder="ex. 30"><span>$</span></span></label>` : ''}
@@ -768,12 +775,12 @@ ${saved ? banner('ok', 'Réglages enregistrés', { strong: true }) : ''}
     ${model('analyze_model', s.analyze_model, "Modèle pour l'analyse de projet")}
     ${model('write_model', s.write_model, 'Modèle pour la rédaction (mails, relances, posts LinkedIn)')}
   </div>
-  <p class="hint">Haiku suffit pour la plupart des projets : passe à Sonnet ou Opus seulement si les fiches ou les textes manquent de précision. Les estimations (économe, intermédiaire, plus cher) sont relatives : avec ton abonnement elles se voient dans ton quota Claude, avec une clé API dans le prix. Chaque modèle a ses propres prompts, réglables plus bas.</p>
+  <p class="hint">${esc(cat.recommended[0].label)} suffit pour la plupart des projets : passe à ${esc(cat.recommended[1].label)} ou ${esc(cat.recommended[2].label)} seulement si les fiches ou les textes manquent de précision. Les estimations (économe, intermédiaire, plus cher) sont relatives : avec ton abonnement elles pèsent sur les limites de ton compte${ai.id === 'claude' ? ' (ton quota Claude)' : ''}, avec une clé API dans le prix. Chaque modèle a ses propres prompts, réglables plus bas.</p>
 </section>
 
 
 <section class="card" id="prompts" aria-labelledby="t-prompts" data-prompts data-pscope="*">
-  <div class="card-h"><h2 id="t-prompts">Prompts IA</h2><p>Les consignes que Claude reçoit pour chaque tâche. Modifie-les pour changer le style, le ton ou les règles. Le contexte du projet et le format de réponse restent ajoutés automatiquement : un prompt modifié ne peut pas casser la lecture de la réponse.</p></div>
+  <div class="card-h"><h2 id="t-prompts">Prompts IA</h2><p>Les consignes que ${esc(ai.name)} reçoit pour chaque tâche. Modifie-les pour changer le style, le ton ou les règles. Le contexte du projet et le format de réponse restent ajoutés automatiquement : un prompt modifié ne peut pas casser la lecture de la réponse.</p></div>
   <p class="hint">Chaque gamme de modèle a ses propres consignes, adaptées à sa façon de travailler (un petit modèle a besoin d'une méthode pas à pas, un grand d'un peu plus de recul). Un texte écrit dans « Tous les modèles » s'applique à toutes les gammes qui n'ont pas le leur. Ce qui est vide revient au texte par défaut.</p>
   <div class="pscope-bar" role="group" aria-label="Gamme de modèle">
     ${s.prompts.scopes.map((sc, i) => `<button type="button" class="pscope-tab" data-pscope-tab="${sc.id}" aria-pressed="${i === 0}">${esc(sc.label)}${sc.count ? ` <span class="badge warn">${sc.count}</span>` : ''}</button>`).join('\n    ')}
