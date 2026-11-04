@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { accessSync, constants, mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
-import { SECRET_ENV_NAMES } from './providers/secretenv.js';
+import { SECRET_ENV_NAMES, EXTRA_ENV_NAMES } from './providers/secretenv.js';
 
 export const SANDBOX_HOME = '/home/sandbox';
 
@@ -16,7 +16,7 @@ const INHERITED_WINDOWS = ['SystemRoot', 'PATHEXT', 'TEMP', 'TMP', 'COMSPEC'];
 export { SECRET_ENV_NAMES };
 
 /** Environnement du processus enfant : liste blanche stricte + le secret de l'utilisateur concerné. */
-export function buildChildEnv(parent, { secretEnv = {}, home }) {
+export function buildChildEnv(parent, { secretEnv = {}, extraEnv = {}, home }) {
   const env = {};
   for (const k of [...INHERITED, ...(process.platform === 'win32' ? INHERITED_WINDOWS : [])]) {
     if (parent[k] !== undefined) env[k] = parent[k];
@@ -26,6 +26,10 @@ export function buildChildEnv(parent, { secretEnv = {}, home }) {
   for (const [k, v] of Object.entries(secretEnv)) {
     if (!SECRET_ENV_NAMES.has(k)) throw new Error(`Variable d'environnement non autorisée pour le processus enfant : ${k}`);
     if (v) env[k] = v;
+  }
+  for (const [k, v] of Object.entries(extraEnv)) {
+    if (!EXTRA_ENV_NAMES.has(k)) throw new Error(`Variable d'environnement non autorisée pour le processus enfant : ${k}`);
+    if (v) env[k] = String(v);
   }
   return env;
 }
@@ -59,8 +63,9 @@ export function isInside(root, path) {
  * @param {string[]} o.command         commande à exécuter dans le bac à sable
  * @param {string[]} [o.roBinds]       dossiers supplémentaires en lecture seule (binaire Claude, Node…)
  * @param {string[]} [o.extraRo]       dossiers de pièces jointes de l'utilisateur (absolus), en lecture seule
+ * @param {string[]} [o.roFiles]       fichiers de réglages du CLI (absolus), en lecture seule, écrits par l'application pour CE lancement
  */
-export function buildBwrapArgs({ workDir = null, command, roBinds = [], extraRo = [] }) {
+export function buildBwrapArgs({ workDir = null, command, roBinds = [], extraRo = [], roFiles = [] }) {
   if (!Array.isArray(command) || !command.length) throw new Error('Commande vide');
   if (workDir !== null && !isAbsolute(workDir)) throw new Error('Le répertoire de travail doit être absolu');
   if (extraRo.some((d) => !isAbsolute(d))) throw new Error('Les dossiers joints doivent être absolus');
@@ -82,6 +87,7 @@ export function buildBwrapArgs({ workDir = null, command, roBinds = [], extraRo 
   for (const p of roBinds) args.push('--ro-bind', p, p);
   if (workDir) args.push('--ro-bind', workDir, workDir);
   for (const d of extraRo) args.push('--ro-bind', d, d);
+  for (const f of roFiles) args.push('--ro-bind', f, f);
   args.push('--chdir', workDir || SANDBOX_HOME, '--', ...command);
   return args;
 }
@@ -106,6 +112,8 @@ export function bwrapAvailable(bin = 'bwrap') {
  * @param {string[]} [o.extraDirs]   dossiers de pièces jointes lus en plus (page IA) ; chacun doit être dans `extraRoot`
  * @param {string} [o.extraRoot]     dossier des pièces jointes de CET utilisateur
  * @param {Record<string,string>} [o.secretEnv]  le secret de l'utilisateur (clé API ou jeton)
+ * @param {Record<string,string>} [o.extraEnv]  variables non secrètes autorisées (liste de providers/secretenv.js)
+ * @param {string[]} [o.roFiles]     fichiers à monter en lecture seule dans le bac à sable (réglages du CLI)
  * @param {object} o.sandbox         cfg.sandbox : { enabled, production, bwrapBin, roBinds }
  * @param {object} [deps]            { parentEnv, hasBwrap, resolveBin } (tests)
  */
@@ -128,7 +136,7 @@ export function prepareLaunch(o, deps = {}) {
     const home = mkdtempSync(join(tmpdir(), 'aitools-home-'));
     return {
       command: nice[0], args: [...nice.slice(1), o.bin, ...o.args], cwd: cwd || undefined, sandboxed: false,
-      env: buildChildEnv(parentEnv, { secretEnv: o.secretEnv, home }),
+      env: buildChildEnv(parentEnv, { secretEnv: o.secretEnv, extraEnv: o.extraEnv, home }),
       cleanup: () => { rmSync(home, { recursive: true, force: true }); },
     };
   }
@@ -140,12 +148,12 @@ export function prepareLaunch(o, deps = {}) {
   if (!real) throw new Error(`Exécutable Claude introuvable : ${o.bin}`);
   const roBinds = [...new Set([...(sb.roBinds || []), ...(real.startsWith('/usr/') ? [] : [dirname(real)])])];
   const bwrap = buildBwrapArgs({
-    workDir: cwd, roBinds, extraRo: extraDirs, command: [real, ...o.args],
+    workDir: cwd, roBinds, extraRo: extraDirs, roFiles: (o.roFiles || []).map((f) => resolve(f)), command: [real, ...o.args],
   });
   return {
     command: nice[0], args: [...nice.slice(1), sb.bwrapBin, ...bwrap], cwd: tmpdir(), sandboxed: true,
     // Le secret n'est jamais dans argv : bwrap transmet son propre environnement au processus du bac à sable
-    env: buildChildEnv(parentEnv, { secretEnv: o.secretEnv, home: SANDBOX_HOME }),
+    env: buildChildEnv(parentEnv, { secretEnv: o.secretEnv, extraEnv: o.extraEnv, home: SANDBOX_HOME }),
     cleanup: () => {},
   };
 }
