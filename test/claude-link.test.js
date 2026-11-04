@@ -179,7 +179,7 @@ test('formulaire HTML : l\'erreur revient sur /link, la page affiche la fenêtre
     body: new URLSearchParams({ token: TOKEN }).toString(),
   });
   assert.equal(form.status, 303);
-  assert.match(decodeURIComponent(form.headers.get('location')), /^\/link\?e=.*cocher/);
+  assert.match(decodeURIComponent(form.headers.get('location')), /^\/link\?ia=claude&e=.*cocher/);
   const page = (await (await u.get('/link', { headers: { accept: 'text/html' } })).text()).replace(/&#39;/g, "'");
   assert.match(page, /<dialog[^>]*id="consent-dialog"/);
   assert.match(page, /contrevenir aux conditions d'utilisation d'Anthropic/);

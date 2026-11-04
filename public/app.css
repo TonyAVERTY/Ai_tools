@@ -1057,8 +1057,32 @@ html.nav-busy { cursor: progress; }
 .link-main { max-width: 760px; }
 .link-main .panel-h { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
 .link-main > p { color: var(--muted); max-width: 46em; }
-.link-key { flex-direction: row; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
+.link-key, form.cfg.link-key { flex-direction: row; flex-wrap: wrap; align-items: flex-end; gap: 12px; } /* « form.cfg » (colonne) est plus spécifique que « .link-key » seul */
 .link-key .field { flex: 0 1 auto; width: min(100%, 460px); }
+.link-key input[type=hidden] { display: none; }
+form.cfg.link-key > .btn { align-self: flex-end; } /* le bouton se pose en bas de la ligne, à la hauteur du champ (« .cfg > .btn » le mettait en haut) */
+/* Page « Relier mon IA » : trois cartes avec le logo de chaque IA ; un clic ouvre les options de connexion de celle-ci (aucune animation : état seulement) */
+.ai-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; max-width: 760px; margin: 20px 0 16px; }
+.ai-card { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 16px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-lg); color: var(--text); text-decoration: none; }
+.ai-card .ic { width: 32px; height: 32px; margin-bottom: 6px; }
+.ai-card b { font-size: 1.0625rem; font-weight: 600; }
+.ai-card small { color: var(--muted); font-size: .875rem; }
+.ai-how { margin-top: 6px; color: var(--muted); font-size: .875rem; }
+.ai-card .badge { margin-top: 8px; }
+a.ai-card:hover { border-color: var(--accent); }
+.ai-card.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.ai-card[aria-disabled="true"] { opacity: .6; }
+.ai-pick { max-width: 760px; }
+.ai-panel { display: flex; flex-direction: column; gap: 16px; }
+.ai-panel[hidden] { display: none; }
+.link-main .notice { margin: 4px 0 8px; max-width: 46em; }
+.devcode { font-family: var(--mono); font-size: 1.75rem; font-weight: 700; letter-spacing: .12em; padding: 12px 16px; background: var(--bg-sunk); border: 1px solid var(--line-strong); border-radius: var(--radius); text-align: center; user-select: all; }
+@media (max-width: 640px) {
+  .ai-cards { grid-template-columns: 1fr; }
+  .ai-card { flex-direction: row; flex-wrap: wrap; align-items: center; column-gap: 12px; }
+  .ai-card .ic { margin: 0; }
+  .ai-how { width: 100%; margin-top: 0; }
+}
 .alts { max-width: 760px; display: flex; flex-direction: column; gap: 0; padding: 20px 24px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-lg); }
 .alts-h { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
 .alts-h h2 { font-size: 1.125rem; font-weight: 600; }
