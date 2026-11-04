@@ -2,7 +2,7 @@
 // Pas de mot de passe : l'inscription est automatique à la première connexion réussie.
 import { createHash, createPrivateKey, createPublicKey, sign, verify, timingSafeEqual } from 'node:crypto';
 import { now } from './db.js';
-import { randomId } from './crypto.js';
+import { randomId, hashSid } from './crypto.js';
 import { parseCookies, setCookie, redirect, HttpError } from './http.js';
 import { loginIdentity } from './users.js';
 
@@ -43,7 +43,7 @@ export async function getSession(db, req) {
   const sid = parseCookies(req)[SESSION_COOKIE];
   if (!sid) return null;
   const s = await db.prepare(`SELECT s.id, s.user_id, u.email, u.name, u.provider, u.status, u.is_admin
-    FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.id = ? AND s.expires_at > ?`).get(sid, now());
+    FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.id = ? AND s.expires_at > ?`).get(hashSid(sid), now());
   if (!s) return null;
   if (s.status !== 'active') {
     await db.prepare('DELETE FROM sessions WHERE user_id = ?').run(s.user_id);
@@ -58,13 +58,13 @@ export async function getSession(db, req) {
 export async function createSession(db, res, userId) {
   const id = randomId();
   await db.prepare('INSERT INTO sessions(id, user_id, created_at, expires_at) VALUES(?, ?, ?, ?)')
-    .run(id, userId, now(), now() + SESSION_TTL);
+    .run(hashSid(id), userId, now(), now() + SESSION_TTL); // en base : l'empreinte ; le cookie garde l'identifiant
   setCookie(res, SESSION_COOKIE, id, { maxAge: SESSION_TTL });
 }
 
 export async function destroySession(db, req, res) {
   const sid = parseCookies(req)[SESSION_COOKIE];
-  if (sid) await db.prepare('DELETE FROM sessions WHERE id = ?').run(sid);
+  if (sid) await db.prepare('DELETE FROM sessions WHERE id = ?').run(hashSid(sid));
   setCookie(res, SESSION_COOKIE, '', { maxAge: 0 });
 }
 

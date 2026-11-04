@@ -1,13 +1,32 @@
-// File de jobs en base : jobs IA simultanés (plafond global), un seul par utilisateur, tourniquet entre utilisateurs.
+// File de jobs en base : jobs IA simultanés (plafond global), plafond par utilisateur selon son offre (multi jobs), tourniquet entre utilisateurs.
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { now } from '../db.js';
+import { modelLabel } from './models.js';
 import { HttpError } from '../http.js';
+import { SCENE_REFUSED } from './promovideo.js';
+import { reviewVerdict } from './promoqa.js';
 import { AI_JOBS } from './budget.js';
 import { getUser } from '../users.js';
 import { aiRefusal, assertCanRunAi } from '../claudelink.js';
 import { loadRatio } from './load.js';
 import { LOAD } from '../limits.js';
+import { createJobLog } from './joblog.js';
+import { attachJobEta } from './jobeta.js';
 import { assertRoom, recordUsage, withUserLock, MAIL_JOBS } from './plans.js';
 import { sendPause, pauseMessage } from './abuse.js';
+
+// Job en cours d'exécution, retrouvé par le wrapper claude() : c'est lui qui dit quel modèle a réellement servi (affiché dans l'avancement et le résultat)
+export const jobContext = new AsyncLocalStorage();
+const recordedUsage = new WeakMap();
+export function liveJobUsage(ctx) {
+  let input = 0, output = 0;
+  const update = (u) => {
+    const tin = Math.max(input, Number(u.tokensIn) || 0), tout = Math.max(output, Number(u.tokensOut) || 0);
+    ctx.usage.tokensIn += tin - input; ctx.usage.tokensOut += tout - output;
+    input = tin; output = tout; ctx.persistUsage?.();
+  };
+  return { update, finish(r) { update(r); ctx.usage.costUsd += r.costUsd || 0; ctx.persistUsage?.(); recordedUsage.set(r, ctx); } };
+}
 
 /**
  * Met un job en file pour un utilisateur. Point de passage obligé de toutes les routes et tâches de fond :
@@ -38,6 +57,10 @@ export async function enqueue(db, { userId, projectId, type, params = {}, runAft
   if (running) return { id: running.id, existing: true };
   // Plafonds du plan : compter puis écrire dans la même section critique (deux requêtes simultanées ne passent pas toutes deux)
   return withUserLock(user.id, async () => {
+    const active = projectId == null
+      ? await db.prepare("SELECT id FROM jobs WHERE user_id = ? AND project_id IS NULL AND type = ? AND status IN ('queued','running')").get(user.id, type)
+      : await db.prepare("SELECT id FROM jobs WHERE project_id = ? AND type = ? AND status IN ('queued','running')").get(projectId, type);
+    if (active) return { id: active.id, existing: true };
     if (AI_JOBS.has(type)) await assertRoom(db, user, 'aiJobs');
     if (MAIL_JOBS.has(type)) {
       await assertRoom(db, user, 'mails');
@@ -73,6 +96,26 @@ export async function cancelJob(db, userId, jobId) {
   if (!r.changes && !(await db.prepare('SELECT 1 FROM jobs WHERE id = ? AND user_id = ?').get(jobId, userId))) throw new HttpError(404, 'Job introuvable');
 }
 
+/**
+ * Une relance conserve la tâche en échec et repasse par les plafonds et autorisations habituels.
+ * Une vidéo livrée avec les avertissements des agents (tâche terminée) peut aussi être relancée ou corrigée.
+ */
+export async function retryJob(db, userId, jobId, opts = {}, { fix = false } = {}) {
+  const job = await db.prepare('SELECT * FROM jobs WHERE id = ? AND user_id = ?').get(jobId, userId);
+  if (!job) throw new HttpError(404, 'Job introuvable');
+  const warnings = job.status === 'done' && job.type === 'promo_video' ? (JSON.parse(job.result_json || '{}').qualityWarnings || []) : [];
+  if (job.status !== 'error' && !warnings.length) throw new HttpError(409, 'Seule une tâche en échec peut être relancée');
+  const params = JSON.parse(job.params_json || '{}');
+  if (fix) {
+    // Correction : le verdict du contrôle repart chez Claude avec la dernière scène (seule une scène refusée est corrigeable)
+    const error = String(job.error ?? '');
+    const verdict = warnings.length ? reviewVerdict(warnings) : (job.type === 'promo_video' && error.startsWith(SCENE_REFUSED) ? error.slice(SCENE_REFUSED.length) : '');
+    if (!verdict) throw new HttpError(409, 'Cette erreur ne se corrige pas automatiquement : utilise « Réessayer »', { expose: true });
+    Object.assign(params, { fix: verdict, fixScene: job.id });
+  }
+  return enqueue(db, { userId, projectId: job.project_id, type: job.type, params }, opts);
+}
+
 /** Derniers jobs d'un projet (le projet doit déjà avoir été vérifié comme appartenant à l'utilisateur). */
 export async function latestJobs(db, projectId) {
   const rows = await db.prepare(`
@@ -80,12 +123,15 @@ export async function latestJobs(db, projectId) {
     JOIN (SELECT type, MAX(id) id FROM jobs WHERE project_id = ? GROUP BY type) lj ON lj.id = j.id
   `).all(projectId);
   const out = {};
+  await attachJobEta(db, rows);
   for (const r of rows) {
     out[r.type] = {
       id: r.id, status: r.status, error: r.error,
+      tokensUsed: Number(r.tokens_in || 0) + Number(r.tokens_out || 0),
+      eta:r.eta||null,
       progress: r.progress_json ? JSON.parse(r.progress_json) : null,
       result: r.result_json ? JSON.parse(r.result_json) : null,
-      createdAt: r.created_at, finishedAt: r.finished_at, runAfter: r.run_after,
+      createdAt: r.created_at, startedAt: r.started_at, finishedAt: r.finished_at, runAfter: r.run_after,
     };
   }
   return out;
@@ -93,8 +139,9 @@ export async function latestJobs(db, projectId) {
 
 /**
  * File de jobs équitable et simultanée.
- *  - jusqu'à `maxJobs` jobs en parallèle sur le serveur (MAX_AI_JOBS) ;
- *  - au plus UN job à la fois par utilisateur ;
+ *  - aucune limite globale de jobs : seule l'offre de chaque compte compte (`maxJobs` n'existe que pour les tests) ;
+ *  - par utilisateur : autant de jobs en même temps que son offre le permet (`parallel(userId)` ; 1 par défaut = un seul à la fois, comme l'offre
+ *    gratuite). Les envois de mails (premiers mails, relances) ne se chevauchent jamais pour un même compte : les plafonds d'envoi se calculent au départ ;
  *  - prochain job choisi en tourniquet entre utilisateurs (le moins récemment servi d'abord), donc pas de famine ;
  *    à l'intérieur d'un utilisateur, l'ordre des jobs (par id) est conservé, y compris pour les jobs programmés la nuit ;
  *  - réservation atomique : UPDATE conditionnel dont on contrôle le nombre de lignes affectées ;
@@ -103,12 +150,13 @@ export async function latestJobs(db, projectId) {
  */
 export class Worker {
   constructor(db, handlers, {
-    maxJobs = 4, loadMax = LOAD.defaultMax, load = loadRatio, pollMs = 3000, log = console, clock = now, onFinish, onLoad,
-    budget, isAiJob, onBudget, quota, isQuotaSensitive, onQuotaHold, cliModeEnabled = true,
+    maxJobs = Infinity, loadMax = LOAD.defaultMax, load = loadRatio, pollMs = 3000, log = console, clock = now, onFinish, onLoad,
+    budget, isAiJob, onBudget, quota, isQuotaSensitive, onQuotaHold, cliModeEnabled = true, parallel,
   } = {}) {
+    this.parallel = parallel; // async (userId) => nombre de jobs simultanés permis à CET utilisateur (selon son offre) ; absent = 1
     this.cliModeEnabled = cliModeEnabled;
     this.clock = clock;
-    this.maxJobs = Math.max(1, Math.floor(Number(maxJobs)) || 1);
+    this.maxJobs = maxJobs === Infinity ? Infinity : Math.max(1, Math.floor(Number(maxJobs)) || 1); // Infinity = pas de plafond global
     this.loadMax = loadMax;
     this.load = load;
     this.loadPaused = false;
@@ -128,8 +176,9 @@ export class Worker {
     this.pollMs = pollMs;
     this.log = log;
     this.running = new Map();   // id du job → { job, ctrl }
-    this.busyUsers = new Set(); // utilisateurs ayant un job réservé ou en cours (un seul à la fois chacun)
-    this.claiming = 0;          // réservations en cours (pour ne jamais dépasser maxJobs)
+    this.busyUsers = new Map(); // utilisateur → nombre de jobs réservés ou en cours (plafonné par son offre)
+    this.busyMail = new Set();  // utilisateurs ayant un envoi de mails réservé ou en cours (jamais deux à la fois)
+    this.claiming = 0;          // réservations en cours (pour ne jamais dépasser maxJobs, s'il est fixé)
     this.served = new Map();    // utilisateur → rang de son dernier service (tourniquet)
     this.turn = 0;
     this.stopped = false;
@@ -215,6 +264,14 @@ export class Worker {
     return true;
   }
 
+  /** Nombre de jobs simultanés permis à cet utilisateur (au moins 1). Une erreur de lecture de l'offre retombe sur 1 : jamais plus que prévu. */
+  async capOf(userId) {
+    try {
+      const n = Math.floor(Number(await this.parallel?.(Number(userId))));
+      return Number.isFinite(n) && n >= 1 ? Math.min(n, 1000) : 1;
+    } catch { return 1; }
+  }
+
   /**
    * Choisit le prochain job et le réserve atomiquement. Renvoie le job réservé (déjà « running » en base), ou null.
    * Sûr si appelé en parallèle : un utilisateur n'a jamais deux jobs, le nombre total reste borné.
@@ -240,9 +297,17 @@ export class Worker {
       }
       const candidates = []; // un seul candidat par utilisateur : son premier job exécutable
       for (const [userId, jobs] of byUser) {
-        if (this.busyUsers.has(Number(userId))) continue; // déjà un job en cours : les suivants attendent
+        const cap = await this.capOf(userId);
+        if ((this.busyUsers.get(Number(userId)) || 0) >= cap) { // autant de jobs en cours que son offre le permet : les suivants attendent, et le disent
+          const why = cap === 1
+            ? "un job est déjà en cours (ton offre en fait tourner un seul à la fois ; les offres payantes en font tourner plusieurs en même temps)"
+            : `${cap} jobs sont déjà en cours (ton offre en permet ${cap} à la fois)`;
+          for (const j of jobs) await hold(j, why);
+          continue;
+        }
         let budgetReason = null, quotaReason = null, cand = null;
         for (const j of jobs) {
+          if (MAIL_JOBS.has(j.type) && this.busyMail.has(Number(userId))) continue; // un seul envoi de mails à la fois pour ce compte
           // Compte suspendu ou supprimé, job IA sans liaison Claude valide : refusé sans exécution
           const refusal = await jobRefusal(this.db, j, { cliModeEnabled: this.cliModeEnabled });
           if (refusal) {
@@ -281,10 +346,13 @@ export class Worker {
       // Tourniquet : le moins récemment servi d'abord (jamais servi = en tête), puis l'ordre des jobs
       candidates.sort((a, b) => (this.served.get(a.user_id) ?? -1) - (this.served.get(b.user_id) ?? -1) || a.id - b.id);
       for (const job of candidates) {
-        if (this.busyUsers.has(Number(job.user_id))) continue; // pris entre-temps par un claim concurrent
-        if (!(await this.reserve(job))) continue;
+        const cap = await this.capOf(job.user_id);
+        if ((this.busyUsers.get(Number(job.user_id)) || 0) >= cap) continue; // pris entre-temps par un claim concurrent
+        if (MAIL_JOBS.has(job.type) && this.busyMail.has(Number(job.user_id))) continue;
+        if (!(await this.reserve(job, cap))) continue;
         // Aucun await entre la réservation en base et ces lignes : l'état en mémoire suit toujours la base
-        this.busyUsers.add(Number(job.user_id));
+        this.busyUsers.set(Number(job.user_id), (this.busyUsers.get(Number(job.user_id)) || 0) + 1);
+        if (MAIL_JOBS.has(job.type)) this.busyMail.add(Number(job.user_id));
         this.served.set(job.user_id, ++this.turn);
         return job;
       }
@@ -293,12 +361,13 @@ export class Worker {
   }
 
   /**
-   * Passage atomique queued → running. Réussit seulement si le job est encore en file ET si son utilisateur n'a aucun
-   * autre job en cours (la sous-requête passe par une table dérivée : MySQL interdit de lire la table qu'on met à jour).
+   * Passage atomique queued → running. Réussit seulement si le job est encore en file ET si son utilisateur a moins de `cap` jobs en cours
+   * (la sous-requête passe par une table dérivée : MySQL interdit de lire la table qu'on met à jour). `cap` est un entier déjà borné par capOf().
    */
-  async reserve(job) {
+  async reserve(job, cap = 1) {
+    const n = Math.max(1, Math.floor(Number(cap)) || 1);
     const r = await this.db.prepare(`UPDATE jobs SET status = 'running', started_at = ? WHERE id = ? AND status = 'queued'
-      AND (SELECT COUNT(*) FROM (SELECT id FROM jobs WHERE user_id = ? AND status = 'running' LIMIT 1) busy) = 0`)
+      AND (SELECT COUNT(*) FROM (SELECT id FROM jobs WHERE user_id = ? AND status = 'running' LIMIT ${n}) busy) < ${n}`)
       .run(now(), job.id, job.user_id);
     return r.changes === 1;
   }
@@ -306,13 +375,23 @@ export class Worker {
   async runJob(job) {
     const ctrl = new AbortController();
     this.running.set(job.id, { job, ctrl });
+    const journal = createJobLog(this.db, job.id);
+    let usageWrite = Promise.resolve();
+    journal.append('status', 'Démarrage de la tâche');
     const ctx = {
       job,
       params: JSON.parse(job.params_json || '{}'),
       signal: ctrl.signal,
-      progress: (p) => setProgress(this.db, job.id, p),
+      // Le modèle réellement utilisé (réglage de l'utilisateur) est joint à chaque avancement : « Modèle : Sonnet » dans Activité et sur le projet
+      progress: (p) => { journal.append('progress', p.message); return setProgress(this.db, job.id, ctx.model ? { ...p, model: modelLabel(ctx.model) } : p); },
+      log: (kind, text) => journal.append(kind, text),
       cancelled: () => this.isCancelled(job.id),
       usage: { costUsd: 0, tokensIn: 0, tokensOut: 0 },
+      persistUsage: () => {
+        const u = { ...ctx.usage };
+        usageWrite = usageWrite.then(() => this.db.prepare('UPDATE jobs SET cost_usd = ?, tokens_in = ?, tokens_out = ? WHERE id = ?').run(u.costUsd, u.tokensIn, u.tokensOut, job.id));
+        usageWrite.catch(() => {});
+      },
     };
     // Annulation depuis l'UI : on surveille la BDD (une erreur ici ne doit jamais faire tomber le process)
     const watch = setInterval(() => {
@@ -325,13 +404,20 @@ export class Worker {
         return;
       }
       try {
-        const result = await handler(ctx);
+        const out = await jobContext.run(ctx, () => handler(ctx));
+        journal.append('status', (await this.isCancelled(job.id)) ? 'Tâche annulée' : 'Tâche terminée');
+        await journal.flush();
+        await usageWrite.catch(() => {});
+        const result = ctx.model && out && typeof out === 'object' && !Array.isArray(out) ? { ...out, model: ctx.model } : out;
         if (!(await this.isCancelled(job.id))) {
           await this.db.prepare("UPDATE jobs SET status='done', result_json=?, finished_at=?, cost_usd=?, tokens_in=?, tokens_out=? WHERE id=?")
             .run(JSON.stringify(result ?? null), now(), ctx.usage.costUsd, ctx.usage.tokensIn, ctx.usage.tokensOut, job.id);
           this.emit('onFinish', job, { status: 'done', result });
         }
       } catch (e) {
+        journal.append('error', e.message);
+        await journal.flush().catch(() => {});
+        await usageWrite.catch(() => {});
         this.log.error(`[job ${job.id} ${job.type}]`, e.message);
         if (!(await this.isCancelled(job.id))) {
           await this.db.prepare("UPDATE jobs SET status='error', error=?, finished_at=?, cost_usd=?, tokens_in=?, tokens_out=? WHERE id=?")
@@ -340,18 +426,25 @@ export class Worker {
         }
       }
     } finally {
+      if (ctrl.signal.aborted) journal.append('status', 'Tâche annulée');
+      await usageWrite.catch(() => {});
+      await journal.flush().catch(() => {});
       clearInterval(watch);
       this.running.delete(job.id);
-      this.busyUsers.delete(Number(job.user_id));
+      const left = (this.busyUsers.get(Number(job.user_id)) || 1) - 1;
+      if (left > 0) this.busyUsers.set(Number(job.user_id), left); else this.busyUsers.delete(Number(job.user_id));
+      if (MAIL_JOBS.has(job.type)) this.busyMail.delete(Number(job.user_id));
     }
   }
 }
 
 // Ajoute la conso d'un appel Claude au job courant
 export function addUsage(ctx, r) {
+  if (recordedUsage.get(r) === ctx) return;
   ctx.usage.costUsd += r.costUsd || 0;
   ctx.usage.tokensIn += r.tokensIn || 0;
   ctx.usage.tokensOut += r.tokensOut || 0;
+  ctx.persistUsage?.();
 }
 
 // Conso des 30 derniers jours, pour la jauge (comptée à la fin du job, comme le budget)

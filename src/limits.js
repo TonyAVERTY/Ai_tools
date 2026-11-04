@@ -12,21 +12,48 @@ const HOUR = 60 * MIN;
  * Une requête passe seulement si toutes les portées de la règle l'acceptent.
  */
 export const RATE_LIMITS = {
+  // Toute écriture d'un compte connecté sur une route sans règle propre : large pour un humain (une par seconde en moyenne), étroit pour une boucle
+  write: { user: { max: 600, windowMs: 10 * MIN } },
+  // Événements de l'agenda (ajout, suppression)
+  event: { user: { max: 60, windowMs: 10 * MIN } },
+  chat: { user: { max: 40, windowMs: 10 * MIN } },
+  chat_upload: { user: { max: 60, windowMs: 10 * MIN } },
+  // Ajout, modification et suppression de prospects ; aperçu d'un mail (rendu sans envoi)
+  prospect_write: { user: { max: 120, windowMs: 10 * MIN } },
+  preview: { user: { max: 120, windowMs: 10 * MIN } },
+  // Tâches des postes : chacune coûte un appel Claude
+  poste: { user: { max: 40, windowMs: HOUR } },
+  // Vidéos de promotion : un rendu coûte un appel Claude et plusieurs minutes de processeur
+  promo: { user: { max: 20, windowMs: HOUR } },
+  // Extraits d'écoute des voix : chacun interroge un service de voix extérieur (mis en cache côté serveur)
+  promo_voice: { user: { max: 60, windowMs: 10 * MIN } },
+  // Abonnement iCal (lien secret) : un agenda interroge au plus quelques fois par heure
+  ical: { ip: { max: 60, windowMs: 10 * MIN } },
+  // API (mode développeur) : par adresse avant authentification, par compte ensuite
+  api_ip: { ip: { max: 300, windowMs: MIN } },
+  api: { user: { max: 120, windowMs: MIN } },
   // Connexion : démarrage (Google, Apple) et retours des fournisseurs
   auth_start: { ip: { max: 20, windowMs: 10 * MIN } },
   auth_callback: { ip: { max: 40, windowMs: 10 * MIN } },
+  // Désinscription (page publique, lien reçu par mail) : large pour un lecteur légitime, étroit pour un robot qui devine
+  unsub: { ip: { max: 60, windowMs: 10 * MIN } },
   // Liaison Claude : chaque essai de clé ou de jeton coûte un appel réseau chez Anthropic
   link: { user: { max: 10, windowMs: 10 * MIN }, ip: { max: 30, windowMs: 10 * MIN } },
   // Export / import CSV
   csv: { user: { max: 10, windowMs: 10 * MIN } },
   // Envois : lancement d'un lot, rapport par mail, notification de test
   mail_send: { user: { max: 30, windowMs: HOUR } },
+  // Régénération d'accroche : un appel Claude (lecture du site) à chaque fois
+  enrich: { user: { max: 40, windowMs: HOUR } },
   // Création de projet (clone du dépôt, analyse)
   project_create: { user: { max: 10, windowMs: HOUR } },
   // Suppression de compte
   account_delete: { user: { max: 5, windowMs: HOUR }, ip: { max: 10, windowMs: HOUR } },
   // Tests de connexion vers les services de l'utilisateur (IMAP, base du récap, SMTP)
   conn_test: { user: { max: 20, windowMs: 10 * MIN } },
+  // Comptabilité : saisie, envoi des justificatifs ; export de l'archive (plusieurs Mo, lecture de tous les fichiers)
+  compta: { user: { max: 120, windowMs: 10 * MIN } },
+  compta_export: { user: { max: 10, windowMs: 10 * MIN } },
   // Back-office
   admin: { user: { max: 120, windowMs: MIN } },
 };
@@ -35,6 +62,8 @@ export const RATE_LIMITS = {
  * Plafonds par plan. `null` = illimité.
  *  - `projects` et `prospects` : totaux du compte ;
  *  - `mails` et `aiJobs` : par mois calendaire, heure de Paris ;
+ *  - `parallelJobs` : jobs IA qu'un compte peut faire tourner EN MÊME TEMPS (multi jobs). 1 = un à la fois : c'est l'offre gratuite ; le multi jobs
+ *    est réservé aux offres payantes et grandit avec l'offre. Aucune limite globale sur le serveur : seule l'offre compte ;
  *  - `seats` : places d'équipe, propriétaire compris (1 = pas d'équipe). L'équipe utilise le plan et les plafonds de son propriétaire.
  * Le plan « pro » est un ancien plan illimité attribué à la main : il reste tel quel pour ne retirer l'accès à personne,
  * mais il n'est pas proposé sur la page Tarifs.
@@ -44,13 +73,13 @@ export const RATE_LIMITS = {
  *  - `aiJobs` couvre au moins `prospects / 50` recherches (une recherche ramène 50 contacts au plus), plus l'analyse et les modèles.
  */
 export const PLAN_LIMITS = {
-  free: { projects: 1, prospects: 50, mails: 100, aiJobs: 6, seats: 1 },
-  starter: { projects: 2, prospects: 300, mails: 500, aiJobs: 20, seats: 2 },
-  growth: { projects: 5, prospects: 1000, mails: 1500, aiJobs: 60, seats: 3 },
-  business: { projects: 10, prospects: 3000, mails: 4000, aiJobs: 150, seats: 10 },
-  intensive: { projects: 25, prospects: 10000, mails: 8000, aiJobs: 400, seats: 25 },
-  pro: { projects: null, prospects: null, mails: null, aiJobs: null, seats: null },
-  admin: { projects: null, prospects: null, mails: null, aiJobs: null, seats: null },
+  free: { projects: 1, prospects: 50, mails: 100, aiJobs: 6, parallelJobs: 1, seats: 1 },
+  starter: { projects: 2, prospects: 300, mails: 500, aiJobs: 20, parallelJobs: 2, seats: 2 },
+  growth: { projects: 5, prospects: 1000, mails: 1500, aiJobs: 60, parallelJobs: 3, seats: 3 },
+  business: { projects: 10, prospects: 3000, mails: 4000, aiJobs: 150, parallelJobs: 4, seats: 10 },
+  intensive: { projects: 25, prospects: 10000, mails: 8000, aiJobs: 400, parallelJobs: 6, seats: 25 },
+  pro: { projects: null, prospects: null, mails: null, aiJobs: null, parallelJobs: 6, seats: null },
+  admin: { projects: null, prospects: null, mails: null, aiJobs: null, parallelJobs: 6, seats: null },
 };
 export const PLAN_LABELS = {
   free: 'gratuit', starter: 'Démarrage', growth: 'Croissance', business: 'Business', intensive: 'Intensif',

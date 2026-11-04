@@ -1,15 +1,21 @@
 // Budget IA : plafonds glissants 24 h / 30 j, en équivalent $ API remonté par Claude Code.
 // Avec un abonnement Pro rien n'est facturé en plus : c'est un garde-fou pour ne pas épuiser le quota.
 import { getSetting, setSetting, now } from '../db.js';
+import { getLinkState, MODES, isPriced } from '../claudelink.js';
+export { isPriced };
+import { ROLE_TASKS } from './roles.js';
 
 // Jobs qui appellent Claude (les envois et relances n'en consomment pas)
-export const AI_JOBS = new Set(['analyze', 'prospect', 'template', 'followup_template', 'evolution', 'linkedin_post']);
+export const AI_JOBS = new Set(['analyze', 'prospect', 'template', 'followup_template', 'evolution', 'linkedin_post', 'promo_video', 'audit', 'hook', 'billing_quotes', 'billing_refine', 'billing_docs', ...ROLE_TASKS.map((t) => t.job)]);
 
 const usd = (n) => `${n.toFixed(2)} $`;
 
 // La dépense compte au moment où le job s'est terminé (un job de nuit compte la nuit). Budget propre à chaque utilisateur.
 async function spentSince(db, userId, since) {
-  return (await db.prepare('SELECT COALESCE(SUM(cost_usd), 0) c FROM jobs WHERE user_id = ? AND COALESCE(finished_at, created_at) > ?').get(userId, since)).c;
+  const jobs = (await db.prepare('SELECT COALESCE(SUM(cost_usd), 0) c FROM jobs WHERE user_id = ? AND COALESCE(finished_at, created_at) > ?').get(userId, since)).c;
+  // La page IA (chat) consomme aussi : ses réponses comptent dans le même budget
+  const chat = (await db.prepare('SELECT COALESCE(SUM(m.cost_usd), 0) c FROM chat_messages m JOIN chat_conversations c ON c.id = m.conversation_id WHERE c.user_id = ? AND m.created_at > ?').get(userId, since)).c;
+  return Number(jobs) + Number(chat);
 }
 
 async function limit(db, userId, key) {
@@ -19,8 +25,11 @@ async function limit(db, userId, key) {
 
 /** @returns {{day: {used:number, limit:number|null}, month: {used:number, limit:number|null}, blocked: boolean, reason: string|null}} */
 export async function budgetState(db, userId, { at = now() } = {}) {
-  const day = { used: await spentSince(db, userId, at - 86400), limit: await limit(db, userId, 'budget_day_usd') };
-  const month = { used: await spentSince(db, userId, at - 30 * 86400), limit: await limit(db, userId, 'budget_month_usd') };
+  // Un plafond en $ n'a de sens qu'avec une clé API (c'est elle qui est facturée à l'usage) : avec un abonnement, rien n'est
+  // facturé en plus, le garde-fou est le quota Claude. Un ancien plafond resté en base ne bloque donc jamais un abonnement.
+  const priced = (await getLinkState(db, userId))?.mode === MODES.api_key;
+  const day = { used: await spentSince(db, userId, at - 86400), limit: priced ? await limit(db, userId, 'budget_day_usd') : null };
+  const month = { used: await spentSince(db, userId, at - 30 * 86400), limit: priced ? await limit(db, userId, 'budget_month_usd') : null };
   const over = (x) => x.limit != null && x.used >= x.limit;
   const reason = over(day) ? `budget IA des dernières 24 h atteint (${usd(day.used)} / ${usd(day.limit)})`
     : over(month) ? `budget IA des 30 derniers jours atteint (${usd(month.used)} / ${usd(month.limit)})`
@@ -30,7 +39,7 @@ export async function budgetState(db, userId, { at = now() } = {}) {
 
 // Jobs IA non urgents : on peut les retarder sans perdre une occasion commerciale.
 // La prospection et l'envoi (y compris les relances) continuent même quota serré.
-const QUOTA_SENSITIVE_JOBS = new Set(['analyze', 'evolution']);
+const QUOTA_SENSITIVE_JOBS = new Set(['analyze', 'evolution', 'audit', ...ROLE_TASKS.map((t) => t.job)]);
 export const isQuotaSensitive = (type) => QUOTA_SENSITIVE_JOBS.has(type);
 
 // Palier à partir duquel on reporte : garde de la marge sur le quota du compte Claude
@@ -47,7 +56,8 @@ export async function quotaState(db, userId) {
   try { rl = JSON.parse(raw); } catch { return { blocked: false, reason: null }; }
   for (const [key, label] of Object.entries(WINDOW_LABELS)) {
     const w = rl[key];
-    if (w?.utilization >= QUOTA_PAUSE_THRESHOLD) {
+    // Une mesure dont la fenêtre a été remise à zéro depuis ne bloque plus rien
+    if (w?.utilization >= QUOTA_PAUSE_THRESHOLD && !(w.resetsAt && w.resetsAt < now())) {
       return { blocked: true, reason: `quota de la ${label} à ${Math.round(w.utilization * 100)} %` };
     }
   }

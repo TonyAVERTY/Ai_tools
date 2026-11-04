@@ -1,0 +1,145 @@
+/* Jetons de design d'AiTools. Voir docs/DESIGN.md : un bureau bleu-gris, des feuilles blanches, l'indigo du logo pour l'action.
+   Source unique des couleurs, rayons, ombres, durées et polices : le site public et l'application les lisent via var(--…),
+   rien n'est redéfini ailleurs. Thème sombre = réglage du système (prefers-color-scheme).
+   Le dégradé du logo n'est utilisé que pour le fil des étapes et les barres de progression, jamais pour du texte ni des boutons. */
+
+/* Polices embarquées (public/fonts, licence OFL) : sous-ensembles latin, graisse variable */
+@font-face {
+  font-family: "Source Serif 4";
+  src: url("/static/fonts/source-serif-4.woff2") format("woff2");
+  font-weight: 200 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Hanken Grotesk";
+  src: url("/static/fonts/hanken-grotesk.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Hanken Grotesk";
+  src: url("/static/fonts/hanken-grotesk-ext.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+:root {
+  /* rayons : un contrôle (6) n'a pas le même rayon qu'un panneau (10) ; 999 px seulement pour une pastille d'état */
+  --radius-sm: 6px;
+  --radius: 8px;
+  --radius-lg: 10px;
+  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px;
+  --s-5: 24px; --s-6: 32px; --s-7: 48px; --s-8: 64px;
+  --ease: cubic-bezier(.2, .7, .2, 1);
+  --t-fast: 120ms; --t: 180ms; --t-slow: 320ms;
+  /* typographie : Hanken Grotesk pour l'interface, Source Serif 4 pour les titres et les chiffres, monospace du système pour les adresses et le code */
+  --font: "Hanken Grotesk", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --serif: "Source Serif 4", "Iowan Old Style", Georgia, "Times New Roman", serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+  /* marque */
+  --indigo: #1e296a;
+  --accent: #1288b7;
+  --accent-2: #0db8c5;
+  --grad: linear-gradient(90deg, #1288b7, #0db8c5);
+  --on-grad: #081022;
+  /* action principale : plein indigo (clair) */
+  --primary: #1e296a;
+  --primary-hover: #2a3890;
+  --on-primary: #ffffff;
+
+  /* clair : le bureau, la feuille, l'encre */
+  --bg: #f1f3f9;
+  --bg-sunk: #e6eaf4;
+  --card: #ffffff;
+  --card-2: #f7f8fc;
+  --text: #0e1535;
+  --muted: #4a5782;
+  --link: #0b6f96;
+  --line: #d5dbeb;
+  --line-strong: #b4bed8;
+  --control: #6f7ea5;
+  --logo-ink: #1e296a;
+  --nav-on-bg: #1e296a;
+  --nav-on-text: #e1e9f6;
+  --ok: #0e6b43; --ok-bg: #e2f4ea;
+  --warn: #8a5200; --warn-bg: #fdf0d8;
+  --err: #b4233a; --err-bg: #fde7eb;
+  --info: #0b6f96; --info-bg: #e1f1f8;
+  --on-err: #ffffff;
+  /* surlignage de l'accroche dans la lettre d'exemple */
+  --mark: #fbe9a8;
+  --on-mark: #0e1535;
+  /* documentation : blocs de code (toujours sombres) et méthodes HTTP */
+  --code-bg: #0f1a33; --code-fg: #e6edf9; --code-muted: #9fb0d0; --code-line: #2a3a5e; --code-hover: #1b2b4d;
+  --tk-k: #7cc4ff; --tk-s: #a5e3a1; --tk-n: #ffcb7b; --tk-b: #f59ad4; --tk-c: #8c9bbd;
+  --m-get: #12633b; --m-post: #1a55bd; --on-m: #ffffff;
+  /* pas d'ombre sous les panneaux (la bordure suffit) ; seules les fenêtres flottantes en ont une */
+  --shadow: none;
+  --shadow-2: 0 6px 18px rgba(21, 30, 83, .12), 0 1px 3px rgba(21, 30, 83, .08);
+  --shadow-3: 0 18px 44px rgba(21, 30, 83, .20), 0 2px 6px rgba(21, 30, 83, .08);
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b1224;
+    --bg-sunk: #080e1d;
+    --card: #111a33;
+    --card-2: #16213f;
+    --text: #e1e9f6;
+    --muted: #9aa8c7;
+    --link: #5cc4ec;
+    --line: #212e55;
+    --line-strong: #33447a;
+    --control: #5f71a8;
+    --logo-ink: #e1e9f6;
+    --nav-on-bg: #24307b;
+    --nav-on-text: #e1e9f6;
+    --primary: #4356c9;
+    --primary-hover: #5668dd;
+    --on-primary: #ffffff;
+    --ok: #5fd6a0; --ok-bg: #0e2a26;
+    --warn: #f2b84b; --warn-bg: #2b2310;
+    --err: #ff8a9b; --err-bg: #33141f;
+    --info: #5cc4ec; --info-bg: #0e2a40;
+    --on-err: #2a0a14;
+    --mark: #5a4a14;
+    --on-mark: #fdf3cf;
+    --code-bg: #0a1226; --code-line: #26365a; --code-hover: #17274a;
+    --m-get: #5fd6a0; --m-post: #7cb2ff; --on-m: #071022;
+    --shadow-2: 0 6px 16px rgba(0, 0, 0, .45), 0 1px 3px rgba(0, 0, 0, .4);
+    --shadow-3: 0 22px 54px rgba(0, 0, 0, .6), 0 2px 8px rgba(0, 0, 0, .45);
+  }
+}
+
+/* Transitions de page (public/ajax.js) : le contenu arrive par la droite quand on va vers la droite dans la barre du haut, par la gauche vers la gauche,
+   et monte en fondu pour les pages hors onglets. Seuls les enfants directs sont animés : un transform sur .page déplacerait les éléments
+   en position fixe (fenêtres). Le mouvement réduit coupe toutes les animations (règle ci-dessous). */
+:root { --t-page: 380ms; }
+#contenu.pt-run { overflow-x: clip; }
+.page[data-move] > :not(dialog) { animation: var(--t-page) var(--ease) both; }
+.page[data-move="right"] > :not(dialog) { animation-name: page-from-right; }
+.page[data-move="left"] > :not(dialog) { animation-name: page-from-left; }
+.page[data-move="up"] > :not(dialog) { animation-name: page-from-below; }
+@keyframes page-from-right { from { opacity: 0; transform: translate3d(56px, 10px, 0); } }
+@keyframes page-from-left { from { opacity: 0; transform: translate3d(-56px, 10px, 0); } }
+@keyframes page-from-below { from { opacity: 0; transform: translate3d(0, 16px, 0); } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

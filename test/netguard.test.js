@@ -195,16 +195,14 @@ test('enregistrement : SMTP, IMAP, base du récap, Forgejo et dépôt vers des a
     assert.equal((await u.post(`/api/projects/${pid}/db`, { ...db, host: 'ok.exemple.fr', port: 3306 })).status, 200);
 
     for (const [host, re] of [['prive.exemple.fr', /interne ou réservée/], ['localhost:3000', /interne|introuvable|Port/], ['ok.exemple.fr:22', /Port 22 refusé/]]) {
-      const r = await u.post('/settings', { forgejo_host: host }, { form: true });
+      const r = await u.post('/settings', { git_type_0: 'forgejo', git_host_0: host }, { form: true });
       assert.equal(r.status, 400, host);
       assert.match((await r.json()).error, re, host);
     }
-    const sm = await u.post('/settings', { forgejo_host: 'ok.exemple.fr', smtp_host: 'prive.exemple.fr', smtp_port: '587' }, { form: true });
-    assert.equal(sm.status, 400);
-    assert.equal((await u.post('/settings', { forgejo_host: 'ok.exemple.fr' }, { form: true })).status, 303);
+    assert.equal((await u.post('/settings', { git_type_0: 'forgejo', git_host_0: 'ok.exemple.fr' }, { form: true })).status, 303);
 
-    // Création de projet : le dépôt doit être sur l'hôte Forgejo enregistré, et cet hôte est revérifié
-    await s.db.prepare("UPDATE user_settings SET value = 'prive.exemple.fr' WHERE user_id = ? AND `key` = 'forgejo_host'").run(u.id);
+    // Création de projet : le dépôt doit être sur un serveur Git enregistré, et cet hôte est revérifié
+    await s.db.prepare("UPDATE user_settings SET value = ? WHERE user_id = ? AND `key` = 'git_servers_json'").run(JSON.stringify([{ id: 'x', type: 'forgejo', host: 'prive.exemple.fr', tokenEnc: null }]), u.id);
     await refused(await u.post('/api/projects', { name: 'X', gitUrl: 'https://prive.exemple.fr/a/x.git' }), /interne ou réservée/, 'dépôt privé');
   } finally { await s.close(); }
 });

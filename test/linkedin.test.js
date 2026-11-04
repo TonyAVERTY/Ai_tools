@@ -8,7 +8,7 @@ import { addProject } from './helpers/users.js';
 import { loadConfig } from '../src/config.js';
 import { decrypt } from '../src/crypto.js';
 
-const LI = { clientId: 'li-client', clientSecret: 'li-secret', redirectUri: 'https://ai.tony-averty.dev/linkedin/callback' };
+const LI = { clientId: 'li-client', clientSecret: 'li-secret', redirectUri: 'https://ai.tony-averty.dev/linkedin/callback', scopes: ['openid', 'profile', 'w_member_social'], apiVersion: '202604', pages: false };
 const TOKEN = 'AQV-secret-token-of-linkedin-0123456789';
 const PROFILE = { resume: 'Cartes de fidélité digitales.', proposition_valeur: 'Fidélisez sans carton.', arguments: ['simple'], ton: 'direct' };
 let s, off;
@@ -59,12 +59,12 @@ test('configuration : les deux clés ensemble, sinon LinkedIn est désactivé', 
   const base = { APP_URL: 'https://x.fr', SECRET_KEY: 'a'.repeat(64), GOOGLE_CLIENT_ID: 'g', GOOGLE_CLIENT_SECRET: 's', DB_DRIVER: 'sqlite' };
   const keep = { ...process.env };
   const withEnv = (extra, fn) => {
-    for (const k of ['LINKEDIN_CLIENT_ID', 'LINKEDIN_CLIENT_SECRET', 'LINKEDIN_REDIRECT_URI']) delete process.env[k];
+    for (const k of ['LINKEDIN_CLIENT_ID', 'LINKEDIN_CLIENT_SECRET', 'LINKEDIN_REDIRECT_URI', 'LINKEDIN_SCOPES', 'LINKEDIN_API_VERSION']) delete process.env[k];
     Object.assign(process.env, base, extra);
     try { return fn(); } finally { for (const k of Object.keys(process.env)) if (!(k in keep)) delete process.env[k]; Object.assign(process.env, keep); }
   };
   assert.equal(withEnv({}, () => loadConfig().linkedin), null);
-  assert.deepEqual(withEnv({ LINKEDIN_CLIENT_ID: 'a', LINKEDIN_CLIENT_SECRET: 'b' }, () => loadConfig().linkedin), { clientId: 'a', clientSecret: 'b', redirectUri: 'https://x.fr/linkedin/callback' });
+  assert.deepEqual(withEnv({ LINKEDIN_CLIENT_ID: 'a', LINKEDIN_CLIENT_SECRET: 'b' }, () => loadConfig().linkedin), { clientId: 'a', clientSecret: 'b', redirectUri: 'https://x.fr/linkedin/callback', scopes: ['openid', 'profile', 'w_member_social'], apiVersion: '202604', pages: false });
   assert.throws(() => withEnv({ LINKEDIN_CLIENT_ID: 'a' }, loadConfig), /vont ensemble/);
   assert.throws(() => withEnv({ LINKEDIN_CLIENT_SECRET: 'b' }, loadConfig), /vont ensemble/);
 });
@@ -108,6 +108,21 @@ test('connexion : vers LinkedIn avec le bon périmètre, retour contrôlé, jeto
 
   // Usage unique du state
   assert.match(location(await goto(owner, `/linkedin/callback?code=c1&state=${st}`, cookie)), /^\/\?li=error/);
+});
+
+test('retour de LinkedIn en erreur : la cause et le remède sont donnés, pas un « refusé » sans explication', async () => {
+  const { owner, p } = await setup();
+  const reason = async (qs) => {
+    const start = await goto(owner, `/linkedin/connect?project=${p}`);
+    const st = new URL(start.headers.get('location')).searchParams.get('state');
+    return decodeURIComponent(location(await goto(owner, `/linkedin/callback?${qs}&state=${st}`, jar(start))));
+  };
+  assert.match(await reason('error=unauthorized_scope_error'), /onglet Produits[\s\S]*Share on LinkedIn/);
+  assert.match(await reason('error=invalid_redirect_uri'), /URL de redirection autorisées[\s\S]*\/linkedin\/callback/);
+  assert.match(await reason('error=unauthorized_client'), /LINKEDIN_CLIENT_ID/);
+  assert.match(await reason('error=access_denied'), /administrateur de la page/);
+  assert.match(await reason('error=server_error&error_description=Quelque%20chose%0Acloche'), /refusé la connexion \(server_error : Quelque chose cloche\)/);
+  assert.match(await reason('error=user_cancelled_login'), /annulée/);
 });
 
 test('connexion : navigateur ou compte différent, annulation, droit de publier absent = refus sans rien enregistrer', async () => {
@@ -272,4 +287,64 @@ test('supprimer le projet efface le compte LinkedIn relié et les brouillons', a
   assert.equal((await owner.post(`/api/projects/${p}/delete`, {})).status, 200);
   assert.equal(await row('SELECT 1 x FROM linkedin_accounts WHERE project_id = ?', p), undefined);
   assert.equal(await row('SELECT 1 x FROM linkedin_posts WHERE project_id = ?', p), undefined);
+});
+
+test('programmation : confirmation, date valide, modification verrouillée, annulation, publication par le planificateur, une seule fois', async () => {
+  const { publishDuePosts } = await import('../src/linkedin.js');
+  const { owner, p } = await setup();
+  await connect(owner, p);
+  await generate(owner, p, { direction: 'à programmer' });
+  const id = (await state(owner, p)).posts[0].id;
+  const at = Math.floor(Date.now() / 1000) + 2 * 3600;
+  const sched = (body) => owner.post(`/api/projects/${p}/linkedin/schedule`, { postId: id, at, ...body });
+  assert.equal((await sched({})).status, 400, 'confirmation obligatoire');
+  assert.equal((await sched({ confirm: true, at: Math.floor(Date.now() / 1000) + 60 })).status, 400, 'pas dans moins de 5 minutes');
+  assert.equal((await sched({ confirm: true, at: Math.floor(Date.now() / 1000) + 400 * 86400 })).status, 400, 'au plus un an');
+  assert.equal((await sched({ confirm: true, body: 'Texte retouché avant programmation' })).status, 200);
+  let st = (await state(owner, p)).posts[0];
+  assert.deepEqual([st.status, st.scheduledAt, st.body], ['scheduled', at, 'Texte retouché avant programmation']);
+  assert.equal((await owner.post(`/api/projects/${p}/linkedin/post`, { postId: id, body: 'autre' })).status, 404, 'modification refusée tant que c\'est programmé');
+  assert.equal((await sched({ confirm: true })).status, 404, 'déjà programmé');
+  assert.equal((await owner.post(`/api/projects/${p}/linkedin/unschedule`, { postId: id })).status, 200);
+  assert.equal((await state(owner, p)).posts[0].status, 'draft');
+  assert.equal((await owner.post(`/api/projects/${p}/linkedin/unschedule`, { postId: id })).status, 404);
+
+  assert.equal((await sched({ confirm: true })).status, 200);
+  const before = calls.filter((c) => c.url.includes('/ugcPosts')).length;
+  assert.deepEqual(await publishDuePosts(s.app, { at: at - 60 }), { published: 0, failed: 0 }, 'pas avant l\'heure');
+  assert.deepEqual(await publishDuePosts(s.app, { at: at + 60 }), { published: 1, failed: 0 });
+  assert.deepEqual(await publishDuePosts(s.app, { at: at + 3600 }), { published: 0, failed: 0 }, 'jamais deux fois');
+  assert.equal(calls.filter((c) => c.url.includes('/ugcPosts')).length, before + 1);
+  st = (await state(owner, p)).posts[0];
+  assert.deepEqual([st.status, st.scheduledAt], ['published', null]);
+  assert.match(JSON.parse(calls.filter((c) => c.url.includes('/ugcPosts')).at(-1).init.body).specificContent['com.linkedin.ugc.ShareContent'].shareCommentary.text, /Texte retouché/);
+});
+
+test('programmation : un échec remet le post en brouillon avec la raison, sans réessai en boucle ; un membre ne programme pas', async () => {
+  const { publishDuePosts } = await import('../src/linkedin.js');
+  const { owner, p } = await setup();
+  await connect(owner, p);
+  await generate(owner, p, {});
+  const id = (await state(owner, p)).posts[0].id;
+  const at = Math.floor(Date.now() / 1000) + 3600;
+  assert.equal((await owner.post(`/api/projects/${p}/linkedin/schedule`, { postId: id, at, confirm: true })).status, 200);
+  linkedinReply = { post: { status: 403, json: {} } };
+  try {
+    assert.deepEqual(await publishDuePosts(s.app, { at: at + 60 }), { published: 0, failed: 1 });
+  } finally { linkedinReply = {}; }
+  const st = (await state(owner, p)).posts[0];
+  assert.equal(st.status, 'draft');
+  assert.equal(st.scheduledAt, null);
+  assert.match(st.scheduleError, /refuse la publication/);
+  assert.deepEqual(await publishDuePosts(s.app, { at: at + 3600 }), { published: 0, failed: 0 }, 'pas de nouvelle tentative automatique');
+  // reprogrammer efface l'erreur
+  assert.equal((await owner.post(`/api/projects/${p}/linkedin/schedule`, { postId: id, at: at + 7200, confirm: true })).status, 200);
+  assert.equal((await state(owner, p)).posts[0].scheduleError, null);
+  // un membre ordinaire ne programme pas (comme il ne publie pas)
+  const member = await s.newUser({ admin: false, link: null });
+  const team = Number((await s.db.prepare("INSERT INTO teams(owner_id, name, created_at) VALUES(?, 'T', ?)").run(owner.id, Math.floor(Date.now() / 1000))).lastInsertRowid);
+  await s.db.prepare("INSERT INTO team_members(team_id, user_id, role, created_at) VALUES(?, ?, 'member', ?)").run(team, member.id, Math.floor(Date.now() / 1000));
+  await s.db.prepare('UPDATE projects SET team_id = ? WHERE id = ?').run(team, p);
+  assert.equal((await member.post(`/api/projects/${p}/linkedin/schedule`, { postId: id, at, confirm: true })).status, 403);
+  assert.equal((await member.post(`/api/projects/${p}/linkedin/unschedule`, { postId: id })).status, 403);
 });

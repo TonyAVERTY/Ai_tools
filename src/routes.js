@@ -1,44 +1,74 @@
+import { activitySnapshot } from './services/activity.js';
+import { attachJobEta } from './services/jobeta.js';
+import { reviewMail } from './services/mailcheck.js';
+import { projectChecklist } from './checklist.js';
 import { now, getSetting, setSetting } from './db.js';
-import { encrypt, encryptJson, decryptJson, verifyUnsubToken } from './crypto.js';
-import { html, json, redirect, readBody, HttpError } from './http.js';
+import { encrypt, decrypt, encryptJson, decryptJson, verifyUnsubToken } from './crypto.js';
+import { html, json, redirect, readBody, HttpError, asBool } from './http.js';
 import { startLogin, finishLogin, destroySession, getSession, checkOrigin } from './auth.js';
 import { verifyCaptcha } from './captcha.js';
 import { deleteUser, normalizeEmail, getUser } from './users.js';
 import {
-  assertCanRunAi, getLinkState, assertLoginConsent, linkLoginToken, validateSubscriptionToken, linkApiKey, linkSubscriptionToken, linkServer, unlink, testLink, lastConsent,
+  assertCanRunAi, getLinkState, assertLoginConsent, linkLoginToken, validateSubscriptionToken, linkApiKey, linkSubscriptionToken, unlink, testLink, lastConsent,
   MODES,
+  isPriced,
 } from './claudelink.js';
 import { loginPage } from './site/pages.js';
 import { registerSiteRoutes } from './site/routes.js';
 import { registerAdminRoutes } from './adminroutes.js';
 import { loginsOf } from './claudelogin.js';
-import { accessOn, memberTeamIds } from './teams.js';
+import { accessOn, memberTeamIds, needAccess } from './teams.js';
 import { registerTeamRoutes } from './teamroutes.js';
+import { registerProfileRoutes, getProfile, isEmpty } from './userprofile.js';
+import { registerTourRoutes, needsTour } from './tour.js';
+import { registerMailRoutes } from './mailroutes.js';
+import { registerApiV1 } from './apiv1.js';
+import { registerDeveloperRoutes } from './developerroutes.js';
+import { registerCalendarRoutes } from './calendar.js';
+import { registerAccountingRoutes } from './accountingroutes.js';
+import { registerBillingRoutes } from './billingroutes.js';
+import { registerClientsRoutes } from './clientsroutes.js';
+import { registerChatRoutes } from './chat.js';
+import { registerEventRoutes } from './events.js';
+import { feedToken, feedUrl } from './services/ical.js';
+import { developerMode } from './apitokens.js';
 import { registerLinkedinRoutes } from './linkedinroutes.js';
-import { dashboardPage, settingsPage, unsubPage, accountPage, linkPage } from './views.js';
-import { enqueue, latestJobs, cancelJob, usageSummary } from './services/jobs.js';
+import { registerPromoRoutes, removeProjectVideos } from './promo.js';
+import { registerPosteRoutes } from './posteroutes.js';
+import { isRoleJob, roleTaskByJob } from './services/roles.js';
+import { registerProspectRoutes } from './prospectroutes.js';
+import { dashboardPage, settingsPage, unsubPage, accountPage, linkPage, layout } from './views.js';
+import { enqueue, latestJobs, cancelJob, retryJob, usageSummary } from './services/jobs.js';
 import { validateGitUrl, removeRepo } from './services/git.js';
 import { fetchRecap, clearRecapCache, validateSelect } from './services/recap.js';
+import { analyzeDb, resolveKpi, explainDbError } from './services/dbschema.js';
 import { sendPause, pauseMessage as pauseMessageOf } from './services/abuse.js';
-import { guardTarget, pinDb, pinGit, checkForgejoHost } from './netguard.js';
+import { guardTarget, pinDb, pinGit } from './netguard.js';
+import { checkGithubToken } from './githubcheck.js';
+import { listGitServers, publicGitServers, allowedGitHosts, saveGitServers, saveGithubToken } from './gitservers.js';
 import { allowedToSend, EMAIL_RE } from './services/mailer.js';
 import { cpuTemp } from './services/thermal.js';
 import { checkInbox } from './services/inbox.js';
 import { followupPlan } from './services/followup.js';
+import { warmupAdvice } from './services/warmup.js';
+import { PROMPT_DEFS, parseCustomPrompts, promptsView, MAX_CUSTOM } from './services/prompts.js';
+import { normalizeModel, PROMPT_SCOPES } from './services/models.js';
 import { nextNightSlot } from './services/paris-time.js';
-import { notify, notifyConfig, EVENTS, WEBHOOK_RE } from './services/notify.js';
+import { notify, notifyConfig, saveDiscordHooks, publicHooks, EVENTS, MAX_HOOKS } from './services/notify.js';
+import { listChannels, saveChannels, publicChannels, notifyChannels, CHANNEL_TYPES } from './services/channels.js';
 import { budgetState, AI_JOBS } from './services/budget.js';
+import { currentClaudeQuota } from './services/usagelive.js';
 import { sendWeeklyReport } from './services/report.js';
 import { exportProspects, importProspects } from './services/csv.js';
 import { quotaFor, planLimitError, withUserLock, assertRoom, usageView } from './services/plans.js';
 import { history, saveSnapshot } from './services/metrics.js';
 import { evolutionHtml } from './services/markdown.js';
 import {
-  listProspects, parseFilters, STATUSES as PROSPECT_STATUSES, prospectDetail, addNote, deleteNote, setNextAction,
+  listProspects, kanbanColumns, parseFilters, STATUSES as PROSPECT_STATUSES, prospectDetail, addNote, deleteNote, setNextAction,
 } from './services/crm.js';
 import {
-  getProject, listProjects, createProject, saveSecretConfig, publicConfig, globalSmtp,
-  prospectStats, sentSince, repoDir, getTemplate, saveTemplate, abStats,
+  getProject, listProjects, createProject, saveSecretConfig, publicConfig,
+  prospectStats, projectStats, sentSince, repoDir, getTemplate, saveTemplate, abStats,
 } from './projects.js';
 
 const lines = (s) => String(s || '').split('\n').map((x) => x.trim()).filter(Boolean).slice(0, 20);
@@ -57,7 +87,21 @@ export function registerRoutes(router, app) {
   registerSiteRoutes(router, app);
   registerAdminRoutes(router, app);
   registerTeamRoutes(router, app);
+  registerProfileRoutes(router, app);
+  registerTourRoutes(router, app);
+  registerMailRoutes(router, app);
   registerLinkedinRoutes(router, app, { project, aiOpts });
+  registerPromoRoutes(router, app, { project, aiOpts });
+  registerPosteRoutes(router, app, { project, aiOpts });
+  registerProspectRoutes(router, app, { project });
+  registerApiV1(router, app, { aiOpts });
+  registerDeveloperRoutes(router, app);
+  registerCalendarRoutes(router, app);
+  registerAccountingRoutes(router, app);
+  registerBillingRoutes(router, app, { aiOpts });
+  registerClientsRoutes(router, app);
+  registerEventRoutes(router, app);
+  registerChatRoutes(router, app);
   // Déjà connecté : la page de connexion n'a rien à offrir, on va au tableau de bord
   router.get('/login', async ({ req, res, url }) => {
     if (await getSession(db, req)) return redirect(res, '/');
@@ -102,7 +146,7 @@ export function registerRoutes(router, app) {
   router.get('/u/:email/:token', async ({ res, params }) => {
     const valid = verifyUnsubToken(cfg.secretKey, params.email, params.token);
     html(res, unsubPage({ email: params.email, valid, done: false }), valid ? 200 : 400);
-  }, { public: true });
+  }, { public: true, limit: 'unsub' });
   router.post('/u/:email/:token', async ({ res, params }) => {
     const email = params.email.toLowerCase();
     const valid = verifyUnsubToken(cfg.secretKey, email, params.token);
@@ -111,47 +155,67 @@ export function registerRoutes(router, app) {
       await db.prepare("UPDATE prospects SET status = 'refused' WHERE email = ? AND status IN ('new','sent')").run(email);
     }
     html(res, unsubPage({ email, valid, done: valid }), valid ? 200 : 400);
-  }, { public: true });
+  }, { public: true, limit: 'unsub' });
 
   // ---------- Privé ----------
   router.post('/logout', async ({ req, res }) => { await destroySession(db, req, res); redirect(res, '/login'); });
 
-  router.get('/', async ({ res, session }) => {
+  router.get('/', async ({ res, session, url }) => {
     const userId = session.userId;
     const projects = [];
     for (const p of await listProjects(app, userId)) {
       const full = await getProject(app, p.id, { userId, secrets: true });
       projects.push({ project: p, smtp: publicConfig(full.smtp, 'pass'), dbCfg: publicConfig(full.dbCfg, 'password'), imap: publicConfig(full.imapCfg, 'pass') });
     }
+    const stats = await projectStats(db, projects.map((x) => x.project.id));
     html(res, dashboardPage({
-      email: session.email, projects, forgejoHost: await getSetting(db, userId, 'forgejo_host'), usage: await usageView(db, await getUser(db, userId)),
+      email: session.email, projects, stats, gitHosts: (await listGitServers(db, userId)).map((x) => x.host), usage: await usageView(db, await getUser(db, userId)),
       pauseMessage: await sendPause(db, userId).then((p) => (p ? pauseMessageOf(p) : null)),
+      // Visite guidée : relancée à la demande (?tour=1), ou toute seule une fois après les questions de bienvenue
+      tour: url.searchParams.get('tour') === '1' ? 'replay' : (await needsTour(db, userId)) ? 'auto' : null,
     }));
   });
 
   router.get('/settings', async ({ res, session, url }) => {
     const userId = session.userId;
     const discord = await notifyConfig(app, userId);
+    const promptsRaw = await getSetting(db, userId, 'prompts_json', '');
+    const analyze = normalizeModel(await getSetting(db, userId, 'analyze_model', 'haiku'));
+    const models = { chat: normalizeModel(await getSetting(db, userId, 'chat_model', 'sonnet'), 'sonnet'), analyze, prospect: normalizeModel(await getSetting(db, userId, 'prospect_model', 'haiku')), write: normalizeModel(await getSetting(db, userId, 'write_model', ''), analyze) };
     const s = {
+      priced: await isPriced(db, userId),
       notify_email: await getSetting(db, userId, 'notify_email', ''),
-      forgejo_host: await getSetting(db, userId, 'forgejo_host', ''),
-      forgejo_token_set: !!await getSetting(db, userId, 'forgejo_token_enc'),
-      smtp: publicConfig(await globalSmtp(app, userId), 'pass'),
+      git_servers: publicGitServers(await listGitServers(db, userId)),
+      github_token_set: !!await getSetting(db, userId, 'github_token_enc'),
       global_daily_cap: await getSetting(db, userId, 'global_daily_cap', '100'),
       send_delay_min: await getSetting(db, userId, 'send_delay_min', '20'),
       send_delay_max: await getSetting(db, userId, 'send_delay_max', '60'),
-      prospect_model: await getSetting(db, userId, 'prospect_model', 'haiku'),
-      analyze_model: await getSetting(db, userId, 'analyze_model', 'haiku'),
-      // La liste d'opposition est commune à tous les comptes : on n'en montre que ce qui touche SES prospects
-      blacklist_count: (await db.prepare(`SELECT COUNT(DISTINCT x.email) n FROM prospects x JOIN projects p ON p.id = x.project_id
-        WHERE p.user_id = ? AND x.email IN (SELECT email FROM blacklist)`).get(userId)).n,
+      prospect_model: models.prospect,
+      analyze_model: models.analyze,
+      write_model: models.write,
       weekly_report: await getSetting(db, userId, 'weekly_report', '0') === '1',
+      read_receipt: await getSetting(db, userId, 'read_receipt', '0') === '1',
+      mail_footer: await getSetting(db, userId, 'mail_footer', '1') !== '0',
       budget_day_usd: await getSetting(db, userId, 'budget_day_usd', ''),
       budget_month_usd: await getSetting(db, userId, 'budget_month_usd', ''),
-      discord: { set: !!discord.url, events: discord.events, all: EVENTS },
+      priced: (await getLinkState(db, userId))?.mode === MODES.api_key, // plafonds en $ : seulement avec une clé API
+      discord: { hooks: publicHooks(discord.hooks), all: EVENTS, max: MAX_HOOKS },
+      channels: publicChannels(await listChannels(app, userId, Object.keys(EVENTS))), canEmail: !!cfg.systemSmtp,
+      prompts: promptsView(parseCustomPrompts(promptsRaw), models),
+      promptMax: MAX_CUSTOM,
     };
     html(res, settingsPage({ email: session.email, s, saved: url.searchParams.has('ok') }));
   });
+
+  // Pied de page des mails de prospection (lien de désinscription + origine de l'adresse) : actif par défaut. Le retirer exige une
+  // confirmation explicite ({ "confirmed": true }) : l'interface montre d'abord l'avertissement sur les risques. Le remettre est libre.
+  router.post('/api/settings/mail-footer', async ({ req, res, session }) => {
+    const b = await readBody(req);
+    const enabled = b.enabled === true || b.enabled === 'true';
+    if (!enabled && b.confirmed !== true) throw new HttpError(400, 'Retirer le pied de page demande une confirmation explicite (risques légaux et de réputation).', { expose: true, code: 'confirmation_required' });
+    await setSetting(db, session.userId, 'mail_footer', enabled ? '1' : '0');
+    json(res, { ok: true, enabled });
+  }, { limit: 'prospect_write' });
 
   router.post('/settings', async ({ req, res, session }) => {
     const userId = session.userId;
@@ -159,33 +223,45 @@ export function registerRoutes(router, app) {
     const b = await readBody(req);
     if (b.notify_email && !EMAIL_RE.test(b.notify_email)) throw new HttpError(400, 'Email de réception invalide');
     await set('notify_email', (b.notify_email || '').trim());
-    const forgejoHost = (b.forgejo_host || '').trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
-    if (forgejoHost) await checkForgejoHost(app, userId, forgejoHost);
-    await set('forgejo_host', forgejoHost);
-    if (b.forgejo_token) await set('forgejo_token_enc', encrypt(cfg.secretKey, b.forgejo_token.trim()));
+    // Dépôts Git : le token GitHub, puis la liste des serveurs ajoutés (chacun avec son URL et son token)
+    await saveGithubToken(app, userId, { typed: b.github_token, clear: b.github_token_clear });
+    await saveGitServers(app, userId, b);
     const cap = int(b.global_daily_cap, 1, 300, 100);
     const dmin = int(b.send_delay_min, 5, 3600, 20);
     const dmax = Math.max(dmin, int(b.send_delay_max, 5, 3600, 60));
     await set('global_daily_cap', String(cap));
     await set('send_delay_min', String(dmin));
     await set('send_delay_max', String(dmax));
-    await set('prospect_model', b.prospect_model === 'sonnet' ? 'sonnet' : 'haiku');
-    await set('analyze_model', b.analyze_model === 'sonnet' ? 'sonnet' : 'haiku');
+    // Modèles : uniquement ceux du catalogue (services/models.js) ; un champ absent ne change rien
+    for (const k of ['prospect_model', 'analyze_model', 'write_model']) if (b[k] !== undefined) await set(k, normalizeModel(b[k]));
     const money = (v) => { const n = Number(String(v || '').replace(',', '.')); return Number.isFinite(n) && n > 0 ? String(Math.round(n * 100) / 100) : ''; };
     await set('weekly_report', b.weekly_report === 'on' ? '1' : '0');
-    await set('budget_day_usd', money(b.budget_day_usd));
-    await set('budget_month_usd', money(b.budget_month_usd));
+    // Les cases décochées ne sont pas envoyées : la présence du champ « délais » signale le formulaire complet
+    if (b.send_delay_min !== undefined) await set('read_receipt', b.read_receipt === 'on' ? '1' : '0');
+    // Champs absents du formulaire (compte en abonnement : pas de plafond en $) : les valeurs enregistrées ne bougent pas
+    if (b.budget_day_usd !== undefined) await set('budget_day_usd', money(b.budget_day_usd));
+    if (b.budget_month_usd !== undefined) await set('budget_month_usd', money(b.budget_month_usd));
 
-    const hook = String(b.discord_webhook || '').trim();
-    if (hook && !WEBHOOK_RE.test(hook)) throw new HttpError(400, 'URL de webhook Discord invalide (https://discord.com/api/webhooks/…)');
-    if (hook) await set('discord_webhook_enc', encrypt(cfg.secretKey, hook));
-    if (b.discord_remove === 'on') await set('discord_webhook_enc', null);
-    await set('discord_events', JSON.stringify(Object.keys(EVENTS).filter((k) => b[`ev_${k}`] === 'on')));
-
-    if (b.smtp_host) await guardTarget(app, userId, 'smtp', String(b.smtp_host).trim(), b.smtp_port || 587, { lenient: true });
-    const prev = await globalSmtp(app, userId) || {};
-    const smtp = { host: b.smtp_host, port: b.smtp_port, user: b.smtp_user, pass: b.smtp_pass || prev.pass, fromEmail: b.smtp_fromEmail };
-    await set('smtp_enc', smtp.host ? encryptJson(cfg.secretKey, smtp) : null);
+    await saveDiscordHooks(app, userId, b);
+    await saveChannels(app, userId, b, Object.keys(EVENTS));
+    // Consignes des prompts, par gamme de modèle (« tous les modèles », Haiku, Sonnet, Opus, Fable). Un champ absent garde sa valeur ;
+    // un champ vide, ou identique à ce que la gamme reçoit déjà, revient au défaut.
+    const fieldName = (scope, key) => (scope === '*' ? `prompt_${key}` : `prompt_${scope}_${key}`);
+    if (PROMPT_SCOPES.some((sc) => Object.keys(PROMPT_DEFS).some((k) => b[fieldName(sc, k)] !== undefined))) {
+      const next = {};
+      const current = parseCustomPrompts(await getSetting(db, userId, 'prompts_json', ''));
+      for (const sc of PROMPT_SCOPES) {
+        next[sc] = { ...current[sc] };
+        for (const k of Object.keys(PROMPT_DEFS)) {
+          const v = b[fieldName(sc, k)];
+          if (v === undefined) continue;
+          if (String(v).length > MAX_CUSTOM) throw new HttpError(400, `Une consigne dépasse ${MAX_CUSTOM} caractères`, { expose: true });
+          next[sc][k] = String(v);
+        }
+      }
+      const own = parseCustomPrompts(next);
+      await set('prompts_json', Object.keys(own).length ? JSON.stringify(own) : '');
+    }
     redirect(res, '/settings?ok');
   });
 
@@ -200,6 +276,20 @@ export function registerRoutes(router, app) {
   });
 
   const LINK_LIMIT = { limit: 'link' };
+
+  // Test du token GitHub : celui tapé dans le champ (pas encore enregistré), sinon celui qui est enregistré
+  router.post('/settings/github/test', async ({ req, res, session }) => {
+    const userId = session.userId;
+    const b = await readBody(req);
+    let token = String(b.token ?? '').trim().slice(0, 600);
+    if (!token) {
+      try { token = decrypt(cfg.secretKey, await getSetting(db, userId, 'github_token_enc')) || ''; }
+      catch { throw new HttpError(400, 'Le token enregistré est illisible : saisis-le de nouveau.'); }
+    }
+    if (!token) throw new HttpError(400, 'Aucun token à tester : colle-le dans le champ, ou enregistre-le d\'abord.');
+    const mine = await db.prepare('SELECT name, git_url AS url FROM projects WHERE user_id = ? ORDER BY LOWER(name)').all(userId);
+    json(res, await checkGithubToken(app, token, mine));
+  }, LINK_LIMIT);
   const wantsJson = (req) => !!req.headers.accept?.includes('json');
   // Formulaire HTML : l'erreur revient sur la page de liaison ; appel JSON : code HTTP + { error }
   const linkAction = (fn, okTo = '/') => async ({ req, res, session }) => {
@@ -234,7 +324,6 @@ export function registerRoutes(router, app) {
     loginsOf(app).cancel(session.userId, (await readBody(req)).id);
     json(res, { ok: true });
   }, LINK_LIMIT);
-  router.post('/link/server', linkAction((b, s) => linkServer(app, s.userId)), LINK_LIMIT);
   router.post('/link/test', async ({ req, res, session }) => {
     const r = await testLink(app, session.userId);
     if (wantsJson(req)) return json(res, r);
@@ -249,9 +338,14 @@ export function registerRoutes(router, app) {
   // ---------- Mon compte ----------
   router.get('/account', async ({ res, session, url }) => {
     const t = url.searchParams.get('t');
+    const link = await getLinkState(db, session.userId);
+    // Le relevé des limites ne doit jamais empêcher d'afficher la page (Anthropic injoignable, réponse inattendue…)
+    const quota = link && link.mode !== MODES.api_key ? await currentClaudeQuota(app, session.userId).catch(() => null) : null;
+    const account = { link, quota };
     html(res, accountPage({
-      user: session.user, error: url.searchParams.get('e'), link: await getLinkState(db, session.userId),
-      consent: await lastConsent(db, session.userId), cliModeEnabled, usage: await usageView(db, await getUser(db, session.userId)),
+      user: session.user, error: url.searchParams.get('e'), link: account.link, quota: account.quota, developer: await developerMode(db, session.userId), appUrl: cfg.appUrl,
+      ical: await (async () => { const t = await feedToken(app, session.userId); return t ? feedUrl(cfg, t) : null; })(),
+      consent: await lastConsent(db, session.userId), profileSet: !isEmpty(await getProfile(db, session.userId)), cliModeEnabled, usage: await usageView(db, await getUser(db, session.userId)),
       notice: t === 'unlinked' ? { ok: true, text: 'Liaison supprimée : le secret a été effacé et tes jobs IA en attente ont été annulés.' }
         : t === 'ok' || t === 'ko' ? { ok: t === 'ok', text: String(url.searchParams.get('m') || '').slice(0, 300) } : null,
     }));
@@ -272,42 +366,43 @@ export function registerRoutes(router, app) {
   // ---------- API JSON ----------
   router.post('/api/report/send', async ({ res, session }) => {
     const r = await sendWeeklyReport(app, session.userId);
-    if (!r.channels.length) throw new HttpError(400, 'Configure le SMTP global + l\'email de réception, ou un webhook Discord');
+    if (!r.channels.length) throw new HttpError(400, app.cfg.systemSmtp ? 'Configure ton email de réception, ou un webhook Discord' : "Le serveur n'a pas de SMTP (SYSTEM_SMTP_*) : configure un webhook Discord, ou demande à l'administrateur");
     json(res, { ok: true, channels: r.channels });
   }, { limit: 'mail_send' });
 
-  router.post('/api/notify/test', async ({ res, session }) => {
-    if (!(await notifyConfig(app, session.userId)).url) throw new HttpError(400, 'Aucun webhook Discord configuré');
-    const ok = await notify(app, session.userId, 'test', { title: 'Notification de test', description: 'Les notifications AiTools arrivent bien ici.', level: 'ok' }, { force: true });
-    if (!ok) throw new HttpError(502, 'Discord a refusé la notification (webhook supprimé ?)');
+  router.post('/api/notify/test', async ({ req, res, session }) => {
+    const b = await readBody(req);
+    const { hooks } = await notifyConfig(app, session.userId);
+    const test = { title: 'Notification de test', description: 'Les notifications AiTools arrivent bien ici.', level: 'ok' };
+    // Un canal précis (Slack, Telegram, e-mail)
+    if (b.channel) {
+      if (!CHANNEL_TYPES[b.channel]) throw new HttpError(400, 'Canal inconnu');
+      const done = await notifyChannels(app, session.userId, 'test', test, Object.keys(EVENTS), { force: true, only: String(b.channel) });
+      if (!done.length) throw new HttpError(502, `${CHANNEL_TYPES[b.channel]} n'a pas accepté la notification (réglage à vérifier${b.channel === 'email' ? ', SMTP du serveur compris' : ''})`);
+      return json(res, { ok: true });
+    }
+    if (!hooks.length && !Object.keys(await listChannels(app, session.userId, Object.keys(EVENTS))).length) throw new HttpError(400, 'Aucun canal de notification configuré');
+    const hookId = b.hook ? String(b.hook) : null;
+    if (hookId && !hooks.some((h) => h.id === hookId)) throw new HttpError(404, 'Webhook introuvable');
+    const ok = await notify(app, session.userId, 'test', test, { force: true, hookId });
+    if (!ok) throw new HttpError(502, 'Aucun canal n\'a accepté la notification (webhook supprimé ?)');
     json(res, { ok: true });
   }, { limit: 'mail_send' });
 
   // Barre du haut : uniquement les jobs, l'usage et les quotas de l'utilisateur courant (la température du serveur, réservée aux admins)
+  router.get('/api/jobs/activity', async ({res,session}) => { json(res, await activitySnapshot(db,session.userId)); });
   router.get('/api/system', async ({ res, session }) => {
     const userId = session.userId;
     // Les jobs de l'utilisateur, plus ceux des projets que ses équipes partagent avec lui
-    const teamIds = await memberTeamIds(db, userId);
-    const mine = teamIds.length ? `(j.user_id = ? OR p.team_id IN (${teamIds.map(() => '?').join(',')}))` : 'j.user_id = ?';
-    const mineArgs = [userId, ...teamIds];
-    const queue = (await db.prepare(`SELECT COUNT(*) n FROM jobs j LEFT JOIN projects p ON p.id = j.project_id WHERE ${mine} AND (j.status = 'running'
-      OR (j.status = 'queued' AND (j.run_after IS NULL OR j.run_after <= ?)))`).get(...mineArgs, now())).n;
-    const scheduled = (await db.prepare(`SELECT COUNT(*) n FROM jobs j LEFT JOIN projects p ON p.id = j.project_id WHERE ${mine} AND j.status = 'queued' AND j.run_after > ?`).get(...mineArgs, now())).n;
+    const { queue, scheduled, jobs } = await activitySnapshot(db, userId);
     const link = await getLinkState(db, userId);
-    // Le quota d'abonnement n'existe qu'en mode abonnement ou serveur : jamais de barre en mode clé API
-    const rlRaw = link?.mode === MODES.api_key ? null : await getSetting(db, userId, 'claude_rate_limit_json');
+    // Le quota d'abonnement n'existe qu'en mode abonnement : relevé en direct chez Anthropic (il compte aussi ce que la personne
+    // fait avec son Claude en dehors d'AiTools), à défaut la dernière mesure d'un job. Jamais de barre en mode clé API.
+    const quota = link?.mode === MODES.api_key ? null : await currentClaudeQuota(app, userId);
     // Détail pour le menu « jobs » de la barre du haut : en cours d'abord, puis la file, puis les programmés
-    const jobs = (await db.prepare(`SELECT j.id, j.type, j.status, j.progress_json, j.run_after, j.started_at, j.created_at, p.id pid, p.name project
-      FROM jobs j LEFT JOIN projects p ON p.id = j.project_id
-      WHERE ${mine} AND j.status IN ('queued','running')
-      ORDER BY j.status = 'running' DESC, COALESCE(j.run_after, 0), j.id LIMIT 20`).all(...mineArgs)).map((r) => ({
-      id: r.id, type: r.type, status: r.status, projectId: r.pid, project: r.project,
-      progress: r.progress_json ? JSON.parse(r.progress_json) : null,
-      runAfter: r.run_after, startedAt: r.started_at, createdAt: r.created_at,
-    }));
     json(res, {
       temp: session.user.isAdmin ? cpuTemp() : null, queue, scheduled, jobs, usage: await usageSummary(db, userId), budget: await budgetState(db, userId),
-      claudeRateLimit: rlRaw ? JSON.parse(rlRaw) : null, linkMode: link?.mode ?? null,
+      claudeRateLimit: quota, linkMode: link?.mode ?? null, linkValid: link ? !!link.valid : null,
     });
   });
 
@@ -316,10 +411,9 @@ export function registerRoutes(router, app) {
     const b = await readBody(req);
     const name = String(b.name || '').trim().slice(0, 80);
     if (!name) throw new HttpError(400, 'Nom requis');
-    const host = await getSetting(db, userId, 'forgejo_host');
-    if (!host) throw new HttpError(400, "Configure l'hôte Forgejo dans Réglages");
+    // GitHub est accepté d'office ; les serveurs ajoutés dans les Réglages s'y ajoutent
     let gitUrl;
-    try { gitUrl = validateGitUrl(String(b.gitUrl || '').trim(), host); }
+    try { gitUrl = validateGitUrl(String(b.gitUrl || '').trim(), await allowedGitHosts(db, userId)); }
     catch (e) { throw new HttpError(400, e.message); }
     await pinGit(app, userId, gitUrl); // hôte public et port autorisé, sinon refus immédiat
     // Un même dépôt peut être un projet pour deux comptes différents : l'unicité est par utilisateur
@@ -337,20 +431,28 @@ export function registerRoutes(router, app) {
 
   router.post('/api/projects/:id/delete', async (ctx) => {
     const p = await project(ctx, { need: 'owner' });
+    await removeProjectVideos(app, p.id); // les fichiers d'abord : les lignes partent avec le projet
     await db.prepare('DELETE FROM projects WHERE id = ? AND user_id = ?').run(p.id, p.userId);
     removeRepo(repoDir(cfg, p.userId, p.id));
     clearRecapCache(p.id);
     json(ctx.res, { ok: true });
   });
 
+  // Mise en route : ce qui est configuré et ce qui reste à faire (aussi inclus dans /status pour le rafraîchissement)
+  router.get('/api/projects/:id/checklist', async (ctx) => json(ctx.res, await projectChecklist(app, await project(ctx))));
+
   router.get('/api/projects/:id/status', async (ctx) => {
     const { res } = ctx;
     const p = await project(ctx);
     const userId = p.userId; // un membre agit comme le propriétaire : ses plafonds, ses réglages
     const jobs = await latestJobs(db, p.id);
+    for (const j of Object.values(jobs)) j.canViewLogs = Number(p.userId) === Number(ctx.session.userId);
     // Rendu côté serveur (échappé) : le front n'injecte jamais le Markdown brut de Claude
     if (jobs.evolution?.result?.markdown) jobs.evolution.result.html = evolutionHtml(jobs.evolution.result.markdown);
-    const tplOut = (row) => (row ? { subject: row.subject, subjectB: row.subject_b, body: row.body, status: row.status, updated_at: row.updated_at } : null);
+    if (jobs.audit?.result?.markdown) jobs.audit.result.html = evolutionHtml(jobs.audit.result.markdown);
+    // Tâches des postes : le texte se lit à la demande (GET /api/projects/:id/poste/:task), pas à chaque rafraîchissement
+    for (const [type, j] of Object.entries(jobs)) if (isRoleJob(type) && j.result) j.result = { size: String(j.result.markdown || '').length };
+    const tplOut = (row) => (row ? { subject: row.subject, subjectB: row.subject_b, body: row.body, status: row.status, html: !!row.html, updated_at: row.updated_at } : null);
     const templates = { initial: tplOut(await getTemplate(db, p.id, 'initial')), followup: tplOut(await getTemplate(db, p.id, 'followup')) };
     const stats = await prospectStats(db, p.id);
     const day = now() - 86400;
@@ -361,9 +463,10 @@ export function registerRoutes(router, app) {
     });
     json(res, {
       jobs, templates, stats, sendMax,
+      warmup: await warmupAdvice(db, p.id, { sentToday: await sentSince(db, day, userId, p.id) }),
       followup: { enabled: p.followupEnabled, days: p.followupDays, ...(await followupPlan(db, p)) },
       targetValidated: p.targetValidated, hasProfile: !!p.profile, hasSmtp: p.hasSmtp, smtpSource: p.smtpSource, access: p.access,
-      hasImap: p.hasImap, inbox: p.inbox, ab: await abStats(db, p.id),
+      hasImap: p.hasImap, inbox: p.inbox, ab: await abStats(db, p.id), checklist: await projectChecklist(app, p),
     });
   });
 
@@ -382,6 +485,23 @@ export function registerRoutes(router, app) {
     if (!target.description || !target.secteurs.length) throw new HttpError(400, 'Description et au moins un secteur requis');
     await db.prepare('UPDATE projects SET target_json = ?, target_validated = 1 WHERE id = ?').run(JSON.stringify(target), p.id);
     json(res, { ok: true });
+  });
+
+  // Site du produit : écrit dans les mails de prospection par {{site}}. Vide = retiré. Seules les adresses http(s) sont acceptées.
+  router.post('/api/projects/:id/site', async (ctx) => {
+    const p = await project(ctx, { need: 'admin' });
+    const b = await readBody(ctx.req);
+    const raw = String(b.site_url ?? '').trim();
+    let value = '';
+    if (raw) {
+      let u;
+      try { u = new URL(/^[a-z][a-z0-9+.-]*:/i.test(raw) ? raw : `https://${raw}`); } catch { throw new HttpError(400, "Adresse du site invalide : écris-la comme https://monproduit.fr"); }
+      if (!['http:', 'https:'].includes(u.protocol) || !u.hostname.includes('.') || u.username || u.password) throw new HttpError(400, "Adresse du site invalide : écris-la comme https://monproduit.fr");
+      value = u.href.replace(/\/$/, '');
+      if (value.length > 300) throw new HttpError(400, 'Adresse du site trop longue (300 caractères au plus)');
+    }
+    await db.prepare('UPDATE projects SET site_url = ? WHERE id = ?').run(value || null, p.id);
+    json(ctx.res, { ok: true, siteUrl: value });
   });
 
   const jobRoute = (type, paramsOf = () => ({}), guard = () => {}) => async (ctx) => {
@@ -418,6 +538,9 @@ export function registerRoutes(router, app) {
     await assertRoom(db, await getUser(db, p.userId), 'prospects');
     if (!p.targetValidated) throw new HttpError(400, 'Valide la cible avant de prospecter');
   }));
+  // Audit du dépôt : réservé aux administrateurs du projet (il lit tout le code), jamais aux simples membres
+  router.post('/api/projects/:id/code-review', jobRoute('audit', (b) => ({ level: ['rapide', 'normal', 'approfondi'].includes(b.level) ? b.level : 'rapide' }),
+    (p) => needAccess(p.access, 'admin', "l'audit du code")));
   router.post('/api/projects/:id/evolution', jobRoute('evolution', (b) => ({
     count: int(b.count, 1, 20, 5),
     level: ['rapide', 'normal', 'approfondi'].includes(b.level) ? b.level : 'rapide',
@@ -439,15 +562,18 @@ export function registerRoutes(router, app) {
     // Relance : objet facultatif (vide = "Re: <objet du 1er mail>", même fil de discussion)
     if (!body || (kind === 'initial' && !subject)) throw new HttpError(400, kind === 'initial' ? 'Objet et corps requis' : 'Corps requis');
     const status = b.mode === 'validate' ? 'validated' : 'draft';
-    await saveTemplate(db, p.id, kind, { subject, subjectB, body, status });
-    json(res, { ok: true, status });
+    // Un modèle cassé (variable inconnue, ligne qui commence par une virgule…) ne peut pas être validé, donc pas envoyé
+    const check = reviewMail({ subject: [subject, subjectB].filter(Boolean).join('\n'), body, facts: JSON.stringify([p.profile, p.target]) });
+    if (status === 'validated' && check.errors.length) throw new HttpError(400, `Modèle à corriger avant validation : ${check.errors.join(' ')}`, { expose: true });
+    await saveTemplate(db, p.id, kind, { subject, subjectB, body, status, html: asBool(b.html) });
+    json(res, { ok: true, status, warnings: check.warnings });
   });
 
   router.post('/api/projects/:id/smtp', async (ctx) => {
     const { req, res } = ctx;
     const p = await project(ctx, { need: 'admin' });
     const b = await readBody(req);
-    // Hôte vide = « utiliser le SMTP des Réglages » : on efface celui du projet (le plafond quotidien reste réglable)
+    // Hôte vide = on efface le SMTP du projet (le plafond quotidien reste réglable) ; le projet ne peut plus envoyer tant qu'il n'en a pas
     if (!String(b.host || '').trim() || b.reset === true || b.reset === 'on') {
       await db.prepare('UPDATE projects SET smtp_enc = NULL WHERE id = ?').run(p.id);
       if (b.dailyCap !== undefined) await db.prepare('UPDATE projects SET daily_mail_cap = ? WHERE id = ?').run(int(b.dailyCap, 1, 200, 30), p.id);
@@ -488,19 +614,59 @@ export function registerRoutes(router, app) {
     catch (e) { throw new HttpError(502, e.message); }
   }, { limit: 'conn_test' });
 
+  // Connexion à la base : les champs du formulaire, le mot de passe laissé vide gardant celui qui est enregistré
+  const dbConnection = (b, stored) => ({
+    type: b.type === 'pg' ? 'pg' : 'mysql', host: String(b.host || '').trim(), port: b.port ? int(b.port, 1, 65535, null) : null,
+    database: String(b.database || '').trim(), user: String(b.user || '').trim(), password: b.password || stored?.password || '',
+    ssl: b.ssl === 'on' || b.ssl === true,
+  });
+  // Les tables choisies, sous la forme que le navigateur envoie (et que analyzeDb / resolveKpi attendent)
+  const KPI_FIELDS = ['users_table', 'clients_table', 'revenue_table', 'revenue_column', 'revenue_unit'];
+  const choiceOf = (b) => Object.fromEntries(KPI_FIELDS.map((k) => [k, String(b[k] || '')]));
+  const choiceFromKpi = (kpi) => ({ users_table: kpi?.users?.table || '', clients_table: kpi?.clients?.table || '', revenue_table: kpi?.revenue?.table || '', revenue_column: kpi?.revenue?.amountColumn || '', revenue_unit: kpi?.revenue ? (kpi.revenue.cents ? 'cents' : 'euros') : '' });
+  const sameChoice = (a, c) => KPI_FIELDS.every((k) => (a[k] || '') === (c[k] || '') || (k === 'revenue_unit' || k === 'revenue_column') && !a.revenue_table && !c.revenue_table);
+
+  // « Se connecter et analyser » : lit le schéma (lecture seule), propose les tables, chiffre un aperçu. Rien n'est enregistré.
+  router.post('/api/projects/:id/db/analyze', async (ctx) => {
+    const { req, res } = ctx;
+    const p = await project(ctx, { need: 'admin', secrets: true });
+    const b = await readBody(req);
+    const conn = dbConnection(b, p.dbCfg);
+    const picked = choiceOf(b);
+    try {
+      const target = await pinDb(app, p.userId, conn);
+      json(res, { ok: true, ...(await analyzeDb(target, KPI_FIELDS.some((k) => picked[k]) ? picked : null)) });
+    } catch (e) {
+      // Une connexion refusée par SA base n'est pas une panne d'AiTools : 400 (un 5xx serait masqué en « Erreur interne » et la raison se perdrait)
+      throw new HttpError(e.status && e.status < 500 ? e.status : 400, e.status && e.status < 500 ? e.message : explainDbError(e));
+    }
+  }, { limit: 'conn_test' });
+
   router.post('/api/projects/:id/db', async (ctx) => {
     const { req, res } = ctx;
-    const p = await project(ctx, { need: 'admin' });
+    const p = await project(ctx, { need: 'admin', secrets: true });
     const b = await readBody(req);
+    // Anciennes requêtes écrites à la main (clients de l'API) : toujours acceptées si elles sont envoyées, toujours vérifiées
     for (const k of ['sql_users', 'sql_clients', 'sql_revenue']) {
       try { validateSelect(b[k]); } catch (e) { throw new HttpError(400, `${k} : ${e.message}`); }
     }
     if (String(b.host || '').trim()) await guardTarget(app, p.userId, b.type === 'pg' ? 'pg' : 'mysql', String(b.host).trim(), b.port ? int(b.port, 1, 65535, 3306) : (b.type === 'pg' ? 5432 : 3306), { lenient: true });
+    // Tables choisies : on ne se reconnecte que si la sélection a changé (corriger un mot de passe ne doit pas exiger une base joignable)
+    let kpiPatch = {};
+    if (KPI_FIELDS.some((k) => k in b) && !sameChoice(choiceOf(b), choiceFromKpi(p.dbCfg?.kpi))) {
+      const picked = choiceOf(b);
+      if (!KPI_FIELDS.some((k) => picked[k])) kpiPatch = { kpi: {}, sql_users: '', sql_clients: '', sql_revenue: '' };
+      else {
+        try { kpiPatch = { kpi: await resolveKpi(await pinDb(app, p.userId, dbConnection(b, p.dbCfg)), picked), sql_users: '', sql_clients: '', sql_revenue: '' }; }
+        catch (e) { throw new HttpError(e.status && e.status < 500 ? e.status : 400, e.status && e.status < 500 ? e.message : explainDbError(e)); }
+      }
+    }
     await saveSecretConfig(app, p.id, 'db_enc', {
       type: b.type === 'pg' ? 'pg' : 'mysql', host: String(b.host || '').trim(), port: b.port ? int(b.port, 1, 65535, null) : null,
       database: String(b.database || '').trim(), user: String(b.user || '').trim(), password: b.password || '',
       ssl: b.ssl === 'on' || b.ssl === true,
-      sql_users: b.sql_users || '', sql_clients: b.sql_clients || '', sql_revenue: b.sql_revenue || '',
+      ...Object.fromEntries(['sql_users', 'sql_clients', 'sql_revenue'].filter((k) => k in b).map((k) => [k, b[k] || ''])),
+      ...kpiPatch,
     }, 'password');
     clearRecapCache(p.id);
     json(res, { ok: true });
@@ -516,7 +682,7 @@ export function registerRoutes(router, app) {
       business = await fetchRecap(p.id, await pinDb(app, p.userId, p.dbCfg), { force: url.searchParams.has('force') });
       await saveSnapshot(db, p.id, business); // la consultation alimente aussi la courbe du jour
     } catch (e) { error = e.message; }
-    json(res, { business, error, stats, aiCostUsd: cost });
+    json(res, { business, error, stats, aiCostUsd: cost, priced: await isPriced(db, p.userId) });
   }, { limit: 'conn_test' });
 
   router.get('/api/projects/:id/prospects\\.csv', async (ctx) => {
@@ -557,6 +723,12 @@ export function registerRoutes(router, app) {
     json(res, await listProspects(db, p.id, parseFilters(url.searchParams)));
   });
 
+  router.get('/api/projects/:id/kanban', async (ctx) => {
+    const { res, url } = ctx;
+    const p = await project(ctx);
+    json(res, { columns: await kanbanColumns(db, p.id, parseFilters(url.searchParams)) });
+  });
+
   const STATUSES = Object.keys(PROSPECT_STATUSES);
   // ---------- Fiche prospect ----------
   // Un prospect n'est accessible que par le propriétaire de son projet ; sinon 404, comme s'il n'existait pas
@@ -565,7 +737,7 @@ export function registerRoutes(router, app) {
       WHERE x.id = ?`).get(Number(params.id));
     // Le propriétaire du projet ou un membre de l'équipe qui le partage ; sinon 404, comme s'il n'existait pas
     if (!row || !(await accessOn(db, { user_id: row.user_id, team_id: row.team_id }, session.userId))) throw new HttpError(404, 'Prospect introuvable');
-    return { id: row.id, email: row.email };
+    return { id: row.id, email: row.email, projectId: Number(row.pid), ownerId: Number(row.user_id) };
   };
   router.post('/api/prospects/:id/status', async (ctx) => {
     const { req, res } = ctx;
@@ -575,11 +747,26 @@ export function registerRoutes(router, app) {
     await db.prepare('UPDATE prospects SET status = ? WHERE id = ?').run(b.status, row.id);
     if (b.status === 'refused') {
       await db.prepare("INSERT OR IGNORE INTO blacklist(email, reason, created_at) VALUES(?, 'refused', ?)").run(row.email, now());
+      // Le refus vaut pour tous les comptes : chez les autres, l'adresse n'est plus proposée ni contactée (sans dire qui ni pourquoi)
+      await db.prepare("UPDATE prospects SET status = 'refused' WHERE email = ? AND status IN ('new','sent')").run(row.email);
     }
     json(res, { ok: true });
   });
 
-  router.get('/api/prospects/:id', async (ctx) => json(ctx.res, await prospectDetail(db, (await ownedProspect(ctx)).id)));
+  router.get('/api/prospects/:id', async (ctx) => {
+    const row = await ownedProspect(ctx);
+    const detail = await prospectDetail(db, row.id);
+    // Régénération de l'accroche en cours ou terminée pour CE prospect
+    const job = await db.prepare("SELECT status, error, result_json FROM jobs WHERE project_id = ? AND type = 'hook' AND params_json = ? ORDER BY id DESC LIMIT 1")
+      .get(row.projectId, JSON.stringify({ prospectId: row.id }));
+    json(ctx.res, { ...detail, hookJob: job ? { status: job.status, error: job.error } : null });
+  });
+  router.post('/api/prospects/:id/hook', async (ctx) => {
+    const row = await ownedProspect(ctx);
+    await assertCanRunAi(db, row.ownerId, aiOpts);
+    const r = await enqueue(db, { userId: row.ownerId, projectId: row.projectId, type: 'hook', params: { prospectId: row.id } }, aiOpts);
+    json(ctx.res, r);
+  }, { limit: 'enrich' });
   router.post('/api/prospects/:id/notes', async (ctx) => {
     const id = (await ownedProspect(ctx)).id;
     const noteId = await addNote(db, id, (await readBody(ctx.req)).body);
@@ -597,6 +784,43 @@ export function registerRoutes(router, app) {
     catch (e) { throw new HttpError(400, e.message); }
   });
 
+  // Les sorties détaillées restent privées au propriétaire du job.
+  const ownJobConsole = async (params, session) => {
+    const job = await db.prepare('SELECT id, user_id, type, params_json, status, error, tokens_in, tokens_out, progress_json, result_json, log_json, created_at, started_at, finished_at FROM jobs WHERE id = ? AND user_id = ?').get(Number(params.id) || 0, session.userId);
+    if (!job) throw new HttpError(404, 'Job introuvable');
+    await attachJobEta(db,[job]);
+    return job;
+  };
+  router.get('/jobs/:id', async ({ res, params, session }) => {
+    const job = await ownJobConsole(params, session);
+    html(res, layout({ title: 'Suivi de la tâche', email: session.email, body: `<section data-job-console="${job.id}" class="job-console">
+      <a class="console-back" href="/">← Tous les projets</a>
+      <header class="console-heading"><div><p class="console-eyebrow">ESPACE DE TRAVAIL · TÂCHE #${job.id}</p><h1 data-console-title>Claude au travail</h1><p class="muted">Suivez la création, étape par étape.</p></div><span class="console-live" data-console-live>Connexion…</span></header>
+      <div class="console-grid"><aside class="console-summary"><span class="console-eyebrow">ACTIVITÉ ACTUELLE</span><p data-console-status role="status">Connexion au journal…</p>
+      <progress data-console-progress max="100" value="0" aria-label="Progression de la tâche"></progress>
+      <div class="console-facts"><span>Modèle<strong data-console-model>—</strong></span><span>Temps écoulé<strong data-console-elapsed>—</strong></span></div>
+      <p class="console-tokens" data-console-tokens>0 tokens</p>
+      <p class="small muted" data-console-remaining></p>
+      <button type="button" class="btn primary" data-retry="${job.id}" hidden>Réessayer</button><button type="button" class="btn primary" data-retry="${job.id}" data-fix hidden>Corriger</button><p class="small error" data-retry-error role="alert" hidden></p>
+      <p class="small muted" data-console-updated>En attente des premières informations</p><p class="small muted">Les étapes et les sorties arrivent ici dès leur réception.</p></aside>
+      <section class="console-feed"><div class="console-feed-head"><h2>Fil d’activité</h2><label><input type="checkbox" data-console-follow checked> Suivre le direct</label></div>
+      <div class="job-console-output" data-console-output tabindex="0" aria-label="Journal de la tâche"><p data-console-empty class="console-empty">Claude prépare la tâche. Ses prochaines actions apparaîtront ici.</p></div></section></div></section>` }));
+  });
+  router.get('/api/jobs/:id/log', async ({ res, params, session, url }) => {
+    const job = await ownJobConsole(params, session);
+    const after = Math.max(0, Number(url.searchParams.get('after')) || 0);
+    const log = JSON.parse(job.log_json || '[]');
+    json(res, { id: job.id, type: job.type, status: job.status, error: job.error, startedAt: job.started_at, finishedAt: job.finished_at,
+      tokensUsed: Number(job.tokens_in || 0) + Number(job.tokens_out || 0),
+      eta:job.eta||null,
+      qualityWarnings: (() => { try { return (JSON.parse(job.result_json || '{}').qualityWarnings || []).length; } catch { return 0; } })(),
+      progress: job.progress_json ? JSON.parse(job.progress_json) : null,
+      entries: log.filter((e) => e.id > after), firstId: log[0]?.id || 0 });
+  });
+  router.post('/api/jobs/:id/retry', async ({ req, res, params, session }) => {
+    const b = await readBody(req);
+    json(res, await retryJob(db, session.userId, Number(params.id) || 0, aiOpts, { fix: b?.fix === true }));
+  });
   router.post('/api/jobs/:id/cancel', async ({ res, params, session }) => {
     const id = Number(params.id);
     const job = await db.prepare('SELECT j.user_id, p.team_id FROM jobs j LEFT JOIN projects p ON p.id = j.project_id WHERE j.id = ?').get(id);
@@ -607,3 +831,4 @@ export function registerRoutes(router, app) {
     json(res, { ok: true });
   });
 }
+

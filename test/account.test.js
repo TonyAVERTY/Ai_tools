@@ -120,7 +120,7 @@ test('suppression : un job en cours pour le compte est interrompu avant l\'effac
 
 test('deleteUser (service) : compte inconnu → 404, et le nouvel inscrit du même email repart de zéro', async () => {
   await assert.rejects(deleteUser(s.app, 999999), { status: 404 });
-  const N = await s.newUser({ email: 'a@x.fr' }); // même email que le compte supprimé
+  const N = await s.newUser({ email: 'a@x.fr', firstLogin: true }); // même email que le compte supprimé ; firstLogin : aucun réglage préposé par l'aide de test
   const c = await counts(N.id);
   assert.equal(c.users, 1);
   for (const t of Object.keys(c).filter((k) => !['users', 'sessions'].includes(k))) assert.equal(c[t], 0, `${t} : aucune donnée de l'ancien compte`);

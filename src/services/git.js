@@ -1,4 +1,4 @@
-// Clone / mise à jour des repos Forgejo. Clone superficiel (--depth 1) : léger sur le SSD.
+// Clone / mise à jour des dépôts Git (GitHub, ou le serveur Git perso de l'utilisateur). Clone superficiel (--depth 1) : léger sur le SSD.
 // Le token passe par variables d'env GIT_CONFIG_* : jamais écrit dans .git/config, invisible dans `ps`.
 // L'URL vient de l'utilisateur : https seulement, aucun hook ni sous-module, délai et taille bornés.
 import { spawn } from 'node:child_process';
@@ -10,12 +10,20 @@ import { tmpdir } from 'node:os';
 export const GIT_TIMEOUT_MS = 2 * 60_000;
 export const GIT_MAX_BYTES = 300 * 1024 * 1024;
 
-export function validateGitUrl(url, allowedHost) {
+/** Hôtes acceptés d'office, sans réglage : GitHub (dépôts publics). Le serveur Git personnel d'un utilisateur s'y ajoute. */
+export const DEFAULT_GIT_HOSTS = ['github.com'];
+
+/**
+ * @param {string} url
+ * @param {string|string[]} [allowedHosts]  hôtes (avec port éventuel) où le dépôt peut se trouver ; omis = pas de contrôle d'hôte
+ */
+export function validateGitUrl(url, allowedHosts) {
   let u;
   try { u = new URL(url); } catch { throw new Error('URL Git invalide'); }
   if (u.protocol !== 'https:') throw new Error('Seules les URL https:// sont acceptées');
   if (u.username || u.password) throw new Error("Ne mets pas d'identifiants dans l'URL, configure le token dans Réglages");
-  if (allowedHost && u.host !== allowedHost) throw new Error(`Le repo doit être sur ${allowedHost}`);
+  const hosts = [allowedHosts].flat().filter(Boolean);
+  if (hosts.length && !hosts.includes(u.host)) throw new Error(`Le repo doit être sur ${hosts.join(' ou ')}`);
   if (!/^\/[\w.-]+\/[\w.-]+?(\.git)?\/?$/.test(u.pathname)) throw new Error('Format attendu : https://hôte/utilisateur/repo.git');
   return u.toString().replace(/\/$/, '');
 }
@@ -24,7 +32,7 @@ export function validateGitUrl(url, allowedHost) {
  * Environnement de git : liste blanche (aucun secret du serveur), https seulement, aucune configuration
  * globale ou système lue, aucune invite.
  */
-export function gitEnv(token, { parentEnv = process.env } = {}) {
+export function gitEnv(token, { parentEnv = process.env, scheme = 'token', user = 'x-access-token' } = {}) {
   const env = {
     ...buildChildEnv(parentEnv, { home: tmpdir() }),
     GIT_TERMINAL_PROMPT: '0',
@@ -35,7 +43,10 @@ export function gitEnv(token, { parentEnv = process.env } = {}) {
   if (token) {
     env.GIT_CONFIG_COUNT = '1';
     env.GIT_CONFIG_KEY_0 = 'http.extraHeader';
-    env.GIT_CONFIG_VALUE_0 = `Authorization: token ${token}`;
+    // GitHub et GitLab veulent l'authentification Basic sur leurs points d'accès git (comme actions/checkout) ; Forgejo/Gitea acceptent « token »
+    env.GIT_CONFIG_VALUE_0 = scheme === 'basic'
+      ? `Authorization: Basic ${Buffer.from(`${user}:${token}`).toString('base64')}`
+      : `Authorization: token ${token}`;
   }
   return env;
 }
@@ -77,9 +88,9 @@ export function dirSize(dir, limit = Infinity) {
 }
 
 // Lance git avec délai et taille bornés : au-delà, le processus est tué et le dossier surveillé effacé par l'appelant
-function runGit(args, { token, cwd, watchDir, timeoutMs = GIT_TIMEOUT_MS, maxBytes = GIT_MAX_BYTES, gitBin = 'git' }) {
+function runGit(args, { token, scheme, user, cwd, watchDir, timeoutMs = GIT_TIMEOUT_MS, maxBytes = GIT_MAX_BYTES, gitBin = 'git' }) {
   return new Promise((resolve, reject) => {
-    const child = spawn(gitBin, args, { env: gitEnv(token), cwd, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(gitBin, args, { env: gitEnv(token, { scheme, user }), cwd, stdio: ['ignore', 'pipe', 'pipe'] });
     let stdout = '', stderr = '', killed = null;
     const kill = (why) => { killed = why; child.kill('SIGKILL'); };
     const timer = setTimeout(() => kill('Délai dépassé'), timeoutMs);
@@ -101,22 +112,58 @@ export async function syncRepo(url, dir, token, opts = {}) {
   try {
     // L'URL est relue en base : on revalide ici (pas de file://, ext::, ssh) quel que soit l'appelant
     url = validateGitUrl(url);
+    // `opts.scheme` / `opts.user` viennent du type de serveur ; à défaut, GitHub est en Basic et le reste en « token »
+    const scheme = opts.scheme ?? (new URL(url).hostname === 'github.com' ? 'basic' : 'token');
+    const { user } = opts;
     if (existsSync(`${dir}/.git`)) {
-      await runGit(fetchArgs(opts.pin), { token, cwd: dir, watchDir: dir, ...opts });
-      await runGit([...GIT_HARDENING, 'reset', '--hard', 'FETCH_HEAD'], { token, cwd: dir, ...opts });
+      await runGit(fetchArgs(opts.pin), { token, scheme, user, cwd: dir, watchDir: dir, ...opts });
+      await runGit([...GIT_HARDENING, 'reset', '--hard', 'FETCH_HEAD'], { token, scheme, user, cwd: dir, ...opts });
     } else {
       rmSync(dir, { recursive: true, force: true });
       mkdirSync(dirname(dir), { recursive: true });
-      try { await runGit(cloneArgs(url, dir, opts.pin), { token, watchDir: dir, ...opts }); }
+      try { await runGit(cloneArgs(url, dir, opts.pin), { token, scheme, user, watchDir: dir, ...opts }); }
       catch (e) { rmSync(dir, { recursive: true, force: true }); throw e; }
     }
     const { stdout } = await runGit([...GIT_HARDENING, 'rev-parse', 'HEAD'], { cwd: dir, ...opts });
     return stdout.trim();
   } catch (e) {
     // On ne remonte jamais stderr brut (pourrait contenir l'en-tête d'auth)
-    const msg = String(e.stderr || e.message).replace(/Authorization: token \S+/g, 'Authorization: ***');
-    throw new Error(`Git : ${msg.split('\n').filter(Boolean).slice(-2).join(' ')}`);
+    const msg = String(e.stderr || e.message).replace(/Authorization: (?:token|Basic) \S+/gi, 'Authorization: ***');
+    const raw = msg.split('\n').filter(Boolean).slice(-2).join(' ');
+    const hint = authHint(raw, url, !!token);
+    throw new Error(hint ? `Git : ${hint} (${raw})` : `Git : ${raw}`);
   }
+}
+
+/**
+ * Traduit un refus d'accès de git en une phrase qui dit quoi faire. Le message de git est le même quand aucun token n'a été
+ * envoyé et quand le serveur l'a refusé (« could not read Username ») : seul ce qu'on a réellement envoyé permet de les distinguer.
+ * @returns {string|null} null : l'échec n'a rien à voir avec l'authentification
+ */
+export function authHint(stderr, url, tokenSent) {
+  let host;
+  try { host = new URL(url).host; } catch { return null; }
+  const where = host === 'github.com' ? 'GitHub' : host;
+  const notFound = /Repository not found|not found|returned error: (?:403|404)/i.test(stderr);
+  const refused = /could not read Username|Authentication failed|Invalid username|returned error: 401|terminal prompts disabled/i.test(stderr);
+  if (!notFound && !refused) return null;
+  if (!tokenSent) {
+    return `Dépôt privé ou introuvable : aucun token n'est configuré pour ${where}. Ajoute-le dans Réglages → Dépôts Git, puis clique sur « Réanalyser ».`;
+  }
+  return notFound && !refused
+    ? `Le token n'a pas accès à ce dépôt (ou il n'existe pas). Ajoute-le aux dépôts du token sur ${where}, puis clique sur « Réanalyser ».`
+    : `${where} a refusé le token (invalide, expiré, révoqué ou sans accès à ce dépôt). Vérifie-le dans Réglages${host === 'github.com' ? ' avec « Tester ce token »' : ''}, puis clique sur « Réanalyser ».`;
+}
+
+/** Versions de git trop anciennes pour ce qu'on lui demande ; à afficher au démarrage. */
+export function gitVersionNotes(versionOutput) {
+  const m = /(\d+)\.(\d+)(?:\.(\d+))?/.exec(String(versionOutput));
+  if (!m) return [];
+  const v = Number(m[1]) * 1000 + Number(m[2]);
+  return [
+    ...(v < 2031 ? [`git ${m[0]} : trop ancien pour l'authentification par token (GIT_CONFIG_COUNT demande git ≥ 2.31) : les dépôts privés ne pourront pas être clonés.`] : []),
+    ...(v < 2037 ? [`git ${m[0]} : l'épinglage d'adresse (http.curloptResolve) demande git ≥ 2.37, il sera ignoré.`] : []),
+  ];
 }
 
 export function removeRepo(dir) { rmSync(dir, { recursive: true, force: true }); }

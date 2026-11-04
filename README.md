@@ -9,7 +9,7 @@ la version publique cible un serveur CloudPanel avec une base MySQL/MariaDB (voi
 - **Node 22, zéro framework** : `node:http`. Dépendances : `nodemailer`, `imapflow`, `mysql2`, `pg`.
 - **Base MySQL / MariaDB** (`mysql2`, pool, utf8mb4, InnoDB), accès entièrement asynchrone via `src/db.js`. SQLite (`node:sqlite`, en mémoire) ne sert plus que pour les tests locaux et comme source du script de migration.
 - **Rendu serveur + JS vanilla**, pas de build.
-- **File de jobs équitable** (en base) : `MAX_AI_JOBS` jobs en parallèle, un seul par utilisateur, tourniquet entre utilisateurs. Le process Claude tourne en `nice 10`. Les nouveaux jobs attendent si la charge du serveur dépasse `LOAD_MAX` (voir « Anti-abus, plafonds et administration »).
+- **File de jobs équitable** (en base) : jobs en parallèle **par compte autant que son offre le permet**, **sans limite globale sur le serveur** (`parallelJobs` dans `src/limits.js` : 1 en gratuit, plus en payant), tourniquet entre utilisateurs. Le process Claude tourne en `nice 10`. Les nouveaux jobs attendent si la charge du serveur dépasse `LOAD_MAX` (voir « Anti-abus, plafonds et administration »).
 - **Économie de tokens** :
   - outils Claude restreints à chaque job (lecture seule pour le code, WebSearch/WebFetch pour la prospection) ;
   - `--max-turns` borné ;
@@ -28,7 +28,7 @@ la version publique cible un serveur CloudPanel avec une base MySQL/MariaDB (voi
 
 ## Site public
 
-Le site (`ai.tony-averty.dev`) est servi par la même application, dans `src/site/`, en rendu serveur sans JavaScript ni dépendance.
+Le site (`iaboss.fr`) est servi par la même application, dans `src/site/`, en rendu serveur sans JavaScript ni dépendance.
 
 - **Pages** : `/` (accueil pour un visiteur, tableau de bord pour un compte connecté), `/fonctionnement`, `/tarifs`, `/login`, `/mentions-legales`, `/confidentialite`, `/cgu`, et une 404 propre. Toutes répondent sans session.
 - **Identité** : `public/site.css` s'ajoute à `public/app.css` et n'utilise que ses jetons (`--bg`, `--card`, `--text`, `--muted`, `--line`, `--accent`, thème sombre compris). Pas de seconde palette : pour changer une couleur, on modifie `app.css`.
@@ -38,6 +38,15 @@ Le site (`ai.tony-averty.dev`) est servi par la même application, dans `src/sit
 - **En-têtes** : CSP stricte (aucun style ni script en ligne, aucune ressource externe), `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, `frame-ancestors 'none'`. HSTS seulement si `APP_URL` commence par `https://`. Les fichiers statiques ont un ETag (réponse 304).
 - **Ajouter une page** : une fonction dans `pages.js` qui appelle `siteLayout`, une route dans `src/site/routes.js`, et son chemin dans `INDEXABLE_PATHS` (`src/site/seo.js`) si elle doit être référencée.
 - **Essayer en local** : `APP_URL=http://localhost:3199 PORT=3199 SECRET_KEY=<64 hexa> GOOGLE_CLIENT_ID=x GOOGLE_CLIENT_SECRET=y DB_DRIVER=sqlite SANDBOX=off node src/server.js` (base SQLite en mémoire, perdue à l'arrêt).
+
+## Liste de mise en route
+
+Sur le tableau de bord, dès qu'un projet existe, une liste en bas à gauche guide la configuration : analyser le projet, valider la cible, chercher des prospects, SMTP, modèle de mail, premier envoi, puis le facultatif (boîte IMAP, relance automatique, idées d'évolution, compte LinkedIn relié, premier post publié).
+
+- **Calculée à chaque lecture** à partir de l'état réel du projet (`src/checklist.js`, route `GET /api/projects/:id/checklist`, aussi incluse dans `/status`). Rien n'est stocké : elle ne peut pas se désynchroniser, et une étape défaite (jeton LinkedIn expiré, par exemple) redevient à faire.
+- **Chaque ligne ouvre la bonne section** du projet et y fait défiler la page. Les sections terminées reçoivent une coche, et le projet une pastille « config 5/11 ».
+- **Selon les droits et la configuration** : un membre d'équipe ne voit pas le SMTP ni l'IMAP (il ne peut pas les régler), et les étapes LinkedIn disparaissent si `LINKEDIN_CLIENT_ID` n'est pas défini.
+- **Côté navigateur** (localStorage) : la liste peut être réduite, ou masquée pour un projet (la pastille la rappelle). Réduite par défaut sous 1700 px de large, pour ne pas recouvrir le contenu. Elle disparaît toute seule quand tout est fait.
 
 ## Suivi des réponses, relances et test A/B
 
@@ -79,7 +88,7 @@ Le site (`ai.tony-averty.dev`) est servi par la même application, dans `src/sit
   - rapport hebdo.
 
   Un bouton permet d'envoyer une notification de test.
-- **Rapport hebdo** : le lundi à 8h, par mail (SMTP global vers ton email de réception) et en résumé sur Discord. Pour chaque projet, sur 7 jours :
+- **Rapport hebdo** : le lundi à 8h, par mail (SMTP du serveur, vers ton email de réception) et en résumé sur Discord. Pour chaque projet, sur 7 jours :
   - prospects trouvés ;
   - mails et relances envoyés ;
   - réponses et taux de réponse ;
@@ -132,7 +141,7 @@ Le site (`ai.tony-averty.dev`) est servi par la même application, dans `src/sit
 ## Comptes et multi-utilisateur
 
 - **Connexion** : Google ou Apple, sans mot de passe. Le compte est créé à la première connexion réussie (plan gratuit). Un même email ne se lie qu'à un seul fournisseur ; un compte suspendu ne peut plus se connecter et ses sessions tombent aussitôt.
-- **Cloisonnement** : projets, prospects, notes, modèles, journaux d'envoi, jobs, métriques et **réglages** (SMTP, Discord, budget IA, plafonds, hôte Forgejo…) sont propres à chaque compte. Toute requête est filtrée par l'utilisateur courant ; la ressource d'un autre compte répond « introuvable » (404). Un même dépôt Git peut être un projet pour deux comptes (unicité par utilisateur).
+- **Cloisonnement** : projets, prospects, notes, modèles, journaux d'envoi, jobs, métriques et **réglages** (SMTP, Discord, budget IA, plafonds, serveur Git perso…) sont propres à chaque compte. Toute requête est filtrée par l'utilisateur courant ; la ressource d'un autre compte répond « introuvable » (404). Un même dépôt Git peut être un projet pour deux comptes (unicité par utilisateur).
 - **Liste d'opposition** : volontairement commune à tous les comptes (une personne désinscrite ne doit plus être contactée par personne). Un compte n'y voit que le nombre de ses propres prospects concernés, jamais l'origine ni le motif d'un autre compte.
 - **Liaison Claude obligatoire** : après la connexion, un compte sans liaison valide est renvoyé vers `/link` et ne peut rien utiliser d'autre que cette page, Mon compte, la déconnexion et la suppression du compte (garde côté serveur sur toutes les routes, dans la file, le worker et le wrapper d'exécution). Voir « Liaison Claude et exécution isolée ».
 - **Mon compte** (`/account`) : email, fournisseur, état de la liaison Claude (mode, dates, valide ou non, 4 derniers caractères de la clé API) avec Tester, Changer de mode et Délier, et suppression du compte (confirmation par saisie de l'email). Elle efface tout : projets, prospects, notes, modèles, journaux, jobs, réglages, sessions et clones Git. Seule la liste d'opposition est conservée.
@@ -144,7 +153,7 @@ Chaque utilisateur relie SON accès ; ses jobs IA tournent avec cet accès uniqu
 - **Clé API Anthropic** (recommandé) : vérifiée par `GET /v1/models` (aucun token consommé), chiffrée AES-256-GCM dans `users.claude_link_json`, jamais réaffichée. Passée par `ANTHROPIC_API_KEY` au seul processus enfant, jamais écrite sur disque. Pas de barre de quota d'abonnement dans ce mode.
 - **Connexion avec Claude (abonnement)** : une fenêtre d'avertissement (risque pour le compte Claude au regard des conditions d'Anthropic) impose de cocher « J'ai compris et j'accepte ce risque » ; l'acceptation est horodatée avec la version du texte. L'utilisateur génère un jeton sur sa machine avec `claude setup-token` et le colle ; il est vérifié par un appel minimal du CLI (quelques tokens décomptés de l'abonnement), chiffré, et passé par `CLAUDE_CODE_OAUTH_TOKEN` au seul processus enfant. `CLAUDE_CLI_MODE_ENABLED=false` masque ce mode et le refuse côté serveur.
 - **Se connecter avec Claude (connexion guidée)** : après la case du risque, le serveur lance `claude setup-token` (`src/claudelogin.js`, via `script` pour disposer d'un pseudo-terminal, `HOME` jetable, environnement assaini), récupère le lien de connexion et l'affiche à l'utilisateur. Il se connecte sur claude.com, recopie le petit code affiché, et le serveur le transmet au CLI puis capte le jeton (rangé chiffré, comme un jeton collé). Une seule connexion en cours par utilisateur, 5 minutes au plus, 5 en même temps sur le serveur. Prérequis : le binaire `claude` (`CLAUDE_BIN`) et la commande `script` (util-linux). La saisie manuelle du jeton reste proposée en secours.
-- **Claude du serveur** (admins de `ADMIN_EMAILS`) : la configuration du CLI de la machine, comme avant.
+- **Pas de mode « Claude du serveur »** : le CLI connecté sur la machine n'est jamais utilisé à la place d'un utilisateur (il consommerait le quota de son propriétaire). Une ancienne liaison de ce type compte comme « pas de liaison » : le compte doit relier sa clé API ou son abonnement.
 - **Bac à sable** : chaque job passe par bubblewrap (racine reconstruite en lecture seule, `/tmp` et `HOME` vides, seul le clone du projet de l'utilisateur monté en lecture seule, PID/IPC/UTS isolés, réseau conservé) avec un environnement en liste blanche (`PATH`, `LANG`, `HOME` jetable, le secret de l'utilisateur). En production le job est refusé si `bwrap` manque ; `SANDBOX=off` ne vaut qu'en développement. Installation : `apt install bubblewrap`. Si Node ou le CLI sont installés hors de `/usr`, liste leurs dossiers dans `SANDBOX_RO_BINDS`.
 - **Clones git** d'URL fournies par les utilisateurs : https uniquement (`GIT_ALLOW_PROTOCOL=https`), pas de hooks ni de sous-modules, 2 minutes et 300 Mo au plus.
 - **Quota, budget IA, pauses et notifications** sont propres à chaque compte.
@@ -187,7 +196,7 @@ Prix TTC : l'éditeur est en franchise de TVA (art. 293 B du CGI). Les offres pa
 
 ### SMTP par projet et équipes
 
-- **SMTP par projet** : chaque projet peut avoir son propre SMTP (une boîte d'envoi par projet). **Hôte vide = SMTP des Réglages** (`getProject` renvoie `smtpSource` : `project`, `settings` ou `null`). L'IMAP réutilise les identifiants du SMTP effectif.
+- **SMTP par projet** : chaque projet peut avoir son propre SMTP (une boîte d'envoi par projet). **Pas de SMTP commun** : un projet envoie depuis SON adresse ou pas du tout (hôte vide = on efface celui du projet). Les mails d'AiTools (rapport, évolutions, invitations, avertissement d'inactivité) partent du SMTP du serveur (`SYSTEM_SMTP_*`). L'ancien SMTP « global » des Réglages a été supprimé : une migration en copie le contenu dans chaque projet qui n'avait pas le sien (`getProject` renvoie `smtpSource` : `project` ou `null`). L'IMAP réutilise les identifiants du SMTP effectif.
 - **Équipes** (`src/teams.js`, `src/teamroutes.js`, page `/team`) : un propriétaire (offre avec `seats` ≥ 2) invite des membres par email (lien à usage unique, valable 7 jours, **lié à l'adresse invitée**, seule son empreinte est stockée) et partage des projets (`projects.team_id`). Sur un projet partagé **un membre agit comme le propriétaire** : ses données, son SMTP, son plan, ses plafonds et son accès Claude (le membre n'a pas besoin du sien). Rôles : `member` (travaille sur les projets), `admin` (règle en plus SMTP, IMAP, base du récap), propriétaire (gère l'équipe, partage, supprime). Un seul point d'accès (`getProject` / `accessOn`) : un projet hors équipe est introuvable (404), le retrait d'un membre coupe l'accès à la requête suivante. Un mail d'invitation part si `SYSTEM_SMTP_*` est configuré, sinon le lien est affiché au propriétaire.
 
 ### LinkedIn
@@ -195,11 +204,23 @@ Prix TTC : l'éditeur est en franchise de TVA (art. 293 B du CGI). Les offres pa
 - **Un compte LinkedIn par projet** (section « LinkedIn » de la carte projet). Le bouton « Connecter LinkedIn » envoie vers l'OAuth officiel (`openid profile w_member_social`, `state` à usage unique lié au compte, au projet et au navigateur) ; le jeton (60 jours) est chiffré dans `linkedin_accounts`, jamais renvoyé. Connecter, déconnecter et publier demandent d'être administrateur du projet.
 - **Direction facultative** : une zone de texte indique de quoi parlera le post. Vide, Claude choisit l'angle. « Générer » puis « Régénérer » lancent un job IA `linkedin_post` (compté dans les jobs IA) ; « Régénérer » donne à Claude les brouillons précédents pour changer d'angle, pas seulement de mots. Le prompt interdit d'inventer chiffres, clients ou résultats.
 - **Rien n'est publié sans clic** : le brouillon est modifiable, la publication (`POST /v2/ugcPosts`, visibilité publique) demande une confirmation, et le texte envoyé est celui affiché. Un post publié ne se modifie ni ne repart. Un échec de LinkedIn conserve le brouillon.
+- **Publier sur une page** (profil par défaut, page si l'application LinkedIn a les droits) : voir « Publier sur une page LinkedIn » ci-dessous.
 - **Configuration** : `LINKEDIN_CLIENT_ID` + `LINKEDIN_CLIENT_SECRET` (les deux ou aucun) ; l'application LinkedIn doit avoir les produits « Sign In with LinkedIn using OpenID Connect » et « Share on LinkedIn », et l'URL de redirection `APP_URL/linkedin/callback`. **Les appels à LinkedIn n'ont pas pu être testés contre le vrai service** (tests avec `fetch` simulé) : essaie avec un compte réel avant de t'y fier.
+
+#### Publier sur une page LinkedIn
+
+Le produit « Share on LinkedIn » ne donne que `w_member_social` : publier sur le **profil** seulement. Publier sur une **page** (société) demande le produit **Community Management API** (`w_organization_social`, plus `rw_organization_admin` pour lister les pages que le compte administre).
+
+- **Contraintes de LinkedIn** : organisation légalement enregistrée, usage commercial, mail professionnel, vérification par un super administrateur de la page. Palier « Development » limité (500 appels par jour, 100 par membre), puis palier « Standard » sur une seconde demande. **Ce produit doit être le seul de son application** : la demande est grisée si l'application a déjà « Share » ou « Sign In ». Il faut donc créer une **application dédiée**, liée à la page, et mettre ses clés dans `LINKEDIN_CLIENT_ID` / `LINKEDIN_CLIENT_SECRET`.
+- **Activation** : `LINKEDIN_SCOPES` (liste de droits, par défaut `openid profile w_member_social`). Pour une application « Community Management API » seule, qui n'a pas OpenID : `LINKEDIN_SCOPES="w_organization_social rw_organization_admin"`. La publication sur une page s'active quand `w_organization_social` et `rw_organization_admin` (ou `r_organization_admin`) sont présents. Les droits inconnus font échouer le démarrage plutôt que toutes les connexions. `LINKEDIN_API_VERSION` (AAAAMM, `202604` par défaut) fixe l'en-tête `Linkedin-Version`.
+- **Utilisation** : dans la section LinkedIn d'un projet, « Publier sur : … [Changer] » liste les pages que le compte administre (appel mis en cache 10 minutes, « Actualiser la liste » force un appel). La page n'est acceptée que si LinkedIn la compte parmi celles du compte, et son nom vient de LinkedIn. Le bouton devient « Publier sur AI_Tools », la confirmation nomme la page, et l'historique dit où chaque post est parti. Seul un administrateur du projet choisit la page ou publie.
+- **Sans OpenID**, le compte est identifié par l'identifiant du membre qui figure dans ses droits sur les pages, et ne peut publier que sur une page choisie. Un compte relié avant l'activation des pages doit être reconnecté (nouvelle autorisation).
+- Le texte part par `POST /rest/posts` avec les caractères réservés du format de l'API échappés (`| { } @ [ ] ( ) < > # \ * _ ~`) ; un `#` suivi d'une lettre reste un hashtag. La publication sur le profil, inchangée, passe toujours par `/v2/ugcPosts`.
+- **Non vérifié contre le vrai LinkedIn** : tout est testé avec LinkedIn simulé (`test/linkedin-pages.test.js`). Les formes de réponse de `organizationAcls` (champ `organizationTarget` ou `organization`) et d'`organizations/{id}` (`localizedName`), l'identification sans OpenID et l'effet réel des échappements sont écrits d'après la documentation, pas essayés. Teste avec un compte réel et dis ce qui diffère.
 
 ### File de jobs
 
-`MAX_AI_JOBS` jobs en parallèle (4 par défaut, un serveur de 6 cœurs), **au plus un par utilisateur**, prochain job choisi en tourniquet entre utilisateurs. Réservation atomique en base. L'arrêt attend tous les jobs en cours. Les nouveaux jobs attendent quand la charge du serveur dépasse `LOAD_MAX` (charge moyenne sur 1 minute divisée par le nombre de cœurs, 0,9 par défaut, reprise 0,1 plus bas) ; les jobs en cours continuent. `nice 10` est conservé. Budget IA et quota Claude restent par utilisateur.
+jobs en parallèle **selon l'offre de chaque compte** (`parallelJobs` : 1 en gratuit), **aucune limite globale de jobs sur le serveur** (l'ancien `MAX_AI_JOBS` n'existe plus), jamais deux envois de mails en même temps, deux synchronisations du même dépôt jamais en même temps, prochain job choisi en tourniquet entre utilisateurs. Réservation atomique en base. L'arrêt attend tous les jobs en cours. Les nouveaux jobs attendent quand la charge du serveur dépasse `LOAD_MAX` (charge moyenne sur 1 minute divisée par le nombre de cœurs, 0,9 par défaut, reprise 0,1 plus bas) ; les jobs en cours continuent. `nice 10` est conservé. Budget IA et quota Claude restent par utilisateur.
 
 ### Hôtes saisis par l'utilisateur (SSRF)
 
@@ -311,19 +332,27 @@ Garde-fous :
 
 Dans la console Google Cloud, crée un ID client OAuth de type « Application Web » (menu Identifiants).
 
-- URI de redirection : `https://ai.tony-averty.dev/auth/google/callback`
+- URI de redirection : `https://iaboss.fr/auth/google/callback`
 - Écran de consentement : mode « Test » avec ton email en testeur, ça suffit.
 
 ### Cloudflare Tunnel
 
 Dans Zero Trust, va dans Networks → Tunnels → Create a tunnel (Cloudflared).
 
-- Public hostname : `ai.tony-averty.dev` → `http://localhost:3100`
+- Public hostname : `iaboss.fr` → `http://localhost:3100`
 - Copie le token, `install.sh` te le demandera.
 
-### Forgejo
+### Dépôts Git : GitHub par défaut, serveurs ajoutables
 
-Le token se crée dans Paramètres → Applications. Donne-lui la portée `read:repository` seulement, puis colle-le dans **Réglages** du panel avec l'hôte `git.tony-averty.dev`.
+**Réglages → Dépôts Git**, par utilisateur :
+
+- **GitHub est toujours là** (`github.com`), avec un champ pour son token. Un lien public (`https://github.com/utilisateur/projet.git`) passe sans rien régler ; un dépôt **privé** demande un token.
+- **Le « + »** propose le type de serveur à ajouter (Forgejo, Gitea, GitLab), puis une ligne avec les mêmes champs : **URL** et **token**. Jusqu'à 5 serveurs. Un serveur sans token ne sert que pour des dépôts publics.
+- **Authentification** selon le type : Forgejo et Gitea en `Authorization: token …`, GitHub en Basic (`x-access-token`), GitLab en Basic (`oauth2`). **GitLab n'a pas été testé contre un vrai serveur.**
+- **Chaque token n'est présenté qu'à son hôte exact** (`gitCredentialFor`, `src/gitservers.js`), jamais à un autre ni à un hôte qui lui ressemble. Il est chiffré en base, jamais réaffiché, remplaçable, supprimable. Changer l'URL d'un serveur ne lui laisse pas son ancien token. Les erreurs de git masquent les en-têtes d'authentification.
+- **Bouton « Tester ce token »** (GitHub) : dit à qui appartient le token, s'il est « fine-grained » ou classique (avertissement, un classique donne accès à tous les dépôts), quand il expire, la liste des dépôts accessibles (100 plus récents) et lesquels de **tes projets** GitHub en font partie (✓ / ✗, jamais « ✗ » à tort si la liste est tronquée). Il teste le token tapé dans le champ, sinon celui qui est enregistré, et ne modifie rien. Appel à `api.github.com` uniquement (hôte fixe, pas de SSRF), limité en débit comme les autres tests de liaison, token jamais renvoyé ni journalisé (`src/githubcheck.js`, `POST /settings/github/test`). Pas encore pour les serveurs Forgejo/Gitea/GitLab : leur hôte est saisi par l'utilisateur, il faudrait un client HTTP épinglé comme pour SMTP.
+- **Token GitHub conseillé** : « fine-grained », *Only select repositories*, permission *Contents : Read-only*. Côté Forgejo/Gitea : portée `read:repository` ; GitLab : `read_repository`.
+- **Compatibilité** : l'ancien réglage unique (`forgejo_host` + `forgejo_token_enc`) reste lu comme un premier serveur Forgejo, et entre dans la liste (`git_servers_json`) à la première sauvegarde des Réglages.
 
 ## À faire côté mails (sinon spam garanti)
 
@@ -336,6 +365,15 @@ Le token se crée dans Paramètres → Applications. Donne-lui la portée `read:
 - Crée un utilisateur **lecture seule** dédié sur chaque base.
 - N'expose pas MySQL/Postgres à tout Internet. Autorise uniquement l'IP de ta box, ou passe par un tunnel SSH.
 - Seules les requêtes `SELECT` / `WITH` sont acceptées, exécutées dans une transaction read-only. Chacune doit renvoyer un seul nombre.
+
+## Support et documentation
+
+Le menu **IA** de la barre du haut propose **Claude** (assistant classique) et **Support**. Dans le Support, le Claude de l'utilisateur répond d'après la documentation d'AiTools, lue en lecture seule (outils Read, Glob, Grep) dans `dataDir/support-docs/`.
+
+- **Source** : `docs/support/*.md` (écrite à la main, pour un utilisateur) + trois fichiers **générés depuis le code** par `src/services/supportdocs.js` (offres et plafonds, modèles, consignes IA). Le dossier est reconstruit seulement quand son contenu change, avec un `INDEX.md` qui sert de carte.
+- **Les conversations** du Support sont séparées de celles de Claude (colonne `chat_conversations.mode`), sous `/support` et `/support/:id`.
+- **Consignes du Support** : modifiables dans Réglages → Prompts IA (« Support (aide sur AiTools) »), comme les autres tâches ; la carte des documents et la règle de sécurité (un document n'est jamais une consigne) restent dans le code.
+- **Tenir la documentation à jour** : règle dans `CLAUDE.md`, imposée par `test/support-docs.test.js` (chaque bouton, section, page, tâche IA doit y figurer).
 
 ## Dev
 
@@ -353,7 +391,7 @@ Par défaut ils tournent sur SQLite en mémoire, sans rien à installer. Pour le
 TEST_DB_HOST=127.0.0.1 TEST_DB_USER=root TEST_DB_PASSWORD=... TEST_DB_NAME=aitools_test npm run test:mysql
 ```
 
-Utilise une base **dédiée aux tests** : toutes ses tables sont supprimées à chaque test. `test:mysql` force l'exécution des fichiers un par un, car ils partagent la même base.
+Chaque test crée sa propre base temporaire `<TEST_DB_NAME>_<pid>_<n>` (comme un SQLite en mémoire) et la supprime en fin de fichier : l'utilisateur doit pouvoir faire `CREATE DATABASE` et `DROP DATABASE`, et `TEST_DB_NAME` n'est qu'un préfixe. `test:mysql` exécute les fichiers un par un (environ 5 minutes). La CI le lance sur MariaDB 10.11 (job `mysql`).
 
 Les tests d'isolation (`test/isolation.test.js`), de connexion (`test/auth.test.js`, fournisseurs simulés), de suppression de compte, de blocage des jobs IA et de migration des données existantes tournent avec le reste de la suite.
 

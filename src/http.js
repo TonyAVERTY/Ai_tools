@@ -5,7 +5,7 @@ export class Router {
   add(method, path, handler, opts = {}) {
     const keys = [];
     const re = new RegExp('^' + path.replace(/:(\w+)/g, (_, k) => { keys.push(k); return '([^/]+)'; }) + '/?$');
-    this.routes.push({ method, re, keys, handler, public: !!opts.public, limit: opts.limit || null, admin: !!opts.admin });
+    this.routes.push({ method, re, keys, handler, public: !!opts.public, limit: opts.limit || null, admin: !!opts.admin, api: !!opts.api });
   }
   get(p, h, o) { this.add('GET', p, h, o); }
   post(p, h, o) { this.add('POST', p, h, o); }
@@ -15,7 +15,8 @@ export class Router {
       const m = r.re.exec(pathname);
       if (m) {
         const params = {};
-        r.keys.forEach((k, i) => { params[k] = decodeURIComponent(m[i + 1]); });
+        try { r.keys.forEach((k, i) => { params[k] = decodeURIComponent(m[i + 1]); }); }
+        catch { throw new HttpError(400, 'Adresse invalide', { expose: true }); } // %zz : une erreur du client, pas du serveur
         return { ...r, params };
       }
     }
@@ -27,7 +28,9 @@ export function parseCookies(req) {
   const out = {};
   for (const part of (req.headers.cookie || '').split(';')) {
     const i = part.indexOf('=');
-    if (i > 0) out[part.slice(0, i).trim()] = decodeURIComponent(part.slice(i + 1).trim());
+    if (i <= 0) continue;
+    // Un cookie mal encodé est ignoré (le visiteur n'a simplement pas de session), il ne fait pas tomber la requête
+    try { out[part.slice(0, i).trim()] = decodeURIComponent(part.slice(i + 1).trim()); } catch { /* ignoré */ }
   }
   return out;
 }
@@ -52,7 +55,9 @@ export async function readBody(req, { max = MAX_BODY } = {}) {
   }
   const raw = Buffer.concat(chunks).toString('utf8');
   const type = req.headers['content-type'] || '';
-  if (type.includes('application/json')) return raw ? JSON.parse(raw) : {};
+  if (type.includes('application/json')) {
+    try { return raw ? JSON.parse(raw) : {}; } catch { throw new HttpError(400, 'Corps JSON invalide', { expose: true }); }
+  }
   return Object.fromEntries(new URLSearchParams(raw));
 }
 
@@ -74,6 +79,9 @@ export class HttpError extends Error {
     this.status = status; this.expose = expose; this.headers = headers; this.code = code; this.data = data;
   }
 }
+
+/** Case à cocher d'un formulaire (« on ») ou booléen JSON. */
+export const asBool = (v) => v === true || v === 'on' || v === '1' || v === 1;
 
 // Échappement HTML pour les templates
 export function esc(v) {

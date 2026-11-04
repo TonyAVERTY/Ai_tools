@@ -9,6 +9,7 @@ import { INACTIVITY } from '../limits.js';
 import { logAudit } from '../audit.js';
 import { deleteUser } from '../users.js';
 import { createTransport } from './mailer.js';
+import { inactivityMail } from './mailhtml.js';
 import { pinSmtp } from '../netguard.js';
 import { CONTACT_EMAIL } from '../site/layout.js';
 
@@ -42,7 +43,8 @@ export function warningMail(cfg, user, deleteAt) {
     '',
     "AiTools · message automatique, envoyé une seule fois.",
   ].join('\n');
-  return { subject: 'Ton compte AiTools sera supprimé pour inactivité', text };
+  const html = inactivityMail({ email: user.email, deleteDate: dateFr(deleteAt), loginUrl: `${cfg.appUrl}/login`, appUrl: cfg.appUrl, contact: CONTACT_EMAIL });
+  return { subject: 'Ton compte AiTools sera supprimé pour inactivité', text, html };
 }
 
 async function sendWarning(app, user, deleteAt) {
@@ -51,7 +53,7 @@ async function sendWarning(app, user, deleteAt) {
   const mail = warningMail(app.cfg, user, deleteAt);
   const transport = (app.createTransport || createTransport)(await pinSmtp(app, null, smtp));
   try {
-    await transport.sendMail({ from: smtp.fromEmail, to: user.email, subject: mail.subject, text: mail.text });
+    await transport.sendMail({ from: smtp.fromEmail, to: user.email, subject: mail.subject, text: mail.text, html: mail.html });
     return { sent: true };
   } catch (e) {
     return { sent: false, reason: `envoi impossible (${String(e.message).slice(0, 120)})`, transient: true };

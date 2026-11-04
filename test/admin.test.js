@@ -79,7 +79,11 @@ test('liste des comptes : identité, plan, statut, dates, mode de liaison et usa
     await s.db.prepare("INSERT INTO user_settings(user_id, `key`, value) VALUES(?, 'smtp_enc', 'SMTPCHIFFRE')").run(bob.id);
 
     const page = await (await admin.get('/admin', html)).text();
-    for (const f of ['bob@exemple.fr', 'tony@x.fr', 'Google', 'gratuit', 'actif', 'Clé API Anthropic', 'P 1/1', 'Pr 1/50', 'M 0/100', 'IA 0/6', '15/01/2027']) assert.ok(page.includes(f), f);
+    for (const f of ['bob@exemple.fr', 'tony@x.fr', 'Google', 'gratuit', 'actif', 'Clé API Anthropic', '15/01/2027']) assert.ok(page.includes(f), f);
+    // Usage du mois : une colonne par plafond, « utilisé / plafond », rouge quand il est atteint
+    for (const [label, v] of [['Projets', '1 / 1'], ['Prospects', '1 / 50'], ['Mails', '0 / 100'], ['Tâches IA', '0 / 6']]) assert.match(page, new RegExp(`<td class="num[^"]*" data-label="${label}">${v}</td>`), label);
+    assert.match(page, /<td class="num error" data-label="Projets">1 \/ 1<\/td>/, 'plafond atteint en rouge');
+    assert.doesNotMatch(page, /Pr 1\/50|IA 0\/6/, 'plus d\'abréviations');
     for (const secret of [SECRET, 'SECRETSECRET', '1234</', 'secret_enc', link.secret_enc, 'SMTPCHIFFRE', 'ProjetConfidentiel', 'secret.git', 'RESUMEPRIVE', 'EntreprisePrivee', 'client@prive.fr', 'ACCROCHEPRIVEE', 'NOTEPRIVEE', 'OBJETPRIVE']) {
       assert.ok(!page.includes(secret), `la page d'administration ne doit pas contenir « ${secret} »`);
     }
@@ -101,7 +105,7 @@ test('liste paginée et recherche par email (caractères spéciaux neutralisés)
     const rows = (h) => (h.match(/<tr>\s*<td>[^<]*@/g) || []).length;
     const p1 = await (await admin.get('/admin', html)).text();
     assert.equal(rows(p1), ADMIN_PAGE_SIZE);
-    assert.match(p1, /page 1 \/ 2/);
+    assert.match(p1, /page 1 sur 2/);
     assert.match(p1, /href="\/admin\?page=2"/);
     const p2 = await (await admin.get('/admin?page=2', html)).text();
     assert.equal(rows(p2), 1 + ADMIN_PAGE_SIZE + 5 + 1 - ADMIN_PAGE_SIZE);

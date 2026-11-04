@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { setSetting, getSetting, now } from '../src/db.js';
 import { testDb } from './helpers/db.js';
-import { addUser } from './helpers/users.js';
+import { addUser, TEST_SECRET_KEY } from './helpers/users.js';
 import { startApp } from './helpers/server.js';
 import { Worker, enqueue } from '../src/services/jobs.js';
 import { makeHandlers } from '../src/handlers.js';
@@ -19,8 +19,8 @@ import { ABUSE } from '../src/limits.js';
 async function world() {
   const db = await testDb();
   const app = {
-    db, resolveHost: async () => [{ address: '93.184.216.34', family: 4 }],
-    cfg: { dataDir: '/tmp/x', appUrl: 'https://ai.test', secretKey: randomBytes(32), sandbox: { enabled: false } },
+    db, resolveHost: async () => [{ address: '93.184.216.34', family: 4 }], resolveMx: async () => [{ exchange: 'mx.test', priority: 10 }],
+    cfg: { dataDir: '/tmp/x', appUrl: 'https://ai.test', secretKey: TEST_SECRET_KEY, sandbox: { enabled: false } },
     fetch: async (url, o) => { app.hooks.push({ url, body: JSON.parse(o.body) }); return { ok: true, status: 204 }; },
     hooks: [],
   };
@@ -127,7 +127,7 @@ test('envois refusés avec un message clair (jamais silencieux) : mise en file, 
       assert.match(e.message, /10 adresse\(s\) sur 50/);
       assert.match(e.message, /20 %/);
       assert.match(e.message, /seuil de 10 %/);
-      assert.match(e.message, /contact@tony-averty\.dev/);
+      assert.match(e.message, /contact@iaboss\.fr/);
       assert.match(e.message, /désinscription/);
       return true;
     });

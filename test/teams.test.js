@@ -13,7 +13,9 @@ import { PLAN_LIMITS } from '../src/limits.js';
 const LINK = { v: 1, mode: 'api_key', valid: true };
 const HTML = { headers: { accept: 'text/html' } };
 let s;
-before(async () => { s = await startApp(); });
+const sent = []; // mails d'invitation : le lien n'existe que là, jamais dans la page du propriétaire
+const SYSTEM_SMTP = { host: 'smtp.test', port: 587, user: 'u', pass: 'p', fromEmail: 'noreply@aitools.test' };
+before(async () => { s = await startApp({ cfg: { systemSmtp: SYSTEM_SMTP }, createTransport: () => ({ sendMail: async (m) => { sent.push(m); }, close() {} }) }); });
 after(async () => { await s.close(); });
 
 const setPlan = (u, plan) => s.db.prepare('UPDATE users SET plan = ? WHERE id = ?').run(plan, u.id);
@@ -42,7 +44,10 @@ async function world({ plan = 'growth' } = {}) {
 const invite = async (w, email, role = 'member') => {
   const r = await form(w.owner, '/team/invite', { email, role });
   assert.equal(r.status, 200);
-  return /value="([^"]*\/team\/join\/[^"]+)"/.exec(await r.text())?.[1].split('/team/join/')[1];
+  assert.doesNotMatch(await r.text(), /\/team\/join\//, 'le propriétaire ne voit jamais le lien');
+  const mail = sent.at(-1);
+  assert.equal(mail.to, email.toLowerCase());
+  return /\/team\/join\/([\w-]+)/.exec(mail.text)?.[1];
 };
 const join = async (u, token) => form(u, `/team/join/${token}`);
 
@@ -50,9 +55,9 @@ test('création : refusée sans place d\'équipe, acceptée avec, une seule par 
   const free = await s.newUser({ admin: false, link: LINK });
   let r = await form(free, '/team/create', { name: 'X' });
   assert.equal(r.status, 400);
-  assert.match(await body(r), /ne comprend pas d'équipe/);
+  assert.match(await body(r), /L'équipe est incluse dans les offres avec des places d'équipe/);
   assert.equal(await ownedTeam(s.db, free.id), null);
-  assert.match(await text(free, '/team'), /ne comprend pas de place d'équipe/);
+  assert.match(await text(free, '/team'), /Les places d'équipe sont incluses dans certaines offres/);
 
   const paid = await s.newUser({ admin: false, link: LINK });
   await setPlan(paid, 'starter');
@@ -253,26 +258,58 @@ test('supprimer son compte efface l\'équipe, les adhésions et les invitations'
   assert.ok(denied((await w.member.get(`/api/projects/${w.shared}/status`)).status));
 });
 
-test('SMTP du projet : hôte vide = retour au SMTP des Réglages, et la page l\'explique', async () => {
+test('SMTP du projet : le sien ou rien, et la page l\'explique ; hôte vide = on l\'efface', async () => {
   const u = await s.newUser({ admin: false, link: LINK });
   const p = await addProject(s.db, u.id, { name: 'Boîte propre' });
   const src = async () => (await (await u.get(`/api/projects/${p}/status`)).json()).smtpSource;
   assert.equal(await src(), null);
   assert.match(await text(u, '/'), /Aucun SMTP/);
+  assert.doesNotMatch(await text(u, '/'), /SMTP des Réglages|Laisse l'hôte vide/);
 
-  assert.equal((await u.post('/settings', { smtp_host: 'smtp.reglages.fr', smtp_port: '587', smtp_user: 'u', smtp_pass: 'p', smtp_fromEmail: 'r@exemple.fr' }, { form: true })).status, 303);
-  assert.equal(await src(), 'settings');
-  assert.match(await text(u, '/'), /utilise le SMTP des Réglages/);
-  assert.match(await text(u, '/'), /Laisse l'hôte vide/);
+  // Il n'y a plus de SMTP « global » dans les Réglages : la page n'en propose plus, et un envoi de formulaire le recevant l'ignore
+  assert.doesNotMatch(await text(u, '/settings'), /SMTP global|name="smtp_host"/);
+  assert.equal((await form(u, '/settings', { smtp_host: 'smtp.reglages.fr', smtp_port: '587', global_daily_cap: '100', send_delay_min: '20', send_delay_max: '60' })).status, 303);
+  assert.equal(await src(), null);
 
   const own = { host: 'smtp.projet.fr', port: 587, user: 'u', pass: 'p', fromEmail: 'p@exemple.fr', dailyCap: 20 };
   assert.equal((await u.post(`/api/projects/${p}/smtp`, own)).status, 200);
   assert.equal(await src(), 'project');
-  assert.match(await text(u, '/'), /propre SMTP/);
+  assert.match(await text(u, '/'), /depuis son adresse/);
 
   const r = await u.post(`/api/projects/${p}/smtp`, { host: '', dailyCap: 25 });
   assert.equal((await r.json()).reset, true);
-  assert.equal(await src(), 'settings');
+  assert.equal(await src(), null);
   assert.equal(Number((await row('SELECT daily_mail_cap c FROM projects WHERE id = ?', p)).c), 25, 'le plafond du projet reste réglable');
   assert.equal(await row('SELECT smtp_enc FROM projects WHERE id = ?', p).then((x) => x.smtp_enc), null);
+});
+
+test('invitation : mail HTML aux couleurs du site, lien seulement dans le mail ; sans mail, pas d\'invitation', async () => {
+  const w = await world();
+  const before = sent.length;
+  const token = await invite(w, w.member.email);
+  assert.equal(sent.length, before + 1);
+  const mail = sent.at(-1);
+  assert.match(mail.html, /<!doctype html>/i);
+  assert.ok(mail.html.includes(`/team/join/${token}`), 'bouton et lien de secours');
+  assert.match(mail.html, /Rejoindre l(&#39;|')équipe/);
+  assert.match(mail.html, /#1e296a/, 'bandeau indigo du logo');
+  assert.match(mail.html, /logo-mark-dark\.png/);
+  assert.doesNotMatch(mail.html, /#7c4dff|#2f5bea/, 'plus de violet');
+  assert.match(mail.text, /\/team\/join\//, 'version texte conservée');
+  const again = await form(w.owner, '/team/invite', { email: 'autre@exemple.fr', role: 'member' });
+  assert.match(await again.text(), /Invitation envoyée à autre@exemple\.fr/);
+
+  // SMTP du serveur en panne : l'invitation n'est pas créée, et aucun lien n'est montré au propriétaire
+  const down = await startApp({ cfg: { systemSmtp: SYSTEM_SMTP }, createTransport: () => ({ sendMail: async () => { throw new Error('connexion refusée'); }, close() {} }) });
+  try {
+    const owner = await down.newUser({ admin: false, link: LINK });
+    await down.db.prepare('UPDATE users SET plan = ? WHERE id = ?').run('growth', owner.id);
+    assert.equal((await owner.post('/team/create', { name: 'T' }, { form: true, headers: { accept: 'text/html' } })).status, 303);
+    const r = await owner.post('/team/invite', { email: 'x@exemple.fr', role: 'member' }, { form: true, headers: { accept: 'text/html' } });
+    assert.equal(r.status, 400);
+    const h = await r.text();
+    assert.match(h, /n&#39;a pas pu partir|n'a pas pu partir/);
+    assert.doesNotMatch(h, /\/team\/join\//);
+    assert.equal(await down.db.prepare('SELECT 1 x FROM team_invites').get(), undefined, 'aucune invitation orpheline');
+  } finally { await down.close(); }
 });

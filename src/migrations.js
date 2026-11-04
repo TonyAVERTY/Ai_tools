@@ -4,7 +4,7 @@
 // en ajouter une. Côté MySQL, chaque instruction est idempotente (CREATE ... IF NOT EXISTS) : MySQL
 // valide implicitement chaque DDL, une migration interrompue peut donc être rejouée.
 //
-// Une instruction est soit une chaîne SQL, soit { sql, params?(ctx), when?(q, ctx) } :
+// Une instruction est soit une chaîne SQL, soit { sql, params?(ctx), when?(q, ctx) } ou { run(q, ctx, exec) } (étape JavaScript) :
 //   - params(ctx) fournit les paramètres liés (ctx = { ownerEmail, now }) ;
 //   - when(q, ctx) décide si l'instruction s'applique (q(sql, params) renvoie les lignes) : c'est ce qui rend
 //     les ALTER TABLE rejouables côté MySQL (pas de IF NOT EXISTS sur ADD COLUMN) ;
@@ -12,7 +12,55 @@
 // sqliteForeignKeysOff : la migration reconstruit des tables (SQLite ne sait pas retirer un UNIQUE) ; les clés
 // étrangères sont suspendues pendant la migration, puis PRAGMA foreign_key_check vérifie le résultat.
 
+import { hashSid } from './crypto.js';
+
 const T = 'ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci';
+
+// Les sessions existantes gardent leur validité : le cookie n'change pas, seule la valeur stockée devient son empreinte.
+const hashSessionIds = {
+  run: async (q, ctx, exec) => {
+    // Une empreinte (64 caractères hexadécimaux) n'est pas rehachée : la migration peut être rejouée côté MySQL
+    for (const r of await q('SELECT id FROM sessions')) if (!/^[0-9a-f]{64}$/.test(r.id)) await exec('UPDATE sessions SET id = ? WHERE id = ?', [hashSid(r.id), r.id]);
+  },
+};
+
+
+// ---------- Aides de la migration 2 ----------
+
+function ownerParams(ctx) { return [ctx.ownerEmail, ctx.now]; }
+function ownerParams0(ctx) { return [ctx.ownerEmail ?? null]; }
+
+// Des données existent-elles (une instance déjà utilisée) ? Alors elles ont besoin d'un propriétaire.
+async function hasLegacyData(q) {
+  for (const t of ['projects', 'settings', 'jobs']) {
+    if ((await q(`SELECT COUNT(*) n FROM ${t}`))[0].n > 0) return true;
+  }
+  return false;
+}
+
+async function checkOwner(q, ctx) {
+  if (ctx.ownerEmail) return;
+  if (await hasLegacyData(q)) {
+    throw new Error('Migration comptes : des données existent, définis ADMIN_EMAILS (le premier email devient propriétaire de ces données).');
+  }
+}
+
+const infoSchema = (what) => `SELECT 1 x FROM information_schema.${what} WHERE table_schema = DATABASE() AND table_name = ?`;
+function colMissing(t, c) {
+  return async (q) => !(await q(`${infoSchema('columns')} AND column_name = ?`, [t, c])).length;
+}
+function idxExists(t, i) {
+  return async (q) => (await q(`${infoSchema('statistics')} AND index_name = ?`, [t, i])).length > 0;
+}
+function idxMissing(t, i) {
+  return async (q) => !(await idxExists(t, i)(q));
+}
+function fkMissing(t, name) {
+  return async (q) => !(await q(`${infoSchema('table_constraints')} AND constraint_name = ? AND constraint_type = 'FOREIGN KEY'`, [t, name])).length;
+}
+function tableExists(t) {
+  return async (q) => (await q(infoSchema('tables'), [t])).length > 0;
+}
 
 export const MIGRATIONS = [
   {
@@ -535,41 +583,568 @@ export const MIGRATIONS = [
       ) ${T}`,
     ],
   },
+  {
+    // LinkedIn : publier sur une page. Le compte relié garde les droits accordés (scope) et la cible choisie (NULL = le profil) ;
+    // chaque post publié garde le nom de l'endroit où il est parti.
+    name: 'linkedin_pages',
+    sqlite: [
+      'ALTER TABLE linkedin_accounts ADD COLUMN scope TEXT',
+      'ALTER TABLE linkedin_accounts ADD COLUMN target_urn TEXT',
+      'ALTER TABLE linkedin_accounts ADD COLUMN target_name TEXT',
+      'ALTER TABLE linkedin_posts ADD COLUMN author_name TEXT',
+    ],
+    mysql: [
+      { sql: 'ALTER TABLE linkedin_accounts ADD COLUMN scope VARCHAR(600) NULL', when: colMissing('linkedin_accounts', 'scope') },
+      { sql: 'ALTER TABLE linkedin_accounts ADD COLUMN target_urn VARCHAR(100) NULL', when: colMissing('linkedin_accounts', 'target_urn') },
+      { sql: 'ALTER TABLE linkedin_accounts ADD COLUMN target_name VARCHAR(255) NULL', when: colMissing('linkedin_accounts', 'target_name') },
+      { sql: 'ALTER TABLE linkedin_posts ADD COLUMN author_name VARCHAR(255) NULL', when: colMissing('linkedin_posts', 'author_name') },
+    ],
+  },
+  {
+    // Le SMTP « global » des Réglages disparaît : les mails d'AiTools (rapport, évolutions, invitations, avertissements) partent
+    // du SMTP du serveur (SYSTEM_SMTP_*). Pour ne rien casser, chaque projet qui s'appuyait sur ce SMTP en garde une copie.
+    name: 'global_smtp_to_projects',
+    sqlite: [
+      `UPDATE projects SET smtp_enc = (SELECT s.value FROM user_settings s WHERE s.user_id = projects.user_id AND s.key = 'smtp_enc')
+        WHERE smtp_enc IS NULL AND EXISTS (SELECT 1 FROM user_settings s WHERE s.user_id = projects.user_id AND s.key = 'smtp_enc')`,
+      "DELETE FROM user_settings WHERE key = 'smtp_enc'",
+    ],
+    mysql: [
+      `UPDATE projects p JOIN user_settings s ON s.user_id = p.user_id AND s.\`key\` = 'smtp_enc' SET p.smtp_enc = s.value WHERE p.smtp_enc IS NULL`,
+      "DELETE FROM user_settings WHERE `key` = 'smtp_enc'",
+    ],
+  },
+  {
+    // Liste d'opposition : les prospects déjà présents chez les autres comptes passent en « refus » (ils ne sont plus contactés, et
+    // l'état affiché le dit sans révéler d'où vient l'opposition).
+    name: 'opposition_propagation',
+    sqlite: ["UPDATE prospects SET status = 'refused' WHERE status IN ('new', 'sent') AND email IN (SELECT email FROM blacklist)"],
+    mysql: ["UPDATE prospects SET status = 'refused' WHERE status IN ('new', 'sent') AND email IN (SELECT email FROM blacklist)"],
+  },
+  {
+    // Réponses des prospects lues dans la boîte : texte, intention (classement automatique), lu / non lu (popup d'arrivée).
+    name: 'replies',
+    sqlite: [
+      `CREATE TABLE replies (
+        id INTEGER PRIMARY KEY,
+        project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        prospect_id INTEGER REFERENCES prospects(id) ON DELETE CASCADE,
+        uid INTEGER,                -- UID IMAP : une réponse n'est enregistrée qu'une fois
+        from_email TEXT NOT NULL, subject TEXT, body TEXT,
+        intent TEXT NOT NULL DEFAULT 'other',   -- interested | question | later | refused | other
+        received_at INTEGER NOT NULL, seen_at INTEGER
+      )`,
+      'CREATE UNIQUE INDEX replies_uid ON replies(project_id, uid)',
+      'CREATE INDEX replies_project ON replies(project_id, received_at)',
+      'CREATE INDEX replies_prospect ON replies(prospect_id)',
+    ],
+    mysql: [
+      `CREATE TABLE IF NOT EXISTS replies (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        project_id BIGINT NOT NULL,
+        prospect_id BIGINT NULL,
+        uid BIGINT NULL,
+        from_email VARCHAR(255) NOT NULL, subject TEXT, body TEXT,
+        intent VARCHAR(20) NOT NULL DEFAULT 'other',
+        received_at BIGINT NOT NULL, seen_at BIGINT NULL,
+        UNIQUE KEY replies_uid (project_id, uid),
+        KEY replies_project (project_id, received_at),
+        KEY replies_prospect (prospect_id),
+        CONSTRAINT replies_project_fk FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+        CONSTRAINT replies_prospect_fk FOREIGN KEY (prospect_id) REFERENCES prospects(id) ON DELETE CASCADE
+      ) ${T}`,
+    ],
+  },
+  {
+    // Accusés de lecture (MDN, RFC 8098) : le destinataire choisit d'en envoyer un ; aucun pixel espion.
+    name: 'read_receipts',
+    sqlite: ['ALTER TABLE mail_log ADD COLUMN read_at INTEGER'],
+    mysql: [{ sql: 'ALTER TABLE mail_log ADD COLUMN read_at BIGINT NULL', when: colMissing('mail_log', 'read_at') }],
+  },
+  {
+    // Agenda : lien iCal secret par compte ; posts LinkedIn programmés (publiés par le planificateur à l'heure choisie).
+    name: 'calendar',
+    sqlite: [
+      `CREATE TABLE ical_feeds (
+        user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+        token_hash TEXT NOT NULL UNIQUE,
+        token_enc TEXT NOT NULL,     -- le lien d'un agenda doit pouvoir être réaffiché : chiffré, jamais en clair
+        created_at INTEGER NOT NULL
+      )`,
+      'ALTER TABLE linkedin_posts ADD COLUMN scheduled_at INTEGER',
+      'ALTER TABLE linkedin_posts ADD COLUMN schedule_error TEXT',
+    ],
+    mysql: [
+      `CREATE TABLE IF NOT EXISTS ical_feeds (
+        user_id BIGINT NOT NULL PRIMARY KEY,
+        token_hash VARCHAR(64) NOT NULL,
+        token_enc TEXT NOT NULL,
+        created_at BIGINT NOT NULL,
+        UNIQUE KEY ical_feeds_hash (token_hash),
+        CONSTRAINT ical_feeds_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      ) ${T}`,
+      { sql: 'ALTER TABLE linkedin_posts ADD COLUMN scheduled_at BIGINT NULL', when: colMissing('linkedin_posts', 'scheduled_at') },
+      { sql: 'ALTER TABLE linkedin_posts ADD COLUMN schedule_error VARCHAR(500) NULL', when: colMissing('linkedin_posts', 'schedule_error') },
+    ],
+  },
+  {
+    // Jetons d'API (mode développeur) : seul le SHA-256 du jeton est gardé, jamais le jeton lui-même.
+    name: 'api_tokens',
+    sqlite: [
+      `CREATE TABLE api_tokens (
+        id INTEGER PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        token_hash TEXT NOT NULL UNIQUE,
+        prefix TEXT NOT NULL,        -- début du jeton, pour le reconnaître dans la liste
+        scopes TEXT NOT NULL,        -- read, write, jobs (séparés par des virgules)
+        created_at INTEGER NOT NULL, last_used_at INTEGER
+      )`,
+      'CREATE INDEX api_tokens_user ON api_tokens(user_id)',
+    ],
+    mysql: [
+      `CREATE TABLE IF NOT EXISTS api_tokens (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        user_id BIGINT NOT NULL,
+        name VARCHAR(100) NOT NULL,
+        token_hash VARCHAR(64) NOT NULL,
+        prefix VARCHAR(16) NOT NULL,
+        scopes VARCHAR(60) NOT NULL,
+        created_at BIGINT NOT NULL, last_used_at BIGINT NULL,
+        UNIQUE KEY api_tokens_hash (token_hash),
+        KEY api_tokens_user (user_id),
+        CONSTRAINT api_tokens_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      ) ${T}`,
+    ],
+  },
+  {
+    // Identifiants de session : la base ne garde plus que leur empreinte SHA-256. Personne n'est déconnecté (voir hashSessionIds).
+    name: 'session_id_hashing',
+    sqlite: [hashSessionIds],
+    mysql: [hashSessionIds],
+  },
+  {
+    // Place réservée : le runner MySQL suit les migrations par numéro (position dans la liste). `calendar_events` avait été insérée
+    // plus haut par erreur, ce qui a décalé les numéros des suivantes ; ce vide garantit qu'elle reçoit un numéro jamais appliqué.
+    name: 'reserved_1',
+    sqlite: [],
+    mysql: [],
+  },
+  {
+    // Événements de l'agenda : ajoutés à la main, ou proposés à partir d'une réponse de prospect (date, appel, rendez-vous).
+    name: 'calendar_events',
+    sqlite: [
+      `CREATE TABLE calendar_events (
+        id INTEGER PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE,
+        prospect_id INTEGER,
+        reply_id INTEGER,
+        title TEXT NOT NULL, notes TEXT,
+        starts_at INTEGER NOT NULL, minutes INTEGER NOT NULL DEFAULT 30,
+        created_at INTEGER NOT NULL
+      )`,
+      'CREATE INDEX calendar_events_user ON calendar_events(user_id, starts_at)',
+      'CREATE INDEX calendar_events_reply ON calendar_events(reply_id)',
+    ],
+    mysql: [
+      `CREATE TABLE IF NOT EXISTS calendar_events (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        user_id BIGINT NOT NULL,
+        project_id BIGINT NULL,
+        prospect_id BIGINT NULL,
+        reply_id BIGINT NULL,
+        title VARCHAR(255) NOT NULL, notes TEXT,
+        starts_at BIGINT NOT NULL, minutes INT NOT NULL DEFAULT 30,
+        created_at BIGINT NOT NULL,
+        KEY calendar_events_user (user_id, starts_at),
+        KEY calendar_events_reply (reply_id),
+        CONSTRAINT calendar_events_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        CONSTRAINT calendar_events_project_fk FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+      ) ${T}`,
+    ],
+  },
+  {
+    // Page IA : conversations de l'utilisateur avec Claude et leurs messages. Supprimés avec le compte (cascade).
+    name: 'chat',
+    sqlite: [
+      `CREATE TABLE chat_conversations (
+        id INTEGER PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        title TEXT NOT NULL, model TEXT NOT NULL,
+        created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+      )`,
+      'CREATE INDEX chat_conversations_user ON chat_conversations(user_id, updated_at)',
+      `CREATE TABLE chat_messages (
+        id INTEGER PRIMARY KEY,
+        conversation_id INTEGER NOT NULL REFERENCES chat_conversations(id) ON DELETE CASCADE,
+        role TEXT NOT NULL, content TEXT NOT NULL, model TEXT,
+        cost_usd REAL NOT NULL DEFAULT 0, created_at INTEGER NOT NULL
+      )`,
+      'CREATE INDEX chat_messages_conv ON chat_messages(conversation_id, id)',
+    ],
+    mysql: [
+      `CREATE TABLE IF NOT EXISTS chat_conversations (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        user_id BIGINT NOT NULL,
+        title VARCHAR(200) NOT NULL, model VARCHAR(64) NOT NULL,
+        created_at BIGINT NOT NULL, updated_at BIGINT NOT NULL,
+        KEY chat_conversations_user (user_id, updated_at),
+        CONSTRAINT chat_conversations_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      ) ${T}`,
+      `CREATE TABLE IF NOT EXISTS chat_messages (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        conversation_id BIGINT NOT NULL,
+        role VARCHAR(12) NOT NULL, content MEDIUMTEXT NOT NULL, model VARCHAR(64) NULL,
+        cost_usd DOUBLE NOT NULL DEFAULT 0, created_at BIGINT NOT NULL,
+        KEY chat_messages_conv (conversation_id, id),
+        CONSTRAINT chat_messages_conv_fk FOREIGN KEY (conversation_id) REFERENCES chat_conversations(id) ON DELETE CASCADE
+      ) ${T}`,
+    ],
+  },
+  {
+    // Page IA : pièces jointes (images, PDF, fichiers texte, vidéos) et projets joints. Les fichiers sont sur le disque (dossier de l'utilisateur,
+    // supprimé avec son compte) ; `file` est le nom du fichier, jamais un chemin. Un projet supprimé laisse la ligne (project_id passe à NULL).
+    name: 'chat_attachments',
+    sqlite: [
+      `CREATE TABLE chat_attachments (
+        id INTEGER PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        conversation_id INTEGER REFERENCES chat_conversations(id) ON DELETE CASCADE,
+        message_id INTEGER REFERENCES chat_messages(id) ON DELETE CASCADE,
+        kind TEXT NOT NULL, name TEXT NOT NULL, mime TEXT, size INTEGER NOT NULL DEFAULT 0,
+        file TEXT, project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL, meta TEXT,
+        created_at INTEGER NOT NULL
+      )`,
+      'CREATE INDEX chat_attachments_user ON chat_attachments(user_id, created_at)',
+      'CREATE INDEX chat_attachments_message ON chat_attachments(message_id)',
+      'CREATE INDEX chat_attachments_conv ON chat_attachments(conversation_id)',
+    ],
+    mysql: [
+      `CREATE TABLE IF NOT EXISTS chat_attachments (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        user_id BIGINT NOT NULL,
+        conversation_id BIGINT NULL,
+        message_id BIGINT NULL,
+        kind VARCHAR(12) NOT NULL, name VARCHAR(255) NOT NULL, mime VARCHAR(100) NULL, size BIGINT NOT NULL DEFAULT 0,
+        file VARCHAR(100) NULL, project_id BIGINT NULL, meta TEXT NULL,
+        created_at BIGINT NOT NULL,
+        KEY chat_attachments_user (user_id, created_at),
+        KEY chat_attachments_message (message_id),
+        KEY chat_attachments_conv (conversation_id),
+        CONSTRAINT chat_attachments_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        CONSTRAINT chat_attachments_conv_fk FOREIGN KEY (conversation_id) REFERENCES chat_conversations(id) ON DELETE CASCADE,
+        CONSTRAINT chat_attachments_msg_fk FOREIGN KEY (message_id) REFERENCES chat_messages(id) ON DELETE CASCADE,
+        CONSTRAINT chat_attachments_project_fk FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL
+      ) ${T}`,
+    ],
+  },
+  {
+    // Onglet Promotion : vidéos de design motion générées pour un projet. Le fichier MP4 est sur le disque (dossier de l'utilisateur, supprimé avec son
+    // compte) ; `file` est un nom de fichier, jamais un chemin. Supprimer le projet supprime les lignes (les fichiers sont retirés par le code).
+    name: 'promo_videos',
+    sqlite: [
+      `CREATE TABLE promo_videos (
+        id INTEGER PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        subject TEXT NOT NULL DEFAULT '', fps INTEGER NOT NULL, seconds INTEGER NOT NULL, format TEXT NOT NULL,
+        width INTEGER NOT NULL, height INTEGER NOT NULL, size INTEGER NOT NULL DEFAULT 0, file TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+      )`,
+      'CREATE INDEX promo_videos_project ON promo_videos(project_id, id)',
+      'CREATE INDEX promo_videos_user ON promo_videos(user_id, id)',
+    ],
+    mysql: [
+      `CREATE TABLE IF NOT EXISTS promo_videos (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        user_id BIGINT NOT NULL,
+        project_id BIGINT NOT NULL,
+        subject VARCHAR(600) NOT NULL DEFAULT '', fps INT NOT NULL, seconds INT NOT NULL, format VARCHAR(12) NOT NULL,
+        width INT NOT NULL, height INT NOT NULL, size BIGINT NOT NULL DEFAULT 0, file VARCHAR(100) NOT NULL,
+        created_at BIGINT NOT NULL,
+        KEY promo_videos_project (project_id, id),
+        KEY promo_videos_user (user_id, id),
+        CONSTRAINT promo_videos_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        CONSTRAINT promo_videos_project_fk FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+      ) ${T}`,
+    ],
+  },
+  {
+    // Page IA, mode Support : une conversation est soit « claude » (assistant classique), soit « support » (aide sur l'application, Claude lit la documentation).
+    // Les anciennes conversations restent « claude ».
+    name: 'chat_mode',
+    sqlite: ["ALTER TABLE chat_conversations ADD COLUMN mode TEXT NOT NULL DEFAULT 'claude'"],
+    mysql: [
+      { sql: "ALTER TABLE chat_conversations ADD COLUMN mode VARCHAR(12) NOT NULL DEFAULT 'claude'", when: colMissing('chat_conversations', 'mode') },
+    ],
+  },
+  {
+    // Mails de prospection : texte simple par défaut ; l'utilisateur peut choisir le HTML en validant le modèle (case « Envoyer en HTML »).
+    name: 'template_html',
+    sqlite: ['ALTER TABLE templates ADD COLUMN html INTEGER NOT NULL DEFAULT 0'],
+    mysql: [
+      { sql: 'ALTER TABLE templates ADD COLUMN html TINYINT NOT NULL DEFAULT 0', when: colMissing('templates', 'html') },
+    ],
+  },
+  {
+    // Comptabilité : une ligne par paiement, dépense, remboursement… avec son justificatif (fichier sur le disque, un dossier par ligne). Le nom du projet est
+    // recopié : supprimer un projet ne supprime pas la comptabilité (on garde les pièces), la ligne reste classée sous son ancien nom.
+    name: 'accounting',
+    sqlite: [
+      `CREATE TABLE accounting_entries (
+        id INTEGER PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL,
+        project_name TEXT NOT NULL DEFAULT '',
+        kind TEXT NOT NULL,
+        entry_date TEXT NOT NULL,
+        label TEXT NOT NULL,
+        party TEXT NOT NULL DEFAULT '',
+        category TEXT NOT NULL DEFAULT '',
+        amount_cents INTEGER NOT NULL,
+        vat_rate INTEGER NOT NULL DEFAULT 0,
+        vat_cents INTEGER NOT NULL DEFAULT 0,
+        method TEXT NOT NULL DEFAULT 'transfer',
+        notes TEXT NOT NULL DEFAULT '',
+        doc_name TEXT NOT NULL,
+        doc_mime TEXT NOT NULL,
+        doc_size INTEGER NOT NULL,
+        doc_file TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )`,
+      'CREATE INDEX accounting_user_date ON accounting_entries(user_id, entry_date)',
+      'CREATE INDEX accounting_project ON accounting_entries(project_id)',
+      `CREATE TABLE accounting_declarations (
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        period TEXT NOT NULL,
+        done_at INTEGER NOT NULL,
+        PRIMARY KEY (user_id, period)
+      )`,
+    ],
+    mysql: [
+      `CREATE TABLE IF NOT EXISTS accounting_entries (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        user_id BIGINT NOT NULL,
+        project_id BIGINT NULL,
+        project_name VARCHAR(200) NOT NULL DEFAULT '',
+        kind VARCHAR(20) NOT NULL,
+        entry_date VARCHAR(10) NOT NULL,
+        label VARCHAR(200) NOT NULL,
+        party VARCHAR(200) NOT NULL DEFAULT '',
+        category VARCHAR(30) NOT NULL DEFAULT '',
+        amount_cents BIGINT NOT NULL,
+        vat_rate INT NOT NULL DEFAULT 0,
+        vat_cents BIGINT NOT NULL DEFAULT 0,
+        method VARCHAR(20) NOT NULL DEFAULT 'transfer',
+        notes VARCHAR(600) NOT NULL DEFAULT '',
+        doc_name VARCHAR(200) NOT NULL,
+        doc_mime VARCHAR(60) NOT NULL,
+        doc_size BIGINT NOT NULL,
+        doc_file VARCHAR(60) NOT NULL,
+        created_at BIGINT NOT NULL,
+        updated_at BIGINT NOT NULL,
+        KEY accounting_user_date (user_id, entry_date),
+        KEY accounting_project (project_id),
+        CONSTRAINT accounting_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        CONSTRAINT accounting_project_fk FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL
+      ) ${T}`,
+      `CREATE TABLE IF NOT EXISTS accounting_declarations (
+        user_id BIGINT NOT NULL,
+        period VARCHAR(10) NOT NULL,
+        done_at BIGINT NOT NULL,
+        PRIMARY KEY (user_id, period),
+        CONSTRAINT accounting_decl_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      ) ${T}`,
+    ],
+  },
+  {
+    // Facturation : informations légales d'un projet et modèles de documents (3 exemples de devis, puis devis / acompte / facture finale / avoir).
+    // `variant` : 1 à 3 pour les exemples de devis (kind « quote_option »), 0 pour les quatre documents définitifs.
+    name: 'billing',
+    sqlite: [
+      `CREATE TABLE billing_projects (
+        project_id INTEGER PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        legal_json TEXT NOT NULL,
+        chosen INTEGER,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )`,
+      `CREATE TABLE billing_docs (
+        id INTEGER PRIMARY KEY,
+        project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        kind TEXT NOT NULL,
+        variant INTEGER NOT NULL DEFAULT 0,
+        status TEXT NOT NULL DEFAULT 'draft',
+        layout TEXT NOT NULL DEFAULT 'classique',
+        content_json TEXT NOT NULL,
+        refinement TEXT NOT NULL DEFAULT '',
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        validated_at INTEGER,
+        UNIQUE (project_id, kind, variant)
+      )`,
+      'CREATE INDEX billing_docs_user ON billing_docs(user_id)',
+    ],
+    mysql: [
+      `CREATE TABLE IF NOT EXISTS billing_projects (
+        project_id BIGINT NOT NULL PRIMARY KEY,
+        user_id BIGINT NOT NULL,
+        legal_json TEXT NOT NULL,
+        chosen INT NULL,
+        created_at BIGINT NOT NULL,
+        updated_at BIGINT NOT NULL,
+        CONSTRAINT billing_projects_project_fk FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+        CONSTRAINT billing_projects_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      ) ${T}`,
+      `CREATE TABLE IF NOT EXISTS billing_docs (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        project_id BIGINT NOT NULL,
+        user_id BIGINT NOT NULL,
+        kind VARCHAR(20) NOT NULL,
+        variant INT NOT NULL DEFAULT 0,
+        status VARCHAR(12) NOT NULL DEFAULT 'draft',
+        layout VARCHAR(12) NOT NULL DEFAULT 'classique',
+        content_json MEDIUMTEXT NOT NULL,
+        refinement VARCHAR(1000) NOT NULL DEFAULT '',
+        created_at BIGINT NOT NULL,
+        updated_at BIGINT NOT NULL,
+        validated_at BIGINT NULL,
+        UNIQUE KEY billing_docs_slot (project_id, kind, variant),
+        KEY billing_docs_user (user_id),
+        CONSTRAINT billing_docs_project_fk FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+        CONSTRAINT billing_docs_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      ) ${T}`,
+    ],
+  },
+  {
+    name: 'billing_invoices',
+    sqlite: [
+      `CREATE TABLE billing_invoices (
+        id INTEGER PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL,
+        project_name TEXT NOT NULL DEFAULT '',
+        kind TEXT NOT NULL,
+        number TEXT NOT NULL,
+        issue_date TEXT NOT NULL,
+        due_date TEXT NOT NULL DEFAULT '',
+        client_json TEXT NOT NULL,
+        amount_cents INTEGER NOT NULL DEFAULT 0,
+        entry_id INTEGER,
+        pdf_file TEXT NOT NULL,
+        pdf_size INTEGER NOT NULL,
+        created_at INTEGER NOT NULL,
+        UNIQUE (user_id, number)
+      )`,
+      'CREATE INDEX billing_invoices_project ON billing_invoices(project_id)',
+      "ALTER TABLE accounting_entries ADD COLUMN pending INTEGER NOT NULL DEFAULT 0",
+      "ALTER TABLE accounting_entries ADD COLUMN invoice_id INTEGER",
+    ],
+    mysql: [
+      `CREATE TABLE IF NOT EXISTS billing_invoices (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        user_id BIGINT NOT NULL,
+        project_id BIGINT NULL,
+        project_name VARCHAR(200) NOT NULL DEFAULT '',
+        kind VARCHAR(20) NOT NULL,
+        number VARCHAR(40) NOT NULL,
+        issue_date VARCHAR(10) NOT NULL,
+        due_date VARCHAR(10) NOT NULL DEFAULT '',
+        client_json TEXT NOT NULL,
+        amount_cents BIGINT NOT NULL DEFAULT 0,
+        entry_id BIGINT NULL,
+        pdf_file VARCHAR(60) NOT NULL,
+        pdf_size BIGINT NOT NULL,
+        created_at BIGINT NOT NULL,
+        UNIQUE KEY billing_invoices_number (user_id, number),
+        KEY billing_invoices_project (project_id),
+        CONSTRAINT billing_invoices_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      ) ${T}`,
+      { sql: 'ALTER TABLE accounting_entries ADD COLUMN pending TINYINT NOT NULL DEFAULT 0', when: colMissing('accounting_entries', 'pending') },
+      { sql: 'ALTER TABLE accounting_entries ADD COLUMN invoice_id BIGINT NULL', when: colMissing('accounting_entries', 'invoice_id') },
+    ],
+  },
+  {
+    name: 'billing_clients',
+    sqlite: [
+      `CREATE TABLE billing_clients (
+        id INTEGER PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        name TEXT NOT NULL,
+        address TEXT NOT NULL DEFAULT '',
+        siret TEXT NOT NULL DEFAULT '',
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )`,
+      'CREATE INDEX billing_clients_project ON billing_clients(project_id)',
+    ],
+    mysql: [
+      `CREATE TABLE IF NOT EXISTS billing_clients (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        user_id BIGINT NOT NULL,
+        project_id BIGINT NOT NULL,
+        name VARCHAR(120) NOT NULL,
+        address VARCHAR(200) NOT NULL DEFAULT '',
+        siret VARCHAR(20) NOT NULL DEFAULT '',
+        created_at BIGINT NOT NULL,
+        updated_at BIGINT NOT NULL,
+        KEY billing_clients_project (project_id),
+        CONSTRAINT billing_clients_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        CONSTRAINT billing_clients_project_fk FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+      ) ${T}`,
+    ],
+  },
+  {
+    // Page Clients : un client garde ses coordonnées, une note, et le lien vers le prospect dont il vient ; un document émis se rattache à son client.
+    name: 'clients_page',
+    sqlite: [
+      "ALTER TABLE billing_clients ADD COLUMN email TEXT NOT NULL DEFAULT ''",
+      "ALTER TABLE billing_clients ADD COLUMN phone TEXT NOT NULL DEFAULT ''",
+      "ALTER TABLE billing_clients ADD COLUMN contact TEXT NOT NULL DEFAULT ''",
+      "ALTER TABLE billing_clients ADD COLUMN notes TEXT NOT NULL DEFAULT ''",
+      'ALTER TABLE billing_clients ADD COLUMN prospect_id INTEGER',
+      'ALTER TABLE billing_invoices ADD COLUMN client_id INTEGER',
+    ],
+    mysql: [
+      { sql: "ALTER TABLE billing_clients ADD COLUMN email VARCHAR(255) NOT NULL DEFAULT ''", when: colMissing('billing_clients', 'email') },
+      { sql: "ALTER TABLE billing_clients ADD COLUMN phone VARCHAR(40) NOT NULL DEFAULT ''", when: colMissing('billing_clients', 'phone') },
+      { sql: "ALTER TABLE billing_clients ADD COLUMN contact VARCHAR(120) NOT NULL DEFAULT ''", when: colMissing('billing_clients', 'contact') },
+      { sql: 'ALTER TABLE billing_clients ADD COLUMN notes TEXT NULL', when: colMissing('billing_clients', 'notes') },
+      { sql: 'ALTER TABLE billing_clients ADD COLUMN prospect_id BIGINT NULL', when: colMissing('billing_clients', 'prospect_id') },
+      { sql: 'ALTER TABLE billing_invoices ADD COLUMN client_id BIGINT NULL', when: colMissing('billing_invoices', 'client_id') },
+    ],
+  },
+  {
+    // Un document émis garde les lignes réellement saisies (devis) et sa référence : acompte, facture finale et avoir se rattachent à un devis émis.
+    name: 'billing_refs',
+    sqlite: [
+      'ALTER TABLE billing_invoices ADD COLUMN devis_id INTEGER',
+      'ALTER TABLE billing_invoices ADD COLUMN ref_id INTEGER',
+      'ALTER TABLE billing_invoices ADD COLUMN lines_json TEXT',
+      'ALTER TABLE billing_invoices ADD COLUMN meta_json TEXT',
+    ],
+    mysql: [
+      { sql: 'ALTER TABLE billing_invoices ADD COLUMN devis_id BIGINT NULL', when: colMissing('billing_invoices', 'devis_id') },
+      { sql: 'ALTER TABLE billing_invoices ADD COLUMN ref_id BIGINT NULL', when: colMissing('billing_invoices', 'ref_id') },
+      { sql: 'ALTER TABLE billing_invoices ADD COLUMN lines_json MEDIUMTEXT NULL', when: colMissing('billing_invoices', 'lines_json') },
+      { sql: 'ALTER TABLE billing_invoices ADD COLUMN meta_json TEXT NULL', when: colMissing('billing_invoices', 'meta_json') },
+    ],
+  },
+  {
+    // Adresse du site du produit : insérée dans les mails de prospection par la variable {{site}}.
+    name: 'project_site_url',
+    sqlite: ['ALTER TABLE projects ADD COLUMN site_url TEXT'],
+    mysql: [{ sql: 'ALTER TABLE projects ADD COLUMN site_url VARCHAR(300) NULL', when: colMissing('projects', 'site_url') }],
+  },
+  {
+    name: 'job_console',
+    sqlite: ['ALTER TABLE jobs ADD COLUMN log_json TEXT'],
+    mysql: [{ sql: 'ALTER TABLE jobs ADD COLUMN log_json MEDIUMTEXT NULL', when: colMissing('jobs', 'log_json') }],
+  },
 ];
 
-// ---------- Aides de la migration 2 ----------
-
-function ownerParams(ctx) { return [ctx.ownerEmail, ctx.now]; }
-function ownerParams0(ctx) { return [ctx.ownerEmail ?? null]; }
-
-// Des données existent-elles (une instance déjà utilisée) ? Alors elles ont besoin d'un propriétaire.
-async function hasLegacyData(q) {
-  for (const t of ['projects', 'settings', 'jobs']) {
-    if ((await q(`SELECT COUNT(*) n FROM ${t}`))[0].n > 0) return true;
-  }
-  return false;
-}
-
-async function checkOwner(q, ctx) {
-  if (ctx.ownerEmail) return;
-  if (await hasLegacyData(q)) {
-    throw new Error('Migration comptes : des données existent, définis ADMIN_EMAILS (le premier email devient propriétaire de ces données).');
-  }
-}
-
-const infoSchema = (what) => `SELECT 1 x FROM information_schema.${what} WHERE table_schema = DATABASE() AND table_name = ?`;
-function colMissing(t, c) {
-  return async (q) => !(await q(`${infoSchema('columns')} AND column_name = ?`, [t, c])).length;
-}
-function idxExists(t, i) {
-  return async (q) => (await q(`${infoSchema('statistics')} AND index_name = ?`, [t, i])).length > 0;
-}
-function idxMissing(t, i) {
-  return async (q) => !(await idxExists(t, i)(q));
-}
-function fkMissing(t, name) {
-  return async (q) => !(await q(`${infoSchema('table_constraints')} AND constraint_name = ? AND constraint_type = 'FOREIGN KEY'`, [t, name])).length;
-}
-function tableExists(t) {
-  return async (q) => (await q(infoSchema('tables'), [t])).length > 0;
-}

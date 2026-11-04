@@ -1,0 +1,86 @@
+/* Téléphone : aucune page ne défile de côté. Chargé après app.css / site.css, il ne change rien au-dessus de 700 px. */
+
+/* Un mot ou une adresse trop long passe à la ligne au lieu d'élargir la page */
+.page, .page * { overflow-wrap: break-word; }
+.page :where(.row, .row-actions, .reply-pop, .card, section, article, label, summary, li, p) { min-width: 0; }
+pre, code, .tokenbox code { overflow-wrap: anywhere; }
+pre { white-space: pre-wrap; }
+img, svg, video, canvas { max-width: 100%; }
+/* Tableaux : le texte long passe à la ligne (adresses, objets) plutôt que d'élargir la page ; seuls les en-têtes restent sur une ligne */
+td { white-space: normal; overflow-wrap: break-word; }
+td select, td .btn, td .badge, td button { white-space: nowrap; }
+td:has(> select), td:has(> .badge) { min-width: 7.5rem; }
+
+@media (max-width: 700px) {
+  .page, .page * { overflow-wrap: anywhere; } /* sur téléphone, plus de tableau à colonnes automatiques : on coupe où il faut */
+  .table-wrap, .art .tw { overflow-x: visible !important; }
+  .tw td, .tw th { padding-left: 10px; padding-right: 10px; } /* la maquette de l'accueil tient dans 320 px */
+  /* ---- Menu du haut : tout tient sur la largeur, sans défilement, avec des icônes au-dessus des mots ---- */
+  .pills { overflow: visible; justify-content: stretch; gap: 0; padding-bottom: 0; }
+  .pill { flex: 1 1 auto; min-width: 0; flex-direction: column; justify-content: center; gap: 2px; min-height: 52px; padding: 6px 2px; border-radius: 0; font-size: .6875rem; line-height: 1.15; text-align: center; }
+  .pill .ic { width: 22px; height: 22px; }
+  .top-in { gap: 6px 12px; padding: 8px 12px 6px; }
+
+  /* ---- Champs : 16 px au moins, sinon iOS zoome au focus et la page se met à défiler de côté ---- */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), select, textarea { font-size: 16px !important; }
+
+  /* ---- Boutons : le texte long passe à la ligne ---- */
+  .btn { white-space: normal; text-align: center; line-height: 1.25; height: auto; padding-top: 10px; padding-bottom: 10px; max-width: 100%; }
+  .row, .row-actions { min-width: 0; }
+
+  /* ---- Fenêtres flottantes : jamais plus larges que l'écran ---- */
+  .reply-pops { right: 8px; left: 8px; bottom: 8px; width: auto; }
+  .reply-pop, .reply-pop > summary, .reply-body { min-width: 0; max-width: 100%; }
+  .prospect-dialog { width: calc(100vw - 16px); padding: 16px; }
+  .tokenbox { flex-direction: column; align-items: stretch; }
+  .tokenbox code { flex-basis: auto; }
+  .row-between { align-items: stretch; }
+}
+/* Libellé court (« Compta ») sous 450 px : le nom complet reste dans la page pour les lecteurs d'écran */
+@media (max-width: 450px) {
+  .pill-s { display: inline; }
+  .pill-l { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+}
+/* Très petit écran (320 px) : sept libellés ne tiennent qu'en retirant les marges des cases */
+@media (max-width: 340px) {
+  .pill { padding-left: 0; padding-right: 0; }
+}
+/* ---- Selon la place RÉELLE du bloc (téléphone, mais aussi panneau étroit sur tablette ou petit portable) ---- */
+[data-prospects], .table-wrap, .cal, .art .tw { container: rc / inline-size; }
+@container rc (max-width: 700px) {
+  /* ---- Tableaux : une carte par ligne, chaque cellule avec son titre (public/responsive.js pose data-label) ---- */
+  table.rt-stack, table.rt-stack tbody, table.rt-stack tr, table.rt-stack td { display: block; width: 100%; min-width: 0; }
+  table.rt-stack thead { display: none; }
+  table.rt-stack tr { margin: 0 0 10px; padding: 8px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); }
+  table.rt-stack td { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 6px 0; border: 0; text-align: right; }
+  table.rt-stack td[data-label]::before { content: attr(data-label); flex: 0 0 34%; max-width: 40%; text-align: left; font-weight: 600; font-size: .8125rem; color: var(--muted); }
+  table.rt-stack td[data-label=""]::before { display: none; }
+  table.rt-stack td, table.rt-flow td { white-space: normal; }
+  table.rt-stack td, table.rt-stack td * { overflow-wrap: anywhere; }
+  .art table.rt-stack, .art table.rt-flow { min-width: 0; }
+  table.rt-stack td > .cv { flex: 1 1 0; min-width: 0; text-align: right; }
+  table.rt-stack td > * { min-width: 0; max-width: 100%; }
+  table.rt-stack .badge { white-space: normal; text-align: left; }
+  table.rt-stack td select { width: auto; max-width: 62%; }
+  table.rt-stack td form { margin: 0; }
+  table.rt-flow, table.rt-flow tbody { display: block; width: 100%; }
+  table.rt-flow tr { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  table.rt-flow td { display: block; padding: 0; border: 0; }
+
+  /* ---- Calendrier : une liste de jours avec leurs rendez-vous, au lieu d'une grille de 7 colonnes ---- */
+  .cal { overflow: visible; }
+  .cal-head { display: none; }
+  .cal-grid { grid-template-columns: 1fr; gap: 8px; }
+  .cal-cell { min-height: 0; }
+  .cal-cell:not(.has):not(.today) { display: none; }
+  .cal-cell.today:not(.has)::after { content: "Rien de prévu aujourd'hui"; font-size: .8125rem; color: var(--muted); }
+  .cal-wd { display: inline; }
+  .cal-ev { white-space: normal; overflow: visible; font-size: .875rem; }
+
+  /* ---- Kanban : les colonnes s'empilent, les colonnes vides sont masquées ---- */
+  .kanban { display: flex; flex-direction: column; overflow: visible; }
+  .kcol.empty { display: none; }
+
+}
+
+.cal-wd { display: none; }

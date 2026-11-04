@@ -1,25 +1,217 @@
 // Front vanilla, sans build. Polling léger uniquement sur les projets dépliés.
 (() => {
+  // Ce script peut être relancé sans recharger la page (public/ajax.js remplace le contenu, puis le ré-exécute) : la précédente exécution
+  // est d'abord arrêtée. Tout ce qui est branché sur document, window ou un minuteur passe par listen / every / later, pour pouvoir être retiré.
+  window.AiTools?.dispose?.();
+  let disposed = false;
+  const cleanups = [];
+  const timers = new Set();
+  const listen = (target, type, fn, opts) => { target.addEventListener(type, fn, opts); cleanups.push(() => target.removeEventListener(type, fn, opts)); };
+  const every = (fn, ms) => { const id = setInterval(fn, ms); cleanups.push(() => clearInterval(id)); return id; };
+  // Minuteur de rafraîchissement : ne part plus une fois cette exécution arrêtée, et s'annule avec elle
+  const later = (fn, ms) => {
+    if (disposed) return 0;
+    const id = setTimeout(() => { timers.delete(id); if (!disposed) fn(); }, ms);
+    timers.add(id);
+    return id;
+  };
+  window.AiTools = {
+    toast: (...a) => toast(...a),
+    dispose() { disposed = true; for (const f of cleanups.splice(0)) f(); for (const t of timers) clearTimeout(t); timers.clear(); },
+  };
+  // Rechargement et navigation sans quitter la page quand public/ajax.js est là ; navigation classique sinon
+  // Un rechargement voulu par l'application (fin d'analyse, cible validée…) garde le projet ouvert ; l'arrivée sur la page, elle, ne rouvre rien
+  const rememberOpen = () => { try { const d = document.querySelector('details.project[open]'); if (d) sessionStorage.setItem('reopenProject', d.dataset.id); } catch { /* stockage indisponible */ } };
+  const reload = () => { rememberOpen(); if (window.AiNav) window.AiNav.reload(); else location.reload(); };
+  const go = (url) => (window.AiNav ? window.AiNav.go(url) : (location.href = url));
+
   const $ = (sel, el = document) => el.querySelector(sel);
   const $$ = (sel, el = document) => [...el.querySelectorAll(sel)];
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const formData = (form) => Object.fromEntries(new FormData(form));
+  const icon = (name) => `<svg class="ic" aria-hidden="true" viewBox="0 0 24 24"><use href="#i-${name}"></use></svg>`;
+  const liDay = (ts) => new Date(ts * 1000).toLocaleDateString('fr-FR', { dateStyle: 'medium', timeZone: 'Europe/Paris' });
+
+  // Montée en charge : un conseil (jamais un blocage) pendant la première semaine d'envois d'un projet
+  const warmupLine = (w) => (w?.active ? ` · conseil : ${w.perDay / 2} à ${w.perDay} par jour cette première semaine` : '');
+  const warmupNotice = (w, count) => (!w?.active || (w.sentToday || 0) + count <= w.perDay ? null
+    : `Conseil : ${w.perDay / 2} à ${w.perDay} mails par jour pendant la première semaine protègent la réputation de ton adresse d'envoi (encore ${w.daysLeft} jour${w.daysLeft > 1 ? 's' : ''}). Tu peux quand même envoyer plus.`);
+
+  // Lancement d'une tâche (analyse, recherche, envoi, audit…) : le bouton s'enfonce, puis un petit agent apporte la tâche au menu « Activité »
+  // (public/fx.js). Un seul point d'accroche, ici : toute route qui met un job en file passe par api().
+  const LAUNCH = /^\/api\/(projects\/\d+\/(analyze|template|followup_template|prospect|evolution|code-review|send|linkedin\/generate|promo\/generate|poste\/\w+)|prospects\/\d+\/hook)$/;
+  let lastTrigger = null; // le bouton cliqué (ou validé au clavier) juste avant
+  listen(document, 'click', (e) => { const t = e.target.closest?.('button, a.btn, label.btn'); if (t && !t.closest('dialog.confirm')) lastTrigger = t; }, true);
+  listen(document, 'submit', (e) => { lastTrigger = e.submitter || $('button:not([type=button])', e.target) || lastTrigger; }, true);
+
+  // Anti-double-clic : un clic répété sur un bouton (2e, 3e clic d'une série rapide) est ignoré, sauf bouton marqué data-repeat
+  listen(document, 'click', (e) => {
+    const t = e.target.closest?.('button');
+    if (t && e.detail > 1 && !t.hasAttribute('data-repeat')) { e.preventDefault(); e.stopImmediatePropagation(); }
+  }, true);
 
   async function api(path, body) {
-    const r = await fetch(path, body === undefined ? { headers: { Accept: 'application/json' } } : {
-      method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(body),
-    });
-    if (r.status === 401) { location.href = '/login'; throw new Error('Session expirée'); }
+    const launching = body !== undefined && LAUNCH.test(path);
+    if (launching) window.AiFx?.press(lastTrigger);
+    // Le bouton cliqué est « occupé » le temps de l'envoi : `aria-busy` affiche l'indicateur dans le bouton (CSS `.btn[aria-busy]`) et le bloque
+    // (anti double envoi). Un bouton que le code a déjà désactivé avant l'appel (la majorité) garde sa logique : on ne fait que le marquer occupé,
+    // et on ne le réactive pas.
+    const btn = body !== undefined && lastTrigger?.tagName === 'BUTTON' && lastTrigger.isConnected ? lastTrigger : null;
+    const lock = !!btn && !btn.disabled;
+    if (btn) { if (lock) btn.disabled = true; btn.setAttribute('aria-busy', 'true'); }
+    try {
+      const data = await call(path, body);
+      if (launching && !data.existing) launched(lastTrigger);
+      return data;
+    } finally {
+      if (btn) { btn.removeAttribute('aria-busy'); if (lock) btn.disabled = false; }
+    }
+  }
+
+  // Outils communs pour les fichiers public/app-*.js (chargés après celui-ci)
+  Object.assign(window.AiTools, { $, $$, api, esc, every, formData, go, icon, liDay, listen, refreshProject, httpErrorText, networkErrorText, toLogin, confirmBox, loadingHtml, loadFailed, sentence });
+
+  // Une erreur dit ce qui s'est passé et quoi faire ensuite : jamais « Failed to fetch » ni un code brut. Le message du serveur, quand il y en a un, passe en premier.
+  function httpErrorText(status) {
+    if (status === 403) return "Tu n'as pas accès à cette action.";
+    if (status === 404) return 'Introuvable : recharge la page.';
+    if (status === 429) return 'Trop de demandes : attends un instant puis réessaie.';
+    if (status >= 500) return 'Erreur interne : réessaie dans un instant.';
+    return `Erreur ${status} : recharge la page puis réessaie.`;
+  }
+  // Une erreur est une phrase : elle finit par un point (les messages du serveur n'en ont pas toujours). Sans effet si le message finit déjà par « . ! ? … ».
+  function sentence(msg) { const t = String(msg ?? ''); return t && !/[.!?…]$/.test(t) ? `${t}.` : t; } // déclaration (hoistée) : exportée plus haut dans window.AiTools
+  function networkErrorText() { return 'Connexion impossible : réessaie dans un instant.'; } // déclaration (hoistée) : exportée plus haut dans window.AiTools
+  // Session expirée : on revient à la connexion avec l'explication (la page de connexion affiche déjà `?e=`), plutôt qu'une redirection muette
+  function toLogin() { location.href = `/login?e=${encodeURIComponent('Ta session a expiré : reconnecte-toi.')}`; }
+
+  async function call(path, body) {
+    let r;
+    try {
+      r = await fetch(path, body === undefined ? { headers: { Accept: 'application/json' } } : {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify(body),
+      });
+    } catch { throw new Error(networkErrorText()); }
+    if (r.status === 401) { toLogin(); throw new Error('Session expirée'); }
     const data = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(data.error || `Erreur ${r.status}`);
+    if (r.status === 403 && data.code === 'link_required') showReconnect();
+    if (!r.ok) throw new Error(sentence(data.error || httpErrorText(r.status))); // tout ce qui affiche err.message (toast, bloc « Réessayer », formulaire, chat) reçoit une phrase
     return data;
   }
 
+  // Accès Claude refusé ou perdu (jeton expiré, révoqué) : une fenêtre propose de se reconnecter, une seule fois par page
+  function showReconnect() {
+    if ($('dialog.reconnect') || /^\/(link|account)(\/|$)/.test(location.pathname)) return;
+    const dlg = document.createElement('dialog');
+    dlg.className = 'prospect-dialog modal reconnect';
+    dlg.setAttribute('aria-labelledby', 'reconnect-title');
+    dlg.innerHTML = `<h2 id="reconnect-title"><svg class="ic" aria-hidden="true" viewBox="0 0 24 24"><use href="#i-alert"></use></svg>Claude est déconnecté</h2>
+      <p>Ton accès Claude n'est plus valide (jeton expiré ou révoqué). Tant qu'il n'est pas relié de nouveau, les tâches IA sont à l'arrêt.</p>
+      <div class="row"><a class="btn primary" href="/link">Reconnecter Claude</a><button type="button" class="btn" data-close>Plus tard</button></div>`;
+    dlg.addEventListener('click', (ev) => { if (ev.target === dlg || ev.target.closest('[data-close]')) dlg.close(); });
+    document.body.append(dlg);
+    dlg.showModal();
+  }
+
+  // Notifications d'une action : empilées dans un conteneur (sinon deux messages se superposent), annoncées aux lecteurs d'écran
+  // (alert pour une erreur, status sinon), fermables, sans doublon (le même message ne s'empile pas : sa durée repart), trois au plus.
+  // Une erreur reste 8 s (le temps de la lire), le reste 4,2 s.
+  // Confirmation d'une action sensible : une boîte de l'application (jamais window.confirm, qui sort du thème, du clavier et du libellé).
+  // Le message s'écrit « Question ? Conséquence. » : la question devient le titre, la suite le détail. Le bouton porte le verbe de l'action
+  // (« Supprimer », « Publier »…), rouge quand on supprime ou retire ; « Annuler » est le choix par défaut dans ce cas. Échap ou un clic à côté annule.
+  // Renvoie une promesse : `if (!(await confirmBox('Supprimer cette note ?'))) return;`
+  const DANGER_VERB = /^(Supprimer|Effacer|Retirer|Déconnecter)\b/;
+  function confirmBox(message, { confirm: label, danger } = {}) {
+    if (document.querySelector('dialog.confirm')) return Promise.resolve(false);
+    const text = String(message).trim().replace(/ \?/g, '\u00a0?'); // espace insécable avant « ? » : le point d'interrogation ne tombe jamais seul à la ligne
+    const cut = /^([^]*?\?)\s+([^]*)$/.exec(text);
+    const title = cut ? cut[1] : text;
+    const detail = cut ? cut[2].trim() : '';
+    const verb = DANGER_VERB.exec(title)?.[1];
+    const risky = danger ?? !!verb;
+    return new Promise((resolve) => {
+      const dlg = document.createElement('dialog');
+      dlg.className = 'prospect-dialog modal confirm';
+      dlg.setAttribute('aria-labelledby', 'confirm-t');
+      const h = document.createElement('h2'); h.id = 'confirm-t'; h.textContent = title; dlg.append(h);
+      if (detail) { dlg.setAttribute('aria-describedby', 'confirm-d'); const p = document.createElement('p'); p.id = 'confirm-d'; p.className = 'confirm-d'; p.textContent = detail; dlg.append(p); }
+      const row = document.createElement('div'); row.className = 'modal-f';
+      const no = document.createElement('button'); no.type = 'button'; no.className = 'btn'; no.textContent = 'Annuler';
+      const yes = document.createElement('button'); yes.type = 'button'; yes.className = `btn ${risky ? 'danger-fill' : 'primary'}`; yes.dataset.yes = ''; yes.textContent = label || verb || 'Confirmer';
+      no.addEventListener('click', () => dlg.close('no'));
+      yes.addEventListener('click', () => dlg.close('yes'));
+      row.append(no, yes); dlg.append(row);
+      dlg.addEventListener('click', (ev) => { if (ev.target === dlg) dlg.close('no'); });
+      dlg.addEventListener('close', () => { const ok = dlg.returnValue === 'yes'; dlg.remove(); resolve(ok); });
+      document.body.append(dlg);
+      dlg.showModal();
+      (risky ? no : yes).focus();
+    });
+  }
+
+  // Contenu qui se charge : l'anneau commun devant « Chargement… » (même balisage que src/loading.js)
+  function loadingHtml(text = 'Chargement…', { small = false } = {}) {
+    return `<span class="loading${small ? ' small' : ''}" role="status"><span class="${small ? 'spin-inline' : 'spinner'}" aria-hidden="true"></span><span>${esc(text)}</span></span>`;
+  }
+
+  // Un contenu qui n'a pas pu se charger : ce qui s'est passé et un bouton « Réessayer » qui remet le cercle de chargement puis relance `retry`.
+  // `small` : pour une liste ou un menu (texte plus petit). Rien d'écrit en dur : le message arrive déjà traduit (voir httpErrorText).
+  function loadFailed(box, message, retry, { small = false } = {}) {
+    const wrap = document.createElement('div');
+    wrap.className = `load-error${small ? ' small' : ''}`;
+    wrap.setAttribute('role', 'alert');
+    const text = document.createElement('p');
+    text.className = 'error small';
+    text.textContent = message;
+    const again = document.createElement('button');
+    again.type = 'button'; again.className = 'btn small'; again.textContent = 'Réessayer';
+    again.addEventListener('click', () => { box.innerHTML = loadingHtml('Chargement…', { small }); retry(); }, { once: true });
+    wrap.append(text, again);
+    box.replaceChildren(wrap);
+  }
+
+  // Contenu chargé après coup : le cercle (ou le bloc « Réessayer ») cède la place au contenu par un fondu de 150 ms (opacité seule, une fois). Seul ce passage est animé :
+  // une mise à jour ultérieure de la zone (rafraîchissement, nouvelle donnée) ne clignote pas.
+  const LOAD_ZONES = '[data-recap], [data-promo], [data-linkedin], [data-setup], [data-cl-lists], [data-chat-projlist], [data-charts]';
+  for (const zone of $$(LOAD_ZONES)) {
+    const watch = new MutationObserver((list) => {
+      if (!list.some((m) => [...m.removedNodes].some((n) => n.nodeType === 1 && n.matches('.loading, .load-error')))) return;
+      if (zone.querySelector(':scope > .loading, :scope > .load-error')) return; // un cercle remplacé par un autre cercle (ou par « Réessayer » qui relance) : pas de fondu
+      zone.classList.remove('reveal'); void zone.offsetWidth; zone.classList.add('reveal');
+    });
+    watch.observe(zone, { childList: true });
+    cleanups.push(() => watch.disconnect());
+  }
+  // Les classes d'animation ponctuelle se retirent d'elles-mêmes (pour pouvoir rejouer) : fondu, coche, badge, ligne ajoutée
+  listen(document, 'animationend', (e) => {
+    const t = e.target;
+    if (e.animationName === 'reveal') t.classList.remove('reveal');
+    else if (e.animationName === 'wiz-pop') { t.classList.remove('pop'); t.closest?.('li.just-done')?.classList.remove('just-done'); }
+    else if (e.animationName === 'fx-flash') t.classList.remove('row-new');
+  });
+
   function toast(msg, kind = 'ok') {
+    let box = document.querySelector('.toasts');
+    if (!box) { box = document.createElement('div'); box.className = 'toasts'; document.body.append(box); }
+    const key = `${kind}|${msg}`;
+    const arm = (t) => { clearTimeout(t._timer); t._timer = setTimeout(() => close(t), kind === 'error' ? 8000 : 4200); };
+    const close = (t) => { clearTimeout(t._timer); t.classList.add('out'); setTimeout(() => t.remove(), 300); };
+    const same = [...box.children].find((t) => t.dataset.key === key);
+    if (same) { arm(same); return; }
+    while (box.children.length >= 3) box.firstElementChild.remove();
     const t = document.createElement('div');
     t.className = `toast ${kind}`;
-    t.textContent = msg;
-    document.body.append(t);
-    setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 300); }, 4200);
+    t.dataset.key = key;
+    t.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+    const text = document.createElement('span');
+    text.className = 'toast-t';
+    text.textContent = kind === 'error' ? sentence(msg) : msg; // une erreur est une phrase : elle finit par un point (un succès, « Nom + participe passé », n'en a pas)
+    const x = document.createElement('button');
+    x.type = 'button'; x.className = 'toast-x'; x.setAttribute('aria-label', 'Fermer la notification'); x.textContent = '×';
+    x.addEventListener('click', () => close(t));
+    t.append(text, x);
+    box.append(t);
+    arm(t);
   }
 
   // Barres de progression : la largeur passe par le CSSOM (la CSP interdit les attributs style="").
@@ -37,32 +229,99 @@
     });
   }
   const pctOf = (p) => (typeof p?.pct === 'number' ? Math.max(0, Math.min(100, Math.round(p.pct))) : null);
+  // Compte à rebours à partir de la prévision des étapes calculée par le serveur.
+  const remainingTime = (job, nowMs = Date.now()) => {
+    if (job.status !== 'running') return '';
+    const eta = job.eta;
+    if (!eta || !Number.isFinite(eta.remainingSeconds)) return 'Temps restant : estimation en cours…';
+    const seconds = Math.max(1, Math.ceil(eta.remainingSeconds - Math.max(0, nowMs / 1000 - eta.estimatedAt)));
+    const minutes = Math.floor(seconds / 60), rest = seconds % 60;
+    const duration = minutes >= 60 ? Math.floor(minutes / 60) + ' h ' + String(minutes % 60).padStart(2,'0') + ' min' : minutes ? minutes + ' min ' + String(rest).padStart(2,'0') + ' s' : seconds + ' s';
+    return 'Temps restant estimé : ' + duration + (eta.revised ? ' · réajusté' : eta.source === 'initial' ? ' · estimation initiale' : '');
+  };
+
   const progressBar = (job) => {
-    const v = pctOf(job.progress);
+    // En file ou programmé : 0 % (barre vide, pas d'animation « indéterminée ») ; seul un job qui tourne sans mesure reste indéterminé
+    const v = pctOf(job.progress) ?? (job.status === 'running' ? null : 0);
     return `<div class="bar${v === null ? ' indet' : ''}"><span data-key="${job.id}" data-pct="${v ?? ''}"></span></div>`;
   };
 
-  const formData = (form) => Object.fromEntries(new FormData(form));
   const ago = (ts) => {
     if (!ts) return 'jamais';
     const m = Math.round((Date.now() / 1000 - ts) / 60);
     return m < 1 ? "à l'instant" : m < 60 ? `il y a ${m} min` : m < 1440 ? `il y a ${Math.round(m / 60)} h` : `il y a ${Math.round(m / 1440)} j`;
   };
   const pct = (x) => `${Math.round(x * 100)} %`;
+  const tokenText = (value) => `${Math.max(0, Number(value) || 0).toLocaleString('fr-FR')} tokens`;
   const ACTIVE = ['queued', 'running'];
   const LABELS = {
     analyze: 'Analyse', prospect: 'Recherche', template: 'Modèle', send: 'Envoi', evolution: 'Évolutions',
-    followup_template: 'Modèle de relance', followup: 'Relances', linkedin_post: 'Post LinkedIn',
+    followup_template: 'Modèle de relance', followup: 'Relances', linkedin_post: 'Post LinkedIn', promo_video: 'Vidéo de promotion', audit: 'Audit', hook: 'Accroche',
+    billing_quotes: 'Facturation : exemples de devis', billing_refine: 'Facturation : affinage', billing_docs: 'Facturation : documents',
   };
 
   // Champs en lecture seule à copier (lien d'invitation) : un clic sélectionne tout
   $$('input.copy').forEach((i) => i.addEventListener('focus', () => i.select()));
 
   // ---------- Barre du haut : page courante en surbrillance ----------
-  $$('.topnav a.navlink').forEach((a) => {
+  $$('.pills a.pill, .user-pop a, .ia-link').forEach((a) => {
     const here = a.pathname === '/' ? location.pathname === '/' : location.pathname === a.pathname || location.pathname.startsWith(`${a.pathname}/`);
     if (here) a.setAttribute('aria-current', 'page');
   });
+
+  // ---------- Nouveau projet : le formulaire s'ouvre sous le bouton ----------
+  const newForm = $('#new-project');
+  $$('[data-new-toggle]').forEach((b) => b.addEventListener('click', () => {
+    if (!newForm) return;
+    newForm.hidden = !newForm.hidden;
+    $$('[data-new-toggle][aria-expanded]').forEach((t) => t.setAttribute('aria-expanded', String(!newForm.hidden)));
+    if (!newForm.hidden) $('input', newForm)?.focus();
+  }));
+
+  // ---------- Menus de la barre (avatar du compte, bouton IA) : s'ouvrent au survol, se ferment quand on les quitte ----------
+  // Avec une souris : survol (le clic sur le bouton ne le referme pas). Au doigt ou au clavier : clic / Entrée, comme un menu ordinaire.
+  const hover = matchMedia('(hover: hover) and (pointer: fine)');
+  $$('details.user, details.ia-menu').forEach((menu) => {
+    const summary = $('summary', menu);
+    let closeTimer;
+    const open = (v) => { clearTimeout(closeTimer); menu.open = v; };
+    menu.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse' && hover.matches) { $$('details.user[open], details.ia-menu[open]').forEach((o) => { if (o !== menu) o.open = false; }); open(true); } });
+    menu.addEventListener('pointerleave', (e) => {
+      if (e.pointerType !== 'mouse' || !hover.matches) return;
+      clearTimeout(closeTimer);
+      closeTimer = setTimeout(() => { menu.open = false; }, 220);
+    });
+    summary.addEventListener('click', (e) => { if (e.detail > 0 && hover.matches) e.preventDefault(); }); // clic souris : le survol l'a déjà ouvert
+    listen(document, 'click', (e) => { if (menu.open && !menu.contains(e.target)) open(false); });
+    menu.addEventListener('keydown', (e) => { if (e.key === 'Escape' && menu.open) { open(false); summary.focus(); } });
+  });
+
+  // ---------- Réglages : le sommaire suit la lecture (la section en cours est surlignée en direct) ----------
+  const tocLinks = $$('.settings .toc a[href^="#"]');
+  if (tocLinks.length) {
+    const sections = tocLinks.map((a) => document.getElementById(a.getAttribute('href').slice(1))).filter(Boolean);
+    let queued = false;
+    const mark = (id) => tocLinks.forEach((a) => { if (a.getAttribute('href') === `#${id}`) a.setAttribute('aria-current', 'true'); else a.removeAttribute('aria-current'); });
+    // Une section est « en cours » dès que son haut passe sous la ligne de lecture, fixée près du haut de l'écran : c'est la position où atterrit un clic
+    // sur le sommaire, donc la section cliquée est bien celle qui s'allume (même courte, avec la suivante déjà visible plus bas). Tout en bas de la page,
+    // la dernière section s'allume, puisqu'elle ne peut plus monter jusqu'à la ligne.
+    let lockUntil = 0;
+    const update = () => {
+      queued = false;
+      if (Date.now() < lockUntil) return; // défilement déclenché par un clic : on garde la section cliquée
+      const line = 140;
+      const atEnd = document.documentElement.scrollHeight - innerHeight - scrollY < 4;
+      let cur = sections[0];
+      if (atEnd) cur = sections[sections.length - 1];
+      else for (const sec of sections) if (sec.getBoundingClientRect().top <= line) cur = sec;
+      mark(cur.id);
+    };
+    const schedule = () => { if (!queued) { queued = true; requestAnimationFrame(update); } };
+    listen(window, 'scroll', schedule, { passive: true });
+    listen(window, 'resize', schedule);
+    tocLinks.forEach((a) => a.addEventListener('click', () => { lockUntil = Date.now() + 900; mark(a.getAttribute('href').slice(1)); setTimeout(schedule, 950); }));
+    update();
+  }
 
   // ---------- Liaison Claude : fenêtre d'avertissement du mode abonnement ----------
   // Le serveur refuse de toute façon (400) une requête sans la case cochée ; ici on évite seulement l'envoi inutile.
@@ -75,6 +334,132 @@
     if (box && btn) box.addEventListener('change', () => { btn.disabled = !box.checked; });
   });
   $('dialog[data-autoopen]')?.showModal();
+
+  // Questionnaire de première connexion : une question à la fois, « Continuer » pour passer à la suivante (sans choix = question passée),
+  // « Retour » pour revenir, et le pourcentage de questions déjà passées. La dernière question envoie le formulaire.
+  const wiz = $('form[data-wizard]');
+  if (wiz) {
+    const steps = $$('[data-step]', wiz);
+    const back = $('[data-wiz-back]', wiz);
+    const next = $('[data-wiz-next]', wiz);
+    const barBox = $('[role=progressbar]', wiz);
+    const dots = $$('[data-dot]', wiz);
+    const veil = $('[data-wiz-confirm]', wiz);
+    const validated = new Set(); // questions auxquelles une réponse a été validée (pastille verte)
+    let at = 0;
+    let moving = false;
+    const calm = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const wait = (ms) => new Promise((r) => setTimeout(r, calm() ? 0 : ms));
+    const setBar = (p) => { $('[data-wiz-bar]', wiz).className = `w-${Math.floor(p / 5) * 5}`; $('[data-wiz-pct]', wiz).textContent = `${p} %`; barBox.setAttribute('aria-valuenow', String(p)); };
+    // Une réponse = un choix coché, ou un texte écrit
+    const answered = (i) => !!$('input:checked', steps[i]) || ($('textarea', steps[i])?.value.trim() ?? '') !== '';
+    const paint = () => dots.forEach((d, k) => { d.classList.toggle('on', k === at); d.classList.toggle('done', validated.has(k)); });
+    const show = (i, { focus = true, dir = 0 } = {}) => {
+      at = i;
+      steps.forEach((s, k) => {
+        s.hidden = k !== i;
+        s.classList.remove('wiz-out', 'wiz-out-back', 'wiz-in', 'wiz-in-back');
+        if (k === i && dir) s.classList.add(dir > 0 ? 'wiz-in' : 'wiz-in-back');
+      });
+      $('[data-wiz-count]', wiz).textContent = `Question ${i + 1} sur ${steps.length}`;
+      setBar(Math.round((100 * i) / steps.length)); // questions déjà passées
+      back.hidden = i === 0;
+      next.textContent = i === steps.length - 1 ? 'Terminer' : 'Continuer';
+      paint();
+      if (focus) ($('input:checked, input, textarea', steps[i]))?.focus({ preventScroll: true });
+    };
+    // Avancer : si une réponse est donnée, la pastille verte « Pris en compte » la confirme un instant, puis la question sort et la suivante entre
+    async function forward() {
+      if (moving) return;
+      const here = steps[at];
+      // Une question marquée data-required attend une réponse (les autres peuvent être passées)
+      if (here.hasAttribute('data-required') && !answered(at)) {
+        const err = $('[data-wiz-error]', here);
+        if (err) { err.hidden = false; }
+        $('input', here)?.focus({ preventScroll: true });
+        return;
+      }
+      moving = true;
+      if (answered(at)) {
+        validated.add(at);
+        veil.classList.add('show'); // grand cercle vert au milieu, arrière-plan flouté
+        $('[data-wiz-live]', wiz).textContent = 'Réponse prise en compte';
+        paint();
+        await new Promise((r) => setTimeout(r, calm() ? 350 : 750)); // même avec « réduire les animations », la confirmation reste visible un instant
+      } else validated.delete(at);
+      if (at === steps.length - 1) { setBar(100); paint(); await finishWizard(); return; }
+      veil.classList.remove('show');
+      here.classList.add('wiz-out');
+      await wait(190);
+      show(at + 1, { dir: 1 });
+      moving = false;
+    }
+    // Fin : une scène plein écran apparaît en fondu (« Merci, ton espace est prêt »), le profil s'enregistre en arrière-plan, puis le tableau de bord
+    // prend la place sans coupure. Si l'enregistrement échoue, on retombe sur l'envoi classique du formulaire.
+    async function finishWizard() {
+      // Destination et textes de la scène de fin : propres à chaque assistant (profil de bienvenue, situation de la comptabilité…)
+      const cfg = { json: wiz.dataset.wizJson, go: wiz.dataset.wizGo || '/', title: wiz.dataset.wizEndTitle || 'Merci, ton espace est prêt', text: wiz.dataset.wizEndText || '' };
+      const end = document.createElement('div');
+      end.className = 'wiz-end';
+      end.setAttribute('role', 'status');
+      end.innerHTML = '<div class="wiz-end-in"></div>';
+      const inner = $('.wiz-end-in', end);
+      inner.append($('.wiz-big', wiz).cloneNode(true));
+      inner.insertAdjacentHTML('beforeend', `<h2>${esc(cfg.title)}</h2>${cfg.text ? `<p>${esc(cfg.text)}</p>` : ''}<div class="bar indet" aria-hidden="true"><span></span></div>`);
+      document.body.append(end);
+      void end.offsetWidth;
+      end.classList.add('show');
+      let ok = true;
+      const saved = api(cfg.json, Object.fromEntries(new FormData(wiz))).catch(() => { ok = false; });
+      await Promise.all([saved, new Promise((r) => setTimeout(r, calm() ? 500 : 1600))]);
+      if (!ok) { wiz.submit(); return; } // submit() n'émet pas l'événement « submit » : pas de boucle
+      go(cfg.go);
+    }
+    async function previous() {
+      if (moving || at === 0) return;
+      moving = true;
+      steps[at].classList.add('wiz-out-back');
+      await wait(190);
+      show(at - 1, { dir: -1 });
+      moving = false;
+    }
+    back.addEventListener('click', previous);
+    wiz.addEventListener('change', () => { for (const e of $$('[data-wiz-error]', wiz)) e.hidden = true; });
+    // « Passer le questionnaire » (formaction) part tel quel ; « Continuer » avance tant qu'il reste des questions
+    wiz.addEventListener('submit', (e) => {
+      if (e.submitter?.hasAttribute('formaction')) return;
+      e.preventDefault();
+      forward();
+    });
+    show(0, { focus: false });
+  }
+
+  // Visite guidée du tableau de bord (public/tour.js) : démarre toute seule une fois après les questions de bienvenue, ou à la demande (« Visite guidée »)
+  const tourData = $('#tour-data');
+  if (tourData && window.AiTour) {
+    const mode = tourData.dataset.mode;
+    cleanups.push(() => window.AiTour.stop());
+    later(() => window.AiTour.start(JSON.parse(tourData.textContent), {
+      onClose: (state) => {
+        if (mode === 'auto') api('/tour/complete', { state }).catch(() => {}); // une visite relancée à la main ne change rien : l'automatique ne revient plus
+        if (mode === 'replay') history.replaceState(null, '', '/');
+      },
+    }), 900);
+  }
+
+  // Attente dont la durée dépend d'un tiers (Claude) : un pourcentage ESTIMÉ monte vers 95 % selon la durée habituelle et ne passe à 100 % qu'avec la
+  // réponse. Il ne prétend pas mesurer l'avancement réel : le CLI de Claude n'en donne pas.
+  function track(box, typicalMs) {
+    const bar = $('[data-pct-bar]', box);
+    const text = $('[data-pct-text]', box);
+    const host = $('[role=progressbar]', box);
+    const set = (p) => { p = Math.max(0, Math.min(100, Math.round(p))); bar.className = `w-${Math.floor(p / 5) * 5}`; text.textContent = `${p} %`; host.setAttribute('aria-valuenow', String(p)); };
+    const t0 = performance.now();
+    box.hidden = false;
+    set(0);
+    const id = every(() => set(95 * (1 - Math.exp((-3 * (performance.now() - t0)) / typicalMs))), 200);
+    return async (ok) => { clearInterval(id); if (ok) { set(100); await new Promise((r) => setTimeout(r, 350)); } box.hidden = true; };
+  }
 
   // Connexion guidée à Claude : 1) le serveur prépare le lien (petit chargement) et il s'ouvre dans une petite fenêtre,
   // 2) l'utilisateur se connecte et copie le code affiché par Claude : dès qu'il revient ici (ou colle), le code est
@@ -92,7 +477,7 @@
     let sending = false;
     const busy = (form, on, label) => {
       const btn = $('button:not([type=button])', form);
-      $('.spin-inline', btn).hidden = !on;
+      if (on) btn.setAttribute('aria-busy', 'true'); else btn.removeAttribute('aria-busy'); // l'indicateur est affiché par le CSS (.btn[aria-busy])
       $('[data-label]', btn).textContent = label;
       btn.disabled = on || (form === loginForm && !$('[data-consent]', form).checked);
     };
@@ -106,8 +491,10 @@
       popup = window.open('', 'aitools-claude-login', 'popup,width=520,height=760');
       busy(loginForm, true, 'Je prépare ton lien…');
       $('[data-claude-status]', loginForm).textContent = 'Ça prend quelques secondes.';
+      const stop = track($('[data-pct]', loginForm), 10_000);
       try {
         const r = await api('/link/claude/login', { accept: 'on' });
+        await stop(true);
         loginId = r.id;
         $('[data-claude-link]', dlg).href = r.url;
         if (popup) popup.location.href = r.url;
@@ -117,6 +504,7 @@
         $('[data-claude-hint-link]', dlg).hidden = !!popup;
         codeInput.focus();
       } catch (err) {
+        await stop(false);
         closePopup();
         fail('[data-claude-error]', err);
         busy(loginForm, false, 'Se connecter avec Claude');
@@ -130,13 +518,16 @@
       sending = true;
       $('[data-claude-error2]', dlg).hidden = true;
       busy(codeForm, true, 'Je récupère ton jeton…');
+      const stop = track($('[data-pct]', codeForm), 12_000);
       try {
         await api('/link/claude/login/code', { id: loginId, code });
+        await stop(true);
         loginId = null;
         closePopup();
-        location.href = '/';
+        go('/');
       } catch (err) {
         // Le serveur a fermé cette connexion (code refusé, expirée) : on repart de l'étape 1 avec le message
+        await stop(false);
         loginId = null; sending = false; closePopup();
         codeForm.reset();
         busy(codeForm, false, 'Terminer la connexion');
@@ -157,8 +548,8 @@
         if (CODE.test(t)) { codeInput.value = t; sendCode(); }
       } catch { /* accès refusé ou non géré : le code se colle à la main */ }
     }
-    window.addEventListener('focus', fromClipboard);
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) fromClipboard(); });
+    listen(window, 'focus', fromClipboard);
+    listen(document, 'visibilitychange', () => { if (!document.hidden) fromClipboard(); });
 
     dlg.addEventListener('close', () => {
       if (loginId) api('/link/claude/login/cancel', { id: loginId }).catch(() => {});
@@ -170,32 +561,22 @@
 
   // ---------- Barre système ----------
   // "IA 24 h : 0,42 $ / 2 $" : orange à 80 %, rouge une fois atteint
-  function gauge(label, x) {
-    const used = `${x.used.toFixed(2)} $`;
-    if (!x.limit) return `<span title="Équivalent API, consommé sur ton quota Pro">IA ${label} : ${used}</span>`;
-    const r = x.used / x.limit;
-    return `<span class="${r >= 1 ? 'error' : r >= 0.8 ? 'warn' : ''}" title="Équivalent API, consommé sur ton quota Pro">IA ${label} : ${used} / ${x.limit} $</span>`;
-  }
-
+  // Ce que les jobs lancés PAR AiTools ont consommé (équivalent API). Ce que la personne fait ailleurs avec son Claude n'y est pas :
+  // Anthropic ne le communique pas à une application ; le quota réel du compte est la mesure « Claude … » à côté.
+  const GAUGE_TIP = "Équivalent API des jobs lancés par AiTools uniquement. Ce que tu fais ailleurs avec Claude n'est pas compté ici : vois le quota « Claude » à côté.";
   // Quota du compte Claude Pro lui-même (session glissante de 5 h + semaine glissante de 7 j),
   // remonté par la CLI à chaque appel. Permet de décider en amont si une tâche vaut le coup.
   function resetLabel(ts) {
     if (!ts) return '';
     return new Date(ts * 1000).toLocaleString('fr-FR', { weekday: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
   }
-  function claudeBit(label, w) {
-    if (!w) return '';
-    const cls = w.utilization >= 1 ? 'error' : w.utilization >= 0.8 ? 'warn' : '';
-    const reset = resetLabel(w.resetsAt);
-    return `<span class="${cls}"${reset ? ` title="Réinitialisation ${esc(reset)}"` : ''}>Claude ${label} : ${pct(w.utilization)}</span>`;
-  }
-  function claudeQuota(rl, mode) {
-    // Clé API : pas de quota d'abonnement à afficher
-    if (mode === 'api_key') return '';
-    if (!rl) return '<span class="muted" title="Mesuré après le premier job IA">Claude : pas encore mesuré</span>';
-    return `${claudeBit('session 5h', rl.fiveHour)} ${claudeBit('semaine', rl.sevenDay)}`.trim();
-  }
-
+  const WHY = {
+    denied: "Anthropic refuse le relevé en direct avec ce jeton (relie-toi avec « Se connecter avec Claude »)",
+    rate: 'Anthropic limite les relevés : nouvel essai dans une minute',
+    network: 'Anthropic ne répond pas',
+    unavailable: 'le relevé en direct est indisponible chez Anthropic',
+    format: 'réponse inattendue du relevé en direct',
+  };
   // ---------- Menu « jobs » : détail de ce qui tourne, avec l'avancement ----------
   const jobsBox = $('#jobs');
   const jobsBtn = jobsBox && $('.jobs-btn', jobsBox);
@@ -204,36 +585,45 @@
   const fmtWhen = (ts) => new Date(ts * 1000).toLocaleString('fr-FR', { weekday: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
   const plural = (n, w) => `${n} ${w}${n > 1 ? 's' : ''}`;
 
-  function jobItem(j) {
+  function jobItem(j, isNew = false) {
     const p = j.progress || {};
     const scheduled = j.status === 'queued' && j.runAfter && j.runAfter * 1000 > Date.now();
     const running = j.status === 'running';
-    const v = running ? pctOf(p) : null;
-    const state = scheduled ? `Programmé ${fmtWhen(j.runAfter)}` : running ? `Démarré ${ago(j.startedAt)}` : 'En file d\'attente';
-    const msg = p.message || (running ? 'En cours…' : '');
-    return `<div class="jitem j-${scheduled ? 'scheduled' : j.status}">
+    const v = pctOf(p) ?? (running ? null : 0); // le pourcentage s'affiche aussi pour une tâche en attente (0 %)
+    const state = j.status === 'error' ? 'En échec' : scheduled ? `Programmé ${fmtWhen(j.runAfter)}` : running ? `Démarré ${ago(j.startedAt)}` : 'En file d\'attente';
+    const msg = j.status === 'error' ? j.error || 'La tâche a échoué' : p.message || (running ? 'En cours…' : '');
+    return `<div class="jitem j-${scheduled ? 'scheduled' : j.status}${isNew ? ' new' : ''}">
       <div class="jrow">${scheduled ? '<span class="moon" aria-hidden="true"></span>' : running ? '<span class="pulse" aria-hidden="true"></span>' : '<span class="dot-wait" aria-hidden="true"></span>'}
-        <strong>${esc(LABELS[j.type] || j.type)}</strong><span class="jproj">${j.project ? esc(j.project) : ''}</span>${v !== null ? `<span class="jpct">${v} %</span>` : ''}</div>
+        <strong>${esc(LABELS[j.type] || j.label || j.type)}</strong>${p.model ? `<span class="jmodel" title="Modèle utilisé">${esc(p.model)}</span>` : ''}<span class="jproj">${j.project ? esc(j.project) : ''}</span>${v !== null ? `<span class="jpct">${v} %</span>` : ''}</div>
       ${msg ? `<div class="jmsg small muted">${esc(msg)}</div>` : ''}
-      ${running ? progressBar(j) : ''}
+      ${progressBar(j)}
+      ${remainingTime(j) ? `<div class="small muted">${esc(remainingTime(j))}</div>` : ''}
+      <div class="small muted">${tokenText(j.tokensUsed)}</div>
       <div class="jmeta small muted"><span>${esc(state)}</span>
-        <span>${j.projectId ? `<button type="button" class="link small" data-goto="${j.projectId}">Voir</button> · ` : ''}<button type="button" class="link small" data-cancel="${j.id}">Annuler</button></span></div>
+        <span>${j.canViewLogs !== false ? `<a class="link small" href="/jobs/${j.id}">Voir</a> · ${j.status === 'error' ? `<button type="button" class="link small" data-retry="${j.id}">Réessayer</button>` : ''}` : ''}${ACTIVE.includes(j.status) ? `<button type="button" class="link small" data-cancel="${j.id}">Annuler</button>` : ''}</span></div>
     </div>`;
   }
 
+  let jobsSeen = null; // jobs déjà vus dans le menu : un job qui apparaît ensuite est mis en évidence un instant
+  const jobsFresh = new Map(); // job → fin de sa mise en évidence
   function renderJobsMenu(s) {
     if (!jobsBox) return;
     const list = s.jobs || [];
+    const ids = list.map((j) => j.id);
+    if (jobsSeen) for (const id of ids) if (!jobsSeen.has(id)) jobsFresh.set(id, Date.now() + 3500);
+    const fresh = new Set(ids.filter((id) => (jobsFresh.get(id) ?? 0) > Date.now()));
+    jobsSeen = new Set([...(jobsSeen || []), ...ids]);
     jobsBox.hidden = !list.length;
     if (!list.length) { if (jobsOpen()) toggleJobs(false); return; }
     $('.spin-inline', jobsBtn).hidden = !s.queue;
+    const failed = list.filter((j) => j.status === 'error').length;
     $('[data-jobs-count]', jobsBtn).textContent = s.queue
       ? `${plural(s.queue, 'job')}${s.scheduled ? ` · ${s.scheduled} cette nuit` : ''}`
-      : `${plural(s.scheduled, 'programmé')} cette nuit`;
+      : s.scheduled ? `${plural(s.scheduled, 'programmé')} cette nuit` : `${plural(failed, 'échec')}`;
     const running = list.filter((j) => j.status === 'running').length;
-    $('[data-jobs-sub]', jobsPop).textContent = `${running} en cours · ${list.length - running} en attente`;
+    $('[data-jobs-sub]', jobsPop).textContent = `${running} en cours · ${list.filter((j) => j.status === 'queued').length} en attente${failed ? ` · ${plural(failed, 'échec')}` : ''}`;
     // Redessine seulement si le contenu change : sinon l'animation d'apparition rejouerait à chaque poll
-    const html = list.map(jobItem).join('');
+    const html = list.map((j) => jobItem(j, fresh.has(j.id))).join('');
     const box = $('[data-jobs-list]', jobsPop);
     if (box._html === html) return;
     box._html = html;
@@ -249,78 +639,258 @@
       // Les lignes n'apparaissent en fondu qu'à l'ouverture, pas à chaque mise à jour
       jobsPop.classList.add('fresh');
       setTimeout(() => jobsPop.classList.remove('fresh'), 600);
-      refreshSys();
+      refreshActivity();
     }
   }
   jobsBtn?.addEventListener('click', () => toggleJobs());
-  document.addEventListener('click', (e) => {
+  // Barre du haut hors de l'écran (page défilée) : le bouton « Activité » reste épinglé en haut à droite, avec son menu et la destination de l'agent
+  const topBar = $('.top');
+  if (jobsBox && topBar && 'IntersectionObserver' in window) {
+    new IntersectionObserver(([en]) => document.body.classList.toggle('hdr-off', !en.isIntersecting)).observe(topBar);
+  }
+  listen(document, 'click', (e) => {
     if (jobsOpen() && !e.target.closest('#jobs')) toggleJobs(false);
-    const go = e.target.closest('[data-goto]');
-    if (!go) return;
-    sessionStorageSet('openProject', go.dataset.goto);
-    const d = $(`details.project[data-id="${go.dataset.goto}"]`);
-    if (!d) { location.href = '/'; return; }
+    const link = e.target.closest('[data-goto]');
+    if (!link) return;
+    const d = $(`details.project[data-id="${link.dataset.goto}"]`);
+    if (!d) { sessionStorageSet('reopenProject', link.dataset.goto); go('/'); return; } // pas sur la page Projets : elle ouvrira ce projet à l'arrivée
     toggleJobs(false);
     d.open = true;
     d.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && jobsOpen()) { toggleJobs(false); jobsBtn.focus(); } });
+  listen(document, 'keydown', (e) => { if (e.key === 'Escape' && jobsOpen()) { toggleJobs(false); jobsBtn.focus(); } });
+
+  // Carte « Usage du mois » : le quota Claude (session 5 h, semaine) et ce que les jobs d'AiTools ont consommé, mêmes données que la barre du haut
+  // « Remise à zéro aujourd'hui à 18:42 » / « demain à 09:00 » / « lundi à 09:00 » (heure de Paris)
+  function resetNote(ts) {
+    if (!ts) return '';
+    const day = (t) => new Date(t).toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris' });
+    const at = new Date(ts * 1000);
+    const hm = at.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
+    const d = day(at) === day(Date.now()) ? "aujourd'hui" : day(at) === day(Date.now() + 864e5) ? 'demain' : at.toLocaleDateString('fr-FR', { weekday: 'long', timeZone: 'Europe/Paris' });
+    return `Remise à zéro ${d} à ${hm}`;
+  }
+  function usageRow(label, value, { ratio = null, tip = '', cls = '', note = '' } = {}) {
+    const w = ratio == null ? '' : `<div class="bar usage${ratio >= 1 ? ' full' : ''}" role="progressbar" aria-label="${esc(label)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.min(100, Math.round(ratio * 100))}"><span class="w-${Math.min(100, Math.round(ratio * 20) * 5)}"></span></div>`;
+    return `<li class="g"><div class="g-h" title="${esc(tip)}"><span>${esc(label)}</span><span class="g-v ${cls}">${value}</span></div>${w}${note ? `<p class="g-r">${esc(note)}</p>` : ''}</li>`;
+  }
+  function usageClaude(s) {
+    const rows = [];
+    const rl = s.claudeRateLimit;
+    if (s.linkMode !== 'api_key') {
+      if (!rl || (!rl.fiveHour && !rl.sevenDay)) {
+        const why = !rl ? 'pas encore mesuré' : 'relevé indisponible';
+        // Pas de mesure : la barre du haut le dit déjà, la carte « Consommation Claude » de la page Projets reste masquée (elle n'apparaît que pour de vraies valeurs)
+        if (!document.querySelector('[data-claude-card]')) rows.push(usageRow('Quota Claude', why, { tip: rl ? (WHY[rl.error] || 'relevé indisponible') : 'Le relevé en direct se fait avec ton abonnement Claude', cls: 'muted' }));
+      }
+      for (const [label, w] of [['Claude session 5 h', rl?.fiveHour], ['Claude semaine', rl?.sevenDay]]) {
+        if (!w) continue;
+        const reset = resetLabel(w.resetsAt);
+        const live = rl.source === 'live' && !rl.error;
+        const tip = `${live ? 'Relevé en direct chez Anthropic, tout ton usage Claude compris (y compris hors AiTools).' : `Dernière mesure ${ago(rl.at)} (pendant un job AiTools).`}${reset ? ` Réinitialisation ${reset}.` : ''}`;
+        rows.push(w.expired ? usageRow(label, '– (remise à zéro)', { tip, cls: 'muted' })
+          : usageRow(label, pct(w.utilization), { ratio: w.utilization, tip, note: resetNote(w.resetsAt), cls: w.utilization >= 1 ? 'error' : w.utilization >= 0.8 ? 'warn' : '' }));
+      }
+    }
+    // Montants en $ : seulement avec une clé API (c'est elle qui est facturée à l'usage). Avec un abonnement, rien n'est facturé en plus : on n'affiche aucun prix.
+    for (const [label, x] of s.linkMode === 'api_key' ? [['IA via AiTools 24 h', s.budget.day], ['IA via AiTools 30 j', s.budget.month]] : []) {
+      const r = x.limit ? x.used / x.limit : null;
+      rows.push(usageRow(label, `${x.used.toFixed(2)} $${x.limit ? ` / ${x.limit} $` : ''}`, { ratio: r, tip: GAUGE_TIP, cls: r >= 1 ? 'error' : r >= 0.8 ? 'warn' : '' }));
+    }
+    return rows.join('');
+  }
 
   let sysTimer;
+  // Page « Relier Claude » sans accès utilisable : le serveur refuse ces relevés (403). On ne les demande pas, et on réessaie vite (la page change une fois Claude relié).
+  const unlinked = () => !!document.querySelector('[data-nolink]');
+  window.AiTools.unlinked = unlinked;
+  let activityTimerId, activityRequest = null, activityBusy = false;
+  function refreshActivity() {
+    clearTimeout(activityTimerId);
+    if (!jobsBox || disposed || document.hidden) return Promise.resolve();
+    if (unlinked()) { activityTimerId = later(refreshActivity, 4000); return Promise.resolve(); }
+    if (activityRequest) return activityRequest;
+    activityRequest = (async () => {
+      try {
+        const response = await fetch('/api/jobs/activity', { headers: { Accept: 'application/json' }, cache: 'no-store', signal: AbortSignal.timeout(8000) });
+        if (response.status === 401) { toLogin(); return; }
+        if (!response.ok) throw new Error('Relevé indisponible');
+        const snapshot = await response.json();
+        if (disposed) return;
+        activityBusy = snapshot.queue > 0;
+        renderJobsMenu(snapshot);
+      } catch { /* garder la dernière mesure, puis retenter automatiquement */ }
+      finally {
+        activityRequest = null;
+        if (!disposed) activityTimerId = later(refreshActivity, jobsOpen() ? 1000 : activityBusy ? 2000 : 10_000);
+      }
+    })();
+    return activityRequest;
+  }
+  refreshActivity();
+  listen(document, 'visibilitychange', () => { if (!document.hidden) refreshActivity(); });
   async function refreshSys() {
     clearTimeout(sysTimer);
-    const el = $('#sys');
-    if (!el) return;
+    if (unlinked()) { sysTimer = later(refreshSys, 4000); return; }
     let busy = false;
     try {
       const s = await api('/api/system');
-      const hot = s.temp !== null && s.temp >= 70;
-      el.innerHTML = `${s.temp !== null ? `<span class="${hot ? 'warn' : ''}">${s.temp} °C</span>` : ''}
-        ${claudeQuota(s.claudeRateLimit, s.linkMode)}
-        ${gauge('24 h', s.budget.day)} ${gauge('30 j', s.budget.month)}
-        ${s.budget.blocked ? '<span class="error">Budget IA atteint : jobs IA en attente</span>' : ''}`;
-      renderJobsMenu(s);
+      for (const box of $$('[data-usage-claude]')) { box.innerHTML = usageClaude(s); box.hidden = false; const card = box.closest('[data-claude-card]'); if (card) card.hidden = !box.innerHTML.trim(); }
       busy = s.queue > 0;
     } catch { /* silencieux */ }
     // Plus réactif quand quelque chose tourne ou que le menu est ouvert
-    sysTimer = setTimeout(refreshSys, jobsOpen() ? 3000 : busy ? 6000 : 30_000);
+    sysTimer = later(refreshSys, jobsOpen() ? 3000 : busy ? 6000 : 30_000);
   }
   refreshSys();
 
+  // Une tâche vient d'être mise en file : le menu « Activité » se met à jour, l'agent y arrive avec sa brouette, puis le menu s'ouvre
+  // quelques secondes sur la liste des tâches en cours et à venir (comme la bulle de téléchargement de Chrome).
+  let activityTimer;
+  function showActivity() {
+    if (!jobsBox || jobsBox.hidden) return;
+    toggleJobs(true);
+    clearTimeout(activityTimer);
+    activityTimer = setTimeout(() => { if (jobsOpen() && !jobsPop.matches(':hover') && !jobsPop.contains(document.activeElement)) toggleJobs(false); }, 7500);
+  }
+  // Le menu s'ouvre d'abord : les traits pointillés et l'agent vont jusqu'à la ligne de la nouvelle tâche, dans la liste
+  function launched(trigger) {
+    refreshActivity()
+      .then(() => { showActivity(); return new Promise((r) => setTimeout(r, 240)); })
+      .then(() => window.AiFx?.launch(trigger, $('.jitem.new', jobsPop) || $('.jitem', jobsPop)))
+      .catch(() => {});
+  }
+
+  // Console : conserver les lignes et la sélection pendant les rafraîchissements.
+  const consoleBox = $('[data-job-console]');
+  if (consoleBox) {
+    const output = $('[data-console-output]', consoleBox);
+    const status = $('[data-console-status]', consoleBox);
+    const labels = { queued: 'En attente', running: 'En cours', done: 'Terminée', error: 'En échec', cancelled: 'Annulée' };
+    let cursor = 0, busy = false, terminal = false;
+    let lastDelta = null;
+    const setText = (selector, text) => { const node = $(selector, consoleBox); if (node) node.textContent = text; };
+    const addEntry = (entry) => {
+      $('[data-console-empty]', consoleBox)?.remove();
+      if (entry.kind === 'delta' && lastDelta?.isConnected) { lastDelta.textContent += entry.text; return; }
+      const types = { output: 'Sortie de Claude', delta: 'Claude écrit', tool: 'Outil utilisé', turn: 'Nouvelle étape', model: 'Modèle', status: 'État de la tâche', progress: 'Progression', error: 'Erreur', activity: 'Activité de réflexion' };
+      const article = document.createElement('article');
+      article.className = 'console-entry';
+      article.dataset.kind = Object.hasOwn(types, entry.kind) ? entry.kind : 'status';
+      const head = document.createElement('div'); head.className = 'console-entry-head';
+      const label = document.createElement('strong'); label.textContent = types[entry.kind] || 'Activité';
+      const time = document.createElement('time'); time.textContent = new Date(entry.at).toLocaleTimeString('fr-FR', { timeZone: 'Europe/Paris' });
+      head.append(label, time); article.append(head);
+      const text = document.createElement(['delta', 'output'].includes(entry.kind) ? 'pre' : 'p'); text.textContent = entry.text;
+      if (entry.kind === 'output' && entry.text.length > 1200) {
+        const detail = document.createElement('details'), summary = document.createElement('summary');
+        summary.textContent = 'Afficher la sortie complète'; detail.append(summary, text); article.append(detail);
+      } else article.append(text);
+      output.append(article); lastDelta = entry.kind === 'delta' ? text : null;
+    };
+    const pollConsole = async () => {
+      if (busy || terminal || disposed) return;
+      busy = true;
+      try {
+        const r = await api(`/api/jobs/${consoleBox.dataset.jobConsole}/log?after=${cursor}`);
+        if (disposed) return;
+        status.textContent = `${labels[r.status] || r.status}${r.progress?.message && ACTIVE.includes(r.status) ? ' · ' + r.progress.message : ''}`;
+        setText('[data-console-title]', LABELS[r.type] || 'Suivi de la tâche');
+        setText('[data-console-live]', ACTIVE.includes(r.status) ? '● En direct' : labels[r.status] || r.status);
+        setText('[data-console-model]', r.progress?.model || '—');
+        const elapsed = r.startedAt ? Math.max(0, Math.floor(((r.finishedAt || Date.now() / 1000) - r.startedAt))) : 0;
+        setText('[data-console-elapsed]', r.startedAt ? `${Math.floor(elapsed / 60)} min ${String(elapsed % 60).padStart(2, '0')} s` : 'En attente');
+        setText('[data-console-updated]', 'Actualisé à ' + new Date().toLocaleTimeString('fr-FR'));
+        const meter = $('[data-console-progress]', consoleBox);
+        if (meter) { if (typeof r.progress?.pct === 'number') meter.value = Math.max(0, Math.min(100, r.progress.pct)); else if (r.status === 'done') meter.value = 100; else meter.removeAttribute('value'); }
+        consoleBox.dataset.status = r.status;
+        setText('[data-console-tokens]', tokenText(r.tokensUsed));
+        setText('[data-console-remaining]', remainingTime(r));
+        // Vidéo livrée avec les avertissements des agents : elle se relance ou se corrige comme une scène refusée
+        const warned = r.type === 'promo_video' && r.status === 'done' && r.qualityWarnings > 0;
+        const fixable = warned || (r.type === 'promo_video' && /^La scène écrite par Claude ne passe pas au rendu/.test(r.error || ''));
+        for (const retry of $$('[data-retry]', consoleBox)) retry.hidden = !(r.status === 'error' || warned) || ('fix' in retry.dataset && !fixable);
+        if (r.entries.length) {
+          if ((cursor && r.firstId > cursor + 1) || (!cursor && r.firstId > 1)) output.append(document.createTextNode('[Début du journal abrégé]\n'));
+          for (const entry of r.entries) {
+            addEntry(entry);
+            cursor = entry.id;
+          }
+          while (output.childElementCount > 400 || (output.textContent.length > 160_000 && output.childElementCount > 1)) output.firstChild.remove();
+          if ($('[data-console-follow]', consoleBox).checked) output.scrollTop = output.scrollHeight;
+        }
+        if (!cursor && !ACTIVE.includes(r.status)) output.textContent = r.error || 'Aucun journal enregistré pour cette tâche ancienne.';
+        terminal = !ACTIVE.includes(r.status);
+        if (r.error && terminal) status.textContent += ' · ' + r.error;
+      } catch (err) { if (!disposed) { status.textContent = 'Connexion interrompue : ' + err.message + ' — nouvelle tentative…'; setText('[data-console-live]', 'Reconnexion…'); } }
+      finally { busy = false; if (!terminal && !disposed) later(pollConsole, 800); }
+    };
+    pollConsole();
+  }
+
   // ---------- Rendu d'un job ----------
   function renderJob(box, job, type) {
+    renderJobContent(box, job, type);
+    if (box && job && job.canViewLogs !== false && !box.querySelector(`a[href="/jobs/${job.id}"]`)) {
+      const link = document.createElement('a');
+      link.className = 'btn small'; link.href = `/jobs/${job.id}`; link.textContent = 'Voir';
+      box.append(link);
+    }
+    if (box && job) {
+      let usage = $('[data-job-tokens]', box);
+      if (!usage) { usage = document.createElement('p'); usage.dataset.jobTokens = ''; usage.className = 'small muted'; box.append(usage); }
+      usage.textContent = tokenText(job.tokensUsed);
+      if (job.status === 'error' && job.canViewLogs !== false && !$('[data-retry]', box)) {
+        const retry = document.createElement('button');
+        retry.type = 'button'; retry.className = 'btn small primary'; retry.dataset.retry = job.id; retry.textContent = 'Réessayer';
+        box.append(retry);
+        if (type === 'promo_video' && /^La scène écrite par Claude ne passe pas au rendu/.test(job.error || '')) {
+          const fix = document.createElement('button');
+          fix.type = 'button'; fix.className = 'btn small primary'; fix.dataset.retry = job.id; fix.dataset.fix = ''; fix.textContent = 'Corriger';
+          box.append(fix);
+        }
+      }
+    }
+  }
+  function renderJobContent(box, job, type) {
     if (!box) return;
+    const name = LABELS[type] || box.dataset.label || 'Tâche';
     if (!job) { box.innerHTML = ''; box._sig = ''; return; }
     const p = job.progress || {};
     const later = job.status === 'queued' && job.runAfter && job.runAfter * 1000 > Date.now();
     // Rien n'a changé : on ne touche pas au DOM (sinon les animations d'apparition rejoueraient à chaque poll)
-    const sig = `${job.id}|${job.status}|${later}|${JSON.stringify(p)}`;
+    const remaining = remainingTime(job);
+    const sig = `${job.id}|${job.status}|${later}|${remaining}|${JSON.stringify(p)}`;
     if (box._sig === sig) return;
     box._sig = sig;
     if (later) {
       const at = new Date(job.runAfter * 1000).toLocaleString('fr-FR', { weekday: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
       box.innerHTML = `<div class="running scheduled"><span class="moon" aria-hidden="true"></span>
-        <div><div>${LABELS[type]} programmé(e) : ${esc(at)}</div><div class="small muted">Démarrage la nuit, quand ton quota Claude est libre.</div></div>
-        <button class="btn small" data-cancel="${job.id}">Annuler</button></div>`;
+        <div><div>${name} programmé(e) : ${esc(at)}</div><div class="small muted">Démarrage la nuit, quand ton quota Claude est libre.</div></div>
+        ${job.canViewLogs !== false ? `<a class="btn small" href="/jobs/${job.id}">Voir</a>` : ''}<button class="btn small" data-cancel="${job.id}">Annuler</button></div>`;
       return;
     }
     if (ACTIVE.includes(job.status)) {
       const extra = type === 'prospect' && p.found !== undefined
         ? `<strong>${p.found}</strong> prospect(s) trouvé(s) sur ${p.target}` : '';
+      // Derniers prospects ajoutés, en direct (le plus récent en haut)
+      const live = type === 'prospect' && p.recent?.length
+        ? `<ul class="live-list">${[...p.recent].reverse().map((r) => `<li>${esc(r.company)}${r.city ? ` <span class="muted">· ${esc(r.city)}</span>` : ''}</li>`).join('')}</ul>` : '';
       const running = job.status === 'running';
-      const v = running ? pctOf(p) : null;
+      const v = pctOf(p) ?? (running ? null : 0);
       box.innerHTML = `<div class="running"><span class="spinner"></span>
         <div><div class="run-head"><span>${esc(p.message || (running ? 'En cours…' : 'En file d\'attente…'))}</span>${v !== null ? `<strong class="jpct">${v} %</strong>` : ''}</div>
-          ${extra ? `<div class="small">${extra}</div>` : ''}${running ? progressBar(job) : ''}</div>
-        <button class="btn small" data-cancel="${job.id}">Annuler</button></div>`;
+          ${extra ? `<div class="small">${extra}</div>` : ''}${progressBar(job)}${remaining ? `<div class="small muted">${esc(remaining)}</div>` : ''}${p.model ? `<div class="small muted">Modèle : ${esc(p.model)}</div>` : ''}${live}</div>
+        ${job.canViewLogs !== false ? `<a class="btn small" href="/jobs/${job.id}">Voir</a>` : ''}<button class="btn small" data-cancel="${job.id}">Annuler</button></div>`;
       paintBars(box);
     } else if (job.status === 'error') {
-      box.innerHTML = `<p class="error small">${LABELS[type]} en échec : ${esc(job.error)}</p>`;
+      box.innerHTML = `<p class="error small">${name} en échec : ${esc(job.error)}</p>`;
     } else if (job.status === 'cancelled') {
-      box.innerHTML = `<p class="muted small">${LABELS[type]} annulé(e).</p>`;
+      box.innerHTML = `<p class="muted small">${name} annulé(e).</p>`;
     } else if (job.status === 'done') {
+      if (type === 'analyze') { box.innerHTML = ''; return; } // la fiche projet affichée juste au-dessus est le résultat
       const r = job.result || {};
-      let txt = `${LABELS[type]} terminé(e).`;
+      let txt = `${name} terminé(e).`;
+      if (type === 'template') txt = r.reviewed ? `Modèle rédigé et relu : ${r.corrections?.length ? r.corrections.join(' ; ') : 'rien à corriger'}.` : 'Modèle rédigé (la relecture n\'a pas pu être faite : relis-le toi-même).';
       if (type === 'prospect') txt = `Recherche terminée : ${r.found} nouveau(x) prospect(s) sur ${r.requested} demandés.`;
       if (type === 'send') txt = `Envoi terminé : ${r.sent} envoyé(s), ${r.failed} échec(s).`;
       if (type === 'followup') txt = r.postponed ? 'Relances reportées au prochain créneau (lun-ven 9h-18h).' : `Relances terminées : ${r.sent} envoyée(s), ${r.failed} échec(s).`;
@@ -333,6 +903,27 @@
         box._markdown = r.markdown;
         return;
       }
+      if (type === 'audit') {
+        const when = job.finishedAt ? new Date(job.finishedAt * 1000).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' }) : '';
+        // r.html est rendu et échappé par le serveur (src/services/markdown.js)
+        box.innerHTML = `<div class="evo-done"><p class="ok small">Audit terminé${when ? ` · ${esc(when)}` : ''}</p>
+          <button type="button" class="btn small" data-copy-md>Copier le rapport (Markdown)</button></div>
+          ${r.html || `<pre class="md">${esc(r.markdown)}</pre>`}`;
+        box._markdown = r.markdown;
+        return;
+      }
+      if (type.startsWith('poste_')) {
+        const when = job.finishedAt ? new Date(job.finishedAt * 1000).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' }) : '';
+        box.innerHTML = `<div class="evo-done"><p class="ok small">Terminé${when ? ` · ${esc(when)}` : ''}</p>
+          <button type="button" class="btn small" data-poste-view="${esc(type.slice(6))}">${icon('eye')}Voir le résultat</button></div>`;
+        return;
+      }
+      if (type === 'promo_video' && r.qualityWarnings?.length) {
+        const items = r.qualityWarnings.flatMap((w) => (w.issues.length ? w.issues.map((x) => `${Number(x.time).toFixed(2)} s : ${x.problem}`) : ['un agent de contrôle n\'a pas approuvé le rendu']));
+        box.innerHTML = `<p class="ok small">${esc(txt)} Les agents de contrôle ont relevé des défauts : la vidéo est dans la liste ci-dessous, regarde-la, télécharge-la ou relance.</p><ul class="small muted">${items.map((i) => `<li>${esc(i)}</li>`).join('')}</ul>
+          <div class="row"><button type="button" class="btn small primary" data-retry="${job.id}">Réessayer</button><button type="button" class="btn small primary" data-retry="${job.id}" data-fix>Corriger</button></div>`;
+        return;
+      }
       box.innerHTML = `<p class="ok small">${esc(txt)}</p>`;
     }
   }
@@ -343,30 +934,45 @@
   async function refreshProject(el) {
     const id = el.dataset.id;
     let s;
-    try { s = await api(`/api/projects/${id}/status`); } catch (e) { return schedule(el, 30_000); }
+    try { s = await api(`/api/projects/${id}/status`); } catch (e) {
+      if (!checklists.has(id)) setupFailed(el, e); // la liste « Mise en route » arrive avec l'état : sans elle, la section resterait sur son cercle
+      return schedule(el, 30_000);
+    }
     const st = state.get(id) || {};
     const jobs = s.jobs;
-    for (const type of ['prospect', 'template', 'send', 'evolution', 'followup_template', 'followup', 'linkedin_post']) renderJob($(`[data-job="${type}"]`, el), jobs[type], type);
+    for (const type of ['analyze', 'prospect', 'template', 'send', 'evolution', 'audit', 'followup_template', 'followup', 'linkedin_post', 'promo_video']) renderJob($(`[data-job="${type}"]`, el), jobs[type], type);
+    for (const box of $$('[data-job^="poste_"]', el)) renderJob(box, jobs[box.dataset.job], box.dataset.job);
+    // « En-tête » est replié une fois le projet analysé : une analyse qui échoue y affiche son erreur, on l'ouvre (une fois par échec, pour ne pas rouvrir ce qu'on vient de fermer)
+    const analyzeJob = jobs.analyze;
+    if (analyzeJob && analyzeJob.status === 'error' && st.analyzeErrorOpened !== analyzeJob.id) {
+      st.analyzeErrorOpened = analyzeJob.id;
+      const head = $('details[data-acc="header"]', el);
+      if (head) head.open = true;
+    }
 
-    const running = Object.entries(jobs).filter(([, j]) => ACTIVE.includes(j.status)).map(([t]) => LABELS[t]);
+    const running = Object.entries(jobs).filter(([, j]) => ACTIVE.includes(j.status));
     $('[data-state]', el).innerHTML = running.length
-      ? `<span class="spin-inline"></span>${esc(running.join(', '))}`
-      : `<span class="muted small">${s.stats.total || 0} prospect(s)</span>`;
+      ? `<span class="spin-inline"></span>${esc(running.map(([t, j]) => { const v = pctOf(j.progress); return `${LABELS[t] || $(`[data-job="${t}"]`, el)?.dataset.label || 'Tâche'}${v !== null ? ` ${v} %` : ''}`; }).join(', '))}`
+      : ''; // au repos : rien, les chiffres sont déjà dans la ligne du projet (projectFacts)
 
     // Fin d'un post LinkedIn → on recharge la zone pour afficher le brouillon
     const li = jobs.linkedin_post;
     if (li && ACTIVE.includes(li.status)) st.liRunning = true;
-    else if (st.liRunning && li) { st.liRunning = false; loadLinkedin(el); }
+    else if (st.liRunning && li) { st.liRunning = false; window.AiTools.loadLinkedin?.(el); }
+
+    // Fin d'une vidéo de promotion → on recharge la liste
+    const pv = jobs.promo_video;
+    if (pv && ACTIVE.includes(pv.status)) st.promoRunning = true;
+    else if (st.promoRunning && pv) { st.promoRunning = false; window.AiTools.loadPromo?.(el); if (pv.status === 'done') toast('Vidéo de promotion prête'); }
 
     // Fin d'analyse → recharge la page pour afficher fiche + cible
     const an = jobs.analyze;
     if (an && ACTIVE.includes(an.status)) st.analyzing = true;
     else if (st.analyzing && an) {
       st.analyzing = false;
-      if (an.status === 'done') { toast('Analyse terminée'); location.reload(); return; }
+      if (an.status === 'done') { toast('Analyse terminée'); reload(); return; }
       if (an.status === 'error') toast(`Analyse en échec : ${an.error}`, 'error');
     }
-    if (an?.status === 'error' && !s.hasProfile) $('.profile p', el).outerHTML = `<p class="error small">${esc(an.error)}</p>`;
 
     // Modèle de mail : on ne remplace le formulaire que s'il a changé côté serveur
     st.tplStamp ||= {};
@@ -378,6 +984,7 @@
         form.subject.value = t.subject;
         if (form.subjectB) form.subjectB.value = t.subjectB || '';
         form.body.value = t.body;
+        form.html.checked = !!t.html;
       }
       $('[data-tpl-state]', form).innerHTML = t
         ? (t.status === 'validated' ? '<span class="badge ok">validé</span>' : '<span class="badge warn">brouillon</span>') : '';
@@ -405,10 +1012,11 @@
     if (!s.sendMax) blockers.push(s.stats.new ? 'plafond du jour atteint' : 'aucun prospect à contacter');
     $('button', sendForm).disabled = blockers.length > 0;
     sendForm.count.max = s.sendMax || 1;
+    sendForm.dataset.warmup = JSON.stringify(s.warmup || {});
     if (Number(sendForm.count.value) > s.sendMax && s.sendMax) sendForm.count.value = s.sendMax;
     $('[data-send-info]', sendForm).textContent = blockers.length
       ? `Bloqué : ${blockers.join(', ')}`
-      : `${s.stats.new} prospect(s) en attente · max ${s.sendMax} maintenant`;
+      : `${s.stats.new} prospect(s) en attente · max ${s.sendMax} maintenant${warmupLine(s.warmup)}`;
     $('[data-count]', el).textContent = `(${s.stats.total || 0})`;
 
     // Boîte de réception + test A/B
@@ -424,129 +1032,355 @@
         <button class="btn small" data-inbox-check="${id}">Vérifier maintenant</button>${ab}`;
     }
 
+    if (s.checklist) setChecklist(id, s.checklist);
     state.set(id, st);
-    schedule(el, running.length ? 4000 : 30_000);
+    schedule(el, running.length ? 2500 : 30_000);
   }
 
   function schedule(el, ms) {
     const st = state.get(el.dataset.id) || {};
     clearTimeout(st.timer);
-    st.timer = el.open ? setTimeout(() => refreshProject(el), ms) : null;
+    st.timer = el.open ? later(() => refreshProject(el), ms) : null;
     state.set(el.dataset.id, st);
   }
 
   $$('details.project').forEach((el) => {
     el.addEventListener('toggle', () => { if (el.open) refreshProject(el); else schedule(el, 0); });
   });
-  // Rouvre le dernier projet consulté après un reload
-  const last = sessionStorageGet('openProject');
+  // Rouvre un projet une seule fois : après un rechargement voulu par l'application, ou depuis « Voir » du menu Activité. Sinon tout reste fermé
+  // (un seul projet : il est ouvert par le serveur).
+  const last = sessionStorageGet('reopenProject');
+  try { sessionStorage.removeItem('reopenProject'); } catch { /* stockage indisponible */ }
   if (last) { const el = $(`details.project[data-id="${last}"]`); if (el) el.open = true; }
+  // Projet unique : ouvert dès l'affichage de la page (attribut `open` du serveur), on lance son suivi sans attendre un clic
+  $$('details.project[open]').forEach((el) => refreshProject(el));
   function sessionStorageGet(k) { try { return sessionStorage.getItem(k); } catch { return null; } }
   function sessionStorageSet(k, v) { try { sessionStorage.setItem(k, v); } catch { /* ignore */ } }
-  $$('details.project').forEach((el) => el.addEventListener('toggle', () => { if (el.open) sessionStorageSet('openProject', el.dataset.id); }));
 
-  // ---------- LinkedIn ----------
-  // Section d'un projet : relier un compte, donner une direction (facultative), générer / régénérer un post, le relire et le publier.
-  const liDay = (ts) => new Date(ts * 1000).toLocaleDateString('fr-FR', { dateStyle: 'medium', timeZone: 'Europe/Paris' });
+  // ---------- Mise en route : une section du projet ----------
+  // Ce qui est configuré et ce qui reste à faire, recalculé côté serveur à chaque lecture (rien n'est mémorisé ici). Le badge « config 4/9 » de la ligne du projet
+  // ouvre la section ; chaque ligne ouvre la bonne section du projet, y fait défiler la page et la fait clignoter un instant. Quand tout est fait, la section disparaît.
+  const checklists = new Map();
+  const TICK = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>';
+  const DOT = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="8"/></svg>';
 
-  async function loadLinkedin(proj) {
-    const box = $('[data-linkedin]', proj);
-    if (!box) return;
-    try { renderLinkedin(box, await api(`/api/projects/${proj.dataset.id}/linkedin`), proj.dataset.id); }
-    catch (e) { box.innerHTML = `<p class="error small">${esc(e.message)}</p>`; }
+  function setChecklist(id, c) {
+    const was = checklists.get(String(id)); // l'état précédent : une étape qui vient d'être faite ou « tout est fait » se remarque, pas ce qui l'était déjà au chargement
+    checklists.set(String(id), c);
+    const el = $(`details.project[data-id="${id}"]`);
+    if (!el) return;
+    markChecklist(el, c, was);
+    renderSetup(el, c);
   }
 
-  function renderLinkedin(box, s, id) {
-    // Ne pas écraser ce que l'utilisateur est en train d'écrire
-    if (box.contains(document.activeElement) && document.activeElement.matches('textarea')) return;
-    if (!s.configured) {
-      box.innerHTML = '<p class="muted">LinkedIn n\'est pas activé sur ce service : l\'administrateur doit renseigner les clés de l\'application LinkedIn.</p>';
-      return;
+  // Badge « config 5/9 » sur la ligne du projet, coche sur chaque section dont toutes les étapes sont faites
+  function markChecklist(el, c, was) {
+    const byAcc = {};
+    for (const s of c.steps) if (s.acc) (byAcc[s.acc] ||= []).push(s);
+    for (const [acc, list] of Object.entries(byAcc)) {
+      const sum = $(`details[data-acc="${acc}"] > summary`, el);
+      if (sum) sum.classList.toggle('acc-done', list.every((s) => s.done));
     }
-    const acc = s.account;
-    if (!acc) {
-      box.innerHTML = `<p>Relie un compte LinkedIn à ce projet : Claude pourra écrire des posts pour ce compte. AiTools demande seulement le droit de <strong>publier un post sur ton profil</strong>, et ne publie jamais sans ton clic.</p>
-        ${s.canManage ? `<p><a class="btn primary" href="/linkedin/connect?project=${id}">Connecter LinkedIn</a></p>` : '<p class="muted small">Demande à un administrateur du projet de relier le compte.</p>'}`;
-      return;
-    }
-    const head = `<div class="row li-head"><p><span class="badge ${acc.expired ? 'warn' : 'ok'}">${acc.expired ? 'connexion expirée' : 'connecté'}</span> <strong>${esc(acc.name)}</strong>
-        ${acc.expiresAt ? `<span class="muted small">· ${acc.expired ? 'a expiré' : 'valable'} jusqu'au ${esc(liDay(acc.expiresAt))}</span>` : ''}</p>
-      ${s.canManage ? `<span>${acc.expired ? `<a class="btn small primary" href="/linkedin/connect?project=${id}">Reconnecter</a> ` : ''}<button type="button" class="btn small danger" data-li-disconnect="${id}">Déconnecter</button></span>` : ''}</div>`;
-    const posts = s.posts || [];
-    const latest = posts[0];
-    const draft = latest && latest.status !== 'published' ? latest : null;
-    const direction = latest?.direction || '';
-    const gen = !s.hasProfile ? '<p class="muted small">Analyse le projet d\'abord : Claude s\'appuie sur la fiche projet.</p>' : acc.expired ? '' : `<div class="li-gen">
-        <label>De quoi doit parler le post ? <span class="muted small">(facultatif)</span>
-          <textarea name="direction" rows="3" maxlength="500" data-li-direction placeholder="Ex. : le lancement de la nouvelle offre, un retour d'expérience, un conseil pour mes clients… Laisse vide : Claude choisit le sujet.">${esc(direction)}</textarea></label>
-        <button type="button" class="btn primary" data-li-generate="${id}">${draft ? 'Régénérer un autre post' : 'Générer un post'}</button></div>`;
-    const draftHtml = draft ? `<div class="li-draft"><label>Brouillon (modifiable)
-        <textarea rows="11" maxlength="${s.maxLength}" data-li-body="${draft.id}">${esc(draft.body)}</textarea></label>
-        <p class="muted small"><span data-li-count>${draft.body.length}</span> / ${s.maxLength} caractères${draft.direction ? ` · direction : « ${esc(draft.direction)} »` : ' · sujet choisi par Claude'}</p>
-        <div class="row-actions"><button type="button" class="btn" data-li-save="${id}">Enregistrer</button>
-          <button type="button" class="btn" data-li-copy>Copier</button>
-          ${s.canManage && !acc.expired ? `<button type="button" class="btn primary" data-li-publish="${id}">Publier sur LinkedIn</button>` : '<span class="muted small">Un administrateur du projet publie.</span>'}</div></div>` : '';
-    const history = posts.filter((x) => x !== draft && x.status === 'published');
-    const hist = history.length ? `<details class="li-history"><summary>Posts publiés (${history.length})</summary>${history.map((x) => `<article class="card"><p class="muted small">Publié le ${esc(liDay(x.publishedAt))}</p><p class="li-text">${esc(x.body)}</p></article>`).join('')}</details>` : '';
-    box.innerHTML = `${head}${gen}${draftHtml}${hist}`;
+    const badge = $('[data-cfg]', el);
+    if (!badge) return;
+    badge.hidden = false;
+    badge.textContent = c.complete ? 'config ✓' : `config ${c.done}/${c.total}`;
+    badge.classList.toggle('ok', c.complete);
+    badge.classList.toggle('warn', !c.ready);
+    badge.setAttribute('aria-label', c.complete ? 'Mise en route terminée' : `Mise en route : ${c.done} étape${c.done > 1 ? 's' : ''} sur ${c.total}. Voir la liste`);
+    if (was && !was.complete && c.complete) { badge.classList.remove('pop'); void badge.offsetWidth; badge.classList.add('pop'); } // tout vient d'être fait : « config ✓ » apparaît d'un petit saut
   }
 
-  document.addEventListener('click', async (e) => {
-    const t = e.target.closest('[data-li-generate],[data-li-save],[data-li-copy],[data-li-publish],[data-li-disconnect]');
-    if (!t) return;
-    const proj = t.closest('.project');
-    const id = proj?.dataset.id;
-    const body = () => $('[data-li-body]', proj);
-    try {
-      if (t.matches('[data-li-generate]')) {
-        t.disabled = true;
-        const r = await api(`/api/projects/${id}/linkedin/generate`, { direction: $('[data-li-direction]', proj)?.value || '' });
-        toast(r.budgetBlocked ? `En file, mais ${r.budgetBlocked}` : r.existing ? 'Un post est déjà en cours de rédaction' : 'Claude rédige le post…', r.budgetBlocked ? 'error' : 'ok');
-        refreshProject(proj);
-      } else if (t.matches('[data-li-save]')) {
-        await api(`/api/projects/${id}/linkedin/post`, { postId: Number(body().dataset.liBody), body: body().value });
-        toast('Brouillon enregistré');
-      } else if (t.matches('[data-li-copy]')) {
-        await navigator.clipboard.writeText(body().value);
-        toast('Post copié');
-      } else if (t.matches('[data-li-publish]')) {
-        if (!confirm('Publier ce post sur LinkedIn ? Il sera visible publiquement par tout le monde.')) return;
-        t.disabled = true;
-        await api(`/api/projects/${id}/linkedin/publish`, { postId: Number(body().dataset.liBody), body: body().value, confirm: true });
-        toast('Post publié sur LinkedIn');
-        loadLinkedin(proj);
-      } else if (t.matches('[data-li-disconnect]')) {
-        if (!confirm('Déconnecter le compte LinkedIn de ce projet ? Les brouillons sont conservés.')) return;
-        await api(`/api/projects/${id}/linkedin/disconnect`, {});
-        loadLinkedin(proj);
-      }
-    } catch (err) { toast(err.message, 'error'); t.disabled = false; }
-  });
-  document.addEventListener('input', (e) => {
-    const area = e.target.closest('[data-li-body]');
-    if (area) $('[data-li-count]', area.closest('.project')).textContent = area.value.length;
-  });
-  $$('details[data-acc="linkedin"]').forEach((d) => d.addEventListener('toggle', () => { if (d.open) loadLinkedin(d.closest('.project')); }));
+  // La section « Mise en route » du projet : titre, avancement et lignes ; masquée une fois tout fait. Redessinée seulement si le contenu change.
+  function renderSetup(el, c) {
+    const acc = $('details[data-acc="setup"]', el);
+    if (!acc) return;
+    acc.hidden = !!c.complete;
+    $('.acc-title', acc).textContent = c.ready ? 'Prêt à prospecter' : 'Mise en route';
+    const sub = $('.acc-sub', acc);
+    if (sub) sub.textContent = `${c.done} étape${c.done > 1 ? 's' : ''} sur ${c.total}`;
+    const body = $('[data-setup]', acc);
+    const html = `<ul>${c.steps.map((s) => `<li class="${s.done ? 'done' : ''}">${s.done ? TICK : DOT}<div>
+      <button type="button" class="setup-go" data-setup-go="${esc(s.key)}">${esc(s.label)}</button>${s.optional ? '<span class="setup-opt">facultatif</span>' : ''}
+      ${s.done ? '' : `<span class="muted small">${esc(s.hint)}</span>`}</div></li>`).join('')}</ul>`;
+    // Les étapes faites depuis le dernier affichage : leur coche apparaît d'un petit saut (jamais au premier affichage, ni pour ce qui l'était déjà)
+    const done = new Set(c.steps.filter((s) => s.done).map((s) => s.key));
+    const fresh = body._done ? [...done].filter((k) => !body._done.has(k)) : [];
+    body._done = done;
+    if (body._html !== html) { body._html = html; body.innerHTML = html; }
+    for (const key of fresh) {
+      const li = $(`[data-setup-go="${key}"]`, body)?.closest('li');
+      if (!li) continue;
+      li.classList.add('just-done');
+      later(() => li.classList.remove('just-done'), 4000); // la section est repliée par défaut : sans personne devant, l'animation ne démarre pas, on ne la garde pas pour plus tard
+    }
+  }
 
-  // Retour de LinkedIn : message, puis on rouvre le projet concerné
+  async function loadChecklist(el) {
+    try { setChecklist(el.dataset.id, await api(`/api/projects/${el.dataset.id}/checklist`)); } catch (err) { setupFailed(el, err); }
+  }
+  // Sans cela la section « Mise en route » restait sur son cercle de chargement pour toujours. Le badge, lui, reste masqué.
+  function setupFailed(el, err) {
+    const body = $('[data-setup]', el);
+    if (!body) return;
+    body._html = null;
+    loadFailed(body, err.message, () => loadChecklist(el));
+  }
+  $$('details.project').forEach((el) => el.addEventListener('toggle', () => { if (el.open && !checklists.has(el.dataset.id)) loadChecklist(el); }));
+
+  // Ouvre la section de l'étape (et ses parents), y fait défiler la page et la fait clignoter un instant
+  function todoGo(el, step) {
+    el.open = true;
+    const target = (step.acc && $(`details[data-acc="${step.acc}"]`, el)) || (step.sel && $(step.sel, el));
+    if (!target) return;
+    for (let n = target; n && n !== el; n = n.parentElement) if (n.tagName === 'DETAILS') n.open = true;
+    const calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    target.scrollIntoView({ behavior: calm ? 'auto' : 'smooth', block: 'center' });
+    target.classList.add('flash');
+    setTimeout(() => target.classList.remove('flash'), 1800);
+  }
+
+  // Le badge « config » ouvre la section du projet ; une ligne de la liste ouvre l'étape
+  listen(document, 'click', (e) => {
+    const badge = e.target.closest('[data-cfg]');
+    if (badge) {
+      e.preventDefault();
+      const el = badge.closest('details.project');
+      const acc = el && $('details[data-acc="setup"]', el);
+      if (!acc || acc.hidden) return;
+      el.open = true;
+      acc.open = true;
+      const calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      acc.scrollIntoView({ behavior: calm ? 'auto' : 'smooth', block: 'start' });
+      $('summary', acc).focus({ preventScroll: true });
+      return;
+    }
+    const go = e.target.closest('[data-setup-go]');
+    const el = go?.closest('details.project');
+    const step = el && checklists.get(el.dataset.id)?.steps.find((s) => s.key === go.dataset.setupGo);
+    if (step) todoGo(el, step);
+  });
+
+  // ---------- Réglages : ajouter un serveur Git ----------
+  // GitHub est toujours là. Le « + » propose le type de serveur, puis ajoute une ligne URL + token (le formulaire reste un POST classique).
   (() => {
-    const q = new URLSearchParams(location.search);
-    if (!q.has('li')) return;
-    history.replaceState(null, '', location.pathname);
-    if (q.get('li') === 'ok') toast('Compte LinkedIn relié au projet');
-    else toast(q.get('m') || 'Connexion LinkedIn impossible', 'error');
-    const proj = $(`details.project[data-id="${q.get('p')}"]`);
-    if (proj) { proj.open = true; const acc = $('details[data-acc="linkedin"]', proj); if (acc) { acc.open = true; loadLinkedin(proj); } }
+    const list = $('[data-gitlist]');
+    const tpl = $('#git-row-tpl');
+    if (!list || !tpl) return;
+    const add = $('[data-git-add]');
+    const pick = $('[data-git-type]');
+    const full = $('[data-git-max]');
+    let next = Number(list.dataset.next) || 0;
+    const rows = () => $$('[data-git-row]', list).length;
+
+    add.addEventListener('click', () => {
+      if (rows() >= Number(list.dataset.max)) { full.hidden = false; return; }
+      pick.hidden = !pick.hidden;
+      add.setAttribute('aria-expanded', String(!pick.hidden));
+      if (!pick.hidden) pick.focus();
+    });
+    pick.addEventListener('change', () => {
+      const opt = pick.selectedOptions[0];
+      if (!opt?.value) return;
+      const html = tpl.innerHTML.replaceAll('__I__', String(next++)).replaceAll('__TYPE__', esc(opt.value)).replaceAll('__LABEL__', esc(opt.dataset.label));
+      const row = document.createElement('div');
+      row.innerHTML = html;
+      const el = row.firstElementChild;
+      $('[data-git-hint]', el).textContent = opt.dataset.hint || '';
+      list.append(el);
+      pick.value = '';
+      pick.hidden = true;
+      add.setAttribute('aria-expanded', 'false');
+      $('input[name^="git_host_"]', el).focus();
+    });
+    list.addEventListener('click', (e) => {
+      if (!e.target.closest('[data-git-cancel]')) return;
+      e.target.closest('[data-git-row]').remove();
+      full.hidden = true;
+    });
+  })();
+
+  // ---------- Corbeilles : marquer un élément « à retirer » (annulable), retiré à l'enregistrement ----------
+  listen(document, 'click', (e) => {
+    const btn = e.target.closest('[data-trash]');
+    if (!btn) return;
+    const wrap = btn.closest('.trash-wrap');
+    const on = btn.getAttribute('aria-pressed') !== 'true';
+    $('[data-trash-input]', wrap).value = on ? '1' : '';
+    btn.setAttribute('aria-pressed', String(on));
+    $('.trash-note', wrap).hidden = !on;
+    // Une ligne entière (serveur Git, webhook) s'estompe tant qu'elle est marquée ; un simple token ne marque que son bouton
+    const row = btn.closest('.gitrow');
+    if (row && !btn.classList.contains('txt')) row.classList.toggle('to-delete', on);
+  });
+
+  // ---------- Développeur : copier le jeton affiché une seule fois ----------
+  listen(document, 'click', async (e) => {
+    const b = e.target.closest('[data-copy-token]');
+    if (!b) return;
+    const code = $('[data-token]');
+    try { await navigator.clipboard.writeText(code.textContent); toast('Jeton copié'); }
+    catch { const r = document.createRange(); r.selectNodeContents(code); getSelection().removeAllRanges(); getSelection().addRange(r); toast('Sélectionné : copie-le avec Ctrl+C', 'error'); }
+  });
+
+  // ---------- Développeur : copier une adresse ou une commande ----------
+  listen(document, 'click', async (e) => {
+    const b = e.target.closest('[data-copy-cmd]');
+    if (!b) return;
+    const code = $('code', b.closest('.cmd'));
+    try { await navigator.clipboard.writeText(code.textContent); toast('Copié'); }
+    catch { const r = document.createRange(); r.selectNodeContents(code); getSelection().removeAllRanges(); getSelection().addRange(r); toast('Sélectionné : copie-le avec Ctrl+C', 'error'); }
+  });
+  // Action définitive : un formulaire qui porte data-confirm demande confirmation avant de partir
+  listen(document, 'submit', async (e) => {
+    const form = e.target;
+    const msg = form.dataset?.confirm;
+    if (!msg || form.dataset.action || form.dataset.confirmed === '1') return; // data-action : voir « Formulaires » plus bas (une seule confirmation)
+    e.preventDefault();
+    if (!(await confirmBox(msg, { confirm: form.dataset.confirmLabel }))) return;
+    form.dataset.confirmed = '1';
+    form.requestSubmit(e.submitter || undefined); // même envoi qu'avant, avec le même bouton, sans redemander
+    delete form.dataset.confirmed;
+  });
+
+  // ---------- Réglages : prompts par gamme de modèle ----------
+  // Onglets « Tous les modèles / Haiku / Sonnet / Opus / Fable » : un seul texte visible par tâche (les autres restent dans le formulaire).
+  listen(document, 'click', (e) => {
+    const tab = e.target.closest('[data-pscope-tab]');
+    if (!tab) return;
+    const card = tab.closest('[data-prompts]');
+    card.dataset.pscope = tab.dataset.pscopeTab;
+    for (const t of $$('[data-pscope-tab]', card)) t.setAttribute('aria-pressed', String(t === tab));
+  });
+  listen(document, 'click', (e) => {
+    const b = e.target.closest('[data-prompt-reset]');
+    if (!b) return;
+    const ta = $('[data-prompt-text]', b.closest('.pscope-box'));
+    ta.value = b.dataset.default;
+    ta.focus();
+  });
+  // Un texte que l'utilisateur n'a pas touché n'est pas renvoyé : il ne fige pas une gamme sur l'ancien défaut quand « Tous les modèles » change
+  listen(document, 'submit', (e) => {
+    for (const ta of $$('[data-prompt-text]', e.target)) if (ta.value === ta.defaultValue) ta.disabled = true;
+  });
+
+  // ---------- Réglages : choix du modèle (liste recommandée + autres) ----------
+  listen(document, 'change', (e) => {
+    const r = e.target.closest('[data-modelpick] input[type=radio]');
+    if (!r) return;
+    const box = r.closest('[data-modelpick]');
+    $('[data-mp-name]', box).textContent = r.dataset.mpLabel;
+    $('[data-mp-tier-out]', box).textContent = r.dataset.mpTier;
+    box.querySelector('details').open = false;
+  });
+
+  // ---------- Réglages : notifications, le « + » ouvre le menu des services ----------
+  // Service → notifications voulues → lien du webhook. Discord peut avoir plusieurs lignes (un webhook par salon) ;
+  // Slack, Telegram et e-mail une seule carte chacun, déjà dans la page mais masquée jusqu'au choix.
+  (() => {
+    const menu = $('[data-addmenu]');
+    const list = $('[data-discordlist]');
+    const tpl = $('#discord-row-tpl');
+    if (!menu || !list || !tpl) return;
+    const full = $('[data-discord-max]');
+    const empty = $('[data-chan-empty]');
+    let next = Number(list.dataset.next) || 0;
+    const rows = () => $$('[data-discord-row]', list);
+    const renumber = () => rows().forEach((r, i) => { $('[data-discord-title]', r).textContent = `Discord ${i + 1}`; });
+    const sync = () => {
+      const any = rows().length || $$('[data-channel]:not([hidden])').length;
+      if (empty) empty.hidden = !!any;
+      full.hidden = rows().length < Number(list.dataset.max);
+    };
+    const focusIn = (el) => { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); $('input:not([type="hidden"]):not([type="checkbox"])', el)?.focus({ preventScroll: true }); };
+
+    listen(document, 'click', (e) => {
+      const pick = e.target.closest('[data-chan-pick]');
+      if (pick) {
+        menu.open = false;
+        const type = pick.dataset.chanPick;
+        if (type === 'discord') {
+          if (rows().length >= Number(list.dataset.max)) { full.hidden = false; return; }
+          const holder = document.createElement('div');
+          holder.innerHTML = tpl.innerHTML.replaceAll('__I__', String(next++));
+          const el = holder.firstElementChild;
+          list.append(el);
+          renumber();
+          focusIn(el);
+        } else {
+          const card = $(`[data-channel="${type}"]`);
+          card.hidden = false;
+          pick.hidden = true;
+          focusIn(card);
+        }
+        sync();
+        return;
+      }
+      if (e.target.closest('[data-discord-cancel]')) {
+        e.target.closest('[data-discord-row]').remove();
+        renumber(); sync();
+        return;
+      }
+      const cancel = e.target.closest('[data-chan-cancel]');
+      if (cancel) {
+        const card = cancel.closest('[data-channel]');
+        card.hidden = true;
+        for (const f of $$('input[type="password"], input[type="text"], input[type="email"]', card)) f.value = '';
+        $(`[data-chan-pick="${card.dataset.channel}"]`).hidden = false;
+        sync();
+        return;
+      }
+      // un clic ailleurs referme le menu
+      if (menu.open && !e.target.closest('[data-addmenu]')) menu.open = false;
+    });
+    listen(document, 'keydown', (e) => { if (e.key === 'Escape' && menu.open) { menu.open = false; $('summary', menu).focus(); } });
+  })();
+
+  // ---------- Réglages : tester le token GitHub ----------
+  // Dit à qui appartient le token, à quels dépôts il donne accès, et lesquels de tes projets en font partie. Ne modifie rien.
+  (() => {
+    const btn = $('[data-github-test]');
+    if (!btn) return;
+    const out = $('[data-github-result]');
+    const field = $('input[name="github_token"]');
+    const show = (html, kind) => { out.hidden = false; out.className = `gittest ${kind}`; out.innerHTML = html; };
+    const mark = { true: ['ok', '✓', 'accessible avec ce token'], false: ['error', '✗', "pas accessible avec ce token (ajoute ce dépôt à ceux du token)"], null: ['muted', '?', 'non déterminé (liste tronquée)'] };
+
+    btn.addEventListener('click', async () => {
+      btn.disabled = true; // api() marque le bouton occupé (indicateur dans le bouton) puis ne le réactive pas : c'est ici
+      try {
+        const r = await api('/settings/github/test', { token: field.value });
+        if (!r.ok) { show(`<p class="error">${esc(sentence(r.message))}</p>`, 'bad'); return; }
+        const projects = r.projects.length
+          ? `<h5>Tes projets sur GitHub</h5><ul class="gitprojects">${r.projects.map((p) => {
+            const [cls, sign, text] = mark[String(p.access)];
+            return `<li class="${cls}"><span aria-hidden="true">${sign}</span> <strong>${esc(p.name)}</strong> <span class="muted small">${esc(p.repo)} : ${esc(text)}</span></li>`;
+          }).join('')}</ul>`
+          : '<p class="muted small">Aucun de tes projets n\'est sur GitHub pour l\'instant.</p>';
+        const repos = r.repos.length
+          ? `<details><summary>${r.repos.length}${r.truncated ? '+' : ''} dépôt(s) accessible(s)${r.truncated ? ' (les 100 plus récents)' : ''}</summary><ul class="gitrepos">${r.repos.map((x) => `<li>${esc(x.name)} <span class="badge">${x.private ? 'privé' : 'public'}</span></li>`).join('')}</ul></details>`
+          : '<p class="warn">Ce token ne donne accès à aucun dépôt : ajoute-en dans les réglages du token sur GitHub.</p>';
+        show(`<p class="ok"><strong>Token valide</strong> · compte <strong>@${esc(r.login)}</strong> · token ${esc(r.kind)}${r.expiresAt ? ` · expire le ${esc(r.expiresAt)}` : ''}</p>
+          ${r.warning ? `<p class="warn small">${esc(r.warning)}</p>` : ''}${projects}${repos}`, 'good');
+      } catch (e) {
+        show(`<p class="error">${esc(e.message)}</p>`, 'bad');
+      } finally {
+        btn.disabled = false;
+      }
+    });
   })();
 
   // ---------- Sections dépliables animées ----------
   // <details class="anim"> : la hauteur du bloc qui suit le <summary> glisse à l'ouverture et à la fermeture.
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
-  document.addEventListener('click', (e) => {
+  listen(document, 'click', (e) => {
     const sum = e.target.closest('summary');
     const d = sum?.parentElement;
     const body = sum?.nextElementSibling;
     if (!d?.matches('details.anim') || !body || reduceMotion.matches) return;
+    // Un bouton ou un lien dans l'en-tête de la section (badge « config », « Analyser ») agit, il ne replie pas la section
+    const control = e.target.closest('button, a, input, select, label');
+    if (control && sum.contains(control)) return;
     e.preventDefault();
     d._anim?.cancel();
     const opening = !d.open || d.classList.contains('closing');
@@ -570,9 +1404,27 @@
   });
 
   // Le récap se charge à l'ouverture de sa section
-  $$('details[data-acc="recap"]').forEach((d) => d.addEventListener('toggle', () => { if (d.open) loadRecap(d.closest('.project')); }));
+  $$('details[data-acc="recap"]').forEach((d) => d.addEventListener('toggle', () => { if (d.open) window.AiTools.loadRecap?.(d.closest('.project')); }));
 
-  document.addEventListener('click', async (e) => {
+  listen(document, 'click', async (e) => {
+    const retry = e.target.closest('[data-retry]');
+    if (retry) {
+      if (retry.disabled) return;
+      const fix = 'fix' in retry.dataset;
+      const label = retry.textContent;
+      retry.disabled = true; retry.textContent = fix ? 'Correction…' : 'Relance…';
+      const failure = $('[data-retry-error]');
+      if (failure) failure.hidden = true;
+      try {
+        const result = await api(`/api/jobs/${retry.dataset.retry}/retry`, fix ? { fix: true } : {});
+        location.href = `/jobs/${result.id}`;
+      } catch (err) {
+        if (failure) { failure.textContent = err.message; failure.hidden = false; }
+        else toast(err.message, 'error');
+        retry.disabled = false; retry.textContent = label;
+      }
+      return;
+    }
     const copy = e.target.closest('[data-copy-md]');
     if (copy) {
       const md = copy.closest('.job')?._markdown || '';
@@ -582,8 +1434,9 @@
 
     const runBtn = e.target.closest('[data-run]');
     if (runBtn) {
+      e.preventDefault(); // le bouton « Réanalyser » est dans la ligne du projet : il ne doit pas la replier
       const { run, id } = runBtn.dataset;
-      if (run === 'analyze' && !confirm('Relancer l\'analyse complète du repo ? (consomme du quota Claude)')) return;
+      if (run === 'analyze' && runBtn.hasAttribute('data-reanalyze') && !(await confirmBox('Relancer l\'analyse complète du dépôt ?\nElle consomme du quota Claude.', { confirm: 'Relancer' }))) return;
       try {
         const r = await api(`/api/projects/${id}/${run}`, {});
         toast(r.existing ? 'Déjà en cours' : 'Lancé');
@@ -599,11 +1452,12 @@
       const proj = cancel.closest('.project');
       if (proj) refreshProject(proj);
       else $$('details.project[open]').forEach((el) => refreshProject(el));
+      refreshActivity();
       refreshSys();
       return;
     }
 
-    if (e.target.matches('[data-recap-refresh]')) loadRecap(e.target.closest('.project'), true);
+    if (e.target.matches('[data-recap-refresh]')) window.AiTools.loadRecap?.(e.target.closest('.project'), true);
 
     if (e.target.closest('[data-report-send]')) {
       try { const r = await api('/api/report/send', {}); toast(`Rapport envoyé (${r.channels.join(' + ')})`); }
@@ -611,8 +1465,12 @@
       return;
     }
 
-    if (e.target.closest('[data-notify-test]')) {
-      try { await api('/api/notify/test', {}); toast('Notification envoyée sur Discord'); }
+    const hookTest = e.target.closest('[data-notify-test]');
+    if (hookTest) {
+      try {
+        await api('/api/notify/test', hookTest.dataset.channel ? { channel: hookTest.dataset.channel } : hookTest.dataset.hook ? { hook: hookTest.dataset.hook } : {});
+        toast(hookTest.dataset.channel ? 'Notification de test envoyée' : 'Notification envoyée sur Discord');
+      }
       catch (err) { toast(err.message, 'error'); }
       return;
     }
@@ -628,13 +1486,97 @@
     }
   });
 
+  // ---------- Postes : filtre par poste et résultat d'une tâche ----------
+  const ROLE_KEY = 'aitools.role';
+  const savedRole = () => { try { return localStorage.getItem(ROLE_KEY) || ''; } catch { return ''; } };
+  function applyRole(role) {
+    for (const sel of $$('[data-role-select]')) sel.value = role;
+    for (const proj of $$('.project')) {
+      for (const d of $$('details.acc[data-roles]', proj)) d.hidden = !!role && !d.dataset.roles.split(' ').includes(role);
+      for (const d of $$('details.role', proj)) {
+        d.hidden = !!role && d.dataset.role !== role;
+        if (role && d.dataset.role === role) d.open = true;
+      }
+      const postes = $('details.acc[data-acc="postes"]', proj);
+      if (postes && role) postes.open = true;
+    }
+  }
+  if (!$$('[data-role-select] option').some((o) => o.value === savedRole())) { try { localStorage.removeItem(ROLE_KEY); } catch { /* ignore */ } }
+  applyRole(savedRole());
+  listen(document, 'change', (e) => {
+    const sel = e.target.closest('[data-role-select]');
+    if (!sel) return;
+    try { if (sel.value) localStorage.setItem(ROLE_KEY, sel.value); else localStorage.removeItem(ROLE_KEY); } catch { /* le filtre fonctionne sans mémoire */ }
+    applyRole(sel.value);
+  });
+
+  let posteMd = '';
+  listen(document, 'click', async (e) => {
+    const v = e.target.closest('[data-poste-view]');
+    if (!v) return;
+    v.disabled = true;
+    try {
+      const r = await api(`/api/projects/${v.closest('.project').dataset.id}/poste/${v.dataset.posteView}`);
+      let dlg = $('dialog.posteview');
+      if (!dlg) {
+        dlg = document.createElement('dialog');
+        dlg.className = 'prospect-dialog posteview';
+        document.body.append(dlg);
+        dlg.addEventListener('click', async (ev) => {
+          if (ev.target === dlg || ev.target.closest('[data-close]')) { dlg.close(); return; }
+          if (ev.target.closest('[data-poste-copy]')) {
+            try { await navigator.clipboard.writeText(posteMd); toast('Markdown copié'); } catch { toast('Copie impossible dans ce navigateur', 'error'); }
+          }
+        });
+      }
+      posteMd = r.markdown;
+      const when = r.finishedAt ? new Date(r.finishedAt * 1000).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' }) : '';
+      // r.html est rendu et échappé par le serveur (src/services/markdown.js)
+      dlg.setAttribute('aria-label', r.label);
+      dlg.innerHTML = `<div class="dlg-head"><div><h3>${esc(r.label)}</h3><p class="muted small">${esc(r.role)}${when ? ` · ${esc(when)}` : ''}${r.notes ? ` · précisions : ${esc(r.notes)}` : ''}</p></div>
+        <button type="button" class="btn small" data-close>Fermer</button></div>
+        <div class="poste-md">${r.html}</div>
+        <div class="row"><button type="button" class="btn small" data-poste-copy>Copier le livrable (Markdown)</button></div>`;
+      if (!dlg.open) dlg.showModal();
+    } catch (err) { toast(err.message, 'error'); }
+    v.disabled = false;
+  });
+
+  // ---------- Réglages : pied de page des mails (retrait confirmé, retour libre) ----------
+  const FOOTER_RISK = "Retirer le pied de page de tes mails de prospection ?\n\n"
+    + "• Légal : le RGPD et la CNIL exigent d'informer la personne de l'origine de son adresse et de lui offrir un moyen simple et gratuit de refuser tes messages. C'est toi qui en portes la responsabilité.\n"
+    + "• Réputation : sans lien de désinscription, les destinataires cliquent « Spam » et Gmail ou Outlook peuvent bloquer ton adresse et ton domaine d'envoi.\n"
+    + "• Seul l'en-tête invisible « List-Unsubscribe » reste, et toutes les messageries ne l'affichent pas.\n\n"
+    + "Tu peux le remettre à tout moment. Confirmer le retrait ?";
+  listen(document, 'click', async (e) => {
+    const off = e.target.closest('[data-footer-off]');
+    const on = e.target.closest('[data-footer-on]');
+    if (!off && !on) return;
+    if (off && !(await confirmBox(FOOTER_RISK, { confirm: 'Retirer le pied de page' }))) return;
+    const box = (off || on).closest('[data-footer-opt]');
+    const btn = off || on;
+    btn.disabled = true;
+    try {
+      const r = await api('/api/settings/mail-footer', { enabled: !!on, confirmed: !!off });
+      $('[data-footer-off]', box).hidden = !r.enabled;
+      $('[data-footer-on]', box).hidden = r.enabled;
+      const st = $('[data-footer-state]', box);
+      st.className = `state ${r.enabled ? 'ok' : 'warn'}`;
+      st.textContent = r.enabled
+        ? 'Actif : chaque mail se termine par « Vous recevez ce message car l\'adresse … est publiée publiquement (source) » et un lien « Ne plus recevoir de messages ».'
+        : 'Retiré : tes mails partent sans lien « Ne plus recevoir de messages » ni origine de l\'adresse (seul l\'en-tête invisible « List-Unsubscribe » reste).';
+      toast(r.enabled ? 'Pied de page remis' : 'Pied de page retiré', r.enabled ? 'ok' : 'error');
+    } catch (err) { toast(err.message, 'error'); }
+    btn.disabled = false;
+  });
+
   // ---------- Formulaires ----------
-  document.addEventListener('submit', async (e) => {
+  listen(document, 'submit', async (e) => {
     const form = e.target.closest('form[data-action]');
     if (!form) return;
     e.preventDefault();
     const { action, id, confirm: question } = form.dataset;
-    if (question && !confirm(question)) return;
+    if (question && !(await confirmBox(question, { confirm: form.dataset.confirmLabel }))) return;
     const data = formData(form);
     if (e.submitter?.name) data[e.submitter.name] = e.submitter.value;
     const proj = form.closest('.project');
@@ -645,30 +1587,45 @@
         case 'create': {
           const r = await api('/api/projects', data);
           toast('Projet créé, analyse lancée');
-          setTimeout(() => location.reload(), 600);
+          // L'analyse apparaît d'abord dans « Activité », avec son pourcentage, puis la page se recharge
+          await refreshSys().then(showActivity).catch(() => {});
+          setTimeout(() => reload(), 1200);
           break;
         }
-        case 'target': await api(`/api/projects/${id}/target`, data); toast('Cible validée'); setTimeout(() => location.reload(), 500); break;
+        case 'site': { const r = await api(`/api/projects/${id}/site`, data); form.elements.site_url.value = r.siteUrl; toast(r.siteUrl ? 'Site enregistré' : 'Site retiré'); break; }
+        case 'target': await api(`/api/projects/${id}/target`, data); toast('Cible validée'); setTimeout(() => reload(), 500); break;
         case 'prospect': {
           const r = await api(`/api/projects/${id}/prospect`, data);
           toast(r.budgetBlocked ? `En file, mais ${r.budgetBlocked}` : r.existing ? 'Une recherche est déjà prévue ou en cours' : data.when === 'night' ? 'Recherche programmée cette nuit' : 'Recherche lancée en arrière-plan', r.budgetBlocked ? 'error' : 'ok');
           break;
         }
         case 'evolution': {
-          if (data.level === 'approfondi' && !confirm('Le niveau approfondi utilise Opus et consomme beaucoup de quota. Continuer ?')) break;
+          if (data.level === 'approfondi' && !(await confirmBox('Utiliser le niveau approfondi ?\nIl utilise Opus et consomme beaucoup de quota.', { confirm: 'Utiliser' }))) break;
           const r = await api(`/api/projects/${id}/evolution`, data);
           toast(r.budgetBlocked ? `En file, mais ${r.budgetBlocked}` : r.existing ? 'Une recherche est déjà prévue ou en cours' : data.when === 'night' ? 'Évolutions programmées cette nuit' : 'Recherche d\'évolutions lancée', r.budgetBlocked ? 'error' : 'ok');
+          break;
+        }
+        case 'audit': {
+          if (data.level === 'approfondi' && !(await confirmBox('Utiliser le niveau approfondi ?\nIl utilise Opus et consomme beaucoup de quota.', { confirm: 'Utiliser' }))) break;
+          const r = await api(`/api/projects/${id}/code-review`, data);
+          toast(r.budgetBlocked ? `En file, mais ${r.budgetBlocked}` : r.existing ? 'Un audit est déjà prévu ou en cours' : 'Audit lancé', r.budgetBlocked ? 'error' : 'ok');
+          break;
+        }
+        case 'poste': {
+          const r = await api(`/api/projects/${id}/poste/${form.dataset.task}`, data);
+          toast(r.budgetBlocked ? `En file, mais ${r.budgetBlocked}` : r.existing ? 'Cette tâche est déjà prévue ou en cours' : 'Tâche lancée', r.budgetBlocked ? 'error' : 'ok');
           break;
         }
         case 'template': {
           data.kind = form.dataset.kind;
           const r = await api(`/api/projects/${id}/template/save`, data);
-          toast(r.status === 'validated' ? 'Modèle validé' : 'Brouillon enregistré');
+          toast(`${r.status === 'validated' ? 'Modèle validé' : 'Brouillon enregistré'}${r.warnings?.length ? ` · À vérifier : ${r.warnings.slice(0, 2).join(' ')}` : ''}`, r.warnings?.length ? 'error' : 'ok');
           break;
         }
         case 'send': {
           const n = Number(data.count);
-          if (!confirm(`Envoyer ${n} mail(s) de prospection maintenant ?\nIls partiront espacés de quelques dizaines de secondes.`)) break;
+          const advice = warmupNotice(JSON.parse(form.dataset.warmup || '{}'), n);
+          if (!(await confirmBox(`Envoyer ${n} mail${n > 1 ? 's' : ''} de prospection maintenant ?\nIls partiront espacés de quelques dizaines de secondes.${advice ? `\n\n${advice}` : ''}`, { confirm: 'Envoyer' }))) break;
           await api(`/api/projects/${id}/send`, { count: n, confirm: true });
           toast('Envoi lancé');
           break;
@@ -689,7 +1646,7 @@
           break;
         }
         case 'db': data.ssl = form.ssl.checked; await api(`/api/projects/${id}/db`, data); toast('Accès BDD enregistré'); form.password.value = ''; break;
-        case 'delete': await api(`/api/projects/${id}/delete`, {}); location.reload(); break;
+        case 'delete': await api(`/api/projects/${id}/delete`, {}); reload(); break;
       }
       if (proj) refreshProject(proj);
     } catch (err) {
@@ -700,422 +1657,22 @@
     }
   });
 
-  // ---------- Courbes (SVG maison : pas de lib externe, CSP stricte) ----------
-  // Dessinées à la largeur réelle du conteneur (1 unité = 1 px) pour que les textes restent lisibles sur mobile.
-  const M = { l: 46, r: 56, t: 12, b: 24, h: 150 };
-  const niceMax = (v) => { if (!(v > 0)) return 1; const p = 10 ** Math.floor(Math.log10(v)); const m = v / p; return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 5 ? 5 : 10) * p; };
-  const fmtVal = (v, unit) => (unit === '€'
-    ? v.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })
-    : v.toLocaleString('fr-FR', { maximumFractionDigits: 1 }));
-  const shortDay = (d) => { const [, m, dd] = d.split('-'); return `${dd}/${m}`; };
-  const yGrid = (w, max, unit, Y) => [0, 0.5, 1].map((f) => `<line class="grid" x1="${M.l}" x2="${w - M.r}" y1="${Y(max * f)}" y2="${Y(max * f)}"/>
-    <text class="axis" x="${M.l - 6}" y="${Y(max * f) + 4}" text-anchor="end">${esc(fmtVal(max * f, unit))}</text>`).join('');
-
-  function drawLine(fig, w) {
-    const { unit, xs, ys } = JSON.parse(fig.dataset.series);
-    const max = niceMax(Math.max(...ys));
-    const step = (w - M.l - M.r) / (xs.length - 1);
-    const X = (i) => M.l + i * step;
-    const Y = (v) => M.t + (M.h - M.t - M.b) * (1 - v / max);
-    const d = ys.map((v, i) => `${i ? 'L' : 'M'}${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join('');
-    const n = xs.length - 1;
-    fig.querySelector('.plot').innerHTML = `<svg width="${w}" height="${M.h}" role="img" aria-label="${esc(fig.dataset.title)}">
-      ${yGrid(w, max, unit, Y)}
-      <text class="axis" x="${M.l}" y="${M.h - 6}">${shortDay(xs[0])}</text>
-      <text class="axis" x="${w - M.r}" y="${M.h - 6}" text-anchor="end">${shortDay(xs[n])}</text>
-      <path class="line" d="${d}"/>
-      <circle class="dot" cx="${X(n)}" cy="${Y(ys[n])}" r="4"/>
-      <text class="end" x="${X(n) + 8}" y="${Y(ys[n]) + 4}">${esc(fmtVal(ys[n], unit))}</text>
-      <line class="cross" x1="0" x2="0" y1="${M.t}" y2="${M.h - M.b}"/>
-      <circle class="dot hover" r="5"/>
-      <rect class="hit" x="${M.l - step / 2}" y="0" width="${w - M.l - M.r + step}" height="${M.h}"/>
-    </svg>`;
-    fig._hover = (vx) => {
-      const i = Math.max(0, Math.min(n, Math.round((vx - M.l) / step)));
-      return { x: X(i), y: Y(ys[i]), html: `<strong>${esc(fmtVal(ys[i], unit))}</strong> · ${shortDay(xs[i])}` };
-    };
-  }
-
-  // Barres arrondies en haut (4 px), à plat sur la ligne de base
-  const bar = (x, y, bw, base) => {
-    const r = Math.min(4, bw / 2, base - y);
-    return base - y < 1 ? '' : `M${x},${base}V${y + r}Q${x},${y} ${x + r},${y}H${x + bw - r}Q${x + bw},${y} ${x + bw},${y + r}V${base}Z`;
+  // Barre d'enregistrement des réglages : visible seulement tant qu'un champ diffère de sa valeur enregistrée
+  const fieldChanged = (el) => {
+    if (el.type === 'checkbox' || el.type === 'radio') return el.checked !== el.defaultChecked;
+    if (el.tagName === 'SELECT') return [...el.options].some((o) => o.selected !== o.defaultSelected);
+    return el.value !== el.defaultValue;
   };
+  const syncSavebar = (e) => {
+    const form = e.target.closest?.('form');
+    const bar = form && $('[data-savebar]', form);
+    if (bar) bar.hidden = ![...form.elements].some((el) => el.name && el.type !== 'hidden' && el.type !== 'submit' && el.type !== 'button' && fieldChanged(el));
+  };
+  listen(document, 'input', syncSavebar);
+  listen(document, 'change', syncSavebar);
+  listen(document, 'change', (e) => { if (e.target.matches('[data-autosubmit]')) e.target.form.requestSubmit(); });
 
-  function drawBars(fig, w) {
-    const { weeks } = JSON.parse(fig.dataset.series);
-    const max = niceMax(Math.max(1, ...weeks.flatMap((x) => [x.sent, x.replies])));
-    const base = M.h - M.b;
-    const Y = (v) => M.t + (base - M.t) * (1 - v / max);
-    const gw = (w - M.l - M.r) / weeks.length;
-    const bw = Math.max(3, Math.min(18, (gw - 8) / 2));
-    // Une étiquette de date tous les ~56 px au minimum, quelle que soit la largeur
-    const every = Math.max(1, Math.ceil(weeks.length / Math.max(1, Math.floor((w - M.l - M.r) / 56))));
-    const marks = weeks.map((x, i) => {
-      const x0 = M.l + i * gw + (gw - (2 * bw + 2)) / 2;
-      const last = i === weeks.length - 1;
-      return `<path class="b1" d="${bar(x0, Y(x.sent), bw, base)}"/><path class="b2" d="${bar(x0 + bw + 2, Y(x.replies), bw, base)}"/>
-        ${(weeks.length - 1 - i) % every === 0 ? `<text class="axis" x="${x0 + bw + 1}" y="${M.h - 6}" text-anchor="middle">${shortDay(x.start)}</text>` : ''}
-        ${last ? `<text class="end" x="${x0 + bw / 2}" y="${Y(x.sent) - 5}" text-anchor="middle">${x.sent}</text>
-                  <text class="end" x="${x0 + bw * 1.5 + 2}" y="${Y(x.replies) - 5}" text-anchor="middle">${x.replies}</text>` : ''}`;
-    }).join('');
-    fig.querySelector('.plot').innerHTML = `<svg width="${w}" height="${M.h}" role="img" aria-label="${esc(fig.dataset.title)}">
-      ${yGrid(w, max, '', Y)}<line class="base" x1="${M.l}" x2="${w - M.r}" y1="${base}" y2="${base}"/>${marks}
-      <rect class="hit" x="${M.l}" y="0" width="${w - M.l - M.r}" height="${M.h}"/></svg>`;
-    fig._hover = (vx) => {
-      const i = Math.max(0, Math.min(weeks.length - 1, Math.floor((vx - M.l) / gw)));
-      const x = weeks[i];
-      const rate = x.sent ? ` (${Math.round((x.replies / x.sent) * 100)} %)` : '';
-      return { x: M.l + (i + 0.5) * gw, y: Y(Math.max(x.sent, x.replies)), band: true,
-        html: `Semaine du ${shortDay(x.start)}<br><strong>${x.sent}</strong> envoyé(s) · <strong>${x.replies}</strong> réponse(s)${rate}` };
-    };
-  }
-
-  function drawChart(fig) {
-    const w = Math.max(240, Math.floor(fig.querySelector('.plot').clientWidth));
-    (fig.dataset.kind === 'bars' ? drawBars : drawLine)(fig, w);
-  }
-
-  // Survol : réticule + infobulle (souris et tactile)
-  document.addEventListener('pointermove', (e) => {
-    const svg = e.target.closest?.('.chart svg');
-    const fig = svg?.closest('.chart');
-    // L'attribut hidden n'agit pas sur les éléments SVG : on passe par une classe
-    $$('.chart.hovering').forEach((c) => { if (c !== fig) { c.classList.remove('hovering'); c.querySelector('.tip').hidden = true; } });
-    if (!svg) return;
-    fig.classList.add('hovering');
-    if (!fig._hover) return;
-    const box = svg.getBoundingClientRect();
-    const h = fig._hover(e.clientX - box.left);
-    const cross = svg.querySelector('.cross');
-    const dot = svg.querySelector('.dot.hover');
-    if (cross) { cross.setAttribute('x1', h.x); cross.setAttribute('x2', h.x); }
-    if (dot) { dot.setAttribute('cx', h.x); dot.setAttribute('cy', h.y); }
-    const tip = fig.querySelector('.tip');
-    tip.innerHTML = h.html;
-    tip.hidden = false;
-    tip.style.left = `${Math.min(box.width - 70, Math.max(70, h.x))}px`;
-    tip.style.top = `${h.y + fig.querySelector('.plot').offsetTop - 8}px`;
-  });
-
-  function figure(kind, title, series, empty) {
-    return `<figure class="chart" data-kind="${kind}" data-title="${esc(title)}" data-series="${esc(JSON.stringify(series))}">
-      <figcaption>${esc(title)}</figcaption>
-      ${kind === 'bars' ? '<p class="legend small"><span class="sw s1"></span>Mails envoyés <span class="sw s2"></span>Réponses</p>' : ''}${empty ? `<p class="muted small">${empty}</p>` : '<div class="plot"></div><div class="tip" hidden></div>'}</figure>`;
-  }
-
-  async function loadHistory(proj, days = 30) {
-    const box = $('[data-charts]', proj);
-    if (!box) return;
-    let h;
-    try { h = await api(`/api/projects/${proj.dataset.id}/history?days=${days}`); }
-    catch (err) { box.innerHTML = `<p class="error small">${esc(err.message)}</p>`; return; }
-    const kpi = (key, title, unit) => {
-      const pts = h.daily.filter((d) => d[key] != null);
-      return figure('line', title, { unit, xs: pts.map((d) => d.day), ys: pts.map((d) => d[key]) },
-        pts.length < 2 ? 'Pas encore assez de données : une photo est prise chaque jour (et à chaque ouverture du récap).' : '');
-    };
-    box.innerHTML = `
-      <div class="row chart-head"><h4>Évolution</h4>
-        <div class="seg" role="group" aria-label="Période">${[30, 90].map((d) => `<button type="button" class="btn small" data-days="${d}" aria-pressed="${d === days}">${d} jours</button>`).join('')}</div>
-      </div>
-      <div class="charts">
-        ${kpi('users', 'Utilisateurs', '')}${kpi('clients', 'Clients payants', '')}${kpi('revenue', 'Revenu total', '€')}
-        ${figure('bars', 'Prospection par semaine', { weeks: h.weeks })}
-      </div>
-      <details class="small"><summary>Voir les données</summary>
-        <div class="table-wrap"><table><thead><tr><th>Jour</th><th>Utilisateurs</th><th>Clients</th><th>Revenu</th></tr></thead><tbody>
-          ${h.daily.map((d) => `<tr><td>${shortDay(d.day)}</td><td>${d.users ?? '–'}</td><td>${d.clients ?? '–'}</td><td>${d.revenue != null ? esc(fmtVal(d.revenue, '€')) : '–'}</td></tr>`).join('') || '<tr><td colspan="4">Aucune photo pour l\'instant.</td></tr>'}
-        </tbody></table>
-        <table><thead><tr><th>Semaine du</th><th>Envoyés</th><th>Réponses</th></tr></thead><tbody>
-          ${h.weeks.map((x) => `<tr><td>${shortDay(x.start)}</td><td>${x.sent}</td><td>${x.replies}</td></tr>`).join('')}
-        </tbody></table></div>
-      </details>`;
-    $$('.chart', box).forEach((fig) => { if (fig.querySelector('.plot')) drawChart(fig); });
-  }
-
-  document.addEventListener('click', (e) => {
-    const b = e.target.closest('[data-days]');
-    if (b) loadHistory(b.closest('.project'), Number(b.dataset.days));
-  });
-  let resizeT;
-  window.addEventListener('resize', () => {
-    clearTimeout(resizeT);
-    resizeT = setTimeout(() => $$('.chart .plot').forEach((p) => drawChart(p.closest('.chart'))), 150);
-  });
-
-  // ---------- Récap ----------
-  async function loadRecap(proj, force = false) {
-    const box = $('[data-recap]', proj);
-    box.innerHTML = '<p class="muted"><span class="spin-inline"></span>Chargement…</p>';
-    try {
-      const r = await api(`/api/projects/${proj.dataset.id}/recap${force ? '?force' : ''}`);
-      const b = r.business;
-      const s = r.stats;
-      const eur = (v) => (typeof v === 'number' ? v.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' }) : esc(v ?? '—'));
-      box.innerHTML = `
-        <div class="kpis">
-          <div class="kpi"><span>Utilisateurs</span><strong>${b?.users ?? '—'}</strong></div>
-          <div class="kpi"><span>Clients payants</span><strong>${b?.clients ?? '—'}</strong></div>
-          <div class="kpi"><span>Revenu total</span><strong>${b ? eur(b.revenue) : '—'}</strong></div>
-        </div>
-        ${r.error ? `<p class="muted small">BDD : ${esc(r.error)}</p>` : ''}
-        <h4>Prospection</h4>
-        <div class="kpis">
-          <div class="kpi"><span>Trouvés</span><strong>${s.total || 0}</strong></div>
-          <div class="kpi"><span>Contactés</span><strong>${(s.sent || 0) + (s.replied || 0) + (s.client || 0) + (s.refused || 0)}</strong></div>
-          <div class="kpi"><span>Réponses</span><strong>${(s.replied || 0) + (s.client || 0)}</strong></div>
-          <div class="kpi"><span>Convertis</span><strong>${s.client || 0}</strong></div>
-        </div>
-        <p class="muted small">Coût IA du projet (équivalent API) : $${r.aiCostUsd.toFixed(2)}${b?.cached ? ' · chiffres en cache (10 min)' : ''}
-        <button class="btn small" data-recap-refresh>Rafraîchir</button></p>
-        <div data-charts></div>`;
-      loadHistory(proj);
-    } catch (err) { box.innerHTML = `<p class="error small">${esc(err.message)}</p>`; }
-  }
-
-  // ---------- Liste des prospects (mini CRM) ----------
-  const STATUS = { new: 'À contacter', sent: 'Contacté', replied: 'A répondu', client: 'Client', refused: 'Refus', bounced: 'Rejeté' };
-  // Seuls les liens http(s) sont cliquables : un "javascript:" venu d'une page web scrapée ne doit jamais s'exécuter ici
-  const safeUrl = (u) => (/^https?:\/\//i.test(String(u || '')) ? String(u) : '');
-  const fmtDate = (ts) => new Date(ts * 1000).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' });
-  const isoDay = (ts) => (ts ? new Date(ts * 1000).toLocaleDateString('sv-SE', { timeZone: 'Europe/Paris' }) : '');
-
-  // ---------- Fiche prospect ----------
-  const dlg = $('#prospect-dialog');
-
-  async function openProspect(id) {
-    let d;
-    try { d = await api(`/api/prospects/${id}`); } catch (err) { toast(err.message, 'error'); return; }
-    const p = d.prospect;
-    const site = safeUrl(p.website);
-    const source = safeUrl(p.source);
-    const events = [
-      ...d.mails.map((m) => ({
-        at: m.sent_at,
-        html: `<strong>${m.kind === 'followup' ? 'Relance' : 'Premier mail'}</strong>${m.variant ? ` <span class="muted">(objet ${esc(m.variant)})</span>` : ''} : ${esc(m.subject || '')}
-          ${m.error ? `<span class="error"> · échec : ${esc(m.error)}</span>` : ''}`,
-      })),
-      ...(p.replied_at ? [{ at: p.replied_at, html: `<strong class="ok">Réponse reçue</strong> : ${esc(p.reply_subject || 'sans objet')}` }] : []),
-    ].sort((a, b) => a.at - b.at);
-
-    $('[data-dialog-body]', dlg).innerHTML = `
-      <div class="row dlg-head">
-        <div>
-          <h3>${site ? `<a href="${esc(site)}" target="_blank" rel="noopener noreferrer">${esc(p.company)}</a>` : esc(p.company)}</h3>
-          <div class="small muted"><a href="mailto:${esc(p.email)}">${esc(p.email)}</a>${p.city ? ` · ${esc(p.city)}` : ''}${p.sector ? ` · ${esc(p.sector)}` : ''}${p.score ? ` · score ${p.score}/10` : ''} · ${esc(STATUS[p.status] || p.status)}</div>
-        </div>
-        <button type="button" class="btn small" data-close>Fermer</button>
-      </div>
-      ${d.optOut ? `<p class="error small">Sur la liste d'opposition (${d.optOut.reason === 'bounce' ? 'adresse invalide' : d.optOut.reason === 'refused' ? 'refus' : 'désinscription'}) : ne plus contacter.</p>` : ''}
-      ${p.hook ? `<p class="hook">« ${esc(p.hook)} »</p>` : ''}
-      ${source ? `<p class="small muted">Email trouvé sur : <a href="${esc(source)}" target="_blank" rel="noopener noreferrer">${esc(source)}</a></p>` : ''}
-
-      <h4>Historique</h4>
-      ${events.length ? `<ol class="timeline">${events.map((e) => `<li><time>${fmtDate(e.at)}</time><div>${e.html}</div></li>`).join('')}</ol>` : '<p class="muted small">Pas encore contacté.</p>'}
-
-      <h4>Prochaine action</h4>
-      <form data-dlg="next" class="inline">
-        <label>Quoi<input name="action" value="${esc(p.next_action || '')}" placeholder="ex. Rappeler après les vacances" maxlength="200"></label>
-        <label>Quand<input type="date" name="day" value="${isoDay(p.next_action_at)}"></label>
-        <button class="btn">Enregistrer</button>
-        ${p.next_action ? '<button type="button" class="btn small" data-clear-next>Effacer</button>' : ''}
-      </form>
-
-      <h4>Notes</h4>
-      <form data-dlg="note">
-        <textarea name="body" rows="3" maxlength="2000" placeholder="Ce qu'il a dit, le contexte, ce qu'il faut retenir…"></textarea>
-        <button class="btn">Ajouter la note</button>
-      </form>
-      <ul class="notes">${d.notes.map((n) => `<li><div class="small muted">${fmtDate(n.created_at)} · <button type="button" class="link small" data-del-note="${n.id}">supprimer</button></div><div class="note-body">${esc(n.body)}</div></li>`).join('')}</ul>`;
-    dlg.dataset.id = id;
-    if (!dlg.open) dlg.showModal();
-  }
-
-  function refreshOpenLists() { $$('details.prospects[open]').forEach((d) => loadProspects(d, Number(d.dataset.page) || 1)); }
-
-  if (dlg) {
-    dlg.addEventListener('click', async (e) => {
-      if (e.target === dlg || e.target.closest('[data-close]')) { dlg.close(); return; }
-      const id = dlg.dataset.id;
-      const del = e.target.closest('[data-del-note]');
-      if (del && confirm('Supprimer cette note ?')) {
-        await api(`/api/prospects/${id}/notes/${del.dataset.delNote}/delete`, {}).catch((err) => toast(err.message, 'error'));
-        openProspect(id);
-      }
-      if (e.target.closest('[data-clear-next]')) {
-        await api(`/api/prospects/${id}/next`, { action: '' }).catch((err) => toast(err.message, 'error'));
-        openProspect(id); refreshOpenLists();
-      }
-    });
-    dlg.addEventListener('submit', async (e) => {
-      const form = e.target.closest('form[data-dlg]');
-      if (!form) return;
-      e.preventDefault();
-      const id = dlg.dataset.id;
-      try {
-        if (form.dataset.dlg === 'note') { await api(`/api/prospects/${id}/notes`, formData(form)); toast('Note ajoutée'); }
-        else { await api(`/api/prospects/${id}/next`, formData(form)); toast('Prochaine action enregistrée'); refreshOpenLists(); }
-        openProspect(id);
-      } catch (err) { toast(err.message, 'error'); }
-    });
-  }
-  // Import CSV : Excel enregistre souvent en Windows-1252, on détecte pour ne pas abîmer les accents
-  document.addEventListener('change', async (e) => {
-    const input = e.target.closest('[data-import]');
-    if (!input?.files?.length) return;
-    const file = input.files[0];
-    input.value = '';
-    const d = input.closest('details.prospects');
-    const report = $('[data-import-report]', d);
-    if (file.size > 1024 * 1024) { toast('Fichier trop gros (1 Mo max, environ 2000 lignes)', 'error'); return; }
-    const buf = await file.arrayBuffer();
-    let csv;
-    try { csv = new TextDecoder('utf-8', { fatal: true }).decode(buf); }
-    catch { csv = new TextDecoder('windows-1252').decode(buf); }
-    try {
-      const r = await api(`/api/projects/${input.dataset.import}/prospects/import`, { csv });
-      report.innerHTML = `<p class="small"><span class="ok">${r.imported} importé(s)</span> sur ${r.total} ·
-        ${r.duplicates} déjà présent(s) · ${r.blacklisted} sur liste d'opposition · ${r.invalid.length} invalide(s)</p>
-        ${r.invalid.length ? `<details class="small"><summary>Lignes ignorées</summary><ul>${r.invalid.map((x) => `<li>Ligne ${x.line} : ${esc(x.reason)}</li>`).join('')}</ul></details>` : ''}`;
-      toast(`${r.imported} prospect(s) importé(s)`);
-      loadProspects(d);
-    } catch (err) { report.innerHTML = ''; toast(err.message, 'error'); }
-  });
-
-  document.addEventListener('click', (e) => {
-    const b = e.target.closest('[data-open-prospect]');
-    if (b) openProspect(b.dataset.openProspect);
-  });
-
-  const fmtDay = (ts) => (ts ? new Date(ts * 1000).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', timeZone: 'Europe/Paris' }) : '');
-
-  async function loadProspects(d, page = 1) {
-    const proj = d.closest('.project');
-    const box = $('[data-prospects]', d);
-    const filters = formData($('[data-filters]', d));
-    const qs = new URLSearchParams({ ...filters, page });
-    // L'export suit les filtres affichés
-    $('[data-export]', d).href = `/api/projects/${proj.dataset.id}/prospects.csv?${new URLSearchParams(filters)}`;
-    try {
-      const r = await api(`/api/projects/${proj.dataset.id}/prospects?${qs}`);
-      d.dataset.page = r.page;
-      box.innerHTML = r.rows.length ? `<div class="table-wrap"><table><thead><tr><th>Entreprise</th><th>Email</th><th>Ville</th><th>Score</th><th>Contacté</th><th>Statut</th></tr></thead><tbody>
-        ${r.rows.map((x) => `<tr data-row="${x.id}"><td><button type="button" class="link" data-open-prospect="${x.id}">${esc(x.company)}</button>
-            ${x.next_action ? `<div class="small ${x.next_action_at * 1000 <= Date.now() ? 'warn' : 'muted'}">→ ${esc(x.next_action)} (${fmtDay(x.next_action_at)})</div>` : ''}</td>
-          <td>${esc(x.email)}</td><td>${esc(x.city)}</td><td>${x.score ?? ''}</td>
-          <td>${fmtDay(x.sent_at)}${x.followup_at ? ' <span class="muted small">+ relance</span>' : ''}</td>
-          <td><select data-prospect="${x.id}" class="st-${x.status}">${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${k === x.status ? 'selected' : ''}>${v}</option>`).join('')}</select></td></tr>`).join('')}
-      </tbody></table></div>` : '<p class="muted small">Aucun prospect ne correspond.</p>';
-      $('[data-pager]', d).innerHTML = r.pages > 1
-        ? `<button type="button" class="btn small" data-page="${r.page - 1}" ${r.page <= 1 ? 'disabled' : ''}>←</button>
-           <span class="small muted">Page ${r.page} / ${r.pages} · ${r.total} prospect(s)</span>
-           <button type="button" class="btn small" data-page="${r.page + 1}" ${r.page >= r.pages ? 'disabled' : ''}>→</button>`
-        : `<span class="small muted">${r.total} prospect(s)</span>`;
-    } catch (err) { box.innerHTML = `<p class="error small">${esc(err.message)}</p>`; }
-  }
-
-  $$('details.prospects').forEach((d) => {
-    d.addEventListener('toggle', () => { if (d.open) loadProspects(d); });
-    const form = $('[data-filters]', d);
-    let t;
-    form.addEventListener('input', (e) => { if (e.target.name === 'q') { clearTimeout(t); t = setTimeout(() => loadProspects(d), 300); } });
-    form.addEventListener('change', (e) => { if (e.target.name !== 'q') loadProspects(d); });
-    form.addEventListener('submit', (e) => { e.preventDefault(); loadProspects(d); });
-    d.addEventListener('click', (e) => {
-      const b = e.target.closest('[data-page]');
-      if (b) loadProspects(d, Number(b.dataset.page));
-    });
-  });
-  document.addEventListener('change', async (e) => {
-    const sel = e.target.closest('[data-prospect]');
-    if (!sel) return;
-    if (sel.value === 'refused' && !confirm('Marquer en refus ajoute l\'adresse à la liste d\'opposition. Continuer ?')) return;
-    try { await api(`/api/prospects/${sel.dataset.prospect}/status`, { status: sel.value }); sel.className = `st-${sel.value}`; toast('Statut mis à jour'); }
-    catch (err) { toast(err.message, 'error'); }
-  });
-
-  // ---------- Fond : constellation de particules qui fuient la souris ----------
-  // Canvas 2D, ~90 points max : léger. Coupé quand l'onglet est caché, figé si l'OS demande moins d'animations.
-  (function particles() {
-    const cv = $('#bg');
-    const ctx = cv?.getContext?.('2d');
-    if (!ctx) return;
-    const LINK = 120;   // distance max d'un trait entre deux points
-    const R = 170;      // rayon d'influence de la souris
-    const mouse = { x: -1e4, y: -1e4 };
-    let W = 0, H = 0, pts = [], raf = 0, rgb = '47,91,234';
-
-    const readColor = () => {
-      const m = /^#?([\da-f]{2})([\da-f]{2})([\da-f]{2})$/i.exec(getComputedStyle(document.documentElement).getPropertyValue('--accent').trim());
-      if (m) rgb = m.slice(1).map((h) => parseInt(h, 16)).join(',');
-    };
-    const spawn = () => {
-      const a = Math.random() * Math.PI * 2, s = 0.12 + Math.random() * 0.25;
-      const bvx = Math.cos(a) * s, bvy = Math.sin(a) * s;
-      return { x: Math.random() * W, y: Math.random() * H, vx: bvx, vy: bvy, bvx, bvy, r: 1 + Math.random() * 1.6 };
-    };
-    function resize() {
-      const dpr = Math.min(2, window.devicePixelRatio || 1);
-      W = window.innerWidth; H = window.innerHeight;
-      cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      const n = Math.round(Math.min(90, Math.max(24, (W * H) / 16000)));
-      while (pts.length < n) pts.push(spawn());
-      pts.length = n;
-    }
-    function step() {
-      for (const p of pts) {
-        const dx = p.x - mouse.x, dy = p.y - mouse.y, d = Math.hypot(dx, dy);
-        if (d < R && d > 0.5) { const f = (1 - d / R) * 0.45; p.vx += (dx / d) * f; p.vy += (dy / d) * f; }
-        // Revient doucement à sa dérive de base après une poussée
-        p.vx += (p.bvx - p.vx) * 0.03; p.vy += (p.bvy - p.vy) * 0.03;
-        p.x += p.vx; p.y += p.vy;
-        if (p.x < -12) p.x = W + 12; else if (p.x > W + 12) p.x = -12;
-        if (p.y < -12) p.y = H + 12; else if (p.y > H + 12) p.y = -12;
-      }
-    }
-    function draw() {
-      ctx.clearRect(0, 0, W, H);
-      ctx.lineWidth = 1;
-      for (let i = 0; i < pts.length; i++) {
-        const a = pts[i];
-        for (let j = i + 1; j < pts.length; j++) {
-          const b = pts[j], dx = a.x - b.x, dy = a.y - b.y, d2 = dx * dx + dy * dy;
-          if (d2 > LINK * LINK) continue;
-          ctx.strokeStyle = `rgba(${rgb},${((1 - Math.sqrt(d2) / LINK) * 0.2).toFixed(3)})`;
-          ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
-        }
-        const md = Math.hypot(a.x - mouse.x, a.y - mouse.y);
-        if (md < R) {
-          ctx.strokeStyle = `rgba(${rgb},${((1 - md / R) * 0.45).toFixed(3)})`;
-          ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(mouse.x, mouse.y); ctx.stroke();
-        }
-      }
-      for (const p of pts) {
-        const glow = Math.max(0, 1 - Math.hypot(p.x - mouse.x, p.y - mouse.y) / R);
-        ctx.fillStyle = `rgba(${rgb},${(0.45 + glow * 0.5).toFixed(3)})`;
-        ctx.beginPath(); ctx.arc(p.x, p.y, p.r + glow * 1.5, 0, Math.PI * 2); ctx.fill();
-      }
-    }
-    const loop = () => { step(); draw(); raf = requestAnimationFrame(loop); };
-    const start = () => { cancelAnimationFrame(raf); if (reduceMotion.matches) draw(); else raf = requestAnimationFrame(loop); };
-
-    window.addEventListener('pointermove', (e) => { mouse.x = e.clientX; mouse.y = e.clientY; }, { passive: true });
-    document.addEventListener('pointerleave', () => { mouse.x = mouse.y = -1e4; });
-    window.addEventListener('blur', () => { mouse.x = mouse.y = -1e4; });
-    // Un clic souffle les particules alentour
-    window.addEventListener('pointerdown', (e) => {
-      for (const p of pts) {
-        const dx = p.x - e.clientX, dy = p.y - e.clientY, d = Math.hypot(dx, dy);
-        if (d < 240 && d > 0.5) { const f = (1 - d / 240) * 5; p.vx += (dx / d) * f; p.vy += (dy / d) * f; }
-      }
-    }, { passive: true });
-    let rt;
-    window.addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { resize(); start(); }, 120); });
-    document.addEventListener('visibilitychange', () => { if (document.hidden) cancelAnimationFrame(raf); else start(); });
-    matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readColor);
-    reduceMotion.addEventListener('change', start);
-    readColor(); resize(); start();
-  })();
 })();
+
+
+

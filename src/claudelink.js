@@ -1,28 +1,21 @@
-// Liaison Claude de chaque utilisateur : clé API Anthropic, jeton d'abonnement (claude setup-token) ou, pour les admins,
-// configuration du CLI du serveur. Le secret est chiffré (AES-256-GCM) dans users.claude_link_json ; il ne sort jamais
+// Liaison Claude de chaque utilisateur : clé API Anthropic ou jeton d'abonnement (claude setup-token). Aucun accès Claude
+// n'est partagé : le CLI du serveur n'est jamais utilisé à la place d'un utilisateur. Le secret est chiffré (AES-256-GCM) dans users.claude_link_json ; il ne sort jamais
 // de ce module que sous forme d'environnement du processus enfant, et toujours à partir du user_id du job.
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
 import { now, getSetting, setSetting } from './db.js';
 import { encrypt, decrypt } from './crypto.js';
 import { HttpError } from './http.js';
 import { getUser } from './users.js';
 import { runClaude } from './services/claude.js';
-import { buildChildEnv } from './services/sandbox.js';
 import { AI_JOBS } from './services/budget.js';
 
-const execFileP = promisify(execFile);
-
-export const MODES = { api_key: 'api_key', subscription_token: 'subscription_token', server: 'server' };
+export const MODES = { api_key: 'api_key', subscription_token: 'subscription_token' };
 export const MODE_LABELS = {
   api_key: 'Clé API Anthropic',
   subscription_token: 'Abonnement Claude (jeton)',
-  server: 'Claude du serveur',
 };
 export const LINK_REQUIRED_MESSAGE = 'Relie ton accès Claude pour utiliser cette fonction';
 export const LINK_INVALID_MESSAGE = "Ta liaison Claude n'est plus valide : teste-la ou relie-la de nouveau (Mon compte)";
 export const CLI_DISABLED_MESSAGE = "Le mode abonnement est désactivé sur ce service : relie une clé API";
-export const SERVER_MODE_MESSAGE = 'Le mode « Claude du serveur » est réservé aux administrateurs';
 
 // Texte de l'avertissement affiché avant le mode abonnement. Toute modification change la version : l'acceptation
 // enregistrée en base indique à quelle version du texte l'utilisateur a consenti.
@@ -39,6 +32,9 @@ const TOKEN_RE = /^[A-Za-z0-9_.-]{20,800}$/;
 const MODELS_URL = 'https://api.anthropic.com/v1/models';
 const SECRET_ENV = { api_key: 'ANTHROPIC_API_KEY', subscription_token: 'CLAUDE_CODE_OAUTH_TOKEN' };
 
+/** Réponse de Claude qui signifie « ton accès est refusé » (jeton expiré ou révoqué, clé invalide) : au sens strict, jamais une panne réseau. */
+export const isAuthRefusal = (text) => /invalid (bearer )?token|invalid (x-)?api[ _-]?key|authentication_error|please run \/login|not logged in|oauth token (has )?(expired|been revoked)|token (has )?(expired|been revoked)|invalid.{0,20}credential|unauthori[sz]ed|\b401\b/i.test(String(text ?? ''));
+
 const truthy = (v) => v === true || v === 'true' || v === 'on' || v === '1' || v === 1;
 
 async function readLink(db, userId) {
@@ -51,15 +47,28 @@ async function writeLink(db, userId, link) {
   await db.prepare('UPDATE users SET claude_link_json = ? WHERE id = ?').run(link ? JSON.stringify(link) : null, Number(userId));
 }
 
+/** Un job a reçu un refus d'authentification : la liaison est marquée invalide (le secret reste en base), l'interface demande de se reconnecter. */
+export async function markLinkInvalid(db, userId) {
+  const link = await readLink(db, userId);
+  if (!link?.mode || !link.valid) return false;
+  await writeLink(db, userId, { ...link, valid: false, last_test_at: now() });
+  return true;
+}
+
 /** Forme exposée à l'interface : jamais le secret, seulement ses 4 derniers caractères pour la clé API. */
 export function publicLink(link) {
-  if (!link?.mode) return null;
+  if (!link?.mode || !MODES[link.mode]) return null; // un ancien mode « serveur » compte comme « pas de liaison »
   return {
     mode: link.mode, label: MODE_LABELS[link.mode], valid: !!link.valid,
     linkedAt: link.linked_at ?? null, validatedAt: link.validated_at ?? null, lastTestAt: link.last_test_at ?? null,
     last4: link.mode === 'api_key' ? link.last4 ?? null : null,
     consentAt: link.consent?.at ?? null, consentVersion: link.consent?.version ?? null,
   };
+}
+
+/** Compte relié par clé API : seul cas où les jobs sont facturés à l'usage (donc où un montant en $ a un sens). Avec un abonnement Claude, rien n'est facturé en plus. */
+export async function isPriced(db, userId) {
+  return (await getLinkState(db, userId))?.mode === MODES.api_key;
 }
 
 export async function getLinkState(db, userId) {
@@ -83,7 +92,6 @@ export async function aiRefusal(db, userId, { cliModeEnabled = true } = {}) {
   const link = await readLink(db, userId);
   if (!link?.mode || !MODES[link.mode]) return LINK_REQUIRED_MESSAGE;
   if (!link.valid) return LINK_INVALID_MESSAGE;
-  if (link.mode === MODES.server && !user.isAdmin) return SERVER_MODE_MESSAGE;
   if (link.mode === MODES.subscription_token && !cliModeEnabled) return CLI_DISABLED_MESSAGE;
   return null;
 }
@@ -100,17 +108,20 @@ export async function hasUsableLink(db, userId, opts) {
 
 /**
  * Identifiants d'exécution du job : lus dans la ligne de CET utilisateur, jamais ailleurs.
- * @returns {{mode:string, secretEnv:Record<string,string>, serverConfig:boolean}}
+ * @returns {{mode:string, secretEnv:Record<string,string>}}
  */
 export async function resolveCredentials(app, userId) {
   await assertCanRunAi(app.db, userId, { cliModeEnabled: app.cfg.cliModeEnabled !== false });
   const link = await readLink(app.db, userId);
-  if (link.mode === MODES.server) return { mode: link.mode, secretEnv: {}, serverConfig: true };
   let secret;
   try { secret = decrypt(app.cfg.secretKey, link.secret_enc); }
-  catch { throw new HttpError(403, 'Secret de liaison illisible : relie de nouveau ton accès Claude'); }
+  catch {
+    // Clé SECRET_KEY changée ou secret abîmé : la liaison est inutilisable, l'interface propose de se reconnecter
+    await markLinkInvalid(app.db, userId);
+    throw new HttpError(403, 'Secret de liaison illisible : relie de nouveau ton accès Claude');
+  }
   if (!secret) throw new HttpError(403, LINK_REQUIRED_MESSAGE);
-  return { mode: link.mode, secretEnv: { [SECRET_ENV[link.mode]]: secret }, serverConfig: false };
+  return { mode: link.mode, secretEnv: { [SECRET_ENV[link.mode]]: secret } };
 }
 
 // ---------- Validation ----------
@@ -152,7 +163,7 @@ export async function validateSubscriptionToken(app, token) {
   const said = String(r.text ?? '').replace(/\s+/g, ' ').trim().slice(0, 240) || `(sans texte, ${r.subtype ?? 'erreur'})`;
   console.warn(`Vérification du jeton d'abonnement refusée (${r.subtype ?? 'erreur'}) : ${said}`);
   // Refus d'authentification, au sens strict : on n'invalide la liaison que pour ces réponses-là
-  if (/invalid (bearer )?token|authentication_error|please run \/login|oauth token (has )?(expired|been revoked)|token (has )?(expired|been revoked)|invalid.{0,20}credential|unauthori[sz]ed|\b401\b/i.test(`${r.text} ${r.subtype}`)) {
+  if (isAuthRefusal(`${r.text} ${r.subtype}`)) {
     throw new HttpError(400, `Jeton refusé par Claude (invalide ou expiré). Réponse de Claude : ${said}`);
   }
   throw new HttpError(502, `Le jeton n'a pas pu être vérifié : Claude a répondu « ${said} ». Réessaie plus tard.`, { expose: true });
@@ -210,13 +221,6 @@ export function assertLoginConsent(cfg, accept) {
   if (!truthy(accept)) throw new HttpError(400, `Tu dois cocher « ${CONSENT_CHECKBOX} » pour utiliser ton abonnement`);
 }
 
-/** Mode « Claude du serveur » : administrateurs seulement, aucun secret stocké. */
-export async function linkServer(app, userId) {
-  const user = await getUser(app.db, userId);
-  if (!user?.isAdmin) throw new HttpError(403, SERVER_MODE_MESSAGE);
-  await saveLink(app, userId, { mode: MODES.server });
-}
-
 /**
  * Délie : supprime le secret chiffré, annule les jobs IA en file ou en cours de CET utilisateur.
  * @returns {Promise<number>} jobs annulés
@@ -237,23 +241,16 @@ export async function unlink(app, userId) {
  */
 export async function testLink(app, userId) {
   const link = await readLink(app.db, userId);
-  if (!link?.mode) throw new HttpError(400, LINK_REQUIRED_MESSAGE);
+  if (!link?.mode || !MODES[link.mode]) throw new HttpError(400, LINK_REQUIRED_MESSAGE);
   const mark = async (valid) => writeLink(app.db, userId, { ...link, valid, last_test_at: now(), ...(valid ? { validated_at: now() } : {}) });
   try {
-    if (link.mode === MODES.server) {
-      const user = await getUser(app.db, userId);
-      if (!user?.isAdmin) throw new HttpError(400, SERVER_MODE_MESSAGE);
-      try { await execFileP(app.cfg.claudeBin, ['--version'], { env: buildChildEnv(process.env, { home: app.cfg.sandbox?.serverHome || '/tmp' }), timeout: 15_000 }); }
-      catch { throw new HttpError(502, 'Le CLI Claude du serveur est introuvable ou ne répond pas', { expose: true }); }
-    } else {
-      let secret;
-      try { secret = decrypt(app.cfg.secretKey, link.secret_enc); } catch { secret = null; }
-      if (!secret) { await mark(false); return { ok: false, message: 'Secret illisible : relie de nouveau ton accès Claude' }; }
-      if (link.mode === MODES.api_key) await (app.validateApiKey || validateApiKey)(secret, app.fetch || fetch);
-      else {
-        if (app.cfg.cliModeEnabled === false) return { ok: false, message: CLI_DISABLED_MESSAGE };
-        await (app.validateToken || ((t) => validateSubscriptionToken(app, t)))(secret);
-      }
+    let secret;
+    try { secret = decrypt(app.cfg.secretKey, link.secret_enc); } catch { secret = null; }
+    if (!secret) { await mark(false); return { ok: false, message: 'Secret illisible : relie de nouveau ton accès Claude' }; }
+    if (link.mode === MODES.api_key) await (app.validateApiKey || validateApiKey)(secret, app.fetch || fetch);
+    else {
+      if (app.cfg.cliModeEnabled === false) return { ok: false, message: CLI_DISABLED_MESSAGE };
+      await (app.validateToken || ((t) => validateSubscriptionToken(app, t)))(secret);
     }
   } catch (e) {
     if (!(e instanceof HttpError)) throw e;
@@ -275,6 +272,7 @@ export async function lastConsent(db, userId) {
 export function isLinkExempt(method, pathname) {
   if (pathname === '/link' || pathname.startsWith('/link/')) return true;
   if (pathname === '/account' || pathname === '/account/delete') return true;
+  if (pathname === '/welcome' || pathname === '/welcome/skip') return true; // le profil ne demande pas d'accès Claude
   if (pathname.startsWith('/linkedin/')) return true; // un administrateur d'équipe relie LinkedIn avec l'accès Claude du propriétaire
   if (pathname === '/team' || pathname.startsWith('/team/')) return true; // on peut gérer son équipe ou accepter une invitation sans avoir relié Claude
   if (pathname === '/admin' || pathname.startsWith('/admin/')) return true; // les administrateurs gèrent les comptes même sans liaison

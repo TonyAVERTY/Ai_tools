@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { setSetting, now } from '../src/db.js';
 import { testDb } from './helpers/db.js';
-import { addUser } from './helpers/users.js';
+import { addUser, TEST_SECRET_KEY } from './helpers/users.js';
 import { Worker, enqueue, cancelJob } from '../src/services/jobs.js';
 import { makeHandlers } from '../src/handlers.js';
 import { createProject, saveSecretConfig } from '../src/projects.js';
@@ -23,15 +23,16 @@ async function world() {
   const db = await testDb();
   const sent = [];
   const app = { resolveHost: async () => [{ address: '93.184.216.34', family: 4 }],
-    db, cfg: { dataDir: '/tmp/x', appUrl: 'https://ai.test', secretKey: randomBytes(32), sandbox: { enabled: false } },
+    db, cfg: { dataDir: '/tmp/x', appUrl: 'https://ai.test', secretKey: TEST_SECRET_KEY, sandbox: { enabled: false } },
     createTransport: () => ({ verify: async () => true, sendMail: async (m) => { sent.push(m); }, close() {} }),
+    resolveMx: async () => [{ exchange: 'mx.test', priority: 10 }], // pas de DNS réel
   };
   return { db, app, sent };
 }
 const proj = async (w, userId, n = 1) => Number((await w.db.prepare('INSERT INTO projects(user_id, name, git_url, created_at) VALUES(?, ?, ?, ?)').run(userId, `p${n}`, `https://git.test/u${userId}/r${n}.git`, now())).lastInsertRowid);
 
 test('les limites viennent d\'un seul module et reprennent le cadrage', () => {
-  assert.deepEqual(PLAN_LIMITS.free, { projects: 1, prospects: 50, mails: 100, aiJobs: 6, seats: 1 });
+  assert.deepEqual(PLAN_LIMITS.free, { projects: 1, prospects: 50, mails: 100, aiJobs: 6, parallelJobs: 1, seats: 1 });
 });
 
 test('mois calendaire à l\'heure de Paris, changement d\'heure compris', () => {
@@ -221,17 +222,24 @@ test('Mon compte et tableau de bord : barres d\'usage du mois, plafond atteint s
     const u = await s.newUser({ admin: false, link: LINK });
     const pid = await proj({ db: s.db }, u.id);
     for (let i = 0; i < 100; i++) await recordUsage(s.db, u.id, 'mail');
-    for (const page of ['/account', '/']) {
-      const h = await (await u.get(page, { headers: { accept: 'text/html' } })).text();
-      assert.match(h, /Usage du mois/, page);
-      assert.match(h, /plan gratuit/, page);
-      assert.match(h, /Mails ce mois-ci<\/span><span class="jpct">100 \/ 100/, page);
-      assert.match(h, /<div class="bar usage full"><span class="w-100">/, page);
-      assert.match(h, /<span class="w-100">/);
-      assert.match(h, /Plafond atteint : .*mails ce mois-ci/, page);
-      assert.match(h, /Projets<\/span><span class="jpct">1 \/ 1/, page);
-      assert.doesNotMatch(h, /style="/, 'pas de style en ligne (CSP)');
-    }
+    // Mon compte : le détail, une barre par plafond
+    const acc = await (await u.get('/account', { headers: { accept: 'text/html' } })).text();
+    assert.match(acc, /Usage du mois/);
+    assert.match(acc, /plan gratuit/);
+    assert.match(acc, /Mails ce mois-ci<\/span><span class="g-v">100 \/ 100/);
+    assert.match(acc, /<div class="bar usage full"[^>]*><span class="w-100">/);
+    assert.match(acc, /Plafond atteint : .*mails ce mois-ci/);
+    assert.match(acc, /Projets<\/span><span class="g-v">1 \/ 1/);
+    assert.doesNotMatch(acc, /style="/, 'pas de style en ligne (CSP)');
+    // Projets : quatre indicateurs en tête, mêmes chiffres, plafond atteint signalé ; plus de panneau « Usage du mois » en doublon
+    const dash = await (await u.get('/', { headers: { accept: 'text/html' } })).text();
+    assert.equal((dash.match(/class="ukpi-c/g) || []).length, 4);
+    assert.match(dash, /<div class="ukpi-c full"><dt>[^]*?Mails envoyés<\/dt><dd><b>100<\/b><span>ce mois-ci · sur 100 · plafond atteint<\/span>/);
+    assert.match(dash, /<dt>[^]*?Projets<\/dt><dd><b>1<\/b><span>sur 1 · plafond atteint<\/span>/);
+    assert.match(dash, /Plafond atteint : .*mails ce mois-ci/);
+    assert.doesNotMatch(dash, /Usage du mois/, 'les chiffres sont dans les indicateurs, pas dans un second panneau');
+    assert.match(dash, /data-claude-card hidden/, 'la consommation Claude reste dans un panneau secondaire, masqué tant qu\'il est vide');
+    assert.doesNotMatch(dash, /style="/, 'pas de style en ligne (CSP)');
     assert.ok(pid);
     const a = await s.newUser({ admin: true });
     const h = await (await a.get('/account', { headers: { accept: 'text/html' } })).text();
@@ -248,6 +256,6 @@ test('Tarifs : plus de « pas encore appliqués », chiffres identiques à la co
     const h = await (await s.anon.get('/tarifs', { headers: { accept: 'text/html' } })).text();
     assert.doesNotMatch(h, /pas encore appliqu/);
     assert.match(h, /appliqués par le serveur/);
-    for (const n of Object.values(PLAN_LIMITS.free)) assert.ok(h.includes(`<strong>${n}</strong>`), String(n));
+    for (const n of Object.values(PLAN_LIMITS.free)) assert.ok(h.includes(`<b>${n}</b>`), String(n));
   } finally { await s.close(); }
 });
