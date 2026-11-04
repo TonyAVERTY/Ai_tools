@@ -4,6 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { accessSync, constants, mkdtempSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { SECRET_ENV_NAMES } from './providers/secretenv.js';
 
 export const SANDBOX_HOME = '/home/sandbox';
 
@@ -11,8 +12,8 @@ export const SANDBOX_HOME = '/home/sandbox';
 const INHERITED = ['PATH', 'LANG'];
 // Développement sous Windows : sans elles Node ne démarre pas correctement (aucune n'est un secret)
 const INHERITED_WINDOWS = ['SystemRoot', 'PATHEXT', 'TEMP', 'TMP', 'COMSPEC'];
-// Les deux seuls secrets qu'un processus enfant peut recevoir, et toujours ceux de l'utilisateur du job
-export const SECRET_ENV_NAMES = new Set(['ANTHROPIC_API_KEY', 'CLAUDE_CODE_OAUTH_TOKEN']);
+// Seuls secrets qu'un processus enfant peut recevoir (listés par fournisseur), et toujours ceux de l'utilisateur du job
+export { SECRET_ENV_NAMES };
 
 /** Environnement du processus enfant : liste blanche stricte + le secret de l'utilisateur concerné. */
 export function buildChildEnv(parent, { secretEnv = {}, home }) {
