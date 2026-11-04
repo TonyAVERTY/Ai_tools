@@ -175,8 +175,29 @@ export async function validateSubscriptionToken(app, token) {
 
 // ---------- Liaison ----------
 
+/** IA de l'utilisateur (une liaison sans fournisseur est une liaison Claude) ; Claude aussi quand il n'a rien relié. */
+export async function userProvider(db, userId) {
+  const id = (await readLink(db, userId))?.provider ?? DEFAULT_PROVIDER;
+  return hasProvider(id) ? id : DEFAULT_PROVIDER;
+}
+
+// Réglages de modèle : ceux d'une IA n'existent pas chez une autre
+const MODEL_SETTINGS = ['analyze_model', 'prospect_model', 'write_model', 'chat_model'];
+
+/**
+ * L'utilisateur change d'IA : ses choix de modèle repartent du défaut de la nouvelle (ils sont lus avec le catalogue de CE fournisseur).
+ * La date et les IA concernées sont gardées pour le dire à l'écran. Ses consignes personnalisées restent en base (masquées tant qu'il n'est pas revenu).
+ */
+async function resetModelsOnSwitch(db, userId, from, to) {
+  for (const k of MODEL_SETTINGS) await setSetting(db, userId, k, null);
+  await setSetting(db, userId, 'ai_switch_json', JSON.stringify({ from, to, at: now() }));
+}
+
 export async function saveLink(app, userId, link) {
   const t = now();
+  const before = await readLink(app.db, userId);
+  const to = link.provider ?? DEFAULT_PROVIDER;
+  if (before?.mode && (before.provider ?? DEFAULT_PROVIDER) !== to) await resetModelsOnSwitch(app.db, userId, before.provider ?? DEFAULT_PROVIDER, to);
   await writeLink(app.db, userId, { v: 1, provider: DEFAULT_PROVIDER, valid: true, linked_at: t, validated_at: t, last_test_at: t, ...link });
   await resetQuotaState(app.db, userId);
 }
