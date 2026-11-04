@@ -9,7 +9,7 @@ import { startLogin, finishLogin, destroySession, getSession, checkOrigin } from
 import { verifyCaptcha } from './captcha.js';
 import { deleteUser, normalizeEmail, getUser } from './users.js';
 import {
-  assertCanRunAi, getLinkState, assertLoginConsent, linkLoginToken, validateSubscriptionToken, linkApiKey, linkSubscriptionToken, unlink, testLink, lastConsent,
+  assertCanRunAi, getLinkState, linkChatgptAccount, assertLoginConsent, linkLoginToken, validateSubscriptionToken, linkApiKey, linkSubscriptionToken, unlink, testLink, lastConsent,
   MODES,
   isPriced, userProvider,
 } from './claudelink.js';
@@ -17,6 +17,7 @@ import { loginPage } from './site/pages.js';
 import { registerSiteRoutes } from './site/routes.js';
 import { registerAdminRoutes } from './adminroutes.js';
 import { loginsOf } from './claudelogin.js';
+import { chatgptLoginsOf } from './chatgptlogin.js';
 import { accessOn, memberTeamIds, needAccess } from './teams.js';
 import { registerTeamRoutes } from './teamroutes.js';
 import { registerProfileRoutes, getProfile, isEmpty } from './userprofile.js';
@@ -326,6 +327,25 @@ export function registerRoutes(router, app) {
   }, LINK_LIMIT);
   router.post('/link/claude/login/cancel', async ({ req, res, session }) => {
     loginsOf(app).cancel(session.userId, (await readBody(req)).id);
+    json(res, { ok: true });
+  }, LINK_LIMIT);
+  // Compte ChatGPT : fichier de connexion de Codex collé (secours) ou connexion guidée par code d'appareil (src/chatgptlogin.js)
+  router.post('/link/chatgpt/auth', linkAction((b, s) => linkChatgptAccount(app, s.userId, { authJson: b.authJson, accept: b.accept, via: 'paste' })), LINK_LIMIT);
+  router.post('/link/chatgpt/login', async ({ req, res, session }) => {
+    const b = await readBody(req);
+    assertLoginConsent(cfg, b.accept); // même exigence que pour l'abonnement Claude : case cochée, avant tout lancement
+    json(res, await chatgptLoginsOf(app).start(session.userId));
+  }, LINK_LIMIT);
+  router.post('/link/chatgpt/login/status', async ({ req, res, session }) => {
+    const b = await readBody(req);
+    const r = chatgptLoginsOf(app).poll(session.userId, b.id);
+    if (r.state !== 'done') return json(res, r);
+    // Connexion validée sur chatgpt.com : vérifiée par un appel minimal à Codex avant d'être rangée (chiffrée)
+    await linkChatgptAccount(app, session.userId, { authJson: r.authJson, accept: true, via: 'login' });
+    json(res, { state: 'done' });
+  }, LINK_LIMIT);
+  router.post('/link/chatgpt/login/cancel', async ({ req, res, session }) => {
+    chatgptLoginsOf(app).cancel(session.userId, (await readBody(req)).id);
     json(res, { ok: true });
   }, LINK_LIMIT);
   router.post('/link/test', async ({ req, res, session }) => {
