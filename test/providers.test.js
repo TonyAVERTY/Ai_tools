@@ -12,13 +12,14 @@ test('chaque fournisseur expose la forme commune', () => {
   for (const p of listProviders()) {
     for (const k of SHAPE) assert.ok(p[k] !== undefined, `${p.id} : « ${k} » manque`);
     assert.ok(Object.keys(p.modes).length >= 1);
-    for (const m of Object.values(p.modes)) assert.match(m.env, /^[A-Z][A-Z0-9_]+$/);
+    // Un mode porte son secret dans une variable d'environnement (`env`) ou dans un fichier de connexion du CLI (`file`)
+    for (const m of Object.values(p.modes)) assert.ok(m.file ? m.env === undefined : /^[A-Z][A-Z0-9_]+$/.test(m.env), `${p.id} : mode ${m.label}`);
     assert.equal(typeof p.bin({ claudeBin: 'x' }) === 'string' || p.bin({}) === undefined, true);
   }
 });
 
 test('le secret de chaque mode est autorisé dans le processus enfant, et rien d\'autre', () => {
-  for (const p of listProviders()) for (const m of Object.values(p.modes)) assert.ok(SECRET_ENV_NAMES.has(m.env), `${m.env} absent de la liste blanche`);
+  for (const p of listProviders()) for (const m of Object.values(p.modes)) if (!m.file) assert.ok(SECRET_ENV_NAMES.has(m.env), `${m.env} absent de la liste blanche`);
   assert.throws(() => buildChildEnv({}, { secretEnv: { SECRET_KEY: 'x'.repeat(20) }, home: '/h' }), /non autorisée/);
 });
 

@@ -64,8 +64,9 @@ export function isInside(root, path) {
  * @param {string[]} [o.roBinds]       dossiers supplémentaires en lecture seule (binaire Claude, Node…)
  * @param {string[]} [o.extraRo]       dossiers de pièces jointes de l'utilisateur (absolus), en lecture seule
  * @param {string[]} [o.roFiles]       fichiers de réglages du CLI (absolus), en lecture seule, écrits par l'application pour CE lancement
+ * @param {string[]} [o.rwDirs]        dossiers temporaires (absolus) montés en LECTURE-ÉCRITURE : la connexion de compte que le CLI renouvelle lui-même
  */
-export function buildBwrapArgs({ workDir = null, command, roBinds = [], extraRo = [], roFiles = [] }) {
+export function buildBwrapArgs({ workDir = null, command, roBinds = [], extraRo = [], roFiles = [], rwDirs = [] }) {
   if (!Array.isArray(command) || !command.length) throw new Error('Commande vide');
   if (workDir !== null && !isAbsolute(workDir)) throw new Error('Le répertoire de travail doit être absolu');
   if (extraRo.some((d) => !isAbsolute(d))) throw new Error('Les dossiers joints doivent être absolus');
@@ -88,6 +89,7 @@ export function buildBwrapArgs({ workDir = null, command, roBinds = [], extraRo 
   if (workDir) args.push('--ro-bind', workDir, workDir);
   for (const d of extraRo) args.push('--ro-bind', d, d);
   for (const f of roFiles) args.push('--ro-bind', f, f);
+  for (const d of rwDirs) args.push('--bind', d, d);
   args.push('--chdir', workDir || SANDBOX_HOME, '--', ...command);
   return args;
 }
@@ -114,6 +116,7 @@ export function bwrapAvailable(bin = 'bwrap') {
  * @param {Record<string,string>} [o.secretEnv]  le secret de l'utilisateur (clé API ou jeton)
  * @param {Record<string,string>} [o.extraEnv]  variables non secrètes autorisées (liste de providers/secretenv.js)
  * @param {string[]} [o.roFiles]     fichiers à monter en lecture seule dans le bac à sable (réglages du CLI)
+ * @param {string[]} [o.rwDirs]      dossiers temporaires à monter en lecture-écriture (connexion de compte renouvelée par le CLI)
  * @param {object} o.sandbox         cfg.sandbox : { enabled, production, bwrapBin, roBinds }
  * @param {object} [deps]            { parentEnv, hasBwrap, resolveBin } (tests)
  */
@@ -148,7 +151,7 @@ export function prepareLaunch(o, deps = {}) {
   if (!real) throw new Error(`Exécutable Claude introuvable : ${o.bin}`);
   const roBinds = [...new Set([...(sb.roBinds || []), ...(real.startsWith('/usr/') ? [] : [dirname(real)])])];
   const bwrap = buildBwrapArgs({
-    workDir: cwd, roBinds, extraRo: extraDirs, roFiles: (o.roFiles || []).map((f) => resolve(f)), command: [real, ...o.args],
+    workDir: cwd, roBinds, extraRo: extraDirs, roFiles: (o.roFiles || []).map((f) => resolve(f)), rwDirs: (o.rwDirs || []).map((d) => resolve(d)), command: [real, ...o.args],
   });
   return {
     command: nice[0], args: [...nice.slice(1), sb.bwrapBin, ...bwrap], cwd: tmpdir(), sandboxed: true,
