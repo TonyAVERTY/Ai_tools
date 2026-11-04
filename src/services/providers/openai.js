@@ -20,7 +20,7 @@
 //  - pas de coût en $ dans le flux : il est estimé d'après services/pricing.js ; pas de quota 5 h / 7 j ;
 //  - le texte n'arrive pas au fil de l'écriture : la réponse finale est transmise d'un bloc.
 import { spawn } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { prepareLaunch } from '../sandbox.js';
@@ -55,10 +55,14 @@ export function toolConfig(tools = []) {
  */
 function sandboxArgs(authHome) {
   if (!authHome) return ['--sandbox', 'read-only'];
+  // Le chemin est la CLÉ d'une table TOML EN LIGNE : écrit en clé pointée (`…filesystem."/chemin"=…`), Codex garde les guillemets dans le chemin
+  // et refuse tout (« filesystem path `"…"` must be absolute », constaté avec Codex 0.166). Une table en ligne reste juste si le chemin contient
+  // un point (`/home/x/iaboss.fr/…`), ce qu'une clé pointée sans guillemets couperait en deux.
+  const path = authHome.replace(/(["\\])/g, '\\$1');
   return [
     '-c', 'default_permissions="aitools"',
     '-c', 'permissions.aitools.extends=":read-only"',
-    '-c', `permissions.aitools.filesystem."${authHome.replace(/(["\\])/g, '\\$1')}"="deny"`,
+    '-c', `permissions.aitools.filesystem={"${path}"="deny"}`,
   ];
 }
 
@@ -88,9 +92,13 @@ export function buildArgs(o, authHome = null) {
 /** Lance Codex CLI. Mêmes options et même résultat que runClaude (services/claude.js). */
 export function runCodex(o) {
   // Connexion de compte : le fichier est écrit dans un dossier propre à CETTE exécution, relu à la fin (Codex a pu renouveler ses jetons)
+  // Ce dossier n'est pas dans /tmp : Codex n'y crée pas ses petits exécutables d'appoint (« Refusing to create helper binaries under temporary dir
+  // "/tmp" », constaté sur le serveur le 4 novembre 2026). `workRoot` = un dossier de l'application (DATA_DIR/run), créé en 0700 ; sans lui (tests),
+  // le dossier temporaire du système.
   let authHome = null;
   if (o.authFile) {
-    authHome = mkdtempSync(join(tmpdir(), 'aitools-codex-home-'));
+    if (o.workRoot) mkdirSync(o.workRoot, { recursive: true, mode: 0o700 });
+    authHome = mkdtempSync(join(o.workRoot || tmpdir(), 'codex-home-'));
     writeFileSync(join(authHome, 'auth.json'), o.authFile, { mode: 0o600 });
   }
   const cleanAuth = () => {
@@ -205,9 +213,11 @@ export async function validateAccount(app, authJson) {
     r = await runCodex({
       bin: app.cfg.codexBin, prompt: 'Réponds uniquement : ok', model: CATALOG_DEFAULT, maxTurns: 1, tools: [], timeoutMs: 90_000,
       sandbox: app.cfg.sandbox, authFile: authJson, secrets: authSecretValues(authJson), onAuthFile: (t) => { renewed = t; },
+      workRoot: app.cfg.dataDir ? join(app.cfg.dataDir, 'run') : undefined,
     });
   } catch (e) {
-    console.warn(`Vérification de la connexion ChatGPT : Codex n'a pas pu s'exécuter : ${String(e.message).slice(0, 300)}`);
+    // Message complet (déjà purgé des jetons par runCodex) : un message coupé a déjà caché la vraie cause d'une panne
+    console.warn(`Vérification de la connexion ChatGPT : Codex n'a pas pu s'exécuter : ${String(e.message).slice(0, 3000)}`);
     throw new HttpError(502, "Codex n'a pas pu être lancé sur le serveur (bac à sable ou installation). Préviens l'administrateur.", { expose: true });
   }
   if (r.ok) return { authFile: renewed };
