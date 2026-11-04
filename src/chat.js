@@ -3,6 +3,7 @@
 // Seule exception : ce que l'utilisateur JOINT au message. Un projet (dépôt en lecture seule) ou des fichiers (images, PDF, texte, images tirées d'une
 // vidéo) ouvrent les seuls outils de lecture (Read, Glob, Grep), dans le bac à sable, sur ces éléments et rien d'autre.
 // Les conversations sont privées : propres à chaque compte, supprimées avec lui (fichiers compris).
+import { userProvider } from './claudelink.js';
 import { existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { HttpError, json, readBody, html, redirect } from './http.js';
@@ -17,7 +18,7 @@ import { needAccess, accessOn } from './teams.js';
 import { accessibleProjects } from './mailroutes.js';
 import { userChatRoot } from './users.js';
 import { FILES, shapeAttachment, removeAttachmentFiles, conversationAttachments, prepareRunDir, registerChatFileRoutes } from './chatfiles.js';
-import { normalizeModel } from './services/models.js';
+import { normalizeModel, catalogOf, isModel } from './services/models.js';
 import { renderMarkdown } from './services/markdown.js';
 import { budgetState, isPriced } from './services/budget.js';
 import { loadRatio } from './services/load.js';
@@ -78,7 +79,11 @@ export const lastProject = (messages) => {
   return p ? { id: p.projectId, name: p.name } : null;
 };
 
-export const chatModel = async (db, userId) => normalizeModel(await getSetting(db, userId, 'chat_model', CHAT.defaultModel), CHAT.defaultModel);
+export const chatModel = async (db, userId) => {
+  const provider = await userProvider(db, userId);
+  const fallback = catalogOf(provider).chatDefault;
+  return normalizeModel(await getSetting(db, userId, 'chat_model', fallback), fallback, provider);
+};
 
 export function registerChatRoutes(router, app) {
   const { db, cfg } = app;
@@ -91,8 +96,10 @@ export function registerChatRoutes(router, app) {
   const page = async (res, session, current, mode = 'claude') => {
     const conversations = await listConversations(db, session.userId, mode);
     const messages = current ? await conversationMessages(db, current.id) : [];
+    const provider = await userProvider(db, session.userId);
     html(res, chatPage({
-      email: session.email, mode, priced: await isPriced(db, session.userId), conversations, current, messages, model: current?.model ?? await chatModel(db, session.userId),
+      email: session.email, mode, priced: await isPriced(db, session.userId), conversations, current, messages, catalog: catalogOf(provider),
+      model: isModel(current?.model, provider) ? current.model : await chatModel(db, session.userId),
       max: CHAT_MAX_MESSAGE, project: lastProject(messages), limits: { files: FILES.perMessage, maxMb: Object.fromEntries(Object.entries(FILES.maxBytes).map(([k, v]) => [k, Math.round(v / 1048576)])) },
     }));
   };
@@ -161,7 +168,8 @@ export function registerChatRoutes(router, app) {
       conv = await getConversation(db, userId, b.conversationId);
       if (!conv) throw new HttpError(404, 'Conversation introuvable');
     }
-    const model = normalizeModel(b.model, conv?.model ?? await chatModel(db, userId));
+    const provider = await userProvider(db, userId);
+    const model = normalizeModel(b.model, isModel(conv?.model, provider) ? conv.model : await chatModel(db, userId), provider);
     // Pièces jointes : les siennes, téléversées et pas encore envoyées. Projet : un projet dont il peut lire le code (propriétaire ou administrateur d'équipe).
     const pending = ids.length
       ? await db.prepare(`SELECT * FROM chat_attachments WHERE user_id = ? AND message_id IS NULL AND kind <> 'project' AND id IN (${ids.map(() => '?').join(',')})`).all(userId, ...ids)
