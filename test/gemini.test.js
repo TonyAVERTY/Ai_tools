@@ -43,6 +43,10 @@ test('le flux est traduit : texte mis bout à bout, jetons, coût estimé, pas d
   assert.equal(r.rateLimit, null);
 });
 
+test('le nombre de tours est compté même sans écouteur', async () => {
+  assert.equal((await run({ prompt: 'TOOLS', tools: ['Read', 'Grep'] })).turns, 2);
+});
+
 test('les outils de lecture sont journalisés sous leur nom Claude, avec les paramètres que lit le journal', async () => {
   const tools = [];
   let turns = 0;

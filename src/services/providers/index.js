@@ -10,10 +10,11 @@
 //   isAuthRefusal(text)     la réponse dit-elle « accès refusé » ?
 import { claudeProvider } from './claude.js';
 import { geminiProvider } from './gemini.js';
+import { openaiProvider } from './openai.js';
 
 export const DEFAULT_PROVIDER = 'claude';
 
-const PROVIDERS = new Map([claudeProvider, geminiProvider].map((p) => [p.id, p]));
+const PROVIDERS = new Map([claudeProvider, geminiProvider, openaiProvider].map((p) => [p.id, p]));
 
 export const providerIds = () => [...PROVIDERS.keys()];
 export const listProviders = () => [...PROVIDERS.values()];

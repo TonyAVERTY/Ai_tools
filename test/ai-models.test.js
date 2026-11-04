@@ -95,10 +95,10 @@ test('changer d\'IA remet les modèles au défaut et le dit ; rester sur la mêm
   assert.ok(note.at > 0);
 });
 
-test('tant qu\'un fournisseur n\'est pas branché, son utilisateur reste traité comme Claude', async () => {
+test('un fournisseur retiré du registre : son utilisateur est traité comme Claude', async () => {
   const u = await s.newUser({ admin: false });
   assert.equal(await userProvider(s.db, u.id), 'claude', 'aucune liaison');
-  await saveLink(s.app, u.id, { provider: 'openai', mode: 'api_key', secret_enc: 'z', last4: '9999' });
+  await saveLink(s.app, u.id, { provider: 'inconnue', mode: 'api_key', secret_enc: 'z', last4: '9999' });
   assert.equal(await userProvider(s.db, u.id), 'claude', 'fournisseur absent du registre');
   assert.equal(defaultModelOf('inconnu'), catalogOf().default);
 });
