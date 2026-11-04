@@ -1,7 +1,8 @@
 // Handlers des jobs en arrière-plan.
 import { now, getSetting, setSetting } from './db.js';
 import { readdirSync, statSync } from 'node:fs';
-import { runClaude, extractJson, rateLimitWindows } from './services/claude.js';
+import { extractJson } from './services/claude.js';
+import { getProvider } from './services/providers/index.js';
 import { tidyTemplateText, acceptReview } from './services/mailcheck.js';
 import { addUsage, jobContext, liveJobUsage } from './services/jobs.js';
 import { syncRepo } from './services/git.js';
@@ -16,7 +17,7 @@ import { linkedinAccount, saveDraft, recentDrafts } from './linkedin.js';
 import { followupCandidates, followupSubject, isBusinessHours } from './services/followup.js';
 import { EMAIL_RE, createTransport, buildProspectMail, allowedToSend, makeMessageId } from './services/mailer.js';
 import { unsubToken } from './crypto.js';
-import { resolveCredentials, isAuthRefusal, markLinkInvalid } from './claudelink.js';
+import { resolveCredentials, markLinkInvalid } from './claudelink.js';
 import { userRepoRoot, userChatRoot } from './users.js';
 import { quotaAlerts } from './services/budget.js';
 import { notify } from './services/notify.js';
@@ -132,6 +133,7 @@ export function makeClaude(app) {
   const { db, cfg } = app;
   return async (userId, o) => {
     const cred = await resolveCredentials(app, userId); // refuse sans liaison valide (dernier garde-fou)
+    const provider = getProvider(cred.provider);
     const jc = jobContext.getStore();
     if (jc && o.model) jc.model = o.model; // le job sait quel modèle sert vraiment
     // Profil de l'utilisateur (secteur, métier…) : une donnée de plus dans les consignes système, sauf pour le Support (qui répond d'après la documentation)
@@ -146,8 +148,8 @@ export function makeClaude(app) {
     const flushUsage = () => { clearTimeout(usageTimer); usageTimer = null; if (pendingUsage) { usage?.update(pendingUsage); pendingUsage = null; } };
     jc?.log?.('model', `Modèle : ${o.model || 'haiku'}`);
     try {
-      r = await runClaude({
-        bin: cfg.claudeBin, ...o, system,
+      r = await provider.run({
+        bin: provider.bin(cfg), ...o, system,
         onUsage: (u) => { pendingUsage = u; if (!usageTimer) usageTimer = setTimeout(flushUsage, 500); o.onUsage?.(u); },
         onDelta: stream ? (text) => { hasOutput = true; stream.delta(text); o.onDelta?.(text); } : o.onDelta,
         onActivity: jc ? (text) => { jc.log?.('activity', text); o.onActivity?.(text); } : o.onActivity,
@@ -163,7 +165,7 @@ export function makeClaude(app) {
     } catch (e) {
       stream?.finish();
       flushUsage();
-      if (isAuthRefusal(e.message)) await refused();
+      if (provider.isAuthRefusal(e.message)) await refused();
       throw e;
     }
     stream?.finish();
@@ -173,10 +175,10 @@ export function makeClaude(app) {
     if (!r.ok) {
       console.warn(claudeDiagnostic({ userId, cred, cfg, cwd: o.cwd, r }));
       // Un message d'erreur d'authentification est court ; un long texte (analyse tronquée qui parle d'un « 401 » dans le code) n'en est pas un
-      if (r.subtype !== 'error_max_turns' && String(r.text ?? '').length < 400 && isAuthRefusal(`${r.text} ${r.subtype}`)) await refused();
+      if (r.subtype !== 'error_max_turns' && String(r.text ?? '').length < 400 && provider.isAuthRefusal(`${r.text} ${r.subtype}`)) await refused();
     }
     // État du quota d'abonnement (session 5h + semaine), affiché dans la carte « Consommation Claude ». Une clé API n'en a pas.
-    const w = cred.mode === 'api_key' ? null : rateLimitWindows(r.rateLimit);
+    const w = cred.mode === 'api_key' ? null : provider.rateLimitWindows(r.rateLimit);
     if (w) {
       await setSetting(db, userId, 'claude_rate_limit_json', JSON.stringify({ at: now(), ...w }));
       for (const a of await quotaAlerts(db, userId, w)) {

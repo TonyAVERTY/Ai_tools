@@ -7,6 +7,9 @@ import { HttpError } from './http.js';
 import { getUser } from './users.js';
 import { runClaude } from './services/claude.js';
 import { AI_JOBS } from './services/budget.js';
+import { getProvider, hasProvider, DEFAULT_PROVIDER } from './services/providers/index.js';
+import { isAuthRefusal } from './services/providers/claude.js';
+export { isAuthRefusal };
 
 export const MODES = { api_key: 'api_key', subscription_token: 'subscription_token' };
 export const MODE_LABELS = {
@@ -30,10 +33,7 @@ export const CONSENT_CHECKBOX = "J'ai compris et j'accepte ce risque";
 const API_KEY_RE = /^sk-ant-[A-Za-z0-9_-]{20,400}$/;
 const TOKEN_RE = /^[A-Za-z0-9_.-]{20,800}$/;
 const MODELS_URL = 'https://api.anthropic.com/v1/models';
-const SECRET_ENV = { api_key: 'ANTHROPIC_API_KEY', subscription_token: 'CLAUDE_CODE_OAUTH_TOKEN' };
 
-/** Réponse de Claude qui signifie « ton accès est refusé » (jeton expiré ou révoqué, clé invalide) : au sens strict, jamais une panne réseau. */
-export const isAuthRefusal = (text) => /invalid (bearer )?token|invalid (x-)?api[ _-]?key|authentication_error|please run \/login|not logged in|oauth token (has )?(expired|been revoked)|token (has )?(expired|been revoked)|invalid.{0,20}credential|unauthori[sz]ed|\b401\b/i.test(String(text ?? ''));
 
 const truthy = (v) => v === true || v === 'true' || v === 'on' || v === '1' || v === 1;
 
@@ -58,7 +58,10 @@ export async function markLinkInvalid(db, userId) {
 /** Forme exposée à l'interface : jamais le secret, seulement ses 4 derniers caractères pour la clé API. */
 export function publicLink(link) {
   if (!link?.mode || !MODES[link.mode]) return null; // un ancien mode « serveur » compte comme « pas de liaison »
+  if (!hasProvider(link.provider ?? DEFAULT_PROVIDER)) return null; // fournisseur retiré : « pas de liaison »
+  const provider = getProvider(link.provider);
   return {
+    provider: provider.id, providerLabel: provider.label,
     mode: link.mode, label: MODE_LABELS[link.mode], valid: !!link.valid,
     linkedAt: link.linked_at ?? null, validatedAt: link.validated_at ?? null, lastTestAt: link.last_test_at ?? null,
     last4: link.mode === 'api_key' ? link.last4 ?? null : null,
@@ -108,7 +111,7 @@ export async function hasUsableLink(db, userId, opts) {
 
 /**
  * Identifiants d'exécution du job : lus dans la ligne de CET utilisateur, jamais ailleurs.
- * @returns {{mode:string, secretEnv:Record<string,string>}}
+ * @returns {{provider:string, mode:string, secretEnv:Record<string,string>}}
  */
 export async function resolveCredentials(app, userId) {
   await assertCanRunAi(app.db, userId, { cliModeEnabled: app.cfg.cliModeEnabled !== false });
@@ -121,7 +124,8 @@ export async function resolveCredentials(app, userId) {
     throw new HttpError(403, 'Secret de liaison illisible : relie de nouveau ton accès Claude');
   }
   if (!secret) throw new HttpError(403, LINK_REQUIRED_MESSAGE);
-  return { mode: link.mode, secretEnv: { [SECRET_ENV[link.mode]]: secret } };
+  const provider = getProvider(link.provider);
+  return { provider: provider.id, mode: link.mode, secretEnv: { [provider.modes[link.mode].env]: secret } };
 }
 
 // ---------- Validation ----------
@@ -173,7 +177,7 @@ export async function validateSubscriptionToken(app, token) {
 
 export async function saveLink(app, userId, link) {
   const t = now();
-  await writeLink(app.db, userId, { v: 1, valid: true, linked_at: t, validated_at: t, last_test_at: t, ...link });
+  await writeLink(app.db, userId, { v: 1, provider: DEFAULT_PROVIDER, valid: true, linked_at: t, validated_at: t, last_test_at: t, ...link });
   await resetQuotaState(app.db, userId);
 }
 
