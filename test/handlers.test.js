@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { setSetting, getSetting, now } from '../src/db.js';
+import { toolActivity } from '../src/handlers.js';
 import { testDb } from './helpers/db.js';
 import { Worker, enqueue, latestJobs } from '../src/services/jobs.js';
 import { makeHandlers, parseProspectLine } from '../src/handlers.js';
@@ -14,7 +15,7 @@ import { allowedToSend, buildProspectMail, fillTemplate } from '../src/services/
 import { validateSelect, firstValue } from '../src/services/recap.js';
 import { validateGitUrl } from '../src/services/git.js';
 import { verifyUnsubToken, encrypt, encryptJson } from '../src/crypto.js';
-import { addUser } from './helpers/users.js';
+import { addUser, TEST_SECRET_KEY } from './helpers/users.js';
 import { makeClaudeBin } from './helpers/claude-bin.js';
 
 async function setup() {
@@ -27,9 +28,10 @@ async function setup() {
   execFileSync('git', ['-C', src, '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'readme']);
   const db = await testDb();
   const sentMails = [];
-  const app = { resolveHost: async () => [{ address: '93.184.216.34', family: 4 }],
+  const app = { resolveHost: async () => [{ address: '93.184.216.34', family: 4 }], resolveMx: async () => [{ exchange: 'mx.test', priority: 10 }],
     db,
-    cfg: { dataDir: tmp, claudeBin: resolve('test/fixtures/fake-claude.js'), sandbox: { enabled: false, production: false }, secretKey: randomBytes(32), appUrl: 'https://ai.test' },
+    cfg: { dataDir: tmp, claudeBin: resolve('test/fixtures/fake-claude.js'), sandbox: { enabled: false, production: false }, secretKey: TEST_SECRET_KEY, appUrl: 'https://ai.test',
+      systemSmtp: { host: 'smtp.serveur', port: 587, user: 'srv', pass: 'p', fromEmail: 'aitools@serveur.test' } }, // mails d'AiTools (évolutions…)
     // syncRepo refuse file:// (clones d'URL fournies par l'utilisateur : https seulement) : le test clone le dépôt local à la place
     syncRepo: async (url, dir) => {
       if (existsSync(join(dir, '.git'))) execFileSync('git', ['-C', dir, 'pull', '-q']);
@@ -56,6 +58,7 @@ test('flux complet : analyse → cible → prospection → modèle → envoi →
     let p = await getProject(s.app, s.id, { userId: s.userId });
     assert.equal(p.profile.resume, 'Cartes de fidélité digitales.');
     assert.equal(p.target.zone, 'Bretagne');
+    assert.equal(p.profile.facturation.legal_name, 'Atelier Averty', 'l\'analyse garde les informations d\'éditeur trouvées pour la Facturation');
     assert.equal(p.targetValidated, false);
     assert.match(p.profileCommit, /^[0-9a-f]{40}$/);
     const rl = JSON.parse(await getSetting(s.db, s.userId, 'claude_rate_limit_json'));
@@ -90,10 +93,11 @@ test('flux complet : analyse → cible → prospection → modèle → envoi →
     assert.equal(mail.subject, 'Idée pour Boulangerie Le Fournil');
     assert.match(mail.text, /Bonjour Boulangerie Le Fournil à Rennes/);
     assert.match(mail.text, /fournil\.fr\/contact/);
-    assert.match(mail.html, /Bonjour Boulangerie Le Fournil à Rennes/);
-    assert.match(mail.html, /Ne plus recevoir de messages/);
-    const unsub = /\/u\/([^/]+)\/(\S+)/.exec(mail.headers['List-Unsubscribe']);
-    assert.ok(verifyUnsubToken(s.app.cfg.secretKey, decodeURIComponent(unsub[1]), unsub[2].replace('>', '')));
+    assert.equal(mail.html, undefined, 'mail classique : texte seulement, sans HTML');
+    assert.equal(mail.headers['List-Unsubscribe'], undefined, 'aucun en-tête de désabonnement invisible');
+    assert.match(mail.text, /Pour ne plus être contacté/);
+    const unsub = /\/u\/([^/\s]+)\/(\S+)/.exec(mail.text);
+    assert.ok(verifyUnsubToken(s.app.cfg.secretKey, decodeURIComponent(unsub[1]), unsub[2]));
     assert.equal((await prospectStats(s.db, s.id)).sent, 1);
 
     const again = await run(s, 'send', { count: 5 });
@@ -105,6 +109,7 @@ test('flux complet : analyse → cible → prospection → modèle → envoi →
     const ev = await run(s, 'evolution', { count: 3, level: 'rapide' });
     assert.equal(ev.status, 'done', ev.error);
     assert.equal(s.sentMails.at(-1).to, 'moi@x.fr');
+    assert.equal(s.sentMails.at(-1).from, 'aitools@serveur.test', 'les mails d\'AiTools partent du SMTP du serveur, pas de celui du projet');
     assert.match(s.sentMails.at(-1).text, /Export CSV/);
     assert.match(s.sentMails.at(-1).html, /class|style/, 'version HTML mise en forme');
     assert.match(s.sentMails.at(-1).html, /Export CSV/);
@@ -197,54 +202,40 @@ test('envoi : Message-ID journalisé et objets A/B alternés équitablement', as
   } finally { rmSync(s.tmp, { recursive: true, force: true }); }
 });
 
-// SMTP : celui du projet, sinon celui des Réglages du propriétaire, sinon un refus clair
-test('SMTP par projet avec repli sur les Réglages', async () => {
+// SMTP d'un projet : le sien, et rien d'autre (un projet n'envoie jamais depuis l'adresse d'un autre ni depuis celle du serveur)
+test('SMTP par projet, sans repli sur un SMTP commun', async () => {
   const s = await setup();
   try {
     await s.db.prepare(`INSERT INTO templates(project_id, kind, subject, body, status, updated_at) VALUES(?, 'initial', 'Salut {{entreprise}}', 'Bonjour', 'validated', ?)`).run(s.id, now());
     const addProspect = (n) => s.db.prepare('INSERT INTO prospects(project_id, company, email, score, created_at) VALUES(?, ?, ?, 5, ?)').run(s.id, `E${n}`, `c${n}@e${n}.fr`, now());
-    const settingsSmtp = { host: 'smtp.reglages', port: 587, user: 'r', pass: 'p', fromEmail: 'reglages@codebzh.fr' };
     const asSource = async () => (await getProject(s.app, s.id, { userId: s.userId })).smtpSource;
 
-    // Aucun SMTP nulle part : refus clair, rien ne part
+    // Aucun SMTP de projet : refus clair, rien ne part (même si le serveur a le sien)
     assert.equal(await asSource(), null);
     assert.equal((await getProject(s.app, s.id, { userId: s.userId })).hasSmtp, false);
     await addProspect(1);
     let job = await run(s, 'send', { count: 1 });
     assert.equal(job.status, 'error');
-    assert.match(job.error, /Aucun SMTP.*Réglages/);
+    assert.match(job.error, /Aucun SMTP/);
     assert.equal(s.sentMails.length, 0);
 
-    // SMTP des Réglages seulement : le projet l'utilise
-    await setSetting(s.db, s.userId, 'smtp_enc', encryptJson(s.app.cfg.secretKey, settingsSmtp));
-    assert.equal(await asSource(), 'settings');
-    const p = await getProject(s.app, s.id, { userId: s.userId, secrets: true });
-    assert.equal(p.hasSmtp, true);
-    assert.equal(p.hasOwnSmtp, false);
-    assert.equal(p.smtp.fromEmail, 'reglages@codebzh.fr');
+    // Un ancien réglage « SMTP global » restant en base n'est plus lu
+    await setSetting(s.db, s.userId, 'smtp_enc', encryptJson(s.app.cfg.secretKey, { host: 'smtp.reglages', port: 587, user: 'r', pass: 'p', fromEmail: 'reglages@codebzh.fr' }));
+    assert.equal(await asSource(), null);
     job = await run(s, 'send', { count: 1 });
-    assert.equal(job.status, 'done', job.error);
-    assert.equal(s.sentMails.at(-1).from, 'reglages@codebzh.fr');
+    assert.equal(job.status, 'error');
+    assert.equal(s.sentMails.length, 0);
 
-    // SMTP propre au projet : il prend le dessus
+    // SMTP propre au projet : les mails du projet partent de son adresse
     await saveSecretConfig(s.app, s.id, 'smtp_enc', { host: 'smtp.projet', port: 587, user: 'u', pass: 'p', fromEmail: 'projet@codebzh.fr' }, 'pass');
     assert.equal(await asSource(), 'project');
-    await addProspect(2);
     job = await run(s, 'send', { count: 1 });
     assert.equal(job.status, 'done', job.error);
     assert.equal(s.sentMails.at(-1).from, 'projet@codebzh.fr');
-
-    // Le SMTP d'un autre compte n'est jamais utilisé
-    const other = await addUser(s.db);
-    await setSetting(s.db, other, 'smtp_enc', encryptJson(s.app.cfg.secretKey, { ...settingsSmtp, fromEmail: 'autre@codebzh.fr' }));
-    await s.db.prepare('UPDATE projects SET smtp_enc = NULL WHERE id = ?').run(s.id);
-    await addProspect(3);
-    await run(s, 'send', { count: 1 });
-    assert.equal(s.sentMails.at(-1).from, 'reglages@codebzh.fr');
-    // L'IMAP réutilise les identifiants du SMTP effectif (repli compris)
+    // L'IMAP réutilise les identifiants du SMTP du projet
     await saveSecretConfig(s.app, s.id, 'imap_enc', { host: 'imap.x', port: 993, user: '', pass: '' }, 'pass');
     const q = await getProject(s.app, s.id, { userId: s.userId, secrets: true });
-    assert.equal(q.imap.user, 'r');
+    assert.equal(q.imap.user, 'u');
   } finally { rmSync(s.tmp, { recursive: true, force: true }); }
 });
 
@@ -265,6 +256,48 @@ test('analyse : modèle économique (Haiku) par défaut, Sonnet uniquement sur d
     const a2 = await run(s, 'analyze');
     assert.equal(a2.status, 'done', a2.error);
     assert.deepEqual(readFileSync(spyFile, 'utf8').trim().split('\n'), ['haiku', 'sonnet']);
+  } finally { rmSync(s.tmp, { recursive: true, force: true }); }
+});
+
+test('modèle et consignes de sa gamme : le prompt de la gamme du modèle choisi (et ce modèle) arrivent à Claude, pour chaque tâche', async () => {
+  const s = await setup();
+  const spyFile = join(s.tmp, 'prompts.log');
+  s.app.cfg.claudeBin = makeClaudeBin(s.tmp, { fixture: 'spy-claude.js', env: { PROMPT_SPY_FILE: spyFile } });
+  // Dernier appel de rédaction (la relecture du mail, qui suit un modèle de mail, a son propre prompt)
+  const last = () => JSON.parse(readFileSync(spyFile, 'utf8').trim().split('\n').filter((l) => !l.includes('RELECTURE DU MAIL')).pop());
+  try {
+    assert.equal((await run(s, 'analyze')).status, 'done'); // le modèle de mail s'écrit à partir de la fiche du projet
+    await setSetting(s.db, s.userId, 'prompts_json', JSON.stringify({ '*': { template: 'email de prospection MARQUE-COMMUNE' }, haiku: { template: 'email de prospection MARQUE-HAIKU' }, opus: { template: 'email de prospection MARQUE-OPUS' } }));
+    // rédaction : Haiku par défaut
+    const tj = await run(s, 'template'); assert.equal(tj.status, 'done', tj.error);
+    assert.equal(last().model, 'haiku');
+    assert.match(last().prompt, /MARQUE-HAIKU/);
+    // modèle précis de la gamme Opus
+    await setSetting(s.db, s.userId, 'write_model', 'claude-opus-5-5');
+    assert.equal((await run(s, 'template')).status, 'done');
+    assert.equal(last().model, 'claude-opus-5-5');
+    assert.match(last().prompt, /MARQUE-OPUS/);
+    assert.doesNotMatch(last().prompt, /MARQUE-HAIKU/);
+    // gamme sans texte propre : « tous les modèles »
+    await setSetting(s.db, s.userId, 'write_model', 'claude-sonnet-5-5');
+    assert.equal((await run(s, 'template')).status, 'done');
+    assert.match(last().prompt, /MARQUE-COMMUNE/);
+    // sans personnalisation : consignes par défaut de la gamme
+    await setSetting(s.db, s.userId, 'prompts_json', '');
+    await setSetting(s.db, s.userId, 'write_model', 'haiku');
+    assert.equal((await run(s, 'template')).status, 'done');
+    assert.match(last().prompt, /Reste sous 150 mots/);
+    await setSetting(s.db, s.userId, 'write_model', 'claude-fable-5-1');
+    assert.equal((await run(s, 'template')).status, 'done');
+    assert.match(last().prompt, /excellent commercial/);
+    // analyse : son propre réglage, sa propre gamme ; un identifiant hors catalogue retombe sur Haiku
+    await setSetting(s.db, s.userId, 'analyze_model', 'claude-opus-4-8');
+    assert.equal((await run(s, 'analyze')).status, 'done');
+    assert.equal(last().model, 'claude-opus-4-8');
+    assert.match(last().prompt, /Remonte à l'intention du produit/);
+    await setSetting(s.db, s.userId, 'analyze_model', '--dangerously-skip-permissions');
+    assert.equal((await run(s, 'analyze')).status, 'done');
+    assert.equal(last().model, 'haiku');
   } finally { rmSync(s.tmp, { recursive: true, force: true }); }
 });
 
@@ -292,3 +325,42 @@ test('quota Claude serré : alerte Discord à 80 %, pas en dessous', async () =>
     assert.equal(sent.length, 1);
   } finally { rmSync(s.tmp, { recursive: true, force: true }); }
 });
+
+test('audit du dépôt, accroche régénérée, consignes personnalisées transmises à Claude', async () => {
+  const s = await setup();
+  try {
+    assert.equal((await run(s, 'analyze')).status, 'done');
+    // Audit : rapport Markdown en lecture seule, gardé dans le résultat du job
+    const au = await run(s, 'audit', { level: 'rapide' });
+    assert.equal(au.status, 'done', au.error);
+    assert.match(au.result.markdown, /## Constats[\s\S]*src\/a\.js:1/);
+    // Accroche : remplace l'ancienne, complète la ville / le secteur manquants sans écraser ceux qui existent
+    const pid = Number((await s.db.prepare("INSERT INTO prospects(project_id, company, email, website, city, hook, status, created_at) VALUES(?, 'Boulangerie Le Fournil', 'c@fournil.fr', 'https://fournil.fr', 'Vern', 'ancienne accroche', 'new', ?)").run(s.id, now())).lastInsertRowid);
+    const h = await run(s, 'hook', { prospectId: pid });
+    assert.equal(h.status, 'done', h.error);
+    const row = await s.db.prepare('SELECT hook, city, sector FROM prospects WHERE id = ?').get(pid);
+    assert.match(row.hook, /Fournil : des fournées/);
+    assert.equal(row.city, 'Vern', 'la ville renseignée n\'est pas écrasée');
+    assert.equal(row.sector, 'boulangerie', 'le secteur manquant est complété');
+    // Un prospect d'un autre projet n'est jamais touché
+    const other = await run(s, 'hook', { prospectId: 999999 });
+    assert.match(other.error, /Prospect introuvable/);
+    // Consignes personnalisées : elles font partie du prompt reçu par Claude (CRASH fait échouer la fausse CLI), le défaut non
+    assert.equal((await run(s, 'template')).status, 'done');
+    await setSetting(s.db, s.userId, 'prompts_json', JSON.stringify({ '*': { template: 'CRASH' } }));
+    assert.equal((await run(s, 'template')).status, 'error', 'la consigne personnalisée est bien transmise');
+    await setSetting(s.db, s.userId, 'prompts_json', '');
+    assert.equal((await run(s, 'template')).status, 'done', 'retour au défaut');
+  } finally { rmSync(s.tmp, { recursive: true, force: true }); }
+});
+
+test('activité de Claude en direct : recherche web, site lu (nom d\'hôte seulement), fichier lu ; rien pour le reste', () => {
+  assert.equal(toolActivity('WebSearch', { query: 'boulangerie  artisanale\nRennes' }), 'Recherche web : « boulangerie artisanale Rennes »');
+  assert.equal(toolActivity('WebFetch', { url: 'https://www.exemple.fr/contact?token=secret#x' }), 'Lecture du site exemple.fr');
+  assert.equal(toolActivity('WebFetch', { url: 'pas une url' }), "Lecture d'une page web");
+  assert.equal(toolActivity('Read', { file_path: '/data/repos/1/src/app.js' }), 'Lecture de src/app.js');
+  assert.equal(toolActivity('Grep', { pattern: 'x' }), 'Recherche dans le code');
+  assert.equal(toolActivity('Bash', { command: 'ls' }), null);
+  assert.ok(toolActivity('WebSearch', { query: 'x'.repeat(300) }).length <= 90);
+});
+

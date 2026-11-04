@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { getSetting, now } from '../src/db.js';
 import { testDb } from './helpers/db.js';
-import { addUser } from './helpers/users.js';
+import { addUser, TEST_SECRET_KEY } from './helpers/users.js';
 import { startApp } from './helpers/server.js';
 import { addMonths, runInactiveCleanup, warningMail } from '../src/services/inactive.js';
 import { Scheduler } from '../src/services/scheduler.js';
@@ -23,7 +23,7 @@ async function world({ smtp = true, months = 24 } = {}) {
   const app = {
     db, resolveHost: async () => [{ address: '93.184.216.34', family: 4 }],
     cfg: {
-      dataDir: '/tmp/aitools-inactive', appUrl: 'https://ai.test', secretKey: randomBytes(32), inactiveMonths: months,
+      dataDir: '/tmp/aitools-inactive', appUrl: 'https://ai.test', secretKey: TEST_SECRET_KEY, inactiveMonths: months,
       systemSmtp: smtp ? { host: 'smtp.serveur.fr', port: 587, user: 'u', pass: 'p', fromEmail: 'noreply@ai.test' } : null,
     },
     createTransport: (cfg) => ({ sendMail: async (m) => { mails.push({ ...m, via: cfg.host }); }, close() {} }),
@@ -211,6 +211,14 @@ test('configuration : INACTIVE_ACCOUNT_MONTHS (24 par défaut) et SMTP du serveu
   const full = { SYSTEM_SMTP_HOST: 'smtp.x.fr', SYSTEM_SMTP_USER: 'u', SYSTEM_SMTP_PASSWORD: 'p', SYSTEM_SMTP_FROM: 'n@x.fr' };
   assert.deepEqual(withEnv(full, () => loadConfig().systemSmtp), { host: 'smtp.x.fr', port: 587, user: 'u', pass: 'p', fromEmail: 'n@x.fr' });
   assert.throws(() => withEnv({ SYSTEM_SMTP_HOST: 'smtp.x.fr' }, loadConfig), /incomplètes/);
+  // Les 3 adresses : expéditeur, contact en reply-to, boîte d'erreur avec le même mot de passe
+  const trio = { ...full, SYSTEM_SMTP_REPLY_TO: 'contact@x.fr', SYSTEM_SMTP_ERROR_USER: 'erreur@x.fr' };
+  const cfg = withEnv(trio, () => { const c = loadConfig(); return { s: c.systemSmtp, e: c.errorSmtp }; });
+  assert.equal(cfg.s.replyTo, 'contact@x.fr');
+  assert.deepEqual(cfg.e, { ...cfg.s, user: 'erreur@x.fr', fromEmail: 'erreur@x.fr' });
+  assert.equal(cfg.e.pass, 'p');
+  assert.equal(withEnv(full, () => loadConfig().errorSmtp), null);
+  assert.equal(withEnv({ SYSTEM_SMTP_ERROR_USER: 'erreur@x.fr' }, () => loadConfig().errorSmtp), null, 'sans SMTP principal, rien');
 });
 
 test('politique de confidentialité : la suppression automatique est annoncée comme en place, avec la durée configurée', async () => {
@@ -233,5 +241,5 @@ test('mail d\'avertissement : jamais le mot de passe ni de donnée métier, lien
   assert.match(m.subject, /supprimé pour inactivité/);
   assert.match(m.text, /ada@ex\.fr/);
   assert.match(m.text, /export/i);
-  assert.ok(m.text.includes('contact@tony-averty.dev'));
+  assert.ok(m.text.includes('contact@iaboss.fr'));
 });

@@ -1,5 +1,4 @@
 import { resolve } from 'node:path';
-import { homedir } from 'node:os';
 import { dbConfigFromEnv } from './db.js';
 import { parseTrustProxy } from './ratelimit.js';
 
@@ -27,16 +26,35 @@ function appleConfig() {
 }
 
 // Google reCAPTCHA v3 sur le démarrage de la connexion : les deux clés ensemble, ou aucune (reCAPTCHA désactivé, développement)
+// Droits LinkedIn que l'application peut demander (liste fermée : une faute de frappe fait échouer toutes les connexions)
+const LINKEDIN_SCOPES = ['openid', 'profile', 'email', 'w_member_social', 'w_organization_social', 'rw_organization_admin', 'r_organization_admin', 'r_organization_social'];
+
 /**
  * LinkedIn (connexion d'un compte à un projet, publication de posts). Désactivé sans clés : il faut une application sur
  * developer.linkedin.com avec les produits « Sign In with LinkedIn using OpenID Connect » et « Share on LinkedIn ».
+ *
+ * Publier sur une PAGE demande la « Community Management API », qui doit être le seul produit de son application (LinkedIn
+ * grise la demande sinon) : cette application-là n'a ni OpenID ni « Share ». Les droits demandés sont donc réglables
+ * (LINKEDIN_SCOPES), avec par défaut ceux d'une publication sur le profil. Une page demande au moins w_organization_social
+ * (publier) et rw_organization_admin ou r_organization_admin (lister les pages administrées).
  */
 function linkedinConfig(appUrl) {
   const clientId = (env.LINKEDIN_CLIENT_ID || '').trim();
   const clientSecret = (env.LINKEDIN_CLIENT_SECRET || '').trim();
   if (!clientId && !clientSecret) return null;
   if (!clientId || !clientSecret) throw new Error('LinkedIn : LINKEDIN_CLIENT_ID et LINKEDIN_CLIENT_SECRET vont ensemble');
-  return { clientId, clientSecret, redirectUri: (env.LINKEDIN_REDIRECT_URI || `${appUrl}/linkedin/callback`).trim() };
+  const scopes = [...new Set((env.LINKEDIN_SCOPES || 'openid profile w_member_social').split(/[\s,]+/).filter(Boolean))];
+  const unknown = scopes.filter((s) => !LINKEDIN_SCOPES.includes(s));
+  if (unknown.length) throw new Error(`LinkedIn : LINKEDIN_SCOPES contient des droits inconnus (${unknown.join(', ')}). Autorisés : ${LINKEDIN_SCOPES.join(', ')}`);
+  if (!scopes.some((s) => s === 'w_member_social' || s === 'w_organization_social')) throw new Error('LinkedIn : LINKEDIN_SCOPES doit contenir w_member_social (profil) ou w_organization_social (page)');
+  const apiVersion = (env.LINKEDIN_API_VERSION || '202604').trim();
+  if (!/^\d{6}$/.test(apiVersion)) throw new Error('LinkedIn : LINKEDIN_API_VERSION doit être au format AAAAMM (ex. 202604)');
+  return {
+    clientId, clientSecret, redirectUri: (env.LINKEDIN_REDIRECT_URI || `${appUrl}/linkedin/callback`).trim(),
+    scopes, apiVersion,
+    // Publier sur une page : le droit d'écrire pour elle, et de lister celles que le compte administre
+    pages: scopes.includes('w_organization_social') && (scopes.includes('rw_organization_admin') || scopes.includes('r_organization_admin')),
+  };
 }
 
 function recaptchaConfig() {
@@ -69,7 +87,16 @@ function systemSmtpConfig() {
   const set = keys.filter((k) => env[k]);
   if (!set.length) return null;
   if (set.length < keys.length) throw new Error(`SMTP du serveur : variables incomplètes (manque ${keys.filter((k) => !env[k]).join(', ')})`);
-  return { host: env.SYSTEM_SMTP_HOST, port: Number(env.SYSTEM_SMTP_PORT || 587), user: env.SYSTEM_SMTP_USER, pass: env.SYSTEM_SMTP_PASSWORD, fromEmail: env.SYSTEM_SMTP_FROM };
+  return {
+    host: env.SYSTEM_SMTP_HOST, port: Number(env.SYSTEM_SMTP_PORT || 587), user: env.SYSTEM_SMTP_USER, pass: env.SYSTEM_SMTP_PASSWORD, fromEmail: env.SYSTEM_SMTP_FROM,
+    ...(env.SYSTEM_SMTP_REPLY_TO ? { replyTo: env.SYSTEM_SMTP_REPLY_TO } : {}), // les réponses aux mails d'AiTools arrivent sur l'adresse de contact
+  };
+}
+
+// Boîte dédiée aux alertes d'erreur (même serveur et même mot de passe que l'expéditeur principal, autre identifiant). Facultative.
+function errorSmtpConfig(base) {
+  if (!base || !env.SYSTEM_SMTP_ERROR_USER) return null;
+  return { ...base, user: env.SYSTEM_SMTP_ERROR_USER, fromEmail: env.SYSTEM_SMTP_ERROR_USER };
 }
 
 function inactiveMonths() {
@@ -94,8 +121,6 @@ function sandboxConfig() {
     bwrapBin: env.BWRAP_BIN || 'bwrap',
     // Dossiers supplémentaires montés en lecture seule (ex. Node installé hors de /usr), séparés par des virgules
     roBinds: (env.SANDBOX_RO_BINDS || '').split(',').map((p) => p.trim()).filter(Boolean),
-    // Configuration du CLI du serveur, montée seulement pour le mode « Claude du serveur » (admins)
-    serverHome: env.HOME || homedir(),
   };
 }
 
@@ -104,6 +129,7 @@ export function loadConfig() {
   if (!/^[0-9a-f]{64}$/i.test(secretKey)) {
     throw new Error('SECRET_KEY doit faire 32 octets en hexadécimal (64 caractères)');
   }
+  const systemSmtp = systemSmtpConfig();
   return {
     appUrl: required('APP_URL').replace(/\/$/, ''),
     port: Number(env.PORT || 3100),
@@ -115,7 +141,8 @@ export function loadConfig() {
     apple: appleConfig(),
     recaptcha: recaptchaConfig(),
     linkedin: linkedinConfig(required('APP_URL').replace(/\/$/, '')),
-    systemSmtp: systemSmtpConfig(),
+    systemSmtp,
+    errorSmtp: errorSmtpConfig(systemSmtp),
     inactiveMonths: inactiveMonths(),
     production: env.NODE_ENV === 'production',
     // Développement : autorise les hôtes privés (SMTP local, etc.). En production, seulement pour les administrateurs.
@@ -129,8 +156,8 @@ export function loadConfig() {
     // Mode « abonnement » (jeton claude setup-token) : désactivable globalement
     cliModeEnabled: flag(env.CLAUDE_CLI_MODE_ENABLED, true),
     sandbox: sandboxConfig(),
-    // Jobs IA simultanés sur le serveur (un seul par utilisateur) et charge (charge/cœurs) au-delà de laquelle les nouveaux jobs attendent
-    maxAiJobs: positive(env.MAX_AI_JOBS, 4, 'MAX_AI_JOBS'),
+    // Aucune limite globale de jobs IA : la limite vient de l'offre de chaque compte (parallelJobs dans limits.js). Reste la charge (charge/cœurs)
+    // au-delà de laquelle les nouveaux jobs attendent (LOAD_MAX).
     loadMax: ratio(env.LOAD_MAX, 0.9, 'LOAD_MAX'),
     // Derrière Nginx/CloudPanel : lire X-Forwarded-For, mais seulement depuis un proxy de confiance (voir ratelimit.js)
     trustProxy: parseTrustProxy(env.TRUST_PROXY),

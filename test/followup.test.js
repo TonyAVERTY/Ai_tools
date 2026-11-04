@@ -12,7 +12,7 @@ import { Worker, latestJobs } from '../src/services/jobs.js';
 import { Scheduler } from '../src/services/scheduler.js';
 import { makeHandlers } from '../src/handlers.js';
 import { createProject, saveSecretConfig, getProject } from '../src/projects.js';
-import { addUser } from './helpers/users.js';
+import { addUser, TEST_SECRET_KEY } from './helpers/users.js';
 
 const paris = (iso) => new Date(iso); // ISO avec décalage explicite
 
@@ -41,8 +41,9 @@ async function setup() {
   const db = await testDb();
   const sentMails = [];
   const app = { resolveHost: async () => [{ address: '93.184.216.34', family: 4 }],
-    db, cfg: { dataDir: tmp, claudeBin: resolve('test/fixtures/fake-claude.js'), sandbox: { enabled: false, production: false }, secretKey: randomBytes(32), appUrl: 'https://ai.test' },
+    db, cfg: { dataDir: tmp, claudeBin: resolve('test/fixtures/fake-claude.js'), sandbox: { enabled: false, production: false }, secretKey: TEST_SECRET_KEY, appUrl: 'https://ai.test' },
     createTransport: () => ({ verify: async () => true, sendMail: async (m) => { sentMails.push(m); }, close() {} }),
+    resolveMx: async () => [{ exchange: 'mx.test', priority: 10 }], // pas de DNS réel
     isBusinessHours: () => true, // horloge figée : le test ne dépend pas de l'heure à laquelle on le lance
   };
   const userId = await addUser(db);

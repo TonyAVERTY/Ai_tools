@@ -3,7 +3,7 @@ import { now } from '../db.js';
 import { parisTime, parisParts } from './paris-time.js';
 
 export const STATUSES = {
-  new: 'À contacter', sent: 'Contacté', replied: 'A répondu', client: 'Client', refused: 'Refus', bounced: 'Rejeté',
+  new: 'À contacter', sent: 'Contacté', replied: 'A répondu', client: 'Client', refused: 'Refus', bounced: 'Rejeté', invalid: 'Adresse invalide',
 };
 
 const SORTS = {
@@ -68,7 +68,9 @@ export async function prospectDetail(db, id) {
   // La liste d'opposition est commune à tous les comptes : on n'en révèle que le strict nécessaire. Le motif d'un
   // autre compte (refus, adresse invalide) n'est pas montré ; seule la désinscription, acte de la personne elle-même, l'est.
   const row = await db.prepare('SELECT reason FROM blacklist WHERE email = ?').get(p.email);
-  const optOut = row ? { reason: row.reason === 'unsubscribe' ? 'unsubscribe' : p.status === 'bounced' ? 'bounce' : 'refused' } : null;
+  // Seulement si le prospect de CE compte porte déjà ce statut : un compte ne découvre jamais qu'une adresse est sur la liste à cause d'un autre.
+  const optOut = row && (p.status === 'refused' || p.status === 'bounced')
+    ? { reason: row.reason === 'unsubscribe' ? 'unsubscribe' : p.status === 'bounced' ? 'bounce' : 'refused' } : null;
   return { prospect: p, mails, notes, optOut };
 }
 
@@ -97,4 +99,20 @@ export async function setNextAction(db, prospectId, action, day) {
   const at = Math.floor(date.getTime() / 1000);
   await db.prepare('UPDATE prospects SET next_action = ?, next_action_at = ? WHERE id = ?').run(text, at, prospectId);
   return at;
+}
+
+/**
+ * Vue Kanban : une colonne par statut, avec le total et les premières fiches (mêmes filtres que la liste).
+ * Le filtre « statut » de la liste ne s'applique pas ici : les colonnes sont justement les statuts.
+ */
+export async function kanbanColumns(db, projectId, f, { per = 25 } = {}) {
+  const cols = [];
+  for (const [status, label] of Object.entries(STATUSES)) {
+    const { sql, args, order } = filterWhere(projectId, { ...f, status });
+    const total = Number((await db.prepare(`SELECT COUNT(*) n FROM prospects WHERE ${sql}`).get(...args)).n);
+    const rows = total ? await db.prepare(`SELECT id, company, email, city, score, status, sent_at, replied_at, next_action, next_action_at
+      FROM prospects WHERE ${sql} ORDER BY ${order} LIMIT ?`).all(...args, per) : [];
+    cols.push({ status, label, total, rows });
+  }
+  return cols;
 }

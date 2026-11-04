@@ -3,14 +3,14 @@ import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { now } from '../src/db.js';
 import { testDb } from './helpers/db.js';
-import { addUser } from './helpers/users.js';
+import { addUser, TEST_SECRET_KEY } from './helpers/users.js';
 
 import { parseHeaders, classify, applyMessages, checkInbox } from '../src/services/inbox.js';
 import { createProject, saveSecretConfig, getProject, imapCredentials } from '../src/projects.js';
 
 async function setup() {
   const db = await testDb();
-  const app = { resolveHost: async () => [{ address: '93.184.216.34', family: 4 }], db, cfg: { secretKey: randomBytes(32) } };
+  const app = { resolveHost: async () => [{ address: '93.184.216.34', family: 4 }], db, cfg: { secretKey: TEST_SECRET_KEY } };
   const userId = await addUser(db);
   const id = await createProject(app, { userId, name: 'P', gitUrl: 'https://git.x/T/P.git' });
   const add = async (company, email, msgId, status = 'sent') => {
@@ -50,7 +50,7 @@ test('réponse rattachée par le fil (In-Reply-To), même depuis une autre adres
   const s = await setup();
   const p = await s.add('Fournil', 'contact@fournil.fr', '<m1@codebzh.fr>');
   const r = await applyMessages(s.db, s.id, [{ from: 'jean.dupont@gmail.com', subject: 'Re: Une idée', inReplyTo: '<m1@codebzh.fr>' }]);
-  assert.deepEqual(r, { replies: 1, bounces: 0, ignored: 0 });
+  assert.deepEqual(r, { replies: 1, bounces: 0, receipts: 0, ignored: 0 });
   assert.equal((await s.status(p)).status, 'replied');
   assert.equal((await s.status(p)).reply_subject, 'Re: Une idée');
   assert.ok((await s.status(p)).replied_at > 0);
@@ -82,7 +82,7 @@ test('pas de faux positif : webmail générique, domaine ambigu, réponse auto, 
     { from: 'boss@client.fr', subject: 'Merci' },                        // déjà client : on ne rétrograde pas
     { from: 'inconnu@ailleurs.fr', subject: 'Spam' },
   ]);
-  assert.deepEqual(r, { replies: 0, bounces: 0, ignored: 5 });
+  assert.deepEqual(r, { replies: 0, bounces: 0, receipts: 0, ignored: 5 });
   for (const pid of [g, a1, a2]) assert.equal((await s.status(pid)).status, 'sent');
   assert.equal((await s.status(client)).status, 'client');
 });
@@ -94,7 +94,7 @@ test('bounce : prospect rejeté + liste d\'opposition, et traitement idempotent'
   assert.equal((await applyMessages(s.db, s.id, [bounce])).bounces, 1);
   assert.equal((await s.status(p)).status, 'bounced');
   assert.equal((await s.db.prepare("SELECT reason FROM blacklist WHERE email = 'contact@ferme-definitivement.fr'").get()).reason, 'bounce');
-  assert.deepEqual(await applyMessages(s.db, s.id, [bounce]), { replies: 0, bounces: 0, ignored: 1 });
+  assert.deepEqual(await applyMessages(s.db, s.id, [bounce]), { replies: 0, bounces: 0, receipts: 0, ignored: 1 });
 });
 
 test('imapCredentials : utilisateur vide = identifiants SMTP', () => {
@@ -118,7 +118,7 @@ test('checkInbox : reprend au dernier UID, mémorise l\'état et les erreurs', a
       ? { uidValidity: '7', lastUid: 12, messages: [{ uid: 12, from: 'contact@fournil.fr', subject: 'Re: idée' }] }
       : { uidValidity: '7', lastUid: 12, messages: [] };
   };
-  assert.deepEqual(await checkInbox(s.app, s.userId, s.id), { replies: 1, bounces: 0, ignored: 0 });
+  assert.deepEqual(await checkInbox(s.app, s.userId, s.id), { replies: 1, bounces: 0, receipts: 0, ignored: 0 });
   assert.equal(calls[0].creds.user, 'u', 'identifiants SMTP réutilisés');
   await checkInbox(s.app, s.userId, s.id);
   assert.deepEqual(calls[1].state && { v: calls[1].state.uidValidity, u: calls[1].state.lastUid }, { v: '7', u: 12 });

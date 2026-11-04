@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import { now, getSetting } from './db.js';
-import { encryptJson, decryptJson, decrypt } from './crypto.js';
+import { encryptJson, decryptJson } from './crypto.js';
 import { HttpError } from './http.js';
 import { getUser } from './users.js';
 import { assertRoom, withUserLock } from './services/plans.js';
@@ -31,16 +31,15 @@ export async function getProject(app, id, { userId, secrets = false, need = null
   const access = await accessOn(app.db, p, userId);
   if (!access) throw new HttpError(404, 'Projet introuvable');
   if (need) needAccess(access, need);
-  // SMTP du projet, sinon celui des Réglages du propriétaire : le projet peut donc envoyer dans les deux cas
-  const settingsSmtp = !p.smtp_enc && !!(await getSetting(app.db, p.user_id, 'smtp_enc'));
   const out = {
     id: p.id, userId: Number(p.user_id), name: p.name, gitUrl: p.git_url,
     access, teamId: p.team_id == null ? null : Number(p.team_id),
     profile: parse(p.profile_json), profileCommit: p.profile_commit, profileAt: p.profile_at,
     target: parse(p.target_json), targetValidated: !!p.target_validated,
-    dailyMailCap: p.daily_mail_cap, createdAt: p.created_at,
-    hasSmtp: !!p.smtp_enc || settingsSmtp, hasOwnSmtp: !!p.smtp_enc,
-    smtpSource: p.smtp_enc ? 'project' : settingsSmtp ? 'settings' : null,
+    dailyMailCap: p.daily_mail_cap, createdAt: p.created_at, siteUrl: p.site_url || '',
+    // Les mails d'un projet partent de SON adresse : pas de repli sur un SMTP commun (celui du serveur ne sert qu'aux mails d'AiTools)
+    hasSmtp: !!p.smtp_enc, hasOwnSmtp: !!p.smtp_enc,
+    smtpSource: p.smtp_enc ? 'project' : null,
     hasDb: !!p.db_enc, hasImap: !!p.imap_enc,
     inbox: parse(p.inbox_json),
     followupEnabled: !!p.followup_enabled, followupDays: p.followup_days,
@@ -48,11 +47,29 @@ export async function getProject(app, id, { userId, secrets = false, need = null
   if (access !== 'owner') out.ownerEmail = (await app.db.prepare('SELECT email FROM users WHERE id = ?').get(p.user_id))?.email ?? null;
   if (secrets && access !== 'member') {
     out.ownSmtp = readSecret(app.cfg.secretKey, p.smtp_enc, `SMTP du projet ${p.id}`);
-    out.smtp = out.ownSmtp || (settingsSmtp ? await globalSmtp(app, p.user_id) : null);
+    out.smtp = out.ownSmtp;
     out.dbCfg = readSecret(app.cfg.secretKey, p.db_enc, `accès BDD du projet ${p.id}`);
     out.imapCfg = readSecret(app.cfg.secretKey, p.imap_enc, `IMAP du projet ${p.id}`);
     out.imap = imapCredentials(out.imapCfg, out.smtp);
   }
+  return out;
+}
+
+/**
+ * Chiffres réels d'une liste de projets, pour les lignes du tableau de bord : prospects, à contacter (statut « new »),
+ * réponses (« replied » ou « client ») et date du dernier envoi (sent_at des prospects). Rien n'est estimé : un projet sans prospect renvoie des zéros.
+ * @returns {Promise<Map<number, {prospects:number, toContact:number, replies:number, lastSentAt:number|null}>>}
+ */
+export async function projectStats(db, ids) {
+  const out = new Map(ids.map((id) => [Number(id), { prospects: 0, toContact: 0, replies: 0, lastSentAt: null }]));
+  if (!ids.length) return out;
+  const rows = await db.prepare(`SELECT project_id,
+      COUNT(*) n,
+      SUM(CASE WHEN status = 'new' THEN 1 ELSE 0 END) fresh,
+      SUM(CASE WHEN status IN ('replied', 'client') THEN 1 ELSE 0 END) replies,
+      MAX(sent_at) last
+    FROM prospects WHERE project_id IN (${ids.map(() => '?').join(',')}) GROUP BY project_id`).all(...ids.map(Number));
+  for (const r of rows) out.set(Number(r.project_id), { prospects: Number(r.n), toContact: Number(r.fresh || 0), replies: Number(r.replies || 0), lastSentAt: r.last == null ? null : Number(r.last) });
   return out;
 }
 
@@ -92,15 +109,6 @@ export function publicConfig(cfg, secretField) {
   return { ...rest, [`${secretField}Set`]: !!_omit };
 }
 
-export async function forgejoToken(app, userId) {
-  try { return decrypt(app.cfg.secretKey, await getSetting(app.db, userId, 'forgejo_token_enc')); }
-  catch { console.warn('[secrets] token Forgejo illisible, à ressaisir'); return null; }
-}
-
-export async function globalSmtp(app, userId) {
-  return readSecret(app.cfg.secretKey, await getSetting(app.db, userId, 'smtp_enc'), 'SMTP global');
-}
-
 export async function prospectStats(db, projectId) {
   const rows = await db.prepare('SELECT status, COUNT(*) n FROM prospects WHERE project_id = ? GROUP BY status').all(projectId);
   const out = { total: 0 };
@@ -137,12 +145,12 @@ export async function getTemplate(db, projectId, kind, { validatedOnly = false }
   return row;
 }
 
-export async function saveTemplate(db, projectId, kind, { subject = '', subjectB = null, body, status = 'draft' }) {
+export async function saveTemplate(db, projectId, kind, { subject = '', subjectB = null, body, status = 'draft', html = false }) {
   if (!TEMPLATE_KINDS.includes(kind)) throw new HttpError(400, 'Type de modèle inconnu');
-  await db.prepare(`INSERT INTO templates(project_id, kind, subject, subject_b, body, status, updated_at) VALUES(?, ?, ?, ?, ?, ?, ?)
+  await db.prepare(`INSERT INTO templates(project_id, kind, subject, subject_b, body, status, html, updated_at) VALUES(?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(project_id, kind) DO UPDATE SET subject = excluded.subject, subject_b = excluded.subject_b,
-      body = excluded.body, status = excluded.status, updated_at = excluded.updated_at`)
-    .run(projectId, kind, subject, kind === 'initial' ? (subjectB || null) : null, body, status, now());
+      body = excluded.body, status = excluded.status, html = excluded.html, updated_at = excluded.updated_at`)
+    .run(projectId, kind, subject, kind === 'initial' ? (subjectB || null) : null, body, status, html ? 1 : 0, now());
 }
 
 // Objet A ou B : on équilibre les envois (B seulement si un objet B est défini)

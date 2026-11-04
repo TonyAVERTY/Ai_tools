@@ -1,47 +1,23 @@
-// Gabarit du site public : balisage sémantique, métadonnées (title, description, canonical, Open Graph), liens
-// d'évitement, navigation. Aucune ressource externe (CSS, images et favicon servis par l'application ; un seul script, site.js, pour le mouvement).
+// Gabarit du site public (design Claude Design) : balisage sémantique, métadonnées (title, description, canonical, Open Graph),
+// lien d'évitement, en-tête, pied de page. Aucune ressource externe : CSS, images, icônes (sprite SVG en ligne) et favicon sont
+// servis par l'application ; un seul script, site.js, pour les petits plus (période des tarifs, sommaire légal, onglets de code).
 import { esc } from '../http.js';
-import { assetUrl } from '../assets.js';
+import { assetUrl, brandMark, iconLinks } from '../assets.js';
+import { SPRITE, ic } from '../icons.js';
+
+export { ic };
 
 export const SITE_NAME = 'AiTools';
-export const CONTACT_EMAIL = 'contact@tony-averty.dev';
+const OG_IMAGE = '/static/img/share_img.jpg'; // 1024 x 541, aperçu des liens partagés
+export const CONTACT_EMAIL = 'contact@iaboss.fr';
 
 const NAV = [
   ['/fonctionnement', 'Fonctionnement'],
   ['/tarifs', 'Tarifs'],
+  ['/docs', 'Docs'],
 ];
 
-const LEGAL_NAV = [
-  ['/mentions-legales', 'Mentions légales'],
-  ['/confidentialite', 'Confidentialité'],
-  ['/cgu', 'CGU'],
-];
-
-/**
- * Bloc « Et ensuite ? » en bas de page : des cartes qui renvoient vers les autres pages du site, pour qu'on ne tombe jamais
- * sur une impasse. Chaque item : [adresse, petit titre, titre, phrase].
- */
-export function nextBlock(items, title = 'Et ensuite ?') {
-  return `<section class="wrap block next" aria-labelledby="titre-ensuite">
-  <h2 id="titre-ensuite">${esc(title)}</h2>
-  <div class="next-grid">
-    ${items.map(([href, kicker, name, text]) => `<a class="next-card" href="${esc(href)}" data-reveal>
-      <span class="next-kicker">${esc(kicker)}</span>
-      <span class="next-name">${esc(name)}</span>
-      <span class="next-text">${esc(text)}</span>
-    </a>`).join('\n    ')}
-  </div>
-</section>`;
-}
-
-/** Les cartes du parcours : accueil, fonctionnement, tarifs, connexion. On retire celle de la page en cours. */
-export const JOURNEY = {
-  home: ['/', 'Accueil', "L'idée en bref", "Ce qu'AiTools fait pour toi, en une page."],
-  how: ['/fonctionnement', 'Étape par étape', 'Comment ça marche', 'Du premier clic à la réponse du client.'],
-  pricing: ['/tarifs', 'Combien ça coûte', 'Les tarifs', 'Un plan gratuit, et ce que tu paies à part.'],
-  login: ['/login', 'Prêt ?', 'Créer mon compte', 'Un clic avec Google, sans mot de passe.'],
-};
-export const journey = (...keys) => keys.map((k) => JOURNEY[k]);
+const lockup = (label = true) => `<a class="lockup" href="/"${label ? ` aria-label="${SITE_NAME}, accueil"` : ''}>${brandMark()}<span class="wordmark">${SITE_NAME}</span></a>`;
 
 /** URL absolue d'une page du site (canonical, Open Graph, sitemap). */
 export function absoluteUrl(appUrl, path) {
@@ -59,10 +35,25 @@ export function absoluteUrl(appUrl, path) {
  * @param {object} [o.jsonLd]    données structurées (bloc de données, non exécuté : compatible avec la CSP)
  * @param {string[]} [o.scripts] scripts de l'application (chemins /static/…) ; aucun par défaut
  */
+// Contenu réservé aux visiteurs : entouré de repères, que withViewer() remplace pour quelqu'un déjà connecté
+export const guest = (key, markup) => `<x-guest data-k="${key}" role="none">${markup}</x-guest>`;
+const MEMBER = {
+  cta: '<a class="btn btn-primary" href="/">Dashboard</a>',
+  foot: '<a href="/">Dashboard</a>',
+  plan: '<a class="btn btn-primary" href="/">Ouvrir le dashboard</a>',
+  big: '<a class="btn btn-primary btn-lg" href="/">Dashboard</a>',
+};
+
+/** Page du site public vue par un compte connecté : « Connexion » et « Créer mon compte » deviennent « Dashboard ». */
+export function withViewer(page, signedIn) {
+  if (!signedIn) return page;
+  return page.replace(/<x-guest data-k="(\w+)" role="none">[\s\S]*?<\/x-guest>/g, (_, key) => MEMBER[key] ?? '');
+}
+
 export function siteLayout({ appUrl, path, title, description, body, noindex = false, jsonLd = null, scripts = [] }) {
   const url = absoluteUrl(appUrl, path === '/' ? '/' : path);
   const year = new Date().getFullYear();
-  const link = ([href, label]) => `<li><a href="${href}"${href === path ? ' aria-current="page"' : ''}>${esc(label)}</a></li>`;
+  const here = (href) => (href === path ? ' aria-current="page"' : '');
   return `<!doctype html>
 <html lang="fr">
 <head>
@@ -72,59 +63,59 @@ export function siteLayout({ appUrl, path, title, description, body, noindex = f
 <meta name="description" content="${esc(description)}">
 <meta name="robots" content="${noindex ? 'noindex, follow' : 'index, follow'}">
 ${noindex ? '' : `<link rel="canonical" href="${esc(url)}">\n`}<meta name="color-scheme" content="light dark">
-<meta name="theme-color" content="#f4f5f7" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#111317" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f1f3f9" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0b1224" media="(prefers-color-scheme: dark)">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="${SITE_NAME}">
 <meta property="og:locale" content="fr_FR">
 <meta property="og:title" content="${esc(title)}">
 <meta property="og:description" content="${esc(description)}">
 <meta property="og:url" content="${esc(url)}">
-<meta name="twitter:card" content="summary">
-<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
-<link rel="alternate icon" href="/favicon.ico">
-<link rel="stylesheet" href="${assetUrl('/static/app.css')}">
+<meta property="og:image" content="${esc(absoluteUrl(appUrl, assetUrl(OG_IMAGE)))}">
+<meta property="og:image:width" content="1024">
+<meta property="og:image:height" content="541">
+<meta property="og:image:alt" content="${SITE_NAME} : prospection, relances et posts LinkedIn pilotés par Claude">
+<meta name="twitter:card" content="summary_large_image">
+${iconLinks()}
+<link rel="stylesheet" href="${assetUrl('/static/tokens.css')}">
 <link rel="stylesheet" href="${assetUrl('/static/site.css')}">
-${['/static/site.js', ...scripts].map((src) => `<script src="${esc(assetUrl(src))}" defer></script>\n`).join('')}${jsonLd ? `<script type="application/ld+json">${JSON.stringify(jsonLd).replace(/</g, '\\u003c')}</script>\n` : ''}</head>
+<link rel="stylesheet" href="${assetUrl('/static/responsive.css')}">
+${['/static/site.js', '/static/responsive.js', ...scripts].map((src) => `<script src="${esc(assetUrl(src))}" defer></script>\n`).join('')}${jsonLd ? `<script type="application/ld+json">${JSON.stringify(jsonLd).replace(/</g, '\\u003c')}</script>\n` : ''}</head>
 <body class="site">
 <a class="skip" href="#contenu">Aller au contenu</a>
-<header class="site-head">
-  <div class="wrap head-in">
-    <a class="brand" href="/" aria-label="${SITE_NAME}, accueil"><span class="mark" aria-hidden="true"></span>${SITE_NAME}</a>
-    <nav class="site-nav" aria-label="Navigation principale">
-      <ul>
-        ${NAV.map(link).join('\n        ')}
-        <li><a href="/login"${path === '/login' ? ' aria-current="page"' : ''}>Connexion</a></li>
-        <li><a class="btn primary" href="/login">Créer mon compte</a></li>
-      </ul>
+${SPRITE}
+<header class="top">
+  <div class="wrap top-in">
+    ${lockup()}
+    <nav class="nav" aria-label="Navigation principale">
+      ${NAV.map(([href, label]) => `<a href="${href}"${here(href)}>${esc(label)}</a>`).join('\n      ')}
     </nav>
+    <div class="top-cta">
+      ${guest('cta', `<a class="btn btn-secondary" href="/login"${here('/login')}>Connexion</a>
+      <a class="btn btn-primary" href="/login">Créer mon compte</a>`)}
+    </div>
   </div>
 </header>
 <main id="contenu" tabindex="-1">
 ${body}
 </main>
-<footer class="site-foot">
-  <div class="wrap foot-in">
-    <div>
-      <a class="brand" href="/"><span class="mark" aria-hidden="true"></span>${SITE_NAME}</a>
-      <p>Un panel qui pilote Claude Code pour prospecter par mail, avec ton propre accès Claude.</p>
-      <p class="fine">Édité par Tony AVERTY, entrepreneur individuel. © ${year}</p>
-    </div>
-    <nav aria-label="Pages du site">
-      <h2>Le site</h2>
-      <ul>
+<footer class="foot">
+  <div class="wrap">
+    <div class="foot-g">
+      <div>${lockup()}<p class="foot-n">Prospection, relances et posts LinkedIn pilotés par Claude.</p></div>
+      <nav aria-label="Produit"><p class="foot-h">Produit</p><ul>
         <li><a href="/">Accueil</a></li>
-        ${NAV.map(link).join('\n        ')}
-        <li><a href="/login">Connexion</a></li>
-      </ul>
-    </nav>
-    <nav aria-label="Informations légales">
-      <h2>Légal et contact</h2>
-      <ul>
-        ${LEGAL_NAV.map(link).join('\n        ')}
-        <li><a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a></li>
-      </ul>
-    </nav>
+        ${NAV.map(([href, label]) => `<li><a href="${href}"${here(href)}>${esc(label)}</a></li>`).join('\n        ')}
+        <li>${guest('foot', '<a href="/login">Connexion</a>')}</li>
+      </ul></nav>
+      <nav aria-label="Informations"><p class="foot-h">Infos</p><ul>
+        <li><a href="/mentions-legales"${here('/mentions-legales')}>Mentions légales</a></li>
+        <li><a href="/confidentialite"${here('/confidentialite')}>Confidentialité</a></li>
+        <li><a href="/cgu"${here('/cgu')}>CGU</a></li>
+        <li><a href="mailto:${CONTACT_EMAIL}">Contact</a></li>
+      </ul></nav>
+    </div>
+    <p class="legal">Édité par Tony AVERTY, entrepreneur individuel. © ${year}</p>
   </div>
 </footer>
 </body>

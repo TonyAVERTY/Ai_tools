@@ -57,11 +57,12 @@ export function isInside(root, path) {
  * @param {string|null} o.workDir      clone du projet (absolu), ou null
  * @param {string[]} o.command         commande à exécuter dans le bac à sable
  * @param {string[]} [o.roBinds]       dossiers supplémentaires en lecture seule (binaire Claude, Node…)
- * @param {{home:string}|null} [o.serverConfig]  mode « Claude du serveur » seulement : monte la configuration du CLI du serveur
+ * @param {string[]} [o.extraRo]       dossiers de pièces jointes de l'utilisateur (absolus), en lecture seule
  */
-export function buildBwrapArgs({ workDir = null, command, roBinds = [], serverConfig = null }) {
+export function buildBwrapArgs({ workDir = null, command, roBinds = [], extraRo = [] }) {
   if (!Array.isArray(command) || !command.length) throw new Error('Commande vide');
   if (workDir !== null && !isAbsolute(workDir)) throw new Error('Le répertoire de travail doit être absolu');
+  if (extraRo.some((d) => !isAbsolute(d))) throw new Error('Les dossiers joints doivent être absolus');
   const args = [
     '--die-with-parent', '--new-session',
     '--unshare-pid', '--unshare-ipc', '--unshare-uts',
@@ -79,10 +80,7 @@ export function buildBwrapArgs({ workDir = null, command, roBinds = [], serverCo
   ];
   for (const p of roBinds) args.push('--ro-bind', p, p);
   if (workDir) args.push('--ro-bind', workDir, workDir);
-  if (serverConfig) {
-    args.push('--bind-try', join(serverConfig.home, '.claude'), `${SANDBOX_HOME}/.claude`);
-    args.push('--bind-try', join(serverConfig.home, '.claude.json'), `${SANDBOX_HOME}/.claude.json`);
-  }
+  for (const d of extraRo) args.push('--ro-bind', d, d);
   args.push('--chdir', workDir || SANDBOX_HOME, '--', ...command);
   return args;
 }
@@ -104,9 +102,10 @@ export function bwrapAvailable(bin = 'bwrap') {
  * @param {string[]} o.args          arguments du CLI
  * @param {string} [o.cwd]           clone du projet ; doit être dans `allowedRoot`
  * @param {string} [o.allowedRoot]   dossier des clones de CET utilisateur
+ * @param {string[]} [o.extraDirs]   dossiers de pièces jointes lus en plus (page IA) ; chacun doit être dans `extraRoot`
+ * @param {string} [o.extraRoot]     dossier des pièces jointes de CET utilisateur
  * @param {Record<string,string>} [o.secretEnv]  le secret de l'utilisateur (clé API ou jeton)
- * @param {boolean} [o.serverConfig] mode « Claude du serveur » : monte la configuration du CLI du serveur
- * @param {object} o.sandbox         cfg.sandbox : { enabled, production, bwrapBin, roBinds, serverHome }
+ * @param {object} o.sandbox         cfg.sandbox : { enabled, production, bwrapBin, roBinds }
  * @param {object} [deps]            { parentEnv, hasBwrap, resolveBin } (tests)
  */
 export function prepareLaunch(o, deps = {}) {
@@ -114,6 +113,8 @@ export function prepareLaunch(o, deps = {}) {
   if (!sb) throw new Error('Configuration du bac à sable requise');
   const parentEnv = deps.parentEnv || process.env;
   const cwd = o.cwd ? resolve(o.cwd) : null;
+  const extraDirs = (o.extraDirs || []).map((d) => resolve(d));
+  if (extraDirs.some((d) => !o.extraRoot || !isInside(o.extraRoot, d))) throw new Error("Dossier joint hors du dossier de l'utilisateur : exécution refusée");
   if (cwd && o.allowedRoot && !isInside(o.allowedRoot, cwd)) {
     throw new Error("Répertoire de travail hors du dossier de l'utilisateur : exécution refusée");
   }
@@ -122,12 +123,12 @@ export function prepareLaunch(o, deps = {}) {
   const nice = ['nice', '-n', '10']; // le serveur web reste réactif pendant qu'un job tourne
 
   if (!sb.enabled) {
-    // Développement uniquement (SANDBOX=off). HOME jetable, sauf pour le mode serveur (sa configuration CLI, comme avant).
-    const home = o.serverConfig ? sb.serverHome : mkdtempSync(join(tmpdir(), 'aitools-home-'));
+    // Développement uniquement (SANDBOX=off). HOME jetable : la configuration du CLI de la machine n'est jamais lue.
+    const home = mkdtempSync(join(tmpdir(), 'aitools-home-'));
     return {
       command: nice[0], args: [...nice.slice(1), o.bin, ...o.args], cwd: cwd || undefined, sandboxed: false,
       env: buildChildEnv(parentEnv, { secretEnv: o.secretEnv, home }),
-      cleanup: () => { if (!o.serverConfig) rmSync(home, { recursive: true, force: true }); },
+      cleanup: () => { rmSync(home, { recursive: true, force: true }); },
     };
   }
 
@@ -138,8 +139,7 @@ export function prepareLaunch(o, deps = {}) {
   if (!real) throw new Error(`Exécutable Claude introuvable : ${o.bin}`);
   const roBinds = [...new Set([...(sb.roBinds || []), ...(real.startsWith('/usr/') ? [] : [dirname(real)])])];
   const bwrap = buildBwrapArgs({
-    workDir: cwd, roBinds, command: [real, ...o.args],
-    serverConfig: o.serverConfig ? { home: sb.serverHome } : null,
+    workDir: cwd, roBinds, extraRo: extraDirs, command: [real, ...o.args],
   });
   return {
     command: nice[0], args: [...nice.slice(1), sb.bwrapBin, ...bwrap], cwd: tmpdir(), sandboxed: true,

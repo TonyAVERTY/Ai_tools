@@ -8,7 +8,7 @@ import { Worker, enqueue, latestJobs } from '../src/services/jobs.js';
 
 async function setup() {
   const db = await testDb();
-  const u = await addUser(db);
+  const u = await addUser(db, { link: { v: 1, mode: 'api_key', valid: true } }); // plafonds en $ : propres aux clés API
   await db.prepare("INSERT INTO projects(user_id, name, git_url, created_at) VALUES(?, 'p', 'u', ?)").run(u, now());
   const spend = (usd, finishedAgo, user = u) => db.prepare("INSERT INTO jobs(user_id, project_id, type, status, cost_usd, created_at, finished_at) VALUES(?, 1, 'prospect', 'done', ?, ?, ?)")
     .run(user, usd, now() - finishedAgo - 60, now() - finishedAgo);
@@ -142,4 +142,26 @@ test('quotaAlerts : un palier (80 %, 95 %) une seule fois, re-sonne si la fenêt
   // saut direct à 95 % : un seul palier notifié, pas 80 puis 95
   a = await quotaAlerts(s.db, s.u, { sevenDay: { utilization: 0.97, resetsAt: 300 } });
   assert.deepEqual(a, [{ label: 'semaine Claude', level: 95, utilization: 0.97 }]);
+});
+
+test('quotaState : une mesure dont la fenêtre a été remise à zéro depuis ne bloque plus rien', async () => {
+  const s = await setup();
+  await setSetting(s.db, s.u, 'claude_rate_limit_json', JSON.stringify({ fiveHour: { utilization: 0.95, resetsAt: now() - 60 }, sevenDay: { utilization: 0.1 } }));
+  assert.equal((await quotaState(s.db, s.u)).blocked, false);
+  await setSetting(s.db, s.u, 'claude_rate_limit_json', JSON.stringify({ fiveHour: { utilization: 0.95, resetsAt: now() + 600 }, sevenDay: { utilization: 0.1 } }));
+  assert.equal((await quotaState(s.db, s.u)).blocked, true);
+});
+
+test('budget : avec un abonnement, un ancien plafond en $ ne bloque jamais', async () => {
+  const s = await setup();
+  const sub = await addUser(s.db); // liaison par jeton d'abonnement (défaut des tests)
+  await setSetting(s.db, sub, 'budget_day_usd', '1');
+  await s.spend(5, 600, sub);
+  const b = await budgetState(s.db, sub);
+  assert.equal(b.blocked, false);
+  assert.equal(b.day.limit, null);
+  assert.equal(b.day.used, 5, 'la dépense reste mesurée');
+  await setSetting(s.db, s.u, 'budget_day_usd', '1');
+  await s.spend(5, 600);
+  assert.equal((await budgetState(s.db, s.u)).blocked, true, 'clé API : le plafond s\'applique');
 });

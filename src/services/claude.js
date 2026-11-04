@@ -2,6 +2,7 @@
 // et parse le flux stream-json pour remonter la progression en direct.
 import { spawn } from 'node:child_process';
 import { prepareLaunch } from './sandbox.js';
+import { createLiveUsage } from './liveusage.js';
 
 export const MODELS = { rapide: 'haiku', normal: 'sonnet', approfondi: 'opus' };
 
@@ -15,12 +16,16 @@ export const MODELS = { rapide: 'haiku', normal: 'sonnet', approfondi: 'opus' };
  * @param {string} [o.system]       consignes ajoutées au prompt système
  * @param {(text:string)=>void} [o.onText]  appelé à chaque bloc texte de Claude
  * @param {(n:number)=>void} [o.onTurn]     appelé à chaque message de Claude (sert à estimer l'avancement)
+ * @param {boolean} [o.chat]        conversation : AUCUN outil (ni fichiers, ni web, ni commandes), pas de session enregistrée, pas de commandes slash
+ * @param {(text:string)=>void} [o.onDelta]  avec `chat` : appelé à chaque morceau de texte au fil de l'écriture
+ * @param {(name:string, input:object)=>void} [o.onTool]  appelé quand Claude utilise un outil (Read, Glob, Grep)
+ * @param {string[]} [o.extraDirs]   dossiers de pièces jointes lisibles en plus (page IA), dans `o.extraRoot`
+ * @param {string} [o.extraRoot]
  * @param {AbortSignal} [o.signal]
  * @param {number} [o.timeoutMs]
  * @param {string} [o.bin]
  * @param {object} o.sandbox        cfg.sandbox (obligatoire : voir services/sandbox.js)
  * @param {Record<string,string>} [o.secretEnv]  secret de l'utilisateur du job (ANTHROPIC_API_KEY ou CLAUDE_CODE_OAUTH_TOKEN), transmis au seul processus enfant
- * @param {boolean} [o.serverConfig]  mode « Claude du serveur » (admins) : configuration CLI du serveur
  * @param {string} [o.allowedRoot]  dossier des clones de l'utilisateur : `cwd` doit s'y trouver
  */
 export function runClaude(o) {
@@ -33,10 +38,14 @@ export function runClaude(o) {
     '--disallowedTools', 'Bash,Edit,Write,MultiEdit,NotebookEdit,Task',
   ];
   if (o.system) args.push('--append-system-prompt', o.system);
+  // Conversation : uniquement les outils de lecture demandés (aucun par défaut), pas de session enregistrée
+  if (o.chat) args.push('--tools', (o.tools || []).join(','), '--no-session-persistence', '--disable-slash-commands', '--include-partial-messages');
+  else if (o.onDelta || o.onActivity || o.onUsage) args.push('--include-partial-messages');
+  for (const d of o.extraDirs || []) args.push('--add-dir', d);
 
   const launch = prepareLaunch({
     bin: o.bin || 'claude', args, cwd: o.cwd, allowedRoot: o.allowedRoot,
-    secretEnv: o.secretEnv, serverConfig: o.serverConfig, sandbox: o.sandbox,
+    secretEnv: o.secretEnv, sandbox: o.sandbox, extraDirs: o.extraDirs, extraRoot: o.extraRoot,
   });
   const secrets = Object.values(o.secretEnv || {}).filter((v) => v && v.length >= 8);
   // Aucune trace du secret dans les erreurs, stderr ou textes remontés (journaux, base, réponses HTTP)
@@ -50,6 +59,7 @@ export function runClaude(o) {
     let rateLimit = null;
     let turns = 0;
     const texts = [];
+    const trackUsage = createLiveUsage(o.onUsage);
 
     const timer = setTimeout(() => child.kill('SIGTERM'), o.timeoutMs || 30 * 60_000);
     o.signal?.addEventListener('abort', () => child.kill('SIGTERM'), { once: true });
@@ -69,10 +79,17 @@ export function runClaude(o) {
     function handle(line) {
       let ev;
       try { ev = JSON.parse(line); } catch { return; }
-      if (ev.type === 'assistant') {
+      trackUsage(ev);
+      if (ev.type === 'stream_event') {
+        if (ev.event?.type === 'content_block_start' && ev.event.content_block?.type === 'thinking') o.onActivity?.('Claude réfléchit à la prochaine étape…');
+        // Texte en cours d'écriture (option --include-partial-messages) : transmis tel quel, le texte final vient du résultat
+        const d = ev.event?.type === 'content_block_delta' ? ev.event.delta : null;
+        if (d?.type === 'text_delta' && d.text) o.onDelta?.(redact(d.text));
+      } else if (ev.type === 'assistant') {
         o.onTurn?.(++turns);
         for (const block of ev.message?.content || []) {
           if (block.type === 'text' && block.text) { texts.push(block.text); o.onText?.(redact(block.text)); }
+          else if (block.type === 'tool_use') o.onTool?.(block.name, block.input || {});
         }
       } else if (ev.type === 'result') {
         result = ev;
@@ -115,26 +132,37 @@ export function rateLimitWindows(info) {
   return { fiveHour, sevenDay };
 }
 
-// Extrait le premier objet JSON d'une réponse (Claude entoure parfois de ```json)
+// Extrait le premier objet (ou tableau) JSON valide d'une réponse (Claude entoure parfois de ```json, ou ajoute une phrase avant).
+// Un « { » qui n'ouvre pas du JSON (une variable {{site}} citée dans la phrase d'introduction) est ignoré : on essaie le suivant.
 export function extractJson(text) {
   const fenced = /```(?:json)?\s*([\s\S]*?)```/.exec(text);
-  const src = fenced ? fenced[1] : text;
-  const start = src.search(/[[{]/);
-  if (start < 0) throw new Error('Aucun JSON dans la réponse de Claude');
-  const open = src[start];
-  const close = open === '{' ? '}' : ']';
-  let depth = 0, inStr = false, escNext = false;
-  for (let i = start; i < src.length; i++) {
-    const c = src[i];
-    if (inStr) {
-      if (escNext) escNext = false;
-      else if (c === '\\') escNext = true;
-      else if (c === '"') inStr = false;
-      continue;
+  const src = fenced ? fenced[1] : String(text ?? '');
+  let from = 0;
+  let any = false;
+  for (let tries = 0; tries < 300; tries++) {
+    const rel = src.slice(from).search(/[[{]/);
+    if (rel < 0) break;
+    const start = from + rel;
+    any = true;
+    const open = src[start];
+    const close = open === '{' ? '}' : ']';
+    let depth = 0, inStr = false, escNext = false;
+    for (let i = start; i < src.length; i++) {
+      const c = src[i];
+      if (inStr) {
+        if (escNext) escNext = false;
+        else if (c === '\\') escNext = true;
+        else if (c === '"') inStr = false;
+        continue;
+      }
+      if (c === '"') inStr = true;
+      else if (c === open) depth++;
+      else if (c === close && --depth === 0) {
+        try { return JSON.parse(src.slice(start, i + 1)); } catch { /* pas du JSON : on passe au « { » suivant */ }
+        break;
+      }
     }
-    if (c === '"') inStr = true;
-    else if (c === open) depth++;
-    else if (c === close && --depth === 0) return JSON.parse(src.slice(start, i + 1));
+    from = start + 1;
   }
-  throw new Error('JSON incomplet dans la réponse de Claude');
+  throw new Error(any ? 'JSON incomplet dans la réponse de Claude' : 'Aucun JSON dans la réponse de Claude');
 }

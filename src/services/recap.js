@@ -1,5 +1,7 @@
 // Récap : requêtes SELECT en lecture seule sur la BDD de chaque projet.
 // Recommandation : utilisateur BDD dédié avec droits SELECT uniquement.
+import { withReadOnly } from './dbconn.js';
+import { buildQueries } from './dbschema.js';
 
 export function validateSelect(sql) {
   const s = String(sql || '').trim().replace(/;\s*$/, '');
@@ -12,39 +14,12 @@ export function validateSelect(sql) {
   return s;
 }
 
-async function queryMysql(cfg, queries) {
-  const mysql = await import('mysql2/promise');
-  const conn = await mysql.createConnection({
-    host: cfg.host, port: Number(cfg.port || 3306), user: cfg.user, password: cfg.password,
-    database: cfg.database, connectTimeout: 8000, ssl: cfg.ssl ? { servername: cfg.servername } : undefined,
-  });
-  try {
-    await conn.query('START TRANSACTION READ ONLY');
+async function runQueries(cfg, queries) {
+  return withReadOnly(cfg, async (q) => {
     const out = {};
-    for (const [k, sql] of Object.entries(queries)) {
-      const [rows] = await conn.query({ sql, timeout: 10_000 });
-      out[k] = firstValue(rows);
-    }
-    await conn.query('ROLLBACK');
+    for (const [k, sql] of Object.entries(queries)) out[k] = firstValue(await q(sql));
     return out;
-  } finally { await conn.end().catch(() => {}); }
-}
-
-async function queryPg(cfg, queries) {
-  const { default: pg } = await import('pg');
-  const client = new pg.Client({
-    host: cfg.host, port: Number(cfg.port || 5432), user: cfg.user, password: cfg.password,
-    database: cfg.database, connectionTimeoutMillis: 8000, statement_timeout: 10_000,
-    ssl: cfg.ssl ? { rejectUnauthorized: false, servername: cfg.servername } : undefined,
   });
-  await client.connect();
-  try {
-    await client.query('BEGIN READ ONLY');
-    const out = {};
-    for (const [k, sql] of Object.entries(queries)) out[k] = firstValue((await client.query(sql)).rows);
-    await client.query('ROLLBACK');
-    return out;
-  } finally { await client.end().catch(() => {}); }
 }
 
 export function firstValue(rows) {
@@ -62,13 +37,16 @@ export async function fetchRecap(projectId, cfg, { force = false } = {}) {
   if (!cfg?.type) throw new Error('Accès BDD non configuré pour ce projet');
   const hit = cache.get(projectId);
   if (!force && hit && Date.now() - hit.at < TTL) return { ...hit.data, cached: true };
-  const queries = {};
-  for (const k of ['users', 'clients', 'revenue']) {
-    const s = validateSelect(cfg[`sql_${k}`]);
-    if (s) queries[k] = s;
+  // Tables choisies par la personne (requêtes construites par AiTools) ; à défaut, d'anciennes requêtes écrites à la main restent exécutées telles quelles
+  const queries = cfg.kpi && Object.keys(cfg.kpi).length ? buildQueries(cfg.type === 'pg' ? 'pg' : 'mysql', cfg.kpi) : {};
+  if (!Object.keys(queries).length) {
+    for (const k of ['users', 'clients', 'revenue']) {
+      const s = validateSelect(cfg[`sql_${k}`]);
+      if (s) queries[k] = s;
+    }
   }
-  if (!Object.keys(queries).length) throw new Error('Aucune requête configurée');
-  const data = cfg.type === 'pg' ? await queryPg(cfg, queries) : await queryMysql(cfg, queries);
+  if (!Object.keys(queries).length) throw new Error('Aucune table choisie : ouvre « Configuration du projet » et choisis tes tables.');
+  const data = await runQueries(cfg, queries);
   cache.set(projectId, { at: Date.now(), data });
   return { ...data, cached: false };
 }

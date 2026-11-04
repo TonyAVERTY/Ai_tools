@@ -8,7 +8,7 @@ import { now, getSetting, setSetting } from '../src/db.js';
 import { encrypt } from '../src/crypto.js';
 import { enqueue, Worker, latestJobs } from '../src/services/jobs.js';
 import { quotaState, budgetState, AI_JOBS, isQuotaSensitive } from '../src/services/budget.js';
-import { makeClaude, makeHandlers } from '../src/handlers.js';
+import { makeClaude, makeHandlers, claudeDiagnostic } from '../src/handlers.js';
 import { extractJson } from '../src/services/claude.js';
 import { buildBwrapArgs, buildChildEnv, prepareLaunch, isInside, SANDBOX_HOME } from '../src/services/sandbox.js';
 import { validateGitUrl, syncRepo, gitEnv, cloneArgs, fetchArgs, GIT_HARDENING, dirSize } from '../src/services/git.js';
@@ -53,7 +53,7 @@ test('un utilisateur ne lance jamais un job avec le secret d\'un autre (secret r
   await enqueue(s.db, { userId: a.id, projectId: pa, type: 'template' });
   await enqueue(s.db, { userId: b.id, projectId: pb, type: 'template' });
   while (await w.tick()) { /* vide la file */ }
-  assert.deepEqual(readFileSync(log, 'utf8').trim().split('\n'), [KEY_A, KEY_B], 'chaque job a tourné avec la clé de SON utilisateur');
+  assert.deepEqual(readFileSync(log, 'utf8').trim().split('\n'), [KEY_A, KEY_A, KEY_B, KEY_B], 'chaque job (rédaction puis relecture) a tourné avec la clé de SON utilisateur');
   assert.equal((await latestJobs(s.db, pa)).template.status, 'done');
   assert.equal((await latestJobs(s.db, pb)).template.status, 'done');
 });
@@ -168,7 +168,7 @@ test('bwrap : ligne de commande — racine en lecture seule, tmpfs, un seul doss
   // Rien d'autre n'est monté : ni la racine entière, ni /home, /root, /var, ni la config Claude du serveur
   const mounts = a.flatMap((x, i) => (['--bind', '--ro-bind', '--bind-try', '--ro-bind-try'].includes(x) ? [a[i + 1]] : []));
   assert.deepEqual(mounts.sort(), ['/bin', '/etc', '/lib', '/lib64', '/opt/claude', '/run/systemd/resolve', '/sbin', '/usr', work].sort());
-  assert.ok(!a.includes('--bind') && !a.includes('--bind-try'), 'aucun montage en écriture hors mode serveur');
+  assert.ok(!a.includes('--bind') && !a.includes('--bind-try'), 'aucun montage en écriture');
   assert.ok(!a.join(' ').includes('.claude'));
   assert.ok(!mounts.includes('/'));
   // Sans projet : seul le HOME vide
@@ -178,15 +178,19 @@ test('bwrap : ligne de commande — racine en lecture seule, tmpfs, un seul doss
   assert.throws(() => buildBwrapArgs({ command: [] }), /vide/);
 });
 
-test('bwrap : la configuration du CLI du serveur n\'est montée que pour le mode serveur', () => {
+test('bwrap : la configuration du CLI du serveur n\'est jamais montée, même si on la demande', () => {
   const sb = { enabled: true, production: true, bwrapBin: 'bwrap', roBinds: [], serverHome: '/home/svc' };
-  const deps = { parentEnv: { PATH: '/usr/bin' }, hasBwrap: () => true, resolveBin: () => '/usr/bin/claude' };
+  const deps = { parentEnv: { PATH: '/usr/bin', HOME: '/home/svc' }, hasBwrap: () => true, resolveBin: () => '/usr/bin/claude' };
   const work = resolve('/srv/aitools/repos/1/1');
-  const user = prepareLaunch({ bin: 'claude', args: ['-p', 'x'], cwd: work, allowedRoot: resolve('/srv/aitools/repos/1'), sandbox: sb, secretEnv: { ANTHROPIC_API_KEY: KEY_A } }, deps);
-  assert.ok(!user.args.join(' ').includes('.claude'));
-  assert.ok(!user.args.some((x) => x === '/home/svc' || x.startsWith('/home/svc')));
-  const server = prepareLaunch({ bin: 'claude', args: ['-p', 'x'], cwd: work, allowedRoot: resolve('/srv/aitools/repos/1'), sandbox: sb, serverConfig: true }, deps);
-  assert.ok(pairIdx(server.args, '--bind-try', join('/home/svc', '.claude'), `${SANDBOX_HOME}/.claude`) >= 0);
+  // `serverConfig` n'existe plus : un appelant qui le passerait encore n'obtient aucun montage de /home/svc
+  const l = prepareLaunch({ bin: 'claude', args: ['-p', 'x'], cwd: work, allowedRoot: resolve('/srv/aitools/repos/1'), sandbox: sb, serverConfig: true, secretEnv: { ANTHROPIC_API_KEY: KEY_A } }, deps);
+  assert.ok(!l.args.join(' ').includes('.claude'));
+  assert.ok(!l.args.some((x) => x === '/home/svc' || x.startsWith('/home/svc')));
+  assert.equal(l.env.HOME, SANDBOX_HOME);
+  // Développement (SANDBOX=off) : HOME jetable, jamais celui du serveur
+  const dev = prepareLaunch({ bin: 'claude', args: ['-p', 'x'], cwd: work, allowedRoot: resolve('/srv/aitools/repos/1'), sandbox: { enabled: false, production: false, serverHome: '/home/svc' }, serverConfig: true }, deps);
+  assert.notEqual(dev.env.HOME, '/home/svc');
+  dev.cleanup();
 });
 
 test('bwrap : prepareLaunch — le secret n\'est jamais dans argv (visible dans ps), seulement dans l\'environnement', () => {
@@ -377,4 +381,23 @@ test('alertes de quota : envoyées au webhook de l\'utilisateur concerné seulem
   assert.equal(sent[0].url, hookA);
   assert.equal(await getSetting(s.db, b.id, 'claude_quota_notified_json'), null, 'B n\'a rien reçu ni mémorisé');
   delete s.app.fetch;
+});
+
+test('diagnostic d\'un échec Claude : forme du secret et contenu du dépôt, jamais la valeur', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'diag-'));
+  writeFileSync(join(dir, 'CLAUDE.md'), 'x');
+  mkdirSync(join(dir, '.claude'));
+  const token = `sk-ant-oat01-${'T'.repeat(40)}`;
+  const line = claudeDiagnostic({
+    userId: 7, cred: { mode: 'subscription_token', secretEnv: { CLAUDE_CODE_OAUTH_TOKEN: token } },
+    cfg: { sandbox: { enabled: true, production: true } }, cwd: dir, r: { subtype: 'success' },
+  });
+  assert.match(line, /user=7 mode=subscription_token secret=CLAUDE_CODE_OAUTH_TOKEN\(len=53,propre\)/);
+  assert.match(line, /bac_a_sable=oui\(prod\)/);
+  assert.match(line, /fichiers_claude_du_depot=(\.claude,CLAUDE\.md|CLAUDE\.md,\.claude)/);
+  assert.ok(!line.includes(token) && !line.includes('TTTTTT'), 'aucune valeur secrète dans la ligne');
+  const dirty = claudeDiagnostic({ userId: 7, cred: { mode: 'subscription_token', secretEnv: { CLAUDE_CODE_OAUTH_TOKEN: `${token}\u001b(B` } }, cfg: { sandbox: {} }, cwd: null, r: { subtype: 'success' } });
+  assert.match(dirty, /CARACTERES_PARASITES/);
+  assert.match(claudeDiagnostic({ userId: 1, cred: { mode: 'server', secretEnv: {} }, cfg: {}, cwd: null, r: {} }), /secret=AUCUN/);
+  rmSync(dir, { recursive: true, force: true });
 });

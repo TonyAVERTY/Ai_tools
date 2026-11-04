@@ -2,46 +2,53 @@
 // Textes rédigés d'après le code (données réellement collectées, cookies réellement posés) pour l'entrepreneur
 // individuel Tony AVERTY. Ce sont des modèles sérieux, pas un avis juridique : voir docs/JOURNAL.md pour ce qui reste
 // à compléter (marqueurs visibles) et à faire relire.
-import { siteLayout, nextBlock, journey, CONTACT_EMAIL } from './layout.js';
+import { siteLayout, ic, CONTACT_EMAIL } from './layout.js';
 import { PLAN_LIMITS, PLAN_PRICES, PLAN_LABELS, ANNUAL_FREE_MONTHS, annualPrice } from '../limits.js';
 
 /**
  * Marqueurs visibles tant que l'information n'est pas fournie ou validée. Leur liste est aussi dans docs/JOURNAL.md
  * (section « Marqueurs à compléter ») ; un test compare les deux pour qu'aucun ne soit oublié.
  */
-export const MARKERS = {
-  address: '[À COMPLÉTER : adresse du siège]',
-  host: '[À COMPLÉTER : hébergeur]',
-  phone: '[À COMPLÉTER : téléphone]',
-  retention: '[À VALIDER : durées de conservation]',
-  transfers: '[À VALIDER : transferts hors UE]',
-  processing: '[À VALIDER : cadre de sous-traitance]',
-  liability: '[À VALIDER : limitation de responsabilité]',
-};
+export const MARKERS = {};
 export const LEGAL_MARKERS = Object.values(MARKERS);
-const todo = (key) => `<mark class="todo">${MARKERS[key]}</mark>`;
+/** Adresses données par l'éditeur : siège de l'entreprise individuelle et hébergeur du serveur. */
+export const ADDRESS = '4 rue Alcide de Gasperi, 35340 Liffré';
+export const HOST = 'ElypseCloud, 29 rue Lebrix Mesmin, 33700 Mérignac';
+const PAGES = [['/mentions-legales', 'Mentions légales'], ['/confidentialite', 'Confidentialité'], ['/cgu', 'CGU']];
 
-export const LEGAL_UPDATED = '22 octobre 2026';
+export const LEGAL_UPDATED = '24 octobre 2026';
 
-/** Gabarit commun : titre, sommaire, sections numérotées par ancre. */
+/** Gabarit commun (design Claude Design) : onglets des trois pages, titre, date, sommaire numéroté, texte. */
 function legalPage({ appUrl, path, title, description, h1, lead, sections }) {
-  const toc = sections.map((s) => `<li><a href="#${s.id}">${s.title}</a></li>`).join('');
-  const body = sections.map((s) => `<h2 id="${s.id}">${s.title}</h2>\n${s.html}`).join('\n');
+  const toc = sections.map((s, i) => `<li><a href="#${s.id}"><span>${i + 1}</span>${s.title}</a></li>`).join('\n        ');
+  const body = sections.map((s, i) => `<h2 id="${s.id}">${i + 1}. ${s.title}</h2>\n${s.html}`).join('\n\n');
   return siteLayout({
     appUrl, path, title, description,
-    body: `<div class="wrap page-head">
-  <p class="eyebrow"><span class="mark" aria-hidden="true"></span>Informations légales</p>
-  <h1>${h1}</h1>
-  <p class="lead">${lead}</p>
-  <p class="updated">Dernière mise à jour : ${LEGAL_UPDATED}</p>
-</div>
-<div class="wrap prose-wrap">
-  <nav class="toc" aria-label="Sommaire"><h2>Sommaire</h2><ol>${toc}</ol></nav>
-  <div class="prose">
-${body}
+    body: `<div class="wrap">
+  <div class="lg-head">
+    <nav class="pills" aria-label="Pages légales">
+      ${PAGES.map(([href, label]) => `<a class="pill" href="${href}"${href === path ? ' aria-current="page"' : ''}>${label}</a>`).join('\n      ')}
+    </nav>
+    <h1 class="h1">${h1}</h1>
+    <p class="maj">Dernière mise à jour : ${LEGAL_UPDATED}</p>
+    <p class="lg-intro">${lead}</p>
   </div>
-</div>
-${nextBlock(journey('home', 'how', 'pricing'), 'Retour au site')}`,
+
+  <div class="lg-body">
+    <details class="toc" open>
+      <summary>Sommaire${ic('chev')}</summary>
+      <nav aria-label="Sommaire">
+        <ol>
+        ${toc}
+        </ol>
+      </nav>
+    </details>
+
+    <article class="art">
+${body}
+    </article>
+  </div>
+</div>`,
   });
 }
 
@@ -60,16 +67,15 @@ export function mentionsPage({ appUrl }) {
   <dt>Nom</dt><dd>Tony AVERTY, entrepreneur individuel (micro-entreprise)</dd>
   <dt>SIRET</dt><dd>100 142 819 00018</dd>
   <dt>Code APE</dt><dd>62.01Z (programmation informatique)</dd>
-  <dt>Siège</dt><dd>${todo('address')}</dd>
+  <dt>Siège</dt><dd>${ADDRESS}</dd>
   <dt>Email</dt><dd><a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a></dd>
-  <dt>Téléphone</dt><dd>${todo('phone')}</dd>
   <dt>TVA</dt><dd>TVA non applicable, art. 293 B du CGI</dd>
   <dt>Directeur de la publication</dt><dd>Tony AVERTY</dd>
 </dl>`,
       },
       {
         id: 'hebergeur', title: 'Hébergeur',
-        html: `<p>Le site et le service sont hébergés par : ${todo('host')}</p>`,
+        html: `<p>Le site et le service sont hébergés par : ${HOST}</p>`,
       },
       {
         id: 'propriete', title: 'Propriété intellectuelle',
@@ -106,15 +112,15 @@ export function privacyPage({ appUrl, apple = false, captcha = false, inactiveMo
     sections: [
       {
         id: 'roles', title: 'Qui est responsable de quoi',
-        html: `<p>AiTools est édité par Tony AVERTY, entrepreneur individuel (SIRET 100 142 819 00018), siège : ${todo('address')}. Contact : <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a>. Il n'y a pas de délégué à la protection des données.</p>
+        html: `<p>AiTools est édité par Tony AVERTY, entrepreneur individuel (SIRET 100 142 819 00018), siège : ${ADDRESS}. Contact : <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a>. Il n'y a pas de délégué à la protection des données.</p>
 <ul>
   <li><strong>Pour ton compte</strong> (identité, connexion, liaison Claude, réglages), AiTools est <strong>responsable de traitement</strong>.</li>
-  <li><strong>Pour les données de tes prospects</strong> (entreprises et adresses professionnelles que tu recherches, importes ou contactes), c'est <strong>toi le responsable de traitement</strong> : tu décides à qui tu écris et pourquoi. AiTools agit comme <strong>sous-traitant</strong> : il les traite uniquement pour faire fonctionner le service que tu utilises, sur tes instructions, avec les garanties de sécurité décrites plus bas, et les supprime avec ton compte. ${todo('processing')}</li>
+  <li><strong>Pour les données de tes prospects</strong> (entreprises et adresses professionnelles que tu recherches, importes ou contactes), c'est <strong>toi le responsable de traitement</strong> : tu décides à qui tu écris et pourquoi. AiTools agit comme <strong>sous-traitant</strong> : il les traite uniquement pour faire fonctionner le service que tu utilises, sur tes instructions, avec les garanties de sécurité décrites plus bas, et les supprime avec ton compte.</li>
 </ul>`,
       },
       {
         id: 'donnees', title: 'Les données collectées',
-        html: `<div class="table-wrap"><table>
+        html: `<div class="tw"><table>
   <caption>Données réellement enregistrées par AiTools</caption>
   <thead><tr><th scope="col">Catégorie</th><th scope="col">Contenu</th><th scope="col">Pourquoi et sur quelle base</th></tr></thead>
   <tbody>
@@ -125,8 +131,12 @@ export function privacyPage({ appUrl, apple = false, captcha = false, inactiveMo
     <tr><th scope="row">Configuration</th><td>Identifiants SMTP et IMAP, accès à la base de données de ton projet (récapitulatif), jeton Forgejo, adresse du webhook Discord, plafonds et budgets. Les mots de passe, jetons et adresses de webhook sont chiffrés.</td><td>Envoyer, lire les réponses, notifier. Exécution du contrat.</td></tr>
     <tr><th scope="row">Prospects</th><td>Entreprise, adresse professionnelle, site, ville, secteur, phrase d'accroche, page source, score, statut, notes, prochaine action, historique d'envoi, objet et date d'une réponse.</td><td>Fournir le service pour ton compte (voir « rôles »). La base légale du démarchage est la tienne, en B2B en règle générale l'intérêt légitime.</td></tr>
     <tr><th scope="row">Activité</th><td>Type, état, durée, coût et nombre de tokens de chaque job IA, résultat du job. Chaque jour, trois nombres lus dans la base de ton projet si tu l'as reliée (utilisateurs, clients, revenu).</td><td>Fournir le service, appliquer tes budgets et plafonds. Exécution du contrat.</td></tr>
+    <tr><th scope="row">Conversations IA</th><td>Titre, messages (les tiens et les réponses de Claude), modèle utilisé et coût de chaque réponse, pour la page IA. Elles ne sont visibles que de ton compte.</td><td>Fournir le service (reprendre une conversation). Exécution du contrat.</td></tr>
+    <tr><th scope="row">Pièces jointes de la page IA</th><td>Les photos, PDF, fichiers texte et vidéos que tu joins à un message (avec leur nom, leur type et leur taille), et, pour une vidéo, quelques images qui en sont tirées (sans le son). Si tu joins un projet, Claude lit une copie de son code, en lecture seule ; rien n'est modifié. Elles ne sont visibles que de ton compte.</td><td>Permettre à Claude de répondre à partir de ce que tu lui montres. Exécution du contrat.</td></tr>
+    <tr><th scope="row">Vidéos de promotion</th><td>Les vidéos que tu fais produire depuis l'onglet Promotion d'un projet : le fichier MP4, le sujet que tu as saisi, les réglages choisis (images par seconde, durée, format) et la date. Elles sont visibles de ton compte et des personnes qui ont accès au projet (équipe).</td><td>Te fournir la vidéo demandée. Exécution du contrat.</td></tr>
     <tr><th scope="row">Adresse IP</th><td>Ton adresse IP sert à limiter le nombre de requêtes (protection contre les abus). Elle reste en mémoire du serveur, quelques minutes à quelques heures, et n'est pas enregistrée en base de données.</td><td>Sécurité du service. Intérêt légitime.</td></tr>
     <tr><th scope="row">Modération</th><td>Actions d'administration sur un compte (suspension, plan, suppression) et pauses d'envoi décidées quand trop de mails sont rejetés : date, action, identifiant du compte et adresse masquée.</td><td>Sécurité du service et lutte contre les abus. Intérêt légitime.</td></tr>
+    <tr><th scope="row">Comptabilité</th><td>Les lignes que tu saisis (date, libellé, montant, TVA, client ou fournisseur, projet, note) et le justificatif que tu joins (PDF ou image), ainsi que ta situation (statut, activité, TVA, rythme de déclaration) et les périodes marquées « déclarées ». Visibles de toi seul.</td><td>Te permettre de ranger tes pièces et de préparer tes déclarations. Exécution du service que tu demandes.</td></tr>
     <tr><th scope="row">Liste d'opposition</th><td>Adresse email, motif (désinscription, refus, mail rejeté) et date.</td><td>Ne plus jamais contacter une personne qui s'y est opposée, pour tous les comptes. Obligation légale, intérêt légitime.</td></tr>
   </tbody>
 </table></div>
@@ -134,16 +144,20 @@ export function privacyPage({ appUrl, apple = false, captcha = false, inactiveMo
       },
       {
         id: 'durees', title: 'Combien de temps',
-        html: `<div class="table-wrap"><table>
-  <caption>Durées de conservation ${todo('retention')}</caption>
+        html: `<div class="tw"><table>
+  <caption>Durées de conservation</caption>
   <thead><tr><th scope="col">Donnée</th><th scope="col">Durée</th></tr></thead>
   <tbody>
     <tr><th scope="row">Compte et toutes ses données</th><td>Tant que le compte existe. Effacés quand tu supprimes ton compte depuis Mon compte, copie du code comprise.</td></tr>
+    <tr><th scope="row">Conversations IA</th><td>Jusqu'à ce que tu les supprimes depuis la page IA (une par une), ou avec ton compte. Au plus 100 conversations : la plus ancienne est supprimée quand une nouvelle dépasse cette limite.</td></tr>
+    <tr><th scope="row">Pièces jointes de la page IA</th><td>Supprimées avec la conversation, ou avec ton compte. Une pièce jointe ajoutée mais jamais envoyée est supprimée au bout de 24 heures. Pendant une réponse, Claude lit une copie temporaire, supprimée dès la réponse terminée.</td></tr>
+    <tr><th scope="row">Vidéos de promotion</th><td>Conservées jusqu'à ce que tu les supprimes depuis l'onglet Promotion, ou avec le projet ou ton compte. Au plus 20 vidéos par compte. Une vidéo dont la production échoue ou est annulée n'est pas conservée.</td></tr>
     <tr><th scope="row">Compte inactif</th><td>${inactiveMonths ? `Suppression automatique après ${inactiveMonths} mois sans connexion ni job, avec un mail d'avertissement 30 jours avant. Un compte suspendu ou administrateur n'est pas concerné.` : 'Aucune suppression automatique pour inactivité.'}</td></tr>
     <tr><th scope="row">Journal d'administration</th><td>12 mois. Il note les actions des administrateurs (suspension, changement de plan, suppression) et les pauses d'envoi, avec un identifiant et une adresse masquée.</td></tr>
     <tr><th scope="row">Session</th><td>30 jours au plus, effacée à la déconnexion. Les états de connexion durent 10 minutes.</td></tr>
     <tr><th scope="row">Clé API ou jeton Claude</th><td>Jusqu'à ce que tu le délies ou supprimes ton compte.</td></tr>
     <tr><th scope="row">Prospects, notes et journaux d'envoi</th><td>Jusqu'à la suppression du projet ou du compte. En tant que responsable de traitement, ne garde pas une fiche plus de 3 ans après le dernier contact.</td></tr>
+    <tr><th scope="row">Comptabilité et justificatifs</th><td>Jusqu'à ce que tu supprimes la ligne ou ton compte. Les documents comptables se conservent en principe 10 ans : exporte-les avant de supprimer.</td></tr>
     <tr><th scope="row">Liste d'opposition</th><td>Conservée après la suppression d'un compte, tant qu'il faut respecter l'opposition de la personne.</td></tr>
     <tr><th scope="row">Sauvegardes</th><td>Environ 14 jours : une donnée effacée disparaît des sauvegardes à leur expiration.</td></tr>
     <tr><th scope="row">Journaux d'accès du serveur web</th><td>12 mois au plus (adresse IP, date, page demandée), pour la sécurité.</td></tr>
@@ -156,22 +170,23 @@ export function privacyPage({ appUrl, apple = false, captcha = false, inactiveMo
 <ul>
   <li><strong>Google</strong> pour la connexion : il nous transmet ton email, ton nom et un identifiant. <a href="https://policies.google.com/privacy" rel="noopener noreferrer">Politique de Google</a>.</li>
   ${apple ? '<li><strong>Apple</strong> pour la connexion avec Apple : même principe, avec la possibilité de masquer ton email. <a href="https://www.apple.com/legal/privacy/fr-fr/" rel="noopener noreferrer">Politique d\'Apple</a>.</li>' : ''}
-  <li><strong>Anthropic</strong>, par l'intermédiaire de <em>ton</em> accès Claude : le code de ton projet lu par Claude, la fiche et la cible, les domaines des prospects déjà connus pour éviter les doublons, et ce que Claude trouve sur le web transitent par ton compte Anthropic, selon les conditions que tu as acceptées avec lui. <a href="https://www.anthropic.com/legal/privacy" rel="noopener noreferrer">Politique d'Anthropic</a>.</li>
+  <li><strong>Anthropic</strong>, par l'intermédiaire de <em>ton</em> accès Claude : le code de ton projet lu par Claude, la fiche et la cible, les domaines des prospects déjà connus pour éviter les doublons, les messages et les pièces jointes (photos, PDF, textes, images tirées d'une vidéo, code d'un projet joint) que tu envoies sur la page IA, la fiche du projet et le sujet que tu donnes pour une vidéo de promotion (la scène animée écrite par Claude est ensuite dessinée sur le serveur d'AiTools, sans accès au réseau), et ce que Claude trouve sur le web transitent par ton compte Anthropic, selon les conditions que tu as acceptées avec lui. <a href="https://www.anthropic.com/legal/privacy" rel="noopener noreferrer">Politique d'Anthropic</a>.</li>
+  <li><strong>Google, ElevenLabs ou Microsoft (voix des vidéos de promotion, facultatif) :</strong> si tu coches « Ajouter une voix », le texte de la narration, écrit par Claude à partir de la fiche de ton projet, est envoyé au service de synthèse vocale que tu choisis (Google Traduction, ou, avec ta propre clé API, ElevenLabs, Google Cloud ou Microsoft Azure) pour être transformé en audio. Une clé API que tu enregistres est chiffrée et n'est utilisée que pour ces appels. Aucun autre élément de ton compte n'y est transmis ; sans la case cochée, rien n'est envoyé, et les voix locales (Piper, eSpeak NG) s'exécutent sur le serveur d'AiTools sans rien transmettre à un tiers.</li>
   ${captcha ? `<li><strong>Google reCAPTCHA</strong> (Google Ireland Limited, Google LLC) : protège la connexion contre les envois automatisés. Son script est chargé automatiquement à l'ouverture de la page de connexion, sans action de ta part. Il dépose des cookies et transmet à Google ton adresse IP, des informations sur ton navigateur et sur ton comportement sur la page. Base légale : l'intérêt légitime d'AiTools à protéger la connexion contre les abus. AiTools ne conserve pas le résultat de la vérification. Sans elle, la connexion n'est pas possible. Si cela te pose problème, écris-nous. <a href="https://policies.google.com/privacy" rel="noopener noreferrer">Politique de Google</a>.</li>` : ''}
-  <li><strong>L'hébergeur</strong> du serveur : ${todo('host')}</li>
+  <li><strong>L'hébergeur</strong> du serveur : ${HOST}</li>
   <li><strong>Tes propres services</strong>, quand tu les configures : serveur SMTP et IMAP de ta messagerie, Forgejo, base de données de ton projet, Discord. AiTools s'y connecte avec tes identifiants.</li>
 </ul>
 <p>Les adresses de tes prospects ne sont pas transmises à d'autres utilisateurs. Chaque compte est cloisonné : une ressource d'un autre compte répond « introuvable ».</p>`,
       },
       {
         id: 'transferts', title: 'Transferts hors de l\'Union européenne',
-        html: `<p>${apple ? 'Google, Apple et Anthropic' : 'Google et Anthropic'} peuvent traiter des données aux États-Unis. Ils s'appuient pour cela sur les mécanismes prévus par le RGPD (clauses contractuelles types, cadre de protection des données UE-États-Unis) décrits dans leurs politiques. ${todo('transfers')}</p>
+        html: `<p>${apple ? 'Google, Apple et Anthropic' : 'Google et Anthropic'} peuvent traiter des données aux États-Unis. Ils s'appuient pour cela sur les mécanismes prévus par le RGPD (clauses contractuelles types, cadre de protection des données UE-États-Unis) décrits dans leurs politiques.</p>
 <p>Le reste du service (base de données, application) est hébergé selon les indications de la section « hébergeur ».</p>`,
       },
       {
         id: 'cookies', title: 'Cookies et traceurs',
         html: `<p>AiTools ne pose que des cookies <strong>strictement nécessaires</strong> au service. Ceux d'AiTools sont exemptés de consentement : c'est pourquoi aucun bandeau ne s'affiche${captcha ? ' (ceux de Google, sur la page de connexion, sont décrits plus bas)' : ''}. Pas d'analyse d'audience, pas de publicité, pas de police ni de script chargés depuis un autre site${captcha ? ', sauf la vérification anti-robot de Google, uniquement sur la page de connexion (voir plus bas)' : ''}.</p>
-<div class="table-wrap"><table>
+<div class="tw"><table>
   <caption>Cookies posés par AiTools</caption>
   <thead><tr><th scope="col">Nom</th><th scope="col">Rôle</th><th scope="col">Durée</th></tr></thead>
   <tbody>
@@ -256,7 +271,7 @@ export function termsPage({ appUrl, apple = false }) {
       {
         id: 'plans', title: 'Plan gratuit et plans payants',
         html: `<p>Le plan gratuit comprend ${PLAN_LIMITS.free.projects} projet, ${PLAN_LIMITS.free.prospects} prospects, ${PLAN_LIMITS.free.mails} mails et ${PLAN_LIMITS.free.aiJobs} jobs IA par mois. Ces limites peuvent évoluer, avec information préalable.</p>
-<p>Des plans payants sont prévus : ${Object.keys(PLAN_PRICES).map((k) => `${PLAN_LABELS[k]} (${PLAN_PRICES[k]} € TTC par mois, ou ${annualPrice(k)} € TTC par an, ${ANNUAL_FREE_MONTHS} mois offerts)`).join(', ')}. Les prix sont TTC ; l'éditeur est en franchise de TVA (art. 293 B du CGI). Ces plans ne sont pas encore ouverts à la vente : aucun paiement n'est demandé aujourd'hui, et rien ne sera facturé sans ton accord exprès.</p>`,
+<p>Des plans payants sont prévus : ${Object.keys(PLAN_PRICES).map((k) => `${PLAN_LABELS[k]} (${PLAN_PRICES[k]} € TTC par mois, ou ${annualPrice(k)} € TTC par an, ${ANNUAL_FREE_MONTHS} mois offerts)`).join(', ')}. Les prix sont TTC ; l'éditeur est en franchise de TVA (art. 293 B du CGI). Ces plans ouvrent prochainement ; seul le plan Gratuit est ouvert aujourd'hui, et rien ne sera facturé sans ton accord exprès.</p>`,
       },
       {
         id: 'envois', title: 'Tes envois',
@@ -283,7 +298,7 @@ export function termsPage({ appUrl, apple = false }) {
       },
       {
         id: 'donnees', title: 'Données personnelles',
-        html: `<p>Les rôles de chacun sont décrits dans la <a href="/confidentialite">politique de confidentialité</a> : tu es responsable de traitement pour les données de tes prospects, AiTools est ton sous-traitant. Tu t'engages à n'enregistrer que des données que tu as le droit de traiter, et à informer les personnes concernées comme la loi l'exige. ${todo('processing')}</p>`,
+        html: `<p>Les rôles de chacun sont décrits dans la <a href="/confidentialite">politique de confidentialité</a> : tu es responsable de traitement pour les données de tes prospects, AiTools est ton sous-traitant. Tu t'engages à n'enregistrer que des données que tu as le droit de traiter, et à informer les personnes concernées comme la loi l'exige.</p>`,
       },
       {
         id: 'garanties', title: 'Disponibilité et résultats',
@@ -295,7 +310,7 @@ export function termsPage({ appUrl, apple = false }) {
       },
       {
         id: 'responsabilite', title: 'Responsabilité',
-        html: `<p>L'éditeur répond des dommages directs qui lui sont imputables. Dans la mesure permise par la loi, il n'est pas responsable des dommages indirects, de la suspension ou de la fermeture de ton compte Claude, des frais facturés par Anthropic ou tes autres prestataires, de la réputation de ton domaine d'envoi, ni de l'usage que tu fais du service en violation de ces conditions. Rien ici n'exclut la responsabilité en cas de faute lourde ou de dol, ni celle que la loi interdit de limiter. ${todo('liability')}</p>`,
+        html: `<p>L'éditeur répond des dommages directs qui lui sont imputables. Dans la mesure permise par la loi, il n'est pas responsable des dommages indirects, de la suspension ou de la fermeture de ton compte Claude, des frais facturés par Anthropic ou tes autres prestataires, de la réputation de ton domaine d'envoi, ni de l'usage que tu fais du service en violation de ces conditions. Rien ici n'exclut la responsabilité en cas de faute lourde ou de dol, ni celle que la loi interdit de limiter.</p>`,
       },
       {
         id: 'suspension', title: 'Suspension et résiliation',

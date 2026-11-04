@@ -5,8 +5,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { now } from '../../src/db.js';
 import { createApp } from '../../src/server.js';
+import { hashSid } from '../../src/crypto.js';
 import { testDb } from './db.js';
-import { addUser } from './users.js';
+import { nextSeq } from './users.js';
+import { addUser, TEST_SECRET_KEY } from './users.js';
 import { RateLimiter } from '../../src/ratelimit.js';
 import { RATE_LIMITS } from '../../src/limits.js';
 
@@ -15,21 +17,24 @@ export const APP_URL = 'https://ai.tony-averty.dev';
 // Limiteur sans plafond réaliste : les tests qui répètent des requêtes ne butent pas sur le débit. `rateLimit: true` rétablit
 // les seuils réels de src/limits.js ; un objet { clock } les garde avec une horloge injectée.
 // Résolveur DNS des tests : tout nom pointe vers une adresse publique (aucune requête DNS réelle)
+// Serveurs de réception : tout domaine en a un (la vérification d'adresses ne fait aucune requête DNS réelle)
+export const FAKE_MX = async () => [{ exchange: 'mx.test', priority: 10 }];
 export const PUBLIC_DNS = async () => [{ address: '93.184.216.34', family: 4 }];
 
 const unlimited = () => new RateLimiter({
   rules: Object.fromEntries(Object.entries(RATE_LIMITS).map(([k, v]) => [k, Object.fromEntries(Object.entries(v).map(([sc, c]) => [sc, { ...c, max: 1e9 }]))])),
 });
 
-export async function startApp({ cfg = {}, worker = false, rateLimit = false, createTransport, resolveHost } = {}) {
+export async function startApp({ cfg = {}, worker = false, rateLimit = false, createTransport, resolveHost, resolveMx, fetch: injectedFetch } = {}) {
   const tmp = mkdtempSync(join(tmpdir(), 'aitools-srv-'));
   const config = {
     appUrl: APP_URL, google: { clientId: 'gid', clientSecret: 'gsecret' }, apple: null, adminEmails: [],
-    secretKey: randomBytes(32), dataDir: tmp, claudeBin: 'claude', cliModeEnabled: true,
-    sandbox: { enabled: false, production: false, roBinds: [], serverHome: tmp }, ...cfg,
+    secretKey: TEST_SECRET_KEY, dataDir: tmp, claudeBin: 'claude', cliModeEnabled: true, promoQuality: false, // le contrôle de qualité visuelle des vidéos a ses propres tests (les scènes factices des autres tests sont minuscules)
+   
+    sandbox: { enabled: false, production: false, roBinds: [] }, ...cfg,
   };
   const limiter = rateLimit ? new RateLimiter(rateLimit === true ? {} : rateLimit) : unlimited();
-  const app = await createApp(config, { db: await testDb(), worker, limiter, createTransport, resolveHost: resolveHost || PUBLIC_DNS });
+  const app = await createApp(config, { db: await testDb(), worker, limiter, createTransport, fetch: injectedFetch, resolveHost: resolveHost || PUBLIC_DNS, resolveMx: resolveMx || FAKE_MX });
   await new Promise((r) => app.server.listen(0, '127.0.0.1', r));
   const base = `http://127.0.0.1:${app.server.address().port}`;
 
@@ -47,13 +52,17 @@ export async function startApp({ cfg = {}, worker = false, rateLimit = false, cr
   });
 
   /** Crée un compte avec une session ouverte. */
-  let n = 0;
   const newUser = async (opts = {}) => {
-    n++;
+    const n = nextSeq(); // compteur commun avec addUser : plusieurs applications d'un même fichier partagent la base en MySQL
     const email = opts.email || `user${n}@test.fr`;
     const id = await addUser(app.db, { ...opts, email });
+    // Les questions de la première connexion (voir userprofile.js) ne gênent pas les autres tests ; `firstLogin: true` les garde
+    if (!opts.firstLogin) {
+      await app.db.prepare("INSERT INTO user_settings(user_id, `key`, value) VALUES(?, 'user_profile_asked', 'skipped')").run(id);
+      await app.db.prepare("INSERT INTO user_settings(user_id, `key`, value) VALUES(?, 'tour_state', 'done')").run(id); // la visite guidée ne démarre pas dans les autres tests
+    }
     const sid = `sess-${id}-${n}`;
-    await app.db.prepare('INSERT INTO sessions(id, user_id, created_at, expires_at) VALUES(?, ?, ?, ?)').run(sid, id, now(), now() + 3600);
+    await app.db.prepare('INSERT INTO sessions(id, user_id, created_at, expires_at) VALUES(?, ?, ?, ?)').run(hashSid(sid), id, now(), now() + 3600);
     const cookie = `sid=${sid}`;
     return { id, email, cookie, ...client(cookie) };
   };

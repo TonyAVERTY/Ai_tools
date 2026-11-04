@@ -1,7 +1,11 @@
 // Notifications Discord via webhook (pas de bot, pas de process permanent : une requête HTTP).
-import { getSetting } from '../db.js';
-import { decrypt } from '../crypto.js';
+import { randomBytes } from 'node:crypto';
+import { getSetting, setSetting } from '../db.js';
+import { encrypt, decrypt } from '../crypto.js';
+import { HttpError } from '../http.js';
 import { parseEvolutions, EFFORTS } from './markdown.js';
+import { notifyChannels } from './channels.js';
+import { isPriced } from '../claudelink.js';
 
 // Uniquement de vraies URLs de webhook Discord : jamais d'envoi vers une adresse arbitraire
 export const WEBHOOK_RE = /^https:\/\/(?:canary\.|ptb\.)?discord(?:app)?\.com\/api\/webhooks\/\d{5,25}\/[\w-]{20,120}$/;
@@ -32,20 +36,89 @@ export function bar(done, total, width = 12) {
   return `${'▰'.repeat(full)}${'▱'.repeat(width - full)} ${Math.round(r * 100)} %`;
 }
 
-export async function notifyConfig(app, userId) {
-  let url = null;
-  try { url = decrypt(app.cfg.secretKey, await getSetting(app.db, userId, 'discord_webhook_enc')); }
-  catch { url = null; }
-  const raw = await getSetting(app.db, userId, 'discord_events');
-  // « thermal » (ancienne pause du Raspberry) est devenu « load »
-  const events = raw ? JSON.parse(raw).map((e) => (e === 'thermal' ? 'load' : e)) : Object.keys(EVENTS);
-  return { url, events };
+export const MAX_HOOKS = 5;
+const ALL_EVENTS = Object.keys(EVENTS);
+// « thermal » (ancienne pause du Raspberry) est devenu « load »
+const cleanEvents = (list) => [...new Set((Array.isArray(list) ? list : []).map((e) => (e === 'thermal' ? 'load' : e)).filter((e) => EVENTS[e]))];
+const parse = (raw) => { try { return JSON.parse(raw); } catch { return null; } };
+
+/**
+ * Les webhooks de l'utilisateur, chacun avec les événements qu'il reçoit (un salon pour les réponses, un autre pour les erreurs…).
+ * Un compte qui n'a jamais enregistré la liste garde son ancien réglage unique (`discord_webhook_enc` + `discord_events`) comme premier webhook.
+ * @returns {Promise<{id:string, url:string, events:string[]}[]>}
+ */
+export async function listHooks(app, userId) {
+  const { db, cfg } = app;
+  const open = (enc) => { try { return enc ? decrypt(cfg.secretKey, enc) : null; } catch { return null; } };
+  const stored = parse(await getSetting(db, userId, 'discord_hooks_json'));
+  if (Array.isArray(stored)) {
+    return stored.map((h) => ({ id: String(h.id), url: open(h.urlEnc), events: cleanEvents(h.events) })).filter((h) => h.url);
+  }
+  const url = open(await getSetting(db, userId, 'discord_webhook_enc'));
+  if (!url) return [];
+  const raw = parse(await getSetting(db, userId, 'discord_events'));
+  return [{ id: 'legacy', url, events: Array.isArray(raw) ? cleanEvents(raw) : ALL_EVENTS }];
 }
 
-/** Envoie une notif si le webhook est configuré et l'événement activé. Ne lève jamais d'erreur. */
-export async function notify(app, userId, event, { title, description = '', level = 'info', fields = [], footer }, { force = false } = {}) {
-  const { url, events } = await notifyConfig(app, userId);
-  if (!url || (!force && !events.includes(event))) return false;
+export async function notifyConfig(app, userId) {
+  const hooks = await listHooks(app, userId);
+  return { hooks, url: hooks[0]?.url ?? null, events: hooks[0]?.events ?? ALL_EVENTS };
+}
+
+/** Ce que l'interface a le droit de voir : jamais l'adresse du webhook, seulement qu'il existe et ce qu'il reçoit. */
+export const publicHooks = (hooks) => hooks.map((h) => ({ id: h.id, events: h.events }));
+
+/**
+ * Enregistre les webhooks à partir du formulaire des Réglages (champs discord_id_i, discord_url_i, discord_ev_i_<événement>,
+ * discord_del_i). Une adresse laissée vide sur une ligne existante la conserve ; une ligne neuve sans adresse est ignorée.
+ */
+export async function saveDiscordHooks(app, userId, body) {
+  const { db, cfg } = app;
+  const stored = new Map();
+  for (const h of parse(await getSetting(db, userId, 'discord_hooks_json')) || []) stored.set(String(h.id), h);
+  const legacy = await getSetting(db, userId, 'discord_webhook_enc');
+  if (!stored.size && legacy) stored.set('legacy', { id: 'legacy', urlEnc: legacy });
+  const rows = [...new Set(Object.keys(body).map((k) => /^discord_url_(\d{1,2})$/.exec(k)?.[1]).filter(Boolean))].map(Number).sort((a, b) => a - b);
+  const out = [];
+  for (const i of rows) {
+    if (body[`discord_del_${i}`]) continue;
+    const typed = String(body[`discord_url_${i}`] ?? '').trim();
+    const before = stored.get(String(body[`discord_id_${i}`] ?? ''));
+    if (typed && !WEBHOOK_RE.test(typed)) throw new HttpError(400, 'URL de webhook Discord invalide (https://discord.com/api/webhooks/…)');
+    const urlEnc = typed ? encrypt(cfg.secretKey, typed) : before?.urlEnc;
+    if (!urlEnc) continue;
+    out.push({ id: before?.id ?? randomBytes(4).toString('hex'), urlEnc, events: ALL_EVENTS.filter((k) => body[`discord_ev_${i}_${k}`] === 'on') });
+  }
+  if (out.length > MAX_HOOKS) throw new HttpError(400, `${MAX_HOOKS} webhooks Discord au plus`);
+  await setSetting(db, userId, 'discord_hooks_json', JSON.stringify(out));
+  // L'ancien réglage unique est dans la liste : on l'efface pour qu'il ne revienne pas après une suppression
+  await setSetting(db, userId, 'discord_webhook_enc', null);
+  await setSetting(db, userId, 'discord_events', null);
+}
+
+async function post(app, url, body) {
+  try {
+    const r = await (app.fetch || fetch)(url, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body), signal: AbortSignal.timeout(10_000),
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return true;
+  } catch (e) {
+    console.warn('[discord]', e.message);
+    return false;
+  }
+}
+
+/**
+ * Envoie une notif à chaque webhook qui reçoit cet événement. Ne lève jamais d'erreur.
+ * `force` : même si l'événement n'est pas coché (test) ; `hookId` : un seul webhook.
+ */
+export async function notify(app, userId, event, { title, description = '', level = 'info', fields = [], footer }, { force = false, hookId = null } = {}) {
+  const targets = (await listHooks(app, userId)).filter((h) => (!hookId || h.id === hookId) && (force || h.events.includes(event)));
+  // Slack, Telegram, e-mail : mêmes événements ; jamais sur un test ciblé d'un webhook Discord précis
+  const others = hookId ? [] : await notifyChannels(app, userId, event, { title, description, level, fields }, ALL_EVENTS, { force });
+  if (!targets.length) return others.length > 0;
   const body = {
     username: 'AiTools',
     allowed_mentions: { parse: [] }, // un "@everyone" dans un nom d'entreprise ne pingera personne
@@ -62,17 +135,8 @@ export async function notify(app, userId, event, { title, description = '', leve
       timestamp: new Date().toISOString(),
     }],
   };
-  try {
-    const r = await (app.fetch || fetch)(url, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body), signal: AbortSignal.timeout(10_000),
-    });
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    return true;
-  } catch (e) {
-    console.warn('[discord]', e.message);
-    return false;
-  }
+  const sent = await Promise.all(targets.map((h) => post(app, h.url, body)));
+  return sent.some(Boolean) || others.length > 0;
 }
 
 const duration = (s) => (s < 60 ? `${s} s` : s < 3600 ? `${Math.round(s / 60)} min` : `${Math.floor(s / 3600)} h ${Math.round((s % 3600) / 60)} min`);
@@ -116,7 +180,7 @@ async function jobMeta(app, job) {
   const row = await app.db.prepare('SELECT started_at, finished_at, cost_usd FROM jobs WHERE id = ? AND user_id = ?').get(job.id, job.user_id);
   const out = [];
   if (row?.started_at && row?.finished_at) out.push({ name: '⏱️ Durée', value: duration(row.finished_at - row.started_at) });
-  if (row?.cost_usd) out.push({ name: '💳 Coût IA', value: `${row.cost_usd.toFixed(2)} $` });
+  if (row?.cost_usd && await isPriced(app.db, job.user_id)) out.push({ name: '💳 Coût IA', value: `${row.cost_usd.toFixed(2)} $` });
   return out;
 }
 

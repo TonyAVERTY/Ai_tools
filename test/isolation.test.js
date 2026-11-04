@@ -58,6 +58,8 @@ test('IDOR : B ne peut lire ni modifier aucune ressource de A (404 partout)', as
     ['POST', `/api/projects/${pa}/imap`, { host: 'evil.example' }],
     ['POST', `/api/projects/${pa}/inbox/check`, {}],
     ['POST', `/api/projects/${pa}/db`, { type: 'mysql', host: 'evil.example', sql_users: 'SELECT 1' }],
+    ['POST', `/api/projects/${pa}/db/analyze`, { type: 'mysql', host: 'evil.example', database: 'x' }],
+    ['POST', `/api/projects/${pa}/db`, { type: 'mysql', users_table: 'users' }],
     ['POST', `/api/projects/${pa}/template/save`, { kind: 'initial', subject: 'pirate', body: 'pirate' }],
     ['POST', `/api/projects/${pa}/analyze`, {}],
     ['POST', `/api/projects/${pa}/template`, {}],
@@ -113,7 +115,7 @@ test('listes et pages de B : aucune donnée de A (tableau de bord, réglages, sy
 
   const settings = await (await B.get('/settings')).text();
   assert.doesNotMatch(settings, /secret-a|a-notify|smtp\.secret/i);
-  assert.match(settings, /0 de tes prospects/, 'la liste d\'opposition commune ne montre rien des autres comptes');
+  assert.doesNotMatch(settings, /\d+ de tes prospects/, 'la liste d\'opposition commune ne montre aucun décompte');
 
   const sys = await (await B.get('/api/system')).json();
   assert.equal(sys.queue, 0);
@@ -141,7 +143,7 @@ test('exports et imports CSV : jamais les prospects d\'un autre compte', async (
 
   // Importer chez B la même adresse que A : c'est un nouveau prospect de B, sans aucun signe de l'existence de celui de A
   const r = await B.post(`/api/projects/${pb}/prospects/import`, { csv: 'email;entreprise\nalpha@secret-a.fr;Alpha chez B' });
-  assert.deepEqual(await r.json(), { total: 1, imported: 1, duplicates: 0, blacklisted: 0, invalid: [] });
+  assert.deepEqual(await r.json(), { total: 1, imported: 1, skipped: 0, invalid: [] });
   assert.equal((await s.db.prepare('SELECT COUNT(*) n FROM prospects WHERE email = ?').get('alpha@secret-a.fr')).n, 2);
   const detail = await (await B.get(`/api/prospects/${(await s.db.prepare("SELECT id FROM prospects WHERE project_id = ? AND email = 'alpha@secret-a.fr'").get(pb)).id}`)).json();
   assert.deepEqual(detail.mails, [], 'pas les mails envoyés par A');
@@ -151,23 +153,27 @@ test('exports et imports CSV : jamais les prospects d\'un autre compte', async (
   const direct = await exportProspects(s.db, pb, parseFilters(new URLSearchParams()));
   assert.doesNotMatch(direct, /Alpha SARL/);
   const res = await importProspects(s.db, pb, 'email\nbeta@b.fr');
-  assert.equal(res.duplicates, 1);
+  assert.equal(res.skipped, 1);
 });
 
 test('liste d\'opposition commune : elle bloque, mais ne révèle ni motif ni origine d\'un autre compte', async () => {
   // L'adresse refusée par A bloque aussi B (RGPD), et c'est tout ce que B apprend
   const pb = (await s.db.prepare("SELECT id FROM projects WHERE user_id = ?").get(B.id)).id;
   const r = await B.post(`/api/projects/${pb}/prospects/import`, { csv: 'email;entreprise\nrefus@secret-a.fr;Refus' });
-  assert.deepEqual(await r.json(), { total: 1, imported: 0, duplicates: 0, blacklisted: 1, invalid: [] });
+  assert.deepEqual(await r.json(), { total: 1, imported: 0, skipped: 1, invalid: [] });
 
   // Un prospect de B dont l'adresse est sur la liste à cause de A : motif générique
   const id = Number((await s.db.prepare("INSERT INTO prospects(project_id, company, email, status, created_at) VALUES(?, 'Doublon', 'gamma@secret-a.fr', 'new', ?)").run(pb, now())).lastInsertRowid);
   await s.db.prepare("INSERT INTO blacklist(email, reason, created_at) VALUES('gamma@secret-a.fr', 'bounce', ?)").run(now());
-  const d = await (await B.get(`/api/prospects/${id}`)).json();
-  assert.deepEqual(d.optOut, { reason: 'refused' }, 'le motif « bounce » vient d\'un autre compte : non divulgué');
+  let d = await (await B.get(`/api/prospects/${id}`)).json();
+  assert.equal(d.optOut, null, 'B ne découvre pas qu\'une adresse est sur la liste à cause d\'un autre compte');
+  // Quand le prospect de B porte lui-même le statut « refus », le motif reste générique (« bounce » vient d'un autre compte)
+  await s.db.prepare("UPDATE prospects SET status = 'refused' WHERE id = ?").run(id);
+  d = await (await B.get(`/api/prospects/${id}`)).json();
+  assert.deepEqual(d.optOut, { reason: 'refused' });
   const settings = await (await B.get('/settings')).text();
   assert.doesNotMatch(settings, /refus@secret-a/);
-  assert.match(settings, /1 de tes prospects/);
+  assert.doesNotMatch(settings, /\d+ de tes prospects ont demandé/, 'aucun décompte : la liste n\'est pas consultable');
 
   // Désinscription publique : n'expose ni projet ni compte
   const email = 'alpha@secret-a.fr';
@@ -217,12 +223,16 @@ test('couche service : getProject, enqueue, cancelJob, budget, usage, rapport, e
 });
 
 test('réglages : chaque compte a les siens', async () => {
-  const r = await B.post('/settings', { notify_email: 'b-notify@x.fr', forgejo_host: 'git.b.fr', global_daily_cap: '5', send_delay_min: '5', send_delay_max: '6' }, { form: true });
+  const r = await B.post('/settings', { notify_email: 'b-notify@x.fr', git_type_0: 'forgejo', git_host_0: 'git.b.fr', git_token_0: 'tok-de-b', global_daily_cap: '5', send_delay_min: '5', send_delay_max: '6' }, { form: true });
   assert.equal(r.status, 303);
   const val = (u, k) => s.db.prepare('SELECT value FROM user_settings WHERE user_id = ? AND `key` = ?').get(u, k).then((x) => x?.value);
   assert.equal(await val(B.id, 'notify_email'), 'b-notify@x.fr');
   assert.equal(await val(A.id, 'notify_email'), 'a-notify@secret-a.fr', 'les réglages de A sont intacts');
-  assert.equal(await val(A.id, 'forgejo_host'), 'git.test');
+  assert.equal(await val(A.id, 'forgejo_host'), 'git.test', 'le serveur Git de A est intact');
+  assert.equal(await val(A.id, 'git_servers_json'), undefined, 'et B n\'a rien écrit chez A');
+  const servers = JSON.parse(await val(B.id, 'git_servers_json'));
+  assert.deepEqual(servers.map((x) => x.host), ['git.b.fr']);
+  assert.ok(!JSON.stringify(servers).includes('tok-de-b'), 'le token de B est chiffré');
 });
 
 test('tâches de fond : le planificateur ne traite que les comptes actifs, projet par projet avec son propriétaire', async () => {

@@ -22,7 +22,7 @@ test('runClaude parse le flux et la conso', async () => {
   assert.ok(j.args.includes('Read,Grep'));
   assert.ok(j.args.join(' ').includes('Bash,Edit,Write'));
   assert.equal(seen.length, 1);
-  assert.deepEqual(r.rateLimit.unifiedWindows.five_hour, { utilization: 0.33, resetsAt: 1_700_000_000 });
+  assert.deepEqual(r.rateLimit.unifiedWindows.five_hour, { utilization: 0.33, resetsAt: 4_000_000_000 });
 });
 
 test('runClaude remonte une erreur si le process meurt', async () => {
@@ -75,3 +75,16 @@ test('worker : exécution, dédoublonnage, erreurs, annulation, conso', async ()
   assert.deepEqual(JSON.parse(first.result_json), { double: 4 });
   assert.equal((await usageSummary(db, u)).month.cost, 0.5);
 });
+
+test('extractJson : une variable {{site}} citée avant le JSON ne le fait pas échouer ; JSON entouré de texte, de ```json, tableaux, chaînes avec accolades', () => {
+  const obj = { subject: 'Idée', body: 'Bonjour {{entreprise}}, voir {{site}} {x}' };
+  assert.deepEqual(extractJson(`Voici le mail, avec {{site}} avant la signature :\n${JSON.stringify(obj)}\nVoilà.`), obj);
+  assert.deepEqual(extractJson(`J'ai mis {{expediteur}} et {{site}}.\n\`\`\`json\n${JSON.stringify(obj)}\n\`\`\``), obj);
+  assert.deepEqual(extractJson('Prose {puis} {"a":1}'), { a: 1 }, 'un { sans JSON est ignoré');
+  assert.deepEqual(extractJson('[1,{"a":"}"}]'), [1, { a: '}' }]);
+  assert.deepEqual(extractJson('{"a":{"b":[1,2]}}'), { a: { b: [1, 2] } });
+  assert.throws(() => extractJson('rien du tout'), /Aucun JSON/);
+  assert.throws(() => extractJson('seulement {{site}} ici'), /JSON incomplet/);
+  assert.throws(() => extractJson('{"a":'), /JSON incomplet/);
+});
+

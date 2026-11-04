@@ -5,12 +5,12 @@ import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { now, getSetting, setSetting } from '../src/db.js';
-import { decrypt } from '../src/crypto.js';
+import { decrypt, encrypt } from '../src/crypto.js';
 import { enqueue, Worker, jobRefusal } from '../src/services/jobs.js';
 import { AI_JOBS } from '../src/services/budget.js';
 import { makeClaude } from '../src/handlers.js';
 import {
-  LINK_REQUIRED_MESSAGE, CONSENT_VERSION, CONSENT_CHECKBOX, aiRefusal, validateApiKey, getLinkState,
+  LINK_REQUIRED_MESSAGE, LINK_INVALID_MESSAGE, CONSENT_VERSION, CONSENT_CHECKBOX, aiRefusal, validateApiKey, getLinkState, hasUsableLink,
 } from '../src/claudelink.js';
 import { HttpError } from '../src/http.js';
 import { startApp } from './helpers/server.js';
@@ -211,20 +211,18 @@ test('drapeau CLAUDE_CLI_MODE_ENABLED=false : mode abonnement masqué et refusé
   } finally { await off.close(); }
 });
 
-test('mode « Claude du serveur » : réservé aux admins (liaison et exécution)', async () => {
-  const user = await s.newUser({ admin: false });
-  assert.equal((await user.post('/link/server', {})).status, 403);
-  assert.equal((await row(user.id)).claude_link_json, null);
-  assert.ok(!(await (await user.get('/link', { headers: { accept: 'text/html' } })).text()).includes('/link/server'));
+test('plus de mode « Claude du serveur » : ni bouton, ni route, et une ancienne liaison de ce type ne lance rien', async () => {
   const admin = await s.newUser({ admin: true, link: null });
-  assert.match(await (await admin.get('/link', { headers: { accept: 'text/html' } })).text(), /action="\/link\/server"/);
-  assert.equal((await admin.post('/link/server', {})).status, 200);
-  assert.equal((await getLinkState(s.db, admin.id)).mode, 'server');
-  assert.equal(await aiRefusal(s.db, admin.id), null);
-  // un admin rétrogradé (ADMIN_EMAILS) perd le mode serveur
-  await s.db.prepare('UPDATE users SET is_admin = 0 WHERE id = ?').run(admin.id);
-  assert.match(await aiRefusal(s.db, admin.id), /réservé aux administrateurs/);
-  await s.db.prepare('UPDATE users SET is_admin = 1 WHERE id = ?').run(admin.id);
+  const page = await (await admin.get('/link', { headers: { accept: 'text/html' } })).text();
+  assert.ok(!page.includes('/link/server') && !page.includes('Claude du serveur'), 'aucun bouton, même pour un admin');
+  assert.equal((await admin.post('/link/server', {})).status, 404);
+  assert.equal(await getLinkState(s.db, admin.id), null);
+  // Une liaison « server » restée en base (ancienne version) compte comme « pas de liaison » : le CLI du serveur ne sert jamais
+  await s.db.prepare('UPDATE users SET claude_link_json = ? WHERE id = ?').run(JSON.stringify({ v: 1, mode: 'server', valid: true }), admin.id);
+  assert.equal(await getLinkState(s.db, admin.id), null);
+  assert.equal(await aiRefusal(s.db, admin.id), LINK_REQUIRED_MESSAGE);
+  assert.equal(await hasUsableLink(s.db, admin.id), false);
+  assert.equal((await admin.post('/link/test', {})).status, 400);
 });
 
 test('onboarding bloquant : sans liaison, tout est refusé côté serveur sauf liaison, compte, déconnexion', async () => {
@@ -300,6 +298,35 @@ test('garde « compte relié » à chaque couche : route, enqueue, worker, wrapp
   await assert.rejects(claude(999999, { prompt: 'x' }), { status: 403, message: 'Compte supprimé' });
 });
 
+test('accès refusé par Claude en cours de route : la liaison devient invalide, plus de job IA, l\'API répond « link_required »', async () => {
+  const link = { v: 1, mode: 'subscription_token', valid: true, linked_at: 1, validated_at: 1, secret_enc: encrypt(s.app.cfg.secretKey, `${TOKEN}REVOKED`) };
+  const u = await s.newUser({ link });
+  const claude = makeClaude({ ...s.app, cfg: { ...s.app.cfg, claudeBin: makeClaudeBin(s.tmp, { name: 'claude-revoked' }) } });
+  const r = await claude(u.id, { prompt: 'bonjour', maxTurns: 1, tools: [] });
+  assert.equal(r.ok, false);
+  assert.equal((await getLinkState(s.db, u.id)).valid, false);
+  assert.equal(await aiRefusal(s.db, u.id), LINK_INVALID_MESSAGE);
+  const sys = await u.get('/api/system');
+  assert.equal(sys.status, 403);
+  assert.equal((await sys.json()).code, 'link_required');
+  // une réponse qui n'est pas un refus d'accès (quota atteint) ne touche pas à la liaison
+  const ok = await s.newUser({ link: { ...link, secret_enc: encrypt(s.app.cfg.secretKey, TOKEN) } });
+  const q = await claude(ok.id, { prompt: 'QUOTAERR', maxTurns: 1, tools: [] });
+  assert.equal(q.ok, false);
+  assert.equal((await getLinkState(s.db, ok.id)).valid, true);
+});
+
+test('secret de liaison illisible (SECRET_KEY changée) : la liaison devient invalide, l\'interface demande de se reconnecter', async () => {
+  const link = { v: 1, mode: 'subscription_token', valid: true, linked_at: 1, validated_at: 1, secret_enc: encrypt(Buffer.alloc(32, 9), TOKEN) };
+  const u = await s.newUser({ link });
+  const claude = makeClaude({ ...s.app, cfg: { ...s.app.cfg, claudeBin: '/inexistant/claude' } });
+  await assert.rejects(claude(u.id, { prompt: 'x' }), { status: 403, message: /illisible/ });
+  assert.equal((await getLinkState(s.db, u.id)).valid, false);
+  const sys = await u.get('/api/system');
+  assert.equal(sys.status, 403);
+  assert.equal((await sys.json()).code, 'link_required');
+});
+
 test('liaison invalide ou compte suspendu : aucun job IA', async () => {
   const u = await s.newUser({ admin: false });
   await u.post('/link/api-key', { apiKey: KEY_A });
@@ -339,15 +366,16 @@ test('Mon compte : Tester — succès, refus (liaison invalidée, onboarding de 
   assert.equal(await aiRefusal(s.db, u.id), null);
 });
 
-test('Mon compte : état de la liaison, boutons Tester, Changer de mode, Délier', async () => {
+test('Mon compte : état de la liaison, limites d\'utilisation, un seul bouton (Déconnecter)', async () => {
   const u = await s.newUser({ admin: false });
   await u.post('/link/api-key', { apiKey: KEY_A });
   const page = await (await u.get('/account', { headers: { accept: 'text/html' } })).text();
   assert.match(page, /Clé API Anthropic/);
   assert.match(page, /Valide/);
-  assert.match(page, /action="\/link\/test"/);
-  assert.match(page, /href="\/link\?change=1"/);
-  assert.match(page, /action="\/link\/unlink"/);
+  assert.match(page, /Limites d'utilisation[\s\S]*Anthropic facture ce que tu consommes, à l'usage/, 'clé API : facturation à l\'usage');
+  assert.doesNotMatch(page, /action="\/link\/test"|href="\/link\?change=1"|>Tester<|Changer de mode/);
+  assert.match(page, /action="\/link\/unlink"><button class="btn danger">Déconnecter<\/button>/);
+  assert.equal((page.match(/<form method="post" action="\/link\//g) || []).length, 1, 'plus que le bouton Déconnecter');
   // changer de mode : la page de liaison reste accessible et le nouvel accès remplace l'ancien
   s.app.validateToken = async () => {};
   try { assert.equal((await u.post('/link/subscription', { token: TOKEN, accept: true })).status, 200); } finally { delete s.app.validateToken; }
@@ -579,4 +607,21 @@ test('connexion guidée : un jeton refusé à la vérification n\'est jamais ran
     assert.match((await r.json()).error, /Jeton refusé/);
     assert.equal((await orow(o, u.id)).claude_link_json, null);
   } finally { await o.close(); rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('Mon compte, abonnement : session de 5 h et semaine affichées avec leur remise à zéro, 80 % en alerte', async () => {
+  const u = await s.newUser({ admin: false });
+  s.app.validateToken = async () => {};
+  try { await u.post('/link/subscription', { token: TOKEN, accept: true }); } finally { delete s.app.validateToken; }
+  const at = Math.floor(Date.now() / 1000);
+  await setSetting(s.db, u.id, 'claude_rate_limit_json', JSON.stringify({ at, source: 'jobs', fiveHour: { utilization: 0.85, resetsAt: at + 3600 }, sevenDay: { utilization: 0.2, resetsAt: at + 86400 } }));
+  s.app.fetch = async () => new Response('{}', { status: 403 }); // aucun relevé en direct : on garde la dernière mesure
+  try {
+    const page = await (await u.get('/account', { headers: { accept: 'text/html' } })).text();
+    assert.match(page, /Session de 5 h<\/span><span class="g-v">85 %/);
+    assert.match(page, /class="bar usage warn"[^>]*aria-valuenow="85"><span class="w-85">/);
+    assert.match(page, /Semaine de 7 jours<\/span><span class="g-v">20 %/);
+    assert.match(page, /Remise à zéro/);
+    assert.match(page, /Dernière mesure faite pendant un job/);
+  } finally { delete s.app.fetch; }
 });

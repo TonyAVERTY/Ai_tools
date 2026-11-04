@@ -77,10 +77,15 @@ export async function loginIdentity(db, cfg, { provider, sub, email, name }) {
 }
 
 export const userRepoRoot = (cfg, userId) => join(cfg.dataDir, 'repos', String(Number(userId)));
+/** Pièces jointes de la page IA (images, PDF, vidéos…) de cet utilisateur : un dossier par compte, supprimé avec lui. */
+export const userChatRoot = (cfg, userId) => join(cfg.dataDir, 'chat', String(Number(userId)));
+/** Justificatifs de la comptabilité : un dossier par compte, un sous-dossier par ligne. Supprimé avec le compte. */
+export const userAccountingRoot = (cfg, userId) => join(cfg.dataDir, 'compta', String(Number(userId)));
+export const userPromoRoot = (cfg, userId) => join(cfg.dataDir, 'promo', String(Number(userId)));
 
 /**
  * Supprime le compte et TOUTES ses données : projets, prospects, notes, modèles, journaux d'envoi, jobs,
- * métriques, réglages et sessions (cascade des clés étrangères), puis les clones git du disque.
+ * métriques, réglages, conversations de la page IA et sessions (cascade des clés étrangères), puis les clones git et les pièces jointes du disque.
  * La liste d'opposition (blacklist) est volontairement conservée : c'est un registre d'adresses qui ont refusé
  * d'être contactées, pas une donnée du compte.
  */
@@ -92,4 +97,7 @@ export async function deleteUser(app, userId) {
   await db.prepare('DELETE FROM users WHERE id = ?').run(user.id);
   for (const p of projects) clearRecapCache(p.id);
   rmSync(userRepoRoot(cfg, user.id), { recursive: true, force: true });
+  rmSync(userChatRoot(cfg, user.id), { recursive: true, force: true });
+  rmSync(userPromoRoot(cfg, user.id), { recursive: true, force: true });
+  rmSync(userAccountingRoot(cfg, user.id), { recursive: true, force: true });
 }

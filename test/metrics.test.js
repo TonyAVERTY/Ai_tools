@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { testDb } from './helpers/db.js';
-import { addUser } from './helpers/users.js';
+import { addUser, TEST_SECRET_KEY } from './helpers/users.js';
 import { saveSnapshot, snapshotAll, history, parisDay } from '../src/services/metrics.js';
 import { createProject, saveSecretConfig } from '../src/projects.js';
 
@@ -10,7 +10,7 @@ const ts = (iso) => Math.floor(Date.parse(iso) / 1000);
 
 async function setup() {
   const db = await testDb();
-  const app = { resolveHost: async () => [{ address: '93.184.216.34', family: 4 }], db, cfg: { secretKey: randomBytes(32) } };
+  const app = { resolveHost: async () => [{ address: '93.184.216.34', family: 4 }], db, cfg: { secretKey: TEST_SECRET_KEY } };
   const userId = await addUser(db);
   const id = await createProject(app, { userId, name: 'MEP', gitUrl: 'https://g/T/M.git' });
   return { db, app, id, userId };

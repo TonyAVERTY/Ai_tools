@@ -7,8 +7,9 @@ import { join } from 'node:path';
 import { now, setSetting } from '../src/db.js';
 import { testDb } from './helpers/db.js';
 import { createApp } from '../src/server.js';
-import { unsubToken } from '../src/crypto.js';
-import { addUser } from './helpers/users.js';
+import { unsubToken, hashSid } from '../src/crypto.js';
+import { addUser, TEST_SECRET_KEY } from './helpers/users.js';
+import { PUBLIC_DNS, FAKE_MX } from './helpers/server.js';
 
 const APP_URL = 'https://ai.tony-averty.dev';
 let app, base, cookie, tmp, uid;
@@ -17,13 +18,13 @@ before(async () => {
   tmp = mkdtempSync(join(tmpdir(), 'aitools-http-'));
   const cfg = {
     appUrl: APP_URL, google: { clientId: 'cid', clientSecret: 'cs' }, apple: null, adminEmails: ['me@gmail.com'],
-    secretKey: randomBytes(32), dataDir: tmp, claudeBin: 'claude', sandbox: { enabled: false, production: false },
+    secretKey: TEST_SECRET_KEY, dataDir: tmp, claudeBin: 'claude', sandbox: { enabled: false, production: false },
   };
-  app = await createApp(cfg, { db: await testDb(), worker: false });
+  app = await createApp(cfg, { db: await testDb(), worker: false, resolveHost: PUBLIC_DNS, resolveMx: FAKE_MX }); // DNS injecté : le test ne dépend pas du réseau
   await new Promise((r) => app.server.listen(0, '127.0.0.1', r));
   base = `http://127.0.0.1:${app.server.address().port}`;
   uid = await addUser(app.db, { email: 'me@gmail.com' });
-  await app.db.prepare('INSERT INTO sessions(id, user_id, created_at, expires_at) VALUES(?, ?, ?, ?)').run('sess1', uid, now(), now() + 3600);
+  await app.db.prepare('INSERT INTO sessions(id, user_id, created_at, expires_at) VALUES(?, ?, ?, ?)').run(hashSid('sess1'), uid, now(), now() + 3600);
   cookie = 'sid=sess1';
 });
 after(async () => { await app.close(); rmSync(tmp, { recursive: true, force: true }); });
@@ -42,7 +43,7 @@ test('non connecté : redirection / 401 et pages publiques', async () => {
   // La racine est le site public pour un visiteur ; une page d'application renvoie vers la connexion
   let r = await get('/', false);
   assert.equal(r.status, 200);
-  assert.match(await r.text(), /<h1[^>]*>Trouve de nouveaux clients/);
+  assert.match(await r.text(), /<h1[^>]*>Claude écrit tes mails de prospection/);
   r = await get('/account', false);
   assert.equal(r.status, 303);
   assert.equal(r.headers.get('location'), '/login');
@@ -82,21 +83,23 @@ test('dashboard, réglages, création de projet et statut', async () => {
 
   r = await post('/api/projects', { name: 'MEP', gitUrl: 'https://git.tony-averty.dev/Tony/MEP.git' });
   assert.equal(r.status, 400);
-  assert.match((await r.json()).error, /Forgejo/);
+  assert.match((await r.json()).error, /github\.com/);
 
-  r = await post('/settings', { notify_email: 'moi@x.fr', forgejo_host: 'https://git.tony-averty.dev/', forgejo_token: 'tok123', global_daily_cap: '9999', send_delay_min: '1', send_delay_max: '2', prospect_model: 'opus', analyze_model: 'opus' }, { form: true });
+  r = await post('/settings', { notify_email: 'moi@x.fr', git_type_0: 'forgejo', git_host_0: 'https://git.tony-averty.dev/', git_token_0: 'tok123', global_daily_cap: '9999', send_delay_min: '1', send_delay_max: '2', prospect_model: 'opus', analyze_model: 'gpt-4; rm -rf /' }, { form: true });
   assert.equal(r.status, 303);
   const s = async (k) => (await app.db.prepare('SELECT value FROM user_settings WHERE user_id = ? AND `key` = ?').get(uid, k))?.value;
-  assert.equal(await s('forgejo_host'), 'git.tony-averty.dev');
+  const servers = JSON.parse(await s('git_servers_json'));
+  assert.deepEqual(servers.map((x) => [x.type, x.host]), [['forgejo', 'git.tony-averty.dev']]);
   assert.equal(await s('global_daily_cap'), '300', 'plafond borné');
   assert.equal(await s('send_delay_min'), '5');
-  assert.equal(await s('prospect_model'), 'haiku', 'opus refusé pour la prospection');
-  assert.equal(await s('analyze_model'), 'haiku', 'opus refusé pour l\'analyse');
-  assert.ok(!(await s('forgejo_token_enc')).includes('tok123'), 'token chiffré');
+  assert.equal(await s('prospect_model'), 'opus', 'tous les modèles du catalogue sont acceptés');
+  assert.equal(await s('analyze_model'), 'haiku', 'un identifiant hors catalogue n\'est jamais transmis à Claude : retour à Haiku');
+  assert.ok(servers[0].tokenEnc && !servers[0].tokenEnc.includes('tok123'), 'token chiffré');
 
-  r = await post('/api/projects', { name: 'MEP', gitUrl: 'https://github.com/Tony/MEP.git' });
+  // Un autre hôte que GitHub et le serveur Git personnel : refusé (GitHub, lui, est accepté d'office : voir test/git-hosts.test.js)
+  r = await post('/api/projects', { name: 'MEP', gitUrl: 'https://gitlab.com/Tony/MEP.git' });
   assert.equal(r.status, 400);
-  assert.match((await r.json()).error, /doit être sur git\.tony-averty\.dev/);
+  assert.match((await r.json()).error, /doit être sur github\.com ou git\.tony-averty\.dev/);
   r = await post('/api/projects', { name: 'MEP', gitUrl: 'https://git.tony-averty.dev/Tony/MEP.git' });
   assert.equal(r.status, 200);
   const { id } = await r.json();
@@ -133,7 +136,7 @@ test('dashboard, réglages, création de projet et statut', async () => {
   r = await get('/');
   const page = await r.text();
   assert.ok(!page.includes('secretpass'), 'le mot de passe ne ressort jamais dans la page');
-  assert.match(page, /readonly disabled/);
+  assert.doesNotMatch(page, /readonly disabled/, 'plus de SMTP commun affiché en lecture seule : chaque projet a le sien');
 
   r = await get(`/api/projects/${id}/recap`);
   assert.match((await r.json()).error, /non configuré/);
@@ -188,26 +191,47 @@ test('« Cette nuit » programme le job au prochain créneau 1h-6h', async () =>
   assert.ok(listed.project);
 });
 
-test('réglages Discord : URL validée, chiffrée, événements enregistrés', async () => {
-  const base = { notify_email: 'moi@x.fr', forgejo_host: 'git.tony-averty.dev', global_daily_cap: '100', send_delay_min: '20', send_delay_max: '60' };
-  let r = await post('/settings', { ...base, discord_webhook: 'https://evil.com/api/webhooks/1/x' }, { form: true });
+test('réglages Discord : URL validée, chiffrée, événements enregistrés, plusieurs webhooks', async () => {
+  const base = { notify_email: 'moi@x.fr', git_type_0: 'forgejo', git_host_0: 'git.tony-averty.dev', global_daily_cap: '100', send_delay_min: '20', send_delay_max: '60' };
+  const stored = async () => JSON.parse((await app.db.prepare("SELECT value FROM user_settings WHERE user_id = ? AND `key` = 'discord_hooks_json'").get(uid)).value);
+  let r = await post('/settings', { ...base, discord_url_0: 'https://evil.com/api/webhooks/1/x' }, { form: true });
   assert.equal(r.status, 400);
   const hook = 'https://discord.com/api/webhooks/123456789012345678/abcdefghijklmnopqrstuvwxyz-ABC_123';
-  r = await post('/settings', { ...base, discord_webhook: hook, ev_reply: 'on', ev_job_error: 'on' }, { form: true });
+  const hook2 = 'https://discord.com/api/webhooks/223456789012345678/zyxwvutsrqponmlkjihgfedcba-ABC_123';
+  r = await post('/settings', { ...base, discord_url_0: hook, discord_ev_0_reply: 'on', discord_ev_0_job_error: 'on' }, { form: true });
   assert.equal(r.status, 303);
-  const enc = (await app.db.prepare("SELECT value FROM user_settings WHERE user_id = ? AND `key` = 'discord_webhook_enc'").get(uid)).value;
-  assert.ok(!enc.includes('abcdefghijklmnop'), 'URL chiffrée');
-  assert.deepEqual(JSON.parse((await app.db.prepare("SELECT value FROM user_settings WHERE user_id = ? AND `key` = 'discord_events'").get(uid)).value), ['job_error', 'reply']);
+  let list = await stored();
+  assert.equal(list.length, 1);
+  assert.ok(!JSON.stringify(list).includes('abcdefghijklmnop'), 'URL chiffrée');
+  assert.deepEqual(list[0].events, ['job_error', 'reply']);
   r = await get('/settings');
-  const page = await r.text();
+  let page = await r.text();
   assert.ok(!page.includes('abcdefghijklmnop'), 'URL jamais réaffichée');
   assert.match(page, /data-notify-test/);
-  r = await post('/settings', { ...base, discord_remove: 'on' }, { form: true });
-  assert.equal((await app.db.prepare("SELECT value FROM user_settings WHERE user_id = ? AND `key` = 'discord_webhook_enc'").get(uid)).value, null);
+  assert.match(page, /data-chan-pick="discord"/, 'menu « + » : Discord, pour un autre webhook');
+  assert.match(page, /Ajoute un canal pour recevoir aussi/, 'événements sans webhook signalés');
+
+  // Un second webhook pour d'autres événements ; l'adresse laissée vide du premier est conservée
+  const id0 = list[0].id;
+  r = await post('/settings', { ...base, discord_id_0: id0, discord_url_0: '', discord_ev_0_reply: 'on', discord_ev_0_job_error: 'on', discord_url_1: hook2, discord_ev_1_weekly: 'on', discord_ev_1_job_done: 'on' }, { form: true });
+  assert.equal(r.status, 303);
+  list = await stored();
+  assert.equal(list.length, 2);
+  assert.equal(list[0].id, id0);
+  assert.deepEqual(list[1].events, ['job_done', 'weekly']);
+  r = await post('/settings', { ...base, discord_id_0: id0, discord_ev_0_reply: 'on', discord_url_0: '', discord_id_1: list[1].id, discord_url_1: '', discord_del_1: '1' }, { form: true });
+  list = await stored();
+  assert.equal(list.length, 1, 'webhook retiré');
+  r = await post('/settings', { ...base, discord_id_0: id0, discord_url_0: '', discord_del_0: '1' }, { form: true });
+  assert.deepEqual(await stored(), []);
 });
 
 test('budget : réglages, jauge et avertissement au lancement', async () => {
-  const base = { notify_email: 'moi@x.fr', forgejo_host: 'git.tony-averty.dev', global_daily_cap: '100', send_delay_min: '20', send_delay_max: '60' };
+  const base = { notify_email: 'moi@x.fr', git_type_0: 'forgejo', git_host_0: 'git.tony-averty.dev', global_daily_cap: '100', send_delay_min: '20', send_delay_max: '60' };
+  // Les plafonds en $ n'existent qu'avec une clé API ; le quota d'abonnement, qu'avec un jeton d'abonnement : on passe de l'un à l'autre
+  const subscriptionLink = (await app.db.prepare('SELECT claude_link_json j FROM users WHERE id = ?').get(uid)).j;
+  const setLink = (j) => app.db.prepare('UPDATE users SET claude_link_json = ? WHERE id = ?').run(j, uid);
+  await setLink(JSON.stringify({ v: 1, mode: 'api_key', valid: true }));
   let r = await post('/settings', { ...base, budget_day_usd: '0,5', budget_month_usd: 'abc' }, { form: true });
   assert.equal(r.status, 303);
   const s = async (k) => (await app.db.prepare('SELECT value FROM user_settings WHERE user_id = ? AND `key` = ?').get(uid, k))?.value;
@@ -217,15 +241,18 @@ test('budget : réglages, jauge et avertissement au lancement', async () => {
   let sys = await (await get('/api/system')).json();
   assert.equal(sys.budget.blocked, true);
   assert.equal(sys.claudeRateLimit, null, 'pas encore mesuré sans appel Claude');
-  await setSetting(app.db, uid, 'claude_rate_limit_json', JSON.stringify({ at: now(), fiveHour: { utilization: 0.42, resetsAt: 123 }, sevenDay: { utilization: 0.1, resetsAt: 456 } }));
+  await setLink(subscriptionLink);
+  await setSetting(app.db, uid, 'claude_rate_limit_json', JSON.stringify({ at: now(), fiveHour: { utilization: 0.42, resetsAt: 4_000_000_000 }, sevenDay: { utilization: 0.1, resetsAt: 4_000_000_000 } }));
   sys = await (await get('/api/system')).json();
   assert.equal(sys.claudeRateLimit.fiveHour.utilization, 0.42);
   assert.equal(sys.claudeRateLimit.sevenDay.utilization, 0.1);
+  await setLink(JSON.stringify({ v: 1, mode: 'api_key', valid: true }));
   const id = (await app.db.prepare('SELECT id FROM projects LIMIT 1').get()).id;
   await app.db.prepare("UPDATE jobs SET status = 'cancelled' WHERE status IN ('queued', 'running')").run();
   r = await post(`/api/projects/${id}/evolution`, { count: 2, level: 'rapide' });
   assert.match((await r.json()).budgetBlocked, /budget IA des dernières 24 h atteint/);
   await post('/settings', { ...base, budget_day_usd: '' }, { form: true });
+  await setLink(subscriptionLink);
 });
 
 test('fiche prospect : routes notes et prochaine action', async () => {
@@ -258,7 +285,7 @@ test('CSV : export en pièce jointe, import via l\'API', async () => {
   assert.match(r.headers.get('content-disposition'), /attachment; filename="prospects-mep-\d{4}-\d{2}-\d{2}\.csv"/);
   assert.match(await r.text(), /a@atelier\.fr/);
   r = await post(`/api/projects/${pid}/prospects/import`, { csv: 'email;entreprise\nnouveau@client.fr;Nouveau' });
-  assert.deepEqual(await r.json(), { total: 1, imported: 1, duplicates: 0, blacklisted: 0, invalid: [] });
+  assert.deepEqual(await r.json(), { total: 1, imported: 1, skipped: 0, invalid: [] });
   r = await post(`/api/projects/${pid}/prospects/import`, { csv: 'nom\nx' });
   assert.equal(r.status, 400);
   r = await fetch(`${base}/api/projects/${pid}/prospects.csv`);
