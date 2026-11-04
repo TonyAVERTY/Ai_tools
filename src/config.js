@@ -154,6 +154,7 @@ export function loadConfig() {
     dataDir: resolve(env.DATA_DIR || './data'),
     claudeBin: env.CLAUDE_BIN || 'claude',
     geminiBin: env.GEMINI_BIN || 'gemini',
+    codexBin: env.CODEX_BIN || 'codex',
     // Mode « abonnement » (jeton claude setup-token) : désactivable globalement
     cliModeEnabled: flag(env.CLAUDE_CLI_MODE_ENABLED, true),
     sandbox: sandboxConfig(),
