@@ -49,6 +49,7 @@ const STATIC = {
   '/static/responsive.js': asset('responsive.js', 'text/javascript; charset=utf-8', 3600),
   '/static/app.js': asset('app.js', 'text/javascript; charset=utf-8', 3600),
   '/static/app-recap.js': asset('app-recap.js', 'text/javascript; charset=utf-8', 3600),
+  '/static/app-link.js': asset('app-link.js', 'text/javascript; charset=utf-8', 3600),
   '/static/app-promo.js': asset('app-promo.js', 'text/javascript; charset=utf-8', 3600),
   '/static/app-linkedin.js': asset('app-linkedin.js', 'text/javascript; charset=utf-8', 3600),
   '/static/app-prospects.js': asset('app-prospects.js', 'text/javascript; charset=utf-8', 3600),

@@ -9,7 +9,7 @@ import { GIT_SERVER_TYPES, MAX_GIT_SERVERS } from './gitservers.js';
 import { ROLES, MAX_NOTES, rolesOfSection } from './services/roles.js';
 import { tourJson } from './tour.js';
 import { describeKpi } from './services/dbschema.js';
-import { MODE_LABELS, CONSENT_TEXT, CONSENT_CHECKBOX, CONSENT_VERSION } from './claudelink.js';
+import { MODE_LABELS } from './claudelink.js';
 import { banner } from './banner.js';
 import { loadingBlock } from './loading.js';
 
@@ -205,7 +205,7 @@ function linkSection(link, consent, quota = null) {
 }
 
 // Barre de chargement avec pourcentage ESTIMÉ (public/app.js, track) : montée vers 95 % selon la durée habituelle, 100 % à la réponse
-const pctBlock = (label) => `<div class="dl-pct" data-pct hidden><div class="bar" role="progressbar" aria-label="${esc(label)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="w-0" data-pct-bar></span></div><p class="dl-pct-t"><span>${esc(label)} · estimation</span><b data-pct-text>0 %</b></p></div>`;
+export const pctBlock = (label) => `<div class="dl-pct" data-pct hidden><div class="bar" role="progressbar" aria-label="${esc(label)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="w-0" data-pct-bar></span></div><p class="dl-pct-t"><span>${esc(label)} · estimation</span><b data-pct-text>0 %</b></p></div>`;
 
 export function accountPage({ user, error, link = null, consent = null, notice = null, usage = null, developer = false, ical = null, appUrl = '', quota = null, profileSet = false }) {
   return layout({
@@ -243,87 +243,6 @@ ${linkSection(link, consent, quota)}
     <div class="row"><button class="btn danger-fill">${ic('trash')}Supprimer mon compte et mes données</button></div>
   </form>
 </section>
-</div>`,
-  });
-}
-
-/**
- * Page « Relier Claude » : onboarding bloquant. Les trois modes sont des formulaires HTML classiques (POST) ;
- * la fenêtre d'avertissement du mode abonnement est un <dialog> ouvert par public/app.js.
- */
-export function linkPage({ user, link, cliModeEnabled, error, start = false }) {
-  const intro = link
-    ? `<p class="lead">Accès actuel : <strong>${esc(link.label)}</strong>${link.valid ? '' : ' (à revalider)'}. Relier un autre accès remplace le précédent, dont le secret est effacé.</p>`
-    : '<p class="lead">Choisis comment AiTools accède à ton Claude. Les analyses, recherches et rédactions s\'exécutent avec <em>ton</em> accès, jamais celui d\'un autre utilisateur.</p>';
-  const box = `<label class="check opt"><input type="checkbox" name="accept" data-consent required><span class="box">${ic('check')}</span><span>${esc(CONSENT_CHECKBOX)}</span></label>`;
-  const notice = `<div class="notice">${CONSENT_TEXT.map((t) => `<p>${esc(t)}</p>`).join('')}</div>`;
-  // Connexion guidée (public/app.js) : le bouton demande le lien au serveur, avec un petit chargement, puis l'étape 2
-  // attend le code que Claude affiche ; le serveur récupère le jeton tout seul.
-  // Alternatives par abonnement : un bloc, avec le risque annoncé dans son titre ; deux lignes (connexion guidée, jeton collé)
-  const cards = cliModeEnabled ? `
-<section class="alts" aria-labelledby="h-alt">
-  <div class="alts-h"><h2 id="h-alt">Avec ton abonnement Claude (Pro, Max)</h2><span class="badge warn">${ic('alert')}Risque pour ton compte</span></div>
-  <p class="hint">Utilise ton abonnement au lieu d'une clé API. Cette option comporte un risque pour ton compte Claude : une fenêtre d'avertissement s'affiche avant de continuer.</p>
-  <div class="alt">
-    <div class="alt-t"><h3>Se connecter avec Claude</h3><p>Connexion guidée : tu te connectes à Claude, puis tu recopies le code qu'il affiche.</p></div>
-    <button type="button" class="btn" data-open-dialog="consent-dialog">Se connecter avec Claude</button>
-  </div>
-  <div class="alt">
-    <div class="alt-t"><h3>Jeton collé à la main</h3><p>Colle un jeton d'abonnement Claude. Pour les cas où la connexion directe ne passe pas.</p></div>
-    <details class="manual"><summary class="btn">Coller un jeton</summary>
-      <form method="post" action="/link/subscription" class="cfg" data-consent-form>
-        ${notice}
-        ${box}
-        <p class="hint">Sur ta propre machine, lance la commande <code>claude setup-token</code>, connecte-toi à ton compte Claude quand le navigateur s'ouvre, puis copie le jeton affiché et colle-le ci-dessous. Le jeton est chiffré, utilisé uniquement pour tes jobs, et n'est jamais réaffiché.</p>
-        <label class="field"><span class="lbl">Jeton d'abonnement</span><input name="token" type="password" autocomplete="new-password" spellcheck="false" required></label>
-        <p class="hint">La vérification lance un appel minimal du CLI : quelques tokens sont décomptés de ton abonnement.</p>
-        <button class="btn primary" data-consent-submit disabled>Relier avec mon jeton</button>
-      </form>
-    </details>
-  </div>
-</section>` : '';
-  const dialog = cliModeEnabled ? `<dialog class="prospect-dialog modal" id="consent-dialog" aria-labelledby="consent-title"${start ? ' data-autoopen' : ''}>
-  <div class="cfg">
-    <h2 id="consent-title">${ic('alert')}Avant de continuer</h2>
-    <form class="cfg" data-claude-login data-consent-form>
-      ${notice}
-      ${box}
-      <p class="hint">Un lien de connexion va s'afficher. Tu te connectes à Claude, puis tu recopies ici le petit code qu'il te montre : AiTools récupère le jeton tout seul. Texte d'avertissement version ${esc(CONSENT_VERSION)}.</p>
-      <div class="modal-f"><button type="button" class="btn" data-close-dialog>Annuler</button><button class="btn primary" data-consent-submit disabled><span data-label>Continuer</span></button></div>
-      <p class="hint" role="status" data-claude-status></p>
-      ${pctBlock('Préparation du lien de connexion')}
-      <p class="msg msg-err" role="alert" data-claude-error hidden></p>
-    </form>
-    <div class="cfg" data-claude-step2 hidden>
-      <p data-claude-hint-popup hidden><strong>1.</strong> Connecte-toi à Claude dans la petite fenêtre qui vient de s'ouvrir.</p>
-      <div data-claude-hint-link><p><strong>1.</strong> Ouvre Claude et connecte-toi :</p>
-      <p><a class="btn primary" data-claude-link href="#" target="_blank" rel="noopener noreferrer">Ouvrir Claude</a></p></div>
-      <p><strong>2.</strong> Copie le code que Claude affiche, puis reviens ici : il est reconnu tout seul (sinon, colle-le dans le champ).</p>
-      <form class="cfg" data-claude-code>
-        <label class="field"><span class="lbl">Code affiché par Claude</span><input name="code" autocomplete="off" spellcheck="false" required></label>
-        <button class="btn primary"><span data-label>Terminer la connexion</span></button>
-        ${pctBlock('Récupération de ton jeton')}
-      </form>
-      <p class="msg msg-err" role="alert" data-claude-error2 hidden></p>
-    </div>
-  </div>
-</dialog>` : '';
-  return layout({
-    title: 'Relier Claude', email: user.email,
-    body: `<div class="narrow"${!link || !link.valid ? ' data-nolink' : ''}>
-<h1 class="h1">Relier Claude</h1>
-${intro}
-${error ? banner('err', error) : ''}
-<section class="panel link-main" aria-labelledby="h-key">
-  <div class="panel-h"><h2 id="h-key">Clé API Anthropic</h2><span class="badge ok">${ic('check')}Recommandée</span></div>
-  <p>Crée une clé sur console.anthropic.com puis colle-la ici. Elle est vérifiée sans consommer de tokens, chiffrée, et ne sera plus jamais affichée (seuls ses 4 derniers caractères le seront). Tu paies à l'usage, directement chez Anthropic.</p>
-  <form method="post" action="/link/api-key" class="cfg link-key">
-    <label class="field"><span class="lbl">Clé API</span><input name="apiKey" type="password" autocomplete="new-password" spellcheck="false" required placeholder="sk-ant-…"></label>
-    <button class="btn primary">Vérifier et relier</button>
-  </form>
-</section>
-${cards}
-${dialog}
 </div>`,
   });
 }
