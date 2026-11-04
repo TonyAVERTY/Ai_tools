@@ -47,8 +47,16 @@
     if (polling || !loginId) return;
     polling = true;
     try {
-      const r = await api('/link/chatgpt/login/status', { id: loginId });
-      if (r.state === 'done') { loginId = null; if (stopPoll) stopPoll(); go('/'); return; }
+      const r = await api(`/link/chatgpt/login/status?id=${encodeURIComponent(loginId)}`); // lecture seule, limite à part
+      if (r.state === 'ready') {
+        // Validée sur chatgpt.com : une seule requête enregistre la connexion (vérifiée par un appel minimal à Codex)
+        if (stopPoll) stopPoll();
+        $('[data-chatgpt-wait]', dlg).textContent = 'Connexion validée : je l\'enregistre…';
+        await api('/link/chatgpt/login/finish', { id: loginId });
+        loginId = null;
+        go('/');
+        return;
+      }
       if (r.state === 'failed') { reset(); fail(r.message); }
     } catch (err) {
       // Connexion expirée ou refusée à la vérification : on repart du début avec le message du serveur

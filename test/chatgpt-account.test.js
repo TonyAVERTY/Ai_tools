@@ -243,13 +243,20 @@ test('connexion guidée par les routes : case obligatoire, lien et code donnés,
   const { id, url, code } = await started.json();
   assert.equal(url, 'https://auth.openai.com/codex/device');
   assert.equal(code, 'ABCD-12345');
-  const pend = await u.post('/link/chatgpt/login/status', { id });
+  const status = (client, i) => client.get(`/link/chatgpt/login/status?id=${i}`);
+  const pend = await status(u, id);
   assert.equal((await pend.json()).state, 'pending');
+  assert.equal((await u.post('/link/chatgpt/login/finish', { id })).status, 409, 'pas de liaison tant que l\'utilisateur n\'a pas validé');
+  assert.equal(await getLinkState(s.db, u.id), null);
   const other = await s.newUser({ admin: false });
-  assert.equal((await other.post('/link/chatgpt/login/status', { id })).status, 404, 'la session d\'un autre n\'est pas la sienne');
+  assert.equal((await status(other, id)).status, 404, 'la session d\'un autre n\'est pas la sienne');
+  assert.equal((await other.post('/link/chatgpt/login/finish', { id })).status, 404);
   await new Promise((r) => setTimeout(r, 700));
-  const done = await u.post('/link/chatgpt/login/status', { id });
-  assert.equal((await done.json()).state, 'done');
+  assert.equal((await (await status(u, id)).json()).state, 'ready', 'prête, et le reste tant qu\'on n\'a pas terminé');
+  assert.equal((await (await status(u, id)).json()).state, 'ready');
+  const done = await u.post('/link/chatgpt/login/finish', { id });
+  assert.equal(done.status, 200);
+  assert.equal((await status(u, id)).status, 404, 'session fermée après l\'enregistrement');
   const pub = await getLinkState(s.db, u.id);
   assert.deepEqual([pub.provider, pub.mode, pub.valid], ['openai', 'chatgpt_account', true]);
   assert.equal((await rawLink(u.id)).via, 'login');
@@ -273,11 +280,11 @@ test('connexion guidée : lien hors OpenAI refusé, CLI muet ou code refusé : m
     const u = await s.newUser({ admin: false });
     const { id } = await (await u.post('/link/chatgpt/login', { accept: 'on' })).json();
     await new Promise((r) => setTimeout(r, 400));
-    const st = await (await u.post('/link/chatgpt/login/status', { id })).json();
+    const st = await (await u.get(`/link/chatgpt/login/status?id=${id}`)).json();
     assert.equal(st.state, 'failed');
     assert.match(st.message, /n'a pas validé/);
     assert.equal(await getLinkState(s.db, u.id), null);
-    assert.equal((await u.post('/link/chatgpt/login/status', { id })).status, 404, 'session fermée après l\'échec');
+    assert.equal((await u.get(`/link/chatgpt/login/status?id=${id}`)).status, 404, 'session fermée après l\'échec');
   } finally { console.warn = realWarn; }
   useBin();
 });
@@ -287,10 +294,10 @@ test('connexion guidée : annulation, et une nouvelle connexion remplace l\'anci
   const u = await s.newUser({ admin: false });
   const a = await (await u.post('/link/chatgpt/login', { accept: 'on' })).json();
   const b = await (await u.post('/link/chatgpt/login', { accept: 'on' })).json();
-  assert.equal((await u.post('/link/chatgpt/login/status', { id: a.id })).status, 404, 'l\'ancienne a été remplacée');
+  assert.equal((await u.get(`/link/chatgpt/login/status?id=${a.id}`)).status, 404, 'l\'ancienne a été remplacée');
   assert.equal(chatgptLoginsOf(s.app).sessions.size >= 1, true);
   await u.post('/link/chatgpt/login/cancel', { id: b.id });
-  assert.equal((await u.post('/link/chatgpt/login/status', { id: b.id })).status, 404);
+  assert.equal((await u.get(`/link/chatgpt/login/status?id=${b.id}`)).status, 404);
   useBin();
 });
 
@@ -301,4 +308,22 @@ test('fichier collé par la route : mêmes garde-fous', async () => {
   assert.equal((await getLinkState(s.db, u.id)).mode, 'chatgpt_account');
   const bad = await (await s.newUser({ admin: false })).post('/link/chatgpt/auth', { authJson: '{}', accept: 'on' }, { headers: { accept: 'application/json' } });
   assert.equal(bad.status, 400);
+});
+
+// Régression : la page interroge l'état toutes les 2 s ; ces appels ne doivent jamais épuiser la limite stricte de la liaison (10 requêtes / 10 min).
+test('le sondage de la connexion guidée ne compte pas dans la limite de liaison', async () => {
+  const lim = await startApp({ rateLimit: true, cfg: { codexBin: makeClaudeBin(tmp, { fixture: 'fake-codex.js', name: 'codex-lim', env: { FAKE_LOGIN_MS: '60000' } }) } });
+  try {
+    const u = await lim.newUser({ admin: false });
+    const { id } = await (await u.post('/link/chatgpt/login', { accept: 'on' })).json();
+    const codes = [];
+    for (let i = 0; i < 200; i++) codes.push((await u.get(`/link/chatgpt/login/status?id=${id}`)).status); // 200 sondages : 6 min et demie de page ouverte
+    assert.deepEqual([...new Set(codes)], [200], 'aucun « Trop de requêtes » pendant l\'attente');
+    // La limite stricte de la liaison reste en vigueur pour les actions qui coûtent un appel réseau
+    const posts = [];
+    for (let i = 0; i < 12; i++) posts.push((await u.post('/link/chatgpt/login/cancel', { id })).status);
+    assert.ok(posts.includes(429), `la limite « link » joue toujours (${posts.join(',')})`);
+    // ... et le sondage, lui, répond encore (la session a été annulée : 404, pas 429)
+    assert.equal((await u.get(`/link/chatgpt/login/status?id=${id}`)).status, 404);
+  } finally { lim.app.chatgptLogins?.closeAll(); await lim.close(); }
 });
