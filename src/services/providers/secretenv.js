@@ -3,6 +3,7 @@
 export const SECRET_ENV = {
   claude: { api_key: 'ANTHROPIC_API_KEY', subscription_token: 'CLAUDE_CODE_OAUTH_TOKEN' },
   gemini: { api_key: 'GEMINI_API_KEY' },
+  openai: { api_key: 'CODEX_API_KEY' }, // variable lue par `codex exec` (documentation Codex, « Authenticate in automation »)
 };
 
 /** Seuls secrets qu'un processus enfant peut recevoir, tous fournisseurs confondus. */
