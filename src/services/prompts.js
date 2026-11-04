@@ -6,7 +6,7 @@
 // Consignes par modèle : chaque tâche a un texte commun (`text`) et, par gamme de modèle (haiku, sonnet, opus, fable), un complément
 // (`byModel`) ajouté à la suite. Un petit modèle gagne à recevoir une méthode pas à pas et des garde-fous ; un grand modèle, à qui l'on
 // demande du recul et du jugement. L'utilisateur peut remplacer le texte pour tous les modèles ou pour une seule gamme.
-import { modelFamily, modelLabel, PROMPT_SCOPES, FAMILY_LABELS } from './models.js';
+import { modelFamily, modelLabel, PROMPT_SCOPES, FAMILY_LABELS, scopesOf } from './models.js';
 import { withSkills, skillsBlock } from './skills.js';
 import { pickStyle, styleBrief, exampleFor } from './promokit.js';
 
@@ -471,13 +471,15 @@ export function parseCustomPrompts(raw) {
 
 /**
  * Données de la section « Prompts IA » des Réglages : pour chaque tâche et chaque onglet (tous les modèles, Haiku…), le texte affiché,
- * le texte par défaut (bouton « revenir ») et s'il est personnalisé. `models` : { analyze, prospect, write } = modèles choisis par le compte.
+ * le texte par défaut (bouton « revenir ») et s'il est personnalisé. `models` : { analyze, prospect, write } = modèles choisis par le compte ; `provider` : son IA.
  */
-export function promptsView(custom, models = {}) {
+export function promptsView(custom, models = {}, provider = 'claude') {
+  // Seuls les onglets de l'IA de l'utilisateur : les consignes enregistrées pour une autre IA restent gardées, mais masquées
+  const visible = scopesOf(provider);
   const used = { chat: models.chat, analyze: models.analyze, prospect: models.prospect, hook: models.prospect, template: models.write, followup_template: models.write, linkedin: models.write, poste: models.write };
   const tasks = Object.entries(PROMPT_DEFS).map(([key, d]) => {
     const scopes = {};
-    for (const sc of PROMPT_SCOPES) {
+    for (const sc of visible) {
       const family = sc === '*' ? null : sc;
       const inherited = custom['*']?.[key] ?? defaultText(key, family);
       const own = custom[sc]?.[key];
@@ -485,7 +487,7 @@ export function promptsView(custom, models = {}) {
     }
     return { key, label: d.label, fixed: d.fixed, vars: d.vars, uses: used[key] ? modelLabel(used[key]) : 'selon le niveau choisi', usesFamily: used[key] ? modelFamily(used[key]) : null, scopes };
   });
-  const scopes = PROMPT_SCOPES.map((id) => ({ id, label: FAMILY_LABELS[id], count: Object.keys(custom[id] || {}).length }));
+  const scopes = visible.map((id) => ({ id, label: FAMILY_LABELS[id], count: Object.keys(custom[id] || {}).length }));
   return { scopes, tasks };
 }
 

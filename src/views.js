@@ -719,9 +719,10 @@ const SETTINGS_TOC = [['notif', 'Notifications'], ['git', 'Dépôts Git'], ['gar
 export function settingsPage({ email, s, saved }) {
   // Sélecteur de modèle en deux listes : les recommandés (avec une estimation relative du coût), puis tous les autres, plus compacts et sans estimation
   const priced = !!s.priced; // le « $ » relatif n'a de sens qu'avec une clé API (facturée à l'usage)
+  const cat = s.catalog || { recommended: RECOMMENDED, others: OTHERS }; // catalogue de l'IA de l'utilisateur
   const recTier = (m) => (priced ? `${m.tier} · ${m.cost}` : m.tier);
   const model = (name, v, title) => {
-    const cur = RECOMMENDED.find((m) => m.id === v);
+    const cur = cat.recommended.find((m) => m.id === v);
     const radio = (m, extra = '') => `<input type="radio" name="${name}" value="${m.id}"${m.id === v ? ' checked' : ''} data-mp-label="${esc(m.label)}" data-mp-tier="${esc(extra)}">`;
     return `<div class="field modelpick" data-modelpick>
       <span class="lbl" id="${name}-l">${title}</span>
@@ -729,11 +730,11 @@ export function settingsPage({ email, s, saved }) {
         <summary aria-labelledby="${name}-l"><span class="mp-cur"><b data-mp-name>${esc(cur ? cur.label : modelLabel(v))}</b> <em data-mp-tier-out>${cur ? esc(recTier(cur)) : ''}</em></span>${ic('down')}</summary>
         <div class="mp-pop" role="radiogroup" aria-labelledby="${name}-l">
           <p class="mp-h">Recommandés</p>
-          ${RECOMMENDED.map((m) => `<label class="mp-rec">${radio(m, recTier(m))}<span class="mp-n"><b>${esc(m.label)}</b><small>${esc(m.note)}</small></span><span class="mp-t">${esc(m.tier)}${priced ? ` <i>${esc(m.cost)}</i>` : ''}</span></label>`).join('\n          ')}
+          ${cat.recommended.map((m) => `<label class="mp-rec">${radio(m, recTier(m))}<span class="mp-n"><b>${esc(m.label)}</b><small>${esc(m.note)}</small></span><span class="mp-t">${esc(m.tier)}${priced ? ` <i>${esc(m.cost)}</i>` : ''}</span></label>`).join('\n          ')}
           <hr class="mp-sep">
           <p class="mp-h mp-h-s">Autres modèles</p>
           <div class="mp-others">
-            ${OTHERS.map((m) => `<label class="mp-o">${radio(m, '')}<span>${esc(m.label)}</span></label>`).join('\n            ')}
+            ${cat.others.map((m) => `<label class="mp-o">${radio(m, '')}<span>${esc(m.label)}</span></label>`).join('\n            ')}
           </div>
         </div>
       </details>
