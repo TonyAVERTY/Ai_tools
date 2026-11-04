@@ -8,7 +8,7 @@ import { destroyUserSessions } from './auth.js';
 import { getUser, deleteUser, normalizeEmail } from './users.js';
 import { ADMIN_PAGE_SIZE, PAID_PLANS } from './limits.js';
 import { usageOf, limitsFor } from './services/plans.js';
-import { MODE_LABELS } from './claudelink.js';
+import { modeLabelOf } from './claudelink.js';
 
 const like = (q) => `%${String(q).replace(/[!%_]/g, '!$&')}%`;
 
@@ -26,7 +26,7 @@ export async function listAccounts(db, { page = 1, q = '', at = now() } = {}) {
   const accounts = [];
   for (const r of rows) {
     let link = null;
-    try { const j = r.claude_link_json ? JSON.parse(r.claude_link_json) : null; if (j?.mode) link = { mode: MODE_LABELS[j.mode] || j.mode, valid: !!j.valid }; } catch { link = null; }
+    try { const j = r.claude_link_json ? JSON.parse(r.claude_link_json) : null; if (j?.mode) link = { mode: modeLabelOf(j), valid: !!j.valid }; } catch { link = null; }
     const user = await getUser(db, r.id);
     const usage = await usageOf(db, r.id, { at });
     accounts.push({
