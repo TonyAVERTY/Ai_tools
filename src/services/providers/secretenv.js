@@ -11,6 +11,6 @@ export const SECRET_ENV_NAMES = new Set(Object.values(SECRET_ENV).flatMap((modes
 
 /**
  * Variables non secrètes qu'un fournisseur peut ajouter à l'environnement du processus enfant (hors secret de l'utilisateur) :
- * Gemini CLI lit un fichier de réglages « système » dont le chemin vient de cette variable.
+ * Gemini CLI lit un fichier de réglages « système » dont le chemin vient de la première ; Codex range sa connexion de compte (auth.json) dans le dossier de la seconde.
  */
-export const EXTRA_ENV_NAMES = new Set(['GEMINI_CLI_SYSTEM_SETTINGS_PATH']);
+export const EXTRA_ENV_NAMES = new Set(['GEMINI_CLI_SYSTEM_SETTINGS_PATH', 'CODEX_HOME']);
