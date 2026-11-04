@@ -1,6 +1,6 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, readFileSync, existsSync, readdirSync } from 'node:fs';
+import { mkdtempSync, rmSync, readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { encrypt, decrypt } from '../src/crypto.js';
@@ -10,6 +10,7 @@ import {
 } from '../src/claudelink.js';
 import { getSetting } from '../src/db.js';
 import { extractLoginUrl, extractUserCode, chatgptLoginsOf } from '../src/chatgptlogin.js';
+import { buildArgs } from '../src/services/providers/openai.js';
 import { buildBwrapArgs, buildChildEnv } from '../src/services/sandbox.js';
 import { startApp } from './helpers/server.js';
 import { makeClaudeBin } from './helpers/claude-bin.js';
@@ -105,18 +106,27 @@ test('un job : le fichier est dans un dossier propre au lancement, le shell n\'a
   assert.equal(r.ok, true);
   const d = dumps().slice(before)[0];
   assert.equal(d.auth.tokens.refresh_token, 'ref.' + 'R'.repeat(30));
-  assert.ok(d.codexHome.includes('aitools-codex-home-'));
+  // Le dossier de connexion est dans DATA_DIR/run, jamais dans /tmp : Codex refuse un dossier de connexion sous un dossier temporaire
+  assert.ok(d.codexHome.startsWith(join(s.app.cfg.dataDir, 'run', 'codex-home-')), d.codexHome);
   assert.equal(d.key, null, 'aucune clé API dans l\'environnement');
   assert.ok(!d.argv.includes('--sandbox'), 'le profil de permissions remplace --sandbox (ils ne se combinent pas)');
   const cfg = d.argv.filter((x, i) => d.argv[i - 1] === '-c');
   assert.ok(cfg.includes('default_permissions="aitools"'));
   assert.ok(cfg.includes('permissions.aitools.extends=":read-only"'));
-  assert.ok(cfg.includes(`permissions.aitools.filesystem."${d.codexHome}"="deny"`), 'le dossier de connexion est refusé au shell');
+  assert.ok(cfg.includes(`permissions.aitools.filesystem={"${d.codexHome}"="deny"}`), 'le dossier de connexion est refusé au shell (table en ligne : une clé pointée garde les guillemets dans le chemin)');
+  assert.ok(!cfg.some((x) => /^permissions\.aitools\.filesystem\."/.test(x)), 'jamais en clé pointée entre guillemets : Codex 0.166 la refuse');
   assert.ok(cfg.includes('cli_auth_credentials_store="file"'));
   assert.ok(cfg.includes('features.shell_tool=true'));
   assert.ok(!d.argv.some((a) => /refresh_token|ref\.R/.test(a)), 'aucun jeton dans argv');
   assert.equal(existsSync(d.codexHome), false, 'dossier temporaire supprimé');
-  assert.equal(readdirSync(tmpdir()).filter((f) => f.startsWith('aitools-codex-home-')).length, 0);
+  assert.equal(readdirSync(join(s.app.cfg.dataDir, 'run')).filter((f) => f.startsWith('codex-home-')).length, 0, 'rien ne reste dans DATA_DIR/run');
+  assert.equal((statSync(join(s.app.cfg.dataDir, 'run')).mode & 0o777).toString(8), '700', 'dossier réservé à l\'application');
+});
+
+test('chemin du dossier de connexion : point, guillemet et antislash sont protégés dans la table en ligne', () => {
+  const args = (home) => buildArgs({ prompt: 'x', tools: ['Read'] }, home).filter((x, i, a) => a[i - 1] === '-c' && x.startsWith('permissions.aitools.filesystem='));
+  assert.deepEqual(args('/home/iaboss/htdocs/iaboss.fr/data/run/codex-home-ab'), ['permissions.aitools.filesystem={"/home/iaboss/htdocs/iaboss.fr/data/run/codex-home-ab"="deny"}']);
+  assert.deepEqual(args('/d/a"b\\c'), ['permissions.aitools.filesystem={"/d/a\\"b\\\\c"="deny"}']);
 });
 
 test('jetons renouvelés par Codex : rangés chiffrés, et le job suivant part des nouveaux', async () => {
@@ -243,13 +253,20 @@ test('connexion guidée par les routes : case obligatoire, lien et code donnés,
   const { id, url, code } = await started.json();
   assert.equal(url, 'https://auth.openai.com/codex/device');
   assert.equal(code, 'ABCD-12345');
-  const pend = await u.post('/link/chatgpt/login/status', { id });
+  const status = (client, i) => client.get(`/link/chatgpt/login/status?id=${i}`);
+  const pend = await status(u, id);
   assert.equal((await pend.json()).state, 'pending');
+  assert.equal((await u.post('/link/chatgpt/login/finish', { id })).status, 409, 'pas de liaison tant que l\'utilisateur n\'a pas validé');
+  assert.equal(await getLinkState(s.db, u.id), null);
   const other = await s.newUser({ admin: false });
-  assert.equal((await other.post('/link/chatgpt/login/status', { id })).status, 404, 'la session d\'un autre n\'est pas la sienne');
+  assert.equal((await status(other, id)).status, 404, 'la session d\'un autre n\'est pas la sienne');
+  assert.equal((await other.post('/link/chatgpt/login/finish', { id })).status, 404);
   await new Promise((r) => setTimeout(r, 700));
-  const done = await u.post('/link/chatgpt/login/status', { id });
-  assert.equal((await done.json()).state, 'done');
+  assert.equal((await (await status(u, id)).json()).state, 'ready', 'prête, et le reste tant qu\'on n\'a pas terminé');
+  assert.equal((await (await status(u, id)).json()).state, 'ready');
+  const done = await u.post('/link/chatgpt/login/finish', { id });
+  assert.equal(done.status, 200);
+  assert.equal((await status(u, id)).status, 404, 'session fermée après l\'enregistrement');
   const pub = await getLinkState(s.db, u.id);
   assert.deepEqual([pub.provider, pub.mode, pub.valid], ['openai', 'chatgpt_account', true]);
   assert.equal((await rawLink(u.id)).via, 'login');
@@ -273,11 +290,11 @@ test('connexion guidée : lien hors OpenAI refusé, CLI muet ou code refusé : m
     const u = await s.newUser({ admin: false });
     const { id } = await (await u.post('/link/chatgpt/login', { accept: 'on' })).json();
     await new Promise((r) => setTimeout(r, 400));
-    const st = await (await u.post('/link/chatgpt/login/status', { id })).json();
+    const st = await (await u.get(`/link/chatgpt/login/status?id=${id}`)).json();
     assert.equal(st.state, 'failed');
     assert.match(st.message, /n'a pas validé/);
     assert.equal(await getLinkState(s.db, u.id), null);
-    assert.equal((await u.post('/link/chatgpt/login/status', { id })).status, 404, 'session fermée après l\'échec');
+    assert.equal((await u.get(`/link/chatgpt/login/status?id=${id}`)).status, 404, 'session fermée après l\'échec');
   } finally { console.warn = realWarn; }
   useBin();
 });
@@ -287,10 +304,10 @@ test('connexion guidée : annulation, et une nouvelle connexion remplace l\'anci
   const u = await s.newUser({ admin: false });
   const a = await (await u.post('/link/chatgpt/login', { accept: 'on' })).json();
   const b = await (await u.post('/link/chatgpt/login', { accept: 'on' })).json();
-  assert.equal((await u.post('/link/chatgpt/login/status', { id: a.id })).status, 404, 'l\'ancienne a été remplacée');
+  assert.equal((await u.get(`/link/chatgpt/login/status?id=${a.id}`)).status, 404, 'l\'ancienne a été remplacée');
   assert.equal(chatgptLoginsOf(s.app).sessions.size >= 1, true);
   await u.post('/link/chatgpt/login/cancel', { id: b.id });
-  assert.equal((await u.post('/link/chatgpt/login/status', { id: b.id })).status, 404);
+  assert.equal((await u.get(`/link/chatgpt/login/status?id=${b.id}`)).status, 404);
   useBin();
 });
 
@@ -301,4 +318,22 @@ test('fichier collé par la route : mêmes garde-fous', async () => {
   assert.equal((await getLinkState(s.db, u.id)).mode, 'chatgpt_account');
   const bad = await (await s.newUser({ admin: false })).post('/link/chatgpt/auth', { authJson: '{}', accept: 'on' }, { headers: { accept: 'application/json' } });
   assert.equal(bad.status, 400);
+});
+
+// Régression : la page interroge l'état toutes les 2 s ; ces appels ne doivent jamais épuiser la limite stricte de la liaison (10 requêtes / 10 min).
+test('le sondage de la connexion guidée ne compte pas dans la limite de liaison', async () => {
+  const lim = await startApp({ rateLimit: true, cfg: { codexBin: makeClaudeBin(tmp, { fixture: 'fake-codex.js', name: 'codex-lim', env: { FAKE_LOGIN_MS: '60000' } }) } });
+  try {
+    const u = await lim.newUser({ admin: false });
+    const { id } = await (await u.post('/link/chatgpt/login', { accept: 'on' })).json();
+    const codes = [];
+    for (let i = 0; i < 200; i++) codes.push((await u.get(`/link/chatgpt/login/status?id=${id}`)).status); // 200 sondages : 6 min et demie de page ouverte
+    assert.deepEqual([...new Set(codes)], [200], 'aucun « Trop de requêtes » pendant l\'attente');
+    // La limite stricte de la liaison reste en vigueur pour les actions qui coûtent un appel réseau
+    const posts = [];
+    for (let i = 0; i < 12; i++) posts.push((await u.post('/link/chatgpt/login/cancel', { id })).status);
+    assert.ok(posts.includes(429), `la limite « link » joue toujours (${posts.join(',')})`);
+    // ... et le sondage, lui, répond encore (la session a été annulée : 404, pas 429)
+    assert.equal((await u.get(`/link/chatgpt/login/status?id=${id}`)).status, 404);
+  } finally { lim.app.chatgptLogins?.closeAll(); await lim.close(); }
 });

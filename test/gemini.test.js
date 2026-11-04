@@ -245,3 +245,27 @@ test('un refus d\'accès de Gemini invalide la liaison (comme chez Claude), sans
   assert.equal((await getLinkState(s.db, u.id)).valid, false);
   assert.equal((await getLinkState(s.db, other.id)).valid, true);
 });
+
+// ---------- Montage du CLI dans le bac à sable ----------
+test('un CLI installé avec npm (nvm) : son arbre node_modules et l\'installation de Node sont montés, sinon il s\'arrête sans rien dire', async () => {
+  const { cliBinds, prepareLaunch } = await import('../src/services/sandbox.js');
+  const codex = '/home/iaboss/.nvm/versions/node/v22.22.0/lib/node_modules/@openai/codex/bin/codex.js';
+  const node = '/home/iaboss/.nvm/versions/node/v22.22.0/bin/node';
+  assert.deepEqual(cliBinds(codex, node).sort(), [
+    '/home/iaboss/.nvm/versions/node/v22.22.0', '/home/iaboss/.nvm/versions/node/v22.22.0/lib/node_modules', '/home/iaboss/.nvm/versions/node/v22.22.0/lib/node_modules/@openai/codex/bin',
+  ]);
+  const gem = '/home/iaboss/.nvm/versions/node/v22.22.0/lib/node_modules/@google/gemini-cli/bundle/gemini.js';
+  assert.ok(cliBinds(gem, node).includes('/home/iaboss/.nvm/versions/node/v22.22.0/lib/node_modules'));
+  assert.deepEqual(cliBinds('/usr/local/bin/codex', '/usr/local/bin/node'), [], 'sous /usr, déjà monté : rien à ajouter');
+  assert.deepEqual(cliBinds('/usr/lib/node_modules/@openai/codex/bin/codex.js', '/usr/bin/node'), ['/usr/lib/node_modules'], 'seul l\'arbre du paquet, Node est sous /usr');
+  assert.deepEqual(cliBinds('/home/u/.local/bin/claude', '/usr/bin/node'), ['/home/u/.local/bin'], 'un binaire natif : son dossier seulement');
+  // De bout en bout dans la ligne de commande bubblewrap : chaque dossier est monté en lecture seule, jamais en écriture
+  const launch = prepareLaunch({ bin: 'codex', args: ['exec'], sandbox: { enabled: true, production: true, bwrapBin: 'bwrap', roBinds: [] } },
+    { hasBwrap: () => true, resolveBin: () => codex, nodeExec: node, parentEnv: { PATH: '/x' } });
+  const a = launch.args;
+  for (const d of ['/home/iaboss/.nvm/versions/node/v22.22.0', '/home/iaboss/.nvm/versions/node/v22.22.0/lib/node_modules']) {
+    const i = a.indexOf(d);
+    assert.deepEqual(a.slice(i - 1, i + 2), ['--ro-bind', d, d], d);
+  }
+  assert.ok(!a.includes('--bind'), 'aucun montage en écriture');
+});

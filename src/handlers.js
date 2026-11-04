@@ -1,6 +1,7 @@
 // Handlers des jobs en arrière-plan.
 import { now, getSetting, setSetting } from './db.js';
 import { readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 import { extractJson } from './services/claude.js';
 import { getProvider } from './services/providers/index.js';
 import { withUserLock } from './services/userlock.js';
@@ -160,7 +161,7 @@ export function makeClaude(app) {
         onTurn: (n) => { jc?.log?.('turn', `Claude · étape ${n}`); o.onTurn?.(n); },
         sandbox: cfg.sandbox, secretEnv: cred.secretEnv,
         // Connexion de compte : le fichier à utiliser, les jetons à masquer, et la mise à jour que le CLI en fait (jetons renouvelés)
-        ...(cred.authFile ? { authFile: cred.authFile, secrets: cred.secrets, onAuthFile: (text) => { renewedAuth = text; } } : {}),
+        ...(cred.authFile ? { authFile: cred.authFile, secrets: cred.secrets, onAuthFile: (text) => { renewedAuth = text; }, workRoot: join(cfg.dataDir, 'run') } : {}),
         // Les clones lus sont ceux du propriétaire du projet (page IA : projet d'équipe joint, accès vérifié par l'appelant) ;
         // les pièces jointes lues en plus sont toujours dans le dossier de CET utilisateur.
         allowedRoot: o.allowedRoot ?? userRepoRoot(cfg, o.repoOwnerId ?? userId),

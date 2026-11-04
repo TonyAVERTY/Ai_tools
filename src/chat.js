@@ -283,7 +283,7 @@ export function registerChatRoutes(router, app) {
         if (ctrl.signal.aborted) return;
         // Pas de liaison Claude valide, bac à sable indisponible, CLI introuvable… : message lisible, détail dans les logs
         console.error('[chat]', e.message);
-        if (!e.status) reportError(app, e, { method: 'POST', path: '/api/chat/send', userId });
+        if (e.status !== 404) reportError(app, e, { method: 'POST', path: '/api/chat/send', userId, status: e.status ?? null });
         write({ type: 'error', error: e.expose || e.status < 500 ? e.message : "Claude n'a pas pu répondre. Réessaie dans un instant." });
       } finally { run?.cleanup(); }
       res.end();

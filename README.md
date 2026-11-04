@@ -261,6 +261,7 @@ Pré-requis : Node 22.13 ou plus, git, la CLI `claude` si les jobs IA doivent to
    | `APP_URL`, `PORT`, `HOST` | URL publique et écoute locale (reverse proxy Nginx devant) |
    | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | connexion Google (voir « Connexion Google et Apple ») |
    | `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_CLIENT_ID`, `APPLE_PRIVATE_KEY` | connexion Apple, facultative : les quatre ou aucune (sans elles, le bouton Apple est masqué) |
+   | `ERROR_ALERT_TO` | destinataires des alertes d'erreur (HTML), séparés par des virgules ; par défaut `contact@tony-averty.dev`. Toute erreur sauf un 404 (réponse d'erreur, tâche en échec, arrêt du processus) est envoyée par `SYSTEM_SMTP_*` ; sans SMTP, aucune alerte. Même erreur : un mail par 30 minutes ; au plus 20 mails par heure pour les erreurs serveur et les tâches, 6 pour les erreurs de requête (4xx) |
    | `ADMIN_EMAILS` | emails des administrateurs, séparés par des virgules. Le premier est aussi propriétaire des données migrées. Remplace `ALLOWED_EMAILS`, supprimée : n'importe qui peut créer un compte |
    | `CLAUDE_CLI_MODE_ENABLED` | `true` (défaut) ou `false` : active le mode abonnement |
    | `NODE_ENV`, `SANDBOX`, `SANDBOX_RO_BINDS`, `BWRAP_BIN` | bac à sable : obligatoire en production, `SANDBOX=off` en développement seulement |
