@@ -196,6 +196,7 @@ test('envoi : Message-ID journalisé et objets A/B alternés équitablement', as
       assert.equal(l.message_id, s.sentMails[i].messageId);
       assert.match(l.message_id, /^<[^@\s]+@codebzh\.fr>$/);
       assert.equal(l.subject, s.sentMails[i].subject);
+      assert.equal(l.body, 'Bonjour', 'le texte envoyé est gardé pour la page Mails');
     }
     assert.equal(new Set(logs.map((l) => l.message_id)).size, 4, 'Message-ID uniques');
     assert.deepEqual((await s.db.prepare('SELECT variant FROM prospects ORDER BY id').all()).map((r) => r.variant), ['A', 'B', 'A', 'B']);

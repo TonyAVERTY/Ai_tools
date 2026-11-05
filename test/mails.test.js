@@ -250,3 +250,29 @@ test('page Mails : état « Lu (accusé) », filtre, et mention honnête (minimu
   assert.doesNotMatch(read, /Pas d&#39;accusé/);
   assert.doesNotMatch(await get('/mails?filter=sent'), /Lu celui-ci/, '« Envoyé » exclut ce qui a été lu');
 });
+
+test('détail d\'un mail : contenu gardé, erreur, raison du rejet, anciens mails, isolation', async () => {
+  const u1 = await s.newUser(), u2 = await s.newUser();
+  const pid = await addProject(s.db, u1.id, { gitUrl: `https://github.com/u${u1.id}/d.git` });
+  const prospect = Number((await s.db.prepare("INSERT INTO prospects(project_id, company, email, status, sent_at, created_at) VALUES(?, 'Fermé', 'f@ferme.fr', 'sent', ?, ?)").run(pid, now(), now())).lastInsertRowid);
+  const log = async (...a) => Number((await s.db.prepare('INSERT INTO mail_log(project_id, prospect_id, email, sent_at, kind, subject, message_id, body, error) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)').run(pid, ...a)).lastInsertRowid);
+  const ok = await log(prospect, 'f@ferme.fr', now(), 'initial', 'Objet <i>1</i>', '<m1@x.fr>', 'Bonjour,\n\nTexte <b>gardé</b>.', null);
+  const old = await log(null, 'o@vieux.fr', now(), 'initial', 'Ancien', null, null, null);
+  const bad = await log(null, 'x@y.fr', now(), 'initial', null, null, null, 'Adresse non envoyée : adresse jetable');
+  const d = await (await u1.get(`/api/mails/${ok}`)).json();
+  assert.equal(d.body, 'Bonjour,\n\nTexte <b>gardé</b>.');
+  assert.equal(d.state, 'sent');
+  assert.equal((await (await u1.get(`/api/mails/${old}`)).json()).body, null, 'mail ancien : pas de contenu inventé');
+  assert.match((await (await u1.get(`/api/mails/${bad}`)).json()).error, /jetable/);
+  // rebond : la raison est lue dans le rapport de remise et rattachée au mail
+  await applyMessages(s.db, pid, [{ from: 'mailer-daemon@mx.ovh.net', subject: 'Mail delivery failed', body: 'Message-ID: <m1@x.fr>\nFinal-Recipient: rfc822; f@ferme.fr\nDiagnostic-Code: smtp; 550 5.1.1 user unknown' }]);
+  const b = await (await u1.get(`/api/mails/${ok}`)).json();
+  assert.equal(b.state, 'bounced');
+  assert.match(b.note, /550 5\.1\.1 user unknown/);
+  assert.equal((await u2.get(`/api/mails/${ok}`)).status, 404, 'le mail d\'un autre compte est introuvable');
+  assert.equal((await u1.get('/api/mails/abc')).status, 404);
+  assert.equal((await s.anon.get(`/api/mails/${ok}`)).status, 401);
+  const page = await (await u1.get('/mails', { headers: { accept: 'text/html' } })).text();
+  assert.match(page, new RegExp(`data-mail="${ok}"[^>]*aria-expanded="false"`));
+  assert.doesNotMatch(page, /Texte <b>gardé/, 'le contenu n\'est chargé qu\'à l\'ouverture');
+});
