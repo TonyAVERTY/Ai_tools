@@ -310,7 +310,12 @@ test('affiner un document définitif : il repasse à valider, et le devis modifi
   const finals = (await docsOf(pid)).filter((d) => d.kind !== 'quote_option');
   const byKind = (k) => finals.find((d) => d.kind === k);
   for (const d of finals) await post(u, `${base(pid)}/valider`, { doc: d.id });
-  assert.match(await html(u, base(pid)), /Tes documents sont prêts/);
+  const ready = await html(u, base(pid));
+  assert.match(ready, /Tes documents sont prêts/);
+  assert.match(ready, /<article class="bill-doc ok locked"/, 'un document validé est un résumé grisé');
+  assert.doesNotMatch(ready.split('id="documents"')[1] || '', /<iframe/, 'sans aperçu intégré : « Voir en grand » suffit');
+  assert.match(ready, /<summary><svg[^>]*>[^]*?<\/svg>Modifier<\/summary>/, 'la demande de changement s\'ouvre par « Modifier »');
+  assert.doesNotMatch(ready, /Valider ce document/, 'plus de bouton « Valider » sur un document validé');
   await post(u, `${base(pid)}/affiner`, { doc: byKind('devis').id, request: 'Remise sur la première ligne' });
   assert.equal((await jobOf(pid, 'billing_refine')).status, 'done');
   const row = async (k) => s.db.prepare('SELECT * FROM billing_docs WHERE id = ?').get(byKind(k).id);

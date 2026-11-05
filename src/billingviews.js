@@ -74,7 +74,7 @@ function legalForm(p, legal, errors, suggestions, open) {
 }
 
 const frame = (d) => `<iframe class="bill-frame" sandbox title="Aperçu : ${esc(d.content.title)}" loading="lazy" src="/facturation/documents/${d.id}/apercu"></iframe>`;
-const refineForm = (p, d, label, open = false) => `<details class="bill-refine"${open ? ' open' : ''}><summary>${ic('pen')}Affiner avec Claude</summary>
+const refineForm = (p, d, label, open = false, summary = 'Affiner avec Claude') => `<details class="bill-refine"${open ? ' open' : ''}><summary>${ic('pen')}${summary}</summary>
     <form method="post" action="/facturation/projet/${p.id}/affiner"><input type="hidden" name="doc" value="${d.id}">
       <label class="field"><span class="lbl">Ce que tu veux changer</span><textarea name="request" rows="3" maxlength="800" required placeholder="Ex. : un ton plus chaleureux, ajouter une ligne « formation de 2 heures », réduire l'acompte à 20 %…"></textarea></label>
       <div class="row-actions"><button class="btn">${label}</button></div></form></details>`;
@@ -193,16 +193,16 @@ function docsSection(p, docs, stage, busy, validatedCount) {
   } else {
     inner = `<p class="muted">Relis chaque document, affine-le si besoin, puis valide-le. <b>${validatedCount} sur ${DOC_KINDS.length}</b> validés.</p>
       <div class="bar" role="progressbar" aria-label="Documents validés" aria-valuemin="0" aria-valuemax="4" aria-valuenow="${validatedCount}"><span class="w-${validatedCount * 25}"></span></div>
-      <div class="bill-docs">${finals.map((d) => `<article class="bill-doc${d.status === 'validated' ? ' ok' : ''}" aria-labelledby="bd-${d.id}">
+      <div class="bill-docs">${finals.map((d) => `<article class="bill-doc${d.status === 'validated' ? ' ok locked' : ''}" aria-labelledby="bd-${d.id}">
         <div class="bill-opt-h"><h3 id="bd-${d.id}">${esc(DOC_BY_KEY[d.kind].label)}</h3><span class="badge ${d.status === 'validated' ? 'ok' : 'warn'}">${d.status === 'validated' ? 'Validé' : 'À valider'}</span></div>
         <p class="muted small">${esc(DOC_BY_KEY[d.kind].help)}</p>
-        ${frame(d)}
-        <p class="muted small bill-vars">Rempli à l'émission : ${DOC_VARIABLES[d.kind].map((v) => `<code>{{${v}}}</code>`).join(' ')}</p>
+        ${d.status === 'validated' ? '' : `${frame(d)}
+        <p class="muted small bill-vars">Rempli à l'émission : ${DOC_VARIABLES[d.kind].map((v) => `<code>{{${v}}}</code>`).join(' ')}</p>`}
         <div class="row-actions">${d.status === 'validated' ? '' : `<form method="post" action="/facturation/projet/${p.id}/valider"><input type="hidden" name="doc" value="${d.id}"><button class="btn primary small"${busy ? ' disabled' : ''}>${ic('check')}Valider ce document</button></form>`}
           <a class="btn small" href="/facturation/documents/${d.id}/apercu" target="_blank" rel="noopener noreferrer" data-noajax>Voir en grand</a>
           <a class="btn small" href="/facturation/documents/${d.id}/pdf" data-noajax>${ic('file')}Modèle en PDF</a>
           ${d.status === 'validated' ? `<a class="btn small primary" href="?type=${d.kind}#generer">${ic('file')}Émettre ce document</a>` : ''}</div>
-        ${refineForm(p, d, 'Affiner ce document')}
+        ${d.status === 'validated' ? refineForm(p, d, 'Modifier ce document', false, 'Modifier') : refineForm(p, d, 'Affiner ce document')}
       </article>`).join('')}</div>`;
   }
   return `<section class="card bill-sec" id="documents" aria-labelledby="t-docs"><h2 id="t-docs">3. Valide tes documents</h2>${inner}</section>`;
