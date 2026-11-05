@@ -32,6 +32,7 @@ DO_CLEAN=0 DO_UPGRADE=0
 KEEP_ENV=0 DOMAIN="" ALLOWED="" GOOGLE_ID="" GOOGLE_SECRET="" THERMAL=75
 TUNNEL_MODE=later TUNNEL_TOKEN=""
 CLAUDE_MODE=later
+OTHER_AIS=0
 NEED_REBOOT=0
 CLEAN_SERVICES=() CLEAN_PACKAGES=() CLEAN_SWAP=0
 
@@ -392,6 +393,15 @@ ask_claude() {
   case $c in 1) CLAUDE_MODE=token ;; 2) CLAUDE_MODE=login ;; *) CLAUDE_MODE=later ;; esac
 }
 
+ask_other_ais() {
+  section "Autres IA (facultatif)"
+  info "Chaque personne choisit son IA dans l'application : Claude, ChatGPT ou Gemini."
+  info "Claude est installé d'office. Pour ChatGPT (Codex) et Gemini, il faut aussi leurs outils sur ce serveur."
+  info "Sans eux, ces deux IA restent grisées sur la page « Relier mon IA » (tu pourras les installer plus tard)."
+  confirm "Installer aussi Codex (ChatGPT) et Gemini CLI ?" o && OTHER_AIS=1
+  return 0
+}
+
 recap() {
   section "Récapitulatif"
   local line
@@ -410,6 +420,7 @@ recap() {
   row "Config" "$( (( KEEP_ENV )) && echo "conservée" || echo "https://$DOMAIN · $google")"
   row "Tunnel" "$TUNNEL_MODE"
   row "Claude" "$CLAUDE_MODE"
+  row "Autres IA" "$( (( OTHER_AIS )) && echo "Codex (ChatGPT) et Gemini CLI" || echo "non (Claude seul)")"
   row "Application" "$APP_DIR (utilisateur $APP_USER, port $PORT)"
   printf '\n'
   confirm "Lancer l'installation ?" o || die "Annulé, rien n'a été modifié."
@@ -540,6 +551,12 @@ do_runtime() {
     run "Installation de Claude Code" npm install -g --no-audit --no-fund @anthropic-ai/claude-code
   fi
 
+  # ChatGPT et Gemini : facultatif, un échec n'arrête pas l'installation (ces IA restent grisées dans l'application)
+  if (( OTHER_AIS )); then
+    ( run "Installation de Codex (ChatGPT)" npm install -g --no-audit --no-fund @openai/codex ) || warn "Codex non installé : ChatGPT restera indisponible (npm install -g @openai/codex, puis redémarre)."
+    ( run "Installation de Gemini CLI" npm install -g --no-audit --no-fund @google/gemini-cli ) || warn "Gemini CLI non installé : Gemini restera indisponible (npm install -g @google/gemini-cli, puis redémarre)."
+  fi
+
   if [[ $TUNNEL_MODE != keep ]]; then
     if command -v cloudflared >/dev/null; then ok "cloudflared déjà présent"
     else run "Installation de cloudflared" install_cloudflared; fi
@@ -612,6 +629,10 @@ EOF
   fi
   set_env DATA_DIR "$DATA_DIR"
   set_env CLAUDE_BIN "$claude_bin"
+  local bin
+  for bin in codex:CODEX_BIN gemini:GEMINI_BIN; do
+    command -v "${bin%%:*}" >/dev/null && set_env "${bin##*:}" "$(command -v "${bin%%:*}")"
+  done
   chown "$APP_USER:" "$f"; chmod 600 "$f"
 }
 
@@ -807,6 +828,7 @@ main() {
   ask_app
   ask_tunnel
   ask_claude
+  ask_other_ais
   recap
 
   do_upgrade
