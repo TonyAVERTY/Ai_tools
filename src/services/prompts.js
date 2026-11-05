@@ -80,14 +80,15 @@ Qualité avant quantité : ignore annuaires, agrégateurs, réseaux sociaux et f
 Ton : [[ton]]
 Expéditeur : [[expediteur]]
 Variables disponibles dans le mail : {{entreprise}}, {{ville}}, {{site}} (adresse du site du produit, remplie à l'envoi), {{accroche}} (phrase personnalisée déjà rédigée, qui se termine par un point : à placer en ouverture telle quelle, puis commence une NOUVELLE phrase, jamais une virgule ni « et » à la suite).
-{{entreprise}} est un nom propre inséré tel quel : place-le dans une tournure qui le porte (« Chez {{entreprise}}, … », « À l'équipe de {{entreprise}}, … », « Bonjour {{entreprise}}, … »). N'écris jamais « Pour {{entreprise}}, » suivi d'une phrase qui ne s'y rattache pas : une fois le nom collé, chaque phrase doit rester correcte et avoir un sens.
+{{entreprise}} est un nom propre inséré tel quel : place-le dans une tournure qui le porte (« Chez {{entreprise}}, … », « À l'équipe de {{entreprise}}, … », « Bonjour {{entreprise}}, … »). N'écris jamais « Pour {{entreprise}}, » suivi d'une phrase qui ne s'y rattache pas : une fois le nom collé, chaque phrase doit rester correcte et avoir un sens. {{entreprise}} n'est jamais vide : la virgule qui le suit est permise (la règle de ponctuation sur les variables vise celles qui peuvent être vides).
 
-Structure : 150 à 180 mots maximum, 4 à 5 courts paragraphes, un mail commercial clair et concret.
+Structure : 150 à 180 mots maximum (sans compter l'appel, la formule de clôture et la signature), 4 à 5 courts paragraphes, un mail commercial clair et concret.
+0. Formule d'appel : « Bonjour, » seul sur la première ligne, suivi d'une ligne vide.
 1. Ouverture : {{accroche}}, puis une phrase qui la relie à un problème concret de leur métier.
 2. Présentation du produit : son nom, ce que c'est en une phrase simple, et pour qui. Donne les mots exacts de la fiche, pas un slogan.
 3. Ce qu'il apporte : 2 à 3 bénéfices concrets, chacun vérifiable dans la fiche (une fonction précise, un cas d'usage, un gain de temps ou de clients), en phrases courtes ou en lignes commençant par un tiret (texte brut). Ajoute en une phrase comment ça marche ou comment on démarre, et le prix ou l'offre SEULEMENT s'ils figurent dans la fiche.
 4. Un seul appel à l'action, facile, qui ne propose QUE ce qui existe : répondre au mail pour en savoir plus (« répondez simplement à ce mail si ça vous intéresse »), ou aller voir le produit sur {{site}} ; une démonstration, un essai, un devis, un appel ou un rendez-vous seulement si la fiche dit qu'ils existent. Si tu hésites, propose seulement de répondre. Si une adresse de site est indiquée sous « Site du produit », écris {{site}} UNE fois, sur sa propre ligne juste avant la signature (« Pour voir le produit : {{site}} »), jamais l'adresse en clair ; sinon n'écris aucune adresse. Pas de proposition d'appel téléphonique ni de visio.
-5. Signature sur deux lignes : {{expediteur}} seul sur la première, le nom du produit seul sur la seconde. Jamais de virgule ni de tiret entre les deux.
+5. Formule de politesse seule sur sa ligne (« Bien cordialement, »), puis signature sur deux lignes : {{expediteur}} seul sur la première, le nom du produit seul sur la seconde. Jamais de virgule ni de tiret entre les deux.
 
 Objet : 4 à 7 mots, en minuscules sauf noms propres, sans point d'exclamation, sans mot de spam (gratuit, offre, urgent, promo, garanti), une question ou un fait, jamais une promesse. Il peut citer le produit ou le bénéfice, comme le ferait un collègue.
 
@@ -98,7 +99,7 @@ Vérité : tout ce que tu écris (fonction, prix, engagement, délai, offre, dé
 Style : phrases courtes, aucune formule creuse (« solution innovante », « leader », « révolutionner »), aucune pression, ni gras ni mise en forme autre que les tirets des bénéfices. N'invente aucun chiffre, client, résultat, prix ni délai absents de la fiche. Écris comme une personne qui écrit à une personne, avec l'envie de faire découvrir quelque chose d'utile.`,
     byModel: {
       haiku: `Reste sous 150 mots. Modèle de structure (adapte le fond, pas la forme) :
-« {{accroche}} [Nouvelle phrase qui relie à un problème de leur métier.]\n[Produit] est [ce que c'est] pour [type d'entreprise].\nConcrètement : [bénéfice 1], [bénéfice 2], [bénéfice 3].\n[Comment on démarre, en une phrase.] Si ça vous parle, répondez simplement à ce mail. »
+« Bonjour,\n\n{{accroche}} [Nouvelle phrase qui relie à un problème de leur métier.]\n[Produit] est [ce que c'est] pour [type d'entreprise].\nConcrètement : [bénéfice 1], [bénéfice 2], [bénéfice 3].\n[Comment on démarre, en une phrase.] Si ça vous parle, répondez simplement à ce mail.\n\nBien cordialement,\n{{expediteur}}\n[Produit] »
 Relis une fois : si une phrase pourrait figurer dans n'importe quel mail commercial, remplace-la par un détail propre au produit.`,
       sonnet: `Adapte le registre au décideur indiqué dans la fiche (gérant de TPE : direct et concret ; responsable : un peu plus structuré). Choisis l'argument le plus fort pour CE public, pas tous.`,
       opus: `Écris pour un décideur sceptique qui reçoit vingt sollicitations par jour : un angle précis, une raison réelle de répondre maintenant, aucune phrase décorative. Le mail doit pouvoir être transféré tel quel à un collègue sans gêne.`,
@@ -109,11 +110,13 @@ Relis une fois : si une phrase pourrait figurer dans n'importe quel mail commerc
     label: 'Mail de relance',
     fixed: 'Le format de réponse (corps) est imposé ; le lien de désinscription est ajouté automatiquement.',
     vars: ['ton', 'expediteur'],
-    text: `Rédige un mail de RELANCE B2B très court (60 mots maximum), envoyé dans le même fil que le premier mail resté sans réponse.
+    text: `Rédige un mail de RELANCE B2B très court (60 mots maximum, sans compter l'appel, la formule de clôture et la signature), envoyé dans le même fil que le premier mail resté sans réponse.
 Ton : [[ton]]
 Expéditeur : [[expediteur]]
 Variables disponibles : {{entreprise}}, {{ville}}, {{expediteur}}.
-{{entreprise}} est un nom propre inséré tel quel : place-le dans une tournure qui le porte (« Chez {{entreprise}}, … », « À l'équipe de {{entreprise}}, … », « Bonjour {{entreprise}}, … »). N'écris jamais « Pour {{entreprise}}, » suivi d'une phrase qui ne s'y rattache pas : une fois le nom collé, chaque phrase doit rester correcte et avoir un sens.
+{{entreprise}} est un nom propre inséré tel quel : place-le dans une tournure qui le porte (« Chez {{entreprise}}, … », « À l'équipe de {{entreprise}}, … », « Bonjour {{entreprise}}, … »). N'écris jamais « Pour {{entreprise}}, » suivi d'une phrase qui ne s'y rattache pas : une fois le nom collé, chaque phrase doit rester correcte et avoir un sens. {{entreprise}} n'est jamais vide : la virgule qui le suit est permise (la règle de ponctuation sur les variables vise celles qui peuvent être vides).
+
+Forme : commence par une formule d'appel courte seule sur sa ligne (« Bonjour, » ou « Bonjour {{entreprise}}, »), puis une ligne vide ; termine par une formule de politesse (« Bien cordialement, ») suivie de la signature {{expediteur}} sur sa propre ligne. Les paragraphes sont séparés par une ligne vide.
 
 Ce que doit faire la relance :
 - Apporter quelque chose de nouveau, pas répéter le premier mail : un exemple concret, un bénéfice qu'il ne mentionnait pas, ou une question plus simple.
@@ -123,7 +126,7 @@ Ce que doit faire la relance :
 
 Interdits : toute culpabilisation (« je me permets de revenir vers vous », « sans nouvelles de votre part », « avez-vous eu le temps de lire »), le ton insistant, les majuscules, les points d'exclamation, les pièces jointes, toute proposition d'appel ou de visio. Aucun chiffre ni résultat inventé.`,
     byModel: {
-      haiku: `Quatre phrases au plus : un fait nouveau, le lien avec {{entreprise}}, la question fermée, la sortie honorable. Pas de formule d'introduction.`,
+      haiku: `Quatre phrases au plus : un fait nouveau, le lien avec {{entreprise}}, la question fermée, la sortie honorable. Pas de préambule, mais garde toujours « Bonjour, » au début et une formule de politesse avant la signature.`,
       sonnet: `Choisis le seul angle nouveau le plus utile pour CE public (un cas d'usage, une économie de temps, une objection levée) et traite-le en une phrase.`,
       opus: `Anticipe pourquoi la personne n'a pas répondu (pas le temps, pas le bon interlocuteur, pas de besoin visible) et écris la relance qui rend la réponse la moins coûteuse possible.`,
       fable: `Une relance exemplaire : courte au point d'être lue en entier, utile même si elle reste sans réponse, jamais insistante.`,
