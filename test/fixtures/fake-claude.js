@@ -52,7 +52,18 @@ const billDocs = () => {
   return JSON.stringify({ devis: base('Devis'), acompte: base("Facture d'acompte", { deposit_percent: 30, lines: [] }), facture: base('Facture', { deposit_percent: 30 }), avoir: base('Avoir', { reason: 'Remboursement partiel', lines: [q.lines[0]] }) });
 };
 // Page IA : « ECHO » renvoie le dernier message de l'utilisateur (la conversation envoyée contient les précédents)
-const lines = prompt.includes('proposer TROIS exemples de devis') ? [billQuotes()]
+// Contrôle du sens des mails (aperçu et envoi) : « SENSEBAD » dans un mail rempli = sans sens (avec un modèle corrigé), « SENSEDOWN » = réponse illisible
+const senseReply = () => {
+  if (prompt.includes('SENSEDOWN')) return 'pas du json';
+  const ids = [...prompt.matchAll(/\[id=(\d+)\]/g)].map((m) => Number(m[1]));
+  const tpl = (/MODÈLE \(avec ses variables\) :\n([\s\S]*?)\n\nMAILS À CONTRÔLER/.exec(prompt) || [])[1] || '';
+  const blocks = (prompt.split('MAILS À CONTRÔLER :\n')[1] || '').split('\n\n---\n\n');
+  return JSON.stringify({ results: ids.map((id, i) => (/SENSEBAD/.test(blocks[i] || '')
+    ? { id, ok: false, problem: "La phrase d'ouverture ne veut rien dire", fix_body: tpl.replace('SENSEBAD', 'bien') }
+    : { id, ok: true })) });
+};
+const lines = prompt.includes('CONTRÔLE DU SENS') ? [senseReply()]
+  : prompt.includes('proposer TROIS exemples de devis') ? [billQuotes()]
   : prompt.includes('Affine ce document') ? [billRefine()]
   : prompt.includes('QUATRE modèles de documents') ? [billDocs()]
   : prompt.includes('ECHO') ? ['Écho : ' + prompt.split('Utilisateur : ').pop().trim()]

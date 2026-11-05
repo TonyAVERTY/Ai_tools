@@ -23,7 +23,7 @@ La recherche de prospects, l'évolution et l'audit proposent « Maintenant » ou
 
 ## Reports automatiques et budget
 - **Quota Claude serré** (au-delà de 85 % de la session ou de la semaine) : les jobs non urgents (analyse, évolutions, audit, tâches des postes) restent en file et repartent seuls une fois le quota libéré. Prospection et envois continuent normalement.
-- **Budget IA** (clé API seulement, Réglages → Budget IA) : plafonds glissants sur 24 h et sur 30 jours. Plafond atteint : les jobs IA restent en file et repartent seuls quand la fenêtre glisse ; les envois et relances continuent. Un job en cours n'est jamais coupé : le plafond peut être dépassé d'un job.
+- **Budget IA** (clé API seulement, Réglages → Budget IA) : plafonds glissants sur 24 h et sur 30 jours. Plafond atteint : les jobs IA restent en file et repartent seuls quand la fenêtre glisse ; les envois et relances ne partent pas non plus, car chaque mail est relu par l'IA avant l'envoi (message « Budget IA atteint … Aucun mail n'est parti ») : relance-les quand la fenêtre a glissé. Un job en cours n'est jamais coupé : le plafond peut être dépassé d'un job.
 - **Charge du serveur élevée** : les nouveaux jobs attendent un instant.
 
 ## Notifications et rapport hebdomadaire

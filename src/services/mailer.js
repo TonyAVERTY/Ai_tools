@@ -36,14 +36,17 @@ export function makeMessageId(fromEmail) {
 /**
  * `footer: false` : l'utilisateur a retiré le pied de page (Réglages → Garde-fous, avec avertissement) : aucun lien de désinscription, visible ou non.
  */
+/** Valeurs des variables {{entreprise}}, {{ville}}… pour un prospect : une seule source pour l'envoi, l'aperçu et le contrôle du sens. */
+export const mailVars = (prospect, smtp, site = '') => ({
+  entreprise: prospect.company,
+  ville: prospect.city || '',
+  accroche: prospect.hook || '',
+  expediteur: smtp?.fromName || '',
+  site: site || '', // adresse du site du produit (En-tête du projet)
+});
+
 export function buildProspectMail({ template, prospect, smtp, site = '', unsubUrl, subject = template.subject, messageId, inReplyTo, readReceipt = false, footer: withFooter = true, html: asHtml = false }) {
-  const vars = {
-    entreprise: prospect.company,
-    ville: prospect.city || '',
-    accroche: prospect.hook || '',
-    expediteur: smtp.fromName || '',
-    site: site || '', // adresse du site du produit (En-tête du projet)
-  };
+  const vars = mailVars(prospect, smtp, site);
   const body = fillBody(template.body, vars).replace(/\n{3,}/g, '\n\n').trim();
   const notice = `Vous recevez ce message car l'adresse ${prospect.email} est publiée publiquement${prospect.source ? ` (${prospect.source})` : ''}.`;
   const footer = ['', '—', notice, `Pour ne plus être contacté : ${unsubUrl}`].join('\n');

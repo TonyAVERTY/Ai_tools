@@ -13,6 +13,12 @@ Aucun lien : active la connexion par code d'appareil dans les paramètres de sé
 ## Avec ChatGPT ou Gemini, je ne vois pas les tokens pendant la tâche
 C'est normal : ChatGPT et Gemini ne communiquent leurs tokens qu'**à la fin** de la tâche, contrairement à Claude qui les envoie au fil de l'eau. Pendant la tâche, la ligne dit « Tokens comptés à la fin de la tâche » (dans « Activité » et dans « Voir »). Le total apparaît dès que la tâche est terminée, et reste affiché même si elle échoue. Si le total reste à 0 après la fin d'une tâche réussie, signale-le à l'administrateur : l'IA n'a pas renvoyé sa mesure.
 
+## « Aucun mail n'est parti : ton IA juge que le texte n'a pas de sens »
+Avant l'envoi, ton IA relit chaque mail rempli avec les vraies valeurs, par lots de 10. Elle a jugé qu'une phrase ne veut rien dire (souvent un nom d'entreprise collé dans une tournure qui ne le porte pas) : le mail ne part pas, rien n'est perdu et les prospects restent « à contacter ». Ouvre **Aperçu** sur le modèle : l'IA y explique le problème et propose une version corrigée ; clique **Appliquer la correction au modèle**, relis, **Enregistrer**, **Valider le modèle**, puis relance l'envoi. Si seuls certains prospects sont refusés, le journal des mails (« Non envoyé : le texte n'a pas de sens (…) ») dit lesquels : la cause est alors leur accroche ou leur nom, à corriger dans leur fiche.
+
+## « Relecture par l'IA impossible » : l'envoi ne part pas
+L'envoi vérifie le sens de chaque mail avec ton IA : quand elle ne peut pas répondre (budget IA atteint, IA déconnectée, réponse illisible), **rien ne part** plutôt que d'envoyer un texte non relu. Le message donne la raison. Reconnecte ton IA (voir « Je ne peux rien lancer »), attends que le budget se libère (Réglages → Budget IA) ou relance un peu plus tard : les prospects restent « à contacter ».
+
 ## Mon job reste « En attente »
 Lire le message « En attente : … » dans le menu **Activité**. Raisons possibles : budget IA atteint (clé API) ; quota Claude serré (au-delà de 85 %) ; charge élevée du serveur ; job programmé « Cette nuit » ; déjà un job IA en cours pour le compte. Il repart seul. On peut l'**Annuler** depuis Activité.
 
