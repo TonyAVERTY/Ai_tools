@@ -1,7 +1,7 @@
 // Promotion d'un projet : formulaire de la vidéo, choix de la voix, vidéos produites, clés des fournisseurs de voix.
 // Chargé après app.js, qui expose ses outils communs dans window.AiTools ; ajax.js relance ce script à chaque navigation, comme app.js.
 (() => {
-  const { $, $$, api, confirmBox, esc, go, icon, liDay, listen, loadFailed, loadingHtml, refreshProject, toast } = window.AiTools;
+  const { $, $$, aiName, api, confirmBox, esc, go, icon, liDay, listen, loadFailed, loadingHtml, refreshProject, toast } = window.AiTools;
   const mo = (n) => (n >= 1048576 ? `${(n / 1048576).toFixed(1).replace('.', ',')} Mo` : `${Math.max(1, Math.round(n / 1024))} Ko`);
 
   // ---------- Promotion ----------
@@ -33,7 +33,7 @@
     const L = s.limits;
     const form = s.hasProfile ? `<form class="promo-form" data-promo-form data-max-frames="${L.maxFrames}">
         <label class="field"><span class="lbl">Sujet <span class="muted small">(facultatif)</span></span>
-          <input name="subject" maxlength="${L.maxSubject}" placeholder="Laisse vide : Claude présente le projet" autocomplete="off"></label>
+          <input name="subject" maxlength="${L.maxSubject}" placeholder="Laisse vide : ${esc(aiName())} présente le projet" autocomplete="off"></label>
         <div class="grid3">
           <label class="field"><span class="lbl">Images par seconde</span><input name="fps" type="number" inputmode="numeric" min="${L.fps.min}" max="${L.fps.max}" value="${L.fps.def}" required></label>
           <label class="field"><span class="lbl">Durée (secondes)</span><input name="seconds" type="number" inputmode="numeric" min="${L.seconds.min}" max="${L.seconds.max}" value="${L.seconds.def}" required></label>
@@ -55,13 +55,13 @@
           </div>
           <div class="row"><button type="button" class="btn small" data-promo-sample>${icon('play')}Écouter un extrait</button><span class="hint" data-promo-sample-state role="status"></span></div>
           <audio data-promo-audio preload="none"></audio>
-          <p class="muted small">La voix lit un texte écrit par Claude, dans la langue de la voix choisie. Ce texte est envoyé au fournisseur pour être lu. Google Traduction est gratuit et sans clé, mais non officiel (il peut changer ou refuser des demandes) et sa voix est simple. Piper et eSpeak NG sont des voix locales, gratuites, sans clé : elles tournent sur le serveur (rien n'en sort) si l'administrateur les a installées ; Piper est bien plus naturelle. ElevenLabs, Google Cloud et Microsoft Azure donnent des voix bien plus naturelles avec ta propre clé API (quota gratuit mensuel du fournisseur) ; ta clé est chiffrée et jamais réaffichée.</p>
+          <p class="muted small">La voix lit un texte écrit par ${esc(aiName())}, dans la langue de la voix choisie. Ce texte est envoyé au fournisseur pour être lu. Google Traduction est gratuit et sans clé, mais non officiel (il peut changer ou refuser des demandes) et sa voix est simple. Piper et eSpeak NG sont des voix locales, gratuites, sans clé : elles tournent sur le serveur (rien n'en sort) si l'administrateur les a installées ; Piper est bien plus naturelle. ElevenLabs, Google Cloud et Microsoft Azure donnent des voix bien plus naturelles avec ta propre clé API (quota gratuit mensuel du fournisseur) ; ta clé est chiffrée et jamais réaffichée.</p>
         </div>
         <p class="hint" data-promo-count></p>
         <div class="row"><button class="btn primary" data-promo-go>${icon('film')}Générer la vidéo</button></div>
       </form>
-      <p class="muted small">Claude écrit la scène, elle est ensuite dessinée image par image sur le serveur : compte quelques minutes selon la durée et le nombre d'images par seconde. Les consignes se modifient dans les Réglages (« Vidéo de promotion »).</p>`
-      : '<p class="muted">Analyse d\'abord le projet : Claude s\'appuie sur sa fiche pour concevoir la vidéo.</p>';
+      <p class="muted small">${esc(aiName())} écrit la scène, elle est ensuite dessinée image par image sur le serveur : compte quelques minutes selon la durée et le nombre d'images par seconde. Les consignes se modifient dans les Réglages (« Vidéo de promotion »).</p>`
+      : `<p class="muted">Analyse d'abord le projet : ${esc(aiName())} s'appuie sur sa fiche pour concevoir la vidéo.</p>`;
     voiceCatalogs.set(box, s.voices);
     box.innerHTML = `${form}${s.videos.length ? `<div class="pv-list">${s.videos.map((v) => promoVideoCard(v, s, id)).join('')}</div>` : (s.hasProfile ? '<p class="muted small">Aucune vidéo pour l\'instant.</p>' : '')}`;
     promoCount(box);
@@ -181,7 +181,7 @@
     btn.disabled = true;
     try {
       const r = await api(`/api/projects/${proj.dataset.id}/promo/generate`, { subject: f.subject.value, fps: Number(f.fps.value), seconds: Number(f.seconds.value), format: f.format.value, style: f.style.value, voice: f.voice.checked, voiceProvider: f.voiceProvider.value, voiceName: f.voiceName.value, voiceLang: f.voiceLang.value });
-      toast(r.budgetBlocked ? `En file, mais ${r.budgetBlocked}` : r.existing ? 'Une vidéo est déjà en cours de production' : 'Claude conçoit la vidéo…', r.budgetBlocked ? 'error' : 'ok');
+      toast(r.budgetBlocked ? `En file, mais ${r.budgetBlocked}` : r.existing ? 'Une vidéo est déjà en cours de production' : `${aiName()} conçoit la vidéo…`, r.budgetBlocked ? 'error' : 'ok');
       refreshProject(proj);
     } catch (err) { toast(err.message, 'error'); }
     promoCount(f.closest('[data-promo]'));

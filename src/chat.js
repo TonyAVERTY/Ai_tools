@@ -4,6 +4,7 @@
 // vidéo) ouvrent les seuls outils de lecture (Read, Glob, Grep), dans le bac à sable, sur ces éléments et rien d'autre.
 // Les conversations sont privées : propres à chaque compte, supprimées avec lui (fichiers compris).
 import { userProvider } from './claudelink.js';
+import { aiName } from './services/ainame.js';
 import { existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { HttpError, json, readBody, html, redirect } from './http.js';
@@ -284,7 +285,7 @@ export function registerChatRoutes(router, app) {
         // Pas de liaison Claude valide, bac à sable indisponible, CLI introuvable… : message lisible, détail dans les logs
         console.error('[chat]', e.message);
         if (e.status !== 404) reportError(app, e, { method: 'POST', path: '/api/chat/send', userId, status: e.status ?? null });
-        write({ type: 'error', error: e.expose || e.status < 500 ? e.message : "Claude n'a pas pu répondre. Réessaie dans un instant." });
+        write({ type: 'error', error: e.expose || e.status < 500 ? e.message : `${aiName()} n'a pas pu répondre. Réessaie dans un instant.` });
       } finally { run?.cleanup(); }
       res.end();
     } finally {
@@ -297,10 +298,10 @@ export function registerChatRoutes(router, app) {
 /** Message lisible pour une réponse en échec de Claude (quota, jeton refusé…), sans détail technique. */
 function friendly(r, text) {
   const t = `${text} ${r?.subtype ?? ''}`.toLowerCase();
-  if (/login|bearer|token|authenticat|credential|401/.test(t)) return "Ton accès Claude n'est plus valide : reconnecte-le depuis Mon compte.";
-  if (/rate.?limit|quota|usage limit|too many|429|overloaded/.test(t)) return 'Ton quota Claude est atteint pour le moment : réessaie plus tard.';
+  if (/login|bearer|token|authenticat|credential|401/.test(t)) return `Ton accès ${aiName()} n'est plus valide : reconnecte-le depuis Mon compte.`;
+  if (/rate.?limit|quota|usage limit|too many|429|overloaded/.test(t)) return `Ton quota ${aiName()} est atteint pour le moment : réessaie plus tard.`;
   if (r?.subtype === 'error_max_turns') return 'La réponse a été interrompue : reformule ou réessaie.';
-  return text ? String(text).slice(0, 300) : "Claude n'a pas répondu. Réessaie dans un instant.";
+  return text ? String(text).slice(0, 300) : `${aiName()} n'a pas répondu. Réessaie dans un instant.`;
 }
 
 /** Ce que Claude est en train de lire, en une ligne pour l'utilisateur (chemins du dépôt joint ou des fichiers joints, jamais ceux du serveur). */

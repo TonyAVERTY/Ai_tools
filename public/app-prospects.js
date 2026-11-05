@@ -2,7 +2,7 @@
 // suppression) et aperçu du mail. Chargé après app.js, qui expose ses outils communs dans window.AiTools ;
 // ajax.js relance ce script à chaque navigation, comme app.js. Aucune fonction n'est appelée de l'extérieur : tout passe par des écouteurs.
 (() => {
-  const { $, $$, api, confirmBox, esc, formData, icon, listen, toast } = window.AiTools;
+  const { $, $$, aiName, api, confirmBox, esc, formData, icon, listen, toast } = window.AiTools;
 
   // ---------- Liste des prospects (mini CRM) ----------
   const STATUS = { new: 'À contacter', sent: 'Contacté', replied: 'A répondu', client: 'Client', refused: 'Refus', bounced: 'Rejeté', invalid: 'Adresse invalide' };
@@ -101,7 +101,7 @@
         regen.disabled = true;
         try {
           await api(`/api/prospects/${id}/hook`, {});
-          toast("Accroche en cours de rédaction : Claude lit le site du prospect");
+          toast(`Accroche en cours de rédaction : ${aiName()} lit le site du prospect`);
           // La fiche se met à jour toute seule quand le job se termine
           for (let i = 0; i < 60 && dlg.open && dlg.dataset.id === id; i++) {
             await new Promise((r) => setTimeout(r, 3000));

@@ -130,3 +130,32 @@ test('messages de tâches : avancement, journal et erreur parlent de l\'IA du pr
   assert.equal(JSON.parse(d.row.progress_json).message, 'Claude rédige trois exemples de devis…', 'pour un utilisateur de Claude, rien ne change');
   assert.equal((await run(c, 'boom')).row.error, "Claude n'a pas produit de post exploitable : réessaie");
 });
+
+test('page IA : titre, saisie, avertissement et sélecteur de modèle parlent de l\'IA de l\'utilisateur', async () => {
+  const g = (await html(await s.newUser({ admin: false, link: linked('gemini') }), '/chat')).replace(/&#39;/g, "'");
+  assert.match(g, /<h2>Discute avec Gemini<\/h2>/);
+  assert.match(g, /aria-label="Conversation avec Gemini"/);
+  assert.match(g, /aria-label="Modèle Gemini"/);
+  assert.match(g, /placeholder="Écris à Gemini…/);
+  assert.match(g, /Chaque message est envoyé à Gemini avec ton propre compte\./);
+  assert.match(g, /Gemini ne voit que cette conversation/);
+  assert.doesNotMatch(g, /Claude/, 'aucun Claude sur la page IA d\'un utilisateur de Gemini');
+  const c = await html(await s.newUser({ admin: false, link: linked('claude') }), '/chat');
+  assert.match(c, /<h2>Discute avec Claude<\/h2>/);
+  assert.match(c, /aria-label="Modèle Claude"/);
+  const sup = (await html(await s.newUser({ admin: false, link: linked('openai', 'chatgpt_account') }), '/support')).replace(/&#39;/g, "'");
+  assert.match(sup, /ChatGPT lit la documentation d'AiTools pour te répondre/);
+});
+
+test('navigateur : <body data-ai> est lu par AiTools.aiName(), et plus aucun « Claude » en dur dans les textes de l\'IA de la personne', async () => {
+  const { readFileSync } = await import('node:fs');
+  const app = readFileSync(new URL('../public/app.js', import.meta.url), 'utf8');
+  assert.match(app, /function aiName\(\) \{ return document\.body\?\.dataset\.ai \|\| 'Claude'; \}/);
+  assert.match(app, /sentence, aiName \}\);/, 'exposé aux fichiers app-*.js');
+  assert.match(app, /\$\{ai\} est déconnecté/);
+  assert.match(app, /La scène écrite par \.\+\? ne passe pas au rendu/, 'le message d\'erreur du serveur porte le nom de l\'IA');
+  for (const f of ['app-linkedin.js', 'app-promo.js', 'app-prospects.js', 'chat.js']) {
+    const src = readFileSync(new URL(`../public/${f}`, import.meta.url), 'utf8').split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n');
+    assert.doesNotMatch(src, /Claude/, `${f} : le nom vient de aiName()`);
+  }
+});
