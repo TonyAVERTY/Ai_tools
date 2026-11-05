@@ -7,7 +7,7 @@ import { addProject } from './helpers/users.js';
 import { setDeveloperMode, createApiToken } from '../src/apitokens.js';
 import { API_ENDPOINTS } from '../src/apiv1.js';
 import { API_DOCS, GROUPS } from '../src/apidocs.js';
-import { TOOLS } from '../mcp/aitools-mcp.js';
+import { TOOLS } from '../mcp/iaboss-mcp.js';
 import { highlight } from '../src/site/highlight.js';
 
 let s;
@@ -76,10 +76,10 @@ test('référence de l\'API : toutes les routes documentées, avec paramètres, 
   assert.match(html, /120 requêtes par minute/);
   // exemples de requête : en-tête d'autorisation, corps JSON des POST, jamais un vrai jeton
   const visible = text(html);
-  assert.match(visible, /curl -X POST "https:\/\/[^"]+\/api\/v1\/projects\/3\/prospects" \\\n\s+-H "Authorization: Bearer \$AITOOLS_TOKEN" \\\n\s+-H "Content-Type: application\/json" \\\n\s+-d '\{"prospects"/);
+  assert.match(visible, /curl -X POST "https:\/\/[^"]+\/api\/v1\/projects\/3\/prospects" \\\n\s+-H "Authorization: Bearer \$IABOSS_TOKEN" \\\n\s+-H "Content-Type: application\/json" \\\n\s+-d '\{"prospects"/);
   assert.match(visible, /requests\.post\(/);
   assert.match(visible, /method: 'POST'/);
-  assert.doesNotMatch(html, /aitk_[A-Za-z0-9_-]{43}/);
+  assert.doesNotMatch(html, /(?:iaboss|aitk)_[A-Za-z0-9_-]{43}/);
 });
 
 test('exemples de réponse fidèles : chaque champ documenté existe dans la vraie réponse du serveur', async () => {
@@ -122,7 +122,7 @@ test('serveur MCP : chaque outil est documenté avec son droit et ses paramètre
     assert.ok(html.includes(`<code>${t.name}</code>`), `outil ${t.name}`);
     for (const k of Object.keys(t.props || {})) assert.ok(html.includes(`<code>${k}</code>`), `${t.name} : paramètre ${k}`);
   }
-  for (const w of ['claude mcp add aitools', 'claude_desktop_config.json', 'AITOOLS_READONLY', 'Node.js 22', 'confirm: true', '-e AITOOLS_TOKEN=aitk_…']) assert.ok(text(html).includes(w), w);
+  for (const w of ['claude mcp add iaboss', 'claude_desktop_config.json', 'IABOSS_READONLY', 'Node.js 22', 'confirm: true', '-e IABOSS_TOKEN=iaboss_…']) assert.ok(text(html).includes(w), w);
   assert.match(html, /href="\/developer\/mcp\.js"/);
   assert.match(html, /Contenus de tiers/);
 });

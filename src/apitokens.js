@@ -1,5 +1,5 @@
 // Mode développeur et jetons d'API. Le mode est un réglage du compte ; un jeton ne fonctionne que tant qu'il est actif.
-// Un jeton = « aitk_ » + 32 octets aléatoires. Il n'est montré qu'à sa création : la base ne garde que son SHA-256.
+// Un jeton = « iaboss_ » + 32 octets aléatoires. Les jetons « aitk_ » créés avant le renommage restent valides (même longueur, même hachage). Il n'est montré qu'à sa création : la base ne garde que son SHA-256.
 import { randomBytes } from 'node:crypto';
 import { now, getSetting, setSetting } from './db.js';
 import { hashSid } from './crypto.js';
@@ -11,8 +11,8 @@ export const SCOPES = {
   jobs: 'Lancer des tâches : analyse, recherche, régénération d\'accroche, audit, envoi de mails',
 };
 export const MAX_TOKENS = 5;
-const PREFIX = 'aitk_';
-const TOKEN_RE = /^aitk_[A-Za-z0-9_-]{43}$/;
+const PREFIX = 'iaboss_';
+const TOKEN_RE = /^(?:iaboss|aitk)_[A-Za-z0-9_-]{43}$/;
 
 export const developerMode = async (db, userId) => (await getSetting(db, userId, 'developer_mode', '0')) === '1';
 export const setDeveloperMode = (db, userId, on) => setSetting(db, userId, 'developer_mode', on ? '1' : '0');
@@ -45,7 +45,7 @@ export async function revokeApiToken(db, userId, id) {
 }
 
 /**
- * Authentifie une requête d'API : en-tête « Authorization: Bearer aitk_… ». Les cookies ne comptent jamais ici.
+ * Authentifie une requête d'API : en-tête « Authorization: Bearer iaboss_… ». Les cookies ne comptent jamais ici.
  * Le compte doit être actif ET en mode développeur : désactiver le mode coupe tous ses jetons d'un coup.
  * @returns {Promise<{userId:number, tokenId:number, scopes:string[], user:object}>}
  */

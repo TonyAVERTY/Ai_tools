@@ -1,4 +1,4 @@
-// API JSON publique (v1), réservée au mode développeur. Authentification : « Authorization: Bearer aitk_… » (voir apitokens.js).
+// API JSON publique (v1), réservée au mode développeur. Authentification : « Authorization: Bearer iaboss_… » (voir apitokens.js).
 // Même contrôle d'accès que le panel : un jeton ne voit que les projets de son compte (et ceux que son équipe partage).
 // Documentation : /docs/api (src/site/docs.js + src/apidocs.js) et la page /developer du panel.
 import { json, readBody, HttpError } from './http.js';

@@ -32,7 +32,7 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   // Copier la commande Claude Code
   await p.locator('[data-copy-cmd]').last().click();
   const clip = await p.evaluate(() => navigator.clipboard.readText());
-  ok(/^claude mcp add aitools/.test(clip) && /AITOOLS_TOKEN=aitk_/.test(clip), `${tag} « Copier » met la commande dans le presse-papiers`);
+  ok(/^claude mcp add iaboss/.test(clip) && /IABOSS_TOKEN=iaboss_/.test(clip), `${tag} « Copier » met la commande dans le presse-papiers`);
 
   // Suppression : refus puis accord
   const row = p.locator('tr', { hasText: `Jeton ${vp.width}` });

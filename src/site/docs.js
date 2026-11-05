@@ -7,7 +7,7 @@ import { highlight } from './highlight.js';
 import { API_ENDPOINTS } from '../apiv1.js';
 import { API_DOCS, GROUPS } from '../apidocs.js';
 import { SCOPES } from '../apitokens.js';
-import { TOOLS } from '../../mcp/aitools-mcp.js';
+import { TOOLS } from '../../mcp/iaboss-mcp.js';
 
 const UPDATED = '23 octobre 2026';
 const DOC_PAGES = [['/docs', 'Démarrage'], ['/docs/api', 'API'], ['/docs/mcp', 'Serveur MCP']];
@@ -37,22 +37,22 @@ function exampleUrl(base, sample) {
 }
 
 function curlExample(method, url, body) {
-  const lines = [`curl ${method === 'GET' ? '' : '-X POST '}"${url}" \\`, '  -H "Authorization: Bearer $AITOOLS_TOKEN"'];
+  const lines = [`curl ${method === 'GET' ? '' : '-X POST '}"${url}" \\`, '  -H "Authorization: Bearer $IABOSS_TOKEN"'];
   if (body) { lines[1] += ' \\'; lines.push('  -H "Content-Type: application/json" \\', `  -d '${JSON.stringify(body)}'`); }
   return lines.join('\n');
 }
 
 function jsExample(method, url, body) {
-  const opts = [`  method: '${method}',`, "  headers: {", "    Authorization: `Bearer ${process.env.AITOOLS_TOKEN}`,", ...(body ? ["    'Content-Type': 'application/json',"] : []), '  },', ...(body ? [`  body: JSON.stringify(${JSON.stringify(body)}),`] : [])];
+  const opts = [`  method: '${method}',`, "  headers: {", "    Authorization: `Bearer ${process.env.IABOSS_TOKEN}`,", ...(body ? ["    'Content-Type': 'application/json',"] : []), '  },', ...(body ? [`  body: JSON.stringify(${JSON.stringify(body)}),`] : [])];
   return method === 'GET'
-    ? `const res = await fetch("${url}", {\n  headers: { Authorization: \`Bearer \${process.env.AITOOLS_TOKEN}\` },\n});\nconst data = await res.json();`
+    ? `const res = await fetch("${url}", {\n  headers: { Authorization: \`Bearer \${process.env.IABOSS_TOKEN}\` },\n});\nconst data = await res.json();`
     : `const res = await fetch("${url}", {\n${opts.join('\n')}\n});\nconst data = await res.json();`;
 }
 
 function pyExample(method, url, body) {
   const [u, qs] = url.split('?');
   const params = qs ? `, params=${JSON.stringify(Object.fromEntries(new URLSearchParams(qs)))}` : '';
-  return ['import os, requests', '', `r = requests.${method.toLowerCase()}(`, `    "${u}",`, '    headers={"Authorization": f"Bearer {os.environ[\'AITOOLS_TOKEN\']}"}' + (body ? ',' : params ? ',' : ''), ...(body ? [`    json=${JSON.stringify(body)},`] : params ? [`    ${params.slice(2)},`] : []), ')', 'data = r.json()'].join('\n');
+  return ['import os, requests', '', `r = requests.${method.toLowerCase()}(`, `    "${u}",`, '    headers={"Authorization": f"Bearer {os.environ[\'IABOSS_TOKEN\']}"}' + (body ? ',' : params ? ',' : ''), ...(body ? [`    json=${JSON.stringify(body)},`] : params ? [`    ${params.slice(2)},`] : []), ')', 'data = r.json()'].join('\n');
 }
 
 const params = (list) => `<div class="tw"><table><thead><tr><th>Paramètre</th><th>Où</th><th>Type</th><th>Description</th></tr></thead><tbody>${list.map(([name, where, type, required, desc]) => `<tr><td><code>${esc(name)}</code>${required ? ' <span class="req">requis</span>' : ''}</td><td>${esc(where)}</td><td>${inline(type)}</td><td>${inline(desc)}</td></tr>`).join('')}</tbody></table></div>`;
@@ -117,13 +117,13 @@ const callout = (title, text) => `<div class="call"><b>${esc(title)}</b>${text}<
 export function docsHomePage({ appUrl }) {
   const base = appUrl;
   const first = [
-    ['cURL', `curl "${base}/api/v1/me" \\\n  -H "Authorization: Bearer $AITOOLS_TOKEN"`, 'bash'],
-    ['JavaScript', `const res = await fetch("${base}/api/v1/me", {\n  headers: { Authorization: \`Bearer \${process.env.AITOOLS_TOKEN}\` },\n});\nconsole.log(await res.json());`, 'js'],
-    ['Python', `import os, requests\n\nr = requests.get(\n    "${base}/api/v1/me",\n    headers={"Authorization": f"Bearer {os.environ['AITOOLS_TOKEN']}"},\n)\nprint(r.json())`, 'python'],
+    ['cURL', `curl "${base}/api/v1/me" \\\n  -H "Authorization: Bearer $IABOSS_TOKEN"`, 'bash'],
+    ['JavaScript', `const res = await fetch("${base}/api/v1/me", {\n  headers: { Authorization: \`Bearer \${process.env.IABOSS_TOKEN}\` },\n});\nconsole.log(await res.json());`, 'js'],
+    ['Python', `import os, requests\n\nr = requests.get(\n    "${base}/api/v1/me",\n    headers={"Authorization": f"Bearer {os.environ['IABOSS_TOKEN']}"},\n)\nprint(r.json())`, 'python'],
   ];
   return docPage({
-    appUrl, path: '/docs', title: 'Documentation développeur : API et MCP · AiTools', description: "Pilote AiTools depuis tes scripts ou depuis Claude : démarrage rapide, API REST et serveur MCP.", h1: 'Documentation développeur',
-    lead: "Pilote ton panel AiTools depuis tes scripts, tes outils d'automatisation ou directement depuis Claude. Une API REST en JSON, un serveur MCP, et les mêmes règles que dans le panel.",
+    appUrl, path: '/docs', title: 'Documentation développeur : API et MCP · iaboss', description: "Pilote iaboss depuis tes scripts ou depuis Claude : démarrage rapide, API REST et serveur MCP.", h1: 'Documentation développeur',
+    lead: "Pilote ton panel iaboss depuis tes scripts, tes outils d'automatisation ou directement depuis Claude. Une API REST en JSON, un serveur MCP, et les mêmes règles que dans le panel.",
     sections: [
       { id: 'apercu', title: 'Vue d’ensemble', html: `<div class="doc-cards">
         <a class="doc-card" href="/docs/api">${ic('link')}<strong>API REST</strong><span>Projets, prospects, réponses, mails et tâches, en JSON, avec un jeton.</span></a>
@@ -135,7 +135,7 @@ export function docsHomePage({ appUrl }) {
         <p>Dans le panel : <strong>Mon compte</strong> → <em>Mode développeur</em> → <strong>Activer</strong>. Les adresses de l'API et du serveur MCP s'affichent ensuite à cet endroit, ainsi que sur la page <a href="/developer">Développeur</a>.</p>
         <h3 id="etape-2">2. Créer un jeton</h3>
         <p>Page <a href="/developer">Développeur</a> → <strong>Créer un jeton</strong> : donne-lui un nom et coche les droits nécessaires (<code>read</code> seul pour commencer). Copie-le tout de suite : <strong>il n'est affiché qu'une fois</strong>, seule son empreinte est conservée.</p>
-        ${codeBlock('export AITOOLS_TOKEN="aitk_…"', 'bash', 'Terminal')}
+        ${codeBlock('export IABOSS_TOKEN="iaboss_…"', 'bash', 'Terminal')}
         <h3 id="etape-3">3. Premier appel</h3>
         <p>Vérifie que le jeton fonctionne avec <code>GET /api/v1/me</code> :</p>
         ${codeTabs(first)}
@@ -160,12 +160,12 @@ export function docsApiPage({ appUrl }) {
     return { id: `ref-${id}`, label, intro, list };
   }).filter((g) => g.list.length);
   return docPage({
-    appUrl, path: '/docs/api', title: 'Référence de l’API v1 · AiTools', description: "Référence de l'API REST d'AiTools : authentification, droits, erreurs, limites et toutes les routes avec exemples cURL, JavaScript et Python.", h1: 'Référence de l’API',
+    appUrl, path: '/docs/api', title: 'Référence de l’API v1 · iaboss', description: "Référence de l'API REST d'iaboss : authentification, droits, erreurs, limites et toutes les routes avec exemples cURL, JavaScript et Python.", h1: 'Référence de l’API',
     lead: `API REST en JSON, version <code>v1</code>. Base : <code>${esc(base)}/api/v1</code>.`,
     sections: [
       { id: 'authentification', title: 'Authentification', html: `
         <p>Chaque requête porte le jeton dans l'en-tête <code>Authorization</code> :</p>
-        ${codeBlock(`Authorization: Bearer aitk_votre_jeton`, 'bash', 'En-tête')}
+        ${codeBlock(`Authorization: Bearer iaboss_votre_jeton`, 'bash', 'En-tête')}
         <p>Un jeton se crée sur la page <a href="/developer">Développeur</a> (mode développeur activé). Il est affiché une seule fois ; sa suppression, ou la désactivation du mode développeur, le coupe immédiatement. Les cookies du panel n'ouvrent jamais l'API.</p>
         ${callout('Garde-le secret', ' Ne place jamais un jeton dans une page web, un dépôt ou un message. Si tu as un doute : supprime-le et crées-en un autre.')}` },
       { id: 'droits', title: 'Droits des jetons', html: `<div class="tw"><table><thead><tr><th>Droit</th><th>Permet</th></tr></thead><tbody>${Object.entries(SCOPES).map(([k, v]) => `<tr><td><span class="scope">${esc(k)}</span></td><td>${esc(v)}</td></tr>`).join('')}</tbody></table></div>
@@ -208,13 +208,13 @@ const scopeOf = (t) => (t.jobs ? 'jobs' : t.write ? 'write' : 'read');
 const paramsOf = (t) => Object.entries(t.props || {}).map(([k, v]) => `<code>${esc(k)}</code>${(t.required || []).includes(k) ? '*' : ''}`).join(' ');
 
 export function docsMcpPage({ appUrl }) {
-  const claudeCode = `claude mcp add aitools \\\n  -e AITOOLS_URL=${appUrl} \\\n  -e AITOOLS_TOKEN=aitk_… \\\n  -- node /chemin/vers/aitools-mcp.js`;
-  const desktop = JSON.stringify({ mcpServers: { aitools: { command: 'node', args: ['/chemin/vers/aitools-mcp.js'], env: { AITOOLS_URL: appUrl, AITOOLS_TOKEN: 'aitk_…' } } } }, null, 2);
+  const claudeCode = `claude mcp add iaboss \\\n  -e IABOSS_URL=${appUrl} \\\n  -e IABOSS_TOKEN=iaboss_… \\\n  -- node /chemin/vers/iaboss-mcp.js`;
+  const desktop = JSON.stringify({ mcpServers: { iaboss: { command: 'node', args: ['/chemin/vers/iaboss-mcp.js'], env: { IABOSS_URL: appUrl, IABOSS_TOKEN: 'iaboss_…' } } } }, null, 2);
   return docPage({
-    appUrl, path: '/docs/mcp', title: 'Serveur MCP pour Claude · AiTools', description: "Relie Claude à ton panel AiTools avec le serveur MCP : installation, outils disponibles, sécurité et dépannage.", h1: 'Serveur MCP',
+    appUrl, path: '/docs/mcp', title: 'Serveur MCP pour Claude · iaboss', description: "Relie Claude à ton panel iaboss avec le serveur MCP : installation, outils disponibles, sécurité et dépannage.", h1: 'Serveur MCP',
     lead: "Le serveur MCP (Model Context Protocol) relie <strong>Claude</strong> à ton panel : tu peux lui demander « quelles réponses sont arrivées ? », « ajoute une note à ce prospect » ou « lance une recherche de 20 prospects ». Il s'appuie sur l'API : il est réservé au mode développeur et n'a <strong>aucun droit propre</strong>, seulement ceux de son jeton.",
     sections: [
-      { id: 'prerequis', title: 'Prérequis', html: `<ul><li><strong>Mode développeur</strong> activé (Mon compte).</li><li>Un <strong>jeton</strong> d'API créé sur la page <a href="/developer">Développeur</a> : commence par <code>read</code> seul.</li><li><strong>Node.js 22</strong> ou plus sur la machine qui lance Claude.</li><li>Le fichier du serveur : <a href="/developer/mcp.js" download="aitools-mcp.js">aitools-mcp.js</a> (téléchargeable depuis Mon compte et la page Développeur). Un seul fichier, aucune dépendance.</li></ul>` },
+      { id: 'prerequis', title: 'Prérequis', html: `<ul><li><strong>Mode développeur</strong> activé (Mon compte).</li><li>Un <strong>jeton</strong> d'API créé sur la page <a href="/developer">Développeur</a> : commence par <code>read</code> seul.</li><li><strong>Node.js 22</strong> ou plus sur la machine qui lance Claude.</li><li>Le fichier du serveur : <a href="/developer/mcp.js" download="iaboss-mcp.js">iaboss-mcp.js</a> (téléchargeable depuis Mon compte et la page Développeur). Un seul fichier, aucune dépendance.</li></ul>` },
       { id: 'installation', title: 'Installation', sub: [['claude-code', 'Claude Code'], ['claude-desktop', 'Claude Desktop'], ['variables', 'Variables']], html: `
         <h3 id="claude-code">Claude Code</h3>
         ${codeBlock(claudeCode, 'bash', 'Terminal')}
@@ -223,9 +223,9 @@ export function docsMcpPage({ appUrl }) {
         ${codeBlock(desktop, 'json', 'claude_desktop_config.json')}
         <h3 id="variables">Variables d'environnement</h3>
         <div class="tw"><table><thead><tr><th>Variable</th><th>Rôle</th></tr></thead><tbody>
-          <tr><td><code>AITOOLS_URL</code> <span class="req">requis</span></td><td>Adresse du panel, sans barre finale.</td></tr>
-          <tr><td><code>AITOOLS_TOKEN</code> <span class="req">requis</span></td><td>Jeton d'API <code>aitk_…</code>.</td></tr>
-          <tr><td><code>AITOOLS_READONLY=1</code></td><td>Ne propose que les outils de lecture, même si le jeton a plus de droits.</td></tr></tbody></table></div>` },
+          <tr><td><code>IABOSS_URL</code> <span class="req">requis</span></td><td>Adresse du panel, sans barre finale.</td></tr>
+          <tr><td><code>IABOSS_TOKEN</code> <span class="req">requis</span></td><td>Jeton d'API <code>iaboss_…</code>.</td></tr>
+          <tr><td><code>IABOSS_READONLY=1</code></td><td>Ne propose que les outils de lecture, même si le jeton a plus de droits.</td></tr></tbody></table></div>` },
       { id: 'outils', title: 'Outils', html: `<p>Chaque outil appelle une route de l'API ; le droit du jeton est celui de la route. Les paramètres marqués <code>*</code> sont obligatoires.</p>
         <div class="tw"><table><thead><tr><th>Outil</th><th>Droit</th><th>Paramètres</th><th>Rôle</th></tr></thead><tbody>${TOOLS.map((t) => `<tr><td><code>${esc(t.name)}</code></td><td><span class="scope">${scopeOf(t)}</span></td><td>${paramsOf(t) || '—'}</td><td>${esc(t.description)}</td></tr>`).join('')}</tbody></table></div>` },
       { id: 'exemples', title: 'Exemples de demandes', html: `<p>Une fois branché, parle à Claude normalement :</p>
@@ -233,7 +233,7 @@ export function docsMcpPage({ appUrl }) {
         <li>« Ajoute une note à ce prospect : veut un devis avant fin novembre, et programme une relance le 3 novembre. » <em>(<code>write</code>)</em></li>
         <li>« Lance une recherche de 20 prospects sur le projet Atelier. » <em>(<code>jobs</code>, consomme le quota de ton IA)</em></li></ul>` },
       { id: 'securite', title: 'Sécurité', html: `<ul>
-        <li><strong>Moindre droit.</strong> Crée un jeton dédié à Claude avec seulement <code>read</code>. Avec <code>AITOOLS_READONLY=1</code>, les outils d'écriture n'existent même plus pour Claude.</li>
+        <li><strong>Moindre droit.</strong> Crée un jeton dédié à Claude avec seulement <code>read</code>. Avec <code>IABOSS_READONLY=1</code>, les outils d'écriture n'existent même plus pour Claude.</li>
         <li><strong>Envoi de mails.</strong> L'outil <code>run_job</code> avec <code>type: "send"</code> exige <code>confirm: true</code>, et le serveur demande à Claude de recueillir ton accord explicite avant. N'accorde le droit <code>jobs</code> que si tu veux cet usage.</li>
         <li><strong>Contenus de tiers.</strong> Les réponses des prospects et les pages web sont écrites par d'autres : le serveur les signale à Claude comme des <em>données</em>, jamais comme des instructions. Relis quand même les actions proposées avant de les valider.</li>
         <li><strong>Jeton.</strong> Il ne quitte ta machine que pour ton panel, et il est masqué dans les messages d'erreur. Supprime-le depuis la page Développeur s'il a pu fuiter.</li></ul>` },
@@ -242,7 +242,7 @@ export function docsMcpPage({ appUrl }) {
         <tr><td><code>Le mode développeur est désactivé (developer_mode_off)</code></td><td>Réactive-le dans Mon compte : les jetons sont conservés.</td></tr>
         <tr><td><code>Ce jeton n'a pas le droit « write » (insufficient_scope)</code></td><td>Crée un jeton avec ce droit.</td></tr>
         <tr><td><code>Trop de requêtes (rate_limited)</code></td><td>120 requêtes par minute : attends quelques secondes.</td></tr>
-        <tr><td><code>AITOOLS_URL et AITOOLS_TOKEN sont requis</code></td><td>Variables d'environnement absentes dans la configuration de Claude.</td></tr></tbody></table></div>` },
+        <tr><td><code>IABOSS_URL et IABOSS_TOKEN sont requis</code></td><td>Variables d'environnement absentes dans la configuration de Claude.</td></tr></tbody></table></div>` },
     ],
   });
 }
