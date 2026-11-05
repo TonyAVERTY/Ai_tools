@@ -29,6 +29,19 @@ export function parseHeaders(raw) {
   return out;
 }
 
+/**
+ * Pourquoi le mail a été rejeté, en une ligne lisible : le « Diagnostic-Code » du rapport de remise, sinon un code d'erreur SMTP (550 5.1.1…), sinon le début du message.
+ * Court (400 caractères au plus), sans caractère de contrôle ; la page l'échappe à l'affichage.
+ */
+export function bounceReason(msg) {
+  const t = String(msg.text || msg.body || '').replace(/\r/g, '');
+  const found = /diagnostic-code:\s*([^\n]+(?:\n[ \t]+[^\n]+)*)/i.exec(t)?.[1]
+    || /\b(5\d\d[ -]\d\.\d\.\d[^\n]{0,200})/.exec(t)?.[1]
+    || /\b(5\d\d[ -][^\n]{5,200})/.exec(t)?.[1]
+    || t;
+  return String(found).replace(/[\u0000-\u001f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 400);
+}
+
 /** @returns {{type: 'reply'|'auto'|'bounce'|'receipt', from: string, ids: string[]}} */
 export function classify(msg) {
   const h = msg.headers || {};
@@ -63,6 +76,7 @@ export async function applyMessages(db, projectId, messages, { at = now() } = {}
   const byDomain = db.prepare("SELECT id FROM prospects WHERE project_id = ? AND status = 'sent' AND substr(email, instr(email, '@') + 1) = ?");
   const markReply = db.prepare("UPDATE prospects SET status = 'replied', replied_at = ?, reply_subject = ? WHERE id = ? AND status = 'sent'");
   const markBounce = db.prepare("UPDATE prospects SET status = 'bounced' WHERE id = ? AND status = 'sent'");
+  const noteBounce = db.prepare('UPDATE mail_log SET note = ? WHERE project_id = ? AND message_id = ? AND note IS NULL');
   const blacklist = db.prepare("INSERT OR IGNORE INTO blacklist(email, reason, created_at) SELECT email, 'bounce', ? FROM prospects WHERE id = ?");
   const markRead = db.prepare('UPDATE mail_log SET read_at = ? WHERE project_id = ? AND message_id = ? AND read_at IS NULL');
   const known = db.prepare('SELECT 1 x FROM replies WHERE project_id = ? AND uid = ?');
@@ -78,7 +92,12 @@ export async function applyMessages(db, projectId, messages, { at = now() } = {}
     const c = classify(msg);
     if (c.type === 'bounce') {
       const pid = await fromIds(c.ids);
-      if (pid && (await markBounce.run(pid)).changes) { await blacklist.run(at, pid); res.bounces++; } else res.ignored++;
+      if (pid && (await markBounce.run(pid)).changes) {
+        await blacklist.run(at, pid);
+        const reason = bounceReason(msg);
+        if (reason) for (const id of c.ids) await noteBounce.run(reason, projectId, id); // la raison du rejet, montrée dans la page Mails
+        res.bounces++;
+      } else res.ignored++;
       continue;
     }
     if (c.type === 'receipt') {

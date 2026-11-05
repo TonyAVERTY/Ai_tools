@@ -303,8 +303,10 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
     await transport.verify();
     const minDelay = Number(await getSetting(db, userId, 'send_delay_min', '20')) * 1000;
     const maxDelay = Number(await getSetting(db, userId, 'send_delay_max', '60')) * 1000;
-    const log = db.prepare(`INSERT INTO mail_log(project_id, prospect_id, email, sent_at, error, kind, variant, subject, message_id)
-      VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    const log = db.prepare(`INSERT INTO mail_log(project_id, prospect_id, email, sent_at, error, kind, variant, subject, message_id, body)
+      VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    // Le texte du mail tel qu'il est rempli pour ce prospect (sans le pied de page) : gardé dans le journal pour la page Mails
+    const bodyFor = (c) => fillBody(template.body, mailVars(c, project.smtp, project.siteUrl)).replace(/\n{3,}/g, '\n\n').trim().slice(0, 10_000);
     const markInitial = db.prepare('UPDATE prospects SET status = ?, sent_at = ?, variant = ? WHERE id = ?');
     const markFollowup = db.prepare('UPDATE prospects SET followup_at = ? WHERE id = ?');
     const markBounced = db.prepare("UPDATE prospects SET status = 'bounced' WHERE id = ?");
@@ -333,7 +335,7 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
         const v = await verifyAddress(p.email, { resolveMx: app.resolveMx || defaultMx, cache: mxCache });
         if (!v.ok) {
           await markInvalid.run(p.id);
-          await log.run(project.id, p.id, p.email, now(), `Adresse non envoyée : ${v.reason}`, kind, null, null, null);
+          await log.run(project.id, p.id, p.email, now(), `Adresse non envoyée : ${v.reason}`, kind, null, null, null, null);
           invalid++;
           continue;
         }
@@ -357,7 +359,7 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
       }
       const verdict = sense.get(p.id);
       if (!verdict.ok) {
-        await log.run(project.id, p.id, p.email, now(), `Non envoyé : le texte n'a pas de sens (${verdict.problem})`, kind, null, null, null);
+        await log.run(project.id, p.id, p.email, now(), `Non envoyé : le texte n'a pas de sens (${verdict.problem})`, kind, null, null, null, bodyFor(p));
         firstProblem ??= verdict.problem;
         unclear++;
         if (++unclearRow >= SENSE_BATCH) break; // un lot entier refusé : c'est le modèle lui-même qui est en cause
@@ -380,13 +382,13 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
       });
       try {
         await transport.sendMail(mail);
-        await log.run(project.id, p.id, p.email, now(), null, kind, variant, mail.subject, mail.messageId);
+        await log.run(project.id, p.id, p.email, now(), null, kind, variant, mail.subject, mail.messageId, bodyFor(p));
         await recordUsage(db, userId, 'mail');
         if (kind === 'initial') await markInitial.run('sent', now(), variant, p.id);
         else await markFollowup.run(now(), p.id);
         sent++;
       } catch (e) {
-        await log.run(project.id, p.id, p.email, now(), String(e.message).slice(0, 500), kind, variant, mail.subject, mail.messageId);
+        await log.run(project.id, p.id, p.email, now(), String(e.message).slice(0, 500), kind, variant, mail.subject, mail.messageId, bodyFor(p));
         if (/^5\d\d/.test(String(e.responseCode))) await markBounced.run(p.id);
         failed++;
       }

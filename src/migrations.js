@@ -1146,5 +1146,15 @@ export const MIGRATIONS = [
     sqlite: ['ALTER TABLE jobs ADD COLUMN log_json TEXT'],
     mysql: [{ sql: 'ALTER TABLE jobs ADD COLUMN log_json MEDIUMTEXT NULL', when: colMissing('jobs', 'log_json') }],
   },
+  {
+    // Page Mails : le contenu d'un mail est gardé tel qu'envoyé (sans le pied de page), et la raison d'un rebond (lue dans le message de la boîte de réception).
+    // Les mails partis avant cette migration n'ont ni l'un ni l'autre : la page le dit.
+    name: 'mail_log_content',
+    sqlite: ['ALTER TABLE mail_log ADD COLUMN body TEXT', 'ALTER TABLE mail_log ADD COLUMN note TEXT'],
+    mysql: [
+      { sql: 'ALTER TABLE mail_log ADD COLUMN body TEXT NULL', when: colMissing('mail_log', 'body') },
+      { sql: 'ALTER TABLE mail_log ADD COLUMN note VARCHAR(400) NULL', when: colMissing('mail_log', 'note') },
+    ],
+  },
 ];
 
