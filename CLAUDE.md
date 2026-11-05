@@ -2,14 +2,14 @@
 
 ## Règle n° 1 : la documentation du Support se met à jour avec chaque fonctionnalité
 
-Le mode **Support** de la page IA (menu IA → Support) fait répondre le Claude de l'utilisateur d'après `docs/support/*.md`. Cette documentation est ce que les utilisateurs et leur IA savent de l'application : **si elle est fausse ou incomplète, le Support répond faux.**
+Le mode **Support** de la page IA (menu IA → Support) fait répondre l'IA de l'utilisateur (Claude, ChatGPT ou Gemini) d'après `docs/support/*.md`. Cette documentation est ce que les utilisateurs et leur IA savent de l'application : **si elle est fausse ou incomplète, le Support répond faux.**
 
 **À chaque nouvelle fonctionnalité, nouveau bouton, nouvelle section, nouveau champ, nouvelle page, nouveau réglage, nouvelle tâche IA ou changement de comportement visible, mets à jour `docs/support/` dans le même commit.** Ne termine pas une tâche d'interface sans l'avoir fait, même si personne ne le redemande.
 
 - Écris pour un utilisateur : libellés exacts de l'écran entre « » (le test les compare à l'application), chemin complet (« Réglages → Garde-fous → … »), étapes numérotées, causes d'erreur et remèdes.
 - Ajoute aussi la rubrique de dépannage correspondante dans `docs/support/18-depannage-et-faq.md` quand la fonctionnalité peut échouer.
 - Un nouveau fichier : commence par `# Titre` puis une ligne `Résumé : …` (l'index du Support est généré à partir de ces deux lignes). Nomme-le `NN-sujet.md`.
-- **Ne recopie jamais à la main** ce qui vient du code : offres et plafonds, limites de la page IA et des pièces jointes, vidéos de promotion, liste des modèles, liste des consignes. Ces fichiers sont **générés** par `src/services/supportdocs.js` (`plans-et-limites.md`, `modeles-claude.md`, `taches-ia-et-prompts.md`) ; un nouveau plafond ou un nouveau modèle y apparaît tout seul. Pour ajouter une donnée générée, modifie `generatedDocs()`.
+- **Ne recopie jamais à la main** ce qui vient du code : offres et plafonds, limites de la page IA et des pièces jointes, vidéos de promotion, liste des modèles, liste des consignes. Ces fichiers sont **générés** par `src/services/supportdocs.js` (`plans-et-limites.md`, `modeles-ia.md`, `taches-ia-et-prompts.md`) ; un nouveau plafond ou un nouveau modèle y apparaît tout seul. Pour ajouter une donnée générée, modifie `generatedDocs()`.
 - `test/support-docs.test.js` **échoue** tant qu'un bouton, une section de projet, une rubrique des Réglages, un type de job, une consigne ou une page n'est pas documenté. Quand il échoue, documente (ne contourne pas) ; pour une nouvelle page, ajoute-la aussi à `PAGES` dans ce test. Les libellés « génériques » (Annuler, Enregistrer…) sont exemptés.
 - Le test ne voit pas tout (le sens, les règles de gestion, les étapes) : c'est à toi de relire la documentation du sujet et de la corriger.
 - Change le comportement d'un bouton ou d'un plafond : corrige la phrase qui le décrit, pas seulement le code.
