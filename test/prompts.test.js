@@ -217,3 +217,21 @@ test('réglages : prompts par gamme dans le formulaire, enregistrés, retrouvés
   await u.post('/settings', { ...base, prompt_template: PROMPT_DEFS.template.text, prompt_haiku_template: '' }, { form: true });
   assert.equal(await getSetting(s.db, u.id, 'prompts_json'), '');
 });
+
+test('mails : les consignes demandent un « Bonjour, », une formule de politesse et une signature, pour chaque gamme de modèle', () => {
+  const profile = { resume: 'Cartes de fidélité.', proposition_valeur: 'Fidéliser.', arguments: ['simple'], ton: 'direct' };
+  for (const model of ['haiku', 'sonnet', 'opus', 'fable']) {
+    const first = templatePrompt({ profile, target: {}, senderName: 'Tony', model }).prompt;
+    const follow = followupTemplatePrompt({ profile, senderName: 'Tony', model }).prompt;
+    assert.match(first, /« Bonjour, » seul sur la première ligne/, `premier mail (${model}) : formule d'appel`);
+    assert.match(first, /Formule de politesse seule sur sa ligne \(« Bien cordialement, »\)/, `premier mail (${model}) : formule de politesse`);
+    assert.match(follow, /commence par une formule d'appel courte[^]*termine par une formule de politesse/, `relance (${model}) : appel et politesse`);
+    assert.doesNotMatch(follow, /Pas de formule d'introduction/, `relance (${model}) : l'ancienne consigne qui supprimait aussi le « Bonjour »`);
+  }
+  assert.match(followupTemplatePrompt({ profile, senderName: 'Tony', model: 'haiku' }).prompt, /garde toujours « Bonjour, » au début/);
+  // Le nom de l'entreprise : une tournure qui le porte, et la virgule qui le suit est permise (il n'est jamais vide)
+  for (const p of [templatePrompt({ profile, target: {}, senderName: 'Tony' }).prompt, followupTemplatePrompt({ profile, senderName: 'Tony' }).prompt]) {
+    assert.match(p, /N'écris jamais « Pour \{\{entreprise\}\}, » suivi d'une phrase qui ne s'y rattache pas/);
+    assert.match(p, /la virgule qui le suit est permise/);
+  }
+});
