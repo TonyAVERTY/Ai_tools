@@ -48,7 +48,12 @@ test('relecture avec objet B : l\'objet B ne peut ni apparaître, ni disparaîtr
 });
 
 test('contrôle d\'un modèle : erreurs bloquantes et avertissements', () => {
-  assert.deepEqual(reviewMail({ subject: 'Idée', body: 'Bonjour {{entreprise}}.\n\nBien cordialement,\n{{expediteur}}\nMonEspacePro' }), { errors: [], warnings: [] });
+  assert.deepEqual(reviewMail({ subject: 'Idée', body: 'Bonjour,\n\nUne idée pour {{entreprise}}.\n\nBien cordialement,\n{{expediteur}}\nMonEspacePro' }), { errors: [], warnings: [] });
+  // « Bonjour {{entreprise}}, » salue une entreprise comme une personne (« Bonjour Une Bonne Bouteille, »)
+  const named = reviewMail({ subject: '', body: 'Bonjour {{entreprise}},\n\nUne question.\n\nBien cordialement,\nTony' });
+  assert.deepEqual(named.errors, []);
+  assert.ok(named.warnings.some((w) => /salue une entreprise comme une personne/.test(w)));
+  assert.ok(!reviewMail({ subject: '', body: 'Bonjour,\n\nChez {{entreprise}}, une question.\n\nBien cordialement,\nTony' }).warnings.some((w) => /salue une entreprise/.test(w)), 'le nom plus loin dans la phrase : rien à signaler');
   // Appel et politesse : signalés quand ils manquent (jamais bloquants), comme sur le modèle de relance de la capture
   const dry = reviewMail({ subject: '', body: 'Au passage en caisse, vos clients retrouvent leur carte.\nEst-ce un sujet chez vous ?\nTony AVERTY | MonEspacePro' });
   assert.deepEqual(dry.errors, []);
