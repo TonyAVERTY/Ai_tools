@@ -1,5 +1,5 @@
 # LinkedIn : relier un compte, écrire, programmer, publier
-Résumé : la section LinkedIn d'un projet : connexion d'un compte, choix du profil ou d'une page, génération d'un post par Claude, relecture, programmation, publication et historique.
+Résumé : la section LinkedIn d'un projet : connexion d'un compte, choix du profil ou d'une page, génération d'un post par l'IA, relecture, programmation, publication et historique.
 
 ## Disponibilité
 La section « LinkedIn » est dans chaque projet. Si le service n'a pas activé LinkedIn, elle dit : « LinkedIn n'est pas activé sur ce service : l'administrateur doit renseigner les clés de l'application LinkedIn ». Rien à faire côté utilisateur dans ce cas.
@@ -11,8 +11,8 @@ Bouton **Connecter LinkedIn** (réservé aux administrateurs du projet ; un memb
 
 ## Faire écrire un post
 1. Le projet doit être analysé (sinon : « Analyse le projet d'abord »).
-2. Champ **« De quoi doit parler le post ? »** (facultatif, 500 caractères) : laisse vide et Claude choisit un angle utile pour le public visé.
-3. Bouton **Générer un post** (ou **Régénérer un autre post** : Claude change l'angle, l'accroche et la structure par rapport aux brouillons précédents).
+2. Champ **« De quoi doit parler le post ? »** (facultatif, 500 caractères) : laisse vide et l'IA choisit un angle utile pour le public visé.
+3. Bouton **Générer un post** (ou **Régénérer un autre post** : l'IA change l'angle, l'accroche et la structure par rapport aux brouillons précédents).
 Le post suit une structure : accroche seule sur sa ligne, courts paragraphes, question finale, 3 emojis et 3 hashtags au plus, sans inventer de chiffre ni de témoignage. Les consignes se modifient dans **Réglages → Prompts IA** (« Post LinkedIn »).
 
 ## Relire, programmer, publier

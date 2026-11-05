@@ -1,5 +1,5 @@
 # Dépannage et questions fréquentes
-Résumé : les problèmes les plus fréquents (liaison Claude, jobs bloqués, mails qui ne partent pas ou arrivent en spam, prospects, LinkedIn, vidéo, agenda) avec cause et solution, plus une FAQ.
+Résumé : les problèmes les plus fréquents (liaison de l'IA, jobs bloqués, mails qui ne partent pas ou arrivent en spam, prospects, LinkedIn, vidéo, agenda) avec cause et solution, plus une FAQ.
 
 ## Je ne peux rien lancer, la page me renvoie à « Relier mon IA »
 La liaison de ton IA est absente ou invalide. Relier un accès (voir « Relier, tester et déconnecter son IA (Claude, ChatGPT ou Gemini) »). État « À revalider » : relier de nouveau.
@@ -48,7 +48,7 @@ Sous **Se connecter et analyser** (Configuration du projet → Base de données)
 Avant une action difficile à défaire (supprimer un projet, un prospect, une vidéo ou une conversation, retirer le pied de page des mails, publier un post, envoyer un lot de mails…), AiTools ouvre une fenêtre : le titre est la question, la ligne dessous dit la conséquence. Le bouton porte le nom de l'action (« Supprimer le projet », « Publier »…) et il est **rouge** quand elle supprime ou retire quelque chose. **Annuler**, la touche Échap ou un clic en dehors de la fenêtre abandonnent sans rien changer. Pour une action qui se rattrape facilement, il n'y a pas de confirmation.
 
 ## « Trop de requêtes : réessaie dans … »
-Le serveur limite le rythme des actions pour se protéger d'une boucle ou d'un abus. Une action isolée n'est jamais concernée : le message apparaît seulement après un très grand nombre d'enregistrements ou de clics en peu de temps (plus de 600 écritures en 10 minutes pour un même compte, avec des seuils plus bas sur certaines actions comme les vidéos, le chat ou la liaison Claude). Attends la durée indiquée dans le message, puis recommence. Les lectures (consulter une page, une liste) ne sont pas limitées. Si le message revient en usage normal, signale-le à l'administrateur.
+Le serveur limite le rythme des actions pour se protéger d'une boucle ou d'un abus. Une action isolée n'est jamais concernée : le message apparaît seulement après un très grand nombre d'enregistrements ou de clics en peu de temps (plus de 600 écritures en 10 minutes pour un même compte, avec des seuils plus bas sur certaines actions comme les vidéos, le chat ou la liaison de l'IA). Attends la durée indiquée dans le message, puis recommence. Les lectures (consulter une page, une liste) ne sont pas limitées. Si le message revient en usage normal, signale-le à l'administrateur.
 
 ## Le bouton Envoyer refuse ou rien ne part
 Vérifier dans l'ordre : 1) SMTP enregistré (« Configuration du projet ») ; 2) modèle de mail **validé** (« Valider le modèle ») ; 3) des prospects au statut « À contacter » ; 4) pas de bandeau rouge de pause d'envoi sur la page Projets ; 5) plafond de mails du projet (24 h), plafond global (Réglages → Garde-fous) et plafond mensuel de l'offre ; 6) pas de job d'envoi déjà en cours ; 7) le message d'erreur du job dans Activité (erreur SMTP : identifiants, port).
@@ -109,10 +109,10 @@ Lire le message du job : outils manquants sur le serveur (Chromium, ffmpeg), pla
 Les agendas se rafraîchissent tout seuls mais lentement (Google : 12 à 24 heures). Pour voir un changement tout de suite, retirer puis rajouter l'abonnement, ou régénérer le lien (Créer mon lien d'agenda).
 
 ## Une question hors du cadre d'AiTools
-Pour rédiger un mail, trouver des idées de posts, réfléchir à une stratégie commerciale : menu **Assistant → Claude**.
+Pour rédiger un mail, trouver des idées de posts, réfléchir à une stratégie commerciale : menu **Assistant** (l'entrée de ton IA).
 
 ## FAQ rapide
-- **Qui paie l'IA ?** La personne, directement chez Anthropic (clé API : à l'usage ; abonnement : son abonnement Claude). AiTools facture seulement son offre.
+- **Qui paie l'IA ?** La personne, directement chez son fournisseur d'IA : Anthropic, OpenAI ou Google (clé API : à l'usage ; abonnement ou compte : son abonnement Claude ou ChatGPT). AiTools facture seulement son offre.
 - **AiTools modifie-t-il mon code ?** Non : le dépôt est cloné et lu en lecture seule.
 - **Puis-je changer le dépôt d'un projet ?** Non : créer un nouveau projet.
 - **Combien de temps dure une recherche ou une vidéo ?** Quelques minutes ; l'avancement est dans Activité.
@@ -122,8 +122,8 @@ Pour rédiger un mail, trouver des idées de posts, réfléchir à une stratégi
 - **Y a-t-il une application mobile ?** Non : le site s'adapte aux téléphones. Sur un écran étroit, les onglets de la barre du haut tiennent tous sur une ligne et « Comptabilité » s'affiche « Compta » (c'est le même onglet).
 - **Qui contacter si la documentation ne répond pas ?** L'administrateur du service d'AiTools.
 
-## Claude ignore la méthode attendue ou la réponse sort du cadre
-Les fiches de méthode (voir « Savoir-faire de Claude dans AiTools ») sont des repères : la consigne de la tâche dans « Réglages → Prompts IA » l'emporte en cas de contradiction.
+## L'IA ignore la méthode attendue ou la réponse sort du cadre
+Les fiches de méthode (voir « Savoir-faire de l'IA dans AiTools ») sont des repères : la consigne de la tâche dans « Réglages → Prompts IA » l'emporte en cas de contradiction.
 1. Vérifie la consigne de la tâche dans « Réglages → Prompts IA » : une consigne modifiée peut aller à l'encontre de la méthode.
 2. Clique « Revenir au texte par défaut » pour comparer.
 3. Choisis un modèle plus capable pour cette tâche dans « Réglages → Budget et modèles IA » si le résultat reste approximatif.
@@ -141,12 +141,12 @@ Les fiches de méthode (voir « Savoir-faire de Claude dans AiTools ») sont des
 
 ## Facturation
 - **Pas de bouton « Générer un modèle de document »** : des informations légales manquent ou sont invalides. Ouvre le projet, **Remplir les informations**, corrige les champs signalés (SIRET à 14 chiffres, code postal à 5 chiffres, IBAN valide, e-mail correct ; capital et immatriculation pour une société ; n° de TVA si tu factures la TVA), puis **Enregistrer les informations**.
-- **« La dernière demande à Claude a échoué »** : la réponse de Claude était inutilisable ou ton compte Claude n'est pas relié (voir « Relier Claude »). Rien n'a été modifié : clique de nouveau sur **Générer un modèle de document** (ou sur **Relancer la préparation** après la validation du devis).
-- **Les prix des exemples sont faux** : sans « Tes tarifs habituels », ce sont des prix d'exemple. Renseigne tes tarifs, puis **Recommencer depuis le début**, ou utilise « Affiner avec Claude » pour les corriger.
+- **« La dernière demande à Claude a échoué »** (le nom suit ton IA) : la réponse de l'IA était inutilisable ou ton IA n'est pas reliée (voir « Relier, tester et déconnecter son IA (Claude, ChatGPT ou Gemini) »). Rien n'a été modifié : clique de nouveau sur **Générer un modèle de document** (ou sur **Relancer la préparation** après la validation du devis).
+- **Les prix des exemples sont faux** : sans « Tes tarifs habituels », ce sont des prix d'exemple. Renseigne tes tarifs, puis **Recommencer depuis le début**, ou utilise « Affiner avec Claude » (le nom suit ton IA) pour les corriger.
 - **« Tes documents sont prêts » a disparu** : tu as affiné un document, il repasse à « À valider ». Valide-le de nouveau.
 - **Un projet n'apparaît pas** : la page n'affiche que les projets de ton compte.
-- **Rien n'est prérempli** : Claude n'a rien trouvé d'écrit dans le dépôt (pas de mentions légales, de contact ou de tarifs) ou l'analyse date d'avant cette fonction. Clique **Réanalyser** dans la « Fiche projet », ou remplis à la main : la première fois suffit, les autres projets reprennent ton identité (« Repris d'un autre de tes projets »).
-- **Une valeur préremplie est fausse** : corrige-la avant **Enregistrer les informations** ; Claude peut se tromper de société si le dépôt en cite plusieurs.
+- **Rien n'est prérempli** : l'IA n'a rien trouvé d'écrit dans le dépôt (pas de mentions légales, de contact ou de tarifs) ou l'analyse date d'avant cette fonction. Clique **Réanalyser** dans la « Fiche projet », ou remplis à la main : la première fois suffit, les autres projets reprennent ton identité (« Repris d'un autre de tes projets »).
+- **Une valeur préremplie est fausse** : corrige-la avant **Enregistrer les informations** ; l'IA peut se tromper de société si le dépôt en cite plusieurs.
 - **« Indique le nom du client. » / « Indique l'adresse du client. »** à l'émission : ces deux champs sont obligatoires. « Le SIRET du client compte 14 chiffres » : corrige-le ou laisse-le vide pour un particulier.
 - **Je ne peux pas choisir un type dans « Générer un document »** : seuls les modèles **validés** se génèrent (« à valider d'abord » sinon). Si tu viens d'affiner un modèle, valide-le de nouveau.
 - **Ma facture émise n'apparaît pas dans mes chiffres de la Comptabilité** : c'est voulu. Elle est dans « Factures émises, à encaisser » et ne compte qu'une fois marquée payée (**Marquer payée**, avec la date d'encaissement).
@@ -181,7 +181,7 @@ Non. Les clics répétés sur un même bouton (double clic, rafale) sont ignoré
 ## « Analyse en échec : Git : EACCES: permission denied, mkdir '/data/repos/…' »
 Le serveur ne peut pas écrire dans son dossier de données (réglage `DATA_DIR` de l'administrateur) : les dépôts ne peuvent donc pas être clonés. C'est à l'administrateur du serveur de pointer `DATA_DIR` vers un dossier qui appartient à l'utilisateur qui fait tourner iaboss, puis de redémarrer. Une fois corrigé, clique de nouveau sur **Analyser**.
 
-## « Analyse en échec : Secret de liaison illisible : relie de nouveau ton accès Claude »
+## « Analyse en échec : Secret de liaison illisible : relie de nouveau ton accès à l'IA »
 Le serveur ne peut pas déchiffrer ton accès à l'IA : le plus souvent, l'administrateur a changé la clé de chiffrement (`SECRET_KEY`) après ta liaison. Avec ChatGPT ou Gemini, le message porte le nom de ton IA à la place de « Claude ». La fenêtre « Claude est déconnecté » (au nom de ton IA) apparaît alors : clique sur **Reconnecter Claude** (« Reconnecter ChatGPT », « Reconnecter Gemini ») et relie de nouveau ton accès (clé API, jeton d'abonnement ou connexion), puis relance l'analyse. Rien d'autre n'est perdu.
 
 ## La fenêtre « Claude est déconnecté » s'affiche
@@ -194,10 +194,10 @@ Renseigne l'adresse dans **En-tête → Site du produit** (puis **Enregistrer le
 Le bouton **Valider le modèle** refuse un modèle cassé : variable inconnue ou mal fermée (`{{site` sans les deux accolades), ligne qui commence par une virgule ou un point-virgule. Corrige la ligne indiquée (le message donne son numéro), puis valide de nouveau. Une virgule en début de ligne vient souvent d'une variable vide, par exemple `{{expediteur}}, MonProduit` sans **Nom expéditeur** réglé : renseigne le **Nom expéditeur** dans **Configuration du projet → SMTP**, ou mets la variable et le nom du produit sur deux lignes. À l'envoi et dans l'aperçu, ces restes sont de toute façon retirés. Si **Générer avec l'IA** dit « la relecture n'a pas pu être faite », relis le mail toi-même avant de le valider.
 
 ## « Modèle en échec : Expected property name or '}' in JSON … »
-Claude avait cité une variable (comme `{{site}}`) dans une phrase avant de donner le mail, et l'application a pris cette accolade pour le début du mail. C'est corrigé : l'application ignore maintenant ce qui n'est pas du JSON valide et retient le vrai mail. Si tu vois encore ce message, clique de nouveau sur **Générer avec l'IA** : Claude répond un peu différemment à chaque fois.
+L'IA avait cité une variable (comme `{{site}}`) dans une phrase avant de donner le mail, et l'application a pris cette accolade pour le début du mail. C'est corrigé : l'application ignore maintenant ce qui n'est pas du JSON valide et retient le vrai mail. Si tu vois encore ce message, clique de nouveau sur **Générer avec l'IA** : l'IA répond un peu différemment à chaque fois.
 
 ## L'Objet B est vide après « Générer avec l'IA »
-Claude n'a pas proposé de second objet, ou l'a rendu identique à l'objet A : il n'y a alors pas de test A/B. Clique de nouveau sur **Générer avec l'IA**, ou écris toi-même l'**Objet B** (les envois alternent ensuite entre A et B ; le taux de réponse de chaque objet s'affiche sous le bouton Envoyer).
+L'IA n'a pas proposé de second objet, ou l'a rendu identique à l'objet A : il n'y a alors pas de test A/B. Clique de nouveau sur **Générer avec l'IA**, ou écris toi-même l'**Objet B** (les envois alternent ensuite entre A et B ; le taux de réponse de chaque objet s'affiche sous le bouton Envoyer).
 
 ## Mon choix de modèle (Haiku, Sonnet, Opus) n'a pas l'air pris en compte
 1. Vérifie qu'il est enregistré : après **Enregistrer les réglages**, le message « Réglages enregistrés » s'affiche et la liste montre ton choix quand tu rouvres les Réglages.
@@ -206,7 +206,7 @@ Claude n'a pas proposé de second objet, ou l'a rendu identique à l'objet A : i
 4. Chaque tâche suit son réglage : **prospection** (recherche de prospects et accroches), **analyse de projet** (analyse du dépôt), **rédaction** (modèles de mail et relances, relecture, posts LinkedIn, devis…). Le modèle de la page IA se règle dans la page IA.
 
 ## Le mail propose une démonstration (ou un essai, un rendez-vous…) qui n'existe pas
-Claude n'a le droit de proposer que ce que la fiche projet dit exister, et l'**Aperçu** avertit quand le mail parle d'une démonstration, d'un essai, d'un devis, d'un appel, d'un rendez-vous ou d'une garantie absents de la fiche. Si ton modèle a été généré avant ce contrôle, clique de nouveau sur **Générer avec l'IA** puis **Valider le modèle**, ou retire la phrase à la main. Si la proposition existe vraiment (une démonstration, par exemple), ajoute-la d'abord à la fiche projet en relançant **Réanalyser** après l'avoir écrite dans le dépôt (par exemple dans le README).
+L'IA n'a le droit de proposer que ce que la fiche projet dit exister, et l'**Aperçu** avertit quand le mail parle d'une démonstration, d'un essai, d'un devis, d'un appel, d'un rendez-vous ou d'une garantie absents de la fiche. Si ton modèle a été généré avant ce contrôle, clique de nouveau sur **Générer avec l'IA** puis **Valider le modèle**, ou retire la phrase à la main. Si la proposition existe vraiment (une démonstration, par exemple), ajoute-la d'abord à la fiche projet en relançant **Réanalyser** après l'avoir écrite dans le dépôt (par exemple dans le README).
 
 ## « LinkedIn a refusé la connexion »
 Le message précise maintenant la cause : produits manquants dans l'application LinkedIn (« onglet Produits »), adresse de retour non déclarée (« onglet Auth → URL de redirection autorisées »), identifiants de l'application faux, ou compte sans droit sur la page. Suis le remède indiqué dans le message, puis recommence la connexion depuis le projet. Les détails sont dans « LinkedIn » (Problèmes fréquents).
