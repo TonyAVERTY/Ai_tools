@@ -1,4 +1,4 @@
-# Journal de projet — AiTools
+# Journal de projet — iaboss
 
 Branches de travail : `feat/saas-mysql` (J1), `feat/saas-accounts` (J2, depuis la précédente) `feat/saas-claude-link` (J3, depuis J2) puis `feat/saas-site` (J4, depuis J3) et `feat/saas-guardrails` (J5, depuis J4) — version publique, voir `docs/CADRAGE.md`.
 
@@ -73,7 +73,7 @@ Aucun marqueur restant : adresse du siège, hébergeur (ElypseCloud), durées de
 
 ### À faire relire par un juriste
 - Clause d'abonnement (risque de suspension du compte Claude, exclusion de responsabilité « dans la mesure permise par la loi ») et sa case d'acceptation (décision 10 du cadrage).
-- Rôles RGPD (utilisateur responsable de traitement, AiTools sous-traitant), contenu de l'article 28 réellement couvert.
+- Rôles RGPD (utilisateur responsable de traitement, iaboss sous-traitant), contenu de l'article 28 réellement couvert.
 - Affirmation de la page Tarifs sur la prospection B2B sans accord préalable (règle CNIL résumée, formulation prudente « en règle générale »).
 - Mentions du siège (sans téléphone : l'email est le seul moyen de contact affiché), médiation de la consommation (service réservé aux professionnels, donc non traitée), juridiction compétente.
 - Liens sortants, saisis de mémoire et à vérifier à la main : `anthropic.com/legal/consumer-terms`, `anthropic.com/legal/privacy`, `policies.google.com/privacy`, `apple.com/legal/privacy/fr-fr/`, `cnil.fr/fr/plaintes`.

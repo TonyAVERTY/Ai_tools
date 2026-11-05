@@ -7,12 +7,19 @@ import { HttpError } from './http.js';
 import { getUser } from './users.js';
 import { runClaude } from './services/claude.js';
 import { AI_JOBS } from './services/budget.js';
+import { withUserLock } from './services/userlock.js';
+import { getProvider, hasProvider, DEFAULT_PROVIDER } from './services/providers/index.js';
+import { isAuthRefusal, validateApiKey } from './services/providers/claude.js';
+export { isAuthRefusal, validateApiKey };
 
-export const MODES = { api_key: 'api_key', subscription_token: 'subscription_token' };
+export const MODES = { api_key: 'api_key', subscription_token: 'subscription_token', chatgpt_account: 'chatgpt_account' };
 export const MODE_LABELS = {
   api_key: 'Clé API Anthropic',
   subscription_token: 'Abonnement Claude (jeton)',
+  chatgpt_account: 'Compte ChatGPT',
 };
+/** Tout mode qui n'est pas une clé API est un abonnement : même avertissement, même interrupteur (CLAUDE_CLI_MODE_ENABLED). */
+export const isSubscriptionMode = (mode) => mode === MODES.subscription_token || mode === MODES.chatgpt_account;
 export const LINK_REQUIRED_MESSAGE = 'Relie ton accès Claude pour utiliser cette fonction';
 export const LINK_INVALID_MESSAGE = "Ta liaison Claude n'est plus valide : teste-la ou relie-la de nouveau (Mon compte)";
 export const CLI_DISABLED_MESSAGE = "Le mode abonnement est désactivé sur ce service : relie une clé API";
@@ -22,18 +29,22 @@ export const CLI_DISABLED_MESSAGE = "Le mode abonnement est désactivé sur ce s
 export const CONSENT_VERSION = '2026-10-22.1';
 export const CONSENT_TEXT = [
   "Utiliser un abonnement Claude (Pro, Max) à travers une application tierce peut contrevenir aux conditions d'utilisation d'Anthropic et entraîner la suspension ou la fermeture de ton compte Claude.",
-  'AiTools ne peut en être tenu responsable. Tu utilises ton abonnement à tes propres risques.',
+  'iaboss ne peut en être tenu responsable. Tu utilises ton abonnement à tes propres risques.',
   "La clé API Anthropic reste l'option recommandée : elle est prévue pour cet usage.",
 ];
 export const CONSENT_CHECKBOX = "J'ai compris et j'accepte ce risque";
 
-const API_KEY_RE = /^sk-ant-[A-Za-z0-9_-]{20,400}$/;
-const TOKEN_RE = /^[A-Za-z0-9_.-]{20,800}$/;
-const MODELS_URL = 'https://api.anthropic.com/v1/models';
-const SECRET_ENV = { api_key: 'ANTHROPIC_API_KEY', subscription_token: 'CLAUDE_CODE_OAUTH_TOKEN' };
+// Même avertissement pour le compte ChatGPT, avec sa propre version (l'acceptation enregistrée dit à quel texte l'utilisateur a consenti).
+export const OPENAI_CONSENT_VERSION = '2026-11-04.1';
+export const OPENAI_CONSENT_TEXT = [
+  "Utiliser ton compte ChatGPT (Plus, Pro, Business) à travers une application tierce peut contrevenir aux conditions d'utilisation d'OpenAI et entraîner la suspension ou la fermeture de ton compte.",
+  "iaboss ne peut en être tenu responsable. Tu utilises ton abonnement à tes propres risques. OpenAI recommande une clé API pour ce type d'usage, et réserve la connexion de compte aux environnements privés de confiance.",
+  "Tes tâches passent l'une après l'autre : un seul exécutable utilise ta connexion à la fois. Elle peut te demander de te reconnecter de temps en temps.",
+  "La clé API OpenAI reste l'option recommandée : elle est prévue pour cet usage.",
+];
 
-/** Réponse de Claude qui signifie « ton accès est refusé » (jeton expiré ou révoqué, clé invalide) : au sens strict, jamais une panne réseau. */
-export const isAuthRefusal = (text) => /invalid (bearer )?token|invalid (x-)?api[ _-]?key|authentication_error|please run \/login|not logged in|oauth token (has )?(expired|been revoked)|token (has )?(expired|been revoked)|invalid.{0,20}credential|unauthori[sz]ed|\b401\b/i.test(String(text ?? ''));
+const TOKEN_RE = /^[A-Za-z0-9_.-]{20,800}$/;
+
 
 const truthy = (v) => v === true || v === 'true' || v === 'on' || v === '1' || v === 1;
 
@@ -55,11 +66,20 @@ export async function markLinkInvalid(db, userId) {
   return true;
 }
 
+/** Libellé du mode de connexion d'une liaison brute (colonne en base), pour la liste des comptes de l'administration. */
+export function modeLabelOf(link) {
+  const p = hasProvider(link?.provider ?? DEFAULT_PROVIDER) ? getProvider(link?.provider) : null;
+  return p?.modes[link?.mode]?.label ?? MODE_LABELS[link?.mode] ?? link?.mode;
+}
+
 /** Forme exposée à l'interface : jamais le secret, seulement ses 4 derniers caractères pour la clé API. */
 export function publicLink(link) {
   if (!link?.mode || !MODES[link.mode]) return null; // un ancien mode « serveur » compte comme « pas de liaison »
+  if (!hasProvider(link.provider ?? DEFAULT_PROVIDER)) return null; // fournisseur retiré : « pas de liaison »
+  const provider = getProvider(link.provider);
   return {
-    mode: link.mode, label: MODE_LABELS[link.mode], valid: !!link.valid,
+    provider: provider.id, providerLabel: provider.label, providerCompany: provider.company,
+    mode: link.mode, label: provider.modes[link.mode]?.label ?? MODE_LABELS[link.mode], valid: !!link.valid,
     linkedAt: link.linked_at ?? null, validatedAt: link.validated_at ?? null, lastTestAt: link.last_test_at ?? null,
     last4: link.mode === 'api_key' ? link.last4 ?? null : null,
     consentAt: link.consent?.at ?? null, consentVersion: link.consent?.version ?? null,
@@ -92,7 +112,7 @@ export async function aiRefusal(db, userId, { cliModeEnabled = true } = {}) {
   const link = await readLink(db, userId);
   if (!link?.mode || !MODES[link.mode]) return LINK_REQUIRED_MESSAGE;
   if (!link.valid) return LINK_INVALID_MESSAGE;
-  if (link.mode === MODES.subscription_token && !cliModeEnabled) return CLI_DISABLED_MESSAGE;
+  if (isSubscriptionMode(link.mode) && !cliModeEnabled) return CLI_DISABLED_MESSAGE;
   return null;
 }
 
@@ -108,7 +128,10 @@ export async function hasUsableLink(db, userId, opts) {
 
 /**
  * Identifiants d'exécution du job : lus dans la ligne de CET utilisateur, jamais ailleurs.
- * @returns {{mode:string, secretEnv:Record<string,string>}}
+ * Un secret en variable d'environnement (`secretEnv`) pour une clé API ou un jeton ; pour une connexion de compte, le contenu du fichier
+ * de connexion du CLI (`authFile`), les valeurs à masquer partout (`secrets`) et la date de liaison (`linkedAt`) qui sert à ne pas écraser
+ * une liaison refaite entre-temps quand le CLI a renouvelé ses jetons.
+ * @returns {{provider:string, mode:string, secretEnv:Record<string,string>, authFile?:string, secrets?:string[], linkedAt?:number}}
  */
 export async function resolveCredentials(app, userId) {
   await assertCanRunAi(app.db, userId, { cliModeEnabled: app.cfg.cliModeEnabled !== false });
@@ -118,32 +141,75 @@ export async function resolveCredentials(app, userId) {
   catch {
     // Clé SECRET_KEY changée ou secret abîmé : la liaison est inutilisable, l'interface propose de se reconnecter
     await markLinkInvalid(app.db, userId);
-    throw new HttpError(403, 'Secret de liaison illisible : relie de nouveau ton accès Claude');
+    throw new HttpError(403, 'Secret de liaison illisible : relie de nouveau ton accès');
   }
   if (!secret) throw new HttpError(403, LINK_REQUIRED_MESSAGE);
-  return { mode: link.mode, secretEnv: { [SECRET_ENV[link.mode]]: secret } };
+  const provider = getProvider(link.provider);
+  const mode = provider.modes[link.mode];
+  if (!mode) throw new HttpError(403, LINK_REQUIRED_MESSAGE);
+  if (mode.file) return { provider: provider.id, mode: link.mode, secretEnv: {}, authFile: secret, secrets: authSecrets(secret), linkedAt: link.linked_at ?? null };
+  return { provider: provider.id, mode: link.mode, secretEnv: { [mode.env]: secret } };
+}
+
+// ---------- Connexion de compte ChatGPT (fichier auth.json de Codex) ----------
+
+/** Jetons contenus dans un fichier de connexion : à masquer dans tout ce qui sort (journaux, erreurs, réponses). */
+export function authSecrets(authJson) {
+  try {
+    const t = JSON.parse(authJson)?.tokens || {};
+    return [t.access_token, t.refresh_token, t.id_token].filter((v) => typeof v === 'string' && v.length >= 8);
+  } catch { return []; }
+}
+
+/**
+ * Vérifie qu'un fichier de connexion est bien celui d'un compte ChatGPT que Codex peut renouveler, et le renvoie compact.
+ * La documentation d'OpenAI : `auth_mode` vaut « chatgpt » et `tokens.refresh_token` existe.
+ */
+export function parseAuthJson(text) {
+  const raw = String(text ?? '').trim();
+  const bad = () => new HttpError(400, "Ce n'est pas un fichier de connexion ChatGPT : colle le contenu complet de ~/.codex/auth.json, obtenu avec « codex login »");
+  if (raw.length < 50 || raw.length > 100_000) throw bad();
+  let j;
+  try { j = JSON.parse(raw); } catch { throw bad(); }
+  if (!j || j.auth_mode !== 'chatgpt' || typeof j.tokens?.refresh_token !== 'string' || !j.tokens.refresh_token) throw bad();
+  return JSON.stringify(j);
+}
+
+/**
+ * Codex a renouvelé ses jetons pendant un job : le fichier mis à jour remplace celui de la base, sauf si l'utilisateur a refait sa liaison
+ * entre-temps (date de liaison différente) ou l'a supprimée. Jamais d'erreur vers l'appelant : un job réussi ne doit pas échouer ici.
+ */
+export async function saveRefreshedAuth(app, userId, linkedAt, authJson) {
+  try {
+    const link = await readLink(app.db, userId);
+    if (!link || link.mode !== MODES.chatgpt_account || (link.linked_at ?? null) !== linkedAt) return false;
+    const compact = parseAuthJson(authJson);
+    if (decrypt(app.cfg.secretKey, link.secret_enc) === compact) return false;
+    await writeLink(app.db, userId, { ...link, secret_enc: encrypt(app.cfg.secretKey, compact), refreshed_at: now() });
+    return true;
+  } catch (e) {
+    console.warn(`[chatgpt] connexion renouvelée mais non enregistrée (utilisateur ${Number(userId)}) : ${String(e.message).slice(0, 120)}`);
+    return false;
+  }
+}
+
+/**
+ * Compte ChatGPT : fichier de connexion collé par l'utilisateur, ou produit par la connexion guidée (src/chatgptlogin.js).
+ * Le consentement est vérifié AVANT tout. La connexion est vérifiée par un appel minimal à Codex (quelques tokens décomptés de l'abonnement).
+ */
+export async function linkChatgptAccount(app, userId, { authJson, accept, via = 'paste' }) {
+  if (app.cfg.cliModeEnabled === false) throw new HttpError(403, CLI_DISABLED_MESSAGE);
+  if (!truthy(accept)) throw new HttpError(400, `Tu dois cocher « ${CONSENT_CHECKBOX} » pour utiliser ton compte ChatGPT`);
+  const provider = getProvider('openai');
+  const compact = parseAuthJson(authJson);
+  const checked = await (app.validateAccount || provider.validateAccount)(app, compact);
+  const stored = checked?.authFile ? parseAuthJson(checked.authFile) : compact; // le test a pu renouveler les jetons : on garde les plus récents
+  const consent = { at: now(), version: OPENAI_CONSENT_VERSION };
+  await saveLink(app, userId, { provider: 'openai', mode: MODES.chatgpt_account, secret_enc: encrypt(app.cfg.secretKey, stored), consent, via });
+  await setSetting(app.db, userId, 'openai_consent_json', JSON.stringify(consent));
 }
 
 // ---------- Validation ----------
-
-/**
- * Valide une clé API par un appel qui ne consomme aucun token : GET /v1/models.
- * 401/403 : refusée ; erreur réseau ou réponse inattendue : message distinct (la clé n'est pas jugée).
- * @returns {Promise<void>}
- */
-export async function validateApiKey(key, fetchFn = fetch) {
-  let r;
-  try {
-    r = await fetchFn(MODELS_URL, {
-      headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-      signal: AbortSignal.timeout(10_000),
-    });
-  } catch {
-    throw new HttpError(502, "Impossible de joindre Anthropic pour vérifier la clé (réseau). Réessaie dans un instant.", { expose: true });
-  }
-  if (r.status === 401 || r.status === 403) throw new HttpError(400, 'Clé API refusée par Anthropic');
-  if (!r.ok) throw new HttpError(502, `Anthropic ne répond pas normalement (HTTP ${r.status}) : la clé n'a pas pu être vérifiée. Réessaie plus tard.`, { expose: true });
-}
 
 // Appel minimal du CLI avec le jeton (modèle le plus petit, 1 tour, aucun outil). Ce n'est PAS gratuit : quelques tokens
 // sont décomptés de l'abonnement. Aucune commande du CLI ne vérifie un jeton sans appel au modèle.
@@ -171,18 +237,55 @@ export async function validateSubscriptionToken(app, token) {
 
 // ---------- Liaison ----------
 
+/** IA de l'utilisateur (une liaison sans fournisseur est une liaison Claude) ; Claude aussi quand il n'a rien relié. */
+export async function userProvider(db, userId) {
+  const id = (await readLink(db, userId))?.provider ?? DEFAULT_PROVIDER;
+  return hasProvider(id) ? id : DEFAULT_PROVIDER;
+}
+
+/** Dernier changement d'IA de l'utilisateur ({ from, to, at } avec les noms affichables), pour le lui dire dans les Réglages ; null s'il n'en a pas fait. */
+export async function aiSwitchOf(db, userId) {
+  try {
+    const j = JSON.parse(await getSetting(db, userId, 'ai_switch_json') || 'null');
+    if (!j || !hasProvider(j.from) || !hasProvider(j.to) || j.from === j.to) return null;
+    return { from: getProvider(j.from).label, to: getProvider(j.to).label, at: j.at };
+  } catch { return null; }
+}
+
+/** Nom affichable de l'IA de l'utilisateur (« Claude », « ChatGPT », « Gemini »). */
+export async function providerLabelOf(db, userId) {
+  return getProvider(await userProvider(db, userId)).label;
+}
+
+// Réglages de modèle : ceux d'une IA n'existent pas chez une autre
+const MODEL_SETTINGS = ['analyze_model', 'prospect_model', 'write_model', 'chat_model'];
+
+/**
+ * L'utilisateur change d'IA : ses choix de modèle repartent du défaut de la nouvelle (ils sont lus avec le catalogue de CE fournisseur).
+ * La date et les IA concernées sont gardées pour le dire à l'écran. Ses consignes personnalisées restent en base (masquées tant qu'il n'est pas revenu).
+ */
+async function resetModelsOnSwitch(db, userId, from, to) {
+  for (const k of MODEL_SETTINGS) await setSetting(db, userId, k, null);
+  await setSetting(db, userId, 'ai_switch_json', JSON.stringify({ from, to, at: now() }));
+}
+
 export async function saveLink(app, userId, link) {
   const t = now();
-  await writeLink(app.db, userId, { v: 1, valid: true, linked_at: t, validated_at: t, last_test_at: t, ...link });
+  const before = await readLink(app.db, userId);
+  const to = link.provider ?? DEFAULT_PROVIDER;
+  if (before?.mode && (before.provider ?? DEFAULT_PROVIDER) !== to) await resetModelsOnSwitch(app.db, userId, before.provider ?? DEFAULT_PROVIDER, to);
+  await writeLink(app.db, userId, { v: 1, provider: DEFAULT_PROVIDER, valid: true, linked_at: t, validated_at: t, last_test_at: t, ...link });
   await resetQuotaState(app.db, userId);
 }
 
-/** Mode A : clé API. Validée, chiffrée, jamais réaffichée. */
-export async function linkApiKey(app, userId, apiKey) {
+/** Mode A : clé API (de l'IA choisie : Claude par défaut). Validée, chiffrée, jamais réaffichée. */
+export async function linkApiKey(app, userId, apiKey, providerId = DEFAULT_PROVIDER) {
+  if (!hasProvider(providerId)) throw new HttpError(400, 'IA inconnue');
+  const provider = getProvider(providerId);
   const key = String(apiKey ?? '').trim();
-  if (!API_KEY_RE.test(key)) throw new HttpError(400, 'Clé API invalide (elle commence par sk-ant-)');
-  await (app.validateApiKey || validateApiKey)(key, app.fetch || fetch);
-  await saveLink(app, userId, { mode: MODES.api_key, secret_enc: encrypt(app.cfg.secretKey, key), last4: key.slice(-4) });
+  if (!provider.apiKey.pattern.test(key)) throw new HttpError(400, provider.apiKey.invalidFormat);
+  await (app.validateApiKey || provider.apiKey.validate)(key, app.fetch || fetch);
+  await saveLink(app, userId, { provider: provider.id, mode: MODES.api_key, secret_enc: encrypt(app.cfg.secretKey, key), last4: key.slice(-4) });
 }
 
 /**
@@ -242,13 +345,22 @@ export async function unlink(app, userId) {
 export async function testLink(app, userId) {
   const link = await readLink(app.db, userId);
   if (!link?.mode || !MODES[link.mode]) throw new HttpError(400, LINK_REQUIRED_MESSAGE);
-  const mark = async (valid) => writeLink(app.db, userId, { ...link, valid, last_test_at: now(), ...(valid ? { validated_at: now() } : {}) });
+  const mark = async (valid) => writeLink(app.db, userId, { ...(await readLink(app.db, userId) ?? link), valid, last_test_at: now(), ...(valid ? { validated_at: now() } : {}) });
   try {
     let secret;
     try { secret = decrypt(app.cfg.secretKey, link.secret_enc); } catch { secret = null; }
     if (!secret) { await mark(false); return { ok: false, message: 'Secret illisible : relie de nouveau ton accès Claude' }; }
-    if (link.mode === MODES.api_key) await (app.validateApiKey || validateApiKey)(secret, app.fetch || fetch);
-    else {
+    if (link.mode === MODES.api_key) await (app.validateApiKey || getProvider(link.provider).apiKey.validate)(secret, app.fetch || fetch);
+    else if (link.mode === MODES.chatgpt_account) {
+      if (app.cfg.cliModeEnabled === false) return { ok: false, message: CLI_DISABLED_MESSAGE };
+      // File d'attente du compte : un test ne passe jamais en même temps qu'un job (le jeton de rafraîchissement est à usage unique)
+      await withUserLock(userId, async () => {
+        const fresh = await readLink(app.db, userId);
+        const cur = fresh ? decrypt(app.cfg.secretKey, fresh.secret_enc) : secret;
+        const c = await (app.validateAccount || getProvider(link.provider).validateAccount)(app, cur);
+        if (c?.authFile) await saveRefreshedAuth(app, userId, fresh?.linked_at ?? null, c.authFile);
+      });
+    } else {
       if (app.cfg.cliModeEnabled === false) return { ok: false, message: CLI_DISABLED_MESSAGE };
       await (app.validateToken || ((t) => validateSubscriptionToken(app, t)))(secret);
     }

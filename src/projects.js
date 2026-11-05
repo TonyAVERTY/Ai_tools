@@ -37,7 +37,7 @@ export async function getProject(app, id, { userId, secrets = false, need = null
     profile: parse(p.profile_json), profileCommit: p.profile_commit, profileAt: p.profile_at,
     target: parse(p.target_json), targetValidated: !!p.target_validated,
     dailyMailCap: p.daily_mail_cap, createdAt: p.created_at, siteUrl: p.site_url || '',
-    // Les mails d'un projet partent de SON adresse : pas de repli sur un SMTP commun (celui du serveur ne sert qu'aux mails d'AiTools)
+    // Les mails d'un projet partent de SON adresse : pas de repli sur un SMTP commun (celui du serveur ne sert qu'aux mails d'iaboss)
     hasSmtp: !!p.smtp_enc, hasOwnSmtp: !!p.smtp_enc,
     smtpSource: p.smtp_enc ? 'project' : null,
     hasDb: !!p.db_enc, hasImap: !!p.imap_enc,

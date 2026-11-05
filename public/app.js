@@ -69,7 +69,7 @@
   }
 
   // Outils communs pour les fichiers public/app-*.js (chargés après celui-ci)
-  Object.assign(window.AiTools, { $, $$, api, esc, every, formData, go, icon, liDay, listen, refreshProject, httpErrorText, networkErrorText, toLogin, confirmBox, loadingHtml, loadFailed, sentence });
+  Object.assign(window.AiTools, { $, $$, api, esc, every, formData, go, icon, liDay, listen, refreshProject, httpErrorText, networkErrorText, toLogin, confirmBox, loadingHtml, loadFailed, sentence, aiName });
 
   // Une erreur dit ce qui s'est passé et quoi faire ensuite : jamais « Failed to fetch » ni un code brut. Le message du serveur, quand il y en a un, passe en premier.
   function httpErrorText(status) {
@@ -81,6 +81,8 @@
   }
   // Une erreur est une phrase : elle finit par un point (les messages du serveur n'en ont pas toujours). Sans effet si le message finit déjà par « . ! ? … ».
   function sentence(msg) { const t = String(msg ?? ''); return t && !/[.!?…]$/.test(t) ? `${t}.` : t; } // déclaration (hoistée) : exportée plus haut dans window.AiTools
+  // Nom de l'IA reliée à ce compte (Claude, ChatGPT, Gemini) : le serveur le pose sur <body data-ai>, « Claude » sans liaison.
+  function aiName() { return document.body?.dataset.ai || 'Claude'; } // déclaration (hoistée) : exportée plus haut dans window.AiTools
   function networkErrorText() { return 'Connexion impossible : réessaie dans un instant.'; } // déclaration (hoistée) : exportée plus haut dans window.AiTools
   // Session expirée : on revient à la connexion avec l'explication (la page de connexion affiche déjà `?e=`), plutôt qu'une redirection muette
   function toLogin() { location.href = `/login?e=${encodeURIComponent('Ta session a expiré : reconnecte-toi.')}`; }
@@ -105,9 +107,10 @@
     const dlg = document.createElement('dialog');
     dlg.className = 'prospect-dialog modal reconnect';
     dlg.setAttribute('aria-labelledby', 'reconnect-title');
-    dlg.innerHTML = `<h2 id="reconnect-title"><svg class="ic" aria-hidden="true" viewBox="0 0 24 24"><use href="#i-alert"></use></svg>Claude est déconnecté</h2>
-      <p>Ton accès Claude n'est plus valide (jeton expiré ou révoqué). Tant qu'il n'est pas relié de nouveau, les tâches IA sont à l'arrêt.</p>
-      <div class="row"><a class="btn primary" href="/link">Reconnecter Claude</a><button type="button" class="btn" data-close>Plus tard</button></div>`;
+    const ai = esc(aiName());
+    dlg.innerHTML = `<h2 id="reconnect-title"><svg class="ic" aria-hidden="true" viewBox="0 0 24 24"><use href="#i-alert"></use></svg>${ai} est déconnecté</h2>
+      <p>Ton accès ${ai} n'est plus valide (clé, jeton ou connexion expirés ou révoqués). Tant qu'il n'est pas relié de nouveau, les tâches IA sont à l'arrêt.</p>
+      <div class="row"><a class="btn primary" href="/link">Reconnecter ${ai}</a><button type="button" class="btn" data-close>Plus tard</button></div>`;
     dlg.addEventListener('click', (ev) => { if (ev.target === dlg || ev.target.closest('[data-close]')) dlg.close(); });
     document.body.append(dlg);
     dlg.showModal();
@@ -252,7 +255,13 @@
     return m < 1 ? "à l'instant" : m < 60 ? `il y a ${m} min` : m < 1440 ? `il y a ${Math.round(m / 60)} h` : `il y a ${Math.round(m / 1440)} j`;
   };
   const pct = (x) => `${Math.round(x * 100)} %`;
-  const tokenText = (value) => `${Math.max(0, Number(value) || 0).toLocaleString('fr-FR')} tokens`;
+  // Claude envoie ses tokens au fil de l'eau ; ChatGPT et Gemini seulement à la fin de la tâche. Tant qu'elle tourne, afficher « 0 tokens »
+  // laisserait croire que rien n'est compté : on dit quand ils arrivent.
+  const tokenText = (value, status) => {
+    const n = Math.max(0, Number(value) || 0);
+    if (!n && (status === 'running' || status === 'queued') && aiName() !== 'Claude') return 'Tokens comptés à la fin de la tâche';
+    return `${n.toLocaleString('fr-FR')} tokens`;
+  };
   const ACTIVE = ['queued', 'running'];
   const LABELS = {
     analyze: 'Analyse', prospect: 'Recherche', template: 'Modèle', send: 'Envoi', evolution: 'Évolutions',
@@ -561,9 +570,9 @@
 
   // ---------- Barre système ----------
   // "IA 24 h : 0,42 $ / 2 $" : orange à 80 %, rouge une fois atteint
-  // Ce que les jobs lancés PAR AiTools ont consommé (équivalent API). Ce que la personne fait ailleurs avec son Claude n'y est pas :
+  // Ce que les jobs lancés PAR iaboss ont consommé (équivalent API). Ce que la personne fait ailleurs avec son Claude n'y est pas :
   // Anthropic ne le communique pas à une application ; le quota réel du compte est la mesure « Claude … » à côté.
-  const GAUGE_TIP = "Équivalent API des jobs lancés par AiTools uniquement. Ce que tu fais ailleurs avec Claude n'est pas compté ici : vois le quota « Claude » à côté.";
+  const GAUGE_TIP = "Équivalent API des jobs lancés par iaboss uniquement. Ce que tu fais ailleurs avec Claude n'est pas compté ici : vois le quota « Claude » à côté.";
   // Quota du compte Claude Pro lui-même (session glissante de 5 h + semaine glissante de 7 j),
   // remonté par la CLI à chaque appel. Permet de décider en amont si une tâche vaut le coup.
   function resetLabel(ts) {
@@ -598,7 +607,7 @@
       ${msg ? `<div class="jmsg small muted">${esc(msg)}</div>` : ''}
       ${progressBar(j)}
       ${remainingTime(j) ? `<div class="small muted">${esc(remainingTime(j))}</div>` : ''}
-      <div class="small muted">${tokenText(j.tokensUsed)}</div>
+      <div class="small muted">${tokenText(j.tokensUsed, j.status)}</div>
       <div class="jmeta small muted"><span>${esc(state)}</span>
         <span>${j.canViewLogs !== false ? `<a class="link small" href="/jobs/${j.id}">Voir</a> · ${j.status === 'error' ? `<button type="button" class="link small" data-retry="${j.id}">Réessayer</button>` : ''}` : ''}${ACTIVE.includes(j.status) ? `<button type="button" class="link small" data-cancel="${j.id}">Annuler</button>` : ''}</span></div>
     </div>`;
@@ -660,7 +669,7 @@
   });
   listen(document, 'keydown', (e) => { if (e.key === 'Escape' && jobsOpen()) { toggleJobs(false); jobsBtn.focus(); } });
 
-  // Carte « Usage du mois » : le quota Claude (session 5 h, semaine) et ce que les jobs d'AiTools ont consommé, mêmes données que la barre du haut
+  // Carte « Usage du mois » : le quota Claude (session 5 h, semaine) et ce que les jobs d'iaboss ont consommé, mêmes données que la barre du haut
   // « Remise à zéro aujourd'hui à 18:42 » / « demain à 09:00 » / « lundi à 09:00 » (heure de Paris)
   function resetNote(ts) {
     if (!ts) return '';
@@ -687,13 +696,13 @@
         if (!w) continue;
         const reset = resetLabel(w.resetsAt);
         const live = rl.source === 'live' && !rl.error;
-        const tip = `${live ? 'Relevé en direct chez Anthropic, tout ton usage Claude compris (y compris hors AiTools).' : `Dernière mesure ${ago(rl.at)} (pendant un job AiTools).`}${reset ? ` Réinitialisation ${reset}.` : ''}`;
+        const tip = `${live ? 'Relevé en direct chez Anthropic, tout ton usage Claude compris (y compris hors iaboss).' : `Dernière mesure ${ago(rl.at)} (pendant un job iaboss).`}${reset ? ` Réinitialisation ${reset}.` : ''}`;
         rows.push(w.expired ? usageRow(label, '– (remise à zéro)', { tip, cls: 'muted' })
           : usageRow(label, pct(w.utilization), { ratio: w.utilization, tip, note: resetNote(w.resetsAt), cls: w.utilization >= 1 ? 'error' : w.utilization >= 0.8 ? 'warn' : '' }));
       }
     }
     // Montants en $ : seulement avec une clé API (c'est elle qui est facturée à l'usage). Avec un abonnement, rien n'est facturé en plus : on n'affiche aucun prix.
-    for (const [label, x] of s.linkMode === 'api_key' ? [['IA via AiTools 24 h', s.budget.day], ['IA via AiTools 30 j', s.budget.month]] : []) {
+    for (const [label, x] of s.linkMode === 'api_key' ? [['IA via iaboss 24 h', s.budget.day], ['IA via iaboss 30 j', s.budget.month]] : []) {
       const r = x.limit ? x.used / x.limit : null;
       rows.push(usageRow(label, `${x.used.toFixed(2)} $${x.limit ? ` / ${x.limit} $` : ''}`, { ratio: r, tip: GAUGE_TIP, cls: r >= 1 ? 'error' : r >= 0.8 ? 'warn' : '' }));
     }
@@ -772,7 +781,7 @@
     const addEntry = (entry) => {
       $('[data-console-empty]', consoleBox)?.remove();
       if (entry.kind === 'delta' && lastDelta?.isConnected) { lastDelta.textContent += entry.text; return; }
-      const types = { output: 'Sortie de Claude', delta: 'Claude écrit', tool: 'Outil utilisé', turn: 'Nouvelle étape', model: 'Modèle', status: 'État de la tâche', progress: 'Progression', error: 'Erreur', activity: 'Activité de réflexion' };
+      const types = { output: `Sortie de ${aiName()}`, delta: `${aiName()} écrit`, tool: 'Outil utilisé', turn: 'Nouvelle étape', model: 'Modèle', status: 'État de la tâche', progress: 'Progression', error: 'Erreur', activity: 'Activité de réflexion' };
       const article = document.createElement('article');
       article.className = 'console-entry';
       article.dataset.kind = Object.hasOwn(types, entry.kind) ? entry.kind : 'status';
@@ -803,11 +812,11 @@
         const meter = $('[data-console-progress]', consoleBox);
         if (meter) { if (typeof r.progress?.pct === 'number') meter.value = Math.max(0, Math.min(100, r.progress.pct)); else if (r.status === 'done') meter.value = 100; else meter.removeAttribute('value'); }
         consoleBox.dataset.status = r.status;
-        setText('[data-console-tokens]', tokenText(r.tokensUsed));
+        setText('[data-console-tokens]', tokenText(r.tokensUsed, r.status));
         setText('[data-console-remaining]', remainingTime(r));
         // Vidéo livrée avec les avertissements des agents : elle se relance ou se corrige comme une scène refusée
         const warned = r.type === 'promo_video' && r.status === 'done' && r.qualityWarnings > 0;
-        const fixable = warned || (r.type === 'promo_video' && /^La scène écrite par Claude ne passe pas au rendu/.test(r.error || ''));
+        const fixable = warned || (r.type === 'promo_video' && /^La scène écrite par .+? ne passe pas au rendu/.test(r.error || ''));
         for (const retry of $$('[data-retry]', consoleBox)) retry.hidden = !(r.status === 'error' || warned) || ('fix' in retry.dataset && !fixable);
         if (r.entries.length) {
           if ((cursor && r.firstId > cursor + 1) || (!cursor && r.firstId > 1)) output.append(document.createTextNode('[Début du journal abrégé]\n'));
@@ -838,12 +847,12 @@
     if (box && job) {
       let usage = $('[data-job-tokens]', box);
       if (!usage) { usage = document.createElement('p'); usage.dataset.jobTokens = ''; usage.className = 'small muted'; box.append(usage); }
-      usage.textContent = tokenText(job.tokensUsed);
+      usage.textContent = tokenText(job.tokensUsed, job.status);
       if (job.status === 'error' && job.canViewLogs !== false && !$('[data-retry]', box)) {
         const retry = document.createElement('button');
         retry.type = 'button'; retry.className = 'btn small primary'; retry.dataset.retry = job.id; retry.textContent = 'Réessayer';
         box.append(retry);
-        if (type === 'promo_video' && /^La scène écrite par Claude ne passe pas au rendu/.test(job.error || '')) {
+        if (type === 'promo_video' && /^La scène écrite par .+? ne passe pas au rendu/.test(job.error || '')) {
           const fix = document.createElement('button');
           fix.type = 'button'; fix.className = 'btn small primary'; fix.dataset.retry = job.id; fix.dataset.fix = ''; fix.textContent = 'Corriger';
           box.append(fix);
@@ -865,7 +874,7 @@
     if (later) {
       const at = new Date(job.runAfter * 1000).toLocaleString('fr-FR', { weekday: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
       box.innerHTML = `<div class="running scheduled"><span class="moon" aria-hidden="true"></span>
-        <div><div>${name} programmé(e) : ${esc(at)}</div><div class="small muted">Démarrage la nuit, quand ton quota Claude est libre.</div></div>
+        <div><div>${name} programmé(e) : ${esc(at)}</div><div class="small muted">Démarrage la nuit, quand ton quota ${esc(aiName())} est libre.</div></div>
         ${job.canViewLogs !== false ? `<a class="btn small" href="/jobs/${job.id}">Voir</a>` : ''}<button class="btn small" data-cancel="${job.id}">Annuler</button></div>`;
       return;
     }
@@ -1436,7 +1445,7 @@
     if (runBtn) {
       e.preventDefault(); // le bouton « Réanalyser » est dans la ligne du projet : il ne doit pas la replier
       const { run, id } = runBtn.dataset;
-      if (run === 'analyze' && runBtn.hasAttribute('data-reanalyze') && !(await confirmBox('Relancer l\'analyse complète du dépôt ?\nElle consomme du quota Claude.', { confirm: 'Relancer' }))) return;
+      if (run === 'analyze' && runBtn.hasAttribute('data-reanalyze') && !(await confirmBox('Relancer l\'analyse complète du dépôt ?\nElle consomme du quota ' + aiName() + '.', { confirm: 'Relancer' }))) return;
       try {
         const r = await api(`/api/projects/${id}/${run}`, {});
         toast(r.existing ? 'Déjà en cours' : 'Lancé');

@@ -108,7 +108,7 @@ export function registerEventRoutes(router, app) {
     const e = Number.isInteger(id) ? await db.prepare('SELECT * FROM calendar_events WHERE id = ? AND user_id = ?').get(id, session.userId) : null;
     if (!e) throw new HttpError(404, 'Événement introuvable');
     res.setHeader('Content-Disposition', 'attachment; filename="evenement.ics"');
-    send(res, 200, buildIcs([{ uid: `event-${e.id}@${new URL(app.cfg.appUrl).host}`, at: Number(e.starts_at), minutes: Number(e.minutes), title: e.title, description: e.notes || '' }], { name: 'AiTools' }), 'text/calendar; charset=utf-8');
+    send(res, 200, buildIcs([{ uid: `event-${e.id}@${new URL(app.cfg.appUrl).host}`, at: Number(e.starts_at), minutes: Number(e.minutes), title: e.title, description: e.notes || '' }], { name: 'iaboss' }), 'text/calendar; charset=utf-8');
   });
 }
 

@@ -37,7 +37,7 @@ export async function fetchRecap(projectId, cfg, { force = false } = {}) {
   if (!cfg?.type) throw new Error('Accès BDD non configuré pour ce projet');
   const hit = cache.get(projectId);
   if (!force && hit && Date.now() - hit.at < TTL) return { ...hit.data, cached: true };
-  // Tables choisies par la personne (requêtes construites par AiTools) ; à défaut, d'anciennes requêtes écrites à la main restent exécutées telles quelles
+  // Tables choisies par la personne (requêtes construites par iaboss) ; à défaut, d'anciennes requêtes écrites à la main restent exécutées telles quelles
   const queries = cfg.kpi && Object.keys(cfg.kpi).length ? buildQueries(cfg.type === 'pg' ? 'pg' : 'mysql', cfg.kpi) : {};
   if (!Object.keys(queries).length) {
     for (const k of ['users', 'clients', 'revenue']) {

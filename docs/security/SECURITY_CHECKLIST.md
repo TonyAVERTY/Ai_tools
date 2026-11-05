@@ -1,4 +1,4 @@
-# Checklist de sécurité AiTools
+# Checklist de sécurité iaboss
 
 `[x]` vérifié avec preuve (test ou lecture du code) · `[ ]` à effectuer · `[!]` problème ou validation nécessaire.
 Détails et preuves : `SECURITY_AUDIT.md`.

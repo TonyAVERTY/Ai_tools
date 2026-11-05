@@ -89,7 +89,7 @@ function systemSmtpConfig() {
   if (set.length < keys.length) throw new Error(`SMTP du serveur : variables incomplètes (manque ${keys.filter((k) => !env[k]).join(', ')})`);
   return {
     host: env.SYSTEM_SMTP_HOST, port: Number(env.SYSTEM_SMTP_PORT || 587), user: env.SYSTEM_SMTP_USER, pass: env.SYSTEM_SMTP_PASSWORD, fromEmail: env.SYSTEM_SMTP_FROM,
-    ...(env.SYSTEM_SMTP_REPLY_TO ? { replyTo: env.SYSTEM_SMTP_REPLY_TO } : {}), // les réponses aux mails d'AiTools arrivent sur l'adresse de contact
+    ...(env.SYSTEM_SMTP_REPLY_TO ? { replyTo: env.SYSTEM_SMTP_REPLY_TO } : {}), // les réponses aux mails d'iaboss arrivent sur l'adresse de contact
   };
 }
 
@@ -149,10 +149,14 @@ export function loadConfig() {
     allowPrivateHosts: flag(env.ALLOW_PRIVATE_HOSTS, false),
     // Administrateurs : ces adresses seulement (la première est aussi propriétaire des données migrées)
     adminEmails: (env.ADMIN_EMAILS || '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean),
+    // Destinataires des alertes d'erreur (HTML) : l'adresse du développeur, séparées par des virgules ; ERROR_ALERT_TO la remplace
+    errorAlertTo: (env.ERROR_ALERT_TO || 'contact@tony-averty.dev').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean),
     secretKey: Buffer.from(secretKey, 'hex'),
     db: dbConfigFromEnv(env),
     dataDir: resolve(env.DATA_DIR || './data'),
     claudeBin: env.CLAUDE_BIN || 'claude',
+    geminiBin: env.GEMINI_BIN || 'gemini',
+    codexBin: env.CODEX_BIN || 'codex',
     // Mode « abonnement » (jeton claude setup-token) : désactivable globalement
     cliModeEnabled: flag(env.CLAUDE_CLI_MODE_ENABLED, true),
     sandbox: sandboxConfig(),

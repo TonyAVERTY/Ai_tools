@@ -9,6 +9,7 @@ import { verifyAddress } from '../src/services/verify.js';
 import { warmupAdvice, warmupNotice, WARMUP } from '../src/services/warmup.js';
 import { extractReplyText, classifyIntent, draftReply, INTENTS } from '../src/services/replies.js';
 import { applyMessages } from '../src/services/inbox.js';
+import { withSense } from './helpers/sense.js';
 
 // ---------- Vérification des adresses ----------
 
@@ -192,7 +193,7 @@ test('envoi : une adresse invalide n\'est pas envoyée, marquée « adresse inva
   await db.prepare('INSERT INTO user_settings(user_id, `key`, value) VALUES(?, ?, ?)').run(uid, 'send_delay_min', '0');
   await db.prepare('INSERT INTO user_settings(user_id, `key`, value) VALUES(?, ?, ?)').run(uid, 'send_delay_max', '0');
   await enqueue(db, { userId: uid, projectId: pid, type: 'send', params: { count: 1, confirm: true } });
-  await new Worker(db, makeHandlers(app), { log: { error() {} } }).tick();
+  await new Worker(db, makeHandlers(app, { claude: withSense(app) }), { log: { error() {} } }).tick();
   assert.deepEqual(sent, ['c@bon.fr'], 'les deux adresses invalides sont passées, la bonne est partie');
   const st = Object.fromEntries((await db.prepare('SELECT email, status FROM prospects').all()).map((r) => [r.email, r.status]));
   assert.deepEqual(st, { 'a@mauvais.fr': 'invalid', 'd@yopmail.com': 'invalid', 'c@bon.fr': 'sent' });

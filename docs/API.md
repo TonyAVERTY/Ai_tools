@@ -1,4 +1,4 @@
-# API AiTools
+# API iaboss
 
 La documentation de l'API est sur le site, avec la référence complète, les exemples (cURL, JavaScript, Python) et la liste des erreurs :
 

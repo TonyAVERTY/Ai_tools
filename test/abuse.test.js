@@ -12,6 +12,7 @@ import { bounceStats, evaluateSending, sendPause, resumeSending, pauseMessage } 
 import { applyMessages } from '../src/services/inbox.js';
 import { recentAudit } from '../src/admin.js';
 import { ABUSE } from '../src/limits.js';
+import { withSense } from './helpers/sense.js';
 
 // Détection d'abus à l'envoi : taux de rejets au-dessus du seuil (avec un minimum d'envois) = pause d'envoi, admin prévenu,
 // message clair, désinscription et liste d'opposition toujours respectées.
@@ -134,7 +135,7 @@ test('envois refusés avec un message clair (jamais silencieux) : mise en file, 
   }
   // Un job d'envoi déjà en file ne part pas : erreur explicite
   w.app.createTransport = () => { throw new Error('aucun transport ne doit être créé'); };
-  const worker = new Worker(w.db, makeHandlers(w.app), { log: { error() {} } });
+  const worker = new Worker(w.db, makeHandlers(w.app, { claude: withSense(w.app) }), { log: { error() {} } });
   await worker.tick();
   const row = await w.db.prepare('SELECT status, error FROM jobs WHERE id = ?').get(queued);
   assert.equal(row.status, 'error');
@@ -194,7 +195,7 @@ test('les rejets lus dans la boîte déclenchent l\'évaluation ; la désinscrip
   w.app.createTransport = () => ({ verify: async () => true, sendMail: async (m) => { sent.push(m.to); }, close() {} });
   await setSetting(w.db, u.id, 'send_delay_min', '0'); await setSetting(w.db, u.id, 'send_delay_max', '0');
   await enqueue(w.db, { userId: u.id, projectId: u.p, type: 'send', params: { count: 10 } });
-  await new Worker(w.db, makeHandlers(w.app), { log: { error() {} } }).tick();
+  await new Worker(w.db, makeHandlers(w.app, { claude: withSense(w.app) }), { log: { error() {} } }).tick();
   assert.deepEqual(sent, ['ok@exemple.fr'], 'la liste d\'opposition reste respectée');
 });
 

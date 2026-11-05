@@ -9,14 +9,15 @@ import { startLogin, finishLogin, destroySession, getSession, checkOrigin } from
 import { verifyCaptcha } from './captcha.js';
 import { deleteUser, normalizeEmail, getUser } from './users.js';
 import {
-  assertCanRunAi, getLinkState, assertLoginConsent, linkLoginToken, validateSubscriptionToken, linkApiKey, linkSubscriptionToken, unlink, testLink, lastConsent,
+  assertCanRunAi, getLinkState, linkChatgptAccount, assertLoginConsent, linkLoginToken, validateSubscriptionToken, linkApiKey, linkSubscriptionToken, unlink, testLink, lastConsent,
   MODES,
-  isPriced,
+  isPriced, userProvider, aiSwitchOf,
 } from './claudelink.js';
 import { loginPage } from './site/pages.js';
 import { registerSiteRoutes } from './site/routes.js';
 import { registerAdminRoutes } from './adminroutes.js';
 import { loginsOf } from './claudelogin.js';
+import { chatgptLoginsOf } from './chatgptlogin.js';
 import { accessOn, memberTeamIds, needAccess } from './teams.js';
 import { registerTeamRoutes } from './teamroutes.js';
 import { registerProfileRoutes, getProfile, isEmpty } from './userprofile.js';
@@ -37,7 +38,10 @@ import { registerPromoRoutes, removeProjectVideos } from './promo.js';
 import { registerPosteRoutes } from './posteroutes.js';
 import { isRoleJob, roleTaskByJob } from './services/roles.js';
 import { registerProspectRoutes } from './prospectroutes.js';
-import { dashboardPage, settingsPage, unsubPage, accountPage, linkPage, layout } from './views.js';
+import { dashboardPage, settingsPage, unsubPage, accountPage, layout } from './views.js';
+import { linkPage } from './linkviews.js';
+import { availableProviders } from './services/providers/availability.js';
+import { getProvider } from './services/providers/index.js';
 import { enqueue, latestJobs, cancelJob, retryJob, usageSummary } from './services/jobs.js';
 import { validateGitUrl, removeRepo } from './services/git.js';
 import { fetchRecap, clearRecapCache, validateSelect } from './services/recap.js';
@@ -52,7 +56,7 @@ import { checkInbox } from './services/inbox.js';
 import { followupPlan } from './services/followup.js';
 import { warmupAdvice } from './services/warmup.js';
 import { PROMPT_DEFS, parseCustomPrompts, promptsView, MAX_CUSTOM } from './services/prompts.js';
-import { normalizeModel, PROMPT_SCOPES } from './services/models.js';
+import { normalizeModel, PROMPT_SCOPES, catalogOf } from './services/models.js';
 import { nextNightSlot } from './services/paris-time.js';
 import { notify, notifyConfig, saveDiscordHooks, publicHooks, EVENTS, MAX_HOOKS } from './services/notify.js';
 import { listChannels, saveChannels, publicChannels, notifyChannels, CHANNEL_TYPES } from './services/channels.js';
@@ -180,8 +184,10 @@ export function registerRoutes(router, app) {
     const userId = session.userId;
     const discord = await notifyConfig(app, userId);
     const promptsRaw = await getSetting(db, userId, 'prompts_json', '');
-    const analyze = normalizeModel(await getSetting(db, userId, 'analyze_model', 'haiku'));
-    const models = { chat: normalizeModel(await getSetting(db, userId, 'chat_model', 'sonnet'), 'sonnet'), analyze, prospect: normalizeModel(await getSetting(db, userId, 'prospect_model', 'haiku')), write: normalizeModel(await getSetting(db, userId, 'write_model', ''), analyze) };
+    const provider = await userProvider(db, userId);
+    const catalog = catalogOf(provider);
+    const analyze = normalizeModel(await getSetting(db, userId, 'analyze_model', catalog.default), undefined, provider);
+    const models = { chat: normalizeModel(await getSetting(db, userId, 'chat_model', catalog.chatDefault), catalog.chatDefault, provider), analyze, prospect: normalizeModel(await getSetting(db, userId, 'prospect_model', catalog.default), undefined, provider), write: normalizeModel(await getSetting(db, userId, 'write_model', ''), analyze, provider) };
     const s = {
       priced: await isPriced(db, userId),
       notify_email: await getSetting(db, userId, 'notify_email', ''),
@@ -201,7 +207,10 @@ export function registerRoutes(router, app) {
       priced: (await getLinkState(db, userId))?.mode === MODES.api_key, // plafonds en $ : seulement avec une clé API
       discord: { hooks: publicHooks(discord.hooks), all: EVENTS, max: MAX_HOOKS },
       channels: publicChannels(await listChannels(app, userId, Object.keys(EVENTS))), canEmail: !!cfg.systemSmtp,
-      prompts: promptsView(parseCustomPrompts(promptsRaw), models),
+      catalog: { recommended: catalog.recommended, others: catalog.others },
+      ai: { id: provider, name: getProvider(provider).label, company: getProvider(provider).company },
+      aiSwitch: await aiSwitchOf(db, userId),
+      prompts: promptsView(parseCustomPrompts(promptsRaw), models, provider),
       promptMax: MAX_CUSTOM,
     };
     html(res, settingsPage({ email: session.email, s, saved: url.searchParams.has('ok') }));
@@ -233,7 +242,8 @@ export function registerRoutes(router, app) {
     await set('send_delay_min', String(dmin));
     await set('send_delay_max', String(dmax));
     // Modèles : uniquement ceux du catalogue (services/models.js) ; un champ absent ne change rien
-    for (const k of ['prospect_model', 'analyze_model', 'write_model']) if (b[k] !== undefined) await set(k, normalizeModel(b[k]));
+    const provider = await userProvider(db, userId);
+    for (const k of ['prospect_model', 'analyze_model', 'write_model']) if (b[k] !== undefined) await set(k, normalizeModel(b[k], undefined, provider));
     const money = (v) => { const n = Number(String(v || '').replace(',', '.')); return Number.isFinite(n) && n > 0 ? String(Math.round(n * 100) / 100) : ''; };
     await set('weekly_report', b.weekly_report === 'on' ? '1' : '0');
     // Les cases décochées ne sont pas envoyées : la présence du champ « délais » signale le formulaire complet
@@ -271,7 +281,7 @@ export function registerRoutes(router, app) {
   router.get('/link', async ({ res, session, url }) => {
     html(res, linkPage({
       user: session.user, link: await getLinkState(db, session.userId), cliModeEnabled, error: url.searchParams.get('e'),
-      start: url.searchParams.get('start') === 'claude',
+      start: url.searchParams.get('start') === 'claude', selected: url.searchParams.get('ia'), available: availableProviders(cfg),
     }));
   });
 
@@ -292,7 +302,7 @@ export function registerRoutes(router, app) {
   }, LINK_LIMIT);
   const wantsJson = (req) => !!req.headers.accept?.includes('json');
   // Formulaire HTML : l'erreur revient sur la page de liaison ; appel JSON : code HTTP + { error }
-  const linkAction = (fn, okTo = '/') => async ({ req, res, session }) => {
+  const linkAction = (fn, okTo = '/', ia = null) => async ({ req, res, session }) => {
     const b = await readBody(req);
     try {
       const out = (await fn(b, session)) || {};
@@ -300,11 +310,13 @@ export function registerRoutes(router, app) {
       redirect(res, okTo);
     } catch (e) {
       if (!(e instanceof HttpError) || wantsJson(req)) throw e;
-      redirect(res, `/link?e=${encodeURIComponent(e.message)}`);
+      // L'erreur revient sur la page de liaison, avec les options de l'IA concernée déjà ouvertes
+      const which = ia || (['claude', 'openai', 'gemini'].includes(b.provider) ? b.provider : 'claude');
+      redirect(res, `/link?ia=${which}&e=${encodeURIComponent(e.message)}`);
     }
   };
-  router.post('/link/api-key', linkAction((b, s) => linkApiKey(app, s.userId, b.apiKey)), LINK_LIMIT);
-  router.post('/link/subscription', linkAction((b, s) => linkSubscriptionToken(app, s.userId, { token: b.token, accept: b.accept })), LINK_LIMIT);
+  router.post('/link/api-key', linkAction((b, s) => linkApiKey(app, s.userId, b.apiKey, b.provider || undefined)), LINK_LIMIT);
+  router.post('/link/subscription', linkAction((b, s) => linkSubscriptionToken(app, s.userId, { token: b.token, accept: b.accept }), '/', 'claude'), LINK_LIMIT);
   // Connexion guidée avec Claude (src/claudelogin.js) : le serveur lance le CLI et renvoie le lien de connexion ;
   // l'utilisateur recopie ensuite le petit code affiché par Claude, et le serveur range le jeton qui en sort.
   router.post('/link/claude/login', async ({ req, res, session }) => {
@@ -322,6 +334,28 @@ export function registerRoutes(router, app) {
   }, LINK_LIMIT);
   router.post('/link/claude/login/cancel', async ({ req, res, session }) => {
     loginsOf(app).cancel(session.userId, (await readBody(req)).id);
+    json(res, { ok: true });
+  }, LINK_LIMIT);
+  // Compte ChatGPT : fichier de connexion de Codex collé (secours) ou connexion guidée par code d'appareil (src/chatgptlogin.js)
+  router.post('/link/chatgpt/auth', linkAction((b, s) => linkChatgptAccount(app, s.userId, { authJson: b.authJson, accept: b.accept, via: 'paste' }), '/', 'openai'), LINK_LIMIT);
+  router.post('/link/chatgpt/login', async ({ req, res, session }) => {
+    const b = await readBody(req);
+    assertLoginConsent(cfg, b.accept); // même exigence que pour l'abonnement Claude : case cochée, avant tout lancement
+    json(res, await chatgptLoginsOf(app).start(session.userId));
+  }, LINK_LIMIT);
+  // Sondage de la page (toutes les 2 s) : lecture seule, avec sa propre limite, jamais celle de la liaison
+  router.get('/link/chatgpt/login/status', async ({ res, session, url }) => {
+    json(res, chatgptLoginsOf(app).poll(session.userId, url.searchParams.get('id')));
+  }, { limit: 'link_poll' });
+  // Connexion validée sur chatgpt.com : vérifiée par un appel minimal à Codex avant d'être rangée (chiffrée). Une seule requête, comptée dans « link ».
+  router.post('/link/chatgpt/login/finish', async ({ req, res, session }) => {
+    const b = await readBody(req);
+    const authJson = chatgptLoginsOf(app).finish(session.userId, b.id);
+    await linkChatgptAccount(app, session.userId, { authJson, accept: true, via: 'login' });
+    json(res, { ok: true });
+  }, LINK_LIMIT);
+  router.post('/link/chatgpt/login/cancel', async ({ req, res, session }) => {
+    chatgptLoginsOf(app).cancel(session.userId, (await readBody(req)).id);
     json(res, { ok: true });
   }, LINK_LIMIT);
   router.post('/link/test', async ({ req, res, session }) => {
@@ -373,7 +407,7 @@ export function registerRoutes(router, app) {
   router.post('/api/notify/test', async ({ req, res, session }) => {
     const b = await readBody(req);
     const { hooks } = await notifyConfig(app, session.userId);
-    const test = { title: 'Notification de test', description: 'Les notifications AiTools arrivent bien ici.', level: 'ok' };
+    const test = { title: 'Notification de test', description: 'Les notifications iaboss arrivent bien ici.', level: 'ok' };
     // Un canal précis (Slack, Telegram, e-mail)
     if (b.channel) {
       if (!CHANNEL_TYPES[b.channel]) throw new HttpError(400, 'Canal inconnu');
@@ -397,7 +431,7 @@ export function registerRoutes(router, app) {
     const { queue, scheduled, jobs } = await activitySnapshot(db, userId);
     const link = await getLinkState(db, userId);
     // Le quota d'abonnement n'existe qu'en mode abonnement : relevé en direct chez Anthropic (il compte aussi ce que la personne
-    // fait avec son Claude en dehors d'AiTools), à défaut la dernière mesure d'un job. Jamais de barre en mode clé API.
+    // fait avec son Claude en dehors d'iaboss), à défaut la dernière mesure d'un job. Jamais de barre en mode clé API.
     const quota = link?.mode === MODES.api_key ? null : await currentClaudeQuota(app, userId);
     // Détail pour le menu « jobs » de la barre du haut : en cours d'abord, puis la file, puis les programmés
     json(res, {
@@ -637,7 +671,7 @@ export function registerRoutes(router, app) {
       const target = await pinDb(app, p.userId, conn);
       json(res, { ok: true, ...(await analyzeDb(target, KPI_FIELDS.some((k) => picked[k]) ? picked : null)) });
     } catch (e) {
-      // Une connexion refusée par SA base n'est pas une panne d'AiTools : 400 (un 5xx serait masqué en « Erreur interne » et la raison se perdrait)
+      // Une connexion refusée par SA base n'est pas une panne d'iaboss : 400 (un 5xx serait masqué en « Erreur interne » et la raison se perdrait)
       throw new HttpError(e.status && e.status < 500 ? e.status : 400, e.status && e.status < 500 ? e.message : explainDbError(e));
     }
   }, { limit: 'conn_test' });
@@ -793,7 +827,7 @@ export function registerRoutes(router, app) {
   };
   router.get('/jobs/:id', async ({ res, params, session }) => {
     const job = await ownJobConsole(params, session);
-    html(res, layout({ title: 'Suivi de la tâche', email: session.email, body: `<section data-job-console="${job.id}" class="job-console">
+    html(res, layout({ title: 'Suivi de la tâche', email: session.email, named: true, body: `<section data-job-console="${job.id}" class="job-console">
       <a class="console-back" href="/">← Tous les projets</a>
       <header class="console-heading"><div><p class="console-eyebrow">ESPACE DE TRAVAIL · TÂCHE #${job.id}</p><h1 data-console-title>Claude au travail</h1><p class="muted">Suivez la création, étape par étape.</p></div><span class="console-live" data-console-live>Connexion…</span></header>
       <div class="console-grid"><aside class="console-summary"><span class="console-eyebrow">ACTIVITÉ ACTUELLE</span><p data-console-status role="status">Connexion au journal…</p>

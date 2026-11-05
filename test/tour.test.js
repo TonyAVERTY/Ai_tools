@@ -57,7 +57,7 @@ test('démarrage automatique : une seule fois, après les questions de bienvenue
   assert.equal(await needsTour(s.db, u.id), true);
   const first = await text(u, '/');
   assert.match(first, /<script type="application\/json" id="tour-data" data-mode="auto">/);
-  assert.match(first, /Bienvenue dans AiTools/);
+  assert.match(first, /Bienvenue dans iaboss/);
   assert.equal((await u.post('/tour/complete', { state: 'skipped' })).status, 200);
   assert.equal(await getSetting(s.db, u.id, 'tour_state'), 'skipped');
   assert.doesNotMatch(await text(u, '/'), /id="tour-data"/, 'elle ne revient plus toute seule');

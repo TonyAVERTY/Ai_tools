@@ -1,5 +1,5 @@
 // Page IA : envoi des messages à Claude et affichage de la réponse au fil de l'écriture (flux de lignes JSON, voir src/chat.js),
-// pièces jointes (photos, vidéos, PDF, fichiers texte, projet AiTools) téléversées avant l'envoi (voir src/chatfiles.js).
+// pièces jointes (photos, vidéos, PDF, fichiers texte, projet iaboss) téléversées avant l'envoi (voir src/chatfiles.js).
 (() => {
   const root = document.getElementById('chat');
   if (!root) return;
@@ -185,7 +185,7 @@
   }
   function botBubble() {
     const a = el('article', 'chat-msg bot');
-    a.innerHTML = '<div class="bubble md streaming"><span class="typing" aria-label="Claude écrit"><i></i><i></i><i></i></span></div><div class="msg-status muted small" data-status hidden></div>';
+    a.innerHTML = '<div class="bubble md streaming"><span class="typing" aria-label="' + window.AiTools.esc(window.AiTools.aiName()) + ' écrit"><i></i><i></i><i></i></span></div><div class="msg-status muted small" data-status hidden></div>';
     return a;
   }
   function addCopy(article, markdown) {

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
-#  AiTools — installation sur Raspberry Pi OS Lite 64 bits
+#  iaboss — installation sur Raspberry Pi OS Lite 64 bits
 #
 #  Usage :  sudo ./install.sh            installation / mise à jour
 #           ./install.sh --dry-run       montre ce qui serait fait, sans rien toucher
@@ -32,6 +32,7 @@ DO_CLEAN=0 DO_UPGRADE=0
 KEEP_ENV=0 DOMAIN="" ALLOWED="" GOOGLE_ID="" GOOGLE_SECRET="" THERMAL=75
 TUNNEL_MODE=later TUNNEL_TOKEN=""
 CLAUDE_MODE=later
+OTHER_AIS=0
 NEED_REBOOT=0
 CLEAN_SERVICES=() CLEAN_PACKAGES=() CLEAN_SWAP=0
 
@@ -45,7 +46,7 @@ fi
 banner() {
   printf '\n%s' "$BLU$B"
   printf '  ╭──────────────────────────────────────────────╮\n'
-  printf '  │   AiTools · installation Raspberry Pi        │\n'
+  printf '  │   iaboss · installation Raspberry Pi        │\n'
   printf '  ╰──────────────────────────────────────────────╯%s\n' "$R"
   (( DRY_RUN )) && printf '  %s[dry-run] rien ne sera modifié%s\n' "$YLW" "$R"
   return 0
@@ -392,6 +393,15 @@ ask_claude() {
   case $c in 1) CLAUDE_MODE=token ;; 2) CLAUDE_MODE=login ;; *) CLAUDE_MODE=later ;; esac
 }
 
+ask_other_ais() {
+  section "Autres IA (facultatif)"
+  info "Chaque personne choisit son IA dans l'application : Claude, ChatGPT ou Gemini."
+  info "Claude est installé d'office. Pour ChatGPT (Codex) et Gemini, il faut aussi leurs outils sur ce serveur."
+  info "Sans eux, ces deux IA restent grisées sur la page « Relier mon IA » (tu pourras les installer plus tard)."
+  confirm "Installer aussi Codex (ChatGPT) et Gemini CLI ?" o && OTHER_AIS=1
+  return 0
+}
+
 recap() {
   section "Récapitulatif"
   local line
@@ -410,6 +420,7 @@ recap() {
   row "Config" "$( (( KEEP_ENV )) && echo "conservée" || echo "https://$DOMAIN · $google")"
   row "Tunnel" "$TUNNEL_MODE"
   row "Claude" "$CLAUDE_MODE"
+  row "Autres IA" "$( (( OTHER_AIS )) && echo "Codex (ChatGPT) et Gemini CLI" || echo "non (Claude seul)")"
   row "Application" "$APP_DIR (utilisateur $APP_USER, port $PORT)"
   printf '\n'
   confirm "Lancer l'installation ?" o || die "Annulé, rien n'a été modifié."
@@ -540,6 +551,12 @@ do_runtime() {
     run "Installation de Claude Code" npm install -g --no-audit --no-fund @anthropic-ai/claude-code
   fi
 
+  # ChatGPT et Gemini : facultatif, un échec n'arrête pas l'installation (ces IA restent grisées dans l'application)
+  if (( OTHER_AIS )); then
+    ( run "Installation de Codex (ChatGPT)" npm install -g --no-audit --no-fund @openai/codex ) || warn "Codex non installé : ChatGPT restera indisponible (npm install -g @openai/codex, puis redémarre)."
+    ( run "Installation de Gemini CLI" npm install -g --no-audit --no-fund @google/gemini-cli ) || warn "Gemini CLI non installé : Gemini restera indisponible (npm install -g @google/gemini-cli, puis redémarre)."
+  fi
+
   if [[ $TUNNEL_MODE != keep ]]; then
     if command -v cloudflared >/dev/null; then ok "cloudflared déjà présent"
     else run "Installation de cloudflared" install_cloudflared; fi
@@ -612,6 +629,10 @@ EOF
   fi
   set_env DATA_DIR "$DATA_DIR"
   set_env CLAUDE_BIN "$claude_bin"
+  local bin
+  for bin in codex:CODEX_BIN gemini:GEMINI_BIN; do
+    command -v "${bin%%:*}" >/dev/null && set_env "${bin##*:}" "$(command -v "${bin%%:*}")"
+  done
   chown "$APP_USER:" "$f"; chmod 600 "$f"
 }
 
@@ -639,7 +660,7 @@ install_units() {
     install -m 755 "$SRC_DIR/deploy/aitools-backup.sh" /usr/local/sbin/aitools-backup
     cat >/etc/systemd/system/aitools-backup.service <<EOF
 [Unit]
-Description=Sauvegarde quotidienne AiTools
+Description=Sauvegarde quotidienne iaboss
 RequiresMountsFor=$DATA_DIR $BACKUP_DIR
 
 [Service]
@@ -651,7 +672,7 @@ ExecStart=/usr/local/sbin/aitools-backup $DATA_DIR/aitools.sqlite $BACKUP_DIR 14
 EOF
     cat >/etc/systemd/system/aitools-backup.timer <<EOF
 [Unit]
-Description=Sauvegarde quotidienne AiTools (04:30)
+Description=Sauvegarde quotidienne iaboss (04:30)
 
 [Timer]
 OnCalendar=*-*-* 04:30
@@ -742,15 +763,15 @@ do_start() {
     info "Complète $APP_DIR/.env puis : sudo systemctl start aitools"
     return 0
   fi
-  run "Démarrage d'AiTools" systemctl restart aitools
+  run "Démarrage d'iaboss" systemctl restart aitools
   local i code=""
   for i in $(seq 1 20); do
     code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT/login" || true)
     [[ $code == 200 ]] && break
     sleep 1
   done
-  if [[ $code == 200 ]]; then ok "AiTools répond sur http://127.0.0.1:$PORT"
-  else warn "AiTools ne répond pas (HTTP ${code:-aucun}). Voir : journalctl -u aitools -n 50"; fi
+  if [[ $code == 200 ]]; then ok "iaboss répond sur http://127.0.0.1:$PORT"
+  else warn "iaboss ne répond pas (HTTP ${code:-aucun}). Voir : journalctl -u aitools -n 50"; fi
 }
 
 finish() {
@@ -807,6 +828,7 @@ main() {
   ask_app
   ask_tunnel
   ask_claude
+  ask_other_ais
   recap
 
   do_upgrade

@@ -1,4 +1,4 @@
-/* Jetons de design d'AiTools. Voir docs/DESIGN.md : un bureau bleu-gris, des feuilles blanches, l'indigo du logo pour l'action.
+/* Jetons de design d'iaboss. Voir docs/DESIGN.md : un bureau bleu-gris, des feuilles blanches, l'indigo du logo pour l'action.
    Source unique des couleurs, rayons, ombres, durées et polices : le site public et l'application les lisent via var(--…),
    rien n'est redéfini ailleurs. Thème sombre = réglage du système (prefers-color-scheme).
    Le dégradé du logo n'est utilisé que pour le fil des étapes et les barres de progression, jamais pour du texte ni des boutons. */

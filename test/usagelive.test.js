@@ -1,4 +1,4 @@
-// Quota réel du compte Claude : relevé en direct chez Anthropic (hors AiTools compris), repli sur la dernière mesure d'un job, jamais de valeur inventée.
+// Quota réel du compte Claude : relevé en direct chez Anthropic (hors iaboss compris), repli sur la dernière mesure d'un job, jamais de valeur inventée.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { startApp } from './helpers/server.js';

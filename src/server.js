@@ -25,7 +25,8 @@ import { reportError } from './services/errormail.js';
 import { installCrashGuards } from './crashguard.js';
 import { purgePendingUploads, sweepRunDirs } from './chatfiles.js';
 import { securityHeaders, robotsHeaderFor, cspFor } from './site/seo.js';
-import { hasUsableLink, isLinkExempt, LINK_REQUIRED_MESSAGE } from './claudelink.js';
+import { hasUsableLink, isLinkExempt, LINK_REQUIRED_MESSAGE, providerLabelOf } from './claudelink.js';
+import { withAiName } from './services/ainame.js';
 import { memberTeamIds, purgeInvites } from './teams.js';
 import { needsWelcome } from './userprofile.js';
 import { sandboxStartupMessages } from './services/sandbox.js';
@@ -49,6 +50,7 @@ const STATIC = {
   '/static/responsive.js': asset('responsive.js', 'text/javascript; charset=utf-8', 3600),
   '/static/app.js': asset('app.js', 'text/javascript; charset=utf-8', 3600),
   '/static/app-recap.js': asset('app-recap.js', 'text/javascript; charset=utf-8', 3600),
+  '/static/app-link.js': asset('app-link.js', 'text/javascript; charset=utf-8', 3600),
   '/static/app-promo.js': asset('app-promo.js', 'text/javascript; charset=utf-8', 3600),
   '/static/app-linkedin.js': asset('app-linkedin.js', 'text/javascript; charset=utf-8', 3600),
   '/static/app-prospects.js': asset('app-prospects.js', 'text/javascript; charset=utf-8', 3600),
@@ -157,13 +159,14 @@ export async function createApp(cfg, { db, worker = true, createTransport, fetch
       }
       // Première connexion : quelques questions sur l'activité (une seule fois, facultatives), avant le tableau de bord
       if (!route.public && isRead && url.pathname === '/' && !req.headers.accept?.includes('json') && await needsWelcome(db, session.userId)) return redirect(res, '/welcome');
-      await route.handler({ req, res, url, params: route.params, session, app });
+      // Les textes de la page parlent de l'IA de CET utilisateur (voir services/ainame.js)
+      const ai = session && !route.public ? await providerLabelOf(db, session.userId) : null;
+      await withAiName(ai, () => route.handler({ req, res, url, params: route.params, session, app }));
     } catch (e) {
       const status = e.status || 500;
-      if (status >= 500 && !e.expose) {
-        console.error(`[${req.method} ${url.pathname}]`, e);
-        reportError(app, e, { method: req.method, path: url.pathname, userId: session?.userId });
-      }
+      if (status >= 500 && !e.expose) console.error(`[${req.method} ${url.pathname}]`, e);
+      // Toute erreur sauf « introuvable » part par mail au développeur (en arrière-plan, dédoublonnée et limitée : voir services/errormail.js)
+      if (status !== 404) reportError(app, e, { method: req.method, path: url.pathname, userId: session?.userId, status });
       if (res.headersSent) return res.end();
       const msg = status >= 500 && !e.expose ? 'Erreur interne' : e.message;
       for (const [k, v] of Object.entries(e.headers || {})) res.setHeader(k, v);
@@ -185,6 +188,7 @@ export async function createApp(cfg, { db, worker = true, createTransport, fetch
       // Multi jobs : combien de jobs en même temps pour CE compte, selon son offre (1 pour la gratuite)
       parallel: async (userId) => { const u = await getUser(db, userId); return u ? limitsFor(u).parallelJobs : 1; },
       onFinish: (job, r) => notifyJob(app, job, r),
+      onError: (job, e) => reportError(app, e, { method: 'JOB', path: job.type, userId: job.user_id, status: null }),
       budget: (userId) => budgetState(db, userId),
       isAiJob: (type) => AI_JOBS.has(type),
       onBudget: (reason, userId) => notify(app, userId, 'budget', {
@@ -218,6 +222,7 @@ export async function createApp(cfg, { db, worker = true, createTransport, fetch
   app.close = async () => {
     clearInterval(purge);
     app.claudeLogins?.closeAll();
+    app.chatgptLogins?.closeAll();
     await new Promise((r) => { server.close(r); server.closeIdleConnections?.(); });
     await w?.stop();
     await scheduler?.stop();
@@ -242,7 +247,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   catch (e) { console.error(`DATA_DIR (${cfg.dataDir}) n'est pas inscriptible par cet utilisateur : ${e.code || e.message}. Les analyses de projet échoueront. Pose DATA_DIR sur un dossier qui t'appartient (ex. DATA_DIR=./data).`); }
   const app = await createApp(cfg);
   installCrashGuards(app);
-  app.server.listen(cfg.port, cfg.host, () => console.log(`AiTools sur http://${cfg.host}:${cfg.port} (${cfg.appUrl})`));
+  app.server.listen(cfg.port, cfg.host, () => console.log(`iaboss sur http://${cfg.host}:${cfg.port} (${cfg.appUrl})`));
   const shutdown = () => app.close().then(() => process.exit(0), (e) => { console.error(e); process.exit(1); });
   process.on('SIGTERM', shutdown);
   process.on('SIGINT', shutdown);

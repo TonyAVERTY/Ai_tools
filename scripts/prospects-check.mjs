@@ -1,13 +1,15 @@
 // Vérifie dans un vrai navigateur (public/app-prospects.js) l'ajout manuel d'un prospect, la modification et la suppression depuis la fiche, l'aperçu du mail
 // (A/B, texte), la vue tableau (Kanban) avec un vrai glisser-déposer entre deux statuts, et le fonctionnement après une navigation sans rechargement.
 // Nécessite Playwright (PLAYWRIGHT_MODULE, PLAYWRIGHT_CHROMIUM). Sortie « TOUT EST BON » attendue.
+import { resolve } from 'node:path';
 import { startApp, APP_URL } from '../test/helpers/server.js';
 import { addProject } from '../test/helpers/users.js';
 import { now } from '../src/db.js';
 
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright-core');
 const exe = process.env.PLAYWRIGHT_CHROMIUM;
-const s = await startApp();
+// Faux Claude : le contrôle du sens (aperçu) répond tout de suite ; « SENSEBAD » dans le mail le fait juger sans sens, avec un modèle corrigé
+const s = await startApp({ cfg: { claudeBin: resolve('test/fixtures/fake-claude.js') } });
 const u = await s.newUser();
 const pid = await addProject(s.db, u.id, { name: 'Atelier', gitUrl: 'https://github.com/u/atelier.git' });
 const b = await chromium.launch(exe ? { executablePath: exe } : {});
@@ -69,8 +71,125 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   await p.waitForSelector('dialog.mailprev .pv-text', { timeout: 8000 }).catch(() => {});
   ok(await p.locator('dialog.mailprev .pv-text').isVisible(), `${tag} l'onglet Version texte s'affiche`);
   ok(!(await p.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)), `${tag} pas de défilement horizontal avec l'aperçu ouvert`);
+  // Contrôle du sens par l'IA : « Sens vérifié » quand tout va bien
+  await p.waitForSelector('dialog.mailprev [data-pv-sense] .badge.ok', { timeout: 15000 }).catch(() => {});
+  ok(((await p.locator('dialog.mailprev [data-pv-sense]').innerText()) || '').includes('Sens vérifié'), `${tag} aperçu : « Sens vérifié » quand le mail a un sens`);
   await p.screenshot({ path: process.env.SHOT_DIR ? `${process.env.SHOT_DIR}/preview-${vp.width}.png` : undefined }).catch(() => {});
   await p.keyboard.press('Escape'); // ferme l'aperçu
+  // Mail sans sens : l'IA l'explique, propose un modèle corrigé, et le modèle ne change qu'au clic sur « Appliquer la correction au modèle »
+  await p.fill(`${tpl} [name=body]`, 'Bonjour SENSEBAD,\n\n{{accroche}}\n\n{{expediteur}}');
+  await p.locator(`${tpl} [data-tpl-preview]`).click();
+  await p.waitForSelector('dialog.mailprev [data-pv-apply]', { timeout: 15000 });
+  const bad = await p.locator('dialog.mailprev [data-pv-sense]').innerText();
+  ok(/Ce mail ne veut pas dire grand-chose/.test(bad) && /Version corrigée proposée/.test(bad), `${tag} aperçu : le problème et la version corrigée sont affichés`);
+  ok((await p.inputValue(`${tpl} [name=body]`)).includes('SENSEBAD'), `${tag} le modèle n'a pas changé tant qu'on n'a pas cliqué`);
+  ok(!(await p.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)), `${tag} pas de défilement horizontal avec la correction proposée`);
+  await p.locator('dialog.mailprev [data-pv-apply]').click();
+  await p.waitForFunction((sel) => !document.querySelector(sel).value.includes('SENSEBAD'), `${tpl} [name=body]`);
+  ok((await p.inputValue(`${tpl} [name=body]`)).startsWith('Bonjour bien,'), `${tag} « Appliquer la correction au modèle » met le texte corrigé dans le modèle`);
+  await p.waitForSelector('dialog.mailprev [data-pv-sense] .badge.ok', { timeout: 15000 }).catch(() => {});
+  ok(((await p.locator('dialog.mailprev [data-pv-sense]').innerText()) || '').includes('Sens vérifié'), `${tag} après correction : « Sens vérifié »`);
+  await p.keyboard.press('Escape');
+  // Phrase sélectionnée dans l'aperçu : « Changer | Modifier »
+  const SENT = 'Est-ce un sujet chez vous ?';
+  const bodyOf = () => p.inputValue(`${tpl} [name=body]`);
+  const selectIn = (text) => p.evaluate((t) => {
+    const w = document.createTreeWalker(document.querySelector('dialog.mailprev [data-pv-body]'), NodeFilter.SHOW_TEXT);
+    for (let n = w.nextNode(); n; n = w.nextNode()) {
+      const i = n.nodeValue.indexOf(t);
+      if (i >= 0) {
+        const r = document.createRange(); r.setStart(n, i); r.setEnd(n, i + t.length);
+        // Comme une personne : la phrase est à l'écran quand elle la sélectionne (cadre du texte, puis fenêtre)
+        const pre = n.parentElement, dlg = document.querySelector('dialog.mailprev');
+        pre.scrollTop += r.getBoundingClientRect().top - pre.getBoundingClientRect().top - 30;
+        const top = r.getBoundingClientRect().top;
+        if (top > innerHeight - 90 || top < 90) dlg.scrollTop += top - innerHeight / 2;
+        const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); return true;
+      }
+    }
+    return false;
+  }, text);
+  const openText = async () => {
+    await p.locator(`${tpl} [data-tpl-preview]`).click();
+    await p.locator('dialog.mailprev').getByText('Version texte').click();
+    await p.waitForSelector('dialog.mailprev [data-pv-body]');
+  };
+  const bar = p.locator('dialog.mailprev [data-pv-sel]:not([hidden])');
+  await p.fill(`${tpl} [name=body]`, `Bonjour,\n\nChez {{entreprise}}, une carte dans le téléphone aide les clients à revenir.\n\n${SENT}\n\nBien cordialement,\n{{expediteur}}`);
+  await openText();
+  ok(await selectIn(SENT), `${tag} (phrase sélectionnée)`);
+  await bar.waitFor({ timeout: 5000 }).catch(() => {});
+  ok(await bar.count() === 1 && (await bar.innerText()).replace(/\s+/g, ' ').trim() === 'Changer Modifier', `${tag} sélection : la barre « Changer | Modifier » apparaît`);
+  const geo = await p.evaluate(() => {
+    const b = document.querySelector('dialog.mailprev [data-pv-sel]').getBoundingClientRect(); const r = getSelection().getRangeAt(0).getBoundingClientRect();
+    return { above: b.bottom <= r.top + 1, below: b.top >= r.bottom - 1, inside: b.left >= 0 && b.right <= innerWidth && b.top >= 0 && b.bottom <= innerHeight };
+  });
+  ok((geo.above || geo.below) && geo.inside, `${tag} la barre est au-dessus de la phrase (sinon dessous), sans sortir de l'écran`);
+  ok(!(await p.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)), `${tag} pas de défilement horizontal avec la barre`);
+  // Une sélection qui contient le nom de l'entreprise est retrouvée dans le modèle ({{entreprise}}) ; le pied de page ne l'est pas
+  await selectIn('Chez Boulangerie Le Fournil, une carte dans le téléphone');
+  await bar.waitFor({ timeout: 5000 }).catch(() => {});
+  ok(await bar.count() === 1, `${tag} une sélection qui contient le nom de l'entreprise donne aussi la barre`);
+  await selectIn('Pour ne plus être contacté');
+  await p.waitForFunction(() => document.querySelector('dialog.mailprev [data-pv-sel]').hidden, null, { timeout: 5000 }).catch(() => {});
+  ok(await bar.count() === 0, `${tag} le pied de page (hors modèle) : pas de barre`);
+  // Changer : l'IA propose, « Proposer une autre phrase » en demande une autre, « Utiliser » remplace dans le modèle
+  await selectIn(SENT);
+  await bar.waitFor({ timeout: 5000 });
+  await p.locator('dialog.mailprev [data-pv-change]').click();
+  await p.waitForSelector('dialog.mailprev [data-pv-use]', { timeout: 15000 });
+  ok(/Autre formulation 1 :/.test(await p.locator('dialog.mailprev .pv-prop-t').innerText()), `${tag} Changer : l'IA propose une autre phrase`);
+  ok((await bodyOf()).includes(`\n${SENT}\n`), `${tag} le modèle n'a pas changé tant qu'on n'a pas choisi`);
+  ok(!(await p.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)), `${tag} pas de défilement horizontal avec la proposition`);
+  await p.locator('dialog.mailprev [data-pv-more]').click();
+  await p.waitForFunction(() => /Autre formulation 2 :/.test(document.querySelector('dialog.mailprev .pv-prop-t')?.textContent || ''), null, { timeout: 15000 });
+  ok(true, `${tag} « Proposer une autre phrase » : une autre proposition, pas la même`);
+  await p.locator('dialog.mailprev [data-pv-use]').click();
+  await p.waitForFunction((sel) => document.querySelector(sel).value.includes('Autre formulation 2 :'), `${tpl} [name=body]`);
+  const replaced = await bodyOf();
+  ok(replaced.includes(`Autre formulation 2 : ${SENT}`) && replaced.split(SENT).length === 2 && replaced.includes('Chez {{entreprise}}, une carte'), `${tag} « Utiliser cette phrase » remplace la phrase dans le modèle, le reste est intact`);
+  await p.waitForSelector('dialog.mailprev [data-pv-sense] .badge.ok', { timeout: 15000 }).catch(() => {});
+  // Annuler : rien ne change
+  await p.locator('dialog.mailprev').getByText('Version texte').click().catch(() => {});
+  await p.waitForSelector('dialog.mailprev [data-pv-body]');
+  await selectIn('Bien cordialement,');
+  await bar.waitFor({ timeout: 5000 });
+  const before = await bodyOf();
+  await p.locator('dialog.mailprev [data-pv-change]').click();
+  await p.waitForSelector('dialog.mailprev [data-pv-cancel]', { timeout: 15000 });
+  await p.locator('dialog.mailprev [data-pv-cancel]').click();
+  ok((await bodyOf()) === before && await bar.count() === 0, `${tag} Annuler : le modèle ne change pas et la barre disparaît`);
+  // Modifier : un champ de consigne facultatif ; vide, l'IA réécrit seule ; rempli, sa proposition en tient compte
+  const instr = p.locator('dialog.mailprev [data-pv-instr]');
+  await selectIn(SENT);
+  await bar.waitFor({ timeout: 5000 });
+  await p.locator('dialog.mailprev [data-pv-edit]').click();
+  await instr.waitFor({ timeout: 5000 });
+  ok((await instr.inputValue()) === '' && await instr.evaluate((e) => e === document.activeElement), `${tag} Modifier : un champ de consigne, vide et prêt à écrire`);
+  ok(!(await p.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)), `${tag} pas de défilement horizontal avec le champ de consigne`);
+  await p.locator('dialog.mailprev [data-pv-go]').click(); // laissé vide
+  await p.waitForSelector('dialog.mailprev [data-pv-use]', { timeout: 15000 });
+  const emptyWish = await p.locator('dialog.mailprev .pv-prop-t').innerText();
+  ok(/Autre formulation \d :/.test(emptyWish) && !/\(/.test(emptyWish.split(':')[0]), `${tag} consigne laissée vide : l'IA propose seule (${emptyWish.slice(0, 30)}…)`);
+  await p.locator('dialog.mailprev [data-pv-cancel]').click();
+  await selectIn(SENT);
+  await bar.waitFor({ timeout: 5000 });
+  await p.locator('dialog.mailprev [data-pv-edit]').click();
+  await instr.fill('plus court');
+  await instr.press('Enter');
+  await p.waitForSelector('dialog.mailprev [data-pv-use]', { timeout: 15000 });
+  ok(/\(plus court\)/.test(await p.locator('dialog.mailprev .pv-prop-t').innerText()), `${tag} consigne écrite (touche Entrée) : la proposition en tient compte`);
+  await p.locator('dialog.mailprev [data-pv-more]').click();
+  await p.waitForFunction(() => /Autre formulation \d+ \(plus court\)/.test(document.querySelector('dialog.mailprev .pv-prop-t')?.textContent || ''), null, { timeout: 15000 });
+  ok(true, `${tag} « Proposer une autre phrase » garde la consigne`);
+  await p.locator('dialog.mailprev [data-pv-cancel]').click();
+  // Modifier à la main : l'aperçu se ferme, la phrase est sélectionnée dans le champ du modèle
+  await selectIn('Bien cordialement,');
+  await bar.waitFor({ timeout: 5000 });
+  await p.locator('dialog.mailprev [data-pv-edit]').click();
+  await p.locator('dialog.mailprev [data-pv-hand]').click();
+  const edit = await p.evaluate((sel) => { const f = document.querySelector(sel); return { active: document.activeElement === f, text: f.value.slice(f.selectionStart, f.selectionEnd), open: !!document.querySelector('dialog.mailprev[open]') }; }, `${tpl} [name=body]`);
+  ok(!edit.open && edit.active && edit.text === 'Bien cordialement,', `${tag} Modifier à la main : l'aperçu se ferme et la phrase est sélectionnée dans le champ du modèle (« ${edit.text} »)`);
   // vue tableau : un prospect glissé d'une colonne à l'autre change de statut côté serveur
   const kanbanEmail = `kanban-${vp.width}@atelier.fr`;
   const kanbanName = `Atelier Kanban ${vp.width}`; // un nom par largeur : le prospect du premier passage reste dans la base

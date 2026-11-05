@@ -13,6 +13,7 @@ import { monthBounds, usageOf, quotaFor, assertRoom, recordUsage, planOf, usageV
 import { encrypt } from '../src/crypto.js';
 import { importProspects } from '../src/services/csv.js';
 import { startApp } from './helpers/server.js';
+import { withSense } from './helpers/sense.js';
 
 // Plafonds du plan gratuit appliqués côté serveur : à la limite exacte, sans compteur qui dérive, sans perte de données.
 
@@ -143,7 +144,7 @@ test('mails : 100 par mois, le 101e refusé à la limite exacte ; un lot est tro
   await w2.db.prepare("INSERT INTO templates(project_id, kind, subject, body, status, updated_at) VALUES(?, 'initial', 's', 'b {{entreprise}}', 'validated', ?)").run(p, now());
   for (let i = 0; i < 5; i++) await w2.db.prepare("INSERT INTO prospects(project_id, company, email, created_at) VALUES(?, ?, ?, ?)").run(p, `E${i}`, `e${i}@x${i}.fr`, now());
   for (let i = 0; i < 98; i++) await recordUsage(w2.db, v, 'mail');
-  const worker = new Worker(w2.db, makeHandlers(w2.app), { log: { error() {} } });
+  const worker = new Worker(w2.db, makeHandlers(w2.app, { claude: withSense(w2.app) }), { log: { error() {} } });
   const { id } = await enqueue(w2.db, { userId: v, projectId: p, type: 'send', params: { count: 5 } });
   await worker.tick();
   const job = await w2.db.prepare('SELECT status, result_json FROM jobs WHERE id = ?').get(id);
@@ -182,7 +183,7 @@ test('prospection : les prospects trouvés au-delà du plafond ne sont pas enreg
   for (let i = 0; i < 49; i++) await w.db.prepare('INSERT INTO prospects(project_id, company, email, created_at) VALUES(?, ?, ?, ?)').run(p, `E${i}`, `e${i}@d${i}.fr`, now());
   const { resolve } = await import('node:path');
   w.app.cfg.claudeBin = resolve('test/fixtures/fake-claude.js');
-  const worker = new Worker(w.db, makeHandlers(w.app), { log: { error() {} } });
+  const worker = new Worker(w.db, makeHandlers(w.app, { claude: withSense(w.app) }), { log: { error() {} } });
   const { id } = await enqueue(w.db, { userId: u, projectId: p, type: 'prospect', params: { count: 3 } });
   await worker.tick();
   const job = await w.db.prepare('SELECT status, error, result_json FROM jobs WHERE id = ?').get(id);

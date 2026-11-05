@@ -100,7 +100,7 @@ export function calendarPage({ email, year, month, byDay, feed, today, agenda = 
   ${agenda.length ? `<ul class="agenda">${agendaItems}</ul>` : '<p class="muted">Rien de prévu pour l\'instant. Les rendez-vous, les prochaines actions sur tes prospects et les posts LinkedIn programmés apparaissent ici.</p>'}
 </section>
 <section class="card" id="evenements" aria-labelledby="h-ev">
-  <div class="card-h"><h2 id="h-ev">Ajouter un événement</h2><p>Un rendez-vous, un appel ou un rappel. Quand un prospect te répond avec une date, AiTools te propose de l'ajouter d'un clic (popup et page Mails).</p></div>
+  <div class="card-h"><h2 id="h-ev">Ajouter un événement</h2><p>Un rendez-vous, un appel ou un rappel. Quand un prospect te répond avec une date, iaboss te propose de l'ajouter d'un clic (popup et page Mails).</p></div>
   ${error ? banner('err', error) : ''}
   <form method="post" action="/calendar/events" class="cfg evform">
     <label class="field"><span class="lbl">Titre</span><input name="title" maxlength="200" required placeholder="ex. Appel avec Boulangerie Dupont"></label>
@@ -149,7 +149,7 @@ export function registerCalendarRoutes(router, app) {
     if (!userId) throw new HttpError(404, 'Page introuvable');
     const host = new URL(cfg.appUrl).host;
     res.setHeader('Cache-Control', 'private, max-age=300');
-    res.setHeader('Content-Disposition', 'inline; filename="aitools.ics"');
-    send(res, 200, buildIcs(await eventsFor(app, userId, { host }), { name: 'AiTools', at: now() }), 'text/calendar; charset=utf-8');
+    res.setHeader('Content-Disposition', 'inline; filename="iaboss.ics"');
+    send(res, 200, buildIcs(await eventsFor(app, userId, { host }), { name: 'iaboss', at: now() }), 'text/calendar; charset=utf-8');
   }, { public: true, limit: 'ical' });
 }

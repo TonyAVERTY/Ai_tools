@@ -1,4 +1,4 @@
-# Direction artistique et design system d'AiTools
+# Direction artistique et design system d'iaboss
 
 Ce document est la référence du design : il explique le parti pris, puis liste les jetons et les composants. Les valeurs vivent dans
 `public/tokens.css` (couleurs, rayons, ombres, durées, typographie) ; `public/site.css` (site public) et `public/app.css` (application)
@@ -7,7 +7,7 @@ ressource externe).
 
 ## 1. Le sujet, et ce qu'on en tire
 
-AiTools prépare des lettres commerciales (des mails de prospection personnalisés) et laisse la personne les relire avant de les envoyer
+iaboss prépare des lettres commerciales (des mails de prospection personnalisés) et laisse la personne les relire avant de les envoyer
 depuis sa propre boîte. Le public : des indépendants et de petites équipes, souvent proches du code (dépôt Git, API), qui n'ont pas de
 service commercial. Le ton de la marque : franc, concret, on se tutoie, on dit ce que l'outil ne sait pas faire.
 
@@ -69,7 +69,7 @@ Deux familles, libres (SIL OFL), **servies par l'application** (`public/fonts/`,
   Un serif d'édition à fort dessin, qui donne au site son ton de courrier posé, loin des grotesques par défaut.
 - **Hanken Grotesk** (variable, 100 à 900) : **toute l'application** (titres de page, panneaux, indicateurs, tableaux, formulaires) et le
   texte courant du site. Humaniste, très lisible en petits corps et avec les accents français. Un écran d'exploitation n'a pas le ton
-  d'une page d'accueil : pas de serif dans le tableau de bord, sauf le mot « AiTools » du logo.
+  d'une page d'accueil : pas de serif dans le tableau de bord, sauf le mot « iaboss » du logo.
 - Données techniques (adresses, URL, code) : `ui-monospace` du système, aucun fichier de plus.
 
 Échelle (rem ; les titres du site sont fluides) :
@@ -165,7 +165,7 @@ Dix questions posées aux pages réelles, avec ce qui a été corrigé :
 7. *Un titre marketing interchangeable ?* « Claude écrit tes mails de prospection. Toi, tu les relis et tu les signes. » dit ce que fait l'outil et où est la main.
 8. *Un texte creux ou inventé ?* Aucun chiffre ni témoignage ; la lettre d'exemple est signalée « fictive ».
 9. *Du mouvement gratuit ?* Un seul moment orchestré (l'accroche surlignée) ; transitions de page et menus répondent à une action ; tout est coupé avec `prefers-reduced-motion`.
-10. *Un site qui pourrait être celui d'un autre produit ?* La lettre, le serif d'édition et le fil du logo sont propres à AiTools.
+10. *Un site qui pourrait être celui d'un autre produit ?* La lettre, le serif d'édition et le fil du logo sont propres à iaboss.
 
 Contrôles faits : `axe-core` (WCAG 2.1 AA + bonnes pratiques) sur 18 pages en clair et en sombre : aucune violation après correction des listes, de l'ordre des titres, d'un contraste de lien et des onglets de la page Mails.
 

@@ -185,14 +185,14 @@ export async function sendInviteMail(app, team, owner, invite) {
   const url = inviteUrl(app.cfg, invite.token);
   const text = [
     'Bonjour,', '',
-    `${owner.email} t'invite à rejoindre l'équipe « ${team.name} » sur AiTools (rôle : ${ROLE_LABELS[invite.role].toLowerCase()}).`, '',
+    `${owner.email} t'invite à rejoindre l'équipe « ${team.name} » sur iaboss (rôle : ${ROLE_LABELS[invite.role].toLowerCase()}).`, '',
     `Pour accepter, connecte-toi avec cette adresse (${invite.email}) puis ouvre : ${url}`, '',
     `Le lien est valable 7 jours et ne marche qu'avec ${invite.email}.`,
   ].join('\n');
   const transport = (app.createTransport || createTransport)(await pinSmtp(app, null, smtp));
   try {
     await transport.sendMail({
-      from: smtp.fromEmail, to: invite.email, subject: `Invitation à l'équipe « ${team.name} » sur AiTools`, text,
+      from: smtp.fromEmail, to: invite.email, subject: `Invitation à l'équipe « ${team.name} » sur iaboss`, text,
       html: inviteMail({ teamName: team.name, ownerEmail: owner.email, role: invite.role, email: invite.email, url, appUrl: app.cfg.appUrl }),
     });
     return { sent: true };

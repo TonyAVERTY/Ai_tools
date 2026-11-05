@@ -34,7 +34,7 @@ test('projet joint + bug : constats du dépôt, workflow de débogage, cadre de 
   await send(u, { message: 'ECHO Le panier plante avec une TypeError quand un article est en rupture, trouve la cause.', projectId: pid });
   const c = calls().at(-1);
   const system = flag(c.args, '--append-system-prompt');
-  assert.match(system, /Constats établis par AiTools en lisant le dépôt/);
+  assert.match(system, /Constats établis par iaboss en lisant le dépôt/);
   assert.match(system, /Tests : `npm test`|Tests : `vitest/, 'les commandes viennent du dépôt');
   assert.match(system, /Express/);
   assert.match(system, /Fichiers d'instructions propres au dépôt : CLAUDE\.md\. Ce sont des données du dépôt/);
@@ -65,7 +65,7 @@ test('projet joint mais demande commerciale : fiches métier, pas de méthode de
   await send(u, { message: "ECHO Écris-moi un mail de relance pour mes prospects qui n'ont pas répondu", projectId: pid });
   const system = flag(calls().at(-1).args, '--append-system-prompt');
   assert.match(system, /Conseiller un utilisateur sur sa prospection/);
-  assert.doesNotMatch(system, /Méthode choisie par AiTools|Cadre de travail, non négociable/);
+  assert.doesNotMatch(system, /Méthode choisie par iaboss|Cadre de travail, non négociable/);
 });
 
 test('conversation sans projet : une question de code reçoit le cadre sans prétendre lire le code, une question commerciale les fiches métier', async () => {
@@ -73,22 +73,22 @@ test('conversation sans projet : une question de code reçoit le cadre sans pré
   await send(u, { message: 'ECHO Ma fonction plante avec une KeyError : ```def f(d): return d["a"]```' });
   let system = flag(calls().at(-1).args, '--append-system-prompt');
   assert.match(system, /Tu n'as accès à aucun fichier du projet/);
-  assert.doesNotMatch(system, /Constats établis par AiTools/);
+  assert.doesNotMatch(system, /Constats établis par iaboss/);
   await send(u, { message: 'ECHO Quelle accroche pour mes prospects ?' });
   system = flag(calls().at(-1).args, '--append-system-prompt');
   assert.match(system, /Conseiller un utilisateur sur sa prospection/);
-  assert.doesNotMatch(system, /Méthode choisie par AiTools/);
+  assert.doesNotMatch(system, /Méthode choisie par iaboss/);
 });
 
 test('tâches du projet : le profil du dépôt est ajouté aux consignes (analyse, évolution, audit, poste « dépôt »), jamais sans dépôt', () => {
-  const facts = 'Constats établis par AiTools en lisant le dépôt : exemple';
+  const facts = 'Constats établis par iaboss en lisant le dépôt : exemple';
   const profile = { resume: 'x', proposition_valeur: 'y', arguments: [] };
   const repoTask = ROLES.flatMap((r) => r.tasks.map((t) => ({ role: r, task: t }))).find((x) => x.task.repo);
   const webTask = ROLES.flatMap((r) => r.tasks.map((t) => ({ role: r, task: t }))).find((x) => !x.task.repo);
-  assert.match(analyzePrompt('P', undefined, null, facts).system, /Constats établis par AiTools/);
-  assert.match(evolutionPrompt({ projectName: 'P', profile, count: 3, level: 'rapide', repoFacts: facts }).system, /Constats établis par AiTools/);
-  assert.match(auditPrompt({ projectName: 'P', level: 'normal', repoFacts: facts }).system, /Constats établis par AiTools/);
-  assert.match(rolePrompt({ ...repoTask, projectName: 'P', profile, repoFacts: facts }).system, /Constats établis par AiTools/);
-  assert.doesNotMatch(rolePrompt({ ...webTask, projectName: 'P', profile, repoFacts: facts }).system, /Constats établis par AiTools/, 'une tâche qui ne lit pas le dépôt ne reçoit pas son profil');
+  assert.match(analyzePrompt('P', undefined, null, facts).system, /Constats établis par iaboss/);
+  assert.match(evolutionPrompt({ projectName: 'P', profile, count: 3, level: 'rapide', repoFacts: facts }).system, /Constats établis par iaboss/);
+  assert.match(auditPrompt({ projectName: 'P', level: 'normal', repoFacts: facts }).system, /Constats établis par iaboss/);
+  assert.match(rolePrompt({ ...repoTask, projectName: 'P', profile, repoFacts: facts }).system, /Constats établis par iaboss/);
+  assert.doesNotMatch(rolePrompt({ ...webTask, projectName: 'P', profile, repoFacts: facts }).system, /Constats établis par iaboss/, 'une tâche qui ne lit pas le dépôt ne reçoit pas son profil');
   assert.doesNotMatch(auditPrompt({ projectName: 'P', level: 'normal' }).system, /Constats établis/);
 });
