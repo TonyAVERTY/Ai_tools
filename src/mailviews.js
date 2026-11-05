@@ -71,10 +71,11 @@ export function mailsPage(d) {
     const solo = d.project || d.projects.length < 2;
     list = `<div class="table-wrap"><table class="mtable">
       <thead><tr><th>Date</th><th>Destinataire</th><th>Objet</th><th>État</th></tr></thead><tbody>
-      ${d.rows.map((r) => `<tr><td class="nowrap">${esc(when(r.sent_at))}</td>
+      ${d.rows.map((r) => `<tr class="mail-row"><td class="nowrap">${esc(when(r.sent_at))}</td>
         <td>${r.company ? `<b>${esc(r.company)}</b><span class="td-s">${esc(r.email)}</span>` : esc(r.email)}</td>
-        <td>${esc(r.subject || '—')}<span class="td-s">${esc(solo ? KIND[r.kind] || r.kind : `${r.project} · ${KIND[r.kind] || r.kind}`)}</span></td>
-        <td><span class="badge ${STATE_BADGE[r.state]}"${r.error ? ` title="${esc(r.error)}"` : ''}>${esc(STATE_LABELS[r.state])}</span>${r.error ? `<span class="td-s">${esc(String(r.error).slice(0, 80))}</span>` : ''}</td></tr>`).join('')}
+        <td><button type="button" class="mail-toggle" data-mail="${Number(r.id)}" aria-expanded="false" aria-controls="mail-d-${Number(r.id)}">${esc(r.subject || '—')}${ic('down')}</button><span class="td-s">${esc(solo ? KIND[r.kind] || r.kind : `${r.project} · ${KIND[r.kind] || r.kind}`)}</span></td>
+        <td><span class="badge ${STATE_BADGE[r.state]}">${esc(STATE_LABELS[r.state])}</span>${r.error ? `<span class="td-s">${esc(String(r.error).slice(0, 80))}</span>` : ''}</td></tr>
+      <tr class="mail-detail" id="mail-d-${Number(r.id)}" hidden><td colspan="4"></td></tr>`).join('')}
       </tbody></table></div>`;
   }
 

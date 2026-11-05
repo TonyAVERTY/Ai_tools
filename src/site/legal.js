@@ -156,7 +156,7 @@ export function privacyPage({ appUrl, apple = false, captcha = false, inactiveMo
     <tr><th scope="row">Journal d'administration</th><td>12 mois. Il note les actions des administrateurs (suspension, changement de plan, suppression) et les pauses d'envoi, avec un identifiant et une adresse masquée.</td></tr>
     <tr><th scope="row">Session</th><td>30 jours au plus, effacée à la déconnexion. Les états de connexion durent 10 minutes.</td></tr>
     <tr><th scope="row">Clé API, jeton ou connexion de ton IA</th><td>Jusqu'à ce que tu le délies ou supprimes ton compte.</td></tr>
-    <tr><th scope="row">Prospects, notes et journaux d'envoi</th><td>Jusqu'à la suppression du projet ou du compte. En tant que responsable de traitement, ne garde pas une fiche plus de 3 ans après le dernier contact.</td></tr>
+    <tr><th scope="row">Prospects, notes et journaux d'envoi</th><td>Jusqu'à la suppression du projet ou du compte. Le journal d'envoi garde le texte de chaque mail envoyé (sans le pied de page) et, pour un mail rejeté, la raison donnée par le serveur du destinataire : tu les relis dans la page Mails. En tant que responsable de traitement, ne garde pas une fiche plus de 3 ans après le dernier contact.</td></tr>
     <tr><th scope="row">Comptabilité et justificatifs</th><td>Jusqu'à ce que tu supprimes la ligne ou ton compte. Les documents comptables se conservent en principe 10 ans : exporte-les avant de supprimer.</td></tr>
     <tr><th scope="row">Liste d'opposition</th><td>Conservée après la suppression d'un compte, tant qu'il faut respecter l'opposition de la personne.</td></tr>
     <tr><th scope="row">Sauvegardes</th><td>Environ 14 jours : une donnée effacée disparaît des sauvegardes à leur expiration.</td></tr>
