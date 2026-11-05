@@ -255,7 +255,13 @@
     return m < 1 ? "à l'instant" : m < 60 ? `il y a ${m} min` : m < 1440 ? `il y a ${Math.round(m / 60)} h` : `il y a ${Math.round(m / 1440)} j`;
   };
   const pct = (x) => `${Math.round(x * 100)} %`;
-  const tokenText = (value) => `${Math.max(0, Number(value) || 0).toLocaleString('fr-FR')} tokens`;
+  // Claude envoie ses tokens au fil de l'eau ; ChatGPT et Gemini seulement à la fin de la tâche. Tant qu'elle tourne, afficher « 0 tokens »
+  // laisserait croire que rien n'est compté : on dit quand ils arrivent.
+  const tokenText = (value, status) => {
+    const n = Math.max(0, Number(value) || 0);
+    if (!n && (status === 'running' || status === 'queued') && aiName() !== 'Claude') return 'Tokens comptés à la fin de la tâche';
+    return `${n.toLocaleString('fr-FR')} tokens`;
+  };
   const ACTIVE = ['queued', 'running'];
   const LABELS = {
     analyze: 'Analyse', prospect: 'Recherche', template: 'Modèle', send: 'Envoi', evolution: 'Évolutions',
@@ -601,7 +607,7 @@
       ${msg ? `<div class="jmsg small muted">${esc(msg)}</div>` : ''}
       ${progressBar(j)}
       ${remainingTime(j) ? `<div class="small muted">${esc(remainingTime(j))}</div>` : ''}
-      <div class="small muted">${tokenText(j.tokensUsed)}</div>
+      <div class="small muted">${tokenText(j.tokensUsed, j.status)}</div>
       <div class="jmeta small muted"><span>${esc(state)}</span>
         <span>${j.canViewLogs !== false ? `<a class="link small" href="/jobs/${j.id}">Voir</a> · ${j.status === 'error' ? `<button type="button" class="link small" data-retry="${j.id}">Réessayer</button>` : ''}` : ''}${ACTIVE.includes(j.status) ? `<button type="button" class="link small" data-cancel="${j.id}">Annuler</button>` : ''}</span></div>
     </div>`;
@@ -806,7 +812,7 @@
         const meter = $('[data-console-progress]', consoleBox);
         if (meter) { if (typeof r.progress?.pct === 'number') meter.value = Math.max(0, Math.min(100, r.progress.pct)); else if (r.status === 'done') meter.value = 100; else meter.removeAttribute('value'); }
         consoleBox.dataset.status = r.status;
-        setText('[data-console-tokens]', tokenText(r.tokensUsed));
+        setText('[data-console-tokens]', tokenText(r.tokensUsed, r.status));
         setText('[data-console-remaining]', remainingTime(r));
         // Vidéo livrée avec les avertissements des agents : elle se relance ou se corrige comme une scène refusée
         const warned = r.type === 'promo_video' && r.status === 'done' && r.qualityWarnings > 0;
@@ -841,7 +847,7 @@
     if (box && job) {
       let usage = $('[data-job-tokens]', box);
       if (!usage) { usage = document.createElement('p'); usage.dataset.jobTokens = ''; usage.className = 'small muted'; box.append(usage); }
-      usage.textContent = tokenText(job.tokensUsed);
+      usage.textContent = tokenText(job.tokensUsed, job.status);
       if (job.status === 'error' && job.canViewLogs !== false && !$('[data-retry]', box)) {
         const retry = document.createElement('button');
         retry.type = 'button'; retry.className = 'btn small primary'; retry.dataset.retry = job.id; retry.textContent = 'Réessayer';
