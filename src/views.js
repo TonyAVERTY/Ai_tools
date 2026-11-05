@@ -347,16 +347,18 @@ function templateForm(p, kind) {
   const job = initial ? 'template' : 'followup_template';
   return `<form data-action="template" data-kind="${kind}" data-id="${p.id}" class="tpl">
       <div class="row"><h4>${initial ? 'Modèle de mail' : 'Modèle de relance'} <span data-tpl-state></span></h4>
-        <button type="button" class="btn small" data-run="${job}" data-id="${p.id}">Générer avec l'IA</button></div>
-      <p class="muted small">Variables : {{entreprise}} {{ville}}${initial ? ' {{accroche}}' : ''} {{expediteur}} {{site}}. Le lien de désinscription est ajouté automatiquement.</p>
-      <label>Objet${initial ? '' : ' <span class="muted small">(vide = « Re: » + objet du premier mail, dans le même fil)</span>'}<input name="subject"></label>
-      ${initial ? '<label>Objet B <span class="muted small">(optionnel : test A/B, les envois alternent entre les deux objets)</span><input name="subjectB"></label>' : ''}
+        <span class="row"><button type="button" class="btn small" data-tpl-unlock hidden>${ic('pen')}Modifier</button>
+        <button type="button" class="btn small" data-run="${job}" data-id="${p.id}">Générer avec l'IA</button></span></div>
+      <p class="muted small" data-tpl-help>Variables : {{entreprise}} {{ville}}${initial ? ' {{accroche}}' : ''} {{expediteur}} {{site}}. Le lien de désinscription est ajouté automatiquement.</p>
+      <label>Objet${initial ? '' : ' <span class="muted small" data-tpl-help>(vide = « Re: » + objet du premier mail, dans le même fil)</span>'}<input name="subject"></label>
+      ${initial ? '<label>Objet B <span class="muted small" data-tpl-help>(optionnel : test A/B, les envois alternent entre les deux objets)</span><input name="subjectB"></label>' : ''}
       <label>Corps<textarea name="body" rows="${initial ? 9 : 5}"></textarea></label>
       <label class="opt"><input type="checkbox" name="html"><span class="box">${ic('check')}</span><span>Envoyer en mail HTML<small class="muted"> Sans cette case, le mail part en texte simple, comme un mail écrit à la main.</small></span></label>
       <div class="row">
         <button type="button" class="btn" data-tpl-preview>${ic('eye')}Aperçu</button>
         <button class="btn" name="mode" value="save">Enregistrer</button>
         <button class="btn primary" name="mode" value="validate">Valider le modèle</button>
+        <button type="button" class="btn" data-tpl-cancel hidden>Annuler</button>
       </div>
     </form>
     <div class="job" data-job="${job}"></div>`;
