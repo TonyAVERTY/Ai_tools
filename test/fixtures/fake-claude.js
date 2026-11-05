@@ -70,7 +70,18 @@ const rephraseReply = () => {
   const refused = ((prompt.split('PROPOSITIONS DÉJÀ REFUSÉES :\n')[1] || '').split('\n\n')[0].match(/^- /gm) || []).length;
   return JSON.stringify({ sentence: `Autre formulation ${refused + 1} : ${sentence}` });
 };
-const lines = prompt.includes('CHANGER UNE PHRASE') ? [rephraseReply()]
+// Correction de forme d'un modèle généré : ajoute l'appel et la politesse manquants, retire « oui, non ou plus tard » ; « FIXBAD » = texte inchangé (refusé), « FIXDOWN » = réponse illisible
+const styleReply = () => {
+  if (prompt.includes('FIXDOWN')) return 'pas du json';
+  const body = (/MAIL À CORRIGER :\n([\s\S]*?)\n\nRéponds UNIQUEMENT/.exec(prompt) || [])[1] || '';
+  if (prompt.includes('FIXBAD')) return JSON.stringify({ body });
+  let b = body.replace(/,? ?oui, non ou plus tard/i, '');
+  if (!/^\s*bonjour/i.test(b)) b = `Bonjour,\n\n${b}`;
+  if (!/cordialement/i.test(b)) b += '\n\nBien cordialement,\nTony';
+  return JSON.stringify({ body: b });
+};
+const lines = prompt.includes('CORRECTION DE FORME') ? [styleReply()]
+  : prompt.includes('CHANGER UNE PHRASE') ? [rephraseReply()]
   : prompt.includes('CONTRÔLE DU SENS') ? [senseReply()]
   : prompt.includes('proposer TROIS exemples de devis') ? [billQuotes()]
   : prompt.includes('Affine ce document') ? [billRefine()]
