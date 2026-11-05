@@ -12,10 +12,10 @@ const SAME_ERROR_MS = 30 * 60_000; // la même erreur ne repart pas avant 30 min
 const MAX_PER_HOUR = { server: 20, request: 6 };
 const HOUR_MS = 3_600_000;
 
-/** Masque ce qui ressemble à un secret : jetons aitk_, « Bearer … », mots de passe d'URL, longues chaînes hexadécimales ou base64. */
+/** Masque ce qui ressemble à un secret : jetons iaboss_ ou aitk_, « Bearer … », mots de passe d'URL, longues chaînes hexadécimales ou base64. */
 export function redact(text) {
   return String(text ?? '')
-    .replace(/\baitk_[A-Za-z0-9_-]+/g, 'aitk_[masqué]')
+    .replace(/\b(iaboss|aitk)_[A-Za-z0-9_-]+/g, '$1_[masqué]')
     .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, 'Bearer [masqué]')
     .replace(/(:\/\/[^\s/:@]+:)[^\s/@]+@/g, '$1[masqué]@')
     .replace(/\b(password|passwd|pass|secret|token|api[_-]?key|authorization)(["']?\s*[:=]\s*["']?)[^\s"',;&]+/gi, '$1$2[masqué]')
@@ -57,7 +57,7 @@ export function errorMail({ error, method, path, userId, at, repeats, appUrl, st
   <p style="margin:16px 0 0;font-size:13px;line-height:1.5;color:#55638a;">Les logs complets sont dans la sortie du processus (<code>pm2 logs</code>). Aucun cookie, en-tête, corps de requête ni paramètre d'URL n'est joint à ce mail.</p>`;
   return mailLayout({
     title: kindOf({ status, method }), subtitle: method === 'JOB' ? `Tâche ${path}` : `${status ? `${status} · ` : ''}${method} ${path}`, preheader: `${e.name} : ${redact(e.message).slice(0, 90)}`,
-    content, appUrl, footer: 'Alerte automatique AiTools, envoyée à l\'adresse du développeur.',
+    content, appUrl, footer: 'Alerte automatique iaboss, envoyée à l\'adresse du développeur.',
   });
 }
 
@@ -93,7 +93,7 @@ export async function reportError(app, error, { method = '?', path = '?', userId
     const transport = (app.createTransport || createTransport)(await pinSmtp(app, null, smtp));
     try {
       await transport.sendMail({
-        from: smtp.fromEmail, to: to.join(', '), subject: `[AiTools] ${kind}${status ? ` ${status}` : ''} · ${what}`, text,
+        from: smtp.fromEmail, to: to.join(', '), subject: `[iaboss] ${kind}${status ? ` ${status}` : ''} · ${what}`, text,
         html: errorMail({ error: e, method, path: safePath, userId, at, repeats, appUrl: app.cfg.appUrl, status }),
       });
     } finally { transport.close?.(); }

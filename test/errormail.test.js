@@ -42,7 +42,7 @@ test('une page qui plante : l\'utilisateur voit « Erreur interne », les admins
   const m = mails[0];
   assert.equal(m.from, SMTP.fromEmail);
   assert.equal(m.to, 'dev@exemple.test, second@exemple.test');
-  assert.match(m.subject, /^\[AiTools\] Erreur serveur 500 · GET \/calendar$/);
+  assert.match(m.subject, /^\[iaboss\] Erreur serveur 500 · GET \/calendar$/);
   assert.match(m.html, /^<!doctype html>/);
   assert.match(m.html, /calendar_events/, 'le détail technique est dans le mail');
   assert.match(m.html, /GET \/calendar/);
@@ -59,6 +59,7 @@ test('une page qui plante : l\'utilisateur voit « Erreur interne », les admins
 
 test('secrets masqués ; limite horaire ; rien sans SMTP ou sans administrateur ; un envoi qui échoue ne casse rien', async () => {
   assert.equal(redact('clé aitk_AbCdEf123_xyz et Bearer abc.def-ghi'), 'clé aitk_[masqué] et Bearer [masqué]');
+  assert.equal(redact('clé iaboss_AbCdEf123_xyz'), 'clé iaboss_[masqué]', 'le nouveau préfixe est masqué aussi');
   assert.equal(redact('mysql://root:hunter2@db/x'), 'mysql://root:[masqué]@db/x');
   assert.equal(redact('password=hunter2 ok'), 'password=[masqué] ok');
   assert.equal(redact(`sid ${'a1b2c3d4'.repeat(8)}`), 'sid [masqué]');
@@ -120,11 +121,11 @@ test('un 404 ne part jamais ; toute autre erreur (400, 401, 403, 429, 502 expos�
   assert.equal(out.length, 6);
   const m = out.find((x) => /502/.test(x.subject));
   assert.equal(m.to, 'contact@tony-averty.dev');
-  assert.match(m.subject, /^\[AiTools\] Erreur serveur 502 · POST \/link\/api-key$/);
+  assert.match(m.subject, /^\[iaboss\] Erreur serveur 502 · POST \/link\/api-key$/);
   assert.match(m.html, /Statut HTTP[^]*?502/);
   assert.match(m.html, /^<!doctype html>/);
   const c = out.find((x) => /403/.test(x.subject));
-  assert.match(c.subject, /^\[AiTools\] Erreur de requête 403/);
+  assert.match(c.subject, /^\[iaboss\] Erreur de requête 403/);
   assert.match(c.html, /Erreur de requête/);
 });
 
@@ -149,10 +150,10 @@ test('une tâche en échec et un arrêt du processus partent aussi, sous leur no
   const { app, out } = mkApp();
   await reportError(app, new Error('Codex s\'est arrêté sans résultat'), { method: 'JOB', path: 'analyze', userId: 3, status: null });
   await reportError(app, new Error('boom'), { method: 'process', path: 'uncaughtException' });
-  assert.match(out[0].subject, /^\[AiTools\] Tâche en échec · tâche analyze$/);
+  assert.match(out[0].subject, /^\[iaboss\] Tâche en échec · tâche analyze$/);
   assert.match(out[0].html, /Tâche en échec/);
   assert.match(out[0].html, /n° 3/);
-  assert.match(out[1].subject, /^\[AiTools\] Arrêt du processus/);
+  assert.match(out[1].subject, /^\[iaboss\] Arrêt du processus/);
 });
 
 test('de bout en bout : une saisie refusée (400) et un 502 exposé partent, une page introuvable non', async () => {
