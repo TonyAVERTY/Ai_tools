@@ -21,6 +21,8 @@ export const RATE_LIMITS = {
   // Ajout, modification et suppression de prospects ; aperçu d'un mail (rendu sans envoi)
   prospect_write: { user: { max: 120, windowMs: 10 * MIN } },
   preview: { user: { max: 120, windowMs: 10 * MIN } },
+  // Contrôle du sens d'un mail dans l'aperçu : chacun coûte un appel à l'IA de la personne
+  sense: { user: { max: 40, windowMs: 10 * MIN } },
   // Tâches des postes : chacune coûte un appel Claude
   poste: { user: { max: 40, windowMs: HOUR } },
   // Vidéos de promotion : un rendu coûte un appel Claude et plusieurs minutes de processeur

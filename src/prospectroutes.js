@@ -6,8 +6,13 @@ import { now, getSetting } from './db.js';
 import { accessOn } from './teams.js';
 import { getProject, getTemplate } from './projects.js';
 import { getUser } from './users.js';
-import { EMAIL_RE, buildProspectMail, fillTemplate } from './services/mailer.js';
-import { reviewMail } from './services/mailcheck.js';
+import { EMAIL_RE, buildProspectMail, fillTemplate, mailVars } from './services/mailer.js';
+import { reviewMail, fillBody, fillSubject } from './services/mailcheck.js';
+import { checkSense, SenseUnavailable } from './services/mailsense.js';
+import { makeClaude } from './handlers.js';
+import { budgetState } from './services/budget.js';
+import { normalizeModel } from './services/models.js';
+import { userProvider } from './claudelink.js';
 import { followupSubject } from './services/followup.js';
 import { quotaFor, planLimitError, withUserLock } from './services/plans.js';
 import { unsubToken } from './crypto.js';
@@ -58,6 +63,9 @@ export function cleanProspect(b = {}, { partial = false } = {}) {
   if (has('source')) out.source = text('source', 300) || null;
   return { fields: out };
 }
+
+// Exemple fictif de l'aperçu quand aucun prospect n'est choisi
+const SAMPLE_PERSON = { company: 'Boulangerie Le Fournil', email: 'contact@lefournil.exemple', city: 'Rennes', hook: 'Vos fournées au levain naturel ont de quoi séduire les gourmands du centre-ville.', source: 'https://lefournil.exemple/contact' };
 
 export function registerProspectRoutes(router, app, { project }) {
   const { db, cfg } = app;
@@ -155,7 +163,7 @@ export function registerProspectRoutes(router, app, { project }) {
       if (!prospect) throw new HttpError(404, 'Prospect introuvable');
     }
     const sample = !prospect;
-    const person = prospect || { company: 'Boulangerie Le Fournil', email: 'contact@lefournil.exemple', city: 'Rennes', hook: 'Vos fournées au levain naturel ont de quoi séduire les gourmands du centre-ville.', source: 'https://lefournil.exemple/contact' };
+    const person = prospect || SAMPLE_PERSON;
     const smtp = { fromName: p.smtp?.fromName || '', fromEmail: p.smtp?.fromEmail || 'vous@votre-domaine.fr' };
     // Relance : l'objet vide devient « Re: » + objet du premier mail, comme à l'envoi
     let subject = template.subject;
@@ -186,6 +194,44 @@ export function registerProspectRoutes(router, app, { project }) {
       note: sample ? 'Exemple fictif : choisis un de tes prospects pour voir le mail réel.' : null,
     });
   }, { limit: 'preview' });
+
+  // Contrôle du sens (aperçu) : l'IA de la personne dit si le mail, une fois rempli, veut dire quelque chose, et propose un MODÈLE corrigé.
+  // Rien n'est modifié ni envoyé : la correction n'est appliquée que par un clic de la personne. Les jobs d'un projet partagé utilisent l'accès du propriétaire.
+  const claude = makeClaude(app);
+  router.post('/api/projects/:id/template/sense', async (ctx) => {
+    const p = await getProject(app, Number(ctx.params.id), { userId: ctx.session.userId, secrets: true });
+    const b = await readBody(ctx.req);
+    const kind = b.kind === 'followup' ? 'followup' : 'initial';
+    const body = String(b.body ?? '').slice(0, 10_000);
+    if (!body.trim()) throw new HttpError(400, "Le corps du mail est vide : rien à relire. Écris-le ou clique « Générer avec l'IA ».", { expose: true });
+    let prospect = null;
+    if (b.prospectId != null && b.prospectId !== '') {
+      prospect = await db.prepare('SELECT * FROM prospects WHERE id = ? AND project_id = ?').get(Number(b.prospectId), p.id);
+      if (!prospect) throw new HttpError(404, 'Prospect introuvable');
+    }
+    const vars = mailVars(prospect || SAMPLE_PERSON, { fromName: p.smtp?.fromName || '' }, p.siteUrl);
+    const item = {
+      id: 1,
+      subject: kind === 'initial' ? fillSubject(String(b.subject ?? '').trim().slice(0, 300), vars) : '',
+      body: fillBody(body, vars).replace(/\n{3,}/g, '\n\n').trim(),
+    };
+    const budget = await budgetState(db, p.userId);
+    if (budget.blocked) return json(ctx.res, { ok: true, unavailable: true, reason: `Budget IA atteint : ${budget.reason}` });
+    const model = normalizeModel(await getSetting(db, p.userId, 'write_model', ''), 'haiku', await userProvider(db, p.userId));
+    try {
+      const { verdicts } = await checkSense({ claude, userId: p.userId, model, kind, template: body, items: [item] });
+      const v = verdicts.get(1);
+      json(ctx.res, {
+        ok: true, sense: v.ok, problem: v.problem || null,
+        fixBody: v.fixBody || null,
+        // Le texte corrigé tel que le prospect le lirait, pour que la personne juge avant d'appliquer
+        fixedText: v.fixBody ? fillBody(v.fixBody, vars).replace(/\n{3,}/g, '\n\n').trim() : null,
+      });
+    } catch (e) {
+      if (!(e instanceof SenseUnavailable)) throw e;
+      json(ctx.res, { ok: true, unavailable: true, reason: e.message });
+    }
+  }, { limit: 'sense' });
 
   router.get('/api/preview/:token', async ({ res, params, session }) => {
     const v = previews.get(String(params.token));
