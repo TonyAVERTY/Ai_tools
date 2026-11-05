@@ -49,7 +49,7 @@ export const shapeMessage = (m) => ({
   ...(m.role === 'assistant' ? { html: renderMarkdown(m.content) } : {}),
 });
 
-/** Conversations d'un compte pour un mode : « claude » (assistant classique) ou « support » (aide sur AiTools). */
+/** Conversations d'un compte pour un mode : « claude » (assistant classique) ou « support » (aide sur iaboss). */
 export async function listConversations(db, userId, mode = 'claude') {
   return (await db.prepare('SELECT * FROM chat_conversations WHERE user_id = ? AND mode = ? ORDER BY updated_at DESC, id DESC').all(userId, mode === 'support' ? 'support' : 'claude')).map(shapeConv);
 }
@@ -250,7 +250,7 @@ export function registerChatRoutes(router, app) {
         // Fichiers de TOUTE la conversation (les plus récents d'abord, bornés) : Claude peut y revenir d'un message à l'autre
         const files = (await conversationMessages(db, conv.id)).flatMap((m) => m.attachments).filter((a) => a.kind !== 'project').slice(-12);
         run = files.length ? prepareRunDir(cfg, userId, files) : null;
-        // Support : Claude lit la documentation d'AiTools (dossier partagé, en lecture seule, sans donnée d'aucun compte)
+        // Support : Claude lit la documentation d'iaboss (dossier partagé, en lecture seule, sans donnée d'aucun compte)
         const docs = mode === 'support' ? ensureSupportDocs(cfg, { chat: CHAT, files: FILES }) : null;
         const tools = docs || repo || run?.files.length ? ['Read', 'Glob', 'Grep'] : [];
         const prompts = parseCustomPrompts(await getSetting(db, userId, 'prompts_json', ''));

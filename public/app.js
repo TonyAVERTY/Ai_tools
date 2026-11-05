@@ -564,9 +564,9 @@
 
   // ---------- Barre système ----------
   // "IA 24 h : 0,42 $ / 2 $" : orange à 80 %, rouge une fois atteint
-  // Ce que les jobs lancés PAR AiTools ont consommé (équivalent API). Ce que la personne fait ailleurs avec son Claude n'y est pas :
+  // Ce que les jobs lancés PAR iaboss ont consommé (équivalent API). Ce que la personne fait ailleurs avec son Claude n'y est pas :
   // Anthropic ne le communique pas à une application ; le quota réel du compte est la mesure « Claude … » à côté.
-  const GAUGE_TIP = "Équivalent API des jobs lancés par AiTools uniquement. Ce que tu fais ailleurs avec Claude n'est pas compté ici : vois le quota « Claude » à côté.";
+  const GAUGE_TIP = "Équivalent API des jobs lancés par iaboss uniquement. Ce que tu fais ailleurs avec Claude n'est pas compté ici : vois le quota « Claude » à côté.";
   // Quota du compte Claude Pro lui-même (session glissante de 5 h + semaine glissante de 7 j),
   // remonté par la CLI à chaque appel. Permet de décider en amont si une tâche vaut le coup.
   function resetLabel(ts) {
@@ -663,7 +663,7 @@
   });
   listen(document, 'keydown', (e) => { if (e.key === 'Escape' && jobsOpen()) { toggleJobs(false); jobsBtn.focus(); } });
 
-  // Carte « Usage du mois » : le quota Claude (session 5 h, semaine) et ce que les jobs d'AiTools ont consommé, mêmes données que la barre du haut
+  // Carte « Usage du mois » : le quota Claude (session 5 h, semaine) et ce que les jobs d'iaboss ont consommé, mêmes données que la barre du haut
   // « Remise à zéro aujourd'hui à 18:42 » / « demain à 09:00 » / « lundi à 09:00 » (heure de Paris)
   function resetNote(ts) {
     if (!ts) return '';
@@ -690,13 +690,13 @@
         if (!w) continue;
         const reset = resetLabel(w.resetsAt);
         const live = rl.source === 'live' && !rl.error;
-        const tip = `${live ? 'Relevé en direct chez Anthropic, tout ton usage Claude compris (y compris hors AiTools).' : `Dernière mesure ${ago(rl.at)} (pendant un job AiTools).`}${reset ? ` Réinitialisation ${reset}.` : ''}`;
+        const tip = `${live ? 'Relevé en direct chez Anthropic, tout ton usage Claude compris (y compris hors iaboss).' : `Dernière mesure ${ago(rl.at)} (pendant un job iaboss).`}${reset ? ` Réinitialisation ${reset}.` : ''}`;
         rows.push(w.expired ? usageRow(label, '– (remise à zéro)', { tip, cls: 'muted' })
           : usageRow(label, pct(w.utilization), { ratio: w.utilization, tip, note: resetNote(w.resetsAt), cls: w.utilization >= 1 ? 'error' : w.utilization >= 0.8 ? 'warn' : '' }));
       }
     }
     // Montants en $ : seulement avec une clé API (c'est elle qui est facturée à l'usage). Avec un abonnement, rien n'est facturé en plus : on n'affiche aucun prix.
-    for (const [label, x] of s.linkMode === 'api_key' ? [['IA via AiTools 24 h', s.budget.day], ['IA via AiTools 30 j', s.budget.month]] : []) {
+    for (const [label, x] of s.linkMode === 'api_key' ? [['IA via iaboss 24 h', s.budget.day], ['IA via iaboss 30 j', s.budget.month]] : []) {
       const r = x.limit ? x.used / x.limit : null;
       rows.push(usageRow(label, `${x.used.toFixed(2)} $${x.limit ? ` / ${x.limit} $` : ''}`, { ratio: r, tip: GAUGE_TIP, cls: r >= 1 ? 'error' : r >= 0.8 ? 'warn' : '' }));
     }

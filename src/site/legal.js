@@ -56,10 +56,10 @@ ${body}
 export function mentionsPage({ appUrl }) {
   return legalPage({
     appUrl, path: '/mentions-legales',
-    title: 'Mentions légales · AiTools',
-    description: "Éditeur, directeur de la publication, hébergeur et contact du site AiTools, édité par Tony AVERTY, entrepreneur individuel.",
+    title: 'Mentions légales · iaboss',
+    description: "Éditeur, directeur de la publication, hébergeur et contact du site iaboss, édité par Tony AVERTY, entrepreneur individuel.",
     h1: 'Mentions légales',
-    lead: "Qui édite AiTools, qui l'héberge et comment nous joindre.",
+    lead: "Qui édite iaboss, qui l'héberge et comment nous joindre.",
     sections: [
       {
         id: 'editeur', title: 'Éditeur du site',
@@ -80,7 +80,7 @@ export function mentionsPage({ appUrl }) {
       {
         id: 'propriete', title: 'Propriété intellectuelle',
         html: `<p>Le site, son code, ses textes et son identité visuelle sont la propriété de leur éditeur. Toute reproduction sans accord écrit est interdite, hors citation courte avec mention de la source.</p>
-<p>Les contenus que tu saisis dans AiTools (projets, prospects, modèles de mail) restent les tiens. Claude et Anthropic sont des marques d'Anthropic, ChatGPT et OpenAI des marques d'OpenAI, Gemini et Google des marques de Google ; Apple est une marque de son propriétaire. Ils sont cités pour décrire le fonctionnement du service, sans lien d'affiliation.</p>`,
+<p>Les contenus que tu saisis dans iaboss (projets, prospects, modèles de mail) restent les tiens. Claude et Anthropic sont des marques d'Anthropic, ChatGPT et OpenAI des marques d'OpenAI, Gemini et Google des marques de Google ; Apple est une marque de son propriétaire. Ils sont cités pour décrire le fonctionnement du service, sans lien d'affiliation.</p>`,
       },
       {
         id: 'responsabilite', title: 'Responsabilité et liens externes',
@@ -93,7 +93,7 @@ export function mentionsPage({ appUrl }) {
       },
       {
         id: 'signalement', title: 'Contact et signalement',
-        html: `<p>Pour toute question, ou pour signaler un contenu illicite ou un mail reçu à tort depuis AiTools : <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a>.</p>
+        html: `<p>Pour toute question, ou pour signaler un contenu illicite ou un mail reçu à tort depuis iaboss : <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a>.</p>
 <p>Droit applicable : le droit français.</p>`,
       },
     ],
@@ -105,23 +105,23 @@ export function mentionsPage({ appUrl }) {
 export function privacyPage({ appUrl, apple = false, captcha = false, inactiveMonths = 24 }) {
   return legalPage({
     appUrl, path: '/confidentialite',
-    title: 'Politique de confidentialité · AiTools',
-    description: "Quelles données AiTools collecte, pourquoi, combien de temps, qui les reçoit et comment exercer tes droits. Rôles : responsable de traitement et sous-traitant.",
+    title: 'Politique de confidentialité · iaboss',
+    description: "Quelles données iaboss collecte, pourquoi, combien de temps, qui les reçoit et comment exercer tes droits. Rôles : responsable de traitement et sous-traitant.",
     h1: 'Politique de confidentialité',
     lead: "Ce que le service collecte, ce qu'il en fait, et comment reprendre la main. Écrit pour être lu.",
     sections: [
       {
         id: 'roles', title: 'Qui est responsable de quoi',
-        html: `<p>AiTools est édité par Tony AVERTY, entrepreneur individuel (SIRET 100 142 819 00018), siège : ${ADDRESS}. Contact : <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a>. Il n'y a pas de délégué à la protection des données.</p>
+        html: `<p>iaboss est édité par Tony AVERTY, entrepreneur individuel (SIRET 100 142 819 00018), siège : ${ADDRESS}. Contact : <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a>. Il n'y a pas de délégué à la protection des données.</p>
 <ul>
-  <li><strong>Pour ton compte</strong> (identité, connexion, liaison de ton IA, réglages), AiTools est <strong>responsable de traitement</strong>.</li>
-  <li><strong>Pour les données de tes prospects</strong> (entreprises et adresses professionnelles que tu recherches, importes ou contactes), c'est <strong>toi le responsable de traitement</strong> : tu décides à qui tu écris et pourquoi. AiTools agit comme <strong>sous-traitant</strong> : il les traite uniquement pour faire fonctionner le service que tu utilises, sur tes instructions, avec les garanties de sécurité décrites plus bas, et les supprime avec ton compte.</li>
+  <li><strong>Pour ton compte</strong> (identité, connexion, liaison de ton IA, réglages), iaboss est <strong>responsable de traitement</strong>.</li>
+  <li><strong>Pour les données de tes prospects</strong> (entreprises et adresses professionnelles que tu recherches, importes ou contactes), c'est <strong>toi le responsable de traitement</strong> : tu décides à qui tu écris et pourquoi. iaboss agit comme <strong>sous-traitant</strong> : il les traite uniquement pour faire fonctionner le service que tu utilises, sur tes instructions, avec les garanties de sécurité décrites plus bas, et les supprime avec ton compte.</li>
 </ul>`,
       },
       {
         id: 'donnees', title: 'Les données collectées',
         html: `<div class="tw"><table>
-  <caption>Données réellement enregistrées par AiTools</caption>
+  <caption>Données réellement enregistrées par iaboss</caption>
   <thead><tr><th scope="col">Catégorie</th><th scope="col">Contenu</th><th scope="col">Pourquoi et sur quelle base</th></tr></thead>
   <tbody>
     <tr><th scope="row">Compte</th><td>Email et nom fournis par ${apple ? 'Google ou Apple' : 'Google'}, fournisseur de connexion et identifiant chez lui, plan, dates de création et de dernière connexion.</td><td>Créer ton compte et te connecter. Exécution du contrat.</td></tr>
@@ -140,7 +140,7 @@ export function privacyPage({ appUrl, apple = false, captcha = false, inactiveMo
     <tr><th scope="row">Liste d'opposition</th><td>Adresse email, motif (désinscription, refus, mail rejeté) et date.</td><td>Ne plus jamais contacter une personne qui s'y est opposée, pour tous les comptes. Obligation légale, intérêt légitime.</td></tr>
   </tbody>
 </table></div>
-<p>AiTools ne collecte ni statistiques de visite, ni identifiant publicitaire, et ne charge aucun pixel de suivi.</p>`,
+<p>iaboss ne collecte ni statistiques de visite, ni identifiant publicitaire, et ne charge aucun pixel de suivi.</p>`,
       },
       {
         id: 'durees', title: 'Combien de temps',
@@ -170,11 +170,11 @@ export function privacyPage({ appUrl, apple = false, captcha = false, inactiveMo
 <ul>
   <li><strong>Google</strong> pour la connexion : il nous transmet ton email, ton nom et un identifiant. <a href="https://policies.google.com/privacy" rel="noopener noreferrer">Politique de Google</a>.</li>
   ${apple ? '<li><strong>Apple</strong> pour la connexion avec Apple : même principe, avec la possibilité de masquer ton email. <a href="https://www.apple.com/legal/privacy/fr-fr/" rel="noopener noreferrer">Politique d\'Apple</a>.</li>' : ''}
-  <li><strong>Ton fournisseur d'IA : Anthropic (Claude), OpenAI (ChatGPT) ou Google (Gemini), un seul à la fois,</strong> par l'intermédiaire de <em>ton</em> accès : le code de ton projet lu par ton IA, la fiche et la cible, les domaines des prospects déjà connus pour éviter les doublons, les messages et les pièces jointes (photos, PDF, textes, images tirées d'une vidéo, code d'un projet joint) que tu envoies sur la page IA, la fiche du projet et le sujet que tu donnes pour une vidéo de promotion (la scène animée écrite par ton IA est ensuite dessinée sur le serveur d'AiTools, sans accès au réseau), et ce que ton IA trouve sur le web transitent par ton compte chez ce fournisseur, selon les conditions que tu as acceptées avec lui. <a href="https://www.anthropic.com/legal/privacy" rel="noopener noreferrer">Politique d'Anthropic</a>, <a href="https://openai.com/policies/privacy-policy" rel="noopener noreferrer">politique d'OpenAI</a>, <a href="https://policies.google.com/privacy" rel="noopener noreferrer">politique de Google</a>. Avec une clé Gemini gratuite, Google peut utiliser les données envoyées pour améliorer ses produits : n'y mets pas de données de prospects, ou active la facturation sur ton projet Google.</li>
-  <li><strong>Google, ElevenLabs ou Microsoft (voix des vidéos de promotion, facultatif) :</strong> si tu coches « Ajouter une voix », le texte de la narration, écrit par ton IA à partir de la fiche de ton projet, est envoyé au service de synthèse vocale que tu choisis (Google Traduction, ou, avec ta propre clé API, ElevenLabs, Google Cloud ou Microsoft Azure) pour être transformé en audio. Une clé API que tu enregistres est chiffrée et n'est utilisée que pour ces appels. Aucun autre élément de ton compte n'y est transmis ; sans la case cochée, rien n'est envoyé, et les voix locales (Piper, eSpeak NG) s'exécutent sur le serveur d'AiTools sans rien transmettre à un tiers.</li>
-  ${captcha ? `<li><strong>Google reCAPTCHA</strong> (Google Ireland Limited, Google LLC) : protège la connexion contre les envois automatisés. Son script est chargé automatiquement à l'ouverture de la page de connexion, sans action de ta part. Il dépose des cookies et transmet à Google ton adresse IP, des informations sur ton navigateur et sur ton comportement sur la page. Base légale : l'intérêt légitime d'AiTools à protéger la connexion contre les abus. AiTools ne conserve pas le résultat de la vérification. Sans elle, la connexion n'est pas possible. Si cela te pose problème, écris-nous. <a href="https://policies.google.com/privacy" rel="noopener noreferrer">Politique de Google</a>.</li>` : ''}
+  <li><strong>Ton fournisseur d'IA : Anthropic (Claude), OpenAI (ChatGPT) ou Google (Gemini), un seul à la fois,</strong> par l'intermédiaire de <em>ton</em> accès : le code de ton projet lu par ton IA, la fiche et la cible, les domaines des prospects déjà connus pour éviter les doublons, les messages et les pièces jointes (photos, PDF, textes, images tirées d'une vidéo, code d'un projet joint) que tu envoies sur la page IA, la fiche du projet et le sujet que tu donnes pour une vidéo de promotion (la scène animée écrite par ton IA est ensuite dessinée sur le serveur d'iaboss, sans accès au réseau), et ce que ton IA trouve sur le web transitent par ton compte chez ce fournisseur, selon les conditions que tu as acceptées avec lui. <a href="https://www.anthropic.com/legal/privacy" rel="noopener noreferrer">Politique d'Anthropic</a>, <a href="https://openai.com/policies/privacy-policy" rel="noopener noreferrer">politique d'OpenAI</a>, <a href="https://policies.google.com/privacy" rel="noopener noreferrer">politique de Google</a>. Avec une clé Gemini gratuite, Google peut utiliser les données envoyées pour améliorer ses produits : n'y mets pas de données de prospects, ou active la facturation sur ton projet Google.</li>
+  <li><strong>Google, ElevenLabs ou Microsoft (voix des vidéos de promotion, facultatif) :</strong> si tu coches « Ajouter une voix », le texte de la narration, écrit par ton IA à partir de la fiche de ton projet, est envoyé au service de synthèse vocale que tu choisis (Google Traduction, ou, avec ta propre clé API, ElevenLabs, Google Cloud ou Microsoft Azure) pour être transformé en audio. Une clé API que tu enregistres est chiffrée et n'est utilisée que pour ces appels. Aucun autre élément de ton compte n'y est transmis ; sans la case cochée, rien n'est envoyé, et les voix locales (Piper, eSpeak NG) s'exécutent sur le serveur d'iaboss sans rien transmettre à un tiers.</li>
+  ${captcha ? `<li><strong>Google reCAPTCHA</strong> (Google Ireland Limited, Google LLC) : protège la connexion contre les envois automatisés. Son script est chargé automatiquement à l'ouverture de la page de connexion, sans action de ta part. Il dépose des cookies et transmet à Google ton adresse IP, des informations sur ton navigateur et sur ton comportement sur la page. Base légale : l'intérêt légitime d'iaboss à protéger la connexion contre les abus. iaboss ne conserve pas le résultat de la vérification. Sans elle, la connexion n'est pas possible. Si cela te pose problème, écris-nous. <a href="https://policies.google.com/privacy" rel="noopener noreferrer">Politique de Google</a>.</li>` : ''}
   <li><strong>L'hébergeur</strong> du serveur : ${HOST}</li>
-  <li><strong>Tes propres services</strong>, quand tu les configures : serveur SMTP et IMAP de ta messagerie, Forgejo, base de données de ton projet, Discord. AiTools s'y connecte avec tes identifiants.</li>
+  <li><strong>Tes propres services</strong>, quand tu les configures : serveur SMTP et IMAP de ta messagerie, Forgejo, base de données de ton projet, Discord. iaboss s'y connecte avec tes identifiants.</li>
 </ul>
 <p>Les adresses de tes prospects ne sont pas transmises à d'autres utilisateurs. Chaque compte est cloisonné : une ressource d'un autre compte répond « introuvable ».</p>`,
       },
@@ -185,9 +185,9 @@ export function privacyPage({ appUrl, apple = false, captcha = false, inactiveMo
       },
       {
         id: 'cookies', title: 'Cookies et traceurs',
-        html: `<p>AiTools ne pose que des cookies <strong>strictement nécessaires</strong> au service. Ceux d'AiTools sont exemptés de consentement : c'est pourquoi aucun bandeau ne s'affiche${captcha ? ' (ceux de Google, sur la page de connexion, sont décrits plus bas)' : ''}. Pas d'analyse d'audience, pas de publicité, pas de police ni de script chargés depuis un autre site${captcha ? ', sauf la vérification anti-robot de Google, uniquement sur la page de connexion (voir plus bas)' : ''}.</p>
+        html: `<p>iaboss ne pose que des cookies <strong>strictement nécessaires</strong> au service. Ceux d'iaboss sont exemptés de consentement : c'est pourquoi aucun bandeau ne s'affiche${captcha ? ' (ceux de Google, sur la page de connexion, sont décrits plus bas)' : ''}. Pas d'analyse d'audience, pas de publicité, pas de police ni de script chargés depuis un autre site${captcha ? ', sauf la vérification anti-robot de Google, uniquement sur la page de connexion (voir plus bas)' : ''}.</p>
 <div class="tw"><table>
-  <caption>Cookies posés par AiTools</caption>
+  <caption>Cookies posés par iaboss</caption>
   <thead><tr><th scope="col">Nom</th><th scope="col">Rôle</th><th scope="col">Durée</th></tr></thead>
   <tbody>
     <tr><th scope="row"><code>sid</code></th><td>Te garder connecté (identifiant de session aléatoire). Sécurisé : HttpOnly, Secure, SameSite=Lax.</td><td>30 jours au plus</td></tr>
@@ -211,10 +211,10 @@ ${captcha
 <p>Tu peux aussi saisir la CNIL : <a href="https://www.cnil.fr/fr/plaintes" rel="noopener noreferrer">cnil.fr/fr/plaintes</a>.</p>`,
       },
       {
-        id: 'prospects', title: 'Tu as reçu un mail envoyé avec AiTools ?',
-        html: `<p>L'expéditeur est un utilisateur d'AiTools : c'est lui le responsable du traitement de ton adresse professionnelle. Le pied du mail indique la page publique où elle a été trouvée.</p>
+        id: 'prospects', title: 'Tu as reçu un mail envoyé avec iaboss ?',
+        html: `<p>L'expéditeur est un utilisateur d'iaboss : c'est lui le responsable du traitement de ton adresse professionnelle. Le pied du mail indique la page publique où elle a été trouvée.</p>
 <ul>
-  <li><strong>Ne plus recevoir de messages :</strong> clique sur le lien de désinscription du mail. Ton adresse entre dans une liste d'opposition respectée par tous les utilisateurs d'AiTools.</li>
+  <li><strong>Ne plus recevoir de messages :</strong> clique sur le lien de désinscription du mail. Ton adresse entre dans une liste d'opposition respectée par tous les utilisateurs d'iaboss.</li>
   <li><strong>Accès, effacement, opposition :</strong> adresse-toi à l'expéditeur. Tu peux aussi écrire à <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a> : nous inscrivons ton adresse en liste d'opposition et transmettons ta demande.</li>
 </ul>`,
       },
@@ -241,14 +241,14 @@ ${captcha
 export function termsPage({ appUrl, apple = false }) {
   return legalPage({
     appUrl, path: '/cgu',
-    title: "Conditions générales d'utilisation · AiTools",
-    description: "Les règles d'usage d'AiTools : compte, plan gratuit, liaison de ton accès à l'IA (y compris le risque de l'abonnement), usages interdits, responsabilités, résiliation.",
+    title: "Conditions générales d'utilisation · iaboss",
+    description: "Les règles d'usage d'iaboss : compte, plan gratuit, liaison de ton accès à l'IA (y compris le risque de l'abonnement), usages interdits, responsabilités, résiliation.",
     h1: "Conditions générales d'utilisation",
-    lead: "Les règles du jeu entre toi et AiTools. À lire avant de relier ton accès à une IA.",
+    lead: "Les règles du jeu entre toi et iaboss. À lire avant de relier ton accès à une IA.",
     sections: [
       {
         id: 'objet', title: 'Objet et éditeur',
-        html: `<p>AiTools est un service en ligne édité par Tony AVERTY, entrepreneur individuel (voir les <a href="/mentions-legales">mentions légales</a>). Il pilote ton IA (Claude, ChatGPT ou Gemini), avec ton propre accès, pour analyser un projet, rechercher des prospects professionnels, rédiger et envoyer des mails de prospection, relancer et suivre les réponses.</p>
+        html: `<p>iaboss est un service en ligne édité par Tony AVERTY, entrepreneur individuel (voir les <a href="/mentions-legales">mentions légales</a>). Il pilote ton IA (Claude, ChatGPT ou Gemini), avec ton propre accès, pour analyser un projet, rechercher des prospects professionnels, rédiger et envoyer des mails de prospection, relancer et suivre les réponses.</p>
 <p>Utiliser le service, c'est accepter ces conditions. Si tu ne les acceptes pas, ne crée pas de compte.</p>`,
       },
       {
@@ -257,14 +257,14 @@ export function termsPage({ appUrl, apple = false }) {
       },
       {
         id: 'compte', title: 'Ton compte',
-        html: `<p>Le compte est créé à la première connexion avec ${apple ? 'Google ou Apple' : 'Google'}. Un compte correspond à une personne. Tu es responsable de la sécurité de l'accès à ton compte de connexion, et de tout ce qui est fait depuis ton compte AiTools. Préviens-nous sans attendre si tu penses qu'un tiers y a accès.</p>`,
+        html: `<p>Le compte est créé à la première connexion avec ${apple ? 'Google ou Apple' : 'Google'}. Un compte correspond à une personne. Tu es responsable de la sécurité de l'accès à ton compte de connexion, et de tout ce qui est fait depuis ton compte iaboss. Préviens-nous sans attendre si tu penses qu'un tiers y a accès.</p>`,
       },
       {
         id: 'claude', title: 'Ton accès à l\'IA',
-        html: `<p>Pour lancer un job, tu relies ton propre accès à une IA : Claude (Anthropic), ChatGPT (OpenAI) ou Gemini (Google). AiTools ne fournit ni crédits ni abonnement.</p>
+        html: `<p>Pour lancer un job, tu relies ton propre accès à une IA : Claude (Anthropic), ChatGPT (OpenAI) ou Gemini (Google). iaboss ne fournit ni crédits ni abonnement.</p>
 <ul>
-  <li><strong>Clé API (Anthropic, OpenAI ou Google) :</strong> ton fournisseur te facture directement, selon ses tarifs. Tu es responsable de cette dépense. Les budgets réglables dans AiTools sont des garde-fous, pas une garantie.</li>
-  <li><strong>Abonnement Claude (jeton) ou compte ChatGPT :</strong> les conditions d'Anthropic ou d'OpenAI peuvent ne pas autoriser l'usage d'un abonnement via une application tierce. Si tu choisis ce mode, <strong>ton compte Claude ou ChatGPT peut être limité, suspendu ou fermé</strong> par ton fournisseur. Gemini ne se relie que par clé API. L'éditeur d'AiTools n'a aucun contrôle sur cette décision et n'en est pas responsable, dans la mesure permise par la loi. Avant la liaison, une fenêtre d'avertissement te demande de cocher « J'ai compris et j'accepte ce risque ». Cette acceptation est enregistrée avec sa date et la version du texte. Ce mode peut être désactivé à tout moment.</li>
+  <li><strong>Clé API (Anthropic, OpenAI ou Google) :</strong> ton fournisseur te facture directement, selon ses tarifs. Tu es responsable de cette dépense. Les budgets réglables dans iaboss sont des garde-fous, pas une garantie.</li>
+  <li><strong>Abonnement Claude (jeton) ou compte ChatGPT :</strong> les conditions d'Anthropic ou d'OpenAI peuvent ne pas autoriser l'usage d'un abonnement via une application tierce. Si tu choisis ce mode, <strong>ton compte Claude ou ChatGPT peut être limité, suspendu ou fermé</strong> par ton fournisseur. Gemini ne se relie que par clé API. L'éditeur d'iaboss n'a aucun contrôle sur cette décision et n'en est pas responsable, dans la mesure permise par la loi. Avant la liaison, une fenêtre d'avertissement te demande de cocher « J'ai compris et j'accepte ce risque ». Cette acceptation est enregistrée avec sa date et la version du texte. Ce mode peut être désactivé à tout moment.</li>
 </ul>
 <p>Tu peux délier ton accès à tout moment depuis Mon compte : le secret est alors effacé et tes jobs IA en attente sont annulés.</p>`,
       },
@@ -298,7 +298,7 @@ export function termsPage({ appUrl, apple = false }) {
       },
       {
         id: 'donnees', title: 'Données personnelles',
-        html: `<p>Les rôles de chacun sont décrits dans la <a href="/confidentialite">politique de confidentialité</a> : tu es responsable de traitement pour les données de tes prospects, AiTools est ton sous-traitant. Tu t'engages à n'enregistrer que des données que tu as le droit de traiter, et à informer les personnes concernées comme la loi l'exige.</p>`,
+        html: `<p>Les rôles de chacun sont décrits dans la <a href="/confidentialite">politique de confidentialité</a> : tu es responsable de traitement pour les données de tes prospects, iaboss est ton sous-traitant. Tu t'engages à n'enregistrer que des données que tu as le droit de traiter, et à informer les personnes concernées comme la loi l'exige.</p>`,
       },
       {
         id: 'garanties', title: 'Disponibilité et résultats',

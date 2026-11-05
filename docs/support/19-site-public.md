@@ -1,8 +1,8 @@
-# Le site public d'AiTools : accueil, Fonctionnement, Tarifs, Docs, pages légales, Connexion
+# Le site public d'iaboss : accueil, Fonctionnement, Tarifs, Docs, pages légales, Connexion
 Résumé : les pages du site public (accueil, Fonctionnement, Tarifs, Docs, mentions légales, politique de confidentialité, CGU, Connexion) et comment passer du site à l'application et inversement.
 
 ## Les pages
-- **Accueil** : présentation d'AiTools (« Trouve de nouveaux clients, sans y passer tes soirées »).
+- **Accueil** : présentation d'iaboss (« Trouve de nouveaux clients, sans y passer tes soirées »).
 - **Fonctionnement** : « Comment ça marche, pas à pas ».
 - **Tarifs** : un tableau des offres (une ligne par offre, une colonne par plafond ; chaque ligne devient un bloc sur téléphone), avec un sélecteur **Au mois** / **À l'année** (l'année offre 2 mois). Les chiffres viennent du code : ils sont les mêmes que dans « Offres, plafonds et limites ».
 - **Docs** (menu « Docs ») : la documentation développeur (**Documentation** : démarrage, API REST, serveur MCP). Voir « Mode développeur : API, jetons et serveur MCP ».

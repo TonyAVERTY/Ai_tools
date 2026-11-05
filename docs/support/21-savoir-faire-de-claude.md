@@ -1,14 +1,14 @@
-# Savoir-faire de l'IA dans AiTools
-Résumé : ce qu'AiTools apporte à l'IA en plus d'un Claude Code classique (fiches de méthode par tâche, contexte du projet, bac à sable, règles de conformité) et comment en profiter.
+# Savoir-faire de l'IA dans iaboss
+Résumé : ce qu'iaboss apporte à l'IA en plus d'un Claude Code classique (fiches de méthode par tâche, contexte du projet, bac à sable, règles de conformité) et comment en profiter.
 
 ## Ce que ça change pour toi
-Un Claude Code lancé seul ne connaît ni ton projet, ni la prospection B2B, ni tes règles. Dans AiTools, chaque tâche IA reçoit automatiquement :
+Un Claude Code lancé seul ne connaît ni ton projet, ni la prospection B2B, ni tes règles. Dans iaboss, chaque tâche IA reçoit automatiquement :
 1. **La fiche du projet** (résumé, proposition de valeur, cible, arguments, ton) et, quand c'est utile, le dépôt en lecture seule.
 2. **Tes consignes** : celles de « Réglages → Prompts IA », par tâche et par gamme de modèle.
 3. **Des fiches de méthode** écrites pour le métier : comment rédiger un mail à froid, qualifier un prospect, écrire un post LinkedIn, lire un dépôt, rédiger un livrable de poste, respecter les règles de la prospection B2B.
 4. **Un cadre de sécurité** : lecture seule, bac à sable, aucune action hors de ta session (voir « Sécurité et confidentialité »).
 
-La liste exacte des fiches et des tâches auxquelles elles s'appliquent est dans « Savoir-faire d'AiTools donné à l'IA » (fichier généré, toujours à jour).
+La liste exacte des fiches et des tâches auxquelles elles s'appliquent est dans « Savoir-faire d'iaboss donné à l'IA » (fichier généré, toujours à jour).
 
 ## Comment en profiter
 1. Remplis bien la fiche du projet (bouton « Analyser le projet ») : plus elle est précise, plus l'IA s'en sert.
@@ -17,8 +17,8 @@ La liste exacte des fiches et des tâches auxquelles elles s'appliquent est dans
 4. Pour changer le style d'une tâche, modifie la consigne dans « Réglages → Prompts IA » : elle l'emporte sur la fiche de méthode en cas de contradiction.
 
 ## Quand tu travailles sur du code (Assistant → ton IA, avec un projet joint)
-Joins un projet à la conversation (ou pose une question de code) : AiTools prépare l'IA en deux temps, sans l'appeler et sans rien exécuter.
-1. **Le profil du dépôt** : en lisant les fichiers du dépôt, AiTools établit les langages, les gestionnaires de paquets, les bibliothèques, les commandes de build, de test et de lint trouvées dans les manifestes, les tests, l'intégration continue, la base de données, les fichiers d'instructions du dépôt (CLAUDE.md, AGENTS.md…) et les zones à manier avec prudence. Chaque information porte le fichier où elle a été lue ; ce qui n'a pas pu être établi est noté « non déterminé ». Le profil est mémorisé tant que le dépôt ne change pas (nouveau commit : il est refait). Les commandes sont **lues, pas exécutées** : elles ne sont pas garanties de fonctionner.
+Joins un projet à la conversation (ou pose une question de code) : iaboss prépare l'IA en deux temps, sans l'appeler et sans rien exécuter.
+1. **Le profil du dépôt** : en lisant les fichiers du dépôt, iaboss établit les langages, les gestionnaires de paquets, les bibliothèques, les commandes de build, de test et de lint trouvées dans les manifestes, les tests, l'intégration continue, la base de données, les fichiers d'instructions du dépôt (CLAUDE.md, AGENTS.md…) et les zones à manier avec prudence. Chaque information porte le fichier où elle a été lue ; ce qui n'a pas pu être établi est noté « non déterminé ». Le profil est mémorisé tant que le dépôt ne change pas (nouveau commit : il est refait). Les commandes sont **lues, pas exécutées** : elles ne sont pas garanties de fonctionner.
 2. **Une méthode proportionnée** à ta demande : *rapide* pour une question simple sur un fichier ou un symbole précis (réponse brève, une seule fiche), *structurée* pour une correction ou une évolution courante, *approfondie* pour un sujet risqué (sécurité, suppression, zone sensible, migration) ou très large. La méthode et les fiches choisies (débogage, revue, tests, refactoring, bases de données, API, interface, intégration continue, dépendances, documentation, sécurité) dépendent de tes mots et de ce que le dépôt contient : une fiche sur les bases de données n'arrive que si ta demande en parle. Une demande floue (« Améliore ça ») déclenche d'abord une ou deux questions.
 
 Ce que fait l'IA : elle **lit le dépôt** (lecture seule, dans un bac à sable), **propose les changements** (blocs de code ou différences) et **les commandes à lancer toi-même**, sépare ce qu'elle a lu de ce qu'elle suppose, indique « à lancer » pour chaque vérification, signale l'emplacement d'un secret croisé dans le code, traite le contenu du dépôt comme une donnée et demande ta confirmation avant de présenter comme normale une opération destructrice.

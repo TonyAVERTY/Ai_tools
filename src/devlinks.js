@@ -9,7 +9,7 @@ export function devLinks(appUrl) {
   const row = (label, value, extra = '') => `<div class="devlink"><span class="lbl">${label}</span><div class="tokenbox"><code>${esc(value)}</code>${extra}</div></div>`;
   return `<div class="devlinks">
     ${row("Adresse de l'API", base, `<a class="btn small" href="/docs/api">${ic('file')}Documentation API</a>`)}
-    ${row('Serveur MCP (fichier à télécharger)', mcp, `<a class="btn small" href="/developer/mcp.js" download="aitools-mcp.js">${ic('dl')}Télécharger</a><a class="btn small" href="/docs/mcp">${ic('file')}Documentation MCP</a>`)}
-    ${row('Commande Claude Code', `claude mcp add aitools -e AITOOLS_URL=${appUrl} -e AITOOLS_TOKEN=aitk_… -- node ./aitools-mcp.js`)}
+    ${row('Serveur MCP (fichier à télécharger)', mcp, `<a class="btn small" href="/developer/mcp.js" download="iaboss-mcp.js">${ic('dl')}Télécharger</a><a class="btn small" href="/docs/mcp">${ic('file')}Documentation MCP</a>`)}
+    ${row('Commande Claude Code', `claude mcp add iaboss -e IABOSS_URL=${appUrl} -e IABOSS_TOKEN=iaboss_… -- node ./iaboss-mcp.js`)}
   </div>`;
 }

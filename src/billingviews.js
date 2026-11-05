@@ -30,7 +30,7 @@ export function billingOverviewPage({ email, rows }) {
   }).join('') : `<div class="empty-s"><p><b>Aucun projet pour l'instant.</b> La facturation se prépare projet par projet : crée d'abord un projet.</p><a class="btn primary small" href="/">Ouvrir mes projets</a></div>`;
   const body = `<div data-bill class="bill-page">
   <section class="card"><div class="row-between"><div><h1>Facturation</h1>
-    <p class="muted">Pour chaque projet : tes informations légales, puis des modèles de devis, d'acompte, de facture finale et d'avoir écrits avec Claude, prêts à être utilisés dans AiTools.</p></div></div>
+    <p class="muted">Pour chaque projet : tes informations légales, puis des modèles de devis, d'acompte, de facture finale et d'avoir écrits avec Claude, prêts à être utilisés dans iaboss.</p></div></div>
     ${rows.length ? `<p class="bill-sum"><b>${ready}</b> projet${ready > 1 ? 's' : ''} prêt${ready > 1 ? 's' : ''} sur <b>${rows.length}</b></p>
     <div class="bar" role="progressbar" aria-label="Projets prêts" aria-valuemin="0" aria-valuemax="${rows.length}" aria-valuenow="${ready}"><span class="w-${Math.round((100 * ready) / rows.length / 5) * 5}"></span></div>` : ''}
   </section>
@@ -233,7 +233,7 @@ export function billingProjectPage({ email, project: p, legal, errors, suggestio
     }
   }
   const done = ready ? `<section class="card bill-ready" aria-labelledby="t-ready"><div>${ic('check')}</div><div><h2 id="t-ready">Tes documents sont prêts</h2>
-    <p class="muted">Le devis, l'acompte, la facture finale et l'avoir de « ${esc(p.name)} » sont validés : ils peuvent être utilisés dans AiTools. Les mentions légales se mettent à jour d'après tes informations légales.</p></div></section>` : '';
+    <p class="muted">Le devis, l'acompte, la facture finale et l'avoir de « ${esc(p.name)} » sont validés : ils peuvent être utilisés dans iaboss. Les mentions légales se mettent à jour d'après tes informations légales.</p></div></section>` : '';
   const reset = docs.length ? `<form method="post" action="/facturation/projet/${p.id}/recommencer" data-confirm="Effacer les exemples et les documents de ce projet et repartir du début ? Tes informations légales sont conservées."><button class="btn small danger">${ic('trash')}Recommencer depuis le début</button></form>` : '';
   const body = `<div class="bill-page" data-bill data-bill-project="${p.id}" data-busy="${stage.busy ? '1' : '0'}">
   <section class="card"><p><a class="link" href="/facturation">${ic('back')} Tous les projets</a></p>
@@ -243,7 +243,7 @@ export function billingProjectPage({ email, project: p, legal, errors, suggestio
   ${ready ? [issueSection(p, docs, clients, invoices, selectedKind, selectedClientId), invoicesSection(invoices)].join('\n  ') : ''}
   ${sections.join('\n  ')}
   ${reset ? `<div class="bill-foot">${reset}</div>` : ''}
-  <p class="muted small bill-disc">Les documents suivent les usages entre professionnels en France. Les mentions légales sont rédigées par AiTools d'après tes informations, jamais par Claude : fais-les vérifier par un expert-comptable avant un usage particulier (client particulier, TVA sur les encaissements, marché public).</p>
+  <p class="muted small bill-disc">Les documents suivent les usages entre professionnels en France. Les mentions légales sont rédigées par iaboss d'après tes informations, jamais par Claude : fais-les vérifier par un expert-comptable avant un usage particulier (client particulier, TVA sur les encaissements, marché public).</p>
 </div>`;
   return layout({ title: `Facturation · ${p.name}`, email, body, scripts: ['/static/facturation.js'], named: true });
 }

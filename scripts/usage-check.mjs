@@ -35,7 +35,7 @@ for (const [who, u, priced] of [['abonnement', sub, false], ['clé API', api, tr
       // Clé API : la carte « Consommation Claude » montre le budget en $ équivalent API
       await p.waitForSelector('[data-claude-card]:not([hidden]) [data-usage-claude]:not([hidden])');
       const card = await p.locator('[data-usage-claude]').innerText();
-      ok(/\$/.test(card) && /IA via AiTools/.test(card), `${tag} carte « Consommation Claude » : lignes « IA via AiTools » en $`);
+      ok(/\$/.test(card) && /IA via iaboss/.test(card), `${tag} carte « Consommation Claude » : lignes « IA via iaboss » en $`);
     } else {
       // Abonnement : aucun montant nulle part, et pas de carte vide quand le quota n'est pas mesuré
       ok(!(await p.locator('.dash').innerText()).includes('$'), `${tag} page Projets : aucun montant en $`);

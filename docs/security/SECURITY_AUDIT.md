@@ -1,4 +1,4 @@
-# Audit de sécurité d'AiTools
+# Audit de sécurité d'iaboss
 
 Date : 23 octobre 2026. Audit statique du code du dépôt + tests dynamiques **locaux** (serveur de test, base jetable, données fictives).
 Aucun test contre la production ni contre un service externe. Aucun secret n'est reproduit dans ce document.

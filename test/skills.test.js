@@ -1,4 +1,4 @@
-// Savoir-faire d'AiTools : les fiches de méthode (knowledge/skills) sont valides, ciblent des tâches qui existent, tiennent dans le plafond,
+// Savoir-faire d'iaboss : les fiches de méthode (knowledge/skills) sont valides, ciblent des tâches qui existent, tiennent dans le plafond,
 // arrivent dans les consignes système de chaque tâche, et sont décrites dans la documentation du Support (générée).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -17,7 +17,7 @@ import { generatedDocs } from '../src/services/supportdocs.js';
 const skills = loadSkills();
 const profile = { resume: 'Un outil', proposition_valeur: 'Gagner du temps', arguments: ['rapide'], ton: 'direct' };
 const target = { description: 'TPE', decideur: 'gérant', secteurs: ['a'], zone: 'FR', taille: 'TPE', requetes: ['q'] };
-const MARK = "Savoir-faire d'AiTools";
+const MARK = "Savoir-faire d'iaboss";
 
 test('chaque fiche a ses champs, un nom unique, et vise des tâches qui existent', () => {
   assert.ok(skills.length >= 8);

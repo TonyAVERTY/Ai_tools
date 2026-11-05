@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { PROMO, FORMATS, SceneError, parsePromoParams, extractScene, prepareScene, findChromium, promoSupported, renderPromo, leftovers } from '../src/services/promovideo.js';
 
-const SCENE = `<!doctype html><html><head><style>body{margin:0;background:#0b1020;overflow:hidden}#t{position:absolute;top:40%;left:50%;font:700 60px sans-serif;color:#fff}</style></head><body><div id="t">AiTools</div><script>window.renderFrame=function(t){var e=document.getElementById('t');e.style.opacity=Math.min(1,t);e.style.left=(30+t*10)+'%';};</script></body></html>`;
+const SCENE = `<!doctype html><html><head><style>body{margin:0;background:#0b1020;overflow:hidden}#t{position:absolute;top:40%;left:50%;font:700 60px sans-serif;color:#fff}</style></head><body><div id="t">iaboss</div><script>window.renderFrame=function(t){var e=document.getElementById('t');e.style.opacity=Math.min(1,t);e.style.left=(30+t*10)+'%';};</script></body></html>`;
 
 test('paramètres : valeurs par défaut, bornes, nombre d\'images maximal, format et sujet nettoyés', () => {
   assert.deepEqual(parsePromoParams({}), { fps: PROMO.fps.def, seconds: PROMO.seconds.def, format: 'paysage', subject: '', style: 'auto' });

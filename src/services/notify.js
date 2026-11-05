@@ -120,10 +120,10 @@ export async function notify(app, userId, event, { title, description = '', leve
   const others = hookId ? [] : await notifyChannels(app, userId, event, { title, description, level, fields }, ALL_EVENTS, { force });
   if (!targets.length) return others.length > 0;
   const body = {
-    username: 'AiTools',
+    username: 'iaboss',
     allowed_mentions: { parse: [] }, // un "@everyone" dans un nom d'entreprise ne pingera personne
     embeds: [{
-      author: { name: `${ICONS[level] ?? ICONS.info}  AiTools`, ...(app.cfg.appUrl ? { url: app.cfg.appUrl } : {}) },
+      author: { name: `${ICONS[level] ?? ICONS.info}  iaboss`, ...(app.cfg.appUrl ? { url: app.cfg.appUrl } : {}) },
       title: String(title).slice(0, 256),
       description: String(description).slice(0, 4000),
       color: COLORS[level] ?? COLORS.info,
@@ -131,7 +131,7 @@ export async function notify(app, userId, event, { title, description = '', leve
         name: String(f.name).slice(0, 256), value: String(f.value ?? '-').slice(0, 1024) || '-', inline: f.inline ?? true,
       })),
       url: app.cfg.appUrl || undefined,
-      footer: { text: String(footer || FOOTERS[event] || 'AiTools').slice(0, 200) },
+      footer: { text: String(footer || FOOTERS[event] || 'iaboss').slice(0, 200) },
       timestamp: new Date().toISOString(),
     }],
   };

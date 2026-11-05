@@ -1,10 +1,10 @@
 Statut : validé (2026-10-22)
 
-# Cadrage — AiTools public (SaaS multi-utilisateurs)
+# Cadrage — iaboss public (SaaS multi-utilisateurs)
 
 ## 1. Contexte et objectif
 
-AiTools est aujourd'hui un panel **mono-utilisateur** (login Google en whitelist, SQLite local, Raspberry Pi) qui pilote Claude Code en headless : prospection par mail, analyse de projets, évolutions, CRM, récap business.
+iaboss est aujourd'hui un panel **mono-utilisateur** (login Google en whitelist, SQLite local, Raspberry Pi) qui pilote Claude Code en headless : prospection par mail, analyse de projets, évolutions, CRM, récap business.
 
 **Objectif** : ouvrir le produit au public. N'importe qui crée un compte sur un site web, relie son accès Claude, et utilise ses propres projets/prospects, sans voir les données des autres. Le site reprend l'identité visuelle du dashboard. La base de données est une base MySQL/MariaDB créée dans CloudPanel.
 
@@ -55,7 +55,7 @@ AiTools est aujourd'hui un panel **mono-utilisateur** (login Google en whitelist
 - **Techno** : rester sur Node 22, zéro framework serveur, rendu serveur + JS vanilla (cohérent avec l'existant). Pas d'ajout de framework front.
 - **Hébergement** : serveur CloudPanel (site Node + base MySQL/MariaDB CloudPanel). Ressources CPU/RAM du serveur à confirmer : les jobs Claude CLI sont lourds, d'où un plafond global de jobs simultanés.
 - **Sécurité** : secrets chiffrés au repos, clé de chiffrement hors BDD, anti-CSRF, validation des entrées, en-têtes de sécurité, limitation de débit, journal d'audit minimal.
-- **RGPD** : données de prospects = données personnelles traitées pour le compte de chaque utilisateur. Rôles à clarifier (l'utilisateur = responsable de traitement, AiTools = sous-traitant), DPA/CGU, durée de conservation, export/suppression, hébergement UE.
+- **RGPD** : données de prospects = données personnelles traitées pour le compte de chaque utilisateur. Rôles à clarifier (l'utilisateur = responsable de traitement, iaboss = sous-traitant), DPA/CGU, durée de conservation, export/suppression, hébergement UE.
 - **Accessibilité** : contrastes et navigation clavier conformes (viser RGAA/WCAG AA sur le site public).
 - **Existant** : le code actuel (≈4 800 lignes) reste la base ; la migration doit garder les tests au vert (`npm run check`).
 

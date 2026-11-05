@@ -1,4 +1,4 @@
-// Récapitulatif : l'utilisateur ne tape jamais de SQL. AiTools se connecte à la base du projet (lecture seule), lit son schéma, propose les bonnes tables
+// Récapitulatif : l'utilisateur ne tape jamais de SQL. iaboss se connecte à la base du projet (lecture seule), lit son schéma, propose les bonnes tables
 // (utilisateurs, clients payants, paiements) et la colonne du montant, montre un aperçu chiffré ; la personne ne fait que choisir ses tables.
 // Les requêtes sont CONSTRUITES ici à partir d'identifiants lus dans le schéma (jamais saisis) : un nom de table ou de colonne n'est accepté que s'il existe.
 //

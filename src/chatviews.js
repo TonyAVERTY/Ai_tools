@@ -67,9 +67,9 @@ export function chatPage({ email, mode = 'claude', priced = false, conversations
     <div class="chat-log" id="chat-log" data-chat-log tabindex="0" aria-live="polite" aria-label="Messages">
       ${messages.length ? messages.map(bubble).join('\n') : `<div class="chat-empty" data-chat-empty>
         <div class="chat-empty-i">${ic(support ? 'help' : 'spark')}</div>
-        <h2>${support ? 'Une question sur AiTools ?' : `Discute avec ${esc(aiName())}`}</h2>
+        <h2>${support ? 'Une question sur iaboss ?' : `Discute avec ${esc(aiName())}`}</h2>
         <p class="muted">${support
-    ? `Où cliquer, comment configurer, pourquoi quelque chose ne marche pas : ${esc(aiName())} lit la documentation d'AiTools pour te répondre. Chaque message est envoyé à ${esc(aiName())} avec ton propre compte.`
+    ? `Où cliquer, comment configurer, pourquoi quelque chose ne marche pas : ${esc(aiName())} lit la documentation d'iaboss pour te répondre. Chaque message est envoyé à ${esc(aiName())} avec ton propre compte.`
     : `Rédaction de mails, réponses à tes prospects, idées de posts, stratégie… Chaque message est envoyé à ${esc(aiName())} avec ton propre compte.`}</p>
         <div class="chat-ideas">${(support ? SUPPORT_SUGGESTIONS : SUGGESTIONS).map((s) => `<button type="button" class="chip" data-chat-idea>${esc(s)}</button>`).join('')}</div>
       </div>`}
@@ -81,18 +81,18 @@ export function chatPage({ email, mode = 'claude', priced = false, conversations
         <input type="file" data-chat-file multiple hidden accept="image/png,image/jpeg,image/gif,image/webp,application/pdf,video/mp4,video/quicktime,video/webm,.txt,.md,.csv,.json,.log,.xml,.yml,.yaml,.html,.css,.js,.ts,.php,.py,.sql">
         <button type="button" class="btn icon-btn" data-chat-attach aria-label="Joindre une photo, une vidéo ou un fichier" title="Joindre une photo, une vidéo ou un fichier">${ic('clip')}</button>
         ${support ? '' : `<details class="chat-proj" data-chat-projmenu>
-          <summary class="btn icon-btn" aria-label="Joindre un projet AiTools" title="Joindre un projet AiTools">${ic('folder')}</summary>
-          <div class="chat-projlist" data-chat-projlist role="menu" aria-label="Projets AiTools">${loadingBlock('Chargement…', { small: true })}</div>
+          <summary class="btn icon-btn" aria-label="Joindre un projet iaboss" title="Joindre un projet iaboss">${ic('folder')}</summary>
+          <div class="chat-projlist" data-chat-projlist role="menu" aria-label="Projets iaboss">${loadingBlock('Chargement…', { small: true })}</div>
         </details>`}
         <label class="sr-only" for="chat-input">Ton message</label>
-        <textarea id="chat-input" name="message" rows="1" maxlength="${max}" placeholder="${support ? 'Pose ta question sur AiTools…' : `Écris à ${esc(aiName())}…`}  (Entrée pour envoyer, Maj+Entrée pour un retour à la ligne)" data-chat-input></textarea>
+        <textarea id="chat-input" name="message" rows="1" maxlength="${max}" placeholder="${support ? 'Pose ta question sur iaboss…' : `Écris à ${esc(aiName())}…`}  (Entrée pour envoyer, Maj+Entrée pour un retour à la ligne)" data-chat-input></textarea>
         <button class="btn primary" data-chat-send>${ic('send')}<span>Envoyer</span></button>
         <button type="button" class="btn" data-chat-stop hidden>${ic('stop')}<span>Arrêter</span></button>
       </div>
     </form>
     <p class="chat-note muted small">${support
-    ? "Le Support répond d'après la documentation d'AiTools. Il ne voit ni tes projets, ni tes prospects, ni tes mails. Tu peux joindre une capture d'écran pour montrer un problème. Il peut se tromper : vérifie avant d'agir."
-    : `${esc(aiName())} ne voit que cette conversation, et ce que tu joins : un projet AiTools (son code, en lecture seule), des photos, des PDF, des fichiers texte ou des vidéos (quelques images en sont tirées, sans le son). Il peut se tromper, vérifie avant d'envoyer.`}</p>
+    ? "Le Support répond d'après la documentation d'iaboss. Il ne voit ni tes projets, ni tes prospects, ni tes mails. Tu peux joindre une capture d'écran pour montrer un problème. Il peut se tromper : vérifie avant d'agir."
+    : `${esc(aiName())} ne voit que cette conversation, et ce que tu joins : un projet iaboss (son code, en lecture seule), des photos, des PDF, des fichiers texte ou des vidéos (quelques images en sont tirées, sans le son). Il peut se tromper, vérifie avant d'envoyer.`}</p>
   </section>
 </div>`;
   return layout({ title: support ? 'Support' : 'IA', email, body, scripts: ['/static/chat.js'] });

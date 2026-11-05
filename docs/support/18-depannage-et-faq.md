@@ -14,7 +14,7 @@ Aucun lien : active la connexion par code d'appareil dans les paramètres de sé
 Lire le message « En attente : … » dans le menu **Activité**. Raisons possibles : budget IA atteint (clé API) ; quota Claude serré (au-delà de 85 %) ; charge élevée du serveur ; job programmé « Cette nuit » ; déjà un job IA en cours pour le compte. Il repart seul. On peut l'**Annuler** depuis Activité.
 
 ## Une section ou une liste n'a pas pu se charger : « Réessayer »
-Quand une partie de la page se charge après coup (la section **Mise en route**, **LinkedIn**, **Promotion** ou **Récapitulatif** d'un projet, la liste de la page **Clients**, le menu **Joindre un projet AiTools** de la page IA), un petit cercle accompagne « Chargement… ». Si la requête échoue, le cercle laisse la place à **un message et un bouton « Réessayer »** : le cercle ne tourne jamais pour toujours.
+Quand une partie de la page se charge après coup (la section **Mise en route**, **LinkedIn**, **Promotion** ou **Récapitulatif** d'un projet, la liste de la page **Clients**, le menu **Joindre un projet iaboss** de la page IA), un petit cercle accompagne « Chargement… ». Si la requête échoue, le cercle laisse la place à **un message et un bouton « Réessayer »** : le cercle ne tourne jamais pour toujours.
 1. Lis le message : « **Connexion impossible : réessaie dans un instant.** » (réseau coupé), « **Erreur interne : réessaie dans un instant.** » (problème du serveur), « **Tu n'as pas accès à cette action.** » (ton rôle sur le projet ne le permet pas) ou « **Introuvable : recharge la page.** ».
 2. Clique sur **Réessayer** : le cercle revient et la demande repart. Si elle échoue encore, le message revient et tu peux recliquer.
 3. Si le message persiste après plusieurs essais, recharge la page ; s'il revient, signale-le avec l'heure et le nom de la section.
@@ -45,7 +45,7 @@ Sous **Se connecter et analyser** (Configuration du projet → Base de données)
 - L'aperçu affiche « indisponible » pour un chiffre : le compte ne peut pas lire cette table, ou la colonne choisie n'est pas un nombre.
 
 ## Une fenêtre me demande de confirmer
-Avant une action difficile à défaire (supprimer un projet, un prospect, une vidéo ou une conversation, retirer le pied de page des mails, publier un post, envoyer un lot de mails…), AiTools ouvre une fenêtre : le titre est la question, la ligne dessous dit la conséquence. Le bouton porte le nom de l'action (« Supprimer le projet », « Publier »…) et il est **rouge** quand elle supprime ou retire quelque chose. **Annuler**, la touche Échap ou un clic en dehors de la fenêtre abandonnent sans rien changer. Pour une action qui se rattrape facilement, il n'y a pas de confirmation.
+Avant une action difficile à défaire (supprimer un projet, un prospect, une vidéo ou une conversation, retirer le pied de page des mails, publier un post, envoyer un lot de mails…), iaboss ouvre une fenêtre : le titre est la question, la ligne dessous dit la conséquence. Le bouton porte le nom de l'action (« Supprimer le projet », « Publier »…) et il est **rouge** quand elle supprime ou retire quelque chose. **Annuler**, la touche Échap ou un clic en dehors de la fenêtre abandonnent sans rien changer. Pour une action qui se rattrape facilement, il n'y a pas de confirmation.
 
 ## « Trop de requêtes : réessaie dans … »
 Le serveur limite le rythme des actions pour se protéger d'une boucle ou d'un abus. Une action isolée n'est jamais concernée : le message apparaît seulement après un très grand nombre d'enregistrements ou de clics en peu de temps (plus de 600 écritures en 10 minutes pour un même compte, avec des seuils plus bas sur certaines actions comme les vidéos, le chat ou la liaison de l'IA). Attends la durée indiquée dans le message, puis recommence. Les lectures (consulter une page, une liste) ne sont pas limitées. Si le message revient en usage normal, signale-le à l'administrateur.
@@ -54,7 +54,7 @@ Le serveur limite le rythme des actions pour se protéger d'une boucle ou d'un a
 Vérifier dans l'ordre : 1) SMTP enregistré (« Configuration du projet ») ; 2) modèle de mail **validé** (« Valider le modèle ») ; 3) des prospects au statut « À contacter » ; 4) pas de bandeau rouge de pause d'envoi sur la page Projets ; 5) plafond de mails du projet (24 h), plafond global (Réglages → Garde-fous) et plafond mensuel de l'offre ; 6) pas de job d'envoi déjà en cours ; 7) le message d'erreur du job dans Activité (erreur SMTP : identifiants, port).
 
 ## Mes mails arrivent en spam
-Configurer SPF, DKIM et DMARC pour le domaine d'envoi ; envoyer de petits lots au début et augmenter progressivement ; garder des délais entre les mails ; éviter les liens et pièces jointes dans le premier mail ; soigner l'accroche. AiTools ajoute déjà un lien de désinscription dans le pied de page des mails.
+Configurer SPF, DKIM et DMARC pour le domaine d'envoi ; envoyer de petits lots au début et augmenter progressivement ; garder des délais entre les mails ; éviter les liens et pièces jointes dans le premier mail ; soigner l'accroche. iaboss ajoute déjà un lien de désinscription dans le pied de page des mails.
 
 ## Le filtre par poste cache une section que je cherche
 Choisis **Tous les postes** dans la liste **Poste**, en haut de la page Projets : le filtre choisi est mémorisé dans ton navigateur et s'applique à tous tes projets. Un poste ne montre que ses sections (Commerce : Cible et Prospecter ; Communication : LinkedIn et Promotion ; Produit : Évolution ; Développement : Audit du projet ; Direction : Récapitulatif) plus **Postes et tâches IA**. Voir « Postes et filtre par poste : les tâches IA d'une entreprise ».
@@ -70,7 +70,7 @@ Choisis **Tous les postes** dans la liste **Poste**, en haut de la page Projets 
 **Réglages → Garde-fous → Pied de page des mails de prospection → Retirer le pied de page des mails** (confirmation demandée). Lis l'avertissement : sans lien de désinscription ni origine de l'adresse, tu t'exposes à des problèmes légaux (RGPD, CNIL) et à des blocages par Gmail ou Outlook. **Remettre le pied de page** le rétablit en un clic. Si des destinataires se plaignent de ne pas pouvoir se désinscrire, c'est la première chose à remettre.
 
 ## « Cette adresse ne peut pas être ajoutée » en ajoutant ou modifiant un prospect
-L'adresse existe déjà dans ce projet (cherche-la dans la liste, avec la recherche) ou elle ne doit pas être contactée (désinscription ou refus enregistrés, tous comptes confondus). Le message est le même dans les deux cas : AiTools ne dit pas lequel. Autres refus : « Adresse email invalide », « Score : un nombre de 1 à 10 », « Adresse du site invalide » (attendu : https://exemple.fr), plafond de prospects de l'offre atteint (voir « Offres, plafonds et limites »).
+L'adresse existe déjà dans ce projet (cherche-la dans la liste, avec la recherche) ou elle ne doit pas être contactée (désinscription ou refus enregistrés, tous comptes confondus). Le message est le même dans les deux cas : iaboss ne dit pas lequel. Autres refus : « Adresse email invalide », « Score : un nombre de 1 à 10 », « Adresse du site invalide » (attendu : https://exemple.fr), plafond de prospects de l'offre atteint (voir « Offres, plafonds et limites »).
 
 ## Je ne peux pas modifier l'adresse email d'un prospect
 Elle est verrouillée dès que le prospect a été contacté (statut autre que « À contacter ») : les mails, relances et réponses y sont rattachés. Ajoute un nouveau prospect avec la bonne adresse. Les autres informations restent modifiables.
@@ -108,22 +108,22 @@ Lire le message du job : outils manquants sur le serveur (Chromium, ffmpeg), pla
 ## L'agenda externe ne se met pas à jour
 Les agendas se rafraîchissent tout seuls mais lentement (Google : 12 à 24 heures). Pour voir un changement tout de suite, retirer puis rajouter l'abonnement, ou régénérer le lien (Créer mon lien d'agenda).
 
-## Une question hors du cadre d'AiTools
+## Une question hors du cadre d'iaboss
 Pour rédiger un mail, trouver des idées de posts, réfléchir à une stratégie commerciale : menu **Assistant** (l'entrée de ton IA).
 
 ## FAQ rapide
-- **Qui paie l'IA ?** La personne, directement chez son fournisseur d'IA : Anthropic, OpenAI ou Google (clé API : à l'usage ; abonnement ou compte : son abonnement Claude ou ChatGPT). AiTools facture seulement son offre.
-- **AiTools modifie-t-il mon code ?** Non : le dépôt est cloné et lu en lecture seule.
+- **Qui paie l'IA ?** La personne, directement chez son fournisseur d'IA : Anthropic, OpenAI ou Google (clé API : à l'usage ; abonnement ou compte : son abonnement Claude ou ChatGPT). iaboss facture seulement son offre.
+- **iaboss modifie-t-il mon code ?** Non : le dépôt est cloné et lu en lecture seule.
 - **Puis-je changer le dépôt d'un projet ?** Non : créer un nouveau projet.
 - **Combien de temps dure une recherche ou une vidéo ?** Quelques minutes ; l'avancement est dans Activité.
 - **Où voir ce que j'ai consommé ?** « Mon compte → Usage du mois », la carte « Consommation » de la page Projets (suivie du nom de ton IA : « Consommation Gemini », par exemple) et « Mon compte → Mon IA → Limites d'utilisation ».
 - **Comment arrêter les notifications ?** Réglages → Notifications : décocher les événements ou retirer le canal.
 - **Comment supprimer mes données ?** « Mon compte → Zone de danger → Supprimer mon compte et mes données ».
 - **Y a-t-il une application mobile ?** Non : le site s'adapte aux téléphones. Sur un écran étroit, les onglets de la barre du haut tiennent tous sur une ligne et « Comptabilité » s'affiche « Compta » (c'est le même onglet).
-- **Qui contacter si la documentation ne répond pas ?** L'administrateur du service d'AiTools.
+- **Qui contacter si la documentation ne répond pas ?** L'administrateur du service d'iaboss.
 
 ## L'IA ignore la méthode attendue ou la réponse sort du cadre
-Les fiches de méthode (voir « Savoir-faire de l'IA dans AiTools ») sont des repères : la consigne de la tâche dans « Réglages → Prompts IA » l'emporte en cas de contradiction.
+Les fiches de méthode (voir « Savoir-faire de l'IA dans iaboss ») sont des repères : la consigne de la tâche dans « Réglages → Prompts IA » l'emporte en cas de contradiction.
 1. Vérifie la consigne de la tâche dans « Réglages → Prompts IA » : une consigne modifiée peut aller à l'encontre de la méthode.
 2. Clique « Revenir au texte par défaut » pour comparer.
 3. Choisis un modèle plus capable pour cette tâche dans « Réglages → Budget et modèles IA » si le résultat reste approximatif.

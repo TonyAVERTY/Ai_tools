@@ -1,4 +1,4 @@
-// Documentation d'AiTools lue par Claude dans le mode « Support » de la page IA.
+// Documentation d'iaboss lue par Claude dans le mode « Support » de la page IA.
 // Deux sources :
 //  - docs/support/*.md : la documentation écrite à la main (parcours, boutons, règles) ; chaque fichier commence par « # Titre » puis une ligne « Résumé : … » ;
 //  - des fichiers GÉNÉRÉS depuis le code (offres et plafonds, modèles, consignes IA) : ils ne peuvent pas être périmés.
@@ -48,7 +48,7 @@ Les plafonds se renouvellent le 1er de chaque mois (heure de Paris). Quand un pl
 |---|---|---|---|---|---|---|---|
 ${rows.join('\n')}
 
-Les offres se voient aussi sur la page publique « Tarifs ». Un administrateur d'AiTools peut attribuer une offre à un compte. Le prix de l'abonnement Claude, du compte ChatGPT ou de la clé API (Anthropic, OpenAI, Google) est à part : il se paie directement à ton fournisseur d'IA.
+Les offres se voient aussi sur la page publique « Tarifs ». Un administrateur d'iaboss peut attribuer une offre à un compte. Le prix de l'abonnement Claude, du compte ChatGPT ou de la clé API (Anthropic, OpenAI, Google) est à part : il se paie directement à ton fournisseur d'IA.
 
 ## Page IA (assistant et Support)
 - ${chat.perDay ?? '—'} réponses au plus par 24 h glissantes et par compte ; ${chat.maxConversations ?? '—'} conversations au plus (la plus ancienne est supprimée quand une nouvelle dépasse la limite).
@@ -126,7 +126,7 @@ ${defs}
   });
   const postes = ROLES.map((r) => `### ${r.label}
 ${r.summary}
-${r.sections.length ? `- Déjà dans AiTools pour ce poste : ${r.sections.map((k) => SECTION_TITLES[k] || k).join(', ')}.` : '- Pas de section dédiée ailleurs dans le projet : les tâches ci-dessous sont sa seule entrée.'}
+${r.sections.length ? `- Déjà dans iaboss pour ce poste : ${r.sections.map((k) => SECTION_TITLES[k] || k).join(', ')}.` : '- Pas de section dédiée ailleurs dans le projet : les tâches ci-dessous sont sa seule entrée.'}
 ${r.tasks.map((t) => `- **${t.label}**${t.web ? ' (cherche sur le web)' : ''}${t.repo ? ' (lit le dépôt, réservé aux administrateurs)' : ''} : ${t.brief} Rubriques : ${t.sections.join(' ; ')}.`).join('\n')}`).join('\n\n');
   out.push({
     name: 'postes-et-taches-ia.md',
@@ -148,8 +148,8 @@ ${k.summary}
 - Réussite : ${k.meta.reussite}`).join('\n\n');
   out.push({
     name: 'savoir-faire-ia.md',
-    content: `# Savoir-faire d'AiTools donné à l'IA
-Résumé : les fiches de méthode (prospection B2B, mails, conformité, lecture de dépôt, posts LinkedIn, et pour le code : débogage, revue, tests, refactoring, sécurité, bases de données…) qu'AiTools ajoute automatiquement aux consignes de Claude, comment elles sont choisies et leurs limites. Fichier généré depuis le code.
+    content: `# Savoir-faire d'iaboss donné à l'IA
+Résumé : les fiches de méthode (prospection B2B, mails, conformité, lecture de dépôt, posts LinkedIn, et pour le code : débogage, revue, tests, refactoring, sécurité, bases de données…) qu'iaboss ajoute automatiquement aux consignes de Claude, comment elles sont choisies et leurs limites. Fichier généré depuis le code.
 
 ## Fiches métier (par tâche)
 Chaque tâche IA reçoit, en plus de tes consignes et de la fiche du projet, les fiches de méthode qui la concernent (au plus ${SKILLS_MAX_CHARS} caractères par tâche). Elles ne se modifient pas depuis l'écran. En cas de doute, la consigne de la tâche (Réglages → Prompts IA) l'emporte sur la fiche.
@@ -159,7 +159,7 @@ ${k.summary}
 - Appliquée à : ${k.tasks.map((t) => labels[t] || t).join(' ; ')}.`).join('\n\n')}
 
 ## Fiches de développement (page IA avec un projet joint)
-Quand tu joins un projet à la conversation ou que tu poses une question de code, AiTools choisit seul, sans appeler Claude, la méthode (rapide, structurée ou approfondie) et au plus quelques fiches, d'après ta demande et le profil du dépôt (langages, commandes de test et de build, tests, intégration continue, base de données, zones sensibles). Une question simple reçoit presque rien ; un changement risqué reçoit la méthode complète. Claude lit le dépôt, propose les changements et les commandes à lancer, et distingue ce qu'il a lu de ce qu'il suppose.
+Quand tu joins un projet à la conversation ou que tu poses une question de code, iaboss choisit seul, sans appeler Claude, la méthode (rapide, structurée ou approfondie) et au plus quelques fiches, d'après ta demande et le profil du dépôt (langages, commandes de test et de build, tests, intégration continue, base de données, zones sensibles). Une question simple reçoit presque rien ; un changement risqué reçoit la méthode complète. Claude lit le dépôt, propose les changements et les commandes à lancer, et distingue ce qu'il a lu de ce qu'il suppose.
 
 ${['base', 'specialise', 'workflow'].map((lvl) => `### ${LEVEL_TITLES[lvl]}\n\n${devSkills(lvl)}`).join('\n\n')}
 `,
@@ -167,7 +167,7 @@ ${['base', 'specialise', 'workflow'].map((lvl) => `### ${LEVEL_TITLES[lvl]}\n\n$
   out.push({
     name: 'visite-guidee.md',
     content: `# Visite guidée du tableau de bord
-Résumé : la visite guidée d'AiTools (étape par étape, ce qui est éclairé et expliqué), comment elle démarre, comment la quitter ou la relancer. Fichier généré depuis le code.
+Résumé : la visite guidée d'iaboss (étape par étape, ce qui est éclairé et expliqué), comment elle démarre, comment la quitter ou la relancer. Fichier généré depuis le code.
 
 ## Comment elle fonctionne
 - Elle démarre **toute seule une fois**, juste après les questions « Faisons connaissance » (répondues ou passées), sur le tableau de bord.
@@ -200,7 +200,7 @@ export function collectDocs(facts = {}) {
 /** INDEX.md : la carte de la documentation (quel fichier répond à quoi). Aussi donnée à Claude dans ses consignes. */
 export function buildIndex(files) {
   const lines = files.map((f) => { const m = docMeta(f.content); return `- ${f.name} : ${m.title}${m.summary ? ` — ${m.summary}` : ''}`; });
-  return `# Index de la documentation d'AiTools\nRésumé : liste de tous les documents, à lire en premier pour trouver le bon fichier.\n\n${lines.join('\n')}\n`;
+  return `# Index de la documentation d'iaboss\nRésumé : liste de tous les documents, à lire en premier pour trouver le bon fichier.\n\n${lines.join('\n')}\n`;
 }
 
 /**
