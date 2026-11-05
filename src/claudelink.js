@@ -78,7 +78,7 @@ export function publicLink(link) {
   if (!hasProvider(link.provider ?? DEFAULT_PROVIDER)) return null; // fournisseur retiré : « pas de liaison »
   const provider = getProvider(link.provider);
   return {
-    provider: provider.id, providerLabel: provider.label,
+    provider: provider.id, providerLabel: provider.label, providerCompany: provider.company,
     mode: link.mode, label: provider.modes[link.mode]?.label ?? MODE_LABELS[link.mode], valid: !!link.valid,
     linkedAt: link.linked_at ?? null, validatedAt: link.validated_at ?? null, lastTestAt: link.last_test_at ?? null,
     last4: link.mode === 'api_key' ? link.last4 ?? null : null,
@@ -241,6 +241,20 @@ export async function validateSubscriptionToken(app, token) {
 export async function userProvider(db, userId) {
   const id = (await readLink(db, userId))?.provider ?? DEFAULT_PROVIDER;
   return hasProvider(id) ? id : DEFAULT_PROVIDER;
+}
+
+/** Dernier changement d'IA de l'utilisateur ({ from, to, at } avec les noms affichables), pour le lui dire dans les Réglages ; null s'il n'en a pas fait. */
+export async function aiSwitchOf(db, userId) {
+  try {
+    const j = JSON.parse(await getSetting(db, userId, 'ai_switch_json') || 'null');
+    if (!j || !hasProvider(j.from) || !hasProvider(j.to) || j.from === j.to) return null;
+    return { from: getProvider(j.from).label, to: getProvider(j.to).label, at: j.at };
+  } catch { return null; }
+}
+
+/** Nom affichable de l'IA de l'utilisateur (« Claude », « ChatGPT », « Gemini »). */
+export async function providerLabelOf(db, userId) {
+  return getProvider(await userProvider(db, userId)).label;
 }
 
 // Réglages de modèle : ceux d'une IA n'existent pas chez une autre

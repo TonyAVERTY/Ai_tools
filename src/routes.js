@@ -11,7 +11,7 @@ import { deleteUser, normalizeEmail, getUser } from './users.js';
 import {
   assertCanRunAi, getLinkState, linkChatgptAccount, assertLoginConsent, linkLoginToken, validateSubscriptionToken, linkApiKey, linkSubscriptionToken, unlink, testLink, lastConsent,
   MODES,
-  isPriced, userProvider,
+  isPriced, userProvider, aiSwitchOf,
 } from './claudelink.js';
 import { loginPage } from './site/pages.js';
 import { registerSiteRoutes } from './site/routes.js';
@@ -41,6 +41,7 @@ import { registerProspectRoutes } from './prospectroutes.js';
 import { dashboardPage, settingsPage, unsubPage, accountPage, layout } from './views.js';
 import { linkPage } from './linkviews.js';
 import { availableProviders } from './services/providers/availability.js';
+import { getProvider } from './services/providers/index.js';
 import { enqueue, latestJobs, cancelJob, retryJob, usageSummary } from './services/jobs.js';
 import { validateGitUrl, removeRepo } from './services/git.js';
 import { fetchRecap, clearRecapCache, validateSelect } from './services/recap.js';
@@ -207,6 +208,8 @@ export function registerRoutes(router, app) {
       discord: { hooks: publicHooks(discord.hooks), all: EVENTS, max: MAX_HOOKS },
       channels: publicChannels(await listChannels(app, userId, Object.keys(EVENTS))), canEmail: !!cfg.systemSmtp,
       catalog: { recommended: catalog.recommended, others: catalog.others },
+      ai: { id: provider, name: getProvider(provider).label, company: getProvider(provider).company },
+      aiSwitch: await aiSwitchOf(db, userId),
       prompts: promptsView(parseCustomPrompts(promptsRaw), models, provider),
       promptMax: MAX_CUSTOM,
     };
