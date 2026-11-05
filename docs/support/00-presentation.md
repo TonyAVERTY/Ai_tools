@@ -2,7 +2,7 @@
 Résumé : ce qu'est AiTools, le vocabulaire (projet, fiche, cible, prospect, job, liaison Claude, plafond), et la carte de tous les boutons de la barre du haut.
 
 ## Ce qu'est AiTools
-AiTools aide à **trouver des clients par mail**, avec **son propre Claude** : la personne relie son accès Claude (clé API Anthropic ou abonnement Claude), ajoute un **projet** (le dépôt Git de son produit), et AiTools :
+AiTools aide à **trouver des clients par mail**, avec **sa propre IA** (Claude, ChatGPT ou Gemini, au choix) : la personne relie son accès (clé API, ou abonnement Claude ou compte ChatGPT), ajoute un **projet** (le dépôt Git de son produit), et AiTools :
 1. lit le code et rédige une **fiche projet** et une **cible** (à qui vendre) ;
 2. cherche des **prospects** (entreprises correspondant à la cible) avec une adresse de contact professionnelle publiée ;
 3. rédige un **modèle de mail** et envoie les mails à la demande, avec relance automatique, suivi des réponses et CRM ;

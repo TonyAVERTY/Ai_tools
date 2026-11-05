@@ -172,7 +172,7 @@ test('aucune ressource externe : tout est servi par l\'application, rien en lign
   // Liens sortants explicites (balise <a>) : seuls ceux-ci sont permis
   const outbound = new Set([
     'https://www.anthropic.com/legal/consumer-terms', 'https://www.anthropic.com/legal/privacy',
-    'https://policies.google.com/privacy', 'https://www.cnil.fr/fr/plaintes', 'https://www.apple.com/legal/privacy/fr-fr/',
+    'https://policies.google.com/privacy', 'https://openai.com/policies/privacy-policy', 'https://www.cnil.fr/fr/plaintes', 'https://www.apple.com/legal/privacy/fr-fr/',
   ]);
   const apple = await startApp({ cfg: { apple: { teamId: 't', keyId: 'k', clientId: 'c', privateKey: 'p' } } });
   try {
@@ -444,7 +444,7 @@ test('un seul moment animé hors action : l\'accroche de la lettre ; pages de do
 test('confidentialité : les pièces jointes de la page IA sont déclarées (données, durée de conservation, destinataire)', async () => {
   const conf = await (await page('/confidentialite')).text();
   assert.equal((conf.match(/Pièces jointes de la page IA/g) || []).length, 2, 'une ligne dans les données, une dans les durées');
-  assert.match(conf, /vidéos que tu joins[\s\S]*Claude lit une copie de son code, en lecture seule/);
+  assert.match(conf, /vidéos que tu joins[\s\S]*ton IA lit une copie de son code, en lecture seule/);
   assert.match(conf, /jamais envoyée est supprimée au bout de 24 heures/);
   assert.match(conf, /pièces jointes \(photos, PDF, textes, images tirées d'une vidéo, code d'un projet joint\)/);
 });
@@ -455,4 +455,26 @@ test('confidentialité : les vidéos de promotion sont déclarées (données, du
   assert.match(conf, /onglet Promotion d'un projet[\s\S]*le sujet que tu as saisi/);
   assert.match(conf, /Au plus 20 vidéos par compte/);
   assert.match(conf, /sujet que tu donnes pour une vidéo de promotion[\s\S]*sans accès au réseau/);
+});
+
+test('site public : l\'IA est « ton IA » (Claude, ChatGPT ou Gemini), les trois fournisseurs sont cités, le risque d\'abonnement couvre ChatGPT', async () => {
+  const page = async (p) => (await s.anon.get(p, { headers: { accept: 'text/html' } })).text();
+  const home = await page('/');
+  assert.match(home, /<h1 class="h1" id="h1">Ton IA écrit tes mails de prospection/);
+  assert.match(home, /avec ta propre IA<\/title>/);
+  assert.match(home, /pilotés par ton IA/);
+  assert.doesNotMatch(home.replace(/<script[^]*?<\/script>/g, ''), /Claude écrit|ton propre Claude|facturé par Anthropic, directement/);
+  const tarifs = await page('/tarifs');
+  assert.match(tarifs, /id="acces-ia"/);
+  assert.doesNotMatch(tarifs, /id="acces-claude"/);
+  assert.match(tarifs, /Ton abonnement Claude ou ChatGPT, avec un risque/);
+  assert.match(tarifs, /Gemini n'a pas ce mode : il se relie par clé API seulement/);
+  assert.match(tarifs, /Google peut alors utiliser les données envoyées pour améliorer ses produits/, 'la clé Gemini gratuite est signalée');
+  const how = await page('/fonctionnement');
+  assert.match(how, /href="\/tarifs#acces-ia"/);
+  const confid = await page('/confidentialite');
+  for (const f of ['Anthropic (Claude), OpenAI (ChatGPT) ou Google (Gemini)', 'Google, Anthropic et OpenAI peuvent traiter des données aux États-Unis']) assert.ok(confid.replace(/&#39;/g, "'").includes(f), f);
+  const cgu = (await page('/cgu')).replace(/&#39;/g, "'");
+  assert.match(cgu, /ton compte Claude ou ChatGPT peut être limité, suspendu ou fermé/);
+  assert.match(cgu, /Gemini ne se relie que par clé API/);
 });

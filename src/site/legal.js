@@ -16,7 +16,7 @@ export const ADDRESS = '4 rue Alcide de Gasperi, 35340 Liffré';
 export const HOST = 'ElypseCloud, 29 rue Lebrix Mesmin, 33700 Mérignac';
 const PAGES = [['/mentions-legales', 'Mentions légales'], ['/confidentialite', 'Confidentialité'], ['/cgu', 'CGU']];
 
-export const LEGAL_UPDATED = '24 octobre 2026';
+export const LEGAL_UPDATED = '5 novembre 2026';
 
 /** Gabarit commun (design Claude Design) : onglets des trois pages, titre, date, sommaire numéroté, texte. */
 function legalPage({ appUrl, path, title, description, h1, lead, sections }) {
@@ -80,7 +80,7 @@ export function mentionsPage({ appUrl }) {
       {
         id: 'propriete', title: 'Propriété intellectuelle',
         html: `<p>Le site, son code, ses textes et son identité visuelle sont la propriété de leur éditeur. Toute reproduction sans accord écrit est interdite, hors citation courte avec mention de la source.</p>
-<p>Les contenus que tu saisis dans AiTools (projets, prospects, modèles de mail) restent les tiens. Claude et Anthropic sont des marques d'Anthropic ; Google et Apple sont des marques de leurs propriétaires. Ils sont cités pour décrire le fonctionnement du service, sans lien d'affiliation.</p>`,
+<p>Les contenus que tu saisis dans AiTools (projets, prospects, modèles de mail) restent les tiens. Claude et Anthropic sont des marques d'Anthropic, ChatGPT et OpenAI des marques d'OpenAI, Gemini et Google des marques de Google ; Apple est une marque de son propriétaire. Ils sont cités pour décrire le fonctionnement du service, sans lien d'affiliation.</p>`,
       },
       {
         id: 'responsabilite', title: 'Responsabilité et liens externes',
@@ -114,7 +114,7 @@ export function privacyPage({ appUrl, apple = false, captcha = false, inactiveMo
         id: 'roles', title: 'Qui est responsable de quoi',
         html: `<p>AiTools est édité par Tony AVERTY, entrepreneur individuel (SIRET 100 142 819 00018), siège : ${ADDRESS}. Contact : <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a>. Il n'y a pas de délégué à la protection des données.</p>
 <ul>
-  <li><strong>Pour ton compte</strong> (identité, connexion, liaison Claude, réglages), AiTools est <strong>responsable de traitement</strong>.</li>
+  <li><strong>Pour ton compte</strong> (identité, connexion, liaison de ton IA, réglages), AiTools est <strong>responsable de traitement</strong>.</li>
   <li><strong>Pour les données de tes prospects</strong> (entreprises et adresses professionnelles que tu recherches, importes ou contactes), c'est <strong>toi le responsable de traitement</strong> : tu décides à qui tu écris et pourquoi. AiTools agit comme <strong>sous-traitant</strong> : il les traite uniquement pour faire fonctionner le service que tu utilises, sur tes instructions, avec les garanties de sécurité décrites plus bas, et les supprime avec ton compte.</li>
 </ul>`,
       },
@@ -126,13 +126,13 @@ export function privacyPage({ appUrl, apple = false, captcha = false, inactiveMo
   <tbody>
     <tr><th scope="row">Compte</th><td>Email et nom fournis par ${apple ? 'Google ou Apple' : 'Google'}, fournisseur de connexion et identifiant chez lui, plan, dates de création et de dernière connexion.</td><td>Créer ton compte et te connecter. Exécution du contrat.</td></tr>
     <tr><th scope="row">Session</th><td>Un identifiant de session aléatoire (cookie), un cookie de liaison pendant la connexion.</td><td>Te garder connecté et sécuriser la connexion. Exécution du contrat, intérêt légitime.</td></tr>
-    <tr><th scope="row">Liaison Claude</th><td>Ta clé API ou ton jeton d'abonnement, chiffrés. Les 4 derniers caractères d'une clé API, les dates de liaison et de test, la date et la version du texte d'avertissement accepté pour le mode abonnement.</td><td>Lancer tes jobs avec ton accès, garder la preuve de ton acceptation. Exécution du contrat, intérêt légitime.</td></tr>
+    <tr><th scope="row">Liaison de ton IA (Claude, ChatGPT ou Gemini)</th><td>Ta clé API, ton jeton d'abonnement ou ton fichier de connexion, chiffrés. Les 4 derniers caractères d'une clé API, les dates de liaison et de test, la date et la version du texte d'avertissement accepté pour le mode abonnement.</td><td>Lancer tes jobs avec ton accès, garder la preuve de ton acceptation. Exécution du contrat, intérêt légitime.</td></tr>
     <tr><th scope="row">Projets</th><td>Nom, adresse du dépôt Git, fiche projet, cible, modèles de mail, copie du dépôt sur le serveur.</td><td>Fournir le service. Exécution du contrat.</td></tr>
     <tr><th scope="row">Configuration</th><td>Identifiants SMTP et IMAP, accès à la base de données de ton projet (récapitulatif), jeton Forgejo, adresse du webhook Discord, plafonds et budgets. Les mots de passe, jetons et adresses de webhook sont chiffrés.</td><td>Envoyer, lire les réponses, notifier. Exécution du contrat.</td></tr>
     <tr><th scope="row">Prospects</th><td>Entreprise, adresse professionnelle, site, ville, secteur, phrase d'accroche, page source, score, statut, notes, prochaine action, historique d'envoi, objet et date d'une réponse.</td><td>Fournir le service pour ton compte (voir « rôles »). La base légale du démarchage est la tienne, en B2B en règle générale l'intérêt légitime.</td></tr>
     <tr><th scope="row">Activité</th><td>Type, état, durée, coût et nombre de tokens de chaque job IA, résultat du job. Chaque jour, trois nombres lus dans la base de ton projet si tu l'as reliée (utilisateurs, clients, revenu).</td><td>Fournir le service, appliquer tes budgets et plafonds. Exécution du contrat.</td></tr>
-    <tr><th scope="row">Conversations IA</th><td>Titre, messages (les tiens et les réponses de Claude), modèle utilisé et coût de chaque réponse, pour la page IA. Elles ne sont visibles que de ton compte.</td><td>Fournir le service (reprendre une conversation). Exécution du contrat.</td></tr>
-    <tr><th scope="row">Pièces jointes de la page IA</th><td>Les photos, PDF, fichiers texte et vidéos que tu joins à un message (avec leur nom, leur type et leur taille), et, pour une vidéo, quelques images qui en sont tirées (sans le son). Si tu joins un projet, Claude lit une copie de son code, en lecture seule ; rien n'est modifié. Elles ne sont visibles que de ton compte.</td><td>Permettre à Claude de répondre à partir de ce que tu lui montres. Exécution du contrat.</td></tr>
+    <tr><th scope="row">Conversations IA</th><td>Titre, messages (les tiens et les réponses de ton IA), modèle utilisé et coût de chaque réponse, pour la page IA. Elles ne sont visibles que de ton compte.</td><td>Fournir le service (reprendre une conversation). Exécution du contrat.</td></tr>
+    <tr><th scope="row">Pièces jointes de la page IA</th><td>Les photos, PDF, fichiers texte et vidéos que tu joins à un message (avec leur nom, leur type et leur taille), et, pour une vidéo, quelques images qui en sont tirées (sans le son). Si tu joins un projet, ton IA lit une copie de son code, en lecture seule ; rien n'est modifié. Elles ne sont visibles que de ton compte.</td><td>Permettre à ton IA de répondre à partir de ce que tu lui montres. Exécution du contrat.</td></tr>
     <tr><th scope="row">Vidéos de promotion</th><td>Les vidéos que tu fais produire depuis l'onglet Promotion d'un projet : le fichier MP4, le sujet que tu as saisi, les réglages choisis (images par seconde, durée, format) et la date. Elles sont visibles de ton compte et des personnes qui ont accès au projet (équipe).</td><td>Te fournir la vidéo demandée. Exécution du contrat.</td></tr>
     <tr><th scope="row">Adresse IP</th><td>Ton adresse IP sert à limiter le nombre de requêtes (protection contre les abus). Elle reste en mémoire du serveur, quelques minutes à quelques heures, et n'est pas enregistrée en base de données.</td><td>Sécurité du service. Intérêt légitime.</td></tr>
     <tr><th scope="row">Modération</th><td>Actions d'administration sur un compte (suspension, plan, suppression) et pauses d'envoi décidées quand trop de mails sont rejetés : date, action, identifiant du compte et adresse masquée.</td><td>Sécurité du service et lutte contre les abus. Intérêt légitime.</td></tr>
@@ -150,12 +150,12 @@ export function privacyPage({ appUrl, apple = false, captcha = false, inactiveMo
   <tbody>
     <tr><th scope="row">Compte et toutes ses données</th><td>Tant que le compte existe. Effacés quand tu supprimes ton compte depuis Mon compte, copie du code comprise.</td></tr>
     <tr><th scope="row">Conversations IA</th><td>Jusqu'à ce que tu les supprimes depuis la page IA (une par une), ou avec ton compte. Au plus 100 conversations : la plus ancienne est supprimée quand une nouvelle dépasse cette limite.</td></tr>
-    <tr><th scope="row">Pièces jointes de la page IA</th><td>Supprimées avec la conversation, ou avec ton compte. Une pièce jointe ajoutée mais jamais envoyée est supprimée au bout de 24 heures. Pendant une réponse, Claude lit une copie temporaire, supprimée dès la réponse terminée.</td></tr>
+    <tr><th scope="row">Pièces jointes de la page IA</th><td>Supprimées avec la conversation, ou avec ton compte. Une pièce jointe ajoutée mais jamais envoyée est supprimée au bout de 24 heures. Pendant une réponse, ton IA lit une copie temporaire, supprimée dès la réponse terminée.</td></tr>
     <tr><th scope="row">Vidéos de promotion</th><td>Conservées jusqu'à ce que tu les supprimes depuis l'onglet Promotion, ou avec le projet ou ton compte. Au plus 20 vidéos par compte. Une vidéo dont la production échoue ou est annulée n'est pas conservée.</td></tr>
     <tr><th scope="row">Compte inactif</th><td>${inactiveMonths ? `Suppression automatique après ${inactiveMonths} mois sans connexion ni job, avec un mail d'avertissement 30 jours avant. Un compte suspendu ou administrateur n'est pas concerné.` : 'Aucune suppression automatique pour inactivité.'}</td></tr>
     <tr><th scope="row">Journal d'administration</th><td>12 mois. Il note les actions des administrateurs (suspension, changement de plan, suppression) et les pauses d'envoi, avec un identifiant et une adresse masquée.</td></tr>
     <tr><th scope="row">Session</th><td>30 jours au plus, effacée à la déconnexion. Les états de connexion durent 10 minutes.</td></tr>
-    <tr><th scope="row">Clé API ou jeton Claude</th><td>Jusqu'à ce que tu le délies ou supprimes ton compte.</td></tr>
+    <tr><th scope="row">Clé API, jeton ou connexion de ton IA</th><td>Jusqu'à ce que tu le délies ou supprimes ton compte.</td></tr>
     <tr><th scope="row">Prospects, notes et journaux d'envoi</th><td>Jusqu'à la suppression du projet ou du compte. En tant que responsable de traitement, ne garde pas une fiche plus de 3 ans après le dernier contact.</td></tr>
     <tr><th scope="row">Comptabilité et justificatifs</th><td>Jusqu'à ce que tu supprimes la ligne ou ton compte. Les documents comptables se conservent en principe 10 ans : exporte-les avant de supprimer.</td></tr>
     <tr><th scope="row">Liste d'opposition</th><td>Conservée après la suppression d'un compte, tant qu'il faut respecter l'opposition de la personne.</td></tr>
@@ -170,8 +170,8 @@ export function privacyPage({ appUrl, apple = false, captcha = false, inactiveMo
 <ul>
   <li><strong>Google</strong> pour la connexion : il nous transmet ton email, ton nom et un identifiant. <a href="https://policies.google.com/privacy" rel="noopener noreferrer">Politique de Google</a>.</li>
   ${apple ? '<li><strong>Apple</strong> pour la connexion avec Apple : même principe, avec la possibilité de masquer ton email. <a href="https://www.apple.com/legal/privacy/fr-fr/" rel="noopener noreferrer">Politique d\'Apple</a>.</li>' : ''}
-  <li><strong>Anthropic</strong>, par l'intermédiaire de <em>ton</em> accès Claude : le code de ton projet lu par Claude, la fiche et la cible, les domaines des prospects déjà connus pour éviter les doublons, les messages et les pièces jointes (photos, PDF, textes, images tirées d'une vidéo, code d'un projet joint) que tu envoies sur la page IA, la fiche du projet et le sujet que tu donnes pour une vidéo de promotion (la scène animée écrite par Claude est ensuite dessinée sur le serveur d'AiTools, sans accès au réseau), et ce que Claude trouve sur le web transitent par ton compte Anthropic, selon les conditions que tu as acceptées avec lui. <a href="https://www.anthropic.com/legal/privacy" rel="noopener noreferrer">Politique d'Anthropic</a>.</li>
-  <li><strong>Google, ElevenLabs ou Microsoft (voix des vidéos de promotion, facultatif) :</strong> si tu coches « Ajouter une voix », le texte de la narration, écrit par Claude à partir de la fiche de ton projet, est envoyé au service de synthèse vocale que tu choisis (Google Traduction, ou, avec ta propre clé API, ElevenLabs, Google Cloud ou Microsoft Azure) pour être transformé en audio. Une clé API que tu enregistres est chiffrée et n'est utilisée que pour ces appels. Aucun autre élément de ton compte n'y est transmis ; sans la case cochée, rien n'est envoyé, et les voix locales (Piper, eSpeak NG) s'exécutent sur le serveur d'AiTools sans rien transmettre à un tiers.</li>
+  <li><strong>Ton fournisseur d'IA : Anthropic (Claude), OpenAI (ChatGPT) ou Google (Gemini), un seul à la fois,</strong> par l'intermédiaire de <em>ton</em> accès : le code de ton projet lu par ton IA, la fiche et la cible, les domaines des prospects déjà connus pour éviter les doublons, les messages et les pièces jointes (photos, PDF, textes, images tirées d'une vidéo, code d'un projet joint) que tu envoies sur la page IA, la fiche du projet et le sujet que tu donnes pour une vidéo de promotion (la scène animée écrite par ton IA est ensuite dessinée sur le serveur d'AiTools, sans accès au réseau), et ce que ton IA trouve sur le web transitent par ton compte chez ce fournisseur, selon les conditions que tu as acceptées avec lui. <a href="https://www.anthropic.com/legal/privacy" rel="noopener noreferrer">Politique d'Anthropic</a>, <a href="https://openai.com/policies/privacy-policy" rel="noopener noreferrer">politique d'OpenAI</a>, <a href="https://policies.google.com/privacy" rel="noopener noreferrer">politique de Google</a>. Avec une clé Gemini gratuite, Google peut utiliser les données envoyées pour améliorer ses produits : n'y mets pas de données de prospects, ou active la facturation sur ton projet Google.</li>
+  <li><strong>Google, ElevenLabs ou Microsoft (voix des vidéos de promotion, facultatif) :</strong> si tu coches « Ajouter une voix », le texte de la narration, écrit par ton IA à partir de la fiche de ton projet, est envoyé au service de synthèse vocale que tu choisis (Google Traduction, ou, avec ta propre clé API, ElevenLabs, Google Cloud ou Microsoft Azure) pour être transformé en audio. Une clé API que tu enregistres est chiffrée et n'est utilisée que pour ces appels. Aucun autre élément de ton compte n'y est transmis ; sans la case cochée, rien n'est envoyé, et les voix locales (Piper, eSpeak NG) s'exécutent sur le serveur d'AiTools sans rien transmettre à un tiers.</li>
   ${captcha ? `<li><strong>Google reCAPTCHA</strong> (Google Ireland Limited, Google LLC) : protège la connexion contre les envois automatisés. Son script est chargé automatiquement à l'ouverture de la page de connexion, sans action de ta part. Il dépose des cookies et transmet à Google ton adresse IP, des informations sur ton navigateur et sur ton comportement sur la page. Base légale : l'intérêt légitime d'AiTools à protéger la connexion contre les abus. AiTools ne conserve pas le résultat de la vérification. Sans elle, la connexion n'est pas possible. Si cela te pose problème, écris-nous. <a href="https://policies.google.com/privacy" rel="noopener noreferrer">Politique de Google</a>.</li>` : ''}
   <li><strong>L'hébergeur</strong> du serveur : ${HOST}</li>
   <li><strong>Tes propres services</strong>, quand tu les configures : serveur SMTP et IMAP de ta messagerie, Forgejo, base de données de ton projet, Discord. AiTools s'y connecte avec tes identifiants.</li>
@@ -180,7 +180,7 @@ export function privacyPage({ appUrl, apple = false, captcha = false, inactiveMo
       },
       {
         id: 'transferts', title: 'Transferts hors de l\'Union européenne',
-        html: `<p>${apple ? 'Google, Apple et Anthropic' : 'Google et Anthropic'} peuvent traiter des données aux États-Unis. Ils s'appuient pour cela sur les mécanismes prévus par le RGPD (clauses contractuelles types, cadre de protection des données UE-États-Unis) décrits dans leurs politiques.</p>
+        html: `<p>${apple ? 'Google, Apple, Anthropic et OpenAI' : 'Google, Anthropic et OpenAI'} peuvent traiter des données aux États-Unis. Ils s'appuient pour cela sur les mécanismes prévus par le RGPD (clauses contractuelles types, cadre de protection des données UE-États-Unis) décrits dans leurs politiques.</p>
 <p>Le reste du service (base de données, application) est hébergé selon les indications de la section « hébergeur ».</p>`,
       },
       {
@@ -242,13 +242,13 @@ export function termsPage({ appUrl, apple = false }) {
   return legalPage({
     appUrl, path: '/cgu',
     title: "Conditions générales d'utilisation · AiTools",
-    description: "Les règles d'usage d'AiTools : compte, plan gratuit, liaison de ton accès Claude (y compris le risque de l'abonnement), usages interdits, responsabilités, résiliation.",
+    description: "Les règles d'usage d'AiTools : compte, plan gratuit, liaison de ton accès à l'IA (y compris le risque de l'abonnement), usages interdits, responsabilités, résiliation.",
     h1: "Conditions générales d'utilisation",
-    lead: "Les règles du jeu entre toi et AiTools. À lire avant de relier ton accès Claude.",
+    lead: "Les règles du jeu entre toi et AiTools. À lire avant de relier ton accès à une IA.",
     sections: [
       {
         id: 'objet', title: 'Objet et éditeur',
-        html: `<p>AiTools est un service en ligne édité par Tony AVERTY, entrepreneur individuel (voir les <a href="/mentions-legales">mentions légales</a>). Il pilote Claude Code, avec ton propre accès Claude, pour analyser un projet, rechercher des prospects professionnels, rédiger et envoyer des mails de prospection, relancer et suivre les réponses.</p>
+        html: `<p>AiTools est un service en ligne édité par Tony AVERTY, entrepreneur individuel (voir les <a href="/mentions-legales">mentions légales</a>). Il pilote ton IA (Claude, ChatGPT ou Gemini), avec ton propre accès, pour analyser un projet, rechercher des prospects professionnels, rédiger et envoyer des mails de prospection, relancer et suivre les réponses.</p>
 <p>Utiliser le service, c'est accepter ces conditions. Si tu ne les acceptes pas, ne crée pas de compte.</p>`,
       },
       {
@@ -260,11 +260,11 @@ export function termsPage({ appUrl, apple = false }) {
         html: `<p>Le compte est créé à la première connexion avec ${apple ? 'Google ou Apple' : 'Google'}. Un compte correspond à une personne. Tu es responsable de la sécurité de l'accès à ton compte de connexion, et de tout ce qui est fait depuis ton compte AiTools. Préviens-nous sans attendre si tu penses qu'un tiers y a accès.</p>`,
       },
       {
-        id: 'claude', title: 'Ton accès Claude',
-        html: `<p>Pour lancer un job, tu relies ton propre accès à Claude. AiTools ne fournit ni crédits ni abonnement.</p>
+        id: 'claude', title: 'Ton accès à l\'IA',
+        html: `<p>Pour lancer un job, tu relies ton propre accès à une IA : Claude (Anthropic), ChatGPT (OpenAI) ou Gemini (Google). AiTools ne fournit ni crédits ni abonnement.</p>
 <ul>
-  <li><strong>Clé API Anthropic :</strong> Anthropic te facture directement, selon ses tarifs. Tu es responsable de cette dépense. Les budgets réglables dans AiTools sont des garde-fous, pas une garantie.</li>
-  <li><strong>Abonnement Claude (jeton) :</strong> les conditions d'Anthropic peuvent ne pas autoriser l'usage d'un abonnement via une application tierce. Si tu choisis ce mode, <strong>ton compte Claude peut être limité, suspendu ou fermé</strong> par Anthropic. L'éditeur d'AiTools n'a aucun contrôle sur cette décision et n'en est pas responsable, dans la mesure permise par la loi. Avant la liaison, une fenêtre d'avertissement te demande de cocher « J'ai compris et j'accepte ce risque ». Cette acceptation est enregistrée avec sa date et la version du texte. Ce mode peut être désactivé à tout moment.</li>
+  <li><strong>Clé API (Anthropic, OpenAI ou Google) :</strong> ton fournisseur te facture directement, selon ses tarifs. Tu es responsable de cette dépense. Les budgets réglables dans AiTools sont des garde-fous, pas une garantie.</li>
+  <li><strong>Abonnement Claude (jeton) ou compte ChatGPT :</strong> les conditions d'Anthropic ou d'OpenAI peuvent ne pas autoriser l'usage d'un abonnement via une application tierce. Si tu choisis ce mode, <strong>ton compte Claude ou ChatGPT peut être limité, suspendu ou fermé</strong> par ton fournisseur. Gemini ne se relie que par clé API. L'éditeur d'AiTools n'a aucun contrôle sur cette décision et n'en est pas responsable, dans la mesure permise par la loi. Avant la liaison, une fenêtre d'avertissement te demande de cocher « J'ai compris et j'accepte ce risque ». Cette acceptation est enregistrée avec sa date et la version du texte. Ce mode peut être désactivé à tout moment.</li>
 </ul>
 <p>Tu peux délier ton accès à tout moment depuis Mon compte : le secret est alors effacé et tes jobs IA en attente sont annulés.</p>`,
       },
@@ -280,7 +280,7 @@ export function termsPage({ appUrl, apple = false }) {
   <li>tu ne prospectes que des professionnels, à propos de leur activité professionnelle ;</li>
   <li>tu laisses en place le lien de désinscription et la mention de la source, ajoutés automatiquement ;</li>
   <li>tu ne recontactes pas une personne qui s'est opposée, et tu respectes les demandes d'effacement qu'elle t'adresse ;</li>
-  <li>tu relis ce que Claude propose avant d'envoyer : il peut se tromper.</li>
+  <li>tu relis ce que ton IA propose avant d'envoyer : il peut se tromper.</li>
 </ul>
 <p>Tu configures toi-même ton serveur d'envoi. La réputation de ton domaine (SPF, DKIM, DMARC, volume) t'appartient.</p>`,
       },
@@ -302,7 +302,7 @@ export function termsPage({ appUrl, apple = false }) {
       },
       {
         id: 'garanties', title: 'Disponibilité et résultats',
-        html: `<p>Le service est fourni en l'état. Il peut être interrompu pour maintenance ou en cas d'incident, et l'éditeur ne garantit pas une disponibilité continue. Aucun résultat n'est garanti : ni nombre de réponses, ni clients obtenus. Les textes et analyses produits par Claude peuvent contenir des erreurs ; tu les vérifies avant de les utiliser.</p>`,
+        html: `<p>Le service est fourni en l'état. Il peut être interrompu pour maintenance ou en cas d'incident, et l'éditeur ne garantit pas une disponibilité continue. Aucun résultat n'est garanti : ni nombre de réponses, ni clients obtenus. Les textes et analyses produits par ton IA peuvent contenir des erreurs ; tu les vérifies avant de les utiliser.</p>`,
       },
       {
         id: 'propriete', title: 'Propriété intellectuelle',
@@ -310,7 +310,7 @@ export function termsPage({ appUrl, apple = false }) {
       },
       {
         id: 'responsabilite', title: 'Responsabilité',
-        html: `<p>L'éditeur répond des dommages directs qui lui sont imputables. Dans la mesure permise par la loi, il n'est pas responsable des dommages indirects, de la suspension ou de la fermeture de ton compte Claude, des frais facturés par Anthropic ou tes autres prestataires, de la réputation de ton domaine d'envoi, ni de l'usage que tu fais du service en violation de ces conditions. Rien ici n'exclut la responsabilité en cas de faute lourde ou de dol, ni celle que la loi interdit de limiter.</p>`,
+        html: `<p>L'éditeur répond des dommages directs qui lui sont imputables. Dans la mesure permise par la loi, il n'est pas responsable des dommages indirects, de la suspension ou de la fermeture de ton compte chez ton fournisseur d'IA (Claude, ChatGPT ou Gemini), des frais facturés par Anthropic, OpenAI, Google ou tes autres prestataires, de la réputation de ton domaine d'envoi, ni de l'usage que tu fais du service en violation de ces conditions. Rien ici n'exclut la responsabilité en cas de faute lourde ou de dol, ni celle que la loi interdit de limiter.</p>`,
       },
       {
         id: 'suspension', title: 'Suspension et résiliation',
