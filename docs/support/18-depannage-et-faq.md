@@ -13,6 +13,9 @@ Aucun lien : active la connexion par code d'appareil dans les paramètres de sé
 ## Avec ChatGPT ou Gemini, je ne vois pas les tokens pendant la tâche
 C'est normal : ChatGPT et Gemini ne communiquent leurs tokens qu'**à la fin** de la tâche, contrairement à Claude qui les envoie au fil de l'eau. Pendant la tâche, la ligne dit « Tokens comptés à la fin de la tâche » (dans « Activité » et dans « Voir »). Le total apparaît dès que la tâche est terminée, et reste affiché même si elle échoue. Si le total reste à 0 après la fin d'une tâche réussie, signale-le à l'administrateur : l'IA n'a pas renvoyé sa mesure.
 
+## Je ne peux plus écrire dans mon modèle de mail ou de relance
+Il est **validé** : un modèle validé est verrouillé (grisé, en lecture seule) pour qu'on ne le change pas par erreur. Clique **Modifier** pour le déverrouiller, change le texte, puis **Valider le modèle** (ou **Enregistrer** pour le garder en brouillon, ou **Annuler** pour revenir au texte validé). **Générer avec l'IA** réapparaît aussi avec **Modifier**.
+
 ## La barre « Changer | Modifier » n'apparaît pas quand je sélectionne une phrase
 Elle n'existe que dans l'**Aperçu**, sur l'onglet **Version texte** (pas dans l'onglet « Mail » mis en forme), et seulement pour une phrase **du modèle** : ni l'en-tête (De, À, Objet), ni le pied de page, ni une phrase qui apparaît deux fois dans le modèle, ni une sélection coupée au milieu d'un nom d'entreprise. Sélectionne une phrase entière du corps du mail. Si « Changer » répond que ton IA n'a pas pu proposer une autre phrase, la raison est écrite (budget IA atteint, IA déconnectée, proposition inutilisable) : clique **Réessayer** ou **Fermer**, ou utilise **Modifier**, puis **Modifier à la main**, pour retoucher la phrase toi-même.
 
