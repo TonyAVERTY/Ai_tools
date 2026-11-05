@@ -65,10 +65,11 @@ const senseReply = () => {
 // Changer une phrase : « REPHRASEBAD » = proposition identique (refusée), « REPHRASEDOWN » = réponse illisible ; sinon « Autre formulation N : » + la phrase (N = propositions déjà refusées + 1)
 const rephraseReply = () => {
   if (prompt.includes('REPHRASEDOWN')) return 'pas du json';
-  const sentence = (/PHRASE À CHANGER \(telle qu'écrite dans le modèle\) :\n([\s\S]*?)\n(?:\nPROPOSITIONS|\nFICHE|\nRéponds UNIQUEMENT)/.exec(prompt) || [])[1] || '';
+  const sentence = (/PHRASE À CHANGER \(telle qu'écrite dans le modèle\) :\n([\s\S]*?)\n(?:\nCE QUE LA PERSONNE VEUT|\nPROPOSITIONS|\nFICHE|\nRéponds UNIQUEMENT)/.exec(prompt) || [])[1] || '';
   if (prompt.includes('REPHRASEBAD')) return JSON.stringify({ sentence });
   const refused = ((prompt.split('PROPOSITIONS DÉJÀ REFUSÉES :\n')[1] || '').split('\n\n')[0].match(/^- /gm) || []).length;
-  return JSON.stringify({ sentence: `Autre formulation ${refused + 1} : ${sentence}` });
+  const wish = (/CE QUE LA PERSONNE VEUT :\n([^\n]*)/.exec(prompt) || [])[1];
+  return JSON.stringify({ sentence: `Autre formulation ${refused + 1}${wish ? ` (${wish})` : ''} : ${sentence}` });
 };
 // Correction de forme d'un modèle généré : ajoute l'appel et la politesse manquants, retire « oui, non ou plus tard » ; « FIXBAD » = texte inchangé (refusé), « FIXDOWN » = réponse illisible
 const styleReply = () => {
