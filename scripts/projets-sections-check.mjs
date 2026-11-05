@@ -65,6 +65,7 @@ for (const vp of [{ width: 1280, height: 900 }, { width: 390, height: 844 }]) {
   // 3) la liste « Mise en route » retrouve En-tête à sa nouvelle place et l'ouvre
   await p.waitForSelector('[data-cfg]:not([hidden])', { timeout: 8000 });
   await p.locator('[data-cfg]').click(); // le badge « config » ouvre la section « Mise en route » du projet
+  await p.locator('details.setup-done > summary').click(); // « Analyser le projet » est fait : il est dans « N étapes faites », repliées
   await p.locator('[data-setup-go="analyze"]').click();
   ok(await waitFor(() => isOpen(p, 'header')), `${tag} « Mise en route → Analyser le projet » ouvre En-tête, même replié en bas`);
   ok(await p.locator('details[data-acc="header"] >> text=Site du produit').first().isVisible(), `${tag} le champ « Site du produit » est visible une fois En-tête ouvert`);

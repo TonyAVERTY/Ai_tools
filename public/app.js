@@ -871,6 +871,8 @@
   function renderJob(box, job, type) {
     if (box && job && job.status === 'done' && QUIET_WHEN_DONE.includes(type)) { box.innerHTML = ''; box._sig = ''; return; }
     renderJobContent(box, job, type);
+    // Résultat d'une seule phrase : « Voir » et les tokens se rangent sur la même ligne au lieu de deux blocs pleine largeur (.job-compact)
+    box?.classList.toggle('job-compact', !!job && job.status === 'done' && !!box.firstElementChild?.matches('p.ok') && !box.querySelector('ul, .evo-done, pre, .row'));
     if (box && job && job.canViewLogs !== false && !box.querySelector(`a[href="/jobs/${job.id}"]`)) {
       const link = document.createElement('a');
       link.className = 'btn small'; link.href = `/jobs/${job.id}`; link.textContent = 'Voir';
@@ -1154,9 +1156,19 @@
     const sub = $('.acc-sub', acc);
     if (sub) sub.textContent = `${c.done} étape${c.done > 1 ? 's' : ''} sur ${c.total}`;
     const body = $('[data-setup]', acc);
-    const html = `<ul>${c.steps.map((s) => `<li class="${s.done ? 'done' : ''}">${s.done ? TICK : DOT}<div>
+    const item = (s) => `<li class="${s.done ? 'done' : ''}">${s.done ? TICK : DOT}<div>
       <button type="button" class="setup-go" data-setup-go="${esc(s.key)}">${esc(s.label)}</button>${s.optional ? '<span class="setup-opt">facultatif</span>' : ''}
-      ${s.done ? '' : `<span class="muted small">${esc(s.hint)}</span>`}</div></li>`).join('')}</ul>`;
+      ${s.done ? '' : `<span class="muted small">${esc(s.hint)}</span>`}</div></li>`;
+    // Les étapes faites se replient en une ligne (« 3 étapes faites ») : il ne reste à l'écran que ce qu'il y a encore à faire
+    // Une étape qui vient d'être faite reste visible jusqu'au prochain chargement de la page : sa coche garde son petit saut (voir plus bas)
+    const doneNow = new Set(c.steps.filter((s) => s.done).map((s) => s.key));
+    const stay = (body._stay ||= new Set());
+    if (body._done) for (const k of doneNow) if (!body._done.has(k)) stay.add(k);
+    const todo = c.steps.filter((s) => !s.done || stay.has(s.key));
+    const finished = c.steps.filter((s) => s.done && !stay.has(s.key));
+    const wasOpen = $('details.setup-done', body)?.open ? ' open' : '';
+    const html = `${todo.length ? `<ul>${todo.map(item).join('')}</ul>` : ''}${finished.length
+      ? `<details class="setup-done"${wasOpen}><summary>${finished.length} étape${finished.length > 1 ? 's' : ''} faite${finished.length > 1 ? 's' : ''}</summary><ul>${finished.map(item).join('')}</ul></details>` : ''}`;
     // Les étapes faites depuis le dernier affichage : leur coche apparaît d'un petit saut (jamais au premier affichage, ni pour ce qui l'était déjà)
     const done = new Set(c.steps.filter((s) => s.done).map((s) => s.key));
     const fresh = body._done ? [...done].filter((k) => !body._done.has(k)) : [];
