@@ -48,7 +48,14 @@ test('relecture avec objet B : l\'objet B ne peut ni apparaître, ni disparaîtr
 });
 
 test('contrôle d\'un modèle : erreurs bloquantes et avertissements', () => {
-  assert.deepEqual(reviewMail({ subject: 'Idée', body: 'Bonjour {{entreprise}}.\n\n{{expediteur}}\nMonEspacePro' }), { errors: [], warnings: [] });
+  assert.deepEqual(reviewMail({ subject: 'Idée', body: 'Bonjour {{entreprise}}.\n\nBien cordialement,\n{{expediteur}}\nMonEspacePro' }), { errors: [], warnings: [] });
+  // Appel et politesse : signalés quand ils manquent (jamais bloquants), comme sur le modèle de relance de la capture
+  const dry = reviewMail({ subject: '', body: 'Au passage en caisse, vos clients retrouvent leur carte.\nEst-ce un sujet chez vous ?\nTony AVERTY | MonEspacePro' });
+  assert.deepEqual(dry.errors, []);
+  assert.ok(dry.warnings.some((w) => /formule d'appel/.test(w)), 'pas de « Bonjour »');
+  assert.ok(dry.warnings.some((w) => /formule de politesse avant la signature/.test(w)), 'pas de formule de politesse');
+  assert.ok(!reviewMail({ subject: '', body: 'Bonjour,\n\nUne question.\n\nBonne journée,\nTony' }).warnings.some((w) => /formule/.test(w)), 'appel et politesse présents : rien à signaler');
+  assert.ok(!reviewMail({ subject: '', body: 'Bonjour {{entreprise}},\n\nUne question.\n\nMerci' }).warnings.some((w) => /formule/.test(w)), '« Bonjour {{entreprise}}, » est un appel');
   const bad = reviewMail({ subject: 'Offre gratuite {{nom}}', body: 'Bonjour.\n, MonEspacePro\n{{site' });
   assert.ok(bad.errors.some((e) => /\{\{nom\}\}/.test(e)), 'variable inconnue');
   assert.ok(bad.errors.some((e) => /ligne 2 commence par une virgule/.test(e)), 'ligne qui commence par une virgule');
