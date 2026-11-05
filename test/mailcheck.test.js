@@ -116,7 +116,11 @@ test('modèle généré : relu par Claude avant enregistrement, corrections affi
   assert.equal(job.status, 'done', job.error);
   assert.equal(job.result.reviewed, true);
   assert.deepEqual(job.result.corrections, ['signature sans virgule']);
-  assert.match((await getTemplate(s.db, pid, 'initial')).body, /\{\{expediteur\}\}$/);
+  const saved = (await getTemplate(s.db, pid, 'initial')).body;
+  assert.match(saved, /\{\{expediteur\}\}/, 'la signature reste');
+  assert.match(saved, /^Bonjour,\n\n/, 'l\'appel manquant a été ajouté à la génération');
+  assert.match(saved, /Bien cordialement,\nTony$/, 'la formule de politesse manquante aussi');
+  assert.equal(job.result.styleFixed.length, 2, 'le résultat du job dit ce qui a été corrigé');
   // objet B généré aussi (test A/B) : différent de l'objet A, conservé par la relecture
   const t = await getTemplate(s.db, pid, 'initial');
   assert.equal(t.subject, 'Idée pour {{entreprise}}');
@@ -174,6 +178,8 @@ test('validation : un modèle cassé est refusé (400), un modèle correct passe
 
 test('réponses toutes faites : « oui, non ou plus tard ? » est signalé, une vraie question ne l\'est pas', () => {
   const warn = (text) => reviewMail({ subject: '', body: `Bonjour,\n\n${text}\n\nBien cordialement,\nTony` }).warnings.some((w) => /réponses toutes faites/.test(w));
-  for (const t of ['Est-ce un sujet chez vous : oui, non ou plus tard ? Si ce n\'est pas le bon moment, dites-le-moi.', 'Vous pouvez répondre oui, non ou plus tard.', 'Intéressé ? oui ou non ?', 'Oui / non ?', 'Répondez par 1 ou 2.']) assert.equal(warn(t), true, t);
-  for (const t of ['Est-ce un sujet chez vous ?', 'Préférez-vous que je repasse plus tard ?', "Il n'y a pas non plus de souci.", "Si ce n'est pas le bon moment, dites-le-moi et je n'insiste pas.", 'Oui, la carte se met en place en une heure.']) assert.equal(warn(t), false, t);
+  for (const t of ['Est-ce un sujet chez vous : oui, non ou plus tard ? Si ce n\'est pas le bon moment, dites-le-moi.', 'Vous pouvez répondre oui, non ou plus tard.', 'Intéressé ? oui ou non ?', 'Oui / non ?', 'Répondez par 1 ou 2.',
+    // énumérations avec d'autres mots (capture du propriétaire)
+    'La fidélité de vos clients est-elle un sujet pour vous, maintenant, plus tard ou pas du tout ?', 'Est-ce un sujet pour vous, oui, non ou plus tard ?', 'Est-ce pour vous un sujet : pas maintenant, peut-être ou bientôt ?']) assert.equal(warn(t), true, t);
+  for (const t of ['Est-ce un sujet chez vous ?', 'Préférez-vous que je repasse plus tard ?', "Il n'y a pas non plus de souci.", "Si ce n'est pas le bon moment, dites-le-moi et je n'insiste pas.", 'Oui, la carte se met en place en une heure.', 'Souhaitez-vous que je vous rappelle maintenant ?', 'Vous utilisez déjà une carte, non ?', 'Est-ce que la fidélité est un sujet chez vous en ce moment ?']) assert.equal(warn(t), false, t);
 });

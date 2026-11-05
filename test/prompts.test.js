@@ -248,9 +248,9 @@ test('mails : aucune consigne ne demande de réponses toutes faites (« oui, non
     const follow = followupTemplatePrompt({ profile, senderName: 'Tony', model }).prompt;
     assert.doesNotMatch(follow, /oui \/ non \/ plus tard|réponse de trois mots|question fermée/, `relance (${model}) : l'ancienne consigne`);
     assert.match(follow, /UNE seule question simple et naturelle/, `relance (${model})`);
-    assert.match(follow, /Ne propose jamais de réponses toutes faites à choisir/, `relance (${model})`);
+    assert.match(follow, /N'énumère jamais les réponses possibles, sous aucune forme[^]*« maintenant, plus tard ou pas du tout »/, `relance (${model})`);
   }
   const r = rephrasePrompt({ template: 'Bonjour,\n\nEst-ce un sujet : oui, non ou plus tard ?', sentence: 'Est-ce un sujet : oui, non ou plus tard ?' }).prompt;
-  assert.match(r, /Ne propose jamais de réponses toutes faites à choisir/);
-  assert.match(r, /la nouvelle phrase les retire et pose simplement la question/);
+  assert.match(r, /N'énumère jamais les réponses possibles, sous aucune forme/);
+  assert.match(r, /la nouvelle phrase retire cette énumération et pose simplement la question/);
 });
