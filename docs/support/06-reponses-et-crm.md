@@ -6,7 +6,7 @@ Dans « Configuration du projet → Boîte de réception (IMAP) », renseigne l'
 - Une réponse fait passer le prospect en **« A répondu »**. Elle est rattachée par le fil de discussion, puis par l'adresse, puis par le domaine professionnel s'il est unique.
 - Les absences, réponses automatiques et newsletters sont ignorées.
 - Les mails rejetés (bounces) passent le prospect en **« Rejeté »** et l'adresse en liste d'opposition.
-- Aucun token Claude n'est consommé pour lire la boîte.
+- Aucun token d'IA n'est consommé pour lire la boîte.
 
 ## Les statuts d'un prospect
 **À contacter**, **Contacté**, **A répondu**, **Client**, **Refus**, **Rejeté**, **Adresse invalide**.
