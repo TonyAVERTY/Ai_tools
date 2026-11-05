@@ -10,6 +10,9 @@ La clé est fausse, supprimée ou limitée : crée-en une nouvelle sur aistudio.
 ## ChatGPT : aucun lien ne s'affiche, ou mes tâches attendent chacune leur tour
 Aucun lien : active la connexion par code d'appareil dans les paramètres de sécurité de ton compte ChatGPT, ou utilise « Coller le fichier ». Les tâches qui s'enchaînent sont normales avec un compte ChatGPT : une seule tourne à la fois pour ton compte (avec une clé API, elles tournent ensemble).
 
+## Une tâche terminée n'affiche plus qu'une ligne (résultat, « Voir », tokens)
+C'est voulu pour alléger la page : sous une recherche, un envoi ou une relance terminés, le résultat, le bouton **Voir** (le détail de la tâche) et le nombre de tokens tiennent sur une même ligne. Rien n'est perdu : **Voir** ouvre le détail complet, et le menu « Activité » garde l'historique.
+
 ## Avec ChatGPT, la carte « Consommation ChatGPT » dit « indisponible » ou ne montre pas mes limites
 - **« ton accès ChatGPT sera renouvelé au prochain job iaboss »** : l'accès enregistré a expiré. iaboss ne le renouvelle pas tout seul (le renouvellement appartient à Codex) : lance une tâche IA, la carte revient ensuite.
 - **« OpenAI refuse le relevé en direct »** : relie-toi de nouveau avec « Se connecter avec ChatGPT ».
