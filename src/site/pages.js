@@ -97,7 +97,7 @@ const HOME_JSON_LD = (appUrl) => ({
   applicationCategory: 'BusinessApplication',
   operatingSystem: 'Web',
   inLanguage: 'fr',
-  description: 'Panel qui pilote Claude Code pour analyser un projet, trouver des prospects, rédiger et envoyer des mails de prospection, relancer et suivre les réponses.',
+  description: 'Panel qui pilote ton IA (Claude, ChatGPT ou Gemini) pour analyser un projet, trouver des prospects, rédiger et envoyer des mails de prospection, relancer et suivre les réponses.',
   offers: [
     { '@type': 'Offer', name: 'Gratuit', price: '0', priceCurrency: 'EUR', description: `Plan gratuit : ${FREE.projects} projet, ${FREE.prospects} prospects, ${FREE.mails} mails et ${FREE.aiJobs} jobs IA par mois` },
     ...PAID.map((k) => ({ '@type': 'Offer', name: PLAN_LABELS[k], price: String(PLAN_PRICES[k]), priceCurrency: 'EUR', description: `${PLAN_LABELS[k]} : ${PLAN_PRICES[k]} € TTC par mois, ou ${annualPrice(k)} € TTC par an (${ANNUAL_FREE_MONTHS} mois offerts)` })),
@@ -121,7 +121,7 @@ const LETTER = `<figure class="letter" aria-labelledby="lt-cap">
     <p>Je peux vous montrer ça en dix minutes ?</p>
     <p class="letter-sign">Tony</p>
   </div>
-  <p class="margin-note"><b>Accroche tirée de leur site.</b> Claude cite une phrase de la page « Contact » du cabinet pour que le mail ne ressemble pas à un envoi en masse.</p>
+  <p class="margin-note"><b>Accroche tirée de leur site.</b> L'IA cite une phrase de la page « Contact » du cabinet pour que le mail ne ressemble pas à un envoi en masse.</p>
   <div class="letter-foot">${badge('b-warn', 'clock', 'À valider')}<span>Rien ne part tant que tu n'as pas relu et confirmé.</span></div>
 </figure>`;
 
@@ -133,8 +133,8 @@ const FACTS = [
   ['Il écrit tes posts LinkedIn', "Il rédige, tu relis et tu publies quand ça te va."],
 ];
 const STEPS = [
-  ['Relie ton accès Claude', "Tu connectes ta propre clé Anthropic ou ton abonnement Claude. C'est ton accès qui travaille, pas celui d'AiTools."],
-  ['Ajoute ton dépôt Git', 'GitHub ou ton propre serveur : Claude lit ton projet pour comprendre ce que tu proposes.'],
+  ['Relie ton IA', "Tu choisis Claude, ChatGPT ou Gemini et tu connectes ta propre clé ou ton compte. C'est ton accès qui travaille, pas celui d'AiTools."],
+  ['Ajoute ton dépôt Git', 'GitHub ou ton propre serveur : ton IA lit ton projet pour comprendre ce que tu proposes.'],
   ['Valide la cible', "Il te dit à qui il pense parler. Tu corriges, puis tu valides."],
   ['Lance la recherche', "Il trouve les contacts et écrit les mails. Tu les relis et tu confirmes l'envoi."],
 ];
@@ -148,13 +148,13 @@ const TRUST = (apple) => [
 export function homePage({ appUrl, apple = false }) {
   return siteLayout({
     appUrl, path: '/',
-    title: 'AiTools : trouve des clients par mail avec ton propre Claude',
+    title: 'AiTools : trouve des clients par mail avec ta propre IA',
     description: 'AiTools lit ton projet, trouve des entreprises qui pourraient avoir besoin de toi, écrit et envoie tes mails, relance et suit les réponses. Gratuit pour commencer.',
     jsonLd: HOME_JSON_LD(appUrl),
     body: `<section class="hero" aria-labelledby="h1">
   <div class="wrap hero-in">
     <div>
-      <h1 class="h1" id="h1">Claude écrit tes mails de prospection. Toi, tu les relis et tu les signes.</h1>
+      <h1 class="h1" id="h1">Ton IA écrit tes mails de prospection. Toi, tu les relis et tu les signes.</h1>
       <p class="lead">Pour les développeurs et les indépendants. AiTools part de ton dépôt Git, cherche des entreprises qui pourraient avoir besoin de ton projet et prépare un mail pour chacune. Les mails partent de ta propre boîte, et jamais sans ton accord.</p>
       <div class="hero-btns">
         ${guest('big', btn('btn-primary btn-lg', '/login', 'Créer mon compte'))}
@@ -169,8 +169,8 @@ export function homePage({ appUrl, apple = false }) {
 <section class="sec sec-edge" aria-labelledby="h-b">
   <div class="wrap split">
     <div class="split-h">
-      <h2 class="h2" id="h-b">Ce que Claude fait pour toi</h2>
-      <p class="sec-lead">Il travaille avec ton propre accès Claude, pendant que tu fais autre chose.</p>
+      <h2 class="h2" id="h-b">Ce que ton IA fait pour toi</h2>
+      <p class="sec-lead">Elle travaille avec ton propre accès, Claude, ChatGPT ou Gemini, pendant que tu fais autre chose.</p>
     </div>
     <dl class="facts">
       ${FACTS.map(([t, p]) => `<div><dt>${esc(t)}</dt><dd>${esc(p)}</dd></div>`).join('\n      ')}
@@ -208,7 +208,7 @@ export function homePage({ appUrl, apple = false }) {
 <section class="inv" aria-labelledby="h-c">
   <div class="wrap">
     <h2 class="h2" id="h-c">Tu gardes la main</h2>
-    <p class="sec-lead">Claude peut se tromper : relis les fiches avant d'envoyer, et n'écris qu'à des professionnels.</p>
+    <p class="sec-lead">Une IA peut se tromper : relis les fiches avant d'envoyer, et n'écris qu'à des professionnels.</p>
     <div class="inv-g">
       ${TRUST(apple).map(([t, p]) => `<div><h3>${esc(t)}</h3><p>${esc(p)}</p></div>`).join('\n      ')}
     </div>
@@ -226,14 +226,14 @@ export function homePage({ appUrl, apple = false }) {
       <div><div class="ph"><h3>Plans payants</h3>${badge('', 'clock', 'Bientôt')}</div><p class="price">${PLAN_PRICES.starter} à ${PLAN_PRICES.intensive} € <small>TTC par mois</small></p>
         <ul class="list"><li>${ic('check')}${['Un', 'Deux', 'Trois', 'Quatre', 'Cinq', 'Six'][PAID.length - 1] ?? PAID.length} plans, de ${PLAN_LABELS[PAID[0]]} à ${PLAN_LABELS[PAID.at(-1)]}</li><li>${ic('check')}En annuel, ${ANNUAL_FREE_MONTHS} mois offerts</li></ul></div>
     </div>
-    <p class="price-n">Ton accès à Claude est facturé par Anthropic, directement à toi.</p>
+    <p class="price-n">Ton accès à l'IA est facturé par son fournisseur (Anthropic, OpenAI ou Google), directement à toi.</p>
     <a class="lnk" href="/tarifs">Voir tous les tarifs</a>
   </div>
 </section>
 
 <div class="wrap">
   <section class="end" aria-labelledby="h-f">
-    <div><h2 id="h-f">Essaie sur un de tes projets</h2><p>Crée ton compte avec ${providersText(apple)}, ajoute un dépôt et regarde ce que Claude prépare. Rien ne part sans ta validation.</p></div>
+    <div><h2 id="h-f">Essaie sur un de tes projets</h2><p>Crée ton compte avec ${providersText(apple)}, ajoute un dépôt et regarde ce que ton IA prépare. Rien ne part sans ta validation.</p></div>
     ${guest('big', btn('btn-primary btn-lg', '/login', 'Créer mon compte'))}
   </section>
 </div>`,
@@ -255,30 +255,30 @@ const how = ({ icon, title, tip, rev = false, n, text, mock }) => `<section clas
 export function howPage({ appUrl, apple = false }) {
   const steps = [
     how({
-      n: 1, icon: 'lock', tip: 'Tes accès sont stockés chiffrés.', title: 'Relie ton accès Claude',
-      text: `<p>Tu te connectes avec ${providersText(apple)}, puis tu relies ton propre accès à Claude : une clé Anthropic, ou ton abonnement Claude (avec un risque à connaître, expliqué sur la page <a href="/tarifs#acces-claude">Tarifs</a>). C'est lui qui cherche, écrit et suit les réponses. Son coût est facturé à part, par Anthropic.</p>`,
-      mock: shot('Maquette : accès Claude connecté, secret chiffré', `<div class="sh-h"><span class="sh-t">Accès Claude</span>${badge('b-ok', 'check', 'Connecté')}</div>
-    <div class="row"><span class="row-l"><span class="ico">${ic('link')}</span><span><b>Ton compte Claude</b><span class="sh-s"> · facturé par Anthropic</span></span></span></div>
+      n: 1, icon: 'lock', tip: 'Tes accès sont stockés chiffrés.', title: 'Relie ton IA',
+      text: `<p>Tu te connectes avec ${providersText(apple)}, puis tu choisis ton IA, Claude, ChatGPT ou Gemini, et tu relies ton propre accès : une clé API, ou ton abonnement quand l'IA le permet (avec un risque à connaître, expliqué sur la page <a href="/tarifs#acces-ia">Tarifs</a>). C'est elle qui cherche, écrit et suit les réponses. Son coût est facturé à part, par son fournisseur.</p>`,
+      mock: shot('Maquette : IA connectée, secret chiffré', `<div class="sh-h"><span class="sh-t">Ton IA</span>${badge('b-ok', 'check', 'Connecté')}</div>
+    <div class="row"><span class="row-l"><span class="ico">${ic('link')}</span><span><b>Ton accès à l'IA</b><span class="sh-s"> · facturé par ton fournisseur</span></span></span></div>
     <div class="row"><span class="row-l"><span class="ico">${ic('lock')}</span><span><b>Secret chiffré</b></span></span>${badge('b-info', '', 'Cloisonné par compte')}</div>`),
     }),
     how({
       n: 2, rev: true, title: 'Ajoute ton dépôt Git',
-      text: `<p>GitHub, ou ton propre serveur (Forgejo, Gitea, GitLab) ajouté dans les réglages. Si le dépôt est privé, tu donnes un token en lecture seule. Claude lit le README, les fichiers de description et les pages principales (une quinzaine de fichiers au plus), sans rien modifier, dans un espace isolé. Il en sort une fiche : ce que tu proposes, à qui, et pourquoi.</p>`,
+      text: `<p>GitHub, ou ton propre serveur (Forgejo, Gitea, GitLab) ajouté dans les réglages. Si le dépôt est privé, tu donnes un token en lecture seule. Ton IA lit le README, les fichiers de description et les pages principales (une quinzaine de fichiers au plus), sans rien modifier, dans un espace isolé. Il en sort une fiche : ce que tu proposes, à qui, et pourquoi.</p>`,
       mock: shot('Maquette : choix entre GitHub et mon serveur, champ adresse du dépôt', `<div class="sh-h"><span class="sh-t">Ton dépôt</span>${badge('', '', 'Étape 2 sur 4')}</div>
     <div class="opts"><span class="opt opt-on">${ic('git')}GitHub<span>Sélectionné</span></span><span class="opt">${ic('git')}Mon serveur<span>Adresse Git</span></span></div>
     <div><p class="lbl">Adresse du dépôt</p><span class="fld">github.com/ton-compte/ton-projet</span></div>`),
     }),
     how({
       n: 3, title: 'Valide la cible',
-      text: `<p>Claude te dit à qui il pense parler : des métiers, une zone, une taille d'entreprise, la personne à contacter. Tu corriges ce qui ne va pas, puis tu valides. Tant que tu n'as pas cliqué sur « Valider la cible », la recherche reste verrouillée.</p>`,
-      mock: shot('Maquette : cible proposée par Claude, à valider', `<div class="sh-h"><span class="sh-t">Atelier Exemple</span>${badge('b-warn', 'clock', 'Cible à valider')}</div>
-    <p class="sh-s">Cible proposée par Claude</p>
+      text: `<p>Ton IA te dit à qui elle pense parler : des métiers, une zone, une taille d'entreprise, la personne à contacter. Tu corriges ce qui ne va pas, puis tu valides. Tant que tu n'as pas cliqué sur « Valider la cible », la recherche reste verrouillée.</p>`,
+      mock: shot('Maquette : cible proposée par l\'IA, à valider', `<div class="sh-h"><span class="sh-t">Atelier Exemple</span>${badge('b-warn', 'clock', 'Cible à valider')}</div>
+    <p class="sh-s">Cible proposée par ton IA</p>
     <div class="chips"><span class="chip">Menuisiers</span><span class="chip">Artisans du bâtiment</span><span class="chip">Bretagne</span></div>
     <div class="btns"><span class="btn btn-secondary">Modifier</span><span class="btn btn-primary">${ic('check')}Valider la cible</span></div>`),
     }),
     how({
       n: 4, rev: true, title: 'Lance la recherche, valide les mails',
-      text: `<p>Claude trouve de 1 à 50 contacts à la fois, tout de suite ou « cette nuit ». Il doit ne garder que des adresses pro publiées au grand jour, sans jamais les deviner, et noter la page d'où elles viennent. Il peut se tromper : relis les fiches.</p>
+      text: `<p>Ton IA trouve de 1 à 50 contacts à la fois, tout de suite ou « cette nuit ». Elle doit ne garder que des adresses pro publiées au grand jour, sans jamais les deviner, et noter la page d'où elles viennent. Il peut se tromper : relis les fiches.</p>
     <p>Il écrit ensuite un mail court, un deuxième objet pour comparer, et une relance. Tu relis, tu ajustes, tu valides, puis tu confirmes chaque lot (100 mails au plus), envoyé depuis ta boîte avec une pause au hasard entre deux mails. La relance est facultative, il n'y en a qu'une. Les réponses se suivent dans le tableau de bord.</p>`,
       mock: shot('Maquette : recherche de contacts à 64 %, brouillon de mail à valider', `<div class="sh-h"><span class="sh-t">Atelier Exemple</span>${badge('b-ok', 'check', 'Cible validée')}</div>
     <div><div class="prog-h"><span>Recherche de contacts</span><span>64 %</span></div><div class="track"><div class="bar"></div></div></div>
@@ -289,9 +289,9 @@ export function howPage({ appUrl, apple = false }) {
 
   const guards = [
     ['Un budget que tu fixes', "Tu peux limiter la dépense en IA sur 24 heures et sur 30 jours. Quand la limite est atteinte, les tâches IA attendent (elles ne sont pas perdues) et les envois continuent. Une tâche déjà commencée n'est jamais coupée."],
-    ['Un œil sur ton quota', "Avec un abonnement, la carte « Consommation Claude » de la page Projets montre le quota restant que Claude indique lui-même. Au-delà de 85 %, l'analyse et les idées d'évolution sont reportées pour garder de la marge à la recherche de contacts."],
+    ['Un œil sur ton quota', "Avec un abonnement Claude, la carte « Consommation Claude » de la page Projets montre le quota restant que Claude indique lui-même. Avec ChatGPT ou Gemini, la carte porte le nom de ton IA et estime le coût. Au-delà de 85 %, l'analyse et les idées d'évolution sont reportées pour garder de la marge à la recherche de contacts."],
     ['Des envois encadrés', "Des professionnels uniquement, un lien de désinscription dans chaque mail, une liste d'opposition respectée pour tout le monde, des plafonds sur 24 heures par projet et pour tout ton compte. Les règles qui t'incombent sont rappelées sur la page <a href=\"/tarifs#envois\">Tarifs</a>."],
-    ['Des modèles économes au départ', 'La recherche, l\'analyse et la rédaction utilisent Haiku par défaut (le plus léger). Dans les réglages, tu choisis un autre modèle Claude pour chacune, et tu adaptes les consignes à chaque modèle.'],
+    ['Des modèles économes au départ', 'La recherche, l\'analyse et la rédaction utilisent par défaut le modèle le plus économe de ton IA (Haiku pour Claude). Dans les réglages, tu choisis un autre modèle de ton IA pour chacune, et tu adaptes les consignes à chaque modèle.'],
   ];
 
   return siteLayout({
@@ -301,7 +301,7 @@ export function howPage({ appUrl, apple = false }) {
     body: `<div class="page">
 <div class="wrap">
   <h1 class="h1">Comment ça marche, pas à pas</h1>
-  <p class="lead">Quatre étapes. À chacune, tu vois ce que Claude prépare, et rien ne part sans ton accord.</p>
+  <p class="lead">Quatre étapes. À chacune, tu vois ce que ton IA prépare, et rien ne part sans ton accord.</p>
 
 ${steps}
 
@@ -325,11 +325,11 @@ ${steps}
 const FAQ = [
   ['Faut-il une carte bancaire ?', 'Non. Le plan Gratuit s\'ouvre sans carte bancaire.'],
   ['Quand puis-je passer à un plan payant ?', 'Le plan Gratuit est ouvert aujourd\'hui et te permet de tout tester. Les plans payants ouvriront prochainement : tu seras prévenu avant toute facturation.'],
-  ['Dois-je fournir mon propre accès à Claude ?', 'Oui. Ton accès à Claude est facturé par Anthropic, directement à toi. C\'est ce qui explique les prix bas : tu ne paies à AiTools que l\'outil (les projets, les contacts, les envois et le suivi), pas la machine qui réfléchit.'],
-  ['Combien me coûtera Claude ?', 'Ça dépend de ton usage et de ton contrat avec Anthropic. Tu fixes un budget maximum dans les réglages. Pour comprendre ce qui consomme quoi, regarde <a href="/fonctionnement">comment ça marche</a>.'],
+  ['Dois-je fournir mon propre accès à une IA ?', 'Oui, Claude, ChatGPT ou Gemini au choix. Ton accès est facturé par son fournisseur (Anthropic, OpenAI ou Google), directement à toi. C\'est ce qui explique les prix bas : tu ne paies à AiTools que l\'outil (les projets, les contacts, les envois et le suivi), pas la machine qui réfléchit.'],
+  ['Combien me coûtera mon IA ?', 'Ça dépend de ton usage et de ton contrat avec ton fournisseur. Tu fixes un budget maximum dans les réglages. Pour comprendre ce qui consomme quoi, regarde <a href="/fonctionnement">comment ça marche</a>.'],
   ['Que se passe-t-il quand j\'atteins un plafond ?', 'La nouvelle action est refusée, mais rien n\'est supprimé. Les plafonds repartent de zéro le 1er du mois, à l\'heure de Paris.'],
   [`Que veut dire « ${ANNUAL_FREE_MONTHS} mois offerts » ?`, `En payant à l'année, tu règles ${12 - ANNUAL_FREE_MONTHS} mois et tu profites de 12. Par exemple ${PLAN_LABELS.growth} : ${euros(annualPrice('growth'))} par an au lieu de ${euros(PLAN_PRICES.growth * 12)}.`],
-  ["Comment fonctionne l'équipe ?", "Tu invites des collègues par email, tu choisis ce que chacun peut faire (membre ou administrateur) et tu partages les projets que tu veux. Ils travaillent avec <em>ton</em> offre, ton SMTP et ton accès Claude : pas besoin d'abonnement pour eux. Le nombre de places dépend de l'offre."],
+  ["Comment fonctionne l'équipe ?", "Tu invites des collègues par email, tu choisis ce que chacun peut faire (membre ou administrateur) et tu partages les projets que tu veux. Ils travaillent avec <em>ton</em> offre, ton SMTP et ton accès à l'IA : pas besoin d'abonnement pour eux. Le nombre de places dépend de l'offre."],
   ['Les prix incluent-ils la TVA ?', 'Oui, ce sont des prix TTC. L\'éditeur est en franchise de TVA (art. 293 B du CGI), donc aucun supplément ne s\'ajoute.'],
   ['Puis-je supprimer mon compte ?', 'Oui, quand tu veux, depuis Mon compte. Ça efface tes projets, tes contacts, tes modèles, tes réglages et la copie de ton code. Seule la liste d\'opposition, qui protège les personnes désinscrites, est gardée.'],
 ];
@@ -346,7 +346,7 @@ export function pricingPage({ appUrl }) {
   return siteLayout({
     appUrl, path: '/tarifs',
     title: 'Tarifs : gratuit, puis 10 à 100 € par mois · AiTools',
-    description: `Plan gratuit, puis des offres de ${PLAN_PRICES.starter} € à ${PLAN_PRICES.intensive} € TTC par mois, avec ${ANNUAL_FREE_MONTHS} mois offerts en annuel. Ton accès Claude est facturé à part, par Anthropic.`,
+    description: `Plan gratuit, puis des offres de ${PLAN_PRICES.starter} € à ${PLAN_PRICES.intensive} € TTC par mois, avec ${ANNUAL_FREE_MONTHS} mois offerts en annuel. Ton accès à l'IA (Claude, ChatGPT ou Gemini) est facturé à part, par son fournisseur.`,
     body: `<div class="page">
 <div class="wrap">
   <h1 class="h1">Des tarifs simples, sans surprise</h1>
@@ -354,7 +354,7 @@ export function pricingPage({ appUrl }) {
 
   <div class="claude-n" role="note">
     ${ic('info')}
-    <p><b>Ton accès à Claude est facturé par Anthropic, directement à toi.</b><span>C'est ce qui explique les prix bas.</span></p>
+    <p><b>Ton accès à l'IA est facturé par son fournisseur, directement à toi.</b><span>C'est ce qui explique les prix bas.</span></p>
   </div>
 
   <div class="bill" data-bill hidden>
@@ -386,18 +386,19 @@ export function pricingPage({ appUrl }) {
     <p>Ces plafonds sont appliqués par le serveur. Les mails et les tâches IA se comptent par mois (heure de Paris) et repartent de zéro le 1er. Quand un plafond est atteint, la nouvelle action est refusée, mais rien n'est supprimé. Un compte ne peut pas envoyer plus de 300 mails par 24 heures, quelle que soit l'offre : c'est une protection pour la réputation de ton adresse.</p>
   </div>
 
-  <section class="more" id="acces-claude" aria-labelledby="h-claude">
-    <h2 class="block-h" id="h-claude">Ton accès à Claude : deux façons, deux coûts</h2>
+  <section class="more" id="acces-ia" aria-labelledby="h-ia">
+    <h2 class="block-h" id="h-ia">Ton accès à l'IA : Claude, ChatGPT ou Gemini</h2>
     <div class="grid g2">
       <article class="card">
-        <h3>Une clé Anthropic (recommandé)</h3>
-        <p>Tu crées une clé sur console.anthropic.com. Anthropic te facture à l'usage, selon ses tarifs, sur ton compte. C'est la façon prévue pour brancher un outil comme celui-ci. Tu peux fixer une limite de dépense par jour et par mois dans les réglages d'AiTools.</p>
+        <h3>Une clé API (recommandé)</h3>
+        <p>Tu crées une clé chez ton fournisseur : console.anthropic.com pour Claude, platform.openai.com pour ChatGPT, aistudio.google.com pour Gemini. Il te facture à l'usage, selon ses tarifs, sur ton compte. C'est la façon prévue pour brancher un outil comme celui-ci. Tu peux fixer une limite de dépense par jour et par mois dans les réglages d'AiTools.</p>
+        <p>Avec Gemini, une clé gratuite suffit pour essayer, mais Google peut alors utiliser les données envoyées pour améliorer ses produits : n'y mets pas de données de prospects, et active la facturation sur ton projet Google pour un vrai usage.</p>
       </article>
       <article class="card">
-        <h3>Ton abonnement Claude (Pro, Max), avec un risque</h3>
-        <p>Tu te connectes à Claude, tu recopies le petit code qu'il te montre, et AiTools récupère le jeton tout seul. Pas de facture en plus, mais les règles d'Anthropic peuvent ne pas autoriser d'utiliser un abonnement à travers une application comme AiTools. Ton compte Claude pourrait être limité, suspendu ou fermé.</p>
-        <p>AiTools ne peut pas l'empêcher et n'en est pas responsable. Une fenêtre d'avertissement et une case à cocher te le rappellent avant toute connexion, et ton accord est enregistré avec sa date. Lis les <a href="https://www.anthropic.com/legal/consumer-terms" rel="noopener noreferrer">conditions d'Anthropic</a> avant de choisir. Ce mode peut aussi être désactivé sur le service.</p>
-        <a class="btn btn-secondary" href="/link?start=claude">Se connecter avec Claude</a>
+        <h3>Ton abonnement Claude ou ChatGPT, avec un risque</h3>
+        <p>Avec Claude (Pro, Max) ou ChatGPT (Plus, Pro, Business), tu te connectes à ton compte et AiTools récupère l'accès tout seul. Pas de facture en plus, mais les règles d'Anthropic et d'OpenAI peuvent ne pas autoriser d'utiliser un abonnement à travers une application comme AiTools. Ton compte pourrait être limité, suspendu ou fermé. Gemini n'a pas ce mode : il se relie par clé API seulement.</p>
+        <p>AiTools ne peut pas l'empêcher et n'en est pas responsable. Une fenêtre d'avertissement et une case à cocher te le rappellent avant toute connexion, et ton accord est enregistré avec sa date. Lis les <a href="https://www.anthropic.com/legal/consumer-terms" rel="noopener noreferrer">conditions d'Anthropic</a> ou celles d'OpenAI avant de choisir. Ce mode peut aussi être désactivé sur le service.</p>
+        <a class="btn btn-secondary" href="/link?start=claude">Choisir mon IA</a>
         <p class="fine">Pas encore de compte AiTools ? Le bouton te demande d'abord de te connecter, puis te ramène ici.</p>
       </article>
     </div>
