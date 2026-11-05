@@ -53,11 +53,11 @@ export function acceptRephrase(original, proposal, avoid = []) {
  * Demande à l'IA une autre phrase à la place de `sentence` (écrite avec ses variables, comme dans le modèle).
  * @returns {Promise<{sentence:string, run:object}>}
  */
-export async function proposeSentence({ claude, userId, model, signal, kind = 'initial', template, sentence, avoid = [], facts = '' }) {
+export async function proposeSentence({ claude, userId, model, signal, kind = 'initial', template, sentence, avoid = [], facts = '', instruction = '' }) {
   let refused = [...avoid];
   // Une proposition refusée par acceptRephrase (énumère des réponses, trop longue, identique…) est redemandée UNE fois, en la mettant dans la liste des refus
   for (let attempt = 0; attempt < 2; attempt++) {
-    const { prompt, system } = rephrasePrompt({ kind, template, sentence, avoid: refused, facts });
+    const { prompt, system } = rephrasePrompt({ kind, template, sentence, avoid: refused, facts, instruction });
     let run;
     try {
       run = await claude(userId, { prompt, system, model, maxTurns: 1, tools: [], signal });

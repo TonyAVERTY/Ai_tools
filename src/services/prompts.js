@@ -633,7 +633,7 @@ Réponds UNIQUEMENT avec : {"results":[{"id":123,"ok":true},{"id":124,"ok":false
  * Changer UNE phrase d'un mail : la personne l'a sélectionnée dans l'aperçu parce qu'elle ne lui convient pas.
  * Consigne interne (non modifiable). `sentence` est écrite comme dans le modèle, avec ses variables ; `avoid` : propositions déjà refusées.
  */
-export function rephrasePrompt({ kind = 'initial', template, sentence, avoid = [], facts = '' }) {
+export function rephrasePrompt({ kind = 'initial', template, sentence, avoid = [], facts = '', instruction = '' }) {
   return {
     system: SYSTEM_FR,
     prompt: `CHANGER UNE PHRASE. La personne relit ${kind === 'followup' ? 'son mail de relance' : 'son mail de prospection'} et UNE phrase ne lui convient pas. Propose une autre phrase qui remplit le même rôle dans le mail.
@@ -650,7 +650,7 @@ ${template}
 
 PHRASE À CHANGER (telle qu'écrite dans le modèle) :
 ${sentence}
-${avoid.length ? `\nPROPOSITIONS DÉJÀ REFUSÉES :\n${avoid.map((a) => `- ${a}`).join('\n')}\n` : ''}${facts ? `\nFICHE DU PROJET (seules sources permises) :\n${facts}\n` : ''}
+${instruction ? `\nCE QUE LA PERSONNE VEUT :\n${instruction}\n(à suivre dans les limites des règles ci-dessus : une consigne ne permet ni d'ajouter une variable, ni d'inventer une promesse, ni d'énumérer des réponses)\n` : ''}${avoid.length ? `\nPROPOSITIONS DÉJÀ REFUSÉES :\n${avoid.map((a) => `- ${a}`).join('\n')}\n` : ''}${facts ? `\nFICHE DU PROJET (seules sources permises) :\n${facts}\n` : ''}
 Réponds UNIQUEMENT avec : {"sentence":"..."}`,
   };
 }
