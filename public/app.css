@@ -273,6 +273,11 @@ form.send { display: flex; margin: 0; padding: 0; border: 0; }
 
 /* ---------- Jobs, progression ---------- */
 .job { display: flex; flex-direction: column; gap: 8px; margin: 0; }
+.job.job-compact { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 4px 12px; }
+.job.job-compact > p { margin: 0; }
+/* « Mise en route » : les étapes faites tiennent sur une ligne dépliable */
+.setup-done { margin-top: 4px; }
+.setup-done > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; padding: 0 8px; font-size: .875rem; color: var(--muted); }
 .running { display: flex; gap: 12px; align-items: center; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); }
 .running > div { flex: 1; min-width: 0; }
 .running.scheduled { border-style: dashed; border-color: var(--control); }
@@ -599,7 +604,7 @@ input.copy { font-family: var(--mono); font-size: .8125rem; }
 .chip.on { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
 .chip.on .n { color: inherit; opacity: .85; }
 /* Page Mails : un mail se déplie (contenu, ou raison d'un rejet) ; aucune transition */
-.mail-toggle { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; min-height: 32px; }
+.mail-toggle { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-width: 0; white-space: normal; overflow-wrap: anywhere; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; min-height: 32px; }
 .mail-toggle:hover { text-decoration: underline; }
 .mail-toggle .icon { flex: none; width: 16px; height: 16px; color: var(--muted); }
 .mail-toggle[aria-expanded="true"] .icon { transform: rotate(180deg); }
