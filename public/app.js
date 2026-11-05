@@ -683,7 +683,36 @@
     const w = ratio == null ? '' : `<div class="bar usage${ratio >= 1 ? ' full' : ''}" role="progressbar" aria-label="${esc(label)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.min(100, Math.round(ratio * 100))}"><span class="w-${Math.min(100, Math.round(ratio * 20) * 5)}"></span></div>`;
     return `<li class="g"><div class="g-h" title="${esc(tip)}"><span>${esc(label)}</span><span class="g-v ${cls}">${value}</span></div>${w}${note ? `<p class="g-r">${esc(note)}</p>` : ''}</li>`;
   }
+  // Compte ChatGPT : limites relevées chez OpenAI (fenêtres 5 h et semaine) ; avec tout abonnement non Claude, les tokens que les jobs d'iaboss ont consommés
+  const CHATGPT_WHY = {
+    expired: 'ton accès ChatGPT sera renouvelé au prochain job iaboss',
+    denied: "OpenAI refuse le relevé en direct (relie-toi avec « Se connecter avec ChatGPT »)",
+    rate: 'OpenAI limite les relevés : nouvel essai dans quelques minutes',
+    network: 'OpenAI ne répond pas',
+    unavailable: 'le relevé en direct est indisponible chez OpenAI',
+    format: 'réponse inattendue du relevé en direct',
+  };
+  const tokensOf = (x) => `${((x?.tin || 0) + (x?.tout || 0)).toLocaleString('fr-FR')} tokens`;
+  function usageOtherAi(s) {
+    const rows = [];
+    const ai = aiName();
+    const cl = s.chatgptLimits;
+    if (s.linkMode === 'chatgpt_account') {
+      for (const w of cl?.windows || []) {
+        const live = cl.source === 'live' && !cl.error;
+        const tip = `${live ? 'Relevé en direct chez OpenAI, tout ton usage ChatGPT compris (y compris hors iaboss).' : `Dernière mesure ${ago(cl.at)}.`}${w.resetsAt ? ` Réinitialisation ${resetLabel(w.resetsAt)}.` : ''}`;
+        const label = `${ai} ${w.label}`;
+        rows.push(w.expired ? usageRow(label, '– (remise à zéro)', { tip, cls: 'muted' })
+          : usageRow(label, pct(w.utilization), { ratio: w.utilization, tip, note: resetNote(w.resetsAt), cls: w.utilization >= 1 ? 'error' : w.utilization >= 0.8 ? 'warn' : '' }));
+      }
+      if (!cl?.windows?.length) rows.push(usageRow(`Limites ${ai}`, 'indisponible', { tip: cl?.error ? (CHATGPT_WHY[cl.error] || 'relevé indisponible') : 'pas encore mesuré', cls: 'muted' }));
+    }
+    const tip = `Tokens (entrée + sortie) des jobs lancés par iaboss uniquement. Ce que tu fais ailleurs avec ${ai} n'est pas compté ici.`;
+    rows.push(usageRow(`${ai} via iaboss 24 h`, tokensOf(s.usage?.day), { tip }), usageRow(`${ai} via iaboss 30 j`, tokensOf(s.usage?.month), { tip }));
+    return rows.join('');
+  }
   function usageClaude(s) {
+    if (s.provider && s.provider !== 'claude' && s.linkMode !== 'api_key') return usageOtherAi(s);
     const rows = [];
     const rl = s.claudeRateLimit;
     if (s.linkMode !== 'api_key') {
