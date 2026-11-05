@@ -121,12 +121,12 @@ Forme : commence par une formule d'appel courte seule sur sa ligne (« Bonjour, 
 Ce que doit faire la relance :
 - Apporter quelque chose de nouveau, pas répéter le premier mail : un exemple concret, un bénéfice qu'il ne mentionnait pas, ou une question plus simple.
 - Rappeler en une phrase l'intérêt pour {{entreprise}}, sans résumer le premier mail.
-- Poser UNE seule question simple et naturelle, à laquelle on peut répondre en une phrase (« Est-ce un sujet chez vous ? »). Ne propose jamais de réponses toutes faites à choisir (« oui, non ou plus tard », « répondez par 1 ou 2 », « vous pouvez répondre oui ou non ») : une personne écrit sa réponse, elle ne coche pas une case.
+- Poser UNE seule question simple et naturelle, à laquelle on peut répondre en une phrase (« Est-ce un sujet chez vous ? »). N'énumère jamais les réponses possibles, sous aucune forme : ni « oui, non ou plus tard », ni « maintenant, plus tard ou pas du tout », ni « oui ou non », ni « répondez par 1 ou 2 ». La question s'arrête au sujet (« Est-ce un sujet chez vous ? ») : une personne écrit sa réponse avec ses mots, elle ne choisit pas dans une liste.
 - Laisser une sortie honorable : « si ce n'est pas le bon moment, dites-le-moi et je n'insiste pas ».
 
 Interdits : toute culpabilisation (« je me permets de revenir vers vous », « sans nouvelles de votre part », « avez-vous eu le temps de lire »), le ton insistant, les majuscules, les points d'exclamation, les pièces jointes, toute proposition d'appel ou de visio. Aucun chiffre ni résultat inventé.`,
     byModel: {
-      haiku: `Quatre phrases au plus : un fait nouveau, le lien avec {{entreprise}}, la question simple (sans réponses toutes faites à choisir), la sortie honorable. Pas de préambule, mais garde toujours « Bonjour, » au début et une formule de politesse avant la signature.`,
+      haiku: `Quatre phrases au plus : un fait nouveau, le lien avec {{entreprise}}, la question simple (qui s'arrête au sujet, sans énumérer de réponses), la sortie honorable. Pas de préambule, mais garde toujours « Bonjour, » au début et une formule de politesse avant la signature.`,
       sonnet: `Choisis le seul angle nouveau le plus utile pour CE public (un cas d'usage, une économie de temps, une objection levée) et traite-le en une phrase.`,
       opus: `Anticipe pourquoi la personne n'a pas répondu (pas le temps, pas le bon interlocuteur, pas de besoin visible) et écris la relance qui rend la réponse la moins coûteuse possible.`,
       fable: `Une relance exemplaire : courte au point d'être lue en entier, utile même si elle reste sans réponse, jamais insistante.`,
@@ -642,7 +642,7 @@ Règles :
 - Les variables sont remplacées à l'envoi : {{entreprise}} (nom de l'entreprise du prospect), {{ville}}, {{accroche}} (phrase déjà rédigée), {{expediteur}}, {{site}}. N'en ajoute aucune ; tu peux en retirer une qui rendrait la phrase fausse une fois remplie. Une fois les variables remplacées, la phrase doit rester correcte et avoir un sens.
 - Garde les adresses web, les chiffres, les prix et les noms propres. N'invente rien : aucune promesse, démonstration, essai, appel, rendez-vous ni chiffre absent de la fiche du projet.
 - Ne commence pas la phrase par une virgule. Pas de « Bonjour » ni de formule de politesse, sauf si la phrase d'origine en est une.
-- Ne propose jamais de réponses toutes faites à choisir (« oui, non ou plus tard », « répondez par 1 ou 2 », « vous pouvez répondre oui ou non ») : une personne écrit sa réponse, elle ne coche pas une case. Si la phrase d'origine en contient, la nouvelle phrase les retire et pose simplement la question.
+- N'énumère jamais les réponses possibles, sous aucune forme : ni « oui, non ou plus tard », ni « maintenant, plus tard ou pas du tout », ni « oui ou non », ni « répondez par 1 ou 2 ». La question s'arrête au sujet (« Est-ce un sujet chez vous ? ») : une personne écrit sa réponse avec ses mots, elle ne choisit pas dans une liste. Si la phrase d'origine en contient, la nouvelle phrase retire cette énumération et pose simplement la question.
 - Écris une seule proposition, différente de la phrase d'origine${avoid.length ? ' et de chacune des propositions déjà refusées' : ''}.
 
 MAIL COMPLET (modèle, avec ses variables), pour le contexte :
@@ -652,6 +652,31 @@ PHRASE À CHANGER (telle qu'écrite dans le modèle) :
 ${sentence}
 ${avoid.length ? `\nPROPOSITIONS DÉJÀ REFUSÉES :\n${avoid.map((a) => `- ${a}`).join('\n')}\n` : ''}${facts ? `\nFICHE DU PROJET (seules sources permises) :\n${facts}\n` : ''}
 Réponds UNIQUEMENT avec : {"sentence":"..."}`,
+  };
+}
+
+/**
+ * Correction de FORME d'un modèle de mail tout juste généré : l'IA ne corrige que les défauts listés (appel, politesse, réponses toutes faites…).
+ * Consigne interne (non modifiable). Le résultat n'est retenu que s'il garde les adresses, n'ajoute aucune variable et améliore le texte (handlers.js).
+ */
+export function fixStylePrompt({ kind = 'initial', body, problems }) {
+  return {
+    system: SYSTEM_FR,
+    prompt: `CORRECTION DE FORME. Voici ${kind === 'followup' ? 'un mail de relance' : 'un mail de prospection'} écrit comme un MODÈLE, avec des variables {{entreprise}}, {{ville}}, {{accroche}}, {{expediteur}}, {{site}}. Il a des défauts de forme. Corrige UNIQUEMENT ceux-là, sans réécrire le reste.
+Règles :
+- « Bonjour, » seul sur la première ligne, suivi d'une ligne vide ; jamais le nom de l'entreprise juste après « Bonjour ».
+- Avant la signature, une formule de politesse seule sur sa ligne (« Bien cordialement, »).
+- Une seule question simple, qui s'arrête au sujet : n'énumère jamais les réponses possibles (« oui, non ou plus tard », « maintenant, plus tard ou pas du tout »).
+- N'ajoute aucune variable ; garde les variables existantes, les adresses web, les chiffres, les prix, les noms propres et le sens. N'ajoute aucune promesse. Longueur voisine.
+- Ne commence aucune ligne par une virgule.
+
+DÉFAUTS À CORRIGER :
+${problems.map((p) => `- ${p}`).join('\n')}
+
+MAIL À CORRIGER :
+${body}
+
+Réponds UNIQUEMENT avec : {"body":"..."}`,
   };
 }
 
