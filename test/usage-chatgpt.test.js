@@ -101,3 +101,23 @@ test('autres modes : aucun relevé ChatGPT ; /api/system expose les limites au c
     assert.ok(!(await (await other.get('/api/system')).json()).chatgptLimits, 'les limites d\'un compte ne sont pas celles d\'un autre');
   } finally { delete s.app.fetch; }
 });
+
+test('un job terminé depuis le dernier relevé : la carte est relue sans attendre les 2 minutes (15 s mini entre deux relevés)', async () => {
+  const u = await s.newUser({ admin: false });
+  await setLink(u, link());
+  let calls = 0;
+  s.app.fetch = async () => { calls++; return { ok: true, status: 200, json: async () => BODY }; };
+  try {
+    const t0 = now();
+    await currentChatgptLimits(s.app, u.id, { at: t0 });
+    await currentChatgptLimits(s.app, u.id, { at: t0 + 20 });
+    assert.equal(calls, 1, 'rien de nouveau : on attend les 2 minutes');
+    await s.db.prepare("INSERT INTO jobs(user_id, type, status, created_at, finished_at) VALUES(?, 'prospect', 'done', ?, ?)").run(u.id, t0 + 25, t0 + 30);
+    await currentChatgptLimits(s.app, u.id, { at: t0 + 35 });
+    assert.equal(calls, 2, 'job terminé depuis le dernier relevé (plus de 15 s) : relu sans attendre les 2 minutes');
+    await currentChatgptLimits(s.app, u.id, { at: t0 + 40 });
+    assert.equal(calls, 2, 'jamais plus d\'une relecture toutes les 15 s, ni tant que le job est déjà compris dans la dernière mesure');
+    await currentChatgptLimits(s.app, u.id, { at: t0 + 70 });
+    assert.equal(calls, 2, 'puis retour au rythme normal');
+  } finally { delete s.app.fetch; }
+});
