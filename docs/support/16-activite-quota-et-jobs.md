@@ -43,7 +43,7 @@ La page présente un fil de cartes horodatées et un résumé de la tâche (prog
 
 Une tâche en échec propose **Réessayer** dans son récapitulatif et sa page de suivi. Une nouvelle tâche reprend les paramètres d'origine ; l'ancienne conserve son erreur et son journal. Les autorisations, les plafonds et la liaison de l'IA sont revérifiés. Les échecs des dernières 24 heures restent dans Activité jusqu'à une nouvelle tâche du même type sur le même projet.
 
-La consommation s'affiche sous la forme **12 345 tokens**, en cumulant les tokens d'entrée et de sortie retournés par l'IA pour les appels de la tâche. Le compteur se met à jour pendant les appels lorsque l'IA fournit ses mesures, puis à leur fin, et reste visible en cas d'échec. Aucun pourcentage de limite n'est affiché.
+La consommation s'affiche sous la forme **12 345 tokens**, en cumulant les tokens d'entrée et de sortie retournés par l'IA pour les appels de la tâche. Le compteur se met à jour pendant les appels lorsque l'IA fournit ses mesures, puis à leur fin, et reste visible en cas d'échec. **Claude** les envoie au fil de l'eau. **ChatGPT et Gemini** ne les donnent qu'à la fin de la tâche : tant qu'elle tourne et que rien n'est encore compté, la ligne dit « Tokens comptés à la fin de la tâche » au lieu de « 0 tokens », puis le total apparaît quand la tâche se termine. Aucun pourcentage de limite n'est affiché.
 ### Suivi pendant la génération
 
 Le menu Activité se rafraîchit automatiquement toutes les secondes lorsqu'il est ouvert, toutes les deux secondes lorsqu'une tâche tourne et que le menu est fermé. Ce relevé léger ne dépend pas du service de quota Claude. Le retour sur un onglet déclenche aussi une mise à jour.
