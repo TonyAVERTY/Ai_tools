@@ -171,3 +171,9 @@ test('validation : un modèle cassé est refusé (400), un modèle correct passe
   assert.equal(ok.status, 200);
   assert.ok((await ok.json()).warnings.some((w) => /signature/.test(w)));
 });
+
+test('réponses toutes faites : « oui, non ou plus tard ? » est signalé, une vraie question ne l\'est pas', () => {
+  const warn = (text) => reviewMail({ subject: '', body: `Bonjour,\n\n${text}\n\nBien cordialement,\nTony` }).warnings.some((w) => /réponses toutes faites/.test(w));
+  for (const t of ['Est-ce un sujet chez vous : oui, non ou plus tard ? Si ce n\'est pas le bon moment, dites-le-moi.', 'Vous pouvez répondre oui, non ou plus tard.', 'Intéressé ? oui ou non ?', 'Oui / non ?', 'Répondez par 1 ou 2.']) assert.equal(warn(t), true, t);
+  for (const t of ['Est-ce un sujet chez vous ?', 'Préférez-vous que je repasse plus tard ?', "Il n'y a pas non plus de souci.", "Si ce n'est pas le bon moment, dites-le-moi et je n'insiste pas.", 'Oui, la carte se met en place en une heure.']) assert.equal(warn(t), false, t);
+});
