@@ -69,7 +69,7 @@ test('une conversation du Support : documentation en dossier de travail (lecture
   assert.doesNotMatch(system, /Tu es l'assistant IA d'AiTools\b.*classique/s);
   // le dossier contient la documentation écrite à la main, l'index et les fichiers générés depuis le code
   const files = readdirSync(docsDir);
-  for (const f of ['INDEX.md', '00-presentation.md', '18-depannage-et-faq.md', 'plans-et-limites.md', 'modeles-claude.md', 'taches-ia-et-prompts.md']) assert.ok(files.includes(f), f);
+  for (const f of ['INDEX.md', '00-presentation.md', '18-depannage-et-faq.md', 'plans-et-limites.md', 'modeles-ia.md', 'taches-ia-et-prompts.md']) assert.ok(files.includes(f), f);
   assert.match(readFileSync(join(docsDir, 'plans-et-limites.md'), 'utf8'), new RegExp(`\\| ${PLAN_LABELS.free} \\|[^\\n]*\\| ${PLAN_LIMITS.free.prospects} \\|`));
   // deux listes séparées
   const sup = await (await u.get('/api/chat/conversations?mode=support')).json();

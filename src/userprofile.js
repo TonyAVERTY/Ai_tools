@@ -114,7 +114,7 @@ function fullForm(p) {
 export function welcomePage({ profile, email, first = true }) {
   const p = profile || cleanProfile({});
   return layout({
-    title: first ? 'Faisons connaissance' : 'Mon profil', email, body: `<section class="card narrow wiz" aria-labelledby="h-welcome">
+    title: first ? 'Faisons connaissance' : 'Mon profil', email, named: true, body: `<section class="card narrow wiz" aria-labelledby="h-welcome">
   <div class="card-h"><h1 id="h-welcome">${first ? 'Faisons connaissance' : 'Mon profil'}</h1>
   <p>${first ? 'Quelques questions, une seule fois, pour que Claude s\'adapte à toi.' : 'Ces réponses adaptent la façon dont Claude te répond.'} Elles valent pour tous tes projets (le secteur et la cible de chaque projet se règlent dans le projet). Tout est facultatif et modifiable depuis « Mon compte ».</p></div>
   ${first ? wizard(p) : fullForm(p)}

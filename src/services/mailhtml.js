@@ -74,7 +74,7 @@ const roleName = { member: 'membre', admin: 'administrateur' };
 /** Invitation à une équipe : le lien n'est dans aucun autre endroit que ce mail (envoyé à la personne invitée seulement). */
 export function inviteMail({ teamName, ownerEmail, role, email, url, appUrl }) {
   const content = `${p(`<strong>${esc(ownerEmail)}</strong> t'invite à rejoindre l'équipe <strong>« ${esc(teamName)} »</strong> sur AiTools, en tant que <strong>${esc(roleName[role] || role)}</strong>.`)}
-    ${p(`Tu travailleras sur les projets qu'il partage, avec son offre, son SMTP et son accès Claude : pas besoin d'abonnement de ton côté.`)}
+    ${p(`Tu travailleras sur les projets qu'il partage, avec son offre, son SMTP et son accès à l'IA : pas besoin d'abonnement de ton côté.`)}
     ${p(`Pour accepter, connecte-toi avec cette adresse (<strong>${esc(email)}</strong>), puis ouvre l'invitation :`)}
     ${mailButton(url, "Rejoindre l'équipe")}
     <p style="margin:14px 0 0;font-size:13px;line-height:1.5;color:${C.muted};">Le bouton ne marche pas ? Copie ce lien dans ton navigateur :<br><a href="${esc(url)}" style="color:${C.link};word-break:break-all;">${esc(url)}</a></p>
