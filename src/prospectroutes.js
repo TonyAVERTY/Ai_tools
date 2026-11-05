@@ -8,7 +8,7 @@ import { getProject, getTemplate } from './projects.js';
 import { getUser } from './users.js';
 import { EMAIL_RE, buildProspectMail, fillTemplate, mailVars } from './services/mailer.js';
 import { reviewMail, fillBody, fillSubject } from './services/mailcheck.js';
-import { checkSense, SenseUnavailable } from './services/mailsense.js';
+import { checkSense, proposeSentence, SenseUnavailable } from './services/mailsense.js';
 import { makeClaude } from './handlers.js';
 import { budgetState } from './services/budget.js';
 import { normalizeModel } from './services/models.js';
@@ -190,6 +190,8 @@ export function registerProspectRoutes(router, app, { project }) {
     json(ctx.res, {
       ok: true, kind, variant, sample, footer, hasB: !!String(b.subjectB ?? '').trim() && kind === 'initial',
       from: mail.from, to: mail.to, subject: mail.subject, text: mail.text, warnings,
+      // Valeurs des variables dans ce mail : l'aperçu s'en sert pour retrouver, dans le modèle, la phrase que la personne sélectionne
+      vars: mailVars(person, smtp, p.siteUrl),
       html: !!mail.html, url: mail.html ? `/api/preview/${keep(ctx.session.userId, mail.html)}` : null,
       note: sample ? 'Exemple fictif : choisis un de tes prospects pour voir le mail réel.' : null,
     });
@@ -227,6 +229,36 @@ export function registerProspectRoutes(router, app, { project }) {
         // Le texte corrigé tel que le prospect le lirait, pour que la personne juge avant d'appliquer
         fixedText: v.fixBody ? fillBody(v.fixBody, vars).replace(/\n{3,}/g, '\n\n').trim() : null,
       });
+    } catch (e) {
+      if (!(e instanceof SenseUnavailable)) throw e;
+      json(ctx.res, { ok: true, unavailable: true, reason: e.message });
+    }
+  }, { limit: 'sense' });
+
+  // Changer une phrase : la personne a sélectionné une phrase de l'aperçu ; `start` et `end` sont sa position dans le modèle (calculée par la page).
+  // L'IA propose une autre phrase au même rôle ; rien n'est modifié : la page n'applique la proposition que sur un clic.
+  router.post('/api/projects/:id/template/rephrase', async (ctx) => {
+    const p = await getProject(app, Number(ctx.params.id), { userId: ctx.session.userId, secrets: true });
+    const b = await readBody(ctx.req);
+    const kind = b.kind === 'followup' ? 'followup' : 'initial';
+    const body = String(b.body ?? '').slice(0, 10_000);
+    const start = Number(b.start), end = Number(b.end);
+    if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end <= start || end > body.length || end - start > 600 || !body.slice(start, end).trim()) {
+      throw new HttpError(400, 'Phrase introuvable dans le modèle : sélectionne-la de nouveau', { expose: true });
+    }
+    let prospect = null;
+    if (b.prospectId != null && b.prospectId !== '') {
+      prospect = await db.prepare('SELECT * FROM prospects WHERE id = ? AND project_id = ?').get(Number(b.prospectId), p.id);
+      if (!prospect) throw new HttpError(404, 'Prospect introuvable');
+    }
+    const vars = mailVars(prospect || SAMPLE_PERSON, { fromName: p.smtp?.fromName || '' }, p.siteUrl);
+    const avoid = (Array.isArray(b.avoid) ? b.avoid : []).slice(-5).map((a) => String(a ?? '').slice(0, 700)).filter(Boolean);
+    const budget = await budgetState(db, p.userId);
+    if (budget.blocked) return json(ctx.res, { ok: true, unavailable: true, reason: `Budget IA atteint : ${budget.reason}` });
+    const model = normalizeModel(await getSetting(db, p.userId, 'write_model', ''), 'haiku', await userProvider(db, p.userId));
+    try {
+      const r = await proposeSentence({ claude, userId: p.userId, model, kind, template: body, sentence: body.slice(start, end), avoid, facts: JSON.stringify([p.profile, p.target]).slice(0, 4000) });
+      json(ctx.res, { ok: true, sentence: r.sentence, shown: fillBody(r.sentence, vars).trim() });
     } catch (e) {
       if (!(e instanceof SenseUnavailable)) throw e;
       json(ctx.res, { ok: true, unavailable: true, reason: e.message });
