@@ -2,7 +2,7 @@
 Résumé : comment filtrer les projets par poste (Commerce, Communication, Finance…), lancer les tâches IA d'un poste depuis « Postes et tâches IA », lire et copier le livrable, droits et limites. La liste complète des postes et tâches est dans postes-et-taches-ia.md.
 
 ## À quoi ça sert
-Une entreprise est faite de postes : Direction, Commerce, Marketing, Communication, Produit, Développement, Support client, Finance, Juridique et conformité, Ressources humaines, Opérations et qualité. Dans un projet, chaque poste a ses tâches faites par Claude. Les fonctions qui existaient déjà (Prospecter, LinkedIn, Promotion, Évolution, Audit du projet, Récapitulatif, Cible) sont rattachées à leur poste ; les autres sont dans la section **Postes et tâches IA**.
+Une entreprise est faite de postes : Direction, Commerce, Marketing, Communication, Produit, Développement, Support client, Finance, Juridique et conformité, Ressources humaines, Opérations et qualité. Dans un projet, chaque poste a ses tâches faites par l'IA. Les fonctions qui existaient déjà (Prospecter, LinkedIn, Promotion, Évolution, Audit du projet, Récapitulatif, Cible) sont rattachées à leur poste ; les autres sont dans la section **Postes et tâches IA**.
 
 ## Filtrer par poste
 1. Sur la page **Projets**, en haut à droite, à côté de **Nouveau projet**, la liste **Poste** propose : **Tous les postes**, **Direction**, **Commerce**, **Marketing**, **Communication**, **Produit**, **Développement**, **Support client**, **Finance**, **Juridique et conformité**, **Ressources humaines**, **Opérations et qualité**.
@@ -22,11 +22,11 @@ Une entreprise est faite de postes : Direction, Commerce, Marketing, Communicati
 
 ## Prérequis, droits et limites
 - Le projet doit avoir été **analysé** (la fiche projet sert de contexte) : sinon « Analyse le projet d'abord ».
-- Ton accès Claude doit être relié (voir « Relier, tester et déconnecter son accès Claude »). Le modèle utilisé est celui des **tâches de rédaction** (Réglages → Budget et modèles IA).
+- Ton accès à l'IA doit être relié (voir « Relier, tester et déconnecter son IA (Claude, ChatGPT ou Gemini) »). Le modèle utilisé est celui des **tâches de rédaction** (Réglages → Budget et modèles IA).
 - Les tâches marquées **lit le dépôt** (Développement, et le registre RGPD du Juridique) lisent le code en lecture seule : elles sont réservées au propriétaire et aux administrateurs de l'équipe ; les autres membres voient « Réservé aux administrateurs du projet ».
 - Les tâches marquées **cherche sur le web** (analyse des concurrents, SEO, choix d'outils) lisent des pages publiques et citent leurs sources.
 - Chaque lancement compte comme une tâche IA dans le plafond de ton offre (voir « Offres, plafonds et limites »). Au plus 40 lancements par heure.
-- **Fiabilité** : Claude n'invente ni prix, ni chiffre, ni client : ce que la fiche ne donne pas est écrit « À compléter » ou « Hypothèse à vérifier ». Les livrables juridiques (conditions de vente, contrat, mentions, registre RGPD), financiers et de ressources humaines sont des **brouillons à faire relire** par un professionnel avant usage.
+- **Fiabilité** : l'IA n'invente ni prix, ni chiffre, ni client : ce que la fiche ne donne pas est écrit « À compléter » ou « Hypothèse à vérifier ». Les livrables juridiques (conditions de vente, contrat, mentions, registre RGPD), financiers et de ressources humaines sont des **brouillons à faire relire** par un professionnel avant usage.
 
 ## Modifier les consignes
 Les consignes communes à toutes ces tâches se modifient dans **Réglages → Prompts IA**, rubrique « Tâches des postes (Commerce, Communication, Finance…) » (un texte par gamme de modèle). Le poste, la mission et les rubriques de chaque tâche sont imposés par l'application.

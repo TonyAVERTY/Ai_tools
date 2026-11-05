@@ -8,7 +8,7 @@ import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PLAN_LIMITS, PLAN_LABELS, PLAN_PRICES, ANNUAL_FREE_MONTHS } from '../limits.js';
-import { RECOMMENDED, OTHERS, DEFAULT_MODEL } from './models.js';
+import { CATALOGS, modelLabel } from './models.js';
 import { PROMPT_DEFS } from './prompts.js';
 import { PROMO, FORMATS } from './promovideo.js';
 import { ROLES, MAX_NOTES } from './roles.js';
@@ -48,9 +48,9 @@ Les plafonds se renouvellent le 1er de chaque mois (heure de Paris). Quand un pl
 |---|---|---|---|---|---|---|---|
 ${rows.join('\n')}
 
-Les offres se voient aussi sur la page publique « Tarifs ». Un administrateur d'AiTools peut attribuer une offre à un compte. Le prix de l'abonnement Claude ou de la clé API Anthropic est à part : il se paie directement à Anthropic.
+Les offres se voient aussi sur la page publique « Tarifs ». Un administrateur d'AiTools peut attribuer une offre à un compte. Le prix de l'abonnement Claude, du compte ChatGPT ou de la clé API (Anthropic, OpenAI, Google) est à part : il se paie directement à ton fournisseur d'IA.
 
-## Page IA (Claude et Support)
+## Page IA (assistant et Support)
 - ${chat.perDay ?? '—'} réponses au plus par 24 h glissantes et par compte ; ${chat.maxConversations ?? '—'} conversations au plus (la plus ancienne est supprimée quand une nouvelle dépasse la limite).
 - Une seule réponse à la fois par compte. Si le serveur est très sollicité, un message demande de réessayer dans un instant.
 - Modèle par défaut : « Sonnet ». Le choix du modèle se fait dans la liste en haut de la conversation.
@@ -72,26 +72,35 @@ Les offres se voient aussi sur la page publique « Tarifs ». Un administrateur 
 `,
   });
 
-  const rec = RECOMMENDED.map((m) => `- **${m.label}** (${m.tier}, ${m.cost}) : ${m.note}`).join('\n');
+  // Un bloc par IA, lu dans les catalogues du code : un nouveau modèle ou une nouvelle IA y apparaît tout seul
+  const AI_TITLES = { claude: 'Claude (Anthropic)', openai: 'ChatGPT (OpenAI)', gemini: 'Gemini (Google)' };
+  const modelBlocks = Object.entries(CATALOGS).map(([id, c]) => {
+    const rec = c.recommended.map((m) => `- **${m.label}** (${m.tier}, ${m.cost}) : ${m.note}`).join('\n');
+    const tabs = ['Tous les modèles', ...c.families.map((f) => c.familyLabels[f] ?? f)].join(', ');
+    return `## ${AI_TITLES[id] ?? id}
+- Modèle par défaut des tâches : « ${modelLabel(c.default)} ». Modèle par défaut de la page IA : « ${modelLabel(c.chatDefault)} ».
+
+### Recommandés
+${rec}
+
+### Autres modèles (identifiant exact, sans estimation de coût)
+${c.others.map((m) => `- ${m.label}`).join('\n')}
+
+Onglets de Réglages → Prompts IA : ${tabs}.`;
+  }).join('\n\n');
   out.push({
-    name: 'modeles-claude.md',
-    content: `# Modèles Claude proposés
-Résumé : liste des modèles Claude que l'on peut choisir (recommandés avec estimation de coût, autres modèles), modèle par défaut et où le choisir. Fichier généré depuis le code.
+    name: 'modeles-ia.md',
+    content: `# Modèles d'IA proposés (Claude, ChatGPT, Gemini)
+Résumé : la liste des modèles que l'on peut choisir pour chaque IA (Claude, ChatGPT, Gemini : recommandés avec estimation de coût, autres modèles), le modèle par défaut et où le choisir. Seuls les modèles de l'IA reliée au compte sont proposés. Fichier généré depuis le code.
 
 ## Choisir un modèle
 - Dans **Réglages → Budget et modèles IA** : un modèle par tâche (prospection, analyse de projet, rédaction des mails et posts, page IA). Le choix s'enregistre avec le bouton « Enregistrer ».
 - Dans la page IA : la liste déroulante en haut de la conversation change le modèle de cette conversation (et devient le modèle par défaut de la page IA).
-- Modèle par défaut des tâches : « ${DEFAULT_MODEL} » (Haiku).
+- La liste ne montre que les modèles de **l'IA reliée au compte**. Quand on relie une autre IA, les choix de modèle repartent du modèle par défaut de la nouvelle IA.
 
-## Recommandés (alias stables : toujours la dernière version de la gamme)
-${rec}
+Les estimations (économe, intermédiaire, plus cher) sont relatives. Avec un abonnement Claude, elles se voient dans le quota Claude affiché en haut de l'écran ; avec une clé API, dans le prix facturé par le fournisseur ; avec un compte ChatGPT, les limites de l'abonnement s'appliquent.
 
-Les estimations (économe, intermédiaire, plus cher) sont relatives. Avec un abonnement Claude, elles se voient dans le quota Claude affiché en haut de l'écran ; avec une clé API, dans le prix facturé par Anthropic.
-
-## Autres modèles (identifiant exact, sans estimation de coût)
-${OTHERS.map((m) => `- ${m.label}`).join('\n')}
-
-Chaque gamme (Haiku, Sonnet, Opus, Fable) a ses propres consignes par défaut, modifiables dans Réglages → Prompts IA.
+${modelBlocks}
 `,
   });
 
@@ -102,14 +111,14 @@ ${d.vars.length ? `- Valeurs insérées automatiquement dans le texte : ${d.vars
   out.push({
     name: 'taches-ia-et-prompts.md',
     content: `# Tâches IA et consignes (prompts) modifiables
-Résumé : la liste des tâches que Claude exécute pour l'utilisateur et, pour chacune, ce qui est modifiable dans Réglages → Prompts IA. Fichier généré depuis le code.
+Résumé : la liste des tâches que l'IA de l'utilisateur exécute et, pour chacune, ce qui est modifiable dans Réglages → Prompts IA. Fichier généré depuis le code.
 
 ## Comment modifier une consigne
 1. Ouvre **Réglages**, section **Prompts IA**.
-2. Choisis l'onglet « Tous les modèles » (s'applique à toutes les gammes qui n'ont pas la leur) ou une gamme : Haiku, Sonnet, Opus, Fable.
+2. Choisis l'onglet « Tous les modèles » (s'applique à toutes les gammes qui n'ont pas la leur) ou une gamme de ton IA (par exemple Haiku, Sonnet, Opus, Fable pour Claude ; Luna, Terra, Sol, Astra pour ChatGPT ; Flash-Lite, Flash, Pro pour Gemini). Seuls les onglets de l'IA reliée s'affichent.
 3. Modifie le texte de la tâche voulue, puis clique « Enregistrer les réglages ».
 4. « Revenir au texte par défaut » rétablit la consigne d'origine (un champ vide revient aussi au défaut).
-Le contexte du projet et le format de réponse sont ajoutés automatiquement : une consigne modifiée ne peut pas casser la lecture de la réponse de Claude.
+Le contexte du projet et le format de réponse sont ajoutés automatiquement : une consigne modifiée ne peut pas casser la lecture de la réponse de l'IA.
 
 ## Les tâches
 ${defs}
@@ -139,7 +148,7 @@ ${k.summary}
 - Réussite : ${k.meta.reussite}`).join('\n\n');
   out.push({
     name: 'savoir-faire-ia.md',
-    content: `# Savoir-faire d'AiTools donné à Claude
+    content: `# Savoir-faire d'AiTools donné à l'IA
 Résumé : les fiches de méthode (prospection B2B, mails, conformité, lecture de dépôt, posts LinkedIn, et pour le code : débogage, revue, tests, refactoring, sécurité, bases de données…) qu'AiTools ajoute automatiquement aux consignes de Claude, comment elles sont choisies et leurs limites. Fichier généré depuis le code.
 
 ## Fiches métier (par tâche)

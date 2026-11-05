@@ -827,7 +827,7 @@ export function registerRoutes(router, app) {
   };
   router.get('/jobs/:id', async ({ res, params, session }) => {
     const job = await ownJobConsole(params, session);
-    html(res, layout({ title: 'Suivi de la tâche', email: session.email, body: `<section data-job-console="${job.id}" class="job-console">
+    html(res, layout({ title: 'Suivi de la tâche', email: session.email, named: true, body: `<section data-job-console="${job.id}" class="job-console">
       <a class="console-back" href="/">← Tous les projets</a>
       <header class="console-heading"><div><p class="console-eyebrow">ESPACE DE TRAVAIL · TÂCHE #${job.id}</p><h1 data-console-title>Claude au travail</h1><p class="muted">Suivez la création, étape par étape.</p></div><span class="console-live" data-console-live>Connexion…</span></header>
       <div class="console-grid"><aside class="console-summary"><span class="console-eyebrow">ACTIVITÉ ACTUELLE</span><p data-console-status role="status">Connexion au journal…</p>

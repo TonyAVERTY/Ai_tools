@@ -10,7 +10,7 @@ import { ROLES, MAX_NOTES, rolesOfSection } from './services/roles.js';
 import { tourJson } from './tour.js';
 import { describeKpi } from './services/dbschema.js';
 import { MODE_LABELS } from './claudelink.js';
-import { aiName } from './services/ainame.js';
+import { aiName, forAi } from './services/ainame.js';
 import { banner } from './banner.js';
 import { loadingBlock } from './loading.js';
 
@@ -35,7 +35,10 @@ export const NAV = [['/', 'folder', 'Projets'], ['/mails', 'mail', 'Mails'], ['/
 const NAV_SHORT = { '/compta': 'Compta' };
 const pillLabel = (href, label) => (NAV_SHORT[href] ? `<span class="pill-l">${label}</span><span class="pill-s" aria-hidden="true">${NAV_SHORT[href]}</span>` : label);
 
-export function layout({ title, body, email, scripts = [] }) {
+// `named` : « Claude » dans ce corps de page veut dire « l'IA de la personne » : il est remplacé par son nom (Gemini, ChatGPT…).
+// À ne pas mettre sur une page qui parle de Claude comme fournisseur (liaison, abonnement, quota de session).
+export function layout({ title, body, email, scripts = [], named = false }) {
+  if (named) body = forAi(body, aiName());
   return `<!doctype html>
 <html lang="fr">
 <head>
