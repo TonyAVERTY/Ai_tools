@@ -3,6 +3,7 @@
 import { prospectStats, getTemplate } from './projects.js';
 import { linkedinAccount, linkedinAvailable } from './linkedin.js';
 import { latestJobs } from './services/jobs.js';
+import { aiName, forAi } from './services/ainame.js';
 
 /**
  * Étapes dans l'ordre conseillé. `acc` : section (data-acc) à ouvrir ; `sel` : sélecteur de repli. `optional` : le cœur de
@@ -29,7 +30,7 @@ const STEPS = [
 export function buildChecklist(f) {
   const steps = STEPS
     .filter((s) => (f.canConfigure || !s.needsConfig) && (f.linkedinAvailable || !s.needsLinkedin))
-    .map((s) => ({ key: s.key, label: s.label, hint: s.hint, acc: s.acc ?? null, sel: s.sel ?? null, optional: !!s.optional, done: !!s.done(f) }));
+    .map((s) => ({ key: s.key, label: s.label, hint: forAi(s.hint, aiName()), acc: s.acc ?? null, sel: s.sel ?? null, optional: !!s.optional, done: !!s.done(f) }));
   const done = steps.filter((s) => s.done).length;
   return {
     steps, done, total: steps.length,

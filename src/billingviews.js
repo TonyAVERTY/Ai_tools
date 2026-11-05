@@ -36,7 +36,7 @@ export function billingOverviewPage({ email, rows }) {
   </section>
   <div class="bill-list">${list}</div>
 </div>`;
-  return layout({ title: 'Facturation', email, body, scripts: ['/static/facturation.js'] });
+  return layout({ title: 'Facturation', email, body, scripts: ['/static/facturation.js'], named: true });
 }
 
 // ---------- Un projet ----------
@@ -245,5 +245,5 @@ export function billingProjectPage({ email, project: p, legal, errors, suggestio
   ${reset ? `<div class="bill-foot">${reset}</div>` : ''}
   <p class="muted small bill-disc">Les documents suivent les usages entre professionnels en France. Les mentions légales sont rédigées par AiTools d'après tes informations, jamais par Claude : fais-les vérifier par un expert-comptable avant un usage particulier (client particulier, TVA sur les encaissements, marché public).</p>
 </div>`;
-  return layout({ title: `Facturation · ${p.name}`, email, body, scripts: ['/static/facturation.js'] });
+  return layout({ title: `Facturation · ${p.name}`, email, body, scripts: ['/static/facturation.js'], named: true });
 }

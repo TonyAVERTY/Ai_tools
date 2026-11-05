@@ -159,3 +159,22 @@ test('navigateur : <body data-ai> est lu par AiTools.aiName(), et plus aucun « 
     assert.doesNotMatch(src, /Claude/, `${f} : le nom vient de aiName()`);
   }
 });
+
+test('Facturation, profil, console, mise en route et équipe : le nom de l\'IA de l\'utilisateur, jamais « Claude » pour un utilisateur de Gemini', async () => {
+  const g = await s.newUser({ admin: false, link: linked('gemini') });
+  const c = await s.newUser({ admin: false, link: linked('claude') });
+  const clean = (t) => t.replace(/<script[^]*?<\/script>/g, '').replace(/&#39;/g, "'");
+  const billing = clean(await html(g, '/facturation'));
+  assert.match(billing, /Gemini/);
+  assert.doesNotMatch(billing, /Claude/, 'Facturation');
+  const welcome = clean(await html(g, '/welcome'));
+  assert.match(welcome, /pour que Gemini s'adapte à toi/);
+  assert.doesNotMatch(welcome, /Claude/, 'questionnaire de profil');
+  assert.match(clean(await html(c, '/welcome')), /pour que Claude s'adapte à toi/);
+  const ins = await s.db.prepare("INSERT INTO jobs(user_id,type,status,created_at) VALUES(?,?,'running',?)").run(g.id, 'x', 1);
+  const consolePage = clean(await html(g, `/jobs/${Number(ins.lastInsertRowid)}`));
+  assert.match(consolePage, /<h1 data-console-title>Gemini au travail<\/h1>/);
+  assert.doesNotMatch(consolePage, /Claude/, 'console de tâche');
+  const team = clean(await html(g, '/team'));
+  assert.doesNotMatch(team, /Claude/, 'équipe');
+});

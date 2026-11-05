@@ -17,7 +17,7 @@ const RIGHTS = `<div class="table-wrap"><table class="rights" data-rt="skip">
     <tr><th scope="row">Administrateur</th><td>Comme un membre, et règle les projets : SMTP, boîte de réception, base du récap, LinkedIn.</td></tr>
     <tr><th scope="row">Propriétaire (toi)</th><td>Gère l'équipe, partage et supprime les projets.</td></tr>
   </tbody></table></div>
-  <p class="muted small">L'équipe utilise ton offre : tes plafonds, ton SMTP et ton accès Claude servent à tous sur les projets partagés. Les membres n'ont pas besoin d'abonnement.</p>`;
+  <p class="muted small">L'équipe utilise ton offre : tes plafonds, ton SMTP et ton accès à l'IA servent à tous sur les projets partagés. Les membres n'ont pas besoin d'abonnement.</p>`;
 
 function ownerSection(d) {
   const seats = d.seats;
@@ -36,7 +36,7 @@ function ownerSection(d) {
     </tbody></table></div>` : '';
   return `<section class="card">
   <h2>Équipe « ${esc(d.team.name)} »</h2>
-  <p class="muted">${esc(seatText)}. L'équipe utilise ton offre : tes plafonds, ton SMTP et ton accès Claude servent à tous sur les projets partagés.${seats.free === 0 ? ' <a href="/tarifs">Voir les offres avec plus de places</a>.' : ''}</p>
+  <p class="muted">${esc(seatText)}. L'équipe utilise ton offre : tes plafonds, ton SMTP et ton accès à l'IA servent à tous sur les projets partagés.${seats.free === 0 ? ' <a href="/tarifs">Voir les offres avec plus de places</a>.' : ''}</p>
   ${RIGHTS}
   ${members}
   ${invites}
@@ -92,7 +92,7 @@ export function joinPage({ user, token, info, error = null }) {
     ? `<section class="card"><h2>Invitation</h2>${banner('err', info.message)}<p><a class="btn" href="/">Retour au tableau de bord</a></p></section>`
     : `<section class="card"><h2>Rejoindre l'équipe « ${esc(info.team.name)} »</h2>
   <p>${esc(info.team.ownerEmail)} t'invite en tant que <strong>${esc(ROLE_LABELS[info.role].toLowerCase())}</strong>.</p>
-  <p class="muted small">Tu verras les projets qu'il partage avec l'équipe et pourras y travailler avec son accès Claude, son SMTP et ses plafonds. Tu pourras quitter l'équipe à tout moment.</p>
+  <p class="muted small">Tu verras les projets qu'il partage avec l'équipe et pourras y travailler avec son accès à l'IA, son SMTP et ses plafonds. Tu pourras quitter l'équipe à tout moment.</p>
   ${error ? banner('err', error) : ''}
   <form method="post" action="/team/join/${esc(token)}" class="row-actions"><button class="btn primary">Rejoindre l'équipe</button> <a class="btn" href="/">Pas maintenant</a></form></section>`;
   return layout({ title: 'Invitation', email: user.email, body: `<div class="narrow"><h1>Invitation</h1>${body}</div>` });
