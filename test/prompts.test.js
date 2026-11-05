@@ -229,6 +229,11 @@ test('mails : les consignes demandent un « Bonjour, », une formule de politess
     assert.doesNotMatch(follow, /Pas de formule d'introduction/, `relance (${model}) : l'ancienne consigne qui supprimait aussi le « Bonjour »`);
   }
   assert.match(followupTemplatePrompt({ profile, senderName: 'Tony', model: 'haiku' }).prompt, /garde toujours « Bonjour, » au début/);
+  // On salue une personne, pas une entreprise : aucune consigne ne propose « Bonjour {{entreprise}}, »
+  for (const p of [templatePrompt({ profile, target: {}, senderName: 'Tony' }).prompt, followupTemplatePrompt({ profile, senderName: 'Tony' }).prompt]) {
+    assert.doesNotMatch(p, /« Bonjour \{\{entreprise\}\}, (…|»)/);
+    assert.match(p, /Ne mets jamais \{\{entreprise\}\} juste après « Bonjour »/);
+  }
   // Le nom de l'entreprise : une tournure qui le porte, et la virgule qui le suit est permise (il n'est jamais vide)
   for (const p of [templatePrompt({ profile, target: {}, senderName: 'Tony' }).prompt, followupTemplatePrompt({ profile, senderName: 'Tony' }).prompt]) {
     assert.match(p, /N'écris jamais « Pour \{\{entreprise\}\}, » suivi d'une phrase qui ne s'y rattache pas/);

@@ -69,6 +69,7 @@ export function reviewMail({ subject = '', body = '', facts = '' } = {}) {
   const filled = lines.map((l) => l.trim()).filter(Boolean);
   if (filled.length) {
     if (!/^(bonjour|bonsoir|madame|monsieur|cher|chère|hello|salut)\b/i.test(filled[0])) warnings.push("Le mail ne commence pas par une formule d'appel (« Bonjour, »).");
+    if (/^(bonjour|bonsoir|hello|salut)[ \t,]*\{\{\s*entreprise\s*\}\}/i.test(filled[0])) warnings.push("« Bonjour {{entreprise}}, » salue une entreprise comme une personne (« Bonjour Une Bonne Bouteille, ») : écris « Bonjour, » tout court.");
     if (!/cordialement|bien à vous|bonne journée|bonne soirée|bonne continuation|à bientôt|salutations|sincèrement|respectueusement|merci/i.test(filled.slice(-4).join(' '))) warnings.push('Aucune formule de politesse avant la signature (« Bien cordialement, »).');
   }
   const n = words(body);
