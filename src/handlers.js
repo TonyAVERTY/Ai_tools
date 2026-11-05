@@ -5,12 +5,12 @@ import { join } from 'node:path';
 import { extractJson } from './services/claude.js';
 import { getProvider } from './services/providers/index.js';
 import { withUserLock } from './services/userlock.js';
-import { tidyTemplateText, acceptReview, fillBody, fillSubject } from './services/mailcheck.js';
-import { checkSense, SenseUnavailable, SENSE_BATCH } from './services/mailsense.js';
+import { tidyTemplateText, acceptReview, fillBody, fillSubject, styleProblems } from './services/mailcheck.js';
+import { checkSense, acceptSenseFix, SenseUnavailable, SENSE_BATCH } from './services/mailsense.js';
 import { addUsage, jobContext, liveJobUsage } from './services/jobs.js';
 import { syncRepo } from './services/git.js';
 import { normalizeModel, defaultModelOf, tierEquivalent } from './services/models.js';
-import { analyzePrompt, prospectPrompt, templatePrompt, reviewMailPrompt, followupTemplatePrompt, evolutionPrompt, linkedinPostPrompt, hookPrompt, auditPrompt, promoPrompt, rolePrompt, parseCustomPrompts, LEVELS } from './services/prompts.js';
+import { analyzePrompt, prospectPrompt, templatePrompt, reviewMailPrompt, fixStylePrompt, followupTemplatePrompt, evolutionPrompt, linkedinPostPrompt, hookPrompt, auditPrompt, promoPrompt, rolePrompt, parseCustomPrompts, LEVELS } from './services/prompts.js';
 import { VOICE_PROVIDERS, parseVoiceParams, extractVoiceScript, prepareVoice, cleanVoice, mixVoice, synthesize, langName } from './services/voiceover.js';
 import { PROMO, FORMATS, SCENE_REFUSED, SceneError, parsePromoParams, extractScene, promoSupported, renderPromo } from './services/promovideo.js';
 import { reviewPromo } from './services/promoqa.js';
@@ -240,6 +240,25 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
   // Rédaction (mails, relances, posts) : son propre réglage ; à défaut, le comportement d'avant (Haiku, et le modèle d'analyse pour LinkedIn)
   const writeModel = async (userId, legacy) => normalizeModel(await getSetting(db, userId, 'write_model', ''), legacy, await userProvider(db, userId));
   const inHours = () => (app.isBusinessHours || isBusinessHours)();
+
+  // Forme d'un modèle tout juste généré : s'il manque l'appel ou la politesse, ou s'il propose des réponses toutes faites, l'IA le corrige UNE fois.
+  // La correction n'est retenue que si elle garde les adresses, n'ajoute aucune variable et réduit le nombre de défauts ; sinon le texte reste tel quel
+  // (l'aperçu signale les défauts qui restent). Une annulation ou un accès perdu remontent ; toute autre panne est sans effet.
+  async function mendStyle(ctx, userId, model, kind, body) {
+    const problems = styleProblems(body);
+    if (!problems.length) return { body, fixed: [] };
+    try {
+      const { prompt, system } = fixStylePrompt({ kind, body, problems });
+      const r = await claude(userId, { prompt, system, model, maxTurns: 1, tools: [], signal: ctx.signal });
+      addUsage(ctx, r);
+      const fixed = tidyTemplateText(String(extractJson(r.text)?.body ?? ''));
+      const left = fixed ? styleProblems(fixed) : problems;
+      if (fixed && left.length < problems.length && acceptSenseFix(body, fixed, { slack: 12 })) return { body: fixed, fixed: problems.filter((p) => !left.includes(p)) };
+    } catch (e) {
+      if (ctx.signal?.aborted || e.status === 403) throw e;
+    }
+    return { body, fixed: [] };
+  }
 
   // Premier mail ou relance : mêmes plafonds, mêmes délais, même journal
   async function sendMails(ctx, kind) {
@@ -553,8 +572,10 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
       } catch (e) {
         if (ctx.signal?.aborted || e.status === 403) throw e; // annulation, ou accès Claude perdu : on ne l'avale pas
       }
+      const mended = await mendStyle(ctx, userId, model, 'initial', mail.body);
+      mail = { ...mail, body: mended.body };
       await saveTemplate(db, project.id, 'initial', mail);
-      return { ok: true, reviewed, corrections };
+      return { ok: true, reviewed, corrections, ...(mended.fixed.length ? { styleFixed: mended.fixed } : {}) };
     },
 
     async followup_template(ctx) {
@@ -568,8 +589,9 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
       addUsage(ctx, r);
       const t = extractJson(r.text);
       if (!t.body) throw new Error('Modèle de relance invalide');
-      await saveTemplate(db, project.id, 'followup', { subject: '', body: t.body });
-      return { ok: true };
+      const mended = await mendStyle(ctx, userId, model, 'followup', tidyTemplateText(t.body));
+      await saveTemplate(db, project.id, 'followup', { subject: '', body: mended.body });
+      return { ok: true, ...(mended.fixed.length ? { styleFixed: mended.fixed } : {}) };
     },
 
     // Facturation : trois exemples de devis. Claude écrit le texte et propose les lignes ; les mentions légales et les totaux viennent du code.
