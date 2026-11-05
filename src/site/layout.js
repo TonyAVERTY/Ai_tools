@@ -7,7 +7,7 @@ import { SPRITE, ic } from '../icons.js';
 
 export { ic };
 
-export const SITE_NAME = 'AiTools';
+export const SITE_NAME = 'iaboss';
 const OG_IMAGE = '/static/img/share_img.jpg'; // 1024 x 541, aperçu des liens partagés
 export const CONTACT_EMAIL = 'contact@iaboss.fr';
 

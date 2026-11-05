@@ -6,7 +6,7 @@ const API = 'https://api.github.com';
 export const MAX_REPOS = 100;
 
 const headers = (token) => ({
-  Accept: 'application/vnd.github+json', Authorization: `Bearer ${token}`, 'X-GitHub-Api-Version': '2022-11-28', 'User-Agent': 'AiTools',
+  Accept: 'application/vnd.github+json', Authorization: `Bearer ${token}`, 'X-GitHub-Api-Version': '2022-11-28', 'User-Agent': 'iaboss',
 });
 
 /** `owner/repo` d'une URL de dépôt GitHub, en minuscules (GitHub ne distingue pas la casse), ou null. */

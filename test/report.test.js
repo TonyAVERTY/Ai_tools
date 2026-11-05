@@ -44,7 +44,7 @@ test('statistiques de la semaine', async () => {
   });
   assert.equal(st.totals.cost, 0.42, 'le job d\'il y a 30 jours ne compte pas');
   const txt = weeklyText(st);
-  assert.match(txt, /^AiTools · semaine du \d\d\/\d\d au \d\d\/\d\d/);
+  assert.match(txt, /^iaboss · semaine du \d\d\/\d\d au \d\d\/\d\d/);
   assert.match(txt, /Réponses {10}: 6 \(taux 30 %\)/);
   assert.match(txt, /l'objet B gagne \(50 % de réponses\)/);
   assert.match(txt, /GoSortir : rien cette semaine/);
@@ -66,7 +66,7 @@ test('envoi automatique : lundi 8h, une seule fois par semaine, désactivé par 
   assert.deepEqual(r.channels, ['mail', 'discord']);
   assert.equal(s.mails[0].to, 'moi@x.fr');
   assert.equal(s.mails[0].from, 'aitools@serveur.test', 'le rapport part du SMTP du serveur');
-  assert.match(s.mails[0].subject, /^\[AiTools\] Rapport du/);
+  assert.match(s.mails[0].subject, /^\[iaboss\] Rapport du/);
   const field = s.hooks[0].embeds[0].fields.find((f) => f.name === '📁 MonEspacePro');
   assert.match(field.value, /20 trouvés · ✉️ 20 envoyés · 💬 6 réponses \(30 %\)/);
   assert.match(s.mails[0].html, /Rapport hebdo/);

@@ -20,7 +20,7 @@ export function assetUrl(path) {
 
 /**
  * Logo de marque (monogramme « AI ») : version claire par défaut, version sombre quand le navigateur est en thème sombre.
- * Décoratif (le nom « AiTools » est écrit à côté), d'où l'alt vide.
+ * Décoratif (le nom « iaboss » est écrit à côté), d'où l'alt vide.
  */
 export function brandMark(cls = '') {
   return `<picture class="brand-mark${cls ? ` ${cls}` : ''}" aria-hidden="true"><source srcset="${assetUrl('/static/img/logo-mark-dark.png')}" media="(prefers-color-scheme: dark)"><img src="${assetUrl('/static/img/logo-mark.png')}" alt="" width="30" height="24"></picture>`;

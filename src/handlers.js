@@ -743,7 +743,7 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
       const count = Math.max(1, Math.min(20, Math.floor(Number(ctx.params.count) || 5)));
       const level = LEVELS[ctx.params.level] ? ctx.params.level : 'normal';
       const to = await getSetting(db, userId, 'notify_email');
-      const smtp = cfg.systemSmtp; // le résultat part de l'adresse d'AiTools (SMTP du serveur), pas de celle du projet
+      const smtp = cfg.systemSmtp; // le résultat part de l'adresse d'iaboss (SMTP du serveur), pas de celle du projet
       if (!to) throw new Error('Adresse de réception non configurée (Réglages)');
       if (!smtp) throw new Error("Le serveur ne peut pas envoyer de mail (SMTP du serveur non configuré) : demande à l'administrateur");
 
@@ -768,7 +768,7 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
       const transport = (app.createTransport || createTransport)(await pinSmtp(app, null, smtp));
       await transport.sendMail({
         from: smtp.fromEmail, to,
-        subject: `[AiTools] ${count} évolutions pour ${project.name}`,
+        subject: `[iaboss] ${count} évolutions pour ${project.name}`,
         text: r.text,
         html: evolutionMail({ markdown: r.text, projectName: project.name, count, appUrl: cfg.appUrl }),
       });

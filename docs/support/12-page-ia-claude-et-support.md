@@ -1,22 +1,22 @@
 # La page IA : l'assistant (ton IA) et Support
-Résumé : le menu Assistant, la différence entre l'assistant (ton IA : Claude, ChatGPT ou Gemini) et Support (aide sur AiTools), conversations, modèles, pièces jointes, projet joint, limites et confidentialité.
+Résumé : le menu Assistant, la différence entre l'assistant (ton IA : Claude, ChatGPT ou Gemini) et Support (aide sur iaboss), conversations, modèles, pièces jointes, projet joint, limites et confidentialité.
 
 ## Le menu Assistant
 Dans la barre du haut, le bouton **Assistant** s'ouvre au survol de la souris (ou au toucher sur téléphone) avec deux choix :
 - **Le nom de ton IA** (**Claude**, **ChatGPT** ou **Gemini** ; sous le nom, « Discute avec ton Claude », « Discute avec ton ChatGPT »…) : l'assistant classique, page `/chat`.
-- **Support** (« Une question sur AiTools ? ») : l'aide sur l'application, page `/support`.
+- **Support** (« Une question sur iaboss ? ») : l'aide sur l'application, page `/support`.
 Les deux utilisent **l'accès de la personne à son IA** (chaque message est envoyé à Claude, ChatGPT ou Gemini avec sa propre liaison) et ont leurs **conversations séparées** : la liste de gauche ne montre que celles du mode en cours.
 
 ## L'assistant (ton IA)
 Pour discuter, rédiger un mail de prospection, répondre à un prospect qui trouve ça trop cher, trouver des idées de posts LinkedIn, réfléchir à une stratégie. L'IA ne voit que la conversation et ce que la personne joint.
 
-## Support (aide sur AiTools)
-Pour poser une question sur l'application : où cliquer, comment configurer, pourquoi quelque chose ne marche pas. L'IA y répond **d'après la documentation d'AiTools**, qu'elle lit elle-même (fichiers en lecture seule). Elle ne voit ni les projets, ni les prospects, ni les mails, ni les réglages de la personne et ne peut rien faire à sa place : elle explique comment faire. Elle peut répondre « Je ne trouve pas ça dans la documentation » plutôt que d'inventer. Un message d'état indique quand elle consulte la documentation (« Consulte la documentation : … »).
+## Support (aide sur iaboss)
+Pour poser une question sur l'application : où cliquer, comment configurer, pourquoi quelque chose ne marche pas. L'IA y répond **d'après la documentation d'iaboss**, qu'elle lit elle-même (fichiers en lecture seule). Elle ne voit ni les projets, ni les prospects, ni les mails, ni les réglages de la personne et ne peut rien faire à sa place : elle explique comment faire. Elle peut répondre « Je ne trouve pas ça dans la documentation » plutôt que d'inventer. Un message d'état indique quand elle consulte la documentation (« Consulte la documentation : … »).
 - Suggestions de départ : relier son IA, pourquoi les mails ne partent pas, la liste de mise en route, créer une vidéo de promotion.
 - On peut joindre une **capture d'écran** pour montrer un problème.
 - Il n'y a pas de bouton « projet » dans le Support.
-- Les consignes du Support se modifient dans **Réglages → Prompts IA** (« Support (aide sur AiTools) »).
-- Pour tout ce qui sort d'AiTools (rédaction, idées, stratégie), le Support renvoie vers l'assistant (ton IA).
+- Les consignes du Support se modifient dans **Réglages → Prompts IA** (« Support (aide sur iaboss) »).
+- Pour tout ce qui sort d'iaboss (rédaction, idées, stratégie), le Support renvoie vers l'assistant (ton IA).
 
 ## Utiliser la page
 - **Nouvelle conversation** (en haut à gauche) ; la liste montre les conversations, la poubelle d'une ligne **supprime** la conversation (et ses pièces jointes).
@@ -33,7 +33,7 @@ Bouton **trombone** (« Joindre une photo, une vidéo ou un fichier »), glisser
 - Les vidéos demandent que le serveur ait ffmpeg ; sinon : « Les vidéos ne sont pas prises en charge sur ce serveur. »
 
 ## Joindre un projet (assistant seulement)
-Bouton **dossier** (« Joindre un projet AiTools ») : l'IA lit le **code du projet en lecture seule** (elle ne peut rien modifier) pour répondre. Réservé au propriétaire du projet et aux administrateurs d'équipe. Le dépôt est mis à jour au premier usage (« Mise à jour du dépôt de … »). Un projet « pas encore analysé » peut quand même être joint. Le projet joint reste attaché d'un message à l'autre ; la croix « Détacher le projet » le retire.
+Bouton **dossier** (« Joindre un projet iaboss ») : l'IA lit le **code du projet en lecture seule** (elle ne peut rien modifier) pour répondre. Réservé au propriétaire du projet et aux administrateurs d'équipe. Le dépôt est mis à jour au premier usage (« Mise à jour du dépôt de … »). Un projet « pas encore analysé » peut quand même être joint. Le projet joint reste attaché d'un message à l'autre ; la croix « Détacher le projet » le retire.
 
 ## Limites et erreurs
 - Une seule réponse à la fois par compte (« Une réponse est déjà en cours : attends qu'elle se termine »).

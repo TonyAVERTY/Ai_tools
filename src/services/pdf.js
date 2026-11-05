@@ -123,7 +123,7 @@ export class Pdf {
       kids.push(add(`<< /Type /Page /Parent ${pagesRoot} 0 R /MediaBox [0 0 ${A4.w} ${A4.h}] /Resources << /Font << ${fontRes} >> >> /Contents ${contentId} 0 R >>`));
     }
     const pdfDate = (() => { const d = new Date(); const p = (n) => String(n).padStart(2, '0'); return `D:${d.getUTCFullYear()}${p(d.getUTCMonth() + 1)}${p(d.getUTCDate())}${p(d.getUTCHours())}${p(d.getUTCMinutes())}${p(d.getUTCSeconds())}Z`; })();
-    const info = add(`<< /Title ${hex(toWinAnsi(this.title))} /Author ${hex(toWinAnsi(this.author))} /Producer ${hex(toWinAnsi('AiTools'))} /CreationDate (${pdfDate}) >>`);
+    const info = add(`<< /Title ${hex(toWinAnsi(this.title))} /Author ${hex(toWinAnsi(this.author))} /Producer ${hex(toWinAnsi('iaboss'))} /CreationDate (${pdfDate}) >>`);
     objs[catalog - 1] = Buffer.from(`<< /Type /Catalog /Pages ${pagesRoot} 0 R >>`, 'latin1');
     objs[pagesRoot - 1] = Buffer.from(`<< /Type /Pages /Kids [${kids.map((k) => `${k} 0 R`).join(' ')}] /Count ${kids.length} >>`, 'latin1');
 

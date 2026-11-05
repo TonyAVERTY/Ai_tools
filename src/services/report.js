@@ -39,7 +39,7 @@ export async function weeklyStats(db, userId, { at = now() } = {}) {
 }
 
 export function weeklyText(st) {
-  const lines = [`AiTools · semaine du ${day(st.from)} au ${day(st.to)}`, ''];
+  const lines = [`iaboss · semaine du ${day(st.from)} au ${day(st.to)}`, ''];
   const t = st.totals;
   const priced = st.priced !== false;
   lines.push(`Total : ${t.found} prospect(s) trouvé(s), ${t.sent} mail(s) + ${t.followups} relance(s), ${t.replies} réponse(s) (${pct(t.replies, t.sent)})${priced ? `, IA ${usd(t.cost)}` : ''}`, '');
@@ -65,12 +65,12 @@ export async function sendWeeklyReport(app, userId, { at = now() } = {}) {
   const text = weeklyText(st);
   const channels = [];
   const to = await getSetting(app.db, userId, 'notify_email');
-  const smtp = app.cfg.systemSmtp; // mails d'AiTools : toujours le SMTP du serveur (SYSTEM_SMTP_*)
+  const smtp = app.cfg.systemSmtp; // mails d'iaboss : toujours le SMTP du serveur (SYSTEM_SMTP_*)
   if (to && smtp) {
     const transport = (app.createTransport || createTransport)(await pinSmtp(app, null, smtp));
     try {
       await transport.sendMail({
-        from: smtp.fromEmail, to, subject: `[AiTools] Rapport du ${day(st.from)} au ${day(st.to)}`, text,
+        from: smtp.fromEmail, to, subject: `[iaboss] Rapport du ${day(st.from)} au ${day(st.to)}`, text,
         html: weeklyMail(st, { period: `Semaine du ${day(st.from)} au ${day(st.to)}`, appUrl: app.cfg.appUrl }),
       });
       channels.push('mail');

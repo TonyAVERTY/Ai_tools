@@ -39,8 +39,8 @@ export const mailButton = (href, label) => `<table role="presentation" cellpaddi
   <a href="${esc(href)}" style="display:inline-block;padding:14px 24px;font-size:15px;font-weight:700;color:${C.onGrad};text-decoration:none;border-radius:12px;">${esc(label)}</a>
 </td></tr></table>`;
 
-/** Mise en page commune des mails envoyés par AiTools (évolutions, rapport hebdo, invitation d'équipe, avertissement d'inactivité). */
-export function mailLayout({ title, subtitle = '', preheader = '', content, appUrl = '', cta = '', footer = 'Message automatique envoyé par AiTools.' }) {
+/** Mise en page commune des mails envoyés par iaboss (évolutions, rapport hebdo, invitation d'équipe, avertissement d'inactivité). */
+export function mailLayout({ title, subtitle = '', preheader = '', content, appUrl = '', cta = '', footer = 'Message automatique envoyé par iaboss.' }) {
   const base = appUrl ? String(appUrl).replace(/\/$/, '') : '';
   return `<!doctype html>
 <html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -52,7 +52,7 @@ export function mailLayout({ title, subtitle = '', preheader = '', content, appU
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:640px;font-family:${FONT};">
     <tr><td bgcolor="${C.indigo}" style="background:${C.indigo};border-radius:14px 14px 0 0;padding:22px 24px 20px;">
       <div style="font-size:20px;font-weight:700;letter-spacing:-.02em;color:${C.headText};">
-        ${base ? `<img src="${esc(base)}/static/img/logo-mark-dark.png" width="39" height="32" alt="" style="display:inline-block;vertical-align:middle;margin-right:10px;border:0;">` : ''}<span style="vertical-align:middle;">AiTools</span>
+        ${base ? `<img src="${esc(base)}/static/img/logo-mark-dark.png" width="39" height="32" alt="" style="display:inline-block;vertical-align:middle;margin-right:10px;border:0;">` : ''}<span style="vertical-align:middle;">iaboss</span>
       </div>
       <div style="margin-top:18px;font-size:24px;line-height:1.25;font-weight:700;letter-spacing:-.02em;color:#ffffff;">${esc(title)}</div>
       ${subtitle ? `<div style="margin-top:6px;font-size:14px;color:${C.headText};">${esc(subtitle)}</div>` : ''}
@@ -73,7 +73,7 @@ const roleName = { member: 'membre', admin: 'administrateur' };
 
 /** Invitation à une équipe : le lien n'est dans aucun autre endroit que ce mail (envoyé à la personne invitée seulement). */
 export function inviteMail({ teamName, ownerEmail, role, email, url, appUrl }) {
-  const content = `${p(`<strong>${esc(ownerEmail)}</strong> t'invite à rejoindre l'équipe <strong>« ${esc(teamName)} »</strong> sur AiTools, en tant que <strong>${esc(roleName[role] || role)}</strong>.`)}
+  const content = `${p(`<strong>${esc(ownerEmail)}</strong> t'invite à rejoindre l'équipe <strong>« ${esc(teamName)} »</strong> sur iaboss, en tant que <strong>${esc(roleName[role] || role)}</strong>.`)}
     ${p(`Tu travailleras sur les projets qu'il partage, avec son offre, son SMTP et son accès à l'IA : pas besoin d'abonnement de ton côté.`)}
     ${p(`Pour accepter, connecte-toi avec cette adresse (<strong>${esc(email)}</strong>), puis ouvre l'invitation :`)}
     ${mailButton(url, "Rejoindre l'équipe")}
@@ -81,13 +81,13 @@ export function inviteMail({ teamName, ownerEmail, role, email, url, appUrl }) {
     <p style="margin:14px 0 0;font-size:13px;line-height:1.5;color:${C.muted};">Le lien est valable 7 jours, ne sert qu'une fois et ne marche qu'avec ${esc(email)}. Si tu ne connais pas ${esc(ownerEmail)}, ignore simplement ce message.</p>`;
   return mailLayout({
     title: `Invitation à l'équipe « ${teamName} »`, subtitle: `de la part de ${ownerEmail}`,
-    preheader: `${ownerEmail} t'invite à rejoindre « ${teamName} » sur AiTools.`, content, appUrl,
+    preheader: `${ownerEmail} t'invite à rejoindre « ${teamName} » sur iaboss.`, content, appUrl,
   });
 }
 
 /** Avertissement avant suppression d'un compte inactif. */
 export function inactivityMail({ email, deleteDate, loginUrl, appUrl, contact }) {
-  const content = `${p(`Ton compte AiTools (<strong>${esc(email)}</strong>) n'a pas servi depuis longtemps. Conformément à la politique de confidentialité, il sera supprimé avec toutes ses données (projets, prospects, modèles, réglages) à partir du <strong>${esc(deleteDate)}</strong>.`)}
+  const content = `${p(`Ton compte iaboss (<strong>${esc(email)}</strong>) n'a pas servi depuis longtemps. Conformément à la politique de confidentialité, il sera supprimé avec toutes ses données (projets, prospects, modèles, réglages) à partir du <strong>${esc(deleteDate)}</strong>.`)}
     ${p('Pour le garder, il suffit de te connecter avant cette date.')}
     ${mailButton(loginUrl, 'Me connecter')}
     <p style="margin:14px 0 0;font-size:13px;line-height:1.5;color:${C.muted};">Pour récupérer tes prospects avant, exporte-les en CSV depuis le tableau de bord. Une question ? ${esc(contact)}</p>`;

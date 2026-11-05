@@ -247,7 +247,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   catch (e) { console.error(`DATA_DIR (${cfg.dataDir}) n'est pas inscriptible par cet utilisateur : ${e.code || e.message}. Les analyses de projet échoueront. Pose DATA_DIR sur un dossier qui t'appartient (ex. DATA_DIR=./data).`); }
   const app = await createApp(cfg);
   installCrashGuards(app);
-  app.server.listen(cfg.port, cfg.host, () => console.log(`AiTools sur http://${cfg.host}:${cfg.port} (${cfg.appUrl})`));
+  app.server.listen(cfg.port, cfg.host, () => console.log(`iaboss sur http://${cfg.host}:${cfg.port} (${cfg.appUrl})`));
   const shutdown = () => app.close().then(() => process.exit(0), (e) => { console.error(e); process.exit(1); });
   process.on('SIGTERM', shutdown);
   process.on('SIGINT', shutdown);

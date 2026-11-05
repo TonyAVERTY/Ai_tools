@@ -41,7 +41,7 @@ test('tableau de bord : le nom de l\'IA de l\'utilisateur, dans le menu, les sec
   const gp = await html(g, '/');
   assert.match(gp, /<body class="app" data-ai="Gemini">/);
   assert.match(gp, /<span class="pop-t">Gemini<small>Discute avec ton Gemini<\/small><\/span>/, 'menu Assistant');
-  assert.match(gp, /aria-label="Assistant : discuter avec Gemini ou demander de l'aide sur AiTools"/);
+  assert.match(gp, /aria-label="Assistant : discuter avec Gemini ou demander de l'aide sur iaboss"/);
   assert.match(gp, /Consommation Gemini/);
   assert.doesNotMatch(gp.replace(/<script[^]*?<\/script>/g, ''), /Discute avec ton Claude|Consommation Claude/, 'aucun Claude là où c\'est l\'IA de la personne');
   const cp = await html(c, '/');
@@ -73,7 +73,7 @@ test('Mon compte : « Mon IA », l\'IA, son fournisseur, les limites propres à 
   assert.doesNotMatch(a, /sk-ant-|Session de 5 h|Semaine de 7 jours|Anthropic/, 'rien de propre à Claude');
   assert.match(a, /Avec une clé API, Google facture ce que tu consommes, à l'usage\./);
   const cg = await s.newUser({ admin: false, link: linked('openai', 'chatgpt_account') });
-  assert.match((await html(cg, '/account')).replace(/&#39;/g, "'"), /Avec ton compte ChatGPT, les limites de ton abonnement s'appliquent\. AiTools ne les mesure pas\./);
+  assert.match((await html(cg, '/account')).replace(/&#39;/g, "'"), /Avec ton compte ChatGPT, les limites de ton abonnement s'appliquent\. iaboss ne les mesure pas\./);
   const c = (await html(await s.newUser({ admin: false, link: linked('claude') }), '/account')).replace(/&#39;/g, "'");
   assert.match(c, /Ton accès à Claude est facturé à part, par Anthropic\./);
   assert.match(c, /<dd>sk-ant-…WXYZ<\/dd>/);
@@ -88,7 +88,7 @@ test('Réglages : budget, modèles et prompts parlent de l\'IA de l\'utilisateur
   assert.match(g, /chaque job est facturé par Google : le coût est estimé d'après les jetons utilisés/);
   assert.doesNotMatch(g, /Haiku suffit|Sonnet ou Opus|quota Claude|Anthropic/, 'aucun modèle ni quota de Claude');
   const o = (await html(await s.newUser({ admin: false, link: linked('openai', 'chatgpt_account') }), '/settings')).replace(/&#39;/g, "'");
-  assert.match(o, /Avec ton compte ChatGPT rien n'est facturé en plus par AiTools : les limites de ton abonnement s'appliquent/);
+  assert.match(o, /Avec ton compte ChatGPT rien n'est facturé en plus par iaboss : les limites de ton abonnement s'appliquent/);
   const c = (await html(await s.newUser({ admin: false, link: linked('claude') }), '/settings')).replace(/&#39;/g, "'");
   assert.match(c, /Haiku suffit pour la plupart des projets : passe à Sonnet ou Opus/);
   assert.match(c, /Les consignes que Claude reçoit pour chaque tâche/);
@@ -144,7 +144,7 @@ test('page IA : titre, saisie, avertissement et sélecteur de modèle parlent de
   assert.match(c, /<h2>Discute avec Claude<\/h2>/);
   assert.match(c, /aria-label="Modèle Claude"/);
   const sup = (await html(await s.newUser({ admin: false, link: linked('openai', 'chatgpt_account') }), '/support')).replace(/&#39;/g, "'");
-  assert.match(sup, /ChatGPT lit la documentation d'AiTools pour te répondre/);
+  assert.match(sup, /ChatGPT lit la documentation d'iaboss pour te répondre/);
 });
 
 test('navigateur : <body data-ai> est lu par AiTools.aiName(), et plus aucun « Claude » en dur dans les textes de l\'IA de la personne', async () => {

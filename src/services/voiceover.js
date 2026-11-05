@@ -184,7 +184,7 @@ async function azureSynth(text, voice, { key, region, fetchImpl = fetch }) {
   const lang = voice.split('-').slice(0, 2).join('-');
   const ssml = `<speak version='1.0' xml:lang='${lang}'><voice name='${voice}'>${xmlEscape(text)}</voice></speak>`;
   const res = await keyedFetch(fetchImpl, `${azureHost(region)}/v1`, {
-    method: 'POST', headers: { 'Ocp-Apim-Subscription-Key': key, 'Content-Type': 'application/ssml+xml', 'X-Microsoft-OutputFormat': 'audio-24khz-96kbitrate-mono-mp3', 'User-Agent': 'AiTools' }, body: ssml,
+    method: 'POST', headers: { 'Ocp-Apim-Subscription-Key': key, 'Content-Type': 'application/ssml+xml', 'X-Microsoft-OutputFormat': 'audio-24khz-96kbitrate-mono-mp3', 'User-Agent': 'iaboss' }, body: ssml,
   }, 'Microsoft Azure');
   return Buffer.from(await res.arrayBuffer());
 }

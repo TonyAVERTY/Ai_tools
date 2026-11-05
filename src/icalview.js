@@ -17,7 +17,7 @@ export function icalTip(url) {
       <ol><li>Ouvre <b>calendar.google.com</b> avec ton compte Google.</li>
         <li>À gauche, <b>Autres agendas</b> → <b>+</b> → <b>À partir de l'URL</b>.</li>
         <li>Colle le lien, clique <b>Ajouter l'agenda</b>.</li>
-        <li>Sur le téléphone, dans Google Agenda : menu ☰, vérifie que l'agenda « AiTools » est coché.</li></ol>
+        <li>Sur le téléphone, dans Google Agenda : menu ☰, vérifie que l'agenda « iaboss » est coché.</li></ol>
       <p class="muted small">Sans compte Google : l'application gratuite <b>ICSx⁵</b> (Play Store, F-Droid) ajoute un lien iCal directement.</p>
       <h4>Ordinateur</h4>
       <p><b>Outlook</b> : Ajouter un calendrier → S'abonner à partir du web. <b>Apple Calendrier (Mac)</b> : Fichier → Nouvel abonnement à un calendrier.</p>
