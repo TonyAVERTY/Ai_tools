@@ -13,6 +13,9 @@ Aucun lien : active la connexion par code d'appareil dans les paramètres de sé
 ## Avec ChatGPT ou Gemini, je ne vois pas les tokens pendant la tâche
 C'est normal : ChatGPT et Gemini ne communiquent leurs tokens qu'**à la fin** de la tâche, contrairement à Claude qui les envoie au fil de l'eau. Pendant la tâche, la ligne dit « Tokens comptés à la fin de la tâche » (dans « Activité » et dans « Voir »). Le total apparaît dès que la tâche est terminée, et reste affiché même si elle échoue. Si le total reste à 0 après la fin d'une tâche réussie, signale-le à l'administrateur : l'IA n'a pas renvoyé sa mesure.
 
+## Un document de facturation validé n'a plus d'aperçu ni de bouton « Valider »
+C'est voulu : un document validé est grisé et réduit à un résumé pour qu'on ne le change pas par erreur. « Voir en grand » ouvre l'aperçu complet. Pour le changer, clique **Modifier** sur le document : il repassera à « À valider » après ta demande.
+
 ## Je ne peux plus écrire dans la cible de mon projet
 Elle est **validée** : une cible validée est grisée et en lecture seule pour qu'on ne la change pas par erreur. Clique **Modifier** (section **Cible** du projet), change les champs, puis **Mettre à jour** ; **Annuler** remet la cible validée. Les prospects déjà trouvés ne changent pas : la nouvelle cible sert aux prochaines recherches.
 
