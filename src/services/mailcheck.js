@@ -65,6 +65,12 @@ export function reviewMail({ subject = '', body = '', facts = '' } = {}) {
       if (hit && !re.test(facts)) warnings.push(`Le mail parle de ${label} (« ${hit[0]} ») alors que la fiche du projet n'en parle pas : retire-le si ce n'est pas disponible.`);
     }
   }
+  // Un mail sans « Bonjour » ni formule de politesse paraît sec : signalé (jamais bloquant, le ton reste au choix de la personne)
+  const filled = lines.map((l) => l.trim()).filter(Boolean);
+  if (filled.length) {
+    if (!/^(bonjour|bonsoir|madame|monsieur|cher|chère|hello|salut)\b/i.test(filled[0])) warnings.push("Le mail ne commence pas par une formule d'appel (« Bonjour, »).");
+    if (!/cordialement|bien à vous|bonne journée|bonne soirée|bonne continuation|à bientôt|salutations|sincèrement|respectueusement|merci/i.test(filled.slice(-4).join(' '))) warnings.push('Aucune formule de politesse avant la signature (« Bien cordialement, »).');
+  }
   const n = words(body);
   if (n > 220) warnings.push(`Le mail fait ${n} mots : au-delà de 200 mots, la réponse devient plus rare.`);
   if (SPAM_WORDS.test(subject)) warnings.push("L'objet contient un mot que les filtres anti-spam repèrent (gratuit, offre, urgent, promo, garanti).");
