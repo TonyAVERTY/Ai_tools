@@ -19,6 +19,7 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   const log = (...a) => s.db.prepare('INSERT INTO mail_log(project_id, prospect_id, email, sent_at, kind, subject, body, note, error) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)').run(pid, ...a);
   await log(prospect, 'f@ferme.fr', now(), 'initial', 'Une idée', 'Bonjour,\n\nTexte <b>complet</b>.\n\nBien cordialement', '550 5.1.1 user unknown', null);
   await log(null, 'x@y.fr', now(), 'initial', 'Autre', null, null, 'Adresse non envoyée : adresse jetable');
+  await log(null, 'l@long.fr', now() - 60, 'initial', 'Un objet de mail suffisamment long pour tester le retour à la ligne dans la liste déroulante', null, null, null);
   const ctx = await b.newContext({ viewport: vp });
   const [name, value] = u.cookie.split('=');
   await ctx.addCookies([{ name, value, url: s.base }]);
@@ -43,6 +44,7 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   await t2.click();
   await p.waitForFunction(() => /jetable/.test(document.body.textContent));
   ok((await p.locator(`#${await t2.getAttribute('aria-controls')}`).innerText()).includes('Non envoyé'), `${tag} mail non envoyé : la cause s'affiche`);
+  ok(await p.locator('.mail-toggle', { hasText: 'suffisamment long' }).evaluate((e) => e.getBoundingClientRect().right <= innerWidth), `${tag} un objet très long passe à la ligne dans son bouton`);
   ok(!(await p.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)), `${tag} pas de défilement horizontal`);
   ok(errs.length === 0, `${tag} aucune erreur console${errs.length ? ` : ${errs.join(' | ')}` : ''}`);
   await ctx.close();
