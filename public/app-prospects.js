@@ -138,7 +138,7 @@
   // ---------- Aperçu du mail ----------
   // Le serveur construit le mail avec le même code que l'envoi réel (rien n'est envoyé) ; le HTML s'affiche dans un cadre isolé (sans script ni réseau).
   let pvDlg = null;
-  const pv = { form: null, prospectId: '', variant: 'A', tab: 'html', prospects: null, seq: 0, fixBody: null, vars: {}, pick: null, mode: 'idle', rseq: 0, avoid: [], hold: false, proposal: null };
+  const pv = { form: null, prospectId: '', variant: 'A', tab: 'html', prospects: null, seq: 0, fixBody: null, vars: {}, pick: null, mode: 'idle', rseq: 0, avoid: [], hold: false, proposal: null, instruction: '' };
 
   async function renderPreview() {
     hideSel();
@@ -202,7 +202,7 @@
 
   const selBox = () => $('[data-pv-sel]', pvDlg);
   function hideSel() {
-    pv.mode = 'idle'; pv.pick = null; pv.avoid = []; pv.rseq++; pv.hold = false; pv.proposal = null;
+    pv.mode = 'idle'; pv.pick = null; pv.avoid = []; pv.rseq++; pv.hold = false; pv.proposal = null; pv.instruction = '';
     const box = pvDlg && selBox();
     if (box) { box.hidden = true; box.className = 'pv-sel'; box.innerHTML = ''; }
   }
@@ -236,7 +236,18 @@
     if (pv.mode === 'idle' && (rect.bottom <= 0 || rect.top >= innerHeight)) { selBox().hidden = true; return; }
     placeSel(rect);
   }
-  // « Modifier » : l'aperçu se ferme et la phrase est sélectionnée dans le champ du modèle, prête à être retouchée à la main
+  // « Modifier » : un champ de consigne pour l'IA, facultatif (vide, elle réécrit seule la phrase). « Changer » est le choix de l'IA en un clic, sans consigne.
+  function openPrompt() {
+    const box = selBox();
+    pv.mode = 'prompt';
+    box.className = 'pv-sel pv-sel-panel';
+    box.innerHTML = `<label class="field"><span class="lbl">Que veux-tu changer ? <span class="muted small">(facultatif)</span></span>
+      <input type="text" maxlength="300" data-pv-instr autocomplete="off" placeholder="Ex. : plus court, plus chaleureux, parle du prix…"></label>
+      <div class="row"><button type="button" class="btn small primary" data-pv-go>Réécrire la phrase</button><button type="button" class="btn small" data-pv-hand>Modifier à la main</button><button type="button" class="btn small" data-pv-cancel>Annuler</button></div>`;
+    $('[data-pv-instr]', box).focus();
+    showSel();
+  }
+  // « Modifier à la main » : l'aperçu se ferme et la phrase est sélectionnée dans le champ du modèle, prête à être retouchée
   function editPick() {
     const { start, end } = pv.pick;
     const field = pv.form.body;
@@ -257,7 +268,7 @@
     const id = pv.form.closest('.project').dataset.id;
     let r;
     try {
-      r = await api(`/api/projects/${id}/template/rephrase`, { kind: pv.form.dataset.kind, body: pv.form.body.value, start, end, prospectId: pv.prospectId, avoid: pv.avoid });
+      r = await api(`/api/projects/${id}/template/rephrase`, { kind: pv.form.dataset.kind, body: pv.form.body.value, start, end, prospectId: pv.prospectId, avoid: pv.avoid, instruction: pv.instruction });
     } catch (err) { r = { unavailable: true, reason: err.message }; }
     if (mine !== pv.rseq || pv.mode !== 'busy') return;
     pv.mode = 'proposal';
@@ -318,8 +329,10 @@
         document.body.append(pvDlg);
         pvDlg.addEventListener('click', (ev) => {
           if (ev.target === pvDlg || ev.target.closest('[data-close]')) { pvDlg.close(); return; }
-          if (ev.target.closest('[data-pv-change]') && pv.pick) { changePick(); return; }
-          if (ev.target.closest('[data-pv-edit]') && pv.pick) { editPick(); return; }
+          if (ev.target.closest('[data-pv-change]') && pv.pick) { pv.instruction = ''; changePick(); return; }
+          if (ev.target.closest('[data-pv-edit]') && pv.pick) { openPrompt(); return; }
+          if (ev.target.closest('[data-pv-go]') && pv.pick) { pv.instruction = ($('[data-pv-instr]', selBox())?.value || '').trim(); changePick(); return; }
+          if (ev.target.closest('[data-pv-hand]') && pv.pick) { editPick(); return; }
           if (ev.target.closest('[data-pv-use]') && pv.proposal) { usePick(); return; }
           if (ev.target.closest('[data-pv-more]') && pv.pick) { if (pv.proposal) pv.avoid.push(pv.proposal); pv.proposal = null; changePick(); return; }
           if (ev.target.closest('[data-pv-cancel]')) { hideSel(); return; }
@@ -337,7 +350,8 @@
           if (t) { pv.tab = t.dataset.pvTab; renderPreview(); }
         });
         // Un clic sur la barre ne doit pas faire disparaître la sélection (et donc la barre) avant d'être pris en compte
-        selBox().addEventListener('mousedown', (ev) => ev.preventDefault());
+        selBox().addEventListener('mousedown', (ev) => { if (!ev.target.closest('input, textarea')) ev.preventDefault(); }); // sauf le champ de consigne : il doit pouvoir prendre le focus
+        selBox().addEventListener('keydown', (ev) => { if (ev.key === 'Enter' && ev.target.matches('[data-pv-instr]')) { ev.preventDefault(); $('[data-pv-go]', selBox()).click(); } });
         selBox().addEventListener('pointerdown', () => { pv.hold = true; });
         pvDlg.addEventListener('close', hideSel);
         pvDlg.addEventListener('change', (ev) => { if (ev.target.matches('[data-pv-prospect]')) { pv.prospectId = ev.target.value; renderPreview(); } });
