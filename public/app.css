@@ -1,4 +1,4 @@
-/* Tableau de bord d'AiTools, d'après le design Claude Design.
+/* Tableau de bord d'iaboss, d'après le design Claude Design.
    Couleurs, rayons, ombres et durées : tokens.css (rien n'est redéfini ici). Mobile d'abord ; paliers 640 px et 900 px.
    Les classes sont celles que produisent src/views.js et public/app.js (balises data-* intactes). */
 *, *::before, *::after { box-sizing: border-box; }

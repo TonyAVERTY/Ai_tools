@@ -6,7 +6,7 @@ resume: Se repérer vite dans un dépôt inconnu (stack, structure, conventions,
 intentions: explain, review, debug, feature, refactor, tests, docs, deps, resume
 quand: dépôt inconnu, question « comment ça marche / où est », début de toute tâche qui touche au code.
 pas_pour: question qui ne dépend pas du code (concept général), ou fichier déjà entièrement fourni dans la conversation.
-prerequis: le profil du dépôt (constats d'AiTools) s'il existe ; sinon la liste des fichiers à la racine.
+prerequis: le profil du dépôt (constats d'iaboss) s'il existe ; sinon la liste des fichiers à la racine.
 outils: Glob pour la structure, Grep pour les symboles et les appels, Read pour les fichiers retenus.
 reussite: tu peux citer les fichiers lus, nommer la stack et les conventions, et dire ce que tu n'as pas lu.
 ---

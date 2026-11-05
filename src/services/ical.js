@@ -52,8 +52,8 @@ function fold(line) {
 }
 
 /** @param {{uid:string, at:number, minutes?:number, title:string, description?:string}[]} events */
-export function buildIcs(events, { name = 'AiTools', at = now() } = {}) {
-  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//AiTools//Agenda//FR', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
+export function buildIcs(events, { name = 'iaboss', at = now() } = {}) {
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//iaboss//Agenda//FR', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
     `X-WR-CALNAME:${esc(name)}`, 'X-WR-TIMEZONE:Europe/Paris', 'REFRESH-INTERVAL;VALUE=DURATION:PT1H', 'X-PUBLISHED-TTL:PT1H'];
   for (const e of events) {
     lines.push('BEGIN:VEVENT', `UID:${e.uid}`, `DTSTAMP:${stamp(at)}`, `DTSTART:${stamp(e.at)}`, `DTEND:${stamp(e.at + (e.minutes || 30) * 60)}`,

@@ -66,7 +66,7 @@ test('token valide : compte, dépôts accessibles, et quels projets en font part
   // appels : API GitHub uniquement, avec le bon en-tête, jamais le token dans l'URL
   assert.deepEqual(calls.map((c) => new URL(c.url).host), ['api.github.com', 'api.github.com']);
   assert.equal(calls[0].headers.Authorization, `Bearer ${FINE}`);
-  assert.equal(calls[0].headers['User-Agent'], 'AiTools');
+  assert.equal(calls[0].headers['User-Agent'], 'iaboss');
   assert.ok(calls.every((c) => !c.url.includes(FINE)));
   // le token n'est jamais renvoyé
   assert.ok(!JSON.stringify(j).includes(FINE));

@@ -112,7 +112,7 @@ function chatgptDialog() {
     <form class="cfg" data-chatgpt-login data-consent-form>
       ${notice(OPENAI_CONSENT_TEXT)}
       ${consentBox()}
-      <p class="hint">Un lien et un code vont s'afficher. Tu valides la connexion sur chatgpt.com, puis AiTools récupère ta connexion tout seul. Dans les paramètres de sécurité de ton compte ChatGPT, la connexion par code d'appareil doit être activée. Texte d'avertissement version ${esc(OPENAI_CONSENT_VERSION)}.</p>
+      <p class="hint">Un lien et un code vont s'afficher. Tu valides la connexion sur chatgpt.com, puis iaboss récupère ta connexion tout seul. Dans les paramètres de sécurité de ton compte ChatGPT, la connexion par code d'appareil doit être activée. Texte d'avertissement version ${esc(OPENAI_CONSENT_VERSION)}.</p>
       <div class="modal-f"><button type="button" class="btn" data-close-dialog>Annuler</button><button class="btn primary" data-consent-submit disabled><span data-label>Continuer</span></button></div>
       <p class="hint" role="status" data-chatgpt-status></p>
       ${pctBlock('Préparation du lien de connexion')}
@@ -138,7 +138,7 @@ function claudeDialog(start) {
     <form class="cfg" data-claude-login data-consent-form>
       ${notice(CONSENT_TEXT)}
       ${consentBox()}
-      <p class="hint">Un lien de connexion va s'afficher. Tu te connectes à Claude, puis tu recopies ici le petit code qu'il te montre : AiTools récupère le jeton tout seul. Texte d'avertissement version ${esc(CONSENT_VERSION)}.</p>
+      <p class="hint">Un lien de connexion va s'afficher. Tu te connectes à Claude, puis tu recopies ici le petit code qu'il te montre : iaboss récupère le jeton tout seul. Texte d'avertissement version ${esc(CONSENT_VERSION)}.</p>
       <div class="modal-f"><button type="button" class="btn" data-close-dialog>Annuler</button><button class="btn primary" data-consent-submit disabled><span data-label>Continuer</span></button></div>
       <p class="hint" role="status" data-claude-status></p>
       ${pctBlock('Préparation du lien de connexion')}

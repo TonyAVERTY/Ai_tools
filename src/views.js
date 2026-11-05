@@ -46,7 +46,7 @@ export function layout({ title, body, email, scripts = [], named = false }) {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <meta name="color-scheme" content="light dark">
-<title>${esc(title)} · AiTools</title>
+<title>${esc(title)} · iaboss</title>
 ${iconLinks()}
 <link rel="stylesheet" href="${assetUrl('/static/tokens.css')}">
 <link rel="stylesheet" href="${assetUrl('/static/app.css')}">
@@ -69,7 +69,7 @@ ${SPRITE}
 <a class="skip" href="#contenu">Aller au contenu</a>
 ${email ? `<header class="top">
   <div class="top-in">
-    <a class="lockup" href="/" aria-label="AiTools, projets">${brandMark()}<span class="wordmark">AiTools</span></a>
+    <a class="lockup" href="/" aria-label="iaboss, projets">${brandMark()}<span class="wordmark">iaboss</span></a>
     <nav class="pills" aria-label="Navigation de l'application">
       ${NAV.map(([href, icon, label]) => `<a class="pill" href="${href}">${ic(icon)}${pillLabel(href, label)}</a>`).join('\n      ')}
     </nav>
@@ -83,10 +83,10 @@ ${email ? `<header class="top">
       </div>
       <a class="ia-link site-link" href="/accueil" data-noajax aria-label="Accès au site internet" title="Accès au site internet">${ic('globe')}<span>Site internet</span></a>
       <details class="ia-menu">
-        <summary class="ia-link" aria-label="Assistant : discuter avec ${esc(aiName())} ou demander de l'aide sur AiTools">${ic('spark')}<span>Assistant</span></summary>
+        <summary class="ia-link" aria-label="Assistant : discuter avec ${esc(aiName())} ou demander de l'aide sur iaboss">${ic('spark')}<span>Assistant</span></summary>
         <div class="user-pop ia-pop">
           <a href="/chat">${ic('spark')}<span class="pop-t">${esc(aiName())}<small>Discute avec ton ${esc(aiName())}</small></span></a>
-          <a href="/support">${ic('help')}<span class="pop-t">Support<small>Une question sur AiTools ?</small></span></a>
+          <a href="/support">${ic('help')}<span class="pop-t">Support<small>Une question sur iaboss ?</small></span></a>
         </div>
       </details>
       <details class="user">
@@ -167,8 +167,8 @@ function claudeLimits(quota, link) {
   const { mode } = link;
   const head = '<h3 class="sub-h">Limites d\'utilisation</h3>';
   if (mode === 'api_key') return `${head}<p class="hint">Avec une clé API, ${esc(link.providerCompany)} facture ce que tu consommes, à l'usage.</p>`;
-  // Seul Claude remonte une session de 5 h et une semaine : pour un compte ChatGPT, les limites sont celles de l'abonnement, non mesurées par AiTools
-  if (link.provider !== 'claude') return `${head}<p class="hint">Avec ton compte ${esc(link.providerLabel)}, les limites de ton abonnement s'appliquent. AiTools ne les mesure pas.</p>`;
+  // Seul Claude remonte une session de 5 h et une semaine : pour un compte ChatGPT, les limites sont celles de l'abonnement, non mesurées par iaboss
+  if (link.provider !== 'claude') return `${head}<p class="hint">Avec ton compte ${esc(link.providerLabel)}, les limites de ton abonnement s'appliquent. iaboss ne les mesure pas.</p>`;
   const row = (label, w) => {
     if (!w) return '';
     if (w.expired) return `<li class="g"><div class="g-h"><span>${label}</span><span class="g-v muted">remise à zéro</span></div></li>`;
@@ -182,7 +182,7 @@ function claudeLimits(quota, link) {
   if (!rows) return `${head}<p class="hint">${quota?.error ? esc(QUOTA_WHY[quota.error] || 'Relevé indisponible.') : 'Pas encore mesuré.'}</p>`;
   const live = quota.source === 'live' && !quota.error;
   return `${head}<ul class="usage-list">${rows}</ul>
-  <p class="hint">${live ? 'Relevé en direct chez Anthropic : il compte tout ton usage de Claude, y compris hors AiTools.' : `Dernière mesure faite pendant un job AiTools${quota.error ? ` (${esc((QUOTA_WHY[quota.error] || 'relevé en direct indisponible').replace(/\.$/, ''))})` : ''}.`}</p>`;
+  <p class="hint">${live ? 'Relevé en direct chez Anthropic : il compte tout ton usage de Claude, y compris hors iaboss.' : `Dernière mesure faite pendant un job iaboss${quota.error ? ` (${esc((QUOTA_WHY[quota.error] || 'relevé en direct indisponible').replace(/\.$/, ''))})` : ''}.`}</p>`;
 }
 
 function linkSection(link, consent, quota = null) {
@@ -238,7 +238,7 @@ ${linkSection(link, consent, quota)}
   ${icalBox(ical, '/account')}
 </section>
 <section class="card">
-  <div class="card-h"><h2>Mode développeur</h2><p>L'API d'AiTools et le serveur MCP (relier Claude à ton panel) ne sont disponibles que si tu actives ce mode.</p></div>
+  <div class="card-h"><h2>Mode développeur</h2><p>L'API d'iaboss et le serveur MCP (relier Claude à ton panel) ne sont disponibles que si tu actives ce mode.</p></div>
   <div class="row"><span class="badge ${developer ? 'ok' : ''}">${developer ? 'Activé' : 'Désactivé'}</span><a class="btn small" href="/developer">${ic('key')}${developer ? 'Jetons et documentation' : 'Activer'}</a></div>
   ${developer ? devLinks(appUrl) : `<p class="muted small">Une fois le mode activé, les adresses de l'API et du serveur MCP, leurs documentations et tes jetons s'affichent ici et sur la page Développeur.</p>`}
 </section>
@@ -299,7 +299,7 @@ function configForms(p, smtp, dbCfg, imap) {
   const source = { project: 'Ce projet envoie depuis son adresse (SMTP ci-dessous).', null: "Aucun SMTP : renseigne celui de l'adresse d'envoi de ce projet, sinon rien ne peut partir." }[p.smtpSource ?? 'null'];
   return `<form data-action="smtp" data-id="${p.id}" class="cfg">
   <h4>SMTP d'envoi de ce projet (adresse du projet)</h4>
-  <p class="muted small" data-smtp-source>${source} Les mails de prospection et les relances de ce projet partent de cette adresse (une boîte par projet). Les mails d'AiTools (rapport, évolutions, invitations) partent, eux, du serveur.</p>
+  <p class="muted small" data-smtp-source>${source} Les mails de prospection et les relances de ce projet partent de cette adresse (une boîte par projet). Les mails d'iaboss (rapport, évolutions, invitations) partent, eux, du serveur.</p>
   <div class="grid3">
     <label>Hôte<input name="host" value="${esc(smtp.host)}" placeholder="smtp.exemple.fr"></label>
     <label>Port<input name="port" type="number" value="${esc(smtp.port || 587)}"></label>
@@ -324,7 +324,7 @@ function configForms(p, smtp, dbCfg, imap) {
 </form>
 <form data-action="db" data-id="${p.id}" class="cfg">
   <h4>Base de données (récapitulatif)</h4>
-  <p class="muted small">Utilise un compte en lecture seule. AiTools lit la structure de ta base, te propose les bonnes tables et affiche un aperçu des chiffres : tu n'écris aucune requête.</p>
+  <p class="muted small">Utilise un compte en lecture seule. iaboss lit la structure de ta base, te propose les bonnes tables et affiche un aperçu des chiffres : tu n'écris aucune requête.</p>
   <div class="grid3">
     <label>Type<select name="type"><option value="mysql" ${dbCfg.type !== 'pg' ? 'selected' : ''}>MySQL / MariaDB</option><option value="pg" ${dbCfg.type === 'pg' ? 'selected' : ''}>PostgreSQL</option></select></label>
     <label>Hôte<input name="host" value="${esc(dbCfg.host)}"></label>
@@ -371,7 +371,7 @@ const ROLE_SELECT = `<label class="rolesel"><span class="lbl">Poste</span><span 
 /** Section « Postes et tâches IA » : chaque poste avec ses tâches. Les tâches qui lisent le dépôt sont réservées aux administrateurs. */
 function postesBody(p) {
   const member = p.access === 'member';
-  return `<p class="muted small">Chaque tâche fait écrire à ${esc(aiName())} un livrable à partir de la fiche du projet : le livrable reste dans AiTools, à toi de l'utiliser. Les précisions sont facultatives. Les chiffres, prix et références que la fiche ne donne pas restent « à compléter ».</p>
+  return `<p class="muted small">Chaque tâche fait écrire à ${esc(aiName())} un livrable à partir de la fiche du projet : le livrable reste dans iaboss, à toi de l'utiliser. Les précisions sont facultatives. Les chiffres, prix et références que la fiche ne donne pas restent « à compléter ».</p>
   <div class="roles">${ROLES.map((r) => `
     <details class="role" data-role="${r.id}">
       <summary><b>${esc(r.label)}</b><span class="muted small">${esc(r.summary)}</span></summary>
@@ -680,8 +680,8 @@ ${saved ? banner('ok', 'Réglages enregistrés', { strong: true }) : ''}
 <form method="post" action="/settings" class="settings-form">
 
 <section class="card" id="notif" aria-labelledby="t-notif">
-  <div class="card-h"><h2 id="t-notif">Notifications</h2><p>Où et quand AiTools te prévient : réponses de prospects, jobs terminés ou en erreur, alertes. Les liens et jetons sont stockés chiffrés et ne sont jamais réaffichés.</p></div>
-  <label class="field"><span class="lbl">Email de réception (évolutions, rapport hebdo)</span><input name="notify_email" type="email" value="${esc(s.notify_email)}" placeholder="toi@exemple.fr"><span class="hint">Ces mails partent de l'adresse d'AiTools (SMTP du serveur).</span></label>
+  <div class="card-h"><h2 id="t-notif">Notifications</h2><p>Où et quand iaboss te prévient : réponses de prospects, jobs terminés ou en erreur, alertes. Les liens et jetons sont stockés chiffrés et ne sont jamais réaffichés.</p></div>
+  <label class="field"><span class="lbl">Email de réception (évolutions, rapport hebdo)</span><input name="notify_email" type="email" value="${esc(s.notify_email)}" placeholder="toi@exemple.fr"><span class="hint">Ces mails partent de l'adresse d'iaboss (SMTP du serveur).</span></label>
   ${check('weekly_report', s.weekly_report, 'Rapport hebdo le lundi à 8h (mail + canaux ci-dessous)')}
   <div class="save"><button type="button" class="btn" data-report-send>${ic('send')}Envoyer le rapport maintenant</button></div>
 
@@ -694,7 +694,7 @@ ${saved ? banner('ok', 'Réglages enregistrés', { strong: true }) : ''}
     ${channelCard('slack', 'Slack', s, `<label class="field"><span class="lbl">Lien du webhook Slack</span><input name="slack_url" type="password" placeholder="${s.channels.slack ? '•••••• (inchangé)' : 'https://hooks.slack.com/services/…'}" autocomplete="off"><span class="hint">Slack : Apps → Incoming Webhooks.</span></label>`)}
     ${channelCard('telegram', 'Telegram', s, `<label class="field"><span class="lbl">Jeton du bot</span><input name="telegram_token" type="password" placeholder="${s.channels.telegram ? '•••••• (inchangé)' : '123456789:AA…'}" autocomplete="off"><span class="hint">Crée un bot avec @BotFather.</span></label>
       <label class="field"><span class="lbl">Identifiant de la conversation</span><input name="telegram_chat" value="${esc(s.channels.telegram?.chat || '')}" placeholder="123456789 ou @mon_canal" autocomplete="off"><span class="hint">Écris d'abord à ton bot, puis lis l'identifiant avec @userinfobot.</span></label>`)}
-    ${channelCard('email', 'E-mail', s, `<label class="field"><span class="lbl">Adresse de réception</span><input name="email_to" type="email" value="${esc(s.channels.email?.to || '')}" placeholder="toi@exemple.fr" autocomplete="off"><span class="hint">${s.canEmail ? "Envoyé depuis l'adresse d'AiTools. Au plus 20 notifications par heure." : "Ce canal s'active dès que l'administrateur a réglé le SMTP du serveur."}</span></label>`)}
+    ${channelCard('email', 'E-mail', s, `<label class="field"><span class="lbl">Adresse de réception</span><input name="email_to" type="email" value="${esc(s.channels.email?.to || '')}" placeholder="toi@exemple.fr" autocomplete="off"><span class="hint">${s.canEmail ? "Envoyé depuis l'adresse d'iaboss. Au plus 20 notifications par heure." : "Ce canal s'active dès que l'administrateur a réglé le SMTP du serveur."}</span></label>`)}
   </div>
   <template id="discord-row-tpl">${hookRow('__I__', { id: '', events: [] }, s.discord.all, { fresh: true })}</template>
   <p class="hint" data-chan-empty${s.discord.hooks.length || Object.keys(s.channels).length ? ' hidden' : ''}>Ajoute un canal ci-dessus pour recevoir les notifications.</p>
@@ -770,7 +770,7 @@ ${saved ? banner('ok', 'Réglages enregistrés', { strong: true }) : ''}
   ${s.aiSwitch ? `<p class="hint" role="status">Tu es passé de ${esc(s.aiSwitch.from)} à ${esc(s.aiSwitch.to)} le ${fmtDate(s.aiSwitch.at)} : tes choix de modèle sont repartis du modèle par défaut de ${esc(s.aiSwitch.to)}. Tes consignes personnalisées de ${esc(s.aiSwitch.from)} sont gardées, et reviennent si tu y retournes.</p>` : ''}
   <div class="card-h"><h2 id="t-budget">${s.priced ? 'Budget IA' : 'Modèles IA'}</h2>${s.priced
     ? `<p>Avec ta clé API, chaque job est facturé par ${esc(ai.company)}${ai.id === 'claude' ? ' : en équivalent $ API remonté par Claude Code' : ' : le coût est estimé d\'après les jetons utilisés et la grille de prix du modèle'}. Au-delà d'un plafond, les jobs IA attendent sans être perdus ; envois et relances continuent. Renseigne un montant pour activer un plafond.</p>`
-    : `<p>Avec ton ${ai.id === 'claude' ? 'abonnement Claude' : `compte ${esc(ai.name)}`} rien n'est facturé en plus par AiTools : ${ai.id === 'claude' ? 'le garde-fou est ton quota Claude (affiché en haut)' : 'les limites de ton abonnement s\'appliquent'}, pas un budget en $.</p>`}</div>
+    : `<p>Avec ton ${ai.id === 'claude' ? 'abonnement Claude' : `compte ${esc(ai.name)}`} rien n'est facturé en plus par iaboss : ${ai.id === 'claude' ? 'le garde-fou est ton quota Claude (affiché en haut)' : 'les limites de ton abonnement s\'appliquent'}, pas un budget en $.</p>`}</div>
   <div class="grid2">
     ${s.priced ? `<label class="field"><span class="lbl">Plafond sur 24 h glissantes</span><span class="unit"><input name="budget_day_usd" inputmode="decimal" value="${esc(s.budget_day_usd)}" placeholder="ex. 2"><span>$</span></span></label>
     <label class="field"><span class="lbl">Plafond sur 30 jours glissants</span><span class="unit"><input name="budget_month_usd" inputmode="decimal" value="${esc(s.budget_month_usd)}" placeholder="ex. 30"><span>$</span></span></label>` : ''}

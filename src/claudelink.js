@@ -29,7 +29,7 @@ export const CLI_DISABLED_MESSAGE = "Le mode abonnement est désactivé sur ce s
 export const CONSENT_VERSION = '2026-10-22.1';
 export const CONSENT_TEXT = [
   "Utiliser un abonnement Claude (Pro, Max) à travers une application tierce peut contrevenir aux conditions d'utilisation d'Anthropic et entraîner la suspension ou la fermeture de ton compte Claude.",
-  'AiTools ne peut en être tenu responsable. Tu utilises ton abonnement à tes propres risques.',
+  'iaboss ne peut en être tenu responsable. Tu utilises ton abonnement à tes propres risques.',
   "La clé API Anthropic reste l'option recommandée : elle est prévue pour cet usage.",
 ];
 export const CONSENT_CHECKBOX = "J'ai compris et j'accepte ce risque";
@@ -38,7 +38,7 @@ export const CONSENT_CHECKBOX = "J'ai compris et j'accepte ce risque";
 export const OPENAI_CONSENT_VERSION = '2026-11-04.1';
 export const OPENAI_CONSENT_TEXT = [
   "Utiliser ton compte ChatGPT (Plus, Pro, Business) à travers une application tierce peut contrevenir aux conditions d'utilisation d'OpenAI et entraîner la suspension ou la fermeture de ton compte.",
-  "AiTools ne peut en être tenu responsable. Tu utilises ton abonnement à tes propres risques. OpenAI recommande une clé API pour ce type d'usage, et réserve la connexion de compte aux environnements privés de confiance.",
+  "iaboss ne peut en être tenu responsable. Tu utilises ton abonnement à tes propres risques. OpenAI recommande une clé API pour ce type d'usage, et réserve la connexion de compte aux environnements privés de confiance.",
   "Tes tâches passent l'une après l'autre : un seul exécutable utilise ta connexion à la fois. Elle peut te demander de te reconnecter de temps en temps.",
   "La clé API OpenAI reste l'option recommandée : elle est prévue pour cet usage.",
 ];

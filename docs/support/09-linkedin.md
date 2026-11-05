@@ -5,7 +5,7 @@ Résumé : la section LinkedIn d'un projet : connexion d'un compte, choix du pro
 La section « LinkedIn » est dans chaque projet. Si le service n'a pas activé LinkedIn, elle dit : « LinkedIn n'est pas activé sur ce service : l'administrateur doit renseigner les clés de l'application LinkedIn ». Rien à faire côté utilisateur dans ce cas.
 
 ## Relier un compte
-Bouton **Connecter LinkedIn** (réservé aux administrateurs du projet ; un membre doit demander à un administrateur). AiTools demande seulement le droit de **publier un post** sur le profil (et, si le service l'a activé, sur une page que la personne administre). Rien n'est jamais publié sans un clic de confirmation.
+Bouton **Connecter LinkedIn** (réservé aux administrateurs du projet ; un membre doit demander à un administrateur). iaboss demande seulement le droit de **publier un post** sur le profil (et, si le service l'a activé, sur une page que la personne administre). Rien n'est jamais publié sans un clic de confirmation.
 - Badge **connecté** ou **connexion expirée** avec la date de validité. Un compte expiré se reconnecte avec **Reconnecter** ; **Déconnecter** retire la liaison.
 - **Publier sur** : le profil ou une page. Quand les pages sont disponibles, boutons **Choisir une page** / **Changer**. Si le compte ne peut pas publier sur le profil, il faut choisir une page. Dans « Où publier ? », on choisit **Mon profil** ou une page puis **Choisir** ; **Actualiser la liste** relit les pages administrées chez LinkedIn. Pour publier sur une page, il faut parfois **reconnecter LinkedIn** (nouvelle autorisation).
 

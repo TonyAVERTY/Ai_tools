@@ -93,7 +93,7 @@ export function registerAccountingRoutes(router, app) {
     const text = String(q.get('q') || '').trim().slice(0, 80).toLowerCase();
 
     const every = await db.prepare('SELECT * FROM accounting_entries WHERE user_id = ? ORDER BY entry_date DESC, id DESC').all(userId);
-    // Les factures émises dans AiTools et pas encore encaissées ne comptent dans aucun chiffre : elles sont listées à part
+    // Les factures émises dans iaboss et pas encore encaissées ne comptent dans aucun chiffre : elles sont listées à part
     const all = every.filter((r) => !Number(r.pending));
     const pendingRows = every.filter((r) => Number(r.pending));
     const inPeriod = rowsInRange(all, range.from, range.to);
@@ -303,7 +303,7 @@ export function registerAccountingRoutes(router, app) {
       files.push({ name: pathOf(r), read: () => readFileSync(path), mtime: new Date(Number(r.created_at) * 1000) });
     }
     const csv = buildCsv(rows, { fileOf: (r) => (missing.includes(r) ? 'fichier manquant' : pathOf(r)) });
-    const readme = [`Archive générée par AiTools le ${todayIso()}.`, '', `Contenu : ${files.length} justificatif(s) et le journal (journal.csv).`,
+    const readme = [`Archive générée par iaboss le ${todayIso()}.`, '', `Contenu : ${files.length} justificatif(s) et le journal (journal.csv).`,
       `Sélection : ${label.replace(/-/g, ' ')}${period !== 'tout' ? `, période ${period}` : ''}.`, '',
       'journal.csv : une ligne par écriture (séparateur « ; », virgule décimale), avec le chemin du justificatif.',
       'Les entrées sont positives, les sorties négatives. Transmets cette archive telle quelle à ton comptable.', ''].join('\r\n');

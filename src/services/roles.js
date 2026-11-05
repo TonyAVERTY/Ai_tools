@@ -6,7 +6,7 @@
 //   repo : Claude lit le dépôt du projet, en lecture seule (documentation technique, tests, conformité…). Réservé aux administrateurs.
 // Une tâche devient un job IA de type `poste_<id>` : l'id est donc court, en minuscules et chiffres, et unique dans tout le catalogue.
 //
-// `sections` = les sections de projet (data-acc) qui relèvent déjà de ce poste dans AiTools : le filtre les garde visibles.
+// `sections` = les sections de projet (data-acc) qui relèvent déjà de ce poste dans iaboss : le filtre les garde visibles.
 // Sections sans poste (En-tête, Configuration du projet) : toujours visibles.
 
 export const POSTE_PREFIX = 'poste_';

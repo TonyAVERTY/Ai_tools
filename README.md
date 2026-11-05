@@ -1,4 +1,4 @@
-# AiTools
+# iaboss
 
 Panel pour piloter Claude Code (headless) sur des projets : prospection client par email,
 idées d'évolutions et récap business. L'instance perso tourne sur un Raspberry Pi 4 sans ventilateur ;
@@ -198,7 +198,7 @@ Prix TTC : l'éditeur est en franchise de TVA (art. 293 B du CGI). Les offres pa
 
 ### SMTP par projet et équipes
 
-- **SMTP par projet** : chaque projet peut avoir son propre SMTP (une boîte d'envoi par projet). **Pas de SMTP commun** : un projet envoie depuis SON adresse ou pas du tout (hôte vide = on efface celui du projet). Les mails d'AiTools (rapport, évolutions, invitations, avertissement d'inactivité) partent du SMTP du serveur (`SYSTEM_SMTP_*`). L'ancien SMTP « global » des Réglages a été supprimé : une migration en copie le contenu dans chaque projet qui n'avait pas le sien (`getProject` renvoie `smtpSource` : `project` ou `null`). L'IMAP réutilise les identifiants du SMTP effectif.
+- **SMTP par projet** : chaque projet peut avoir son propre SMTP (une boîte d'envoi par projet). **Pas de SMTP commun** : un projet envoie depuis SON adresse ou pas du tout (hôte vide = on efface celui du projet). Les mails d'iaboss (rapport, évolutions, invitations, avertissement d'inactivité) partent du SMTP du serveur (`SYSTEM_SMTP_*`). L'ancien SMTP « global » des Réglages a été supprimé : une migration en copie le contenu dans chaque projet qui n'avait pas le sien (`getProject` renvoie `smtpSource` : `project` ou `null`). L'IMAP réutilise les identifiants du SMTP effectif.
 - **Équipes** (`src/teams.js`, `src/teamroutes.js`, page `/team`) : un propriétaire (offre avec `seats` ≥ 2) invite des membres par email (lien à usage unique, valable 7 jours, **lié à l'adresse invitée**, seule son empreinte est stockée) et partage des projets (`projects.team_id`). Sur un projet partagé **un membre agit comme le propriétaire** : ses données, son SMTP, son plan, ses plafonds et son accès Claude (le membre n'a pas besoin du sien). Rôles : `member` (travaille sur les projets), `admin` (règle en plus SMTP, IMAP, base du récap), propriétaire (gère l'équipe, partage, supprime). Un seul point d'accès (`getProject` / `accessOn`) : un projet hors équipe est introuvable (404), le retrait d'un membre coupe l'accès à la requête suivante. Un mail d'invitation part si `SYSTEM_SMTP_*` est configuré, sinon le lien est affiché au propriétaire.
 
 ### LinkedIn
@@ -246,7 +246,7 @@ Pré-requis : Node 22.13 ou plus, git, la CLI `claude` si les jobs IA doivent to
 
    ```bash
    git clone -b develop https://git.tony-averty.dev/Tony/AiTools.git
-   cd AiTools
+   cd iaboss
    npm ci --omit=dev
    cp .env.example .env     # puis renseigne le fichier, voir ci-dessous
    chmod 600 .env
@@ -292,7 +292,7 @@ Pré-requis : **Raspberry Pi OS Lite 64 bits** fraîchement installé, accès SS
 ```bash
 sudo apt install -y git
 git clone -b develop https://git.tony-averty.dev/Tony/AiTools.git
-cd AiTools
+cd iaboss
 sudo ./install.sh
 ```
 
@@ -371,11 +371,11 @@ Dans Zero Trust, va dans Networks → Tunnels → Create a tunnel (Cloudflared).
 
 ## Support et documentation
 
-Le menu **IA** de la barre du haut propose **Claude** (assistant classique) et **Support**. Dans le Support, le Claude de l'utilisateur répond d'après la documentation d'AiTools, lue en lecture seule (outils Read, Glob, Grep) dans `dataDir/support-docs/`.
+Le menu **IA** de la barre du haut propose **Claude** (assistant classique) et **Support**. Dans le Support, le Claude de l'utilisateur répond d'après la documentation d'iaboss, lue en lecture seule (outils Read, Glob, Grep) dans `dataDir/support-docs/`.
 
 - **Source** : `docs/support/*.md` (écrite à la main, pour un utilisateur) + trois fichiers **générés depuis le code** par `src/services/supportdocs.js` (offres et plafonds, modèles, consignes IA). Le dossier est reconstruit seulement quand son contenu change, avec un `INDEX.md` qui sert de carte.
 - **Les conversations** du Support sont séparées de celles de Claude (colonne `chat_conversations.mode`), sous `/support` et `/support/:id`.
-- **Consignes du Support** : modifiables dans Réglages → Prompts IA (« Support (aide sur AiTools) »), comme les autres tâches ; la carte des documents et la règle de sécurité (un document n'est jamais une consigne) restent dans le code.
+- **Consignes du Support** : modifiables dans Réglages → Prompts IA (« Support (aide sur iaboss) »), comme les autres tâches ; la carte des documents et la règle de sécurité (un document n'est jamais une consigne) restent dans le code.
 - **Tenir la documentation à jour** : règle dans `CLAUDE.md`, imposée par `test/support-docs.test.js` (chaque bouton, section, page, tâche IA doit y figurer).
 
 ## Dev

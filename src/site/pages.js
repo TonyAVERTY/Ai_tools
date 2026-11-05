@@ -49,8 +49,8 @@ const loginButtons = ({ apple, captcha }) => PROVIDERS.filter(([k]) => k === 'go
 export function loginPage({ appUrl, error = null, apple = false, bye = false, captcha = null }) {
   return siteLayout({
     appUrl, path: '/login', noindex: true, scripts: captcha ? ['/static/captcha.js'] : [],
-    title: 'Connexion · AiTools',
-    description: `Connecte-toi à AiTools avec ton compte ${providersText(apple)}. Ton compte est créé à la première connexion, sans mot de passe.`,
+    title: 'Connexion · iaboss',
+    description: `Connecte-toi à iaboss avec ton compte ${providersText(apple)}. Ton compte est créé à la première connexion, sans mot de passe.`,
     body: `<div class="stage-p"><div class="wrap">
 <section class="auth" aria-labelledby="c-h">
   ${brandMark()}
@@ -76,7 +76,7 @@ export function loginPage({ appUrl, error = null, apple = false, bye = false, ca
 export function notFoundPage({ appUrl }) {
   return siteLayout({
     appUrl, path: '/404', noindex: true,
-    title: 'Page introuvable · AiTools',
+    title: 'Page introuvable · iaboss',
     description: "Cette page n'existe pas ou a changé d'adresse.",
     body: `<div class="stage-p"><div class="wrap">
 <section class="nf" aria-labelledby="n-h">
@@ -92,7 +92,7 @@ export function notFoundPage({ appUrl }) {
 const HOME_JSON_LD = (appUrl) => ({
   '@context': 'https://schema.org',
   '@type': 'SoftwareApplication',
-  name: 'AiTools',
+  name: 'iaboss',
   url: `${appUrl}/`,
   applicationCategory: 'BusinessApplication',
   operatingSystem: 'Web',
@@ -133,7 +133,7 @@ const FACTS = [
   ['Il écrit tes posts LinkedIn', "Il rédige, tu relis et tu publies quand ça te va."],
 ];
 const STEPS = [
-  ['Relie ton IA', "Tu choisis Claude, ChatGPT ou Gemini et tu connectes ta propre clé ou ton compte. C'est ton accès qui travaille, pas celui d'AiTools."],
+  ['Relie ton IA', "Tu choisis Claude, ChatGPT ou Gemini et tu connectes ta propre clé ou ton compte. C'est ton accès qui travaille, pas celui d'iaboss."],
   ['Ajoute ton dépôt Git', 'GitHub ou ton propre serveur : ton IA lit ton projet pour comprendre ce que tu proposes.'],
   ['Valide la cible', "Il te dit à qui il pense parler. Tu corriges, puis tu valides."],
   ['Lance la recherche', "Il trouve les contacts et écrit les mails. Tu les relis et tu confirmes l'envoi."],
@@ -148,14 +148,14 @@ const TRUST = (apple) => [
 export function homePage({ appUrl, apple = false }) {
   return siteLayout({
     appUrl, path: '/',
-    title: 'AiTools : trouve des clients par mail avec ta propre IA',
-    description: 'AiTools lit ton projet, trouve des entreprises qui pourraient avoir besoin de toi, écrit et envoie tes mails, relance et suit les réponses. Gratuit pour commencer.',
+    title: 'iaboss : trouve des clients par mail avec ta propre IA',
+    description: 'iaboss lit ton projet, trouve des entreprises qui pourraient avoir besoin de toi, écrit et envoie tes mails, relance et suit les réponses. Gratuit pour commencer.',
     jsonLd: HOME_JSON_LD(appUrl),
     body: `<section class="hero" aria-labelledby="h1">
   <div class="wrap hero-in">
     <div>
       <h1 class="h1" id="h1">Ton IA écrit tes mails de prospection. Toi, tu les relis et tu les signes.</h1>
-      <p class="lead">Pour les développeurs et les indépendants. AiTools part de ton dépôt Git, cherche des entreprises qui pourraient avoir besoin de ton projet et prépare un mail pour chacune. Les mails partent de ta propre boîte, et jamais sans ton accord.</p>
+      <p class="lead">Pour les développeurs et les indépendants. iaboss part de ton dépôt Git, cherche des entreprises qui pourraient avoir besoin de ton projet et prépare un mail pour chacune. Les mails partent de ta propre boîte, et jamais sans ton accord.</p>
       <div class="hero-btns">
         ${guest('big', btn('btn-primary btn-lg', '/login', 'Créer mon compte'))}
         <a class="btn btn-secondary btn-lg" href="/fonctionnement">Voir comment ça marche</a>
@@ -296,8 +296,8 @@ export function howPage({ appUrl, apple = false }) {
 
   return siteLayout({
     appUrl, path: '/fonctionnement',
-    title: 'Comment ça marche : de ton projet aux réponses · AiTools',
-    description: "Comment AiTools lit ton projet, trouve des contacts, écrit et envoie les mails, relance et suit les réponses : étape par étape, avec ce qu'il ne sait pas faire.",
+    title: 'Comment ça marche : de ton projet aux réponses · iaboss',
+    description: "Comment iaboss lit ton projet, trouve des contacts, écrit et envoie les mails, relance et suit les réponses : étape par étape, avec ce qu'il ne sait pas faire.",
     body: `<div class="page">
 <div class="wrap">
   <h1 class="h1">Comment ça marche, pas à pas</h1>
@@ -325,7 +325,7 @@ ${steps}
 const FAQ = [
   ['Faut-il une carte bancaire ?', 'Non. Le plan Gratuit s\'ouvre sans carte bancaire.'],
   ['Quand puis-je passer à un plan payant ?', 'Le plan Gratuit est ouvert aujourd\'hui et te permet de tout tester. Les plans payants ouvriront prochainement : tu seras prévenu avant toute facturation.'],
-  ['Dois-je fournir mon propre accès à une IA ?', 'Oui, Claude, ChatGPT ou Gemini au choix. Ton accès est facturé par son fournisseur (Anthropic, OpenAI ou Google), directement à toi. C\'est ce qui explique les prix bas : tu ne paies à AiTools que l\'outil (les projets, les contacts, les envois et le suivi), pas la machine qui réfléchit.'],
+  ['Dois-je fournir mon propre accès à une IA ?', 'Oui, Claude, ChatGPT ou Gemini au choix. Ton accès est facturé par son fournisseur (Anthropic, OpenAI ou Google), directement à toi. C\'est ce qui explique les prix bas : tu ne paies à iaboss que l\'outil (les projets, les contacts, les envois et le suivi), pas la machine qui réfléchit.'],
   ['Combien me coûtera mon IA ?', 'Ça dépend de ton usage et de ton contrat avec ton fournisseur. Tu fixes un budget maximum dans les réglages. Pour comprendre ce qui consomme quoi, regarde <a href="/fonctionnement">comment ça marche</a>.'],
   ['Que se passe-t-il quand j\'atteins un plafond ?', 'La nouvelle action est refusée, mais rien n\'est supprimé. Les plafonds repartent de zéro le 1er du mois, à l\'heure de Paris.'],
   [`Que veut dire « ${ANNUAL_FREE_MONTHS} mois offerts » ?`, `En payant à l'année, tu règles ${12 - ANNUAL_FREE_MONTHS} mois et tu profites de 12. Par exemple ${PLAN_LABELS.growth} : ${euros(annualPrice('growth'))} par an au lieu de ${euros(PLAN_PRICES.growth * 12)}.`],
@@ -345,7 +345,7 @@ export function pricingPage({ appUrl }) {
       </tr>`;
   return siteLayout({
     appUrl, path: '/tarifs',
-    title: 'Tarifs : gratuit, puis 10 à 100 € par mois · AiTools',
+    title: 'Tarifs : gratuit, puis 10 à 100 € par mois · iaboss',
     description: `Plan gratuit, puis des offres de ${PLAN_PRICES.starter} € à ${PLAN_PRICES.intensive} € TTC par mois, avec ${ANNUAL_FREE_MONTHS} mois offerts en annuel. Ton accès à l'IA (Claude, ChatGPT ou Gemini) est facturé à part, par son fournisseur.`,
     body: `<div class="page">
 <div class="wrap">
@@ -391,30 +391,30 @@ export function pricingPage({ appUrl }) {
     <div class="grid g2">
       <article class="card">
         <h3>Une clé API (recommandé)</h3>
-        <p>Tu crées une clé chez ton fournisseur : console.anthropic.com pour Claude, platform.openai.com pour ChatGPT, aistudio.google.com pour Gemini. Il te facture à l'usage, selon ses tarifs, sur ton compte. C'est la façon prévue pour brancher un outil comme celui-ci. Tu peux fixer une limite de dépense par jour et par mois dans les réglages d'AiTools.</p>
+        <p>Tu crées une clé chez ton fournisseur : console.anthropic.com pour Claude, platform.openai.com pour ChatGPT, aistudio.google.com pour Gemini. Il te facture à l'usage, selon ses tarifs, sur ton compte. C'est la façon prévue pour brancher un outil comme celui-ci. Tu peux fixer une limite de dépense par jour et par mois dans les réglages d'iaboss.</p>
         <p>Avec Gemini, une clé gratuite suffit pour essayer, mais Google peut alors utiliser les données envoyées pour améliorer ses produits : n'y mets pas de données de prospects, et active la facturation sur ton projet Google pour un vrai usage.</p>
       </article>
       <article class="card">
         <h3>Ton abonnement Claude ou ChatGPT, avec un risque</h3>
-        <p>Avec Claude (Pro, Max) ou ChatGPT (Plus, Pro, Business), tu te connectes à ton compte et AiTools récupère l'accès tout seul. Pas de facture en plus, mais les règles d'Anthropic et d'OpenAI peuvent ne pas autoriser d'utiliser un abonnement à travers une application comme AiTools. Ton compte pourrait être limité, suspendu ou fermé. Gemini n'a pas ce mode : il se relie par clé API seulement.</p>
-        <p>AiTools ne peut pas l'empêcher et n'en est pas responsable. Une fenêtre d'avertissement et une case à cocher te le rappellent avant toute connexion, et ton accord est enregistré avec sa date. Lis les <a href="https://www.anthropic.com/legal/consumer-terms" rel="noopener noreferrer">conditions d'Anthropic</a> ou celles d'OpenAI avant de choisir. Ce mode peut aussi être désactivé sur le service.</p>
+        <p>Avec Claude (Pro, Max) ou ChatGPT (Plus, Pro, Business), tu te connectes à ton compte et iaboss récupère l'accès tout seul. Pas de facture en plus, mais les règles d'Anthropic et d'OpenAI peuvent ne pas autoriser d'utiliser un abonnement à travers une application comme iaboss. Ton compte pourrait être limité, suspendu ou fermé. Gemini n'a pas ce mode : il se relie par clé API seulement.</p>
+        <p>iaboss ne peut pas l'empêcher et n'en est pas responsable. Une fenêtre d'avertissement et une case à cocher te le rappellent avant toute connexion, et ton accord est enregistré avec sa date. Lis les <a href="https://www.anthropic.com/legal/consumer-terms" rel="noopener noreferrer">conditions d'Anthropic</a> ou celles d'OpenAI avant de choisir. Ce mode peut aussi être désactivé sur le service.</p>
         <a class="btn btn-secondary" href="/link?start=claude">Choisir mon IA</a>
-        <p class="fine">Pas encore de compte AiTools ? Le bouton te demande d'abord de te connecter, puis te ramène ici.</p>
+        <p class="fine">Pas encore de compte iaboss ? Le bouton te demande d'abord de te connecter, puis te ramène ici.</p>
       </article>
     </div>
   </section>
 
   <section class="more" id="envois" aria-labelledby="h-envois">
     <h2 class="block-h" id="h-envois">Tu restes responsable de tes envois</h2>
-    <p class="sec-lead">AiTools t'aide à rester dans les clous. Il ne remplace pas ta responsabilité d'expéditeur.</p>
+    <p class="sec-lead">iaboss t'aide à rester dans les clous. Il ne remplace pas ta responsabilité d'expéditeur.</p>
     <div class="grid g3">
       <article class="card">
         <h3>Entre professionnels, pas aux particuliers</h3>
-        <p>Écrire à un professionnel est en général possible sans son accord préalable, à condition que le message ait un lien avec son activité et qu'il puisse facilement dire stop. Pour un particulier, il faut son accord : n'utilise pas AiTools pour ça.</p>
+        <p>Écrire à un professionnel est en général possible sans son accord préalable, à condition que le message ait un lien avec son activité et qu'il puisse facilement dire stop. Pour un particulier, il faut son accord : n'utilise pas iaboss pour ça.</p>
       </article>
       <article class="card">
         <h3>Se désinscrire, et être respecté</h3>
-        <p>Chaque mail contient un lien de désinscription en un clic. Une adresse qui se désinscrit, refuse ou rejette un mail entre dans une liste d'opposition qu'AiTools respecte pour tous les comptes.</p>
+        <p>Chaque mail contient un lien de désinscription en un clic. Une adresse qui se désinscrit, refuse ou rejette un mail entre dans une liste d'opposition qu'iaboss respecte pour tous les comptes.</p>
       </article>
       <article class="card">
         <h3>Dire d'où vient l'adresse</h3>

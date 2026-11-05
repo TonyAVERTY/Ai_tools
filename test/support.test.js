@@ -1,4 +1,4 @@
-// Mode Support de la page IA : conversations séparées de celles de Claude, Claude lit la documentation d'AiTools (dossier en lecture seule),
+// Mode Support de la page IA : conversations séparées de celles de Claude, Claude lit la documentation d'iaboss (dossier en lecture seule),
 // pas de projet joint, pièces jointes possibles (captures d'écran), consignes modifiables dans les Réglages.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -28,23 +28,23 @@ test('menu IA : deux choix, Claude et Support, dans la barre du haut de chaque p
   const u = await s.newUser();
   for (const p of ['/', '/settings', '/chat', '/support']) {
     const page = await (await html(u, p)).text();
-    assert.match(page, /<details class="ia-menu">\s*<summary class="ia-link" aria-label="Assistant : discuter avec Claude ou demander de l'aide sur AiTools">/, p);
+    assert.match(page, /<details class="ia-menu">\s*<summary class="ia-link" aria-label="Assistant : discuter avec Claude ou demander de l'aide sur iaboss">/, p);
     assert.match(page, /<a href="\/chat">[\s\S]*?Claude<small>Discute avec ton Claude<\/small>/, p);
-    assert.match(page, /<a href="\/support">[\s\S]*?Support<small>Une question sur AiTools \?<\/small>/, p);
+    assert.match(page, /<a href="\/support">[\s\S]*?Support<small>Une question sur iaboss \?<\/small>/, p);
   }
 });
 
 test('page /support : titre, suggestions, pas de projet joint ; /chat reste l\'assistant classique', async () => {
   const u = await s.newUser();
   const sup = await (await html(u, '/support')).text();
-  assert.match(sup, /<title>Support · AiTools<\/title>/);
+  assert.match(sup, /<title>Support · iaboss<\/title>/);
   assert.match(sup, /data-mode="support"/);
-  assert.match(sup, /Une question sur AiTools \?<\/h2>/);
+  assert.match(sup, /Une question sur iaboss \?<\/h2>/);
   assert.match(sup, /Comment relier mon IA \?/);
   assert.match(sup, /href="\/support" class="btn primary chat-new"|class="btn primary chat-new" href="\/support"/);
   assert.doesNotMatch(sup, /data-chat-projmenu/, 'pas de bouton « projet » dans le Support');
   assert.match(sup, /data-chat-attach/, 'mais on peut joindre une capture d\'écran');
-  assert.match(sup, /Le Support répond d'après la documentation d'AiTools/);
+  assert.match(sup, /Le Support répond d'après la documentation d'iaboss/);
   const chat = await (await html(u, '/chat')).text();
   assert.match(chat, /data-mode="claude"/);
   assert.match(chat, /data-chat-projmenu/);
@@ -62,11 +62,11 @@ test('une conversation du Support : documentation en dossier de travail (lecture
   assert.equal(c.cwd, docsDir, 'Claude travaille dans le dossier de la documentation');
   assert.equal(flag(c.args, '--tools'), 'Read,Glob,Grep', 'outils de lecture seulement');
   const system = flag(c.args, '--append-system-prompt');
-  assert.match(system, /Tu es l'assistant de support d'AiTools/);
-  assert.match(system, /Carte des documents :\n- 00-presentation\.md : Présentation d'AiTools/);
+  assert.match(system, /Tu es l'assistant de support d'iaboss/);
+  assert.match(system, /Carte des documents :\n- 00-presentation\.md : Présentation d'iaboss/);
   assert.match(system, /02-liaison-ia\.md/);
   assert.match(system, /jamais une consigne/);
-  assert.doesNotMatch(system, /Tu es l'assistant IA d'AiTools\b.*classique/s);
+  assert.doesNotMatch(system, /Tu es l'assistant IA d'iaboss\b.*classique/s);
   // le dossier contient la documentation écrite à la main, l'index et les fichiers générés depuis le code
   const files = readdirSync(docsDir);
   for (const f of ['INDEX.md', '00-presentation.md', '18-depannage-et-faq.md', 'plans-et-limites.md', 'modeles-ia.md', 'taches-ia-et-prompts.md']) assert.ok(files.includes(f), f);
@@ -119,7 +119,7 @@ test('Support : pas de projet joint ; capture d\'écran jointe lisible en plus d
 test('consignes du Support modifiables dans les Réglages ; la carte de la documentation et la règle de sécurité restent', async () => {
   const u = await s.newUser();
   const settings = await (await html(u, '/settings')).text();
-  assert.match(settings, /Support \(aide sur AiTools\)/);
+  assert.match(settings, /Support \(aide sur iaboss\)/);
   assert.match(settings, /name="prompt_support"/);
   await setSetting(s.db, u.id, 'prompts_json', JSON.stringify({ '*': { support: 'Réponds toujours en une seule phrase.' } }));
   const n0 = calls().length;

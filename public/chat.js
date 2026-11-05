@@ -1,5 +1,5 @@
 // Page IA : envoi des messages à Claude et affichage de la réponse au fil de l'écriture (flux de lignes JSON, voir src/chat.js),
-// pièces jointes (photos, vidéos, PDF, fichiers texte, projet AiTools) téléversées avant l'envoi (voir src/chatfiles.js).
+// pièces jointes (photos, vidéos, PDF, fichiers texte, projet iaboss) téléversées avant l'envoi (voir src/chatfiles.js).
 (() => {
   const root = document.getElementById('chat');
   if (!root) return;

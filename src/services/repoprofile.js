@@ -259,7 +259,7 @@ const list = (a) => a.join(', ');
 /** Texte compact (environ 2 500 caractères au plus) donné à Claude : faits observés avec preuve, puis lacunes. */
 export function renderRepoProfile(f) {
   const L = [];
-  L.push(`Constats établis par AiTools en lisant le dépôt (observés, avec leur fichier source ; rien n'a été exécuté, donc une commande listée n'est PAS vérifiée comme fonctionnelle) :`);
+  L.push(`Constats établis par iaboss en lisant le dépôt (observés, avec leur fichier source ; rien n'a été exécuté, donc une commande listée n'est PAS vérifiée comme fonctionnelle) :`);
   if (f.languages.length) L.push(`- Langages (fichiers) : ${list(f.languages.map((l) => `${l.language} ${l.files}`))}.`);
   if (f.managers.length) L.push(`- Gestionnaires / outils de build : ${list(f.managers.map((m) => `${m.name} (${m.evidence})`))}.`);
   if (f.frameworks.length) L.push(`- Bibliothèques et frameworks repérés dans les dépendances : ${list(f.frameworks)}.`);

@@ -22,7 +22,7 @@
     }
     const acc = s.account;
     if (!acc) {
-      box.innerHTML = `<p>Relie un compte LinkedIn à ce projet : ${esc(aiName())} pourra écrire des posts pour ce compte. AiTools demande seulement le droit de <strong>publier un post ${s.pagesEnabled ? 'sur ton profil ou sur une page que tu administres' : 'sur ton profil'}</strong>, et ne publie jamais sans ton clic.</p>
+      box.innerHTML = `<p>Relie un compte LinkedIn à ce projet : ${esc(aiName())} pourra écrire des posts pour ce compte. iaboss demande seulement le droit de <strong>publier un post ${s.pagesEnabled ? 'sur ton profil ou sur une page que tu administres' : 'sur ton profil'}</strong>, et ne publie jamais sans ton clic.</p>
         ${s.canManage ? `<p><a class="btn primary" href="/linkedin/connect?project=${id}">Connecter LinkedIn</a></p>` : '<p class="muted small">Demande à un administrateur du projet de relier le compte.</p>'}`;
       return;
     }

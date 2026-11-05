@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Banc d'essai de l'intelligence d'AiTools. Deux parties :
+// Banc d'essai de l'intelligence d'iaboss. Deux parties :
 //
 //  1. HORS LIGNE (par défaut, gratuit, reproductible) : exactitude du profil de dépôt sur des dépôts factices de plusieurs stacks, exactitude de la
 //     sélection de l'orchestrateur sur des demandes étiquetées, surcoût en caractères (≈ jetons) de chaque mode, durée du profil à froid et en cache.
@@ -100,7 +100,7 @@ if (flag('live')) {
   }
   console.log('\nAvec peu d\'essais, une différence n\'est pas une preuve : augmente --runs et compare les écarts à la variabilité entre essais.');
 } else {
-  console.log('\n(Partie live non exécutée : ajoute --live avec ANTHROPIC_API_KEY pour comparer Claude seul et Claude avec AiTools. Aucune supériorité n\'est revendiquée sans elle.)');
+  console.log('\n(Partie live non exécutée : ajoute --live avec ANTHROPIC_API_KEY pour comparer Claude seul et Claude avec iaboss. Aucune supériorité n\'est revendiquée sans elle.)');
 }
 
 if (opt('out', null)) { writeFileSync(opt('out'), JSON.stringify(report, null, 2)); console.log(`Résultats écrits dans ${opt('out')}`); }
