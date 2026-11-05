@@ -253,11 +253,12 @@ export function registerProspectRoutes(router, app, { project }) {
     }
     const vars = mailVars(prospect || SAMPLE_PERSON, { fromName: p.smtp?.fromName || '' }, p.siteUrl);
     const avoid = (Array.isArray(b.avoid) ? b.avoid : []).slice(-5).map((a) => String(a ?? '').slice(0, 700)).filter(Boolean);
+    const instruction = String(b.instruction ?? '').replace(/\s+/g, ' ').trim().slice(0, 300); // facultative : vide, l'IA choisit seule
     const budget = await budgetState(db, p.userId);
     if (budget.blocked) return json(ctx.res, { ok: true, unavailable: true, reason: `Budget IA atteint : ${budget.reason}` });
     const model = normalizeModel(await getSetting(db, p.userId, 'write_model', ''), 'haiku', await userProvider(db, p.userId));
     try {
-      const r = await proposeSentence({ claude, userId: p.userId, model, kind, template: body, sentence: body.slice(start, end), avoid, facts: JSON.stringify([p.profile, p.target]).slice(0, 4000) });
+      const r = await proposeSentence({ claude, userId: p.userId, model, kind, template: body, sentence: body.slice(start, end), avoid, instruction, facts: JSON.stringify([p.profile, p.target]).slice(0, 4000) });
       json(ctx.res, { ok: true, sentence: r.sentence, shown: fillBody(r.sentence, vars).trim() });
     } catch (e) {
       if (!(e instanceof SenseUnavailable)) throw e;

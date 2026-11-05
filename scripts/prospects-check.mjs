@@ -159,12 +159,37 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   await p.waitForSelector('dialog.mailprev [data-pv-cancel]', { timeout: 15000 });
   await p.locator('dialog.mailprev [data-pv-cancel]').click();
   ok((await bodyOf()) === before && await bar.count() === 0, `${tag} Annuler : le modèle ne change pas et la barre disparaît`);
-  // Modifier : l'aperçu se ferme, la phrase est sélectionnée dans le champ du modèle
+  // Modifier : un champ de consigne facultatif ; vide, l'IA réécrit seule ; rempli, sa proposition en tient compte
+  const instr = p.locator('dialog.mailprev [data-pv-instr]');
+  await selectIn(SENT);
+  await bar.waitFor({ timeout: 5000 });
+  await p.locator('dialog.mailprev [data-pv-edit]').click();
+  await instr.waitFor({ timeout: 5000 });
+  ok((await instr.inputValue()) === '' && await instr.evaluate((e) => e === document.activeElement), `${tag} Modifier : un champ de consigne, vide et prêt à écrire`);
+  ok(!(await p.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)), `${tag} pas de défilement horizontal avec le champ de consigne`);
+  await p.locator('dialog.mailprev [data-pv-go]').click(); // laissé vide
+  await p.waitForSelector('dialog.mailprev [data-pv-use]', { timeout: 15000 });
+  const emptyWish = await p.locator('dialog.mailprev .pv-prop-t').innerText();
+  ok(/Autre formulation \d :/.test(emptyWish) && !/\(/.test(emptyWish.split(':')[0]), `${tag} consigne laissée vide : l'IA propose seule (${emptyWish.slice(0, 30)}…)`);
+  await p.locator('dialog.mailprev [data-pv-cancel]').click();
+  await selectIn(SENT);
+  await bar.waitFor({ timeout: 5000 });
+  await p.locator('dialog.mailprev [data-pv-edit]').click();
+  await instr.fill('plus court');
+  await instr.press('Enter');
+  await p.waitForSelector('dialog.mailprev [data-pv-use]', { timeout: 15000 });
+  ok(/\(plus court\)/.test(await p.locator('dialog.mailprev .pv-prop-t').innerText()), `${tag} consigne écrite (touche Entrée) : la proposition en tient compte`);
+  await p.locator('dialog.mailprev [data-pv-more]').click();
+  await p.waitForFunction(() => /Autre formulation \d+ \(plus court\)/.test(document.querySelector('dialog.mailprev .pv-prop-t')?.textContent || ''), null, { timeout: 15000 });
+  ok(true, `${tag} « Proposer une autre phrase » garde la consigne`);
+  await p.locator('dialog.mailprev [data-pv-cancel]').click();
+  // Modifier à la main : l'aperçu se ferme, la phrase est sélectionnée dans le champ du modèle
   await selectIn('Bien cordialement,');
   await bar.waitFor({ timeout: 5000 });
   await p.locator('dialog.mailprev [data-pv-edit]').click();
+  await p.locator('dialog.mailprev [data-pv-hand]').click();
   const edit = await p.evaluate((sel) => { const f = document.querySelector(sel); return { active: document.activeElement === f, text: f.value.slice(f.selectionStart, f.selectionEnd), open: !!document.querySelector('dialog.mailprev[open]') }; }, `${tpl} [name=body]`);
-  ok(!edit.open && edit.active && edit.text === 'Bien cordialement,', `${tag} Modifier : l'aperçu se ferme et la phrase est sélectionnée dans le champ du modèle (« ${edit.text} »)`);
+  ok(!edit.open && edit.active && edit.text === 'Bien cordialement,', `${tag} Modifier à la main : l'aperçu se ferme et la phrase est sélectionnée dans le champ du modèle (« ${edit.text} »)`);
   // vue tableau : un prospect glissé d'une colonne à l'autre change de statut côté serveur
   const kanbanEmail = `kanban-${vp.width}@atelier.fr`;
   const kanbanName = `Atelier Kanban ${vp.width}`; // un nom par largeur : le prospect du premier passage reste dans la base
