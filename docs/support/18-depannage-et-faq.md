@@ -116,7 +116,7 @@ Pour rédiger un mail, trouver des idées de posts, réfléchir à une stratégi
 - **AiTools modifie-t-il mon code ?** Non : le dépôt est cloné et lu en lecture seule.
 - **Puis-je changer le dépôt d'un projet ?** Non : créer un nouveau projet.
 - **Combien de temps dure une recherche ou une vidéo ?** Quelques minutes ; l'avancement est dans Activité.
-- **Où voir ce que j'ai consommé ?** « Mon compte → Usage du mois », la carte « Consommation Claude » de la page Projets et « Mon compte → Liaison Claude → Limites d'utilisation ».
+- **Où voir ce que j'ai consommé ?** « Mon compte → Usage du mois », la carte « Consommation » de la page Projets (suivie du nom de ton IA : « Consommation Gemini », par exemple) et « Mon compte → Mon IA → Limites d'utilisation ».
 - **Comment arrêter les notifications ?** Réglages → Notifications : décocher les événements ou retirer le canal.
 - **Comment supprimer mes données ?** « Mon compte → Zone de danger → Supprimer mon compte et mes données ».
 - **Y a-t-il une application mobile ?** Non : le site s'adapte aux téléphones. Sur un écran étroit, les onglets de la barre du haut tiennent tous sur une ligne et « Comptabilité » s'affiche « Compta » (c'est le même onglet).

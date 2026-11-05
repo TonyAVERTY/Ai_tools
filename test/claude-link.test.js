@@ -412,7 +412,7 @@ test('délier : secret effacé, jobs IA en file annulés, autres jobs et autres 
   assert.equal((await a.get('/', { headers: { accept: 'text/html' } })).headers.get('location'), '/link');
   assert.equal(await aiRefusal(s.db, a.id), LINK_REQUIRED_MESSAGE);
   // Mon compte reste accessible et propose de relier
-  assert.match(await (await a.get('/account', { headers: { accept: 'text/html' } })).text(), /Relier Claude/);
+  assert.match(await (await a.get('/account', { headers: { accept: 'text/html' } })).text(), /Relier mon IA/);
 });
 
 test('délier un job IA en cours : il est interrompu', async () => {

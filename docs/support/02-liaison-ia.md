@@ -30,12 +30,12 @@ Dans la carte **Gemini** (Google), un seul mode : la **Clé API Google AI Studio
 ## Le risque de l'abonnement
 Utiliser un abonnement Claude (Pro, Max) ou un compte ChatGPT à travers une application tierce peut contrevenir aux conditions d'utilisation d'Anthropic ou d'OpenAI et entraîner la suspension ou la fermeture du compte. AiTools ne peut en être tenu responsable. La clé API reste l'option recommandée. L'acceptation du risque est enregistrée avec sa date et la version du texte.
 
-## Voir, tester, déconnecter (Avatar → Mon compte → « Liaison Claude »)
-La carte affiche : le **Mode** (clé API ou abonnement), l'**État** (« Valide » ou « À revalider »), la date de liaison, les 4 derniers caractères d'une clé API, et la date d'acceptation du risque pour un abonnement. Elle contient aussi les **Limites d'utilisation** et un seul bouton : **Déconnecter**.
+## Voir, changer, déconnecter (Avatar → Mon compte → « Mon IA »)
+La carte « Mon IA » affiche : l'**IA** reliée (Claude, ChatGPT ou Gemini), le **Mode** (clé API ou abonnement), l'**État** (« Valide » ou « À revalider »), la date de liaison, les 4 derniers caractères d'une clé API, et la date d'acceptation du risque pour un abonnement. Elle contient aussi les **Limites d'utilisation**, le lien **Changer d'IA** (il ouvre la page « Relier mon IA ») et le bouton **Déconnecter**.
 - **Déconnecter** efface le secret chiffré et annule les jobs IA en attente ou en cours. Pour changer de mode, de clé ou d'IA, on relie de nouveau depuis la page « Relier mon IA » (elle remplace l'accès précédent).
 - État « À revalider » : le secret a été refusé (clé révoquée, jeton ou connexion expirés…). Relie de nouveau ton IA.
 
-## Limites d'utilisation de Claude (carte « Liaison Claude »)
+## Limites d'utilisation (carte « Mon IA »)
 Avec un **abonnement** Claude, la carte montre deux barres : **Session de 5 h** et **Semaine de 7 jours**, avec le pourcentage utilisé et l'heure de remise à zéro. Orange à partir de 80 %, rouge à 100 %.
 - « Relevé en direct chez Anthropic » : compte tout l'usage de Claude, y compris hors AiTools (claude.ai, Claude Code).
 - Sinon : « Dernière mesure faite pendant un job AiTools », avec la raison du repli (Anthropic limite les relevés, refuse le relevé avec ce jeton, ne répond pas, etc.).
@@ -50,7 +50,7 @@ Avec un **abonnement** Claude, la carte montre deux barres : **Session de 5 h** 
 - « Anthropic limite les relevés : nouvel essai dans une minute » : seulement l'affichage des limites, rien n'est cassé.
 - « Clé API refusée par Google » ou « Clé API refusée par OpenAI » : la clé est fausse, supprimée ou limitée → en créer une nouvelle. « Impossible de joindre Google (ou OpenAI) pour vérifier la clé » : problème de réseau, la clé n'est pas jugée, réessaie.
 - ChatGPT, aucun lien ne s'affiche : active la connexion par code d'appareil dans les paramètres de sécurité de ton compte ChatGPT, ou colle ton fichier de connexion (« Coller le fichier »).
-- Aucun job IA ne démarre : vérifier « Mon compte → Liaison Claude → État ».
+- Aucun job IA ne démarre : vérifier « Mon compte → Mon IA → État ».
 
 ## Quand ton IA se déconnecte toute seule
 Si ton IA refuse ton accès pendant une tâche (jeton d'abonnement expiré ou révoqué, clé API supprimée, connexion ChatGPT révoquée), ou si le serveur ne peut plus lire ton secret de liaison (après un changement de la clé de chiffrement du serveur), la liaison est marquée **invalide** et une fenêtre **« Claude est déconnecté »** s'ouvre sur la page où tu te trouves. Elle propose le bouton **Reconnecter Claude**, qui ouvre la page de liaison, et **Plus tard** pour la fermer (elle ne revient pas sur la même page ; en changeant de page, la page de liaison s'affiche d'office tant qu'aucune IA n'est reliée). Les tâches IA restent à l'arrêt jusqu'à la reconnexion, puis tu peux relancer celles qui ont échoué (par exemple **Analyser**).
