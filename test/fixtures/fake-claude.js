@@ -62,7 +62,16 @@ const senseReply = () => {
     ? { id, ok: false, problem: "La phrase d'ouverture ne veut rien dire", fix_body: tpl.replace('SENSEBAD', 'bien') }
     : { id, ok: true })) });
 };
-const lines = prompt.includes('CONTRÔLE DU SENS') ? [senseReply()]
+// Changer une phrase : « REPHRASEBAD » = proposition identique (refusée), « REPHRASEDOWN » = réponse illisible ; sinon « Autre formulation N : » + la phrase (N = propositions déjà refusées + 1)
+const rephraseReply = () => {
+  if (prompt.includes('REPHRASEDOWN')) return 'pas du json';
+  const sentence = (/PHRASE À CHANGER \(telle qu'écrite dans le modèle\) :\n([\s\S]*?)\n(?:\nPROPOSITIONS|\nFICHE|\nRéponds UNIQUEMENT)/.exec(prompt) || [])[1] || '';
+  if (prompt.includes('REPHRASEBAD')) return JSON.stringify({ sentence });
+  const refused = ((prompt.split('PROPOSITIONS DÉJÀ REFUSÉES :\n')[1] || '').split('\n\n')[0].match(/^- /gm) || []).length;
+  return JSON.stringify({ sentence: `Autre formulation ${refused + 1} : ${sentence}` });
+};
+const lines = prompt.includes('CHANGER UNE PHRASE') ? [rephraseReply()]
+  : prompt.includes('CONTRÔLE DU SENS') ? [senseReply()]
   : prompt.includes('proposer TROIS exemples de devis') ? [billQuotes()]
   : prompt.includes('Affine ce document') ? [billRefine()]
   : prompt.includes('QUATRE modèles de documents') ? [billDocs()]
