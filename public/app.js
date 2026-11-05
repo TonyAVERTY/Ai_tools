@@ -1458,6 +1458,22 @@
     }
 
     // Modèle validé : « Modifier » le déverrouille ; « Annuler » remet le texte validé et le reverrouille
+    // Cible validée : « Modifier » rend les champs modifiables ; « Annuler » remet les valeurs validées et reverrouille
+    const tUnlock = e.target.closest('[data-target-unlock]');
+    const tCancel = e.target.closest('[data-target-cancel]');
+    if (tUnlock || tCancel) {
+      const form = (tUnlock || tCancel).closest('form.target');
+      const fields = $$('input, textarea', form);
+      if (tUnlock) form._orig = fields.map((f) => f.value);
+      else fields.forEach((f, i) => { f.value = form._orig?.[i] ?? f.value; });
+      form.classList.toggle('target-locked', !tUnlock);
+      fields.forEach((f) => { f.readOnly = !tUnlock; });
+      $('[data-target-save]', form).disabled = !tUnlock;
+      $('[data-target-unlock]', form).hidden = !!tUnlock;
+      $('[data-target-cancel]', form).hidden = !tUnlock;
+      if (tUnlock) fields[0].focus();
+      return;
+    }
     const unlock = e.target.closest('[data-tpl-unlock]');
     if (unlock) {
       const form = unlock.closest('form.tpl');
@@ -1618,7 +1634,7 @@
     const form = e.target.closest('form[data-action]');
     if (!form) return;
     e.preventDefault();
-    if (form.classList.contains('tpl-locked')) return; // un modèle validé ne s'envoie pas (Entrée dans un champ) tant qu'on n'a pas cliqué sur « Modifier »
+    if (form.classList.contains('tpl-locked') || form.classList.contains('target-locked')) return; // un modèle validé ne s'envoie pas (Entrée dans un champ) tant qu'on n'a pas cliqué sur « Modifier »
     const { action, id, confirm: question } = form.dataset;
     if (question && !(await confirmBox(question, { confirm: form.dataset.confirmLabel }))) return;
     const data = formData(form);

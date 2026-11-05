@@ -26,7 +26,7 @@ Pourquoi : l'IA adapte son vocabulaire, ses exemples et son niveau de détail à
 4. Dépôt privé ou autre serveur Git : ajoute d'abord un token dans **Réglages → Dépôts Git**.
 
 ## 4. Valider la cible
-Quand l'analyse est finie, la section **Cible** s'ouvre avec le badge « à valider ». Relis la description, la zone, la taille, le décideur, les secteurs et les requêtes de recherche, corrige si besoin, puis clique **Valider la cible**. Le badge « à valider » disparaît et la coche verte apparaît sur la section.
+Quand l'analyse est finie, la section **Cible** s'ouvre avec le badge « à valider ». Relis la description, la zone, la taille, le décideur, les secteurs et les requêtes de recherche, corrige si besoin, puis clique **Valider la cible**. Le badge « à valider » disparaît et la coche verte apparaît sur la section. Une fois validée, la cible est **grisée et en lecture seule** : pour la changer, clique **Modifier**, corrige, puis **Mettre à jour** (ou **Annuler** pour remettre ce qui était validé).
 
 ## 5. Chercher des prospects
 Dans **Prospecter → Recherche de prospects** : choisis « Prospects à chercher » (de 1 à 50), « Quand » (Maintenant ou Cette nuit, 1h-6h), puis **Lancer la recherche**.

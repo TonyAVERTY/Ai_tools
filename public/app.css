@@ -969,6 +969,9 @@ html.nav-busy { cursor: progress; }
 .tpl-locked [data-tpl-help], .tpl-locked [data-run], .tpl-locked .opt small, .tpl-locked button[name="mode"] { display: none; }
 .tpl-locked input, .tpl-locked textarea { background: var(--bg-sunk); color: var(--muted); cursor: default; }
 .tpl-locked .opt { opacity: .6; }
+/* Cible validée : même principe que le modèle validé */
+.target-locked input, .target-locked textarea { background: var(--bg-sunk); color: var(--muted); cursor: default; }
+.target-locked [data-target-save] { display: none; }
 .pv-text[data-pv-body] { user-select: text; }
 /* Barre « Changer | Modifier » au-dessus d'une phrase sélectionnée dans l'aperçu : positionnée par le script, sans transition ni animation */
 .pv-sel { position: fixed; z-index: 5; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; max-width: calc(100vw - 16px); padding: 6px; background: var(--card); color: var(--text); border: 1px solid var(--line-strong); border-radius: var(--radius); box-shadow: var(--shadow-2); }
