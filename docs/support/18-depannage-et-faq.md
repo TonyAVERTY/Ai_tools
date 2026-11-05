@@ -101,6 +101,11 @@ Elle est verrouillée dès que le prospect a été contacté (statut autre que �
 - « Aperçu expiré » : relance l'aperçu (il se garde 15 minutes).
 - Les alertes jaunes (variable inconnue, accroche vide, nom d'expéditeur ou adresse d'envoi non réglés) montrent ce que le prospect verrait en moins bien : corrige le modèle ou la configuration du projet. Le lien de désinscription d'un exemple fictif est un lien d'exemple, il ne fonctionne pas.
 
+## Dans « Mails », un mail déplié dit « Contenu non conservé » ou ne donne pas la raison du rejet
+- **Contenu non conservé** : ce mail est parti avant que la page Mails garde les textes. Les nouveaux envois sont tous consultables.
+- **« Le serveur du destinataire n'a pas donné de raison. »** sur un mail **Rejeté** : le rapport de rejet reçu ne contenait pas de motif lisible. Vérifie aussi que la boîte de réception du projet est reliée (Réglages du projet → boîte de réception, IMAP) : sans elle, les rejets ne sont pas détectés et le mail reste « Envoyé ».
+- **« Détail indisponible »** : la connexion a coupé ou ta session a expiré ; replie puis déplie le mail, ou recharge la page.
+
 ## Les réponses n'apparaissent pas
 Configurer la **Boîte de réception (IMAP)** (« Enregistrer et tester ») et cliquer **Vérifier maintenant** dans la section Envoi (lecture automatique toutes les 15 minutes). Sans IMAP, les réponses ne sont pas détectées et les relances automatiques ne partent pas.
 

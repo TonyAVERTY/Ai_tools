@@ -2,7 +2,7 @@
 // « Mails ». Chargé après app.js, qui expose ses outils communs dans window.AiTools ; ajax.js relance ce script à chaque navigation,
 // comme app.js. Aucune fonction n'est appelée de l'extérieur : tout passe par des écouteurs et par la consultation périodique.
 (() => {
-  const { $, $$, api, every, listen, toast, unlinked } = window.AiTools;
+  const { $, $$, api, every, listen, toast, unlinked, loadingHtml, loadFailed } = window.AiTools;
 
   // ---------- Réponses des prospects : popup d'arrivée, page « Mails » ----------
   // La popup ne s'affiche que pour les réponses non lues ; tout le texte vient de la base et passe par textContent.
@@ -121,7 +121,40 @@
     } catch { /* hors ligne ou session expirée : la prochaine requête le dira */ }
   }
   if ($('.top')) { pollReplies(); every(pollReplies, 45_000); listen(document, 'visibilitychange', () => { if (!document.hidden) pollReplies(); }); }
+  // Page « Mails » : un clic sur un mail déplie son contenu (ou, s'il est rejeté ou n'est pas parti, la raison), chargé à la première ouverture
+  async function toggleMail(btn) {
+    const row = document.getElementById(btn.getAttribute('aria-controls'));
+    const open = btn.getAttribute('aria-expanded') !== 'true';
+    btn.setAttribute('aria-expanded', String(open));
+    row.hidden = !open;
+    if (!open || row.dataset.loaded) return;
+    const cell = row.firstElementChild;
+    cell.innerHTML = loadingHtml('Chargement…', { small: true });
+    try {
+      const m = await api(`/api/mails/${btn.dataset.mail}`);
+      const box = document.createElement('div');
+      box.className = 'mail-box';
+      const add = (cls, text, label) => {
+        const p = document.createElement('p');
+        p.className = cls;
+        if (label) { const b = document.createElement('b'); b.textContent = `${label} `; p.append(b); }
+        p.append(text);
+        box.append(p);
+      };
+      if (m.error) add('mail-err', m.error, 'Non envoyé :');
+      else if (m.state === 'bounced') add('mail-err', m.note || "Le serveur du destinataire n'a pas donné de raison.", 'Rejeté :');
+      add('muted small', m.subject ? `À ${m.to} · objet : ${m.subject}` : `À ${m.to}`);
+      if (m.body) add('mail-text', m.body);
+      else add('muted', 'Contenu non conservé : ce mail est parti avant que la page Mails ne garde les textes.');
+      cell.replaceChildren(box);
+      row.dataset.loaded = '1';
+    } catch (err) {
+      loadFailed(cell, err.message || 'Détail indisponible : réessaie dans un instant', () => { row.dataset.loaded = ''; btn.setAttribute('aria-expanded', 'false'); toggleMail(btn); }, { small: true });
+    }
+  }
   listen(document, 'click', async (e) => {
+    const mt = e.target.closest('[data-mail]');
+    if (mt) { toggleMail(mt); return; }
     const c = e.target.closest('[data-copy-draft]');
     if (c) { copyText($('[data-draft]', c.closest('.reply-body')).value, c); return; }
     const s = e.target.closest('[data-reply-seen]');

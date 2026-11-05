@@ -61,6 +61,19 @@ export function registerMailRoutes(router, app) {
   const REPLY_SELECT = `SELECT r.*, p.name project, x.company FROM replies r JOIN projects p ON p.id = r.project_id
     LEFT JOIN prospects x ON x.id = r.prospect_id`;
 
+  // Détail d'un mail envoyé (liste déroulante de la page Mails) : contenu gardé à l'envoi, erreur d'envoi ou raison du rejet.
+  // Un mail d'un projet auquel la personne n'a pas accès est « introuvable ».
+  router.get('/api/mails/:id', async ({ res, params, session }) => {
+    const ids = (await myProjects(session.userId)).map((p) => Number(p.id));
+    const id = Number(params.id);
+    const r = ids.length && Number.isInteger(id)
+      ? await db.prepare(`SELECT m.id, m.email, m.subject, m.error, m.read_at, m.body, m.note, x.status FROM mail_log m
+          LEFT JOIN prospects x ON x.id = m.prospect_id WHERE m.id = ? AND m.project_id IN (${inList(ids)})`).get(id, ...ids)
+      : null;
+    if (!r) throw new HttpError(404, 'Mail introuvable');
+    json(res, { id: Number(r.id), to: r.email, subject: r.subject || '', body: r.body || null, error: r.error || null, note: r.note || null, state: stateOf(r) });
+  });
+
   // Réponses : les nouvelles (popup) ou la liste complète
   router.get('/api/replies', async ({ res, url, session }) => {
     const ids = (await myProjects(session.userId)).map((p) => Number(p.id));
