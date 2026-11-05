@@ -9,7 +9,7 @@ import { addProject, testTokenLink } from './helpers/users.js';
 import { Worker, enqueue, latestJobs } from '../src/services/jobs.js';
 import { makeHandlers, makeClaude } from '../src/handlers.js';
 import { saveSecretConfig } from '../src/projects.js';
-import { parseSense, SenseUnavailable, SENSE_BATCH } from '../src/services/mailsense.js';
+import { parseSense, acceptRephrase, SenseUnavailable, SENSE_BATCH } from '../src/services/mailsense.js';
 import { setSetting, now } from '../src/db.js';
 
 let s;
@@ -174,4 +174,86 @@ test('question posée à l\'IA : « Bonjour Une Bonne Bouteille, » est un défa
   assert.match(prompt, /\[id=7\]/);
   assert.match(prompt, /tu peux alors la retirer de cette phrase/);
   assert.match(prompt, /N'ajoute aucune variable/);
+});
+
+// ---------- Changer une phrase ----------
+const BODY = 'Bonjour,\n\nChez {{entreprise}}, une carte dans le téléphone aide les clients à revenir. Voir https://x.fr\n\nEst-ce un sujet chez vous ?\n\nBien cordialement,\nTony';
+const rephrase = (u, pid, body = {}) => u.post(`/api/projects/${pid}/template/rephrase`, { kind: 'followup', body: BODY, ...body });
+const at = (text) => ({ start: BODY.indexOf(text), end: BODY.indexOf(text) + text.length });
+
+test('acceptRephrase : même office, aucune variable ajoutée, mêmes adresses, longueur voisine, différente et jamais déjà refusée', () => {
+  const orig = 'Chez {{entreprise}}, une carte aide les clients à revenir.';
+  assert.equal(acceptRephrase(orig, 'À {{entreprise}}, une carte de fidélité aide les clients à revenir.'), true);
+  assert.equal(acceptRephrase(orig, 'Une carte aide les clients à revenir.'), true, 'retirer une variable est permis');
+  assert.equal(acceptRephrase(orig, 'Chez {{entreprise}}, une carte aide les clients à revenir.'), false, 'identique');
+  assert.equal(acceptRephrase(orig, 'chez {{entreprise}} : une carte aide les clients à revenir !'), false, 'identique à la casse et à la ponctuation près');
+  assert.equal(acceptRephrase(orig, 'Une carte à {{ville}} aide les clients.'), false, 'variable ajoutée');
+  assert.equal(acceptRephrase(orig, 'Une carte aide les clients à revenir. https://autre.fr'), false, 'adresse ajoutée');
+  assert.equal(acceptRephrase(orig, 'Oui.'), false, 'beaucoup trop court');
+  assert.equal(acceptRephrase(orig, `${'mot '.repeat(60)}`), false, 'beaucoup trop long');
+  assert.equal(acceptRephrase(orig, ', une carte aide les clients à revenir sans souci.'), false, 'virgule en tête de ligne');
+  assert.equal(acceptRephrase(orig, 'Une carte de fidélité aide les clients à revenir.', ['Une carte de fidélité aide les clients à revenir']), false, 'déjà refusée');
+  assert.equal(acceptRephrase(orig, 42), false);
+});
+
+test('changer une phrase : l\'IA en propose une autre, la page reçoit la phrase du modèle et sa version remplie, rien n\'est modifié', async () => {
+  const w = await world({ n: 1, company: () => 'Boulangerie Le Fournil' });
+  const prospect = await s.db.prepare('SELECT id FROM prospects WHERE project_id = ?').get(w.pid);
+  const sentence = 'Est-ce un sujet chez vous ?';
+  const r = await (await rephrase(w.u, w.pid, { ...at(sentence), prospectId: prospect.id })).json();
+  assert.equal(r.ok, true);
+  assert.equal(r.sentence, `Autre formulation 1 : ${sentence}`);
+  assert.equal(r.shown, `Autre formulation 1 : ${sentence}`);
+  // Une phrase avec une variable : la proposition garde son modèle, la version remplie montre le nom du prospect
+  const withVar = 'Chez {{entreprise}}, une carte dans le téléphone aide les clients à revenir.';
+  const v = await (await rephrase(w.u, w.pid, { ...at(withVar), prospectId: prospect.id })).json();
+  assert.match(v.sentence, /^Autre formulation 1 : Chez \{\{entreprise\}\}, une carte/);
+  assert.match(v.shown, /^Autre formulation 1 : Chez Boulangerie Le Fournil, une carte/);
+  const tpl = await s.db.prepare("SELECT body FROM templates WHERE project_id = ? AND kind = 'initial'").get(w.pid);
+  assert.equal(tpl.body, 'Bonjour {{entreprise}}.', 'le modèle enregistré n\'a pas bougé');
+});
+
+test('changer une phrase : les propositions déjà refusées sont données à l\'IA et ne reviennent pas', async () => {
+  const w = await world({ n: 1 });
+  const sentence = 'Est-ce un sujet chez vous ?';
+  const first = await (await rephrase(w.u, w.pid, at(sentence))).json();
+  const second = await (await rephrase(w.u, w.pid, { ...at(sentence), avoid: [first.sentence] })).json();
+  assert.equal(second.sentence, `Autre formulation 2 : ${sentence}`);
+  assert.notEqual(second.sentence, first.sentence);
+});
+
+test('changer une phrase : proposition inutilisable ou IA illisible → « indisponible » avec la raison, jamais une erreur serveur', async () => {
+  const w = await world({ n: 1 });
+  const same = await rephrase(w.u, w.pid, { body: `${BODY} REPHRASEBAD`, start: 0, end: 'Bonjour,'.length });
+  assert.equal(same.status, 200);
+  const a = await same.json();
+  assert.equal(a.unavailable, true);
+  assert.match(a.reason, /phrase utilisable/);
+  const down = await (await rephrase(w.u, w.pid, { body: `${BODY} REPHRASEDOWN`, start: 0, end: 'Bonjour,'.length })).json();
+  assert.equal(down.unavailable, true);
+  assert.match(down.reason, /réponse lisible/);
+});
+
+test('changer une phrase : sélection impossible, prospect ou projet d\'un autre compte, visiteur', async () => {
+  const w = await world({ n: 1 });
+  const ok = at('Est-ce un sujet chez vous ?');
+  for (const bad of [{ start: -1, end: 5 }, { start: 5, end: 5 }, { start: 5, end: 99999 }, { start: 'a', end: 9 }, { start: 0, end: 700 }]) {
+    assert.equal((await rephrase(w.u, w.pid, bad)).status, 400, JSON.stringify(bad));
+  }
+  assert.equal((await rephrase(w.u, w.pid, { start: BODY.indexOf('\n\n'), end: BODY.indexOf('\n\n') + 2 })).status, 400, 'des espaces seuls ne sont pas une phrase');
+  const other = await s.newUser({ admin: false, link: testTokenLink() });
+  assert.equal((await rephrase(other, w.pid, ok)).status, 404, 'le projet d\'un autre compte est introuvable');
+  const w2 = await world({ n: 1 });
+  const foreign = await s.db.prepare('SELECT id FROM prospects WHERE project_id = ?').get(w2.pid);
+  assert.equal((await rephrase(w.u, w.pid, { ...ok, prospectId: foreign.id })).status, 404, 'un prospect d\'un autre projet est introuvable');
+  assert.equal((await rephrase(s.anon, w.pid, ok)).status, 401);
+});
+
+test('aperçu : renvoie les valeurs des variables, pour retrouver dans le modèle la phrase sélectionnée', async () => {
+  const w = await world({ n: 1, company: () => 'Boulangerie Le Fournil' });
+  const prospect = await s.db.prepare('SELECT id FROM prospects WHERE project_id = ?').get(w.pid);
+  const r = await (await w.u.post(`/api/projects/${w.pid}/template/preview`, { kind: 'initial', subject: 'Bonjour {{entreprise}}', body: 'Bonjour {{entreprise}}.', prospectId: prospect.id })).json();
+  assert.equal(r.vars.entreprise, 'Boulangerie Le Fournil');
+  assert.deepEqual(Object.keys(r.vars).sort(), ['accroche', 'entreprise', 'expediteur', 'site', 'ville']);
+  assert.equal(r.vars.expediteur, 'Moi');
 });

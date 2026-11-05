@@ -629,6 +629,31 @@ Réponds UNIQUEMENT avec : {"results":[{"id":123,"ok":true},{"id":124,"ok":false
   };
 }
 
+/**
+ * Changer UNE phrase d'un mail : la personne l'a sélectionnée dans l'aperçu parce qu'elle ne lui convient pas.
+ * Consigne interne (non modifiable). `sentence` est écrite comme dans le modèle, avec ses variables ; `avoid` : propositions déjà refusées.
+ */
+export function rephrasePrompt({ kind = 'initial', template, sentence, avoid = [], facts = '' }) {
+  return {
+    system: SYSTEM_FR,
+    prompt: `CHANGER UNE PHRASE. La personne relit ${kind === 'followup' ? 'son mail de relance' : 'son mail de prospection'} et UNE phrase ne lui convient pas. Propose une autre phrase qui remplit le même rôle dans le mail.
+Règles :
+- Même rôle et même sens dans le mail, autrement dit : ne change pas ce que la phrase apporte, change la façon de le dire. Longueur proche.
+- Les variables sont remplacées à l'envoi : {{entreprise}} (nom de l'entreprise du prospect), {{ville}}, {{accroche}} (phrase déjà rédigée), {{expediteur}}, {{site}}. N'en ajoute aucune ; tu peux en retirer une qui rendrait la phrase fausse une fois remplie. Une fois les variables remplacées, la phrase doit rester correcte et avoir un sens.
+- Garde les adresses web, les chiffres, les prix et les noms propres. N'invente rien : aucune promesse, démonstration, essai, appel, rendez-vous ni chiffre absent de la fiche du projet.
+- Ne commence pas la phrase par une virgule. Pas de « Bonjour » ni de formule de politesse, sauf si la phrase d'origine en est une.
+- Écris une seule proposition, différente de la phrase d'origine${avoid.length ? ' et de chacune des propositions déjà refusées' : ''}.
+
+MAIL COMPLET (modèle, avec ses variables), pour le contexte :
+${template}
+
+PHRASE À CHANGER (telle qu'écrite dans le modèle) :
+${sentence}
+${avoid.length ? `\nPROPOSITIONS DÉJÀ REFUSÉES :\n${avoid.map((a) => `- ${a}`).join('\n')}\n` : ''}${facts ? `\nFICHE DU PROJET (seules sources permises) :\n${facts}\n` : ''}
+Réponds UNIQUEMENT avec : {"sentence":"..."}`,
+  };
+}
+
 export function followupTemplatePrompt({ profile, senderName, custom, model = null }) {
   return {
     system: withSkills(SYSTEM_FR, 'followup_template'),
