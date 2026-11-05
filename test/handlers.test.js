@@ -87,7 +87,7 @@ test('flux complet : analyse → cible → prospection → modèle → envoi →
     await saveSecretConfig(s.app, s.id, 'smtp_enc', { host: 'smtp.x', port: 587, user: 'u', pass: 'secret', fromEmail: 'tony@x.fr', fromName: 'Tony' }, 'pass');
     const sent = await run(s, 'send', { count: 5 });
     assert.equal(sent.status, 'done', sent.error);
-    assert.deepEqual(sent.result, { sent: 1, failed: 0, total: 1 });
+    assert.deepEqual(sent.result, { sent: 1, failed: 0, total: 1, model: 'haiku' });
     const mail = s.sentMails[0];
     assert.equal(mail.to, 'contact@fournil.fr');
     assert.equal(mail.subject, 'Idée pour Boulangerie Le Fournil');

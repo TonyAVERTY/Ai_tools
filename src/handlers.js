@@ -5,7 +5,8 @@ import { join } from 'node:path';
 import { extractJson } from './services/claude.js';
 import { getProvider } from './services/providers/index.js';
 import { withUserLock } from './services/userlock.js';
-import { tidyTemplateText, acceptReview } from './services/mailcheck.js';
+import { tidyTemplateText, acceptReview, fillBody, fillSubject } from './services/mailcheck.js';
+import { checkSense, SenseUnavailable, SENSE_BATCH } from './services/mailsense.js';
 import { addUsage, jobContext, liveJobUsage } from './services/jobs.js';
 import { syncRepo } from './services/git.js';
 import { normalizeModel, defaultModelOf, tierEquivalent } from './services/models.js';
@@ -17,11 +18,11 @@ import { createJobStream } from './services/jobstream.js';
 import { reserveVideo, finishVideo, removeVideo, countVideos, keepScene, takeScene, getVoiceKey, getVoiceRegion } from './promo.js';
 import { linkedinAccount, saveDraft, recentDrafts } from './linkedin.js';
 import { followupCandidates, followupSubject, isBusinessHours } from './services/followup.js';
-import { EMAIL_RE, createTransport, buildProspectMail, allowedToSend, makeMessageId } from './services/mailer.js';
+import { EMAIL_RE, createTransport, buildProspectMail, allowedToSend, makeMessageId, mailVars } from './services/mailer.js';
 import { unsubToken } from './crypto.js';
 import { resolveCredentials, markLinkInvalid, userProvider, saveRefreshedAuth } from './claudelink.js';
 import { userRepoRoot, userChatRoot } from './users.js';
-import { quotaAlerts } from './services/budget.js';
+import { quotaAlerts, budgetState } from './services/budget.js';
 import { notify } from './services/notify.js';
 import { quotaFor, recordUsage, planLimitMessage } from './services/plans.js';
 import { getUser } from './users.js';
@@ -272,6 +273,13 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
     const n = mq.unlimited ? n0 : Math.min(n0, mq.remaining);
     if (n === 0) throw new Error(kind === 'followup' ? 'Plafond quotidien atteint ou aucune relance due' : 'Plafond quotidien atteint ou aucun prospect à contacter');
 
+    // Chaque mail est relu par l'IA de la personne avant de partir (le texte rempli a-t-il un sens ?) : sans IA utilisable, rien ne part
+    const budget = await budgetState(db, userId);
+    if (budget.blocked) throw new Error(`Budget IA atteint : ${budget.reason}. Aucun mail n'est parti : chaque mail est relu par ton IA avant l'envoi.`);
+    const senseModel = await writeModel(userId, 'haiku');
+    const sense = new Map(); // id du prospect -> avis de l'IA sur son mail rempli
+    let unclear = 0, unclearRow = 0, senseStop = null, firstProblem = null;
+
     const transport = (app.createTransport || createTransport)(await pinSmtp(app, userId, project.smtp));
     await transport.verify();
     const minDelay = Number(await getSetting(db, userId, 'send_delay_min', '20')) * 1000;
@@ -291,7 +299,7 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
     await ctx.progress({ sent, failed, total: n, message: `0/${n} ${kind === 'followup' ? 'relances envoyées' : 'envoyés'}`, pct: 0 });
 
     // Les adresses refusées par la vérification ne comptent pas dans le lot : on continue dans la liste jusqu'à `n` envois tentés
-    for (const p of candidates) {
+    for (const [at, p] of candidates.entries()) {
       if (sent + failed >= n) break;
       if (await ctx.cancelled()) break;
       if (kind === 'followup' && !inHours()) break; // le reste repartira au prochain créneau
@@ -311,6 +319,32 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
           continue;
         }
       }
+      // Relecture du sens par lots : ce prospect et les suivants pas encore relus
+      if (!sense.has(p.id)) {
+        const items = candidates.slice(at, at + SENSE_BATCH).filter((c) => !sense.has(c.id)).map((c) => {
+          const vars = mailVars(c, project.smtp, project.siteUrl);
+          return { id: c.id, subject: kind === 'initial' ? fillSubject(template.subject, vars) : '', body: fillBody(template.body, vars).replace(/\n{3,}/g, '\n\n').trim() };
+        });
+        await ctx.progress({ sent, failed, total: n, message: "Relecture des mails par l'IA…", pct: Math.round(((sent + failed) / n) * 100) });
+        try {
+          const { verdicts, run } = await checkSense({ claude, userId, model: senseModel, signal: ctx.signal, kind, template: template.body, items });
+          addUsage(ctx, run);
+          for (const [id, v] of verdicts) sense.set(id, v);
+        } catch (e) {
+          if (!(e instanceof SenseUnavailable)) throw e;
+          senseStop = e.message;
+          break; // rien d'autre ne part tant que l'IA ne peut pas relire
+        }
+      }
+      const verdict = sense.get(p.id);
+      if (!verdict.ok) {
+        await log.run(project.id, p.id, p.email, now(), `Non envoyé : le texte n'a pas de sens (${verdict.problem})`, kind, null, null, null);
+        firstProblem ??= verdict.problem;
+        unclear++;
+        if (++unclearRow >= SENSE_BATCH) break; // un lot entier refusé : c'est le modèle lui-même qui est en cause
+        continue;
+      }
+      unclearRow = 0;
       const unsubUrl = `${cfg.appUrl}/u/${encodeURIComponent(p.email)}/${unsubToken(cfg.secretKey, p.email)}`;
       let variant = null, subject, inReplyTo;
       if (kind === 'initial') {
@@ -343,7 +377,12 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
     }
     transport.close();
     await evaluateSending(app, userId); // trop de rejets : le compte passe en pause d'envoi
-    return { sent, failed, total: n, ...(invalid ? { invalid } : {}) };
+    if (sent + failed === 0 && (senseStop || unclear)) {
+      throw new Error(senseStop
+        ? `Relecture par l'IA impossible : ${senseStop}. Aucun mail n'est parti : relance quand ton IA répond de nouveau`
+        : `Aucun mail n'est parti : ton IA juge que le texte n'a pas de sens (${firstProblem}). Ouvre « Aperçu » : elle y propose une version corrigée du modèle`);
+    }
+    return { sent, failed, total: n, ...(invalid ? { invalid } : {}), ...(unclear ? { unclear } : {}), ...(senseStop ? { waiting: senseStop } : {}) };
   }
 
   // Tâche d'un poste (Commerce, Communication, Finance…) : un livrable Markdown écrit à partir de la fiche du projet.
