@@ -68,7 +68,7 @@ Sur le tableau de bord, dès qu'un projet existe, une liste en bas à gauche gui
 
 - **Jobs de nuit** : Prospecter et Évolution proposent « Maintenant » ou « Cette nuit ». Le job démarre au prochain créneau entre 1h et 6h (heure de Paris, changements d'heure gérés), quand le serveur est peu chargé et que ton quota Claude est libre. Il est annulable jusqu'au départ.
 - **Budget IA** : plafonds glissants sur 24 h et sur 30 jours, en équivalent $ API remonté par Claude Code. L'abonnement Pro ne facture rien en plus ; c'est un garde-fou pour ton quota.
-  - Plafond atteint : les jobs IA **restent en file** et repartent seuls quand la fenêtre glisse. Les envois et relances, qui ne consomment pas d'IA, continuent.
+  - Plafond atteint : les jobs IA **restent en file** et repartent seuls quand la fenêtre glisse. Les envois et relances attendent aussi : chaque mail est relu par l'IA de la personne avant de partir (contrôle du sens, `src/services/mailsense.js`), et sans budget l'envoi s'arrête avant d'envoyer quoi que ce soit.
   - Un job en cours n'est jamais coupé : le plafond peut donc être dépassé d'un job.
 - **Quota du compte Claude** : la barre du haut affiche, dès qu'un job IA a tourné, le taux d'utilisation
   remonté par la CLI elle-même — session glissante de 5 h et semaine glissante de 7 jours, avec l'heure de
