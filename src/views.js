@@ -258,18 +258,21 @@ ${linkSection(link, consent, quota)}
 function targetForm(p) {
   const t = p.target || {};
   const list = (a) => esc((a || []).join('\n'));
-  return `<form class="target cfg" data-action="target" data-id="${p.id}">
-  <label>Description<input name="description" value="${esc(t.description)}"></label>
+  const lock = p.targetValidated ? ' readonly' : ''; // cible validée : grisée et en lecture seule jusqu'à « Modifier » (public/app.js)
+  return `<form class="target cfg${p.targetValidated ? ' target-locked' : ''}" data-action="target" data-id="${p.id}">
+  <label>Description<input name="description" value="${esc(t.description)}"${lock}></label>
   <div class="grid3">
-    <label>Zone<input name="zone" value="${esc(t.zone)}"></label>
-    <label>Taille<input name="taille" value="${esc(t.taille)}"></label>
-    <label>Décideur<input name="decideur" value="${esc(t.decideur)}"></label>
+    <label>Zone<input name="zone" value="${esc(t.zone)}"${lock}></label>
+    <label>Taille<input name="taille" value="${esc(t.taille)}"${lock}></label>
+    <label>Décideur<input name="decideur" value="${esc(t.decideur)}"${lock}></label>
   </div>
   <div class="grid2">
-    <label>Secteurs (1 par ligne)<textarea name="secteurs" rows="4">${list(t.secteurs)}</textarea></label>
-    <label>Requêtes de recherche (1 par ligne)<textarea name="requetes" rows="4">${list(t.requetes)}</textarea></label>
+    <label>Secteurs (1 par ligne)<textarea name="secteurs" rows="4"${lock}>${list(t.secteurs)}</textarea></label>
+    <label>Requêtes de recherche (1 par ligne)<textarea name="requetes" rows="4"${lock}>${list(t.requetes)}</textarea></label>
   </div>
-  <div class="row"><button class="btn${p.targetValidated ? '' : ' primary'}">${p.targetValidated ? 'Mettre à jour' : `${ic('check')}Valider la cible`}</button></div>
+  <div class="row">${p.targetValidated ? `<button type="button" class="btn small" data-target-unlock>${ic('pen')}Modifier</button>` : ''}
+    <button class="btn${p.targetValidated ? '' : ' primary'}" data-target-save${p.targetValidated ? ' disabled' : ''}>${p.targetValidated ? 'Mettre à jour' : `${ic('check')}Valider la cible`}</button>
+    ${p.targetValidated ? '<button type="button" class="btn" data-target-cancel hidden>Annuler</button>' : ''}</div>
 </form>`;
 }
 
