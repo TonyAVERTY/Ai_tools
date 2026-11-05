@@ -780,6 +780,7 @@
     sysTimer = later(refreshSys, jobsOpen() ? 3000 : busy ? 6000 : 30_000);
   }
   refreshSys();
+  listen(document, 'visibilitychange', () => { if (!document.hidden) refreshSys(); }); // retour sur l'onglet : la carte se remet à jour tout de suite
 
   // Une tâche vient d'être mise en file : le menu « Activité » se met à jour, l'agent y arrive avec sa brouette, puis le menu s'ouvre
   // quelques secondes sur la liste des tâches en cours et à venir (comme la bulle de téléchargement de Chrome).

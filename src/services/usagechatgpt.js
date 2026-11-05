@@ -11,6 +11,7 @@ import { resolveCredentials, MODES } from '../claudelink.js';
 const URL_USAGE = 'https://chatgpt.com/backend-api/wham/usage';
 const KEY = 'chatgpt_rate_limit_json';
 const EVERY = 120; // s entre deux relevés (réussis ou non) : on ne sollicite pas OpenAI à chaque rafraîchissement de la page
+const AFTER_JOB = 15; // s : un job vient de se terminer depuis le dernier relevé, la mesure a bougé : on relit plus vite (jamais plus d'une fois par 15 s)
 
 const num = (v) => { const n = typeof v === 'string' && v.trim() !== '' ? Number(v) : v; return typeof n === 'number' && Number.isFinite(n) ? n : null; };
 
@@ -88,7 +89,9 @@ export async function currentChatgptLimits(app, userId, { at = now() } = {}) {
   let error = null;
   const tried = (app.chatgptUsageTried ||= new Map()); // userId -> { at, error }
   const last = tried.get(userId);
-  if (last && at - last.at < EVERY) error = last.error;
+  // Un job terminé depuis le dernier relevé a consommé du quota : la carte se met à jour sans attendre les 2 minutes
+  const finished = last ? Number((await db.prepare('SELECT MAX(finished_at) f FROM jobs WHERE user_id = ?').get(userId))?.f || 0) : 0;
+  if (last && at - last.at < (finished > last.at ? AFTER_JOB : EVERY)) error = last.error;
   else {
     const r = await fetchLive(app, cred, at);
     tried.set(userId, { at, error: r.error ?? null });
