@@ -9,7 +9,7 @@ import { addProject, testTokenLink } from './helpers/users.js';
 import { Worker, enqueue, latestJobs } from '../src/services/jobs.js';
 import { makeHandlers, makeClaude } from '../src/handlers.js';
 import { saveSecretConfig } from '../src/projects.js';
-import { parseSense, acceptRephrase, SenseUnavailable, SENSE_BATCH } from '../src/services/mailsense.js';
+import { parseSense, acceptRephrase, proposeSentence, SenseUnavailable, SENSE_BATCH } from '../src/services/mailsense.js';
 import { setSetting, now } from '../src/db.js';
 
 let s;
@@ -256,4 +256,78 @@ test('aperçu : renvoie les valeurs des variables, pour retrouver dans le modèl
   assert.equal(r.vars.entreprise, 'Boulangerie Le Fournil');
   assert.deepEqual(Object.keys(r.vars).sort(), ['accroche', 'entreprise', 'expediteur', 'site', 'ville']);
   assert.equal(r.vars.expediteur, 'Moi');
+});
+
+// ---------- Forme d'un modèle généré : l'IA corrige une fois, sans jamais dégrader ----------
+const { styleProblems } = await import('../src/services/mailcheck.js');
+const GEN = 'Est-ce un sujet chez {{entreprise}}, oui, non ou plus tard ? Si ce n\'est pas le bon moment, dites-le-moi.';
+
+/** Génère un modèle de relance avec un lanceur d'IA simulé : `gen` = texte généré, `fix(prompt)` = réponse à la correction de forme (ou lève). */
+async function generate({ gen = GEN, fix }) {
+  const calls = { gen: 0, fix: 0 };
+  const claude = async (userId, o) => {
+    if (String(o.prompt).includes('CORRECTION DE FORME')) { calls.fix++; return { ok: true, subtype: 'success', costUsd: 0, tokensIn: 0, tokensOut: 0, turns: 1, text: fix(o.prompt) }; }
+    calls.gen++;
+    return { ok: true, subtype: 'success', costUsd: 0, tokensIn: 0, tokensOut: 0, turns: 1, text: JSON.stringify({ body: gen }) };
+  };
+  const u = await s.newUser({ admin: false, link: testTokenLink() });
+  const pid = await addProject(s.db, u.id, { name: 'Fidélio', gitUrl: 'https://github.com/u/fidelio.git' });
+  await s.db.prepare('UPDATE projects SET profile_json = ?, target_json = ?, target_validated = 1 WHERE id = ?').run(PROFILE, JSON.stringify({ description: 'x' }), pid);
+  const worker = new Worker(s.db, makeHandlers(s.app, { claude }), { log: { error() {} } });
+  await enqueue(s.db, { userId: u.id, projectId: pid, type: 'followup_template' });
+  await worker.tick();
+  const job = (await latestJobs(s.db, pid)).followup_template;
+  const tpl = await s.db.prepare("SELECT body FROM templates WHERE project_id = ? AND kind = 'followup'").get(pid);
+  return { job, body: tpl?.body, calls };
+}
+const fixed = (body) => JSON.stringify({ body });
+const GOOD = 'Bonjour,\n\nEst-ce un sujet chez {{entreprise}} ? Si ce n\'est pas le bon moment, dites-le-moi.\n\nBien cordialement,\nTony';
+
+test('génération : un texte avec des défauts de forme est corrigé une fois par l\'IA, le résultat dit ce qui a changé', async () => {
+  assert.equal(styleProblems(GEN).length, 3, 'sans appel, sans politesse, avec des réponses toutes faites');
+  const r = await generate({ fix: () => fixed(GOOD) });
+  assert.equal(r.job.status, 'done', r.job.error);
+  assert.equal(r.body, GOOD);
+  assert.deepEqual(r.calls, { gen: 1, fix: 1 }, 'une seule correction, pas de boucle');
+  assert.equal(r.job.result.styleFixed.length, 3);
+  assert.deepEqual(styleProblems(r.body), []);
+});
+
+test('génération : un texte sans défaut n\'appelle pas l\'IA une seconde fois', async () => {
+  const r = await generate({ gen: GOOD, fix: () => { throw new Error('ne doit pas être appelé'); } });
+  assert.equal(r.job.status, 'done', r.job.error);
+  assert.equal(r.body, GOOD);
+  assert.equal(r.calls.fix, 0);
+  assert.equal(r.job.result.styleFixed, undefined);
+});
+
+test('génération : une correction qui ajoute une variable, change une adresse, n\'améliore rien ou est illisible est ignorée, le texte d\'origine est gardé', async () => {
+  for (const [name, fix] of [
+    ['variable ajoutée', () => fixed(GOOD.replace('{{entreprise}} ?', '{{entreprise}} à {{ville}} ?'))],
+    ['aucune amélioration', () => fixed(GEN)],
+    ['illisible', () => 'pas du json'],
+    ['vide', () => fixed('')],
+    ['panne', () => { throw Object.assign(new Error('service indisponible'), { status: 503 }); }],
+  ]) {
+    const r = await generate({ fix });
+    assert.equal(r.job.status, 'done', `${name} : ${r.job.error}`);
+    assert.equal(r.body, GEN, `${name} : le texte d'origine est gardé`);
+    assert.equal(r.job.result.styleFixed, undefined, name);
+  }
+});
+
+test('changer une phrase : une proposition qui énumère des réponses est refusée, redemandée une fois, puis « indisponible » si elle persiste', async () => {
+  const orig = 'Est-ce un sujet chez vous ?';
+  assert.equal(acceptRephrase(orig, 'La fidélité est-elle un sujet pour vous, maintenant, plus tard ou pas du tout ?'), false);
+  assert.equal(acceptRephrase(orig, 'La fidélité est-elle un sujet pour vous en ce moment ?'), true);
+  const prompts = [];
+  const answers = (list) => async (userId, o) => { prompts.push(o.prompt); return { ok: true, text: JSON.stringify({ sentence: list[Math.min(prompts.length - 1, list.length - 1)] }) }; };
+  const base = { userId: 1, model: 'haiku', kind: 'followup', template: `Bonjour,\n\n${orig}`, sentence: orig };
+  const good = await proposeSentence({ ...base, claude: answers(['Est-ce un sujet pour vous, maintenant, plus tard ou pas du tout ?', 'La fidélité vous intéresse-t-elle en ce moment ?']) });
+  assert.equal(good.sentence, 'La fidélité vous intéresse-t-elle en ce moment ?');
+  assert.equal(prompts.length, 2, 'redemandée une seule fois');
+  assert.match(prompts[1], /PROPOSITIONS DÉJÀ REFUSÉES :\n- Est-ce un sujet pour vous, maintenant, plus tard ou pas du tout \?/, 'la proposition refusée est donnée à l\'IA');
+  prompts.length = 0;
+  await assert.rejects(proposeSentence({ ...base, claude: answers(['Un sujet : oui, non ou plus tard ?']) }), (e) => e instanceof SenseUnavailable && /phrase utilisable/.test(e.message));
+  assert.equal(prompts.length, 2, 'jamais plus de deux appels');
 });
