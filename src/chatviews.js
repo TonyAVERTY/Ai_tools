@@ -5,9 +5,10 @@ import { ic } from './icons.js';
 import { layout } from './views.js';
 import { RECOMMENDED, OTHERS } from './services/models.js';
 import { loadingBlock } from './loading.js';
+import { aiName } from './services/ainame.js';
 
 const SUPPORT_SUGGESTIONS = [
-  'Comment relier mon compte Claude ?',
+  'Comment relier mon IA ?',
   'Pourquoi mes mails ne partent pas ?',
   'À quoi sert la liste de mise en route ?',
   'Comment créer une vidéo de promotion ?',
@@ -39,7 +40,7 @@ const bubble = (m) => (m.role === 'user'
 // Le « $ » relatif n'apparaît qu'avec une clé API (facturée à l'usage) : avec un abonnement, on ne montre que la gamme (économe, intermédiaire…)
 function modelSelect(model, priced = false, catalog = { recommended: RECOMMENDED, others: OTHERS }) {
   const opt = (m) => `<option value="${m.id}"${m.id === model ? ' selected' : ''}>${esc(m.label)}${m.tier ? ` · ${esc(m.tier)}${priced ? ` ${m.cost}` : ''}` : ''}</option>`;
-  return `<span class="sel chat-model"><select name="model" aria-label="Modèle Claude" data-chat-model>
+  return `<span class="sel chat-model"><select name="model" aria-label="Modèle ${esc(aiName())}" data-chat-model>
     <optgroup label="Recommandés">${catalog.recommended.map(opt).join('')}</optgroup>
     <optgroup label="Autres modèles">${catalog.others.map(opt).join('')}</optgroup>
   </select>${ic('down')}</span>`;
@@ -58,7 +59,7 @@ export function chatPage({ email, mode = 'claude', priced = false, conversations
     <ul class="chat-list" data-chat-list>${list}</ul>
     <p class="muted small chat-none"${conversations.length ? ' hidden' : ''} data-chat-none>Tes conversations apparaîtront ici.</p>
   </aside>
-  <section class="chat-main" aria-label="${support ? 'Conversation avec le Support' : 'Conversation avec Claude'}">
+  <section class="chat-main" aria-label="${support ? 'Conversation avec le Support' : `Conversation avec ${esc(aiName())}`}">
     <header class="chat-head">
       <h1>${ic(support ? 'help' : 'spark')}${support ? 'Support' : 'Assistant IA'}</h1>
       ${modelSelect(model, priced, catalog)}
@@ -66,10 +67,10 @@ export function chatPage({ email, mode = 'claude', priced = false, conversations
     <div class="chat-log" id="chat-log" data-chat-log tabindex="0" aria-live="polite" aria-label="Messages">
       ${messages.length ? messages.map(bubble).join('\n') : `<div class="chat-empty" data-chat-empty>
         <div class="chat-empty-i">${ic(support ? 'help' : 'spark')}</div>
-        <h2>${support ? 'Une question sur AiTools ?' : 'Discute avec Claude'}</h2>
+        <h2>${support ? 'Une question sur AiTools ?' : `Discute avec ${esc(aiName())}`}</h2>
         <p class="muted">${support
-    ? "Où cliquer, comment configurer, pourquoi quelque chose ne marche pas : Claude lit la documentation d'AiTools pour te répondre. Chaque message est envoyé à Claude avec ton propre compte."
-    : 'Rédaction de mails, réponses à tes prospects, idées de posts, stratégie… Chaque message est envoyé à Claude avec ton propre compte.'}</p>
+    ? `Où cliquer, comment configurer, pourquoi quelque chose ne marche pas : ${esc(aiName())} lit la documentation d'AiTools pour te répondre. Chaque message est envoyé à ${esc(aiName())} avec ton propre compte.`
+    : `Rédaction de mails, réponses à tes prospects, idées de posts, stratégie… Chaque message est envoyé à ${esc(aiName())} avec ton propre compte.`}</p>
         <div class="chat-ideas">${(support ? SUPPORT_SUGGESTIONS : SUGGESTIONS).map((s) => `<button type="button" class="chip" data-chat-idea>${esc(s)}</button>`).join('')}</div>
       </div>`}
     </div>
@@ -84,14 +85,14 @@ export function chatPage({ email, mode = 'claude', priced = false, conversations
           <div class="chat-projlist" data-chat-projlist role="menu" aria-label="Projets AiTools">${loadingBlock('Chargement…', { small: true })}</div>
         </details>`}
         <label class="sr-only" for="chat-input">Ton message</label>
-        <textarea id="chat-input" name="message" rows="1" maxlength="${max}" placeholder="${support ? 'Pose ta question sur AiTools…' : 'Écris à Claude…'}  (Entrée pour envoyer, Maj+Entrée pour un retour à la ligne)" data-chat-input></textarea>
+        <textarea id="chat-input" name="message" rows="1" maxlength="${max}" placeholder="${support ? 'Pose ta question sur AiTools…' : `Écris à ${esc(aiName())}…`}  (Entrée pour envoyer, Maj+Entrée pour un retour à la ligne)" data-chat-input></textarea>
         <button class="btn primary" data-chat-send>${ic('send')}<span>Envoyer</span></button>
         <button type="button" class="btn" data-chat-stop hidden>${ic('stop')}<span>Arrêter</span></button>
       </div>
     </form>
     <p class="chat-note muted small">${support
     ? "Le Support répond d'après la documentation d'AiTools. Il ne voit ni tes projets, ni tes prospects, ni tes mails. Tu peux joindre une capture d'écran pour montrer un problème. Il peut se tromper : vérifie avant d'agir."
-    : "Claude ne voit que cette conversation, et ce que tu joins : un projet AiTools (son code, en lecture seule), des photos, des PDF, des fichiers texte ou des vidéos (quelques images en sont tirées, sans le son). Il peut se tromper, vérifie avant d'envoyer."}</p>
+    : `${esc(aiName())} ne voit que cette conversation, et ce que tu joins : un projet AiTools (son code, en lecture seule), des photos, des PDF, des fichiers texte ou des vidéos (quelques images en sont tirées, sans le son). Il peut se tromper, vérifie avant d'envoyer.`}</p>
   </section>
 </div>`;
   return layout({ title: support ? 'Support' : 'IA', email, body, scripts: ['/static/chat.js'] });

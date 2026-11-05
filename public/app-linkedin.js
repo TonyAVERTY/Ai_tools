@@ -1,7 +1,7 @@
 // LinkedIn d'un projet : relier un compte, donner une direction, générer / régénérer un post, le relire et le publier.
 // Chargé après app.js, qui expose ses outils communs dans window.AiTools ; ajax.js relance ce script à chaque navigation, comme app.js.
 (() => {
-  const { $, $$, api, confirmBox, esc, liDay, listen, loadFailed, refreshProject, toast } = window.AiTools;
+  const { $, $$, aiName, api, confirmBox, esc, liDay, listen, loadFailed, refreshProject, toast } = window.AiTools;
 
   // ---------- LinkedIn ----------
   // Section d'un projet : relier un compte, donner une direction (facultative), générer / régénérer un post, le relire et le publier.
@@ -22,7 +22,7 @@
     }
     const acc = s.account;
     if (!acc) {
-      box.innerHTML = `<p>Relie un compte LinkedIn à ce projet : Claude pourra écrire des posts pour ce compte. AiTools demande seulement le droit de <strong>publier un post ${s.pagesEnabled ? 'sur ton profil ou sur une page que tu administres' : 'sur ton profil'}</strong>, et ne publie jamais sans ton clic.</p>
+      box.innerHTML = `<p>Relie un compte LinkedIn à ce projet : ${esc(aiName())} pourra écrire des posts pour ce compte. AiTools demande seulement le droit de <strong>publier un post ${s.pagesEnabled ? 'sur ton profil ou sur une page que tu administres' : 'sur ton profil'}</strong>, et ne publie jamais sans ton clic.</p>
         ${s.canManage ? `<p><a class="btn primary" href="/linkedin/connect?project=${id}">Connecter LinkedIn</a></p>` : '<p class="muted small">Demande à un administrateur du projet de relier le compte.</p>'}`;
       return;
     }
@@ -46,9 +46,9 @@
     const latest = posts[0];
     const draft = latest && latest.status !== 'published' ? latest : null;
     const direction = latest?.direction || '';
-    const gen = !s.hasProfile ? '<p class="muted small">Analyse le projet d\'abord : Claude s\'appuie sur la fiche projet.</p>' : acc.expired ? '' : `<div class="li-gen">
+    const gen = !s.hasProfile ? `<p class="muted small">Analyse le projet d'abord : ${esc(aiName())} s'appuie sur la fiche projet.</p>` : acc.expired ? '' : `<div class="li-gen">
         <label>De quoi doit parler le post ? <span class="muted small">(facultatif)</span>
-          <textarea name="direction" rows="3" maxlength="500" data-li-direction placeholder="Ex. : le lancement de la nouvelle offre, un retour d'expérience, un conseil pour mes clients… Laisse vide : Claude choisit le sujet.">${esc(direction)}</textarea></label>
+          <textarea name="direction" rows="3" maxlength="500" data-li-direction placeholder="Ex. : le lancement de la nouvelle offre, un retour d'expérience, un conseil pour mes clients… Laisse vide : ${esc(aiName())} choisit le sujet.">${esc(direction)}</textarea></label>
         <button type="button" class="btn primary" data-li-generate="${id}">${draft ? 'Régénérer un autre post' : 'Générer un post'}</button></div>`;
     const liWhen = (ts) => new Date(ts * 1000).toLocaleString('fr-FR', { dateStyle: 'full', timeStyle: 'short', timeZone: 'Europe/Paris' });
     const scheduled = draft?.status === 'scheduled';
@@ -59,7 +59,7 @@
         <button type="button" class="btn" data-li-schedule="${id}"${where ? '' : ' disabled'}>Programmer</button></div>`;
     const draftHtml = draft ? `<div class="li-draft"><label>${scheduled ? 'Post programmé (annule la programmation pour le modifier)' : 'Brouillon (modifiable)'}
         <textarea rows="11" maxlength="${s.maxLength}" data-li-body="${draft.id}"${scheduled ? ' readonly' : ''}>${esc(draft.body)}</textarea></label>
-        <p class="muted small"><span data-li-count>${draft.body.length}</span> / ${s.maxLength} caractères${draft.direction ? ` · direction : « ${esc(draft.direction)} »` : ' · sujet choisi par Claude'}</p>
+        <p class="muted small"><span data-li-count>${draft.body.length}</span> / ${s.maxLength} caractères${draft.direction ? ` · direction : « ${esc(draft.direction)} »` : ' · sujet choisi par ' + esc(aiName())}</p>
         ${scheduled ? `<p class="ok small">Programmé : ${esc(liWhen(draft.scheduledAt))} (heure de Paris). Il part tout seul, dans les 15 minutes qui suivent l'heure choisie.</p>` : ''}
         ${draft.scheduleError ? `<p class="error small">La dernière publication programmée a échoué : ${esc(draft.scheduleError)}</p>` : ''}
         <div class="row-actions">${scheduled ? `<button type="button" class="btn" data-li-unschedule="${id}">Annuler la programmation</button>` : `<button type="button" class="btn" data-li-save="${id}">Enregistrer</button>`}
@@ -80,7 +80,7 @@
       if (t.matches('[data-li-generate]')) {
         t.disabled = true;
         const r = await api(`/api/projects/${id}/linkedin/generate`, { direction: $('[data-li-direction]', proj)?.value || '' });
-        toast(r.budgetBlocked ? `En file, mais ${r.budgetBlocked}` : r.existing ? 'Un post est déjà en cours de rédaction' : 'Claude rédige le post…', r.budgetBlocked ? 'error' : 'ok');
+        toast(r.budgetBlocked ? `En file, mais ${r.budgetBlocked}` : r.existing ? 'Un post est déjà en cours de rédaction' : `${aiName()} rédige le post…`, r.budgetBlocked ? 'error' : 'ok');
         refreshProject(proj);
       } else if (t.matches('[data-li-save]')) {
         await api(`/api/projects/${id}/linkedin/post`, { postId: Number(body().dataset.liBody), body: body().value });

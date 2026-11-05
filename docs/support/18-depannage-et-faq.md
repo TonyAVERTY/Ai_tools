@@ -182,10 +182,10 @@ Non. Les clics répétés sur un même bouton (double clic, rafale) sont ignoré
 Le serveur ne peut pas écrire dans son dossier de données (réglage `DATA_DIR` de l'administrateur) : les dépôts ne peuvent donc pas être clonés. C'est à l'administrateur du serveur de pointer `DATA_DIR` vers un dossier qui appartient à l'utilisateur qui fait tourner iaboss, puis de redémarrer. Une fois corrigé, clique de nouveau sur **Analyser**.
 
 ## « Analyse en échec : Secret de liaison illisible : relie de nouveau ton accès Claude »
-Le serveur ne peut pas déchiffrer ton accès Claude : le plus souvent, l'administrateur a changé la clé de chiffrement (`SECRET_KEY`) après ta liaison. La fenêtre « Claude est déconnecté » apparaît alors : clique sur **Reconnecter Claude** et relie de nouveau ton accès (jeton d'abonnement ou clé API), puis relance l'analyse. Rien d'autre n'est perdu.
+Le serveur ne peut pas déchiffrer ton accès à l'IA : le plus souvent, l'administrateur a changé la clé de chiffrement (`SECRET_KEY`) après ta liaison. Avec ChatGPT ou Gemini, le message porte le nom de ton IA à la place de « Claude ». La fenêtre « Claude est déconnecté » (au nom de ton IA) apparaît alors : clique sur **Reconnecter Claude** (« Reconnecter ChatGPT », « Reconnecter Gemini ») et relie de nouveau ton accès (clé API, jeton d'abonnement ou connexion), puis relance l'analyse. Rien d'autre n'est perdu.
 
 ## La fenêtre « Claude est déconnecté » s'affiche
-Claude a refusé ton accès (jeton expiré ou révoqué, clé API supprimée). Clique sur **Reconnecter Claude** pour relier un nouvel accès ; **Plus tard** ferme simplement la fenêtre.
+Ton IA (Claude, ChatGPT ou Gemini : la fenêtre porte son nom) a refusé ton accès (jeton ou connexion expirés ou révoqués, clé API supprimée). Clique sur **Reconnecter Claude** (ou le nom de ton IA) pour relier un nouvel accès ; **Plus tard** ferme simplement la fenêtre.
 
 ## Le mail de prospection ne contient pas le lien de mon site
 Renseigne l'adresse dans **En-tête → Site du produit** (puis **Enregistrer le site**), clique sur **Générer avec l'IA** dans « Modèle de mail » : le nouveau texte contient `{{site}}`, remplacée à l'envoi par ton adresse. Un modèle déjà généré avant cela n'a pas `{{site}}` : régénère-le, ou ajoute toi-même `{{site}}` dans le corps, puis **Valider le modèle** de nouveau. L'**Aperçu** montre le lien tel qu'il partira.
