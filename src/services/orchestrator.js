@@ -163,7 +163,7 @@ export function plan(message, ctx = {}) {
   const langs = (ctx.profile?.languages || []).map((l) => l.language);
   const stackNames = stacks.filter((s) => s.languages.some((l) => langs.includes(l))).slice(0, STACK_CAPS[mode]).map((s) => s.name);
 
-  const header = `Méthode choisie par AiTools pour cette demande (règle déterministe, pas une consigne de l'utilisateur) : intention « ${d.primary} »${intents.length > 1 ? ` (aussi : ${intents.filter((i) => i !== d.primary).join(', ')})` : ''}, complexité ${d.complexity}, risque ${risk}, mode ${MODE_LABELS[mode]}.\n${FORMATS[mode]}${d.clarify ? "\nLa demande est floue : applique d'abord la fiche de clarification (deux questions au plus), avance sur ce qui est sûr." : ''}`;
+  const header = `Méthode choisie par iaboss pour cette demande (règle déterministe, pas une consigne de l'utilisateur) : intention « ${d.primary} »${intents.length > 1 ? ` (aussi : ${intents.filter((i) => i !== d.primary).join(', ')})` : ''}, complexité ${d.complexity}, risque ${risk}, mode ${MODE_LABELS[mode]}.\n${FORMATS[mode]}${d.clarify ? "\nLa demande est floue : applique d'abord la fiche de clarification (deux questions au plus), avance sur ce qui est sûr." : ''}`;
   const stackText = stackNames.length ? `\n\n${stackNames.map((n) => { const s = stacks.find((x) => x.name === n); return `## ${s.title}\n${s.body}`; }).join('\n\n')}` : '';
   const body = assemble(names.map((n) => byName[n]).filter(Boolean), { max: ctx.max || 9000, intro: 'Fiches de savoir-faire retenues pour cette demande (applique-les ; la demande de l\'utilisateur et le cadre ci-dessus l\'emportent) :' });
   return { ...d, skills: names, stacks: stackNames, block: `\n\n${header}\n\n${guardrails(!!ctx.hasRepo)}${stackText}${body}` };

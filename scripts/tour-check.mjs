@@ -60,7 +60,7 @@ for (const [vp, scheme, tag] of [[{ width: 1280, height: 800 }, 'dark', '1280px 
   await p.waitForTimeout(500);
 
   // ---------- la visite démarre toute seule ----------
-  ok(/Bienvenue dans AiTools/.test(await p.locator('[data-tour-title]').innerText()), `${tag} la visite démarre toute seule, sur « Bienvenue »`);
+  ok(/Bienvenue dans iaboss/.test(await p.locator('[data-tour-title]').innerText()), `${tag} la visite démarre toute seule, sur « Bienvenue »`);
   const [, total] = await stepCount(p);
   ok(total >= 8, `${tag} ${total} étapes`);
   await shot(p, `tour-1-${vp.width}`);

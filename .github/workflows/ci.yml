@@ -1,10 +1,15 @@
-# Vérifie chaque PR et chaque push sur develop/main : syntaxe puis tests (comme le hook .githooks/pre-commit).
+# Vérifie chaque PR et chaque push sur main : syntaxe puis tests (comme le hook .githooks/pre-commit).
+# Pour limiter les minutes consommées : develop n'est plus rejoué après la fusion d'une PR (la PR l'a déjà été ; le passage en
+# production, develop vers main, rejoue tout), et un changement qui ne touche que README.md ou docs/*.md (aucun test ne les lit ;
+# docs/support/ et docs/security/ restent testés) ne lance rien. Lancement à la main possible depuis l'onglet Actions.
 name: CI
 
 on:
   pull_request:
+    paths-ignore: ['README.md', 'docs/*.md']
   push:
-    branches: [develop, main]
+    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read

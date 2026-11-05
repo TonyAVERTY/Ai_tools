@@ -1,4 +1,4 @@
-// Savoir-faire d'AiTools donné à Claude : des fiches de méthode (knowledge/skills/*.md) ajoutées aux consignes système.
+// Savoir-faire d'iaboss donné à Claude : des fiches de méthode (knowledge/skills/*.md) ajoutées aux consignes système.
 // C'est ce qui rend Claude meilleur ICI que dans un Claude Code « nu » : il reçoit la méthode du métier en plus du contexte du projet.
 // Les fiches sont versionnées avec le code, jamais modifiables par l'utilisateur.
 //
@@ -81,7 +81,7 @@ export function renderSkill(s) {
   return `## ${s.title}\nObjectif : ${s.summary}\nRéussite : ${s.meta.reussite}\n${parts.join('\n')}`;
 }
 
-const INTRO = "Savoir-faire d'AiTools : méthode éprouvée pour cette tâche. Applique-la, elle ne remplace pas les règles de format ni les consignes ci-dessus ; en cas de doute, la consigne de la tâche l'emporte. Si une fiche te pousserait à inventer une information, n'invente pas.";
+const INTRO = "Savoir-faire d'iaboss : méthode éprouvée pour cette tâche. Applique-la, elle ne remplace pas les règles de format ni les consignes ci-dessus ; en cas de doute, la consigne de la tâche l'emporte. Si une fiche te pousserait à inventer une information, n'invente pas.";
 
 /** Assemble des fiches dans un bloc de consignes, dans la limite `max` : une fiche qui ferait dépasser est écartée entière, jamais coupée. */
 export function assemble(selected, { max = SKILLS_MAX_CHARS, intro = INTRO } = {}) {

@@ -37,7 +37,7 @@
     box.append(why, title, row);
     return box;
   }
-  // Après l'ajout : l'événement est dans l'agenda d'AiTools ; deux liens pour l'avoir aussi dans SON agenda
+  // Après l'ajout : l'événement est dans l'agenda d'iaboss ; deux liens pour l'avoir aussi dans SON agenda
   function doneDom(box, ev) {
     box.className = 'suggest done';
     box.replaceChildren();

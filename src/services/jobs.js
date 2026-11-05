@@ -7,7 +7,8 @@ import { SCENE_REFUSED } from './promovideo.js';
 import { reviewVerdict } from './promoqa.js';
 import { AI_JOBS } from './budget.js';
 import { getUser } from '../users.js';
-import { aiRefusal, assertCanRunAi } from '../claudelink.js';
+import { aiRefusal, assertCanRunAi, providerLabelOf } from '../claudelink.js';
+import { forAi } from './ainame.js';
 import { loadRatio } from './load.js';
 import { LOAD } from '../limits.js';
 import { createJobLog } from './joblog.js';
@@ -150,7 +151,7 @@ export async function latestJobs(db, projectId) {
  */
 export class Worker {
   constructor(db, handlers, {
-    maxJobs = Infinity, loadMax = LOAD.defaultMax, load = loadRatio, pollMs = 3000, log = console, clock = now, onFinish, onLoad,
+    maxJobs = Infinity, loadMax = LOAD.defaultMax, load = loadRatio, pollMs = 3000, log = console, clock = now, onFinish, onLoad, onError,
     budget, isAiJob, onBudget, quota, isQuotaSensitive, onQuotaHold, cliModeEnabled = true, parallel,
   } = {}) {
     this.parallel = parallel; // async (userId) => nombre de jobs simultanés permis à CET utilisateur (selon son offre) ; absent = 1
@@ -169,6 +170,7 @@ export class Worker {
     this.onQuotaHold = onQuotaHold;          // (reason, userId) → une notif quand le report commence
     this.quotaBlocked = new Set();
     this.onFinish = onFinish;   // (job, {status, result, error}) → notifications
+    this.onError = onError;     // (job, erreur) → alerte au développeur (services/errormail.js), jamais bloquante
     this.onLoad = onLoad;       // (ratio, userId) → une fois par pause et par utilisateur en attente
     this.loadNotified = new Set();
     this.db = db;
@@ -376,6 +378,9 @@ export class Worker {
     const ctrl = new AbortController();
     this.running.set(job.id, { job, ctrl });
     const journal = createJobLog(this.db, job.id);
+    // Dans les messages du job, « Claude » désigne l'IA de la personne : on écrit le nom de la sienne (services/ainame.js)
+    const ai = await providerLabelOf(this.db, job.user_id).catch(() => 'Claude');
+    const say = (t) => forAi(t, ai);
     let usageWrite = Promise.resolve();
     journal.append('status', 'Démarrage de la tâche');
     const ctx = {
@@ -383,8 +388,8 @@ export class Worker {
       params: JSON.parse(job.params_json || '{}'),
       signal: ctrl.signal,
       // Le modèle réellement utilisé (réglage de l'utilisateur) est joint à chaque avancement : « Modèle : Sonnet » dans Activité et sur le projet
-      progress: (p) => { journal.append('progress', p.message); return setProgress(this.db, job.id, ctx.model ? { ...p, model: modelLabel(ctx.model) } : p); },
-      log: (kind, text) => journal.append(kind, text),
+      progress: (p) => { const q = p?.message ? { ...p, message: say(p.message) } : p; journal.append('progress', q.message); return setProgress(this.db, job.id, ctx.model ? { ...q, model: modelLabel(ctx.model) } : q); },
+      log: (kind, text) => journal.append(kind, say(text)),
       cancelled: () => this.isCancelled(job.id),
       usage: { costUsd: 0, tokensIn: 0, tokensOut: 0 },
       persistUsage: () => {
@@ -415,6 +420,7 @@ export class Worker {
           this.emit('onFinish', job, { status: 'done', result });
         }
       } catch (e) {
+        e.message = say(e.message);
         journal.append('error', e.message);
         await journal.flush().catch(() => {});
         await usageWrite.catch(() => {});
@@ -423,6 +429,7 @@ export class Worker {
           await this.db.prepare("UPDATE jobs SET status='error', error=?, finished_at=?, cost_usd=?, tokens_in=?, tokens_out=? WHERE id=?")
             .run(String(e.message).slice(0, 2000), now(), ctx.usage.costUsd, ctx.usage.tokensIn, ctx.usage.tokensOut, job.id);
           this.emit('onFinish', job, { status: 'error', error: e.message });
+          try { this.onError?.(job, e); } catch { /* l'alerte ne fait jamais échouer le traitement du job */ }
         }
       }
     } finally {

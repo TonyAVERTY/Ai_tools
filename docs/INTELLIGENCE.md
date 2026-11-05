@@ -1,4 +1,4 @@
-# Intelligence d'AiTools : ce qui rend Claude meilleur ici que seul
+# Intelligence d'iaboss : ce qui rend Claude meilleur ici que seul
 
 Document d'architecture et d'audit. Il dit ce qui existe, ce qui est réellement branché à l'exécution, ce qui est mesuré et ce qui ne l'est pas. La documentation utilisateur est dans `docs/support/21-savoir-faire-de-claude.md`.
 
@@ -15,9 +15,9 @@ Document d'architecture et d'audit. Il dit ce qui existe, ce qui est réellement
 - Aucun **garde-fou transverse** sur les affirmations (« les tests passent ») ni sur le contenu du dépôt (CLAUDE.md, README, commentaires) traité comme une instruction.
 - Aucun moyen de **mesurer** quoi que ce soit.
 
-**Contrainte structurante, vérifiée dans le code.** Les jobs et le chat n'ont **pas** `Bash`, `Edit` ni `Write`. AiTools n'est donc pas un environnement où Claude exécute des tests ou modifie un dépôt : il **lit et conseille**. Les mécanismes ci-dessous sont conçus pour cette réalité (propositions de changement, commandes à lancer, séparation entre lu / supposé / non vérifié) ; je n'ai pas affaibli le bac à sable pour simuler de l'autonomie.
+**Contrainte structurante, vérifiée dans le code.** Les jobs et le chat n'ont **pas** `Bash`, `Edit` ni `Write`. iaboss n'est donc pas un environnement où Claude exécute des tests ou modifie un dépôt : il **lit et conseille**. Les mécanismes ci-dessous sont conçus pour cette réalité (propositions de changement, commandes à lancer, séparation entre lu / supposé / non vérifié) ; je n'ai pas affaibli le bac à sable pour simuler de l'autonomie.
 
-**Choix d'intégration, vérifié avec Claude Code 2.1.311.** Les « skills » natifs de Claude Code (`.claude/skills`) ne sont pas utilisés : le bac à sable monte seulement le clone en lecture seule avec un HOME jetable, le chat désactive les commandes slash (`--disable-slash-commands`), et écrire dans le clone de l'utilisateur le salirait. Les fiches sont donc des fichiers du dépôt AiTools, lus par le serveur et ajoutées à `--append-system-prompt`. Rien n'est supposé actif parce qu'un fichier existe : chaque fiche est atteignable par une demande de référence (test).
+**Choix d'intégration, vérifié avec Claude Code 2.1.311.** Les « skills » natifs de Claude Code (`.claude/skills`) ne sont pas utilisés : le bac à sable monte seulement le clone en lecture seule avec un HOME jetable, le chat désactive les commandes slash (`--disable-slash-commands`), et écrire dans le clone de l'utilisateur le salirait. Les fiches sont donc des fichiers du dépôt iaboss, lus par le serveur et ajoutées à `--append-system-prompt`. Rien n'est supposé actif parce qu'un fichier existe : chaque fiche est atteignable par une demande de référence (test).
 
 ## 2. Architecture
 
@@ -54,7 +54,7 @@ user_settings ──► userprofile ────────────┤
 
 ## 3. Mesure
 
-`node scripts/bench.mjs` (hors ligne, gratuit, reproductible) mesure : l'exactitude du profil de dépôt sur 6 dépôts factices (TypeScript web, API Python, CLI Go, Laravel, monorepo, dépôt de notes), celle de l'orchestrateur sur 16 demandes étiquetées, et le surcoût en contexte de chaque mode. `node scripts/bench.mjs --live` compare **Claude seul** et **Claude avec AiTools** (même modèle, mêmes outils de lecture, même dépôt, même question) sur 4 tâches avec des contrôles objectifs écrits à l'avance (`bench/tasks.js`) : bug dans un dépôt inconnu, analyse de sécurité, question simple, demande ambiguë.
+`node scripts/bench.mjs` (hors ligne, gratuit, reproductible) mesure : l'exactitude du profil de dépôt sur 6 dépôts factices (TypeScript web, API Python, CLI Go, Laravel, monorepo, dépôt de notes), celle de l'orchestrateur sur 16 demandes étiquetées, et le surcoût en contexte de chaque mode. `node scripts/bench.mjs --live` compare **Claude seul** et **Claude avec iaboss** (même modèle, mêmes outils de lecture, même dépôt, même question) sur 4 tâches avec des contrôles objectifs écrits à l'avance (`bench/tasks.js`) : bug dans un dépôt inconnu, analyse de sécurité, question simple, demande ambiguë.
 
 **Ce qui a été exécuté et ce qui ne l'a pas été** : voir la section « Résultats » ci-dessous, mise à jour avec les chiffres réels.
 
@@ -71,7 +71,7 @@ Exécution de `node scripts/bench.mjs` (hors ligne) :
 | Contexte ajouté, mode approfondi | ≈ 2 200 jetons en moyenne (max ≈ 2 700) |
 | Profil de dépôt rendu | ≈ 430 jetons ; 0,4 à 16 ms à froid sur les fixtures, instantané en cache |
 
-Estimation à 4 caractères par jeton. **Comparaison Claude seul / Claude avec AiTools (`--live`) : non exécutée**, faute de clé API dans l'environnement de développement. Les contrôles du dispositif sont eux-mêmes testés (`test/bench.test.js` : une bonne réponse type les passe tous, une mauvaise en échoue la plupart).
+Estimation à 4 caractères par jeton. **Comparaison Claude seul / Claude avec iaboss (`--live`) : non exécutée**, faute de clé API dans l'environnement de développement. Les contrôles du dispositif sont eux-mêmes testés (`test/bench.test.js` : une bonne réponse type les passe tous, une mauvaise en échoue la plupart).
 
 ## 5. Limites connues
 

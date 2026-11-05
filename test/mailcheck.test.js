@@ -48,7 +48,19 @@ test('relecture avec objet B : l\'objet B ne peut ni apparaître, ni disparaîtr
 });
 
 test('contrôle d\'un modèle : erreurs bloquantes et avertissements', () => {
-  assert.deepEqual(reviewMail({ subject: 'Idée', body: 'Bonjour {{entreprise}}.\n\n{{expediteur}}\nMonEspacePro' }), { errors: [], warnings: [] });
+  assert.deepEqual(reviewMail({ subject: 'Idée', body: 'Bonjour,\n\nUne idée pour {{entreprise}}.\n\nBien cordialement,\n{{expediteur}}\nMonEspacePro' }), { errors: [], warnings: [] });
+  // « Bonjour {{entreprise}}, » salue une entreprise comme une personne (« Bonjour Une Bonne Bouteille, »)
+  const named = reviewMail({ subject: '', body: 'Bonjour {{entreprise}},\n\nUne question.\n\nBien cordialement,\nTony' });
+  assert.deepEqual(named.errors, []);
+  assert.ok(named.warnings.some((w) => /salue une entreprise comme une personne/.test(w)));
+  assert.ok(!reviewMail({ subject: '', body: 'Bonjour,\n\nChez {{entreprise}}, une question.\n\nBien cordialement,\nTony' }).warnings.some((w) => /salue une entreprise/.test(w)), 'le nom plus loin dans la phrase : rien à signaler');
+  // Appel et politesse : signalés quand ils manquent (jamais bloquants), comme sur le modèle de relance de la capture
+  const dry = reviewMail({ subject: '', body: 'Au passage en caisse, vos clients retrouvent leur carte.\nEst-ce un sujet chez vous ?\nTony AVERTY | MonEspacePro' });
+  assert.deepEqual(dry.errors, []);
+  assert.ok(dry.warnings.some((w) => /formule d'appel/.test(w)), 'pas de « Bonjour »');
+  assert.ok(dry.warnings.some((w) => /formule de politesse avant la signature/.test(w)), 'pas de formule de politesse');
+  assert.ok(!reviewMail({ subject: '', body: 'Bonjour,\n\nUne question.\n\nBonne journée,\nTony' }).warnings.some((w) => /formule/.test(w)), 'appel et politesse présents : rien à signaler');
+  assert.ok(!reviewMail({ subject: '', body: 'Bonjour {{entreprise}},\n\nUne question.\n\nMerci' }).warnings.some((w) => /formule/.test(w)), '« Bonjour {{entreprise}}, » est un appel');
   const bad = reviewMail({ subject: 'Offre gratuite {{nom}}', body: 'Bonjour.\n, MonEspacePro\n{{site' });
   assert.ok(bad.errors.some((e) => /\{\{nom\}\}/.test(e)), 'variable inconnue');
   assert.ok(bad.errors.some((e) => /ligne 2 commence par une virgule/.test(e)), 'ligne qui commence par une virgule');
@@ -104,7 +116,11 @@ test('modèle généré : relu par Claude avant enregistrement, corrections affi
   assert.equal(job.status, 'done', job.error);
   assert.equal(job.result.reviewed, true);
   assert.deepEqual(job.result.corrections, ['signature sans virgule']);
-  assert.match((await getTemplate(s.db, pid, 'initial')).body, /\{\{expediteur\}\}$/);
+  const saved = (await getTemplate(s.db, pid, 'initial')).body;
+  assert.match(saved, /\{\{expediteur\}\}/, 'la signature reste');
+  assert.match(saved, /^Bonjour,\n\n/, 'l\'appel manquant a été ajouté à la génération');
+  assert.match(saved, /Bien cordialement,\nTony$/, 'la formule de politesse manquante aussi');
+  assert.equal(job.result.styleFixed.length, 2, 'le résultat du job dit ce qui a été corrigé');
   // objet B généré aussi (test A/B) : différent de l'objet A, conservé par la relecture
   const t = await getTemplate(s.db, pid, 'initial');
   assert.equal(t.subject, 'Idée pour {{entreprise}}');
@@ -158,4 +174,12 @@ test('validation : un modèle cassé est refusé (400), un modèle correct passe
   const ok = await save({ subject: 'Idée', body: 'Bonjour {{entreprise}}.\n\n{{expediteur}}, MonEspacePro' });
   assert.equal(ok.status, 200);
   assert.ok((await ok.json()).warnings.some((w) => /signature/.test(w)));
+});
+
+test('réponses toutes faites : « oui, non ou plus tard ? » est signalé, une vraie question ne l\'est pas', () => {
+  const warn = (text) => reviewMail({ subject: '', body: `Bonjour,\n\n${text}\n\nBien cordialement,\nTony` }).warnings.some((w) => /réponses toutes faites/.test(w));
+  for (const t of ['Est-ce un sujet chez vous : oui, non ou plus tard ? Si ce n\'est pas le bon moment, dites-le-moi.', 'Vous pouvez répondre oui, non ou plus tard.', 'Intéressé ? oui ou non ?', 'Oui / non ?', 'Répondez par 1 ou 2.',
+    // énumérations avec d'autres mots (capture du propriétaire)
+    'La fidélité de vos clients est-elle un sujet pour vous, maintenant, plus tard ou pas du tout ?', 'Est-ce un sujet pour vous, oui, non ou plus tard ?', 'Est-ce pour vous un sujet : pas maintenant, peut-être ou bientôt ?']) assert.equal(warn(t), true, t);
+  for (const t of ['Est-ce un sujet chez vous ?', 'Préférez-vous que je repasse plus tard ?', "Il n'y a pas non plus de souci.", "Si ce n'est pas le bon moment, dites-le-moi et je n'insiste pas.", 'Oui, la carte se met en place en une heure.', 'Souhaitez-vous que je vous rappelle maintenant ?', 'Vous utilisez déjà une carte, non ?', 'Est-ce que la fidélité est un sujet chez vous en ce moment ?']) assert.equal(warn(t), false, t);
 });

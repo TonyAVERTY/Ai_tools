@@ -7,7 +7,7 @@ import { SPRITE, ic } from '../icons.js';
 
 export { ic };
 
-export const SITE_NAME = 'AiTools';
+export const SITE_NAME = 'iaboss';
 const OG_IMAGE = '/static/img/share_img.jpg'; // 1024 x 541, aperçu des liens partagés
 export const CONTACT_EMAIL = 'contact@iaboss.fr';
 
@@ -74,7 +74,7 @@ ${noindex ? '' : `<link rel="canonical" href="${esc(url)}">\n`}<meta name="color
 <meta property="og:image" content="${esc(absoluteUrl(appUrl, assetUrl(OG_IMAGE)))}">
 <meta property="og:image:width" content="1024">
 <meta property="og:image:height" content="541">
-<meta property="og:image:alt" content="${SITE_NAME} : prospection, relances et posts LinkedIn pilotés par Claude">
+<meta property="og:image:alt" content="${SITE_NAME} : prospection, relances et posts LinkedIn pilotés par ton IA">
 <meta name="twitter:card" content="summary_large_image">
 ${iconLinks()}
 <link rel="stylesheet" href="${assetUrl('/static/tokens.css')}">
@@ -102,7 +102,7 @@ ${body}
 <footer class="foot">
   <div class="wrap">
     <div class="foot-g">
-      <div>${lockup()}<p class="foot-n">Prospection, relances et posts LinkedIn pilotés par Claude.</p></div>
+      <div>${lockup()}<p class="foot-n">Prospection, relances et posts LinkedIn pilotés par ton IA.</p></div>
       <nav aria-label="Produit"><p class="foot-h">Produit</p><ul>
         <li><a href="/">Accueil</a></li>
         ${NAV.map(([href, label]) => `<li><a href="${href}"${here(href)}>${esc(label)}</a></li>`).join('\n        ')}

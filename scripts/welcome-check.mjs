@@ -124,7 +124,7 @@ for (const [vp, scheme] of [[{ width: 1280, height: 800 }, 'dark'], [{ width: 39
   await ctx.route('**/link/claude/login', (r) => r.fulfill({ contentType: 'application/json', body: JSON.stringify({ id: 'x', url: `${s.base}/static/tokens.css` }) }));
   await ctx.route('**/link/claude/login/code', async (r) => { await new Promise((res) => setTimeout(res, 3500)); r.fulfill({ contentType: 'application/json', body: JSON.stringify({ ok: true }) }); });
   await ctx.route('**/link/claude/login/cancel', (r) => r.fulfill({ contentType: 'application/json', body: '{}' }));
-  await p.goto(`${s.base}/link`);
+  await p.goto(`${s.base}/link?ia=claude`);
   await p.waitForSelector('html[data-nav="ready"]');
   await p.locator('[data-open-dialog="consent-dialog"]').click();
   await p.locator('#consent-dialog label.opt').click();

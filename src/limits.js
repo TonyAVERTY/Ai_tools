@@ -21,6 +21,8 @@ export const RATE_LIMITS = {
   // Ajout, modification et suppression de prospects ; aperçu d'un mail (rendu sans envoi)
   prospect_write: { user: { max: 120, windowMs: 10 * MIN } },
   preview: { user: { max: 120, windowMs: 10 * MIN } },
+  // Contrôle du sens d'un mail dans l'aperçu : chacun coûte un appel à l'IA de la personne
+  sense: { user: { max: 40, windowMs: 10 * MIN } },
   // Tâches des postes : chacune coûte un appel Claude
   poste: { user: { max: 40, windowMs: HOUR } },
   // Vidéos de promotion : un rendu coûte un appel Claude et plusieurs minutes de processeur
@@ -39,6 +41,9 @@ export const RATE_LIMITS = {
   unsub: { ip: { max: 60, windowMs: 10 * MIN } },
   // Liaison Claude : chaque essai de clé ou de jeton coûte un appel réseau chez Anthropic
   link: { user: { max: 10, windowMs: 10 * MIN }, ip: { max: 30, windowMs: 10 * MIN } },
+  // Connexion guidée ChatGPT : la page demande où en est la connexion toutes les 2 s pendant 15 minutes au plus (lecture seule, aucun appel réseau
+  // vers OpenAI). Elle ne doit JAMAIS compter dans « link » ci-dessus, sinon elle l'épuise en quelques secondes.
+  link_poll: { user: { max: 600, windowMs: 10 * MIN }, ip: { max: 900, windowMs: 10 * MIN } },
   // Export / import CSV
   csv: { user: { max: 10, windowMs: 10 * MIN } },
   // Envois : lancement d'un lot, rapport par mail, notification de test

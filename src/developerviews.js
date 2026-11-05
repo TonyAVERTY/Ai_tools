@@ -13,7 +13,7 @@ const day = (ts) => (ts ? new Date(ts * 1000).toLocaleString('fr-FR', { dateStyl
 
 export function developerPage({ user, enabled, tokens = [], newToken = null, error = null, appUrl, max }) {
   const body = !enabled ? `<section class="card">
-  <div class="card-h"><h2>Mode développeur</h2><p>Active le mode développeur pour utiliser l'API d'AiTools et le serveur MCP (piloter ton panel depuis Claude ou depuis tes propres scripts). Tant qu'il est désactivé, aucun jeton ne fonctionne.</p></div>
+  <div class="card-h"><h2>Mode développeur</h2><p>Active le mode développeur pour utiliser l'API d'iaboss et le serveur MCP (piloter ton panel depuis Claude ou depuis tes propres scripts). Tant qu'il est désactivé, aucun jeton ne fonctionne.</p></div>
   <form method="post" action="/account/developer" class="cfg"><input type="hidden" name="enabled" value="on">
     <div class="row"><button class="btn primary">${ic('key')}Activer le mode développeur</button></div></form>
 </section>` : `
@@ -37,9 +37,9 @@ ${newToken ? `<section class="card" role="status">
   </form>` : ''}
 </section>
 <section class="card" aria-labelledby="h-dapi">
-  <div class="card-h"><h2 id="h-dapi">API</h2><p>Chaque requête porte <code>Authorization: Bearer aitk_…</code> ; les corps sont en JSON ; limite de 120 requêtes par minute et par compte. <a href="/docs/api">Référence complète, exemples et erreurs</a>.</p></div>
+  <div class="card-h"><h2 id="h-dapi">API</h2><p>Chaque requête porte <code>Authorization: Bearer iaboss_…</code> ; les corps sont en JSON ; limite de 120 requêtes par minute et par compte. <a href="/docs/api">Référence complète, exemples et erreurs</a>.</p></div>
   ${cmd("Adresse de l'API", `${appUrl}/api/v1`)}
-  ${cmd('Exemple', `curl -H "Authorization: Bearer $AITOOLS_TOKEN" ${appUrl}/api/v1/projects`)}
+  ${cmd('Exemple', `curl -H "Authorization: Bearer $IABOSS_TOKEN" ${appUrl}/api/v1/projects`)}
   <details class="routes"><summary>Les ${API_ENDPOINTS.length} routes et le droit qu'elles demandent</summary>
     <div class="table-wrap"><table><thead><tr><th>Route</th><th>Droit</th><th>Rôle</th></tr></thead><tbody>
     ${API_ENDPOINTS.map((e) => `<tr><td><code>${e.method} ${esc(e.path)}</code></td><td>${e.scope ? `<code>${esc(e.scope)}</code>` : '—'}</td><td>${esc(e.summary)}</td></tr>`).join('')}
@@ -51,9 +51,9 @@ ${newToken ? `<section class="card" role="status">
   <div class="card-h"><h2 id="h-dmcp">Serveur MCP (Claude)</h2><p>Le serveur MCP relie Claude à ton panel avec ces mêmes jetons : tu peux lui demander « quelles réponses sont arrivées ? » ou « ajoute une note à ce prospect ». Il tourne sur ton ordinateur (il a besoin de Node.js) et parle à ce panel par internet, avec ton jeton. Il n'a aucun droit propre : il ne peut faire que ce que son jeton autorise.</p></div>
   <ol class="mcp-steps">
     <li><span><b>Télécharge le fichier</b> et range-le où tu veux sur ton ordinateur (par exemple dans ton dossier personnel).</span>
-      <span class="row"><a class="btn small" href="/developer/mcp.js" download="aitools-mcp.js">${ic('dl')}Télécharger aitools-mcp.js</a></span></li>
-    <li><span><b>Ajoute-le à Claude Code.</b> Dans un terminal, ouvre le dossier où tu l'as rangé et lance la commande (remplace <code>aitk_…</code> par ton jeton).</span>
-      ${cmd('Commande Claude Code', `claude mcp add aitools \\\n  -e AITOOLS_URL=${appUrl} \\\n  -e AITOOLS_TOKEN=aitk_… \\\n  -- node "$(pwd)/aitools-mcp.js"`)}</li>
+      <span class="row"><a class="btn small" href="/developer/mcp.js" download="iaboss-mcp.js">${ic('dl')}Télécharger iaboss-mcp.js</a></span></li>
+    <li><span><b>Ajoute-le à Claude Code.</b> Dans un terminal, ouvre le dossier où tu l'as rangé et lance la commande (remplace <code>iaboss_…</code> par ton jeton).</span>
+      ${cmd('Commande Claude Code', `claude mcp add iaboss \\\n  -e IABOSS_URL=${appUrl} \\\n  -e IABOSS_TOKEN=iaboss_… \\\n  -- node "$(pwd)/iaboss-mcp.js"`)}</li>
   </ol>
   <p class="muted small">Installation et outils : <a href="/docs/mcp">documentation du serveur MCP</a>.</p>
 </section>

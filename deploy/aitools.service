@@ -1,6 +1,6 @@
 # Template : install.sh remplace @APP_DIR@, @DATA_DIR@ et @APP_USER@.
 [Unit]
-Description=AiTools (panel prospection IA)
+Description=iaboss (panel prospection IA)
 After=network-online.target
 Wants=network-online.target
 # Ne démarre pas si le disque de données n'est pas monté

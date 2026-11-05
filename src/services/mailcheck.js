@@ -45,6 +45,39 @@ const PROMISES = [
   [/garanti|remboursé|sans engagement/i, 'une garantie ou une absence d\'engagement'],
 ];
 
+const ANSWER_WORDS = /\b(oui|non|peut-être|plus tard|pas du tout|maintenant|jamais|pas maintenant|pas encore|bientôt)\b/gi;
+
+/**
+ * Le texte offre-t-il des réponses toutes faites à choisir ? « Oui, non ou plus tard ? », « maintenant, plus tard ou pas du tout ? », « oui / non ? »,
+ * « répondez par 1 ou 2 » : une personne écrit sa réponse, elle ne coche pas une case. Une question qui contient deux mots de réponse énumérés est signalée ;
+ * une seule (« Préférez-vous que je repasse plus tard ? ») ne l'est pas.
+ */
+export function readyMadeAnswers(text) {
+  const t = String(text ?? '');
+  if (/\brépon(?:ds|dez)\s+par\s+(?:1|un)\b|vous pouvez répondre\s+(?:oui|non|par)\b/i.test(t)) return true;
+  for (const q of t.match(/[^.?!\n]*\?/g) || []) {
+    const found = new Set((q.match(ANSWER_WORDS) || []).map((w) => w.toLowerCase()));
+    if (found.size >= 2 && /,|\bou\b|\//.test(q)) return true;
+  }
+  return false;
+}
+
+/**
+ * Défauts de FORME d'un mail (jamais bloquants, le ton reste au choix de la personne) : pas d'appel, appel adressé à l'entreprise, pas de politesse avant la
+ * signature, réponses toutes faites. Une seule source : l'aperçu les signale, et la génération d'un modèle les fait corriger par l'IA (handlers.js).
+ */
+export function styleProblems(body = '') {
+  const out = [];
+  const filled = String(body).split('\n').map((l) => l.trim()).filter(Boolean);
+  if (filled.length) {
+    if (!/^(bonjour|bonsoir|madame|monsieur|cher|chère|hello|salut)\b/i.test(filled[0])) out.push("Le mail ne commence pas par une formule d'appel (« Bonjour, »).");
+    if (/^(bonjour|bonsoir|hello|salut)[ \t,]*\{\{\s*entreprise\s*\}\}/i.test(filled[0])) out.push("« Bonjour {{entreprise}}, » salue une entreprise comme une personne (« Bonjour Une Bonne Bouteille, ») : écris « Bonjour, » tout court.");
+    if (!/cordialement|bien à vous|bonne journée|bonne soirée|bonne continuation|à bientôt|salutations|sincèrement|respectueusement|merci/i.test(filled.slice(-4).join(' '))) out.push('Aucune formule de politesse avant la signature (« Bien cordialement, »).');
+  }
+  if (readyMadeAnswers(body)) out.push('Le mail propose des réponses toutes faites (« oui, non ou plus tard », « maintenant, plus tard ou pas du tout ») : pose plutôt une question simple, à laquelle on répond avec ses mots.');
+  return out;
+}
+
 /**
  * Contrôle d'un modèle : `errors` bloquent la validation, `warnings` informent (aperçu).
  * `facts` : texte de la fiche du projet ; une promesse du mail dont la fiche ne parle pas est signalée (le mail ne doit proposer que ce qui existe).
@@ -65,6 +98,7 @@ export function reviewMail({ subject = '', body = '', facts = '' } = {}) {
       if (hit && !re.test(facts)) warnings.push(`Le mail parle de ${label} (« ${hit[0]} ») alors que la fiche du projet n'en parle pas : retire-le si ce n'est pas disponible.`);
     }
   }
+  warnings.push(...styleProblems(body));
   const n = words(body);
   if (n > 220) warnings.push(`Le mail fait ${n} mots : au-delà de 200 mots, la réponse devient plus rare.`);
   if (SPAM_WORDS.test(subject)) warnings.push("L'objet contient un mot que les filtres anti-spam repèrent (gratuit, offre, urgent, promo, garanti).");

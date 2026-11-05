@@ -1,12 +1,16 @@
 // Handlers des jobs en arrière-plan.
 import { now, getSetting, setSetting } from './db.js';
 import { readdirSync, statSync } from 'node:fs';
-import { runClaude, extractJson, rateLimitWindows } from './services/claude.js';
-import { tidyTemplateText, acceptReview } from './services/mailcheck.js';
+import { join } from 'node:path';
+import { extractJson } from './services/claude.js';
+import { getProvider } from './services/providers/index.js';
+import { withUserLock } from './services/userlock.js';
+import { tidyTemplateText, acceptReview, fillBody, fillSubject, styleProblems } from './services/mailcheck.js';
+import { checkSense, acceptSenseFix, SenseUnavailable, SENSE_BATCH } from './services/mailsense.js';
 import { addUsage, jobContext, liveJobUsage } from './services/jobs.js';
 import { syncRepo } from './services/git.js';
-import { normalizeModel } from './services/models.js';
-import { analyzePrompt, prospectPrompt, templatePrompt, reviewMailPrompt, followupTemplatePrompt, evolutionPrompt, linkedinPostPrompt, hookPrompt, auditPrompt, promoPrompt, rolePrompt, parseCustomPrompts, LEVELS } from './services/prompts.js';
+import { normalizeModel, defaultModelOf, tierEquivalent } from './services/models.js';
+import { analyzePrompt, prospectPrompt, templatePrompt, reviewMailPrompt, fixStylePrompt, followupTemplatePrompt, evolutionPrompt, linkedinPostPrompt, hookPrompt, auditPrompt, promoPrompt, rolePrompt, parseCustomPrompts, LEVELS } from './services/prompts.js';
 import { VOICE_PROVIDERS, parseVoiceParams, extractVoiceScript, prepareVoice, cleanVoice, mixVoice, synthesize, langName } from './services/voiceover.js';
 import { PROMO, FORMATS, SCENE_REFUSED, SceneError, parsePromoParams, extractScene, promoSupported, renderPromo } from './services/promovideo.js';
 import { reviewPromo } from './services/promoqa.js';
@@ -14,11 +18,11 @@ import { createJobStream } from './services/jobstream.js';
 import { reserveVideo, finishVideo, removeVideo, countVideos, keepScene, takeScene, getVoiceKey, getVoiceRegion } from './promo.js';
 import { linkedinAccount, saveDraft, recentDrafts } from './linkedin.js';
 import { followupCandidates, followupSubject, isBusinessHours } from './services/followup.js';
-import { EMAIL_RE, createTransport, buildProspectMail, allowedToSend, makeMessageId } from './services/mailer.js';
+import { EMAIL_RE, createTransport, buildProspectMail, allowedToSend, makeMessageId, mailVars } from './services/mailer.js';
 import { unsubToken } from './crypto.js';
-import { resolveCredentials, isAuthRefusal, markLinkInvalid } from './claudelink.js';
+import { resolveCredentials, markLinkInvalid, userProvider, saveRefreshedAuth } from './claudelink.js';
 import { userRepoRoot, userChatRoot } from './users.js';
-import { quotaAlerts } from './services/budget.js';
+import { quotaAlerts, budgetState } from './services/budget.js';
 import { notify } from './services/notify.js';
 import { quotaFor, recordUsage, planLimitMessage } from './services/plans.js';
 import { getUser } from './users.js';
@@ -120,6 +124,7 @@ export function claudeDiagnostic({ userId, cred, cfg, cwd, r }) {
     catch { ctx = 'illisible'; }
   }
   const sb = cfg.sandbox || {};
+  if (cred.authFile) secrets.push(`fichier_de_connexion(len=${String(cred.authFile).length})`);
   return `[claude] échec user=${Number(userId)} mode=${cred.mode} secret=${secrets.join(',') || 'AUCUN'} `
     + `bac_a_sable=${sb.enabled ? 'oui' : 'non'}${sb.production ? '(prod)' : ''} fichiers_claude_du_depot=${ctx} subtype=${r.subtype}`;
 }
@@ -130,8 +135,8 @@ export function claudeDiagnostic({ userId, cred, cfg, cwd, r }) {
  */
 export function makeClaude(app) {
   const { db, cfg } = app;
-  return async (userId, o) => {
-    const cred = await resolveCredentials(app, userId); // refuse sans liaison valide (dernier garde-fou)
+  const claude = async (userId, o, cred) => {
+    const provider = getProvider(cred.provider);
     const jc = jobContext.getStore();
     if (jc && o.model) jc.model = o.model; // le job sait quel modèle sert vraiment
     // Profil de l'utilisateur (secteur, métier…) : une donnée de plus dans les consignes système, sauf pour le Support (qui répond d'après la documentation)
@@ -139,15 +144,16 @@ export function makeClaude(app) {
     // Accès refusé par Claude (jeton expiré, clé révoquée) : la liaison devient invalide et l'interface demande de se reconnecter
     const refused = async () => { if (await markLinkInvalid(db, userId)) console.warn(`[claude] accès refusé : liaison de l'utilisateur ${Number(userId)} marquée invalide`); };
     let r;
+    let renewedAuth = null;
     let hasOutput = false;
-    const stream = jc?.log ? createJobStream(jc.log, Object.values(cred.secretEnv || {})) : null;
+    const stream = jc?.log ? createJobStream(jc.log, [...Object.values(cred.secretEnv || {}), ...(cred.secrets || [])]) : null;
     const usage = jc?.usage ? liveJobUsage(jc) : null;
     let usageTimer = null, pendingUsage = null;
     const flushUsage = () => { clearTimeout(usageTimer); usageTimer = null; if (pendingUsage) { usage?.update(pendingUsage); pendingUsage = null; } };
     jc?.log?.('model', `Modèle : ${o.model || 'haiku'}`);
     try {
-      r = await runClaude({
-        bin: cfg.claudeBin, ...o, system,
+      r = await provider.run({
+        bin: provider.bin(cfg), ...o, system,
         onUsage: (u) => { pendingUsage = u; if (!usageTimer) usageTimer = setTimeout(flushUsage, 500); o.onUsage?.(u); },
         onDelta: stream ? (text) => { hasOutput = true; stream.delta(text); o.onDelta?.(text); } : o.onDelta,
         onActivity: jc ? (text) => { jc.log?.('activity', text); o.onActivity?.(text); } : o.onActivity,
@@ -155,6 +161,8 @@ export function makeClaude(app) {
         onTool: (name, input) => { jc?.log?.('tool', toolActivity(name, input) || `Outil : ${name}`); o.onTool?.(name, input); },
         onTurn: (n) => { jc?.log?.('turn', `Claude · étape ${n}`); o.onTurn?.(n); },
         sandbox: cfg.sandbox, secretEnv: cred.secretEnv,
+        // Connexion de compte : le fichier à utiliser, les jetons à masquer, et la mise à jour que le CLI en fait (jetons renouvelés)
+        ...(cred.authFile ? { authFile: cred.authFile, secrets: cred.secrets, onAuthFile: (text) => { renewedAuth = text; }, workRoot: join(cfg.dataDir, 'run') } : {}),
         // Les clones lus sont ceux du propriétaire du projet (page IA : projet d'équipe joint, accès vérifié par l'appelant) ;
         // les pièces jointes lues en plus sont toujours dans le dossier de CET utilisateur.
         allowedRoot: o.allowedRoot ?? userRepoRoot(cfg, o.repoOwnerId ?? userId),
@@ -163,20 +171,22 @@ export function makeClaude(app) {
     } catch (e) {
       stream?.finish();
       flushUsage();
-      if (isAuthRefusal(e.message)) await refused();
+      if (renewedAuth) await saveRefreshedAuth(app, userId, cred.linkedAt, renewedAuth);
+      if (provider.isAuthRefusal(e.message)) await refused();
       throw e;
     }
     stream?.finish();
     flushUsage();
+    if (renewedAuth) await saveRefreshedAuth(app, userId, cred.linkedAt, renewedAuth);
     usage?.finish(r);
     if (!hasOutput && r.text) jc?.log?.('output', r.text);
     if (!r.ok) {
       console.warn(claudeDiagnostic({ userId, cred, cfg, cwd: o.cwd, r }));
       // Un message d'erreur d'authentification est court ; un long texte (analyse tronquée qui parle d'un « 401 » dans le code) n'en est pas un
-      if (r.subtype !== 'error_max_turns' && String(r.text ?? '').length < 400 && isAuthRefusal(`${r.text} ${r.subtype}`)) await refused();
+      if (r.subtype !== 'error_max_turns' && String(r.text ?? '').length < 400 && provider.isAuthRefusal(`${r.text} ${r.subtype}`)) await refused();
     }
     // État du quota d'abonnement (session 5h + semaine), affiché dans la carte « Consommation Claude ». Une clé API n'en a pas.
-    const w = cred.mode === 'api_key' ? null : rateLimitWindows(r.rateLimit);
+    const w = cred.mode === 'api_key' ? null : provider.rateLimitWindows(r.rateLimit);
     if (w) {
       await setSetting(db, userId, 'claude_rate_limit_json', JSON.stringify({ at: now(), ...w }));
       for (const a of await quotaAlerts(db, userId, w)) {
@@ -189,6 +199,13 @@ export function makeClaude(app) {
       }
     }
     return r;
+  };
+  return async (userId, o) => {
+    const cred = await resolveCredentials(app, userId); // refuse sans liaison valide (dernier garde-fou)
+    if (!cred.authFile) return claude(userId, o, cred);
+    // Connexion de compte : un seul exécutable à la fois par utilisateur (le CLI renouvelle ses jetons, à usage unique), les tâches s'enchaînent.
+    // Les identifiants sont relus DANS la file : le job précédent a pu renouveler le fichier.
+    return withUserLock(userId, async () => claude(userId, o, await resolveCredentials(app, userId)), { signal: o.signal });
   };
 }
 
@@ -219,10 +236,29 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
   // Consignes modifiées par l'utilisateur (Réglages) : celles du compte qui lance le job
   const custom = async (userId) => parseCustomPrompts(await getSetting(db, userId, 'prompts_json'));
   // Modèles choisis dans les Réglages (liste de services/models.js ; toute autre valeur retombe sur Haiku)
-  const modelOf = async (userId, key) => normalizeModel(await getSetting(db, userId, key, 'haiku'));
+  const modelOf = async (userId, key) => { const pv = await userProvider(db, userId); return normalizeModel(await getSetting(db, userId, key, defaultModelOf(pv)), undefined, pv); };
   // Rédaction (mails, relances, posts) : son propre réglage ; à défaut, le comportement d'avant (Haiku, et le modèle d'analyse pour LinkedIn)
-  const writeModel = async (userId, legacy) => normalizeModel(await getSetting(db, userId, 'write_model', ''), legacy);
+  const writeModel = async (userId, legacy) => normalizeModel(await getSetting(db, userId, 'write_model', ''), legacy, await userProvider(db, userId));
   const inHours = () => (app.isBusinessHours || isBusinessHours)();
+
+  // Forme d'un modèle tout juste généré : s'il manque l'appel ou la politesse, ou s'il propose des réponses toutes faites, l'IA le corrige UNE fois.
+  // La correction n'est retenue que si elle garde les adresses, n'ajoute aucune variable et réduit le nombre de défauts ; sinon le texte reste tel quel
+  // (l'aperçu signale les défauts qui restent). Une annulation ou un accès perdu remontent ; toute autre panne est sans effet.
+  async function mendStyle(ctx, userId, model, kind, body) {
+    const problems = styleProblems(body);
+    if (!problems.length) return { body, fixed: [] };
+    try {
+      const { prompt, system } = fixStylePrompt({ kind, body, problems });
+      const r = await claude(userId, { prompt, system, model, maxTurns: 1, tools: [], signal: ctx.signal });
+      addUsage(ctx, r);
+      const fixed = tidyTemplateText(String(extractJson(r.text)?.body ?? ''));
+      const left = fixed ? styleProblems(fixed) : problems;
+      if (fixed && left.length < problems.length && acceptSenseFix(body, fixed, { slack: 12 })) return { body: fixed, fixed: problems.filter((p) => !left.includes(p)) };
+    } catch (e) {
+      if (ctx.signal?.aborted || e.status === 403) throw e;
+    }
+    return { body, fixed: [] };
+  }
 
   // Premier mail ou relance : mêmes plafonds, mêmes délais, même journal
   async function sendMails(ctx, kind) {
@@ -256,6 +292,13 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
     const n = mq.unlimited ? n0 : Math.min(n0, mq.remaining);
     if (n === 0) throw new Error(kind === 'followup' ? 'Plafond quotidien atteint ou aucune relance due' : 'Plafond quotidien atteint ou aucun prospect à contacter');
 
+    // Chaque mail est relu par l'IA de la personne avant de partir (le texte rempli a-t-il un sens ?) : sans IA utilisable, rien ne part
+    const budget = await budgetState(db, userId);
+    if (budget.blocked) throw new Error(`Budget IA atteint : ${budget.reason}. Aucun mail n'est parti : chaque mail est relu par ton IA avant l'envoi.`);
+    const senseModel = await writeModel(userId, 'haiku');
+    const sense = new Map(); // id du prospect -> avis de l'IA sur son mail rempli
+    let unclear = 0, unclearRow = 0, senseStop = null, firstProblem = null;
+
     const transport = (app.createTransport || createTransport)(await pinSmtp(app, userId, project.smtp));
     await transport.verify();
     const minDelay = Number(await getSetting(db, userId, 'send_delay_min', '20')) * 1000;
@@ -275,7 +318,7 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
     await ctx.progress({ sent, failed, total: n, message: `0/${n} ${kind === 'followup' ? 'relances envoyées' : 'envoyés'}`, pct: 0 });
 
     // Les adresses refusées par la vérification ne comptent pas dans le lot : on continue dans la liste jusqu'à `n` envois tentés
-    for (const p of candidates) {
+    for (const [at, p] of candidates.entries()) {
       if (sent + failed >= n) break;
       if (await ctx.cancelled()) break;
       if (kind === 'followup' && !inHours()) break; // le reste repartira au prochain créneau
@@ -295,6 +338,32 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
           continue;
         }
       }
+      // Relecture du sens par lots : ce prospect et les suivants pas encore relus
+      if (!sense.has(p.id)) {
+        const items = candidates.slice(at, at + SENSE_BATCH).filter((c) => !sense.has(c.id)).map((c) => {
+          const vars = mailVars(c, project.smtp, project.siteUrl);
+          return { id: c.id, subject: kind === 'initial' ? fillSubject(template.subject, vars) : '', body: fillBody(template.body, vars).replace(/\n{3,}/g, '\n\n').trim() };
+        });
+        await ctx.progress({ sent, failed, total: n, message: "Relecture des mails par l'IA…", pct: Math.round(((sent + failed) / n) * 100) });
+        try {
+          const { verdicts, run } = await checkSense({ claude, userId, model: senseModel, signal: ctx.signal, kind, template: template.body, items });
+          addUsage(ctx, run);
+          for (const [id, v] of verdicts) sense.set(id, v);
+        } catch (e) {
+          if (!(e instanceof SenseUnavailable)) throw e;
+          senseStop = e.message;
+          break; // rien d'autre ne part tant que l'IA ne peut pas relire
+        }
+      }
+      const verdict = sense.get(p.id);
+      if (!verdict.ok) {
+        await log.run(project.id, p.id, p.email, now(), `Non envoyé : le texte n'a pas de sens (${verdict.problem})`, kind, null, null, null);
+        firstProblem ??= verdict.problem;
+        unclear++;
+        if (++unclearRow >= SENSE_BATCH) break; // un lot entier refusé : c'est le modèle lui-même qui est en cause
+        continue;
+      }
+      unclearRow = 0;
       const unsubUrl = `${cfg.appUrl}/u/${encodeURIComponent(p.email)}/${unsubToken(cfg.secretKey, p.email)}`;
       let variant = null, subject, inReplyTo;
       if (kind === 'initial') {
@@ -327,7 +396,12 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
     }
     transport.close();
     await evaluateSending(app, userId); // trop de rejets : le compte passe en pause d'envoi
-    return { sent, failed, total: n, ...(invalid ? { invalid } : {}) };
+    if (sent + failed === 0 && (senseStop || unclear)) {
+      throw new Error(senseStop
+        ? `Relecture par l'IA impossible : ${senseStop}. Aucun mail n'est parti : relance quand ton IA répond de nouveau`
+        : `Aucun mail n'est parti : ton IA juge que le texte n'a pas de sens (${firstProblem}). Ouvre « Aperçu » : elle y propose une version corrigée du modèle`);
+    }
+    return { sent, failed, total: n, ...(invalid ? { invalid } : {}), ...(unclear ? { unclear } : {}), ...(senseStop ? { waiting: senseStop } : {}) };
   }
 
   // Tâche d'un poste (Commerce, Communication, Finance…) : un livrable Markdown écrit à partir de la fiche du projet.
@@ -498,8 +572,10 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
       } catch (e) {
         if (ctx.signal?.aborted || e.status === 403) throw e; // annulation, ou accès Claude perdu : on ne l'avale pas
       }
+      const mended = await mendStyle(ctx, userId, model, 'initial', mail.body);
+      mail = { ...mail, body: mended.body };
       await saveTemplate(db, project.id, 'initial', mail);
-      return { ok: true, reviewed, corrections };
+      return { ok: true, reviewed, corrections, ...(mended.fixed.length ? { styleFixed: mended.fixed } : {}) };
     },
 
     async followup_template(ctx) {
@@ -513,8 +589,9 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
       addUsage(ctx, r);
       const t = extractJson(r.text);
       if (!t.body) throw new Error('Modèle de relance invalide');
-      await saveTemplate(db, project.id, 'followup', { subject: '', body: t.body });
-      return { ok: true };
+      const mended = await mendStyle(ctx, userId, model, 'followup', tidyTemplateText(t.body));
+      await saveTemplate(db, project.id, 'followup', { subject: '', body: mended.body });
+      return { ok: true, ...(mended.fixed.length ? { styleFixed: mended.fixed } : {}) };
     },
 
     // Facturation : trois exemples de devis. Claude écrit le texte et propose les lignes ; les mentions légales et les totaux viennent du code.
@@ -727,7 +804,7 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
       const count = Math.max(1, Math.min(20, Math.floor(Number(ctx.params.count) || 5)));
       const level = LEVELS[ctx.params.level] ? ctx.params.level : 'normal';
       const to = await getSetting(db, userId, 'notify_email');
-      const smtp = cfg.systemSmtp; // le résultat part de l'adresse d'AiTools (SMTP du serveur), pas de celle du projet
+      const smtp = cfg.systemSmtp; // le résultat part de l'adresse d'iaboss (SMTP du serveur), pas de celle du projet
       if (!to) throw new Error('Adresse de réception non configurée (Réglages)');
       if (!smtp) throw new Error("Le serveur ne peut pas envoyer de mail (SMTP du serveur non configuré) : demande à l'administrateur");
 
@@ -737,7 +814,8 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
 
       await ctx.progress({ message: `Recherche de ${count} évolutions (${level})…`, pct: 10 });
       const { prompt, system } = evolutionPrompt({ projectName: project.name, profile: project.profile, count, level, custom: await custom(userId), repoFacts: factsOf(dir) });
-      const { model, maxTurns } = LEVELS[level];
+      const { maxTurns } = LEVELS[level];
+      const model = tierEquivalent(LEVELS[level].model, await userProvider(db, userId));
       const sink = makeSink();
       const r = await claude(userId, {
         prompt, system, cwd: dir, model, maxTurns, tools: ['Read', 'Glob', 'Grep'], signal: ctx.signal,
@@ -751,7 +829,7 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
       const transport = (app.createTransport || createTransport)(await pinSmtp(app, null, smtp));
       await transport.sendMail({
         from: smtp.fromEmail, to,
-        subject: `[AiTools] ${count} évolutions pour ${project.name}`,
+        subject: `[iaboss] ${count} évolutions pour ${project.name}`,
         text: r.text,
         html: evolutionMail({ markdown: r.text, projectName: project.name, count, appUrl: cfg.appUrl }),
       });
@@ -769,7 +847,8 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
       await sync(userId, project.gitUrl, dir);
       await ctx.progress({ message: `Audit du code (${level})…`, pct: 10 });
       const { prompt, system } = auditPrompt({ projectName: project.name, level, custom: await custom(userId), repoFacts: factsOf(dir) });
-      const { model, maxTurns } = LEVELS[level];
+      const { maxTurns } = LEVELS[level];
+      const model = tierEquivalent(LEVELS[level].model, await userProvider(db, userId));
       const sink = makeSink();
       const r = await claude(userId, {
         prompt, system, cwd: dir, model, maxTurns, tools: ['Read', 'Glob', 'Grep'], signal: ctx.signal,

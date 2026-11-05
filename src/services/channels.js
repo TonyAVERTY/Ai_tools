@@ -112,7 +112,7 @@ export async function notifyChannels(app, userId, event, message, allEvents, { f
         if (!force && !mailAllowed(userId)) throw new Error('plafond horaire atteint');
         const transport = (app.createTransport || createTransport)(await pinSmtp(app, null, smtp));
         try {
-          await transport.sendMail({ from: smtp.fromEmail, to: c.to, subject: `[AiTools] ${String(message.title).replace(/[\r\n]+/g, ' ').slice(0, 150)}`, text, html: `<pre style="font-family:inherit;white-space:pre-wrap">${esc(text)}</pre>` });
+          await transport.sendMail({ from: smtp.fromEmail, to: c.to, subject: `[iaboss] ${String(message.title).replace(/[\r\n]+/g, ' ').slice(0, 150)}`, text, html: `<pre style="font-family:inherit;white-space:pre-wrap">${esc(text)}</pre>` });
         } finally { transport.close?.(); }
       }
       delivered.push(type);

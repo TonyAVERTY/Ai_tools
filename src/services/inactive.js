@@ -34,17 +34,17 @@ export function warningMail(cfg, user, deleteAt) {
   const text = [
     'Bonjour,',
     '',
-    `Ton compte AiTools (${user.email}) n'a pas servi depuis longtemps. Conformément à notre politique de confidentialité, il sera supprimé avec toutes ses données (projets, prospects, modèles, réglages) à partir du ${dateFr(deleteAt)}.`,
+    `Ton compte iaboss (${user.email}) n'a pas servi depuis longtemps. Conformément à notre politique de confidentialité, il sera supprimé avec toutes ses données (projets, prospects, modèles, réglages) à partir du ${dateFr(deleteAt)}.`,
     '',
     `Pour le garder, il suffit de te connecter avant cette date : ${cfg.appUrl}/login`,
     `Pour récupérer tes prospects avant, exporte-les en CSV depuis le tableau de bord (${cfg.appUrl}/).`,
     '',
     `Une question ? ${CONTACT_EMAIL}`,
     '',
-    "AiTools · message automatique, envoyé une seule fois.",
+    "iaboss · message automatique, envoyé une seule fois.",
   ].join('\n');
   const html = inactivityMail({ email: user.email, deleteDate: dateFr(deleteAt), loginUrl: `${cfg.appUrl}/login`, appUrl: cfg.appUrl, contact: CONTACT_EMAIL });
-  return { subject: 'Ton compte AiTools sera supprimé pour inactivité', text, html };
+  return { subject: 'Ton compte iaboss sera supprimé pour inactivité', text, html };
 }
 
 async function sendWarning(app, user, deleteAt) {

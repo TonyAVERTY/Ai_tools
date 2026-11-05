@@ -8,7 +8,7 @@ const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright-c
 const exe = process.env.PLAYWRIGHT_CHROMIUM;
 const s = await startApp();
 const u = await s.newUser();
-const pid = await addProject(s.db, u.id, { name: 'AiTools', gitUrl: 'https://github.com/u/aitools.git' });
+const pid = await addProject(s.db, u.id, { name: 'iaboss', gitUrl: 'https://github.com/u/aitools.git' });
 const job = (type, status, progress) => s.db.prepare('INSERT INTO jobs(project_id, user_id, type, status, progress_json, created_at, started_at) VALUES(?, ?, ?, ?, ?, ?, ?)').run(pid, u.id, type, status, JSON.stringify(progress), now(), status === 'running' ? now() : null);
 await job('analyze', 'queued', { message: 'En attente : quota de la session Claude (5 h) à 95 %' }); // la capture de l'utilisateur
 await job('evolution', 'running', { message: 'Lecture du code…', pct: 42 });

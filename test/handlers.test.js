@@ -31,7 +31,7 @@ async function setup() {
   const app = { resolveHost: async () => [{ address: '93.184.216.34', family: 4 }], resolveMx: async () => [{ exchange: 'mx.test', priority: 10 }],
     db,
     cfg: { dataDir: tmp, claudeBin: resolve('test/fixtures/fake-claude.js'), sandbox: { enabled: false, production: false }, secretKey: TEST_SECRET_KEY, appUrl: 'https://ai.test',
-      systemSmtp: { host: 'smtp.serveur', port: 587, user: 'srv', pass: 'p', fromEmail: 'aitools@serveur.test' } }, // mails d'AiTools (évolutions…)
+      systemSmtp: { host: 'smtp.serveur', port: 587, user: 'srv', pass: 'p', fromEmail: 'aitools@serveur.test' } }, // mails d'iaboss (évolutions…)
     // syncRepo refuse file:// (clones d'URL fournies par l'utilisateur : https seulement) : le test clone le dépôt local à la place
     syncRepo: async (url, dir) => {
       if (existsSync(join(dir, '.git'))) execFileSync('git', ['-C', dir, 'pull', '-q']);
@@ -87,7 +87,7 @@ test('flux complet : analyse → cible → prospection → modèle → envoi →
     await saveSecretConfig(s.app, s.id, 'smtp_enc', { host: 'smtp.x', port: 587, user: 'u', pass: 'secret', fromEmail: 'tony@x.fr', fromName: 'Tony' }, 'pass');
     const sent = await run(s, 'send', { count: 5 });
     assert.equal(sent.status, 'done', sent.error);
-    assert.deepEqual(sent.result, { sent: 1, failed: 0, total: 1 });
+    assert.deepEqual(sent.result, { sent: 1, failed: 0, total: 1, model: 'haiku' });
     const mail = s.sentMails[0];
     assert.equal(mail.to, 'contact@fournil.fr');
     assert.equal(mail.subject, 'Idée pour Boulangerie Le Fournil');
@@ -109,7 +109,7 @@ test('flux complet : analyse → cible → prospection → modèle → envoi →
     const ev = await run(s, 'evolution', { count: 3, level: 'rapide' });
     assert.equal(ev.status, 'done', ev.error);
     assert.equal(s.sentMails.at(-1).to, 'moi@x.fr');
-    assert.equal(s.sentMails.at(-1).from, 'aitools@serveur.test', 'les mails d\'AiTools partent du SMTP du serveur, pas de celui du projet');
+    assert.equal(s.sentMails.at(-1).from, 'aitools@serveur.test', 'les mails d\'iaboss partent du SMTP du serveur, pas de celui du projet');
     assert.match(s.sentMails.at(-1).text, /Export CSV/);
     assert.match(s.sentMails.at(-1).html, /class|style/, 'version HTML mise en forme');
     assert.match(s.sentMails.at(-1).html, /Export CSV/);
@@ -263,8 +263,8 @@ test('modèle et consignes de sa gamme : le prompt de la gamme du modèle choisi
   const s = await setup();
   const spyFile = join(s.tmp, 'prompts.log');
   s.app.cfg.claudeBin = makeClaudeBin(s.tmp, { fixture: 'spy-claude.js', env: { PROMPT_SPY_FILE: spyFile } });
-  // Dernier appel de rédaction (la relecture du mail, qui suit un modèle de mail, a son propre prompt)
-  const last = () => JSON.parse(readFileSync(spyFile, 'utf8').trim().split('\n').filter((l) => !l.includes('RELECTURE DU MAIL')).pop());
+  // Dernier appel de rédaction (la relecture et la correction de forme, qui suivent un modèle de mail, ont leur propre prompt)
+  const last = () => JSON.parse(readFileSync(spyFile, 'utf8').trim().split('\n').filter((l) => !l.includes('RELECTURE DU MAIL') && !l.includes('CORRECTION DE FORME')).pop());
   try {
     assert.equal((await run(s, 'analyze')).status, 'done'); // le modèle de mail s'écrit à partir de la fiche du projet
     await setSetting(s.db, s.userId, 'prompts_json', JSON.stringify({ '*': { template: 'email de prospection MARQUE-COMMUNE' }, haiku: { template: 'email de prospection MARQUE-HAIKU' }, opus: { template: 'email de prospection MARQUE-OPUS' } }));

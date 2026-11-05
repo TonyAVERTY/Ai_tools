@@ -1,4 +1,4 @@
-# AiTools
+# iaboss
 
 Panel pour piloter Claude Code (headless) sur des projets : prospection client par email,
 idées d'évolutions et récap business. L'instance perso tourne sur un Raspberry Pi 4 sans ventilateur ;
@@ -68,7 +68,7 @@ Sur le tableau de bord, dès qu'un projet existe, une liste en bas à gauche gui
 
 - **Jobs de nuit** : Prospecter et Évolution proposent « Maintenant » ou « Cette nuit ». Le job démarre au prochain créneau entre 1h et 6h (heure de Paris, changements d'heure gérés), quand le serveur est peu chargé et que ton quota Claude est libre. Il est annulable jusqu'au départ.
 - **Budget IA** : plafonds glissants sur 24 h et sur 30 jours, en équivalent $ API remonté par Claude Code. L'abonnement Pro ne facture rien en plus ; c'est un garde-fou pour ton quota.
-  - Plafond atteint : les jobs IA **restent en file** et repartent seuls quand la fenêtre glisse. Les envois et relances, qui ne consomment pas d'IA, continuent.
+  - Plafond atteint : les jobs IA **restent en file** et repartent seuls quand la fenêtre glisse. Les envois et relances attendent aussi : chaque mail est relu par l'IA de la personne avant de partir (contrôle du sens, `src/services/mailsense.js`), et sans budget l'envoi s'arrête avant d'envoyer quoi que ce soit.
   - Un job en cours n'est jamais coupé : le plafond peut donc être dépassé d'un job.
 - **Quota du compte Claude** : la barre du haut affiche, dès qu'un job IA a tourné, le taux d'utilisation
   remonté par la CLI elle-même — session glissante de 5 h et semaine glissante de 7 jours, avec l'heure de
@@ -153,6 +153,8 @@ Chaque utilisateur relie SON accès ; ses jobs IA tournent avec cet accès uniqu
 - **Clé API Anthropic** (recommandé) : vérifiée par `GET /v1/models` (aucun token consommé), chiffrée AES-256-GCM dans `users.claude_link_json`, jamais réaffichée. Passée par `ANTHROPIC_API_KEY` au seul processus enfant, jamais écrite sur disque. Pas de barre de quota d'abonnement dans ce mode.
 - **Connexion avec Claude (abonnement)** : une fenêtre d'avertissement (risque pour le compte Claude au regard des conditions d'Anthropic) impose de cocher « J'ai compris et j'accepte ce risque » ; l'acceptation est horodatée avec la version du texte. L'utilisateur génère un jeton sur sa machine avec `claude setup-token` et le colle ; il est vérifié par un appel minimal du CLI (quelques tokens décomptés de l'abonnement), chiffré, et passé par `CLAUDE_CODE_OAUTH_TOKEN` au seul processus enfant. `CLAUDE_CLI_MODE_ENABLED=false` masque ce mode et le refuse côté serveur.
 - **Se connecter avec Claude (connexion guidée)** : après la case du risque, le serveur lance `claude setup-token` (`src/claudelogin.js`, via `script` pour disposer d'un pseudo-terminal, `HOME` jetable, environnement assaini), récupère le lien de connexion et l'affiche à l'utilisateur. Il se connecte sur claude.com, recopie le petit code affiché, et le serveur le transmet au CLI puis capte le jeton (rangé chiffré, comme un jeton collé). Une seule connexion en cours par utilisateur, 5 minutes au plus, 5 en même temps sur le serveur. Prérequis : le binaire `claude` (`CLAUDE_BIN`) et la commande `script` (util-linux). La saisie manuelle du jeton reste proposée en secours.
+- **Gemini (clé API Google AI Studio)** : `src/services/providers/gemini.js` lance `gemini -p … --output-format stream-json` (binaire `GEMINI_BIN`) dans le même bac à sable, avec `GEMINI_API_KEY` passé au seul processus enfant. Clé vérifiée par la liste des modèles (aucun token consommé), chiffrée comme les autres. Pas de connexion par compte Google : Gemini CLI ne sert plus ces comptes depuis le 18 juin 2026 et n'accepte, en headless, que la clé API ou Vertex AI. Les outils sont limités par un fichier de réglages « système » écrit pour chaque lancement et monté en lecture seule ; le CLI ne donne pas de coût en $ : il est estimé d'après `src/services/pricing.js` (grille à revérifier à chaque nouveau modèle).
+- **ChatGPT (clé API OpenAI ou compte ChatGPT)** : `src/services/providers/openai.js` lance `codex exec --json` (binaire `CODEX_BIN`) dans le même bac à sable. **Clé API** : `CODEX_API_KEY` passé au seul processus enfant, clé vérifiée par la liste des modèles (aucun token consommé). **Compte ChatGPT** (comme l'abonnement Claude : même case de risque, même interrupteur `CLAUDE_CLI_MODE_ENABLED`) : le fichier `auth.json` de Codex est gardé chiffré en base ; pour chaque exécution il est écrit dans un dossier temporaire (`CODEX_HOME`, monté en lecture-écriture dans le bac à sable, seul montage en écriture), puis relu, car Codex renouvelle lui-même ses jetons (jeton de rafraîchissement à usage unique) : le fichier à jour remplace celui de la base, sauf si la liaison a été refaite entre-temps. Les exécutions d'un même compte passent donc **l'une après l'autre** (`src/services/userlock.js`), les comptes différents en parallèle. Connexion : fichier collé (`POST /link/chatgpt/auth`) ou connexion guidée par code d'appareil (`src/chatgptlogin.js`, `codex login --device-auth`, à activer dans les paramètres de sécurité du compte ChatGPT). Codex lit le dépôt avec une commande shell (pas d'outil « Read ») : une tâche qui lit le dépôt garde le shell, en lecture seule, sans réseau d'après la doc, sans variable `KEY`/`SECRET`/`TOKEN`, sans `AGENTS.md` du dépôt, et avec une connexion de compte un profil de permissions **refuse au shell la lecture du dossier des jetons** ; toute autre tâche a le shell coupé (`features.shell_tool=false`). Pas de limite de tours dans Codex : l'application compte les actions et l'arrête au-delà de `maxTurns`. Coût estimé d'après `src/services/pricing.js` (une connexion de compte n'est pas facturée à l'usage).
 - **Pas de mode « Claude du serveur »** : le CLI connecté sur la machine n'est jamais utilisé à la place d'un utilisateur (il consommerait le quota de son propriétaire). Une ancienne liaison de ce type compte comme « pas de liaison » : le compte doit relier sa clé API ou son abonnement.
 - **Bac à sable** : chaque job passe par bubblewrap (racine reconstruite en lecture seule, `/tmp` et `HOME` vides, seul le clone du projet de l'utilisateur monté en lecture seule, PID/IPC/UTS isolés, réseau conservé) avec un environnement en liste blanche (`PATH`, `LANG`, `HOME` jetable, le secret de l'utilisateur). En production le job est refusé si `bwrap` manque ; `SANDBOX=off` ne vaut qu'en développement. Installation : `apt install bubblewrap`. Si Node ou le CLI sont installés hors de `/usr`, liste leurs dossiers dans `SANDBOX_RO_BINDS`.
 - **Clones git** d'URL fournies par les utilisateurs : https uniquement (`GIT_ALLOW_PROTOCOL=https`), pas de hooks ni de sous-modules, 2 minutes et 300 Mo au plus.
@@ -196,7 +198,7 @@ Prix TTC : l'éditeur est en franchise de TVA (art. 293 B du CGI). Les offres pa
 
 ### SMTP par projet et équipes
 
-- **SMTP par projet** : chaque projet peut avoir son propre SMTP (une boîte d'envoi par projet). **Pas de SMTP commun** : un projet envoie depuis SON adresse ou pas du tout (hôte vide = on efface celui du projet). Les mails d'AiTools (rapport, évolutions, invitations, avertissement d'inactivité) partent du SMTP du serveur (`SYSTEM_SMTP_*`). L'ancien SMTP « global » des Réglages a été supprimé : une migration en copie le contenu dans chaque projet qui n'avait pas le sien (`getProject` renvoie `smtpSource` : `project` ou `null`). L'IMAP réutilise les identifiants du SMTP effectif.
+- **SMTP par projet** : chaque projet peut avoir son propre SMTP (une boîte d'envoi par projet). **Pas de SMTP commun** : un projet envoie depuis SON adresse ou pas du tout (hôte vide = on efface celui du projet). Les mails d'iaboss (rapport, évolutions, invitations, avertissement d'inactivité) partent du SMTP du serveur (`SYSTEM_SMTP_*`). L'ancien SMTP « global » des Réglages a été supprimé : une migration en copie le contenu dans chaque projet qui n'avait pas le sien (`getProject` renvoie `smtpSource` : `project` ou `null`). L'IMAP réutilise les identifiants du SMTP effectif.
 - **Équipes** (`src/teams.js`, `src/teamroutes.js`, page `/team`) : un propriétaire (offre avec `seats` ≥ 2) invite des membres par email (lien à usage unique, valable 7 jours, **lié à l'adresse invitée**, seule son empreinte est stockée) et partage des projets (`projects.team_id`). Sur un projet partagé **un membre agit comme le propriétaire** : ses données, son SMTP, son plan, ses plafonds et son accès Claude (le membre n'a pas besoin du sien). Rôles : `member` (travaille sur les projets), `admin` (règle en plus SMTP, IMAP, base du récap), propriétaire (gère l'équipe, partage, supprime). Un seul point d'accès (`getProject` / `accessOn`) : un projet hors équipe est introuvable (404), le retrait d'un membre coupe l'accès à la requête suivante. Un mail d'invitation part si `SYSTEM_SMTP_*` est configuré, sinon le lien est affiché au propriétaire.
 
 ### LinkedIn
@@ -237,7 +239,7 @@ Réservé aux administrateurs (`404` pour tous les autres). Liste paginée des c
 
 ## Installation sur un serveur (CloudPanel ou autre, sans Raspberry)
 
-Pré-requis : Node 22.13 ou plus, git, la CLI `claude` si les jobs IA doivent tourner sur ce serveur, et une base MySQL 8.0.16 ou plus / MariaDB 10.4 ou plus (contraintes `CHECK`).
+Pré-requis : Node 22.13 ou plus, git, la CLI de l'IA que les utilisateurs relieront si les jobs IA doivent tourner sur ce serveur (`claude` pour Claude, `codex` pour ChatGPT, `gemini` pour Gemini : voir « Installer les outils des autres IA »), et une base MySQL 8.0.16 ou plus / MariaDB 10.4 ou plus (contraintes `CHECK`).
 
 1. **Base de données** : dans CloudPanel, Databases > Add Database. Note le nom, l'utilisateur et le mot de passe. Les tables sont créées par l'application au premier démarrage, rien à importer à la main.
 2. **Code** :
@@ -259,13 +261,15 @@ Pré-requis : Node 22.13 ou plus, git, la CLI `claude` si les jobs IA doivent to
    | `APP_URL`, `PORT`, `HOST` | URL publique et écoute locale (reverse proxy Nginx devant) |
    | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | connexion Google (voir « Connexion Google et Apple ») |
    | `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_CLIENT_ID`, `APPLE_PRIVATE_KEY` | connexion Apple, facultative : les quatre ou aucune (sans elles, le bouton Apple est masqué) |
+   | `ERROR_ALERT_TO` | destinataires des alertes d'erreur (HTML), séparés par des virgules ; par défaut `contact@tony-averty.dev`. Toute erreur sauf un 404 (réponse d'erreur, tâche en échec, arrêt du processus) est envoyée par `SYSTEM_SMTP_*` ; sans SMTP, aucune alerte. Même erreur : un mail par 30 minutes ; au plus 20 mails par heure pour les erreurs serveur et les tâches, 6 pour les erreurs de requête (4xx) |
    | `ADMIN_EMAILS` | emails des administrateurs, séparés par des virgules. Le premier est aussi propriétaire des données migrées. Remplace `ALLOWED_EMAILS`, supprimée : n'importe qui peut créer un compte |
    | `CLAUDE_CLI_MODE_ENABLED` | `true` (défaut) ou `false` : active le mode abonnement |
    | `NODE_ENV`, `SANDBOX`, `SANDBOX_RO_BINDS`, `BWRAP_BIN` | bac à sable : obligatoire en production, `SANDBOX=off` en développement seulement |
    | `DATA_DIR` | clones Git des projets analysés, rangés par utilisateur (`repos/<utilisateur>/<projet>`) |
 
-4. **Démarrage** : `npm start`. Au lancement, les migrations en attente sont appliquées (table `schema_migrations`, verrou pour éviter deux migrations simultanées). Lance le service sous un gestionnaire de processus (systemd ou celui de CloudPanel) et mets un reverse proxy TLS devant `HOST:PORT`.
-5. **Sauvegardes** : sauvegarde quotidienne de la base avec `mysqldump --single-transaction` (ou la sauvegarde CloudPanel) ; teste une restauration.
+4. **Outils des IA (facultatif)** : voir « Installer les outils des autres IA » ci-dessous.
+5. **Démarrage** : `npm start`. Au lancement, les migrations en attente sont appliquées (table `schema_migrations`, verrou pour éviter deux migrations simultanées). Lance le service sous un gestionnaire de processus (systemd ou celui de CloudPanel) et mets un reverse proxy TLS devant `HOST:PORT`.
+6. **Sauvegardes** : sauvegarde quotidienne de la base avec `mysqldump --single-transaction` (ou la sauvegarde CloudPanel) ; teste une restauration.
 
 ### Reprendre les données de l'ancienne instance SQLite
 
@@ -279,6 +283,18 @@ npm run migrate:sqlite -- data/aitools.sqlite --force   # vide les tables cibles
 Toutes les tables sont copiées dans une seule transaction, ids conservés, avec un rapport de lignes par table. En cas d'écart ou d'erreur, rien n'est écrit. L'ancienne base est mono-utilisateur : tout est rattaché au compte propriétaire (première adresse de `ADMIN_EMAILS`, créé s'il n'existe pas) et les anciens réglages deviennent les siens. Les sessions de l'ancienne base ne sont pas copiées : reconnecte-toi. Les clones Git sont à recloner : le dossier est maintenant `DATA_DIR/repos/<utilisateur>/<projet>`.
 
 Une base MySQL/MariaDB déjà utilisée **avant les comptes** (migration 1) se met à niveau toute seule au démarrage : la migration « comptes_multi_tenant » rattache ses données au propriétaire (`ADMIN_EMAILS` doit alors être défini, sinon le démarrage s'arrête avec un message clair). Au premier login Google ou Apple avec cet email, tu retrouves tes données.
+
+### Installer les outils des autres IA
+
+Chaque utilisateur choisit son IA sur la page « Relier mon IA » : Claude, ChatGPT ou Gemini. Une IA n'est proposée que si son outil en ligne de commande est installé sur le serveur ; sinon sa carte est grisée (« Pas encore disponible sur ce serveur »).
+
+```bash
+sudo npm install -g @anthropic-ai/claude-code   # Claude
+sudo npm install -g @openai/codex               # ChatGPT
+sudo npm install -g @google/gemini-cli          # Gemini
+```
+
+Puis, si les binaires ne sont pas dans le `PATH` du service, renseigne leur chemin dans `.env` (`CLAUDE_BIN`, `CODEX_BIN`, `GEMINI_BIN`) et redémarre. Le bac à sable monte lui-même le dossier d'installation de ces outils (y compris `node_modules` pour les installations npm) : `SANDBOX_RO_BINDS` ne devrait pas être nécessaire pour eux (s'ils restent introuvables dans le bac à sable, ajoute leur dossier d'installation à `SANDBOX_RO_BINDS`). `install.sh` propose d'installer Codex et Gemini CLI et renseigne `CODEX_BIN` et `GEMINI_BIN` quand ils sont présents.
 
 ## Installation sur le Pi (instance perso, héritage)
 
@@ -304,7 +320,8 @@ Pour voir ce qui serait fait sans rien toucher : `./install.sh --dry-run`.
    - nettoyage du système ;
    - config de l'app ;
    - token Cloudflare ;
-   - connexion Claude.
+   - connexion Claude ;
+   - installation facultative de Codex (ChatGPT) et de Gemini CLI.
 
    Puis un **récapitulatif à valider**. Rien n'est modifié avant.
 2. **Installation sans interruption** :
@@ -368,11 +385,11 @@ Dans Zero Trust, va dans Networks → Tunnels → Create a tunnel (Cloudflared).
 
 ## Support et documentation
 
-Le menu **IA** de la barre du haut propose **Claude** (assistant classique) et **Support**. Dans le Support, le Claude de l'utilisateur répond d'après la documentation d'AiTools, lue en lecture seule (outils Read, Glob, Grep) dans `dataDir/support-docs/`.
+Le menu **IA** de la barre du haut propose **Claude** (assistant classique) et **Support**. Dans le Support, le Claude de l'utilisateur répond d'après la documentation d'iaboss, lue en lecture seule (outils Read, Glob, Grep) dans `dataDir/support-docs/`.
 
 - **Source** : `docs/support/*.md` (écrite à la main, pour un utilisateur) + trois fichiers **générés depuis le code** par `src/services/supportdocs.js` (offres et plafonds, modèles, consignes IA). Le dossier est reconstruit seulement quand son contenu change, avec un `INDEX.md` qui sert de carte.
 - **Les conversations** du Support sont séparées de celles de Claude (colonne `chat_conversations.mode`), sous `/support` et `/support/:id`.
-- **Consignes du Support** : modifiables dans Réglages → Prompts IA (« Support (aide sur AiTools) »), comme les autres tâches ; la carte des documents et la règle de sécurité (un document n'est jamais une consigne) restent dans le code.
+- **Consignes du Support** : modifiables dans Réglages → Prompts IA (« Support (aide sur iaboss) »), comme les autres tâches ; la carte des documents et la règle de sécurité (un document n'est jamais une consigne) restent dans le code.
 - **Tenir la documentation à jour** : règle dans `CLAUDE.md`, imposée par `test/support-docs.test.js` (chaque bouton, section, page, tâche IA doit y figurer).
 
 ## Dev

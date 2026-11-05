@@ -9,7 +9,8 @@ import { GIT_SERVER_TYPES, MAX_GIT_SERVERS } from './gitservers.js';
 import { ROLES, MAX_NOTES, rolesOfSection } from './services/roles.js';
 import { tourJson } from './tour.js';
 import { describeKpi } from './services/dbschema.js';
-import { MODE_LABELS, CONSENT_TEXT, CONSENT_CHECKBOX, CONSENT_VERSION } from './claudelink.js';
+import { MODE_LABELS } from './claudelink.js';
+import { aiName, forAi } from './services/ainame.js';
 import { banner } from './banner.js';
 import { loadingBlock } from './loading.js';
 
@@ -34,7 +35,10 @@ export const NAV = [['/', 'folder', 'Projets'], ['/mails', 'mail', 'Mails'], ['/
 const NAV_SHORT = { '/compta': 'Compta' };
 const pillLabel = (href, label) => (NAV_SHORT[href] ? `<span class="pill-l">${label}</span><span class="pill-s" aria-hidden="true">${NAV_SHORT[href]}</span>` : label);
 
-export function layout({ title, body, email, scripts = [] }) {
+// `named` : « Claude » dans ce corps de page veut dire « l'IA de la personne » : il est remplacé par son nom (Gemini, ChatGPT…).
+// À ne pas mettre sur une page qui parle de Claude comme fournisseur (liaison, abonnement, quota de session).
+export function layout({ title, body, email, scripts = [], named = false }) {
+  if (named) body = forAi(body, aiName());
   return `<!doctype html>
 <html lang="fr">
 <head>
@@ -42,7 +46,7 @@ export function layout({ title, body, email, scripts = [] }) {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <meta name="color-scheme" content="light dark">
-<title>${esc(title)} · AiTools</title>
+<title>${esc(title)} · iaboss</title>
 ${iconLinks()}
 <link rel="stylesheet" href="${assetUrl('/static/tokens.css')}">
 <link rel="stylesheet" href="${assetUrl('/static/app.css')}">
@@ -60,12 +64,12 @@ ${iconLinks()}
 <script src="${assetUrl('/static/ajax.js')}" defer></script>
 ${scripts.map((src) => `<script src="${assetUrl(src)}" defer></script>`).join('\n')}
 </head>
-<body class="app">
+<body class="app" data-ai="${esc(aiName())}">
 ${SPRITE}
 <a class="skip" href="#contenu">Aller au contenu</a>
 ${email ? `<header class="top">
   <div class="top-in">
-    <a class="lockup" href="/" aria-label="AiTools, projets">${brandMark()}<span class="wordmark">AiTools</span></a>
+    <a class="lockup" href="/" aria-label="iaboss, projets">${brandMark()}<span class="wordmark">iaboss</span></a>
     <nav class="pills" aria-label="Navigation de l'application">
       ${NAV.map(([href, icon, label]) => `<a class="pill" href="${href}">${ic(icon)}${pillLabel(href, label)}</a>`).join('\n      ')}
     </nav>
@@ -79,10 +83,10 @@ ${email ? `<header class="top">
       </div>
       <a class="ia-link site-link" href="/accueil" data-noajax aria-label="Accès au site internet" title="Accès au site internet">${ic('globe')}<span>Site internet</span></a>
       <details class="ia-menu">
-        <summary class="ia-link" aria-label="Assistant : discuter avec Claude ou demander de l'aide sur AiTools">${ic('spark')}<span>Assistant</span></summary>
+        <summary class="ia-link" aria-label="Assistant : discuter avec ${esc(aiName())} ou demander de l'aide sur iaboss">${ic('spark')}<span>Assistant</span></summary>
         <div class="user-pop ia-pop">
-          <a href="/chat">${ic('spark')}<span class="pop-t">Claude<small>Discute avec ton Claude</small></span></a>
-          <a href="/support">${ic('help')}<span class="pop-t">Support<small>Une question sur AiTools ?</small></span></a>
+          <a href="/chat">${ic('spark')}<span class="pop-t">${esc(aiName())}<small>Discute avec ton ${esc(aiName())}</small></span></a>
+          <a href="/support">${ic('help')}<span class="pop-t">Support<small>Une question sur iaboss ?</small></span></a>
         </div>
       </details>
       <details class="user">
@@ -124,11 +128,11 @@ export function usageKpis(u) {
 </section>`;
 }
 
-// Consommation de Claude (quota de l'abonnement ou budget d'une clé API) : rempli par public/app.js à partir de /api/system, masqué tant qu'il est vide
+// Consommation de l'IA (quota de l'abonnement Claude ou budget d'une clé API) : rempli par public/app.js à partir de /api/system, masqué tant qu'il est vide
 export function claudePanel() {
   return `<section class="panel claude-card" aria-labelledby="h-claude-use" data-claude-card hidden>
-  <div class="panel-h"><h2 id="h-claude-use">Consommation Claude</h2></div>
-  <ul class="usage-list usage-claude" data-usage-claude aria-label="Consommation de Claude"></ul>
+  <div class="panel-h"><h2 id="h-claude-use">Consommation ${esc(aiName())}</h2></div>
+  <ul class="usage-list usage-claude" data-usage-claude aria-label="Consommation de ${esc(aiName())}"></ul>
 </section>`;
 }
 
@@ -140,14 +144,14 @@ export function usagePanel(u) {
   return `<section class="panel usage-card" aria-labelledby="h-usage">
   <div class="panel-h"><h2 id="h-usage">Usage du mois</h2><span class="badge">plan ${esc(u.planLabel)}</span></div>
   <ul class="usage-list">${rows}</ul>
-  <div data-claude-card hidden><ul class="usage-list usage-claude" data-usage-claude aria-label="Usage de Claude"></ul></div>
+  <div data-claude-card hidden><ul class="usage-list usage-claude" data-usage-claude aria-label="Usage de ${esc(aiName())}"></ul></div>
   ${full.length ? `<p class="cap" role="alert">${ic('alert')}<span>Plafond atteint : ${full.map((i) => esc(i.label.toLowerCase())).join(', ')}. Rien n'est perdu. <a href="/tarifs">Voir les tarifs</a></span></p>` : u.plan === 'free' ? '<p class="foot-n">Les plafonds se renouvellent le 1er du mois (heure de Paris). <a href="/tarifs">Voir les tarifs</a></p>' : ''}
 </section>`;
 }
 
 const PROVIDER_NAMES = { google: 'Google', apple: 'Apple' };
 
-// Section « Liaison Claude » de Mon compte : état, test, changement de mode, déliaison. Jamais le secret, ni même un masque
+// Section « Mon IA » de Mon compte : état, test, changement de mode, déliaison. Jamais le secret, ni même un masque
 // plus long que les 4 derniers caractères de la clé API.
 const QUOTA_WHY = {
   denied: "Anthropic refuse le relevé en direct avec ce jeton (relie-toi avec « Se connecter avec Claude »).",
@@ -159,9 +163,12 @@ const QUOTA_WHY = {
 const fmtReset = (ts) => new Date(ts * 1000).toLocaleString('fr-FR', { weekday: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
 
 // Limites d'utilisation du compte Claude : session glissante de 5 h et semaine de 7 j (abonnement seulement ; une clé API n'a pas ces limites).
-function claudeLimits(quota, mode) {
+function claudeLimits(quota, link) {
+  const { mode } = link;
   const head = '<h3 class="sub-h">Limites d\'utilisation</h3>';
-  if (mode === 'api_key') return `${head}<p class="hint">Avec une clé API, Anthropic facture ce que tu consommes, à l'usage.</p>`;
+  if (mode === 'api_key') return `${head}<p class="hint">Avec une clé API, ${esc(link.providerCompany)} facture ce que tu consommes, à l'usage.</p>`;
+  // Seul Claude remonte une session de 5 h et une semaine : pour un compte ChatGPT, les limites sont celles de l'abonnement, non mesurées par iaboss
+  if (link.provider !== 'claude') return `${head}<p class="hint">Avec ton compte ${esc(link.providerLabel)}, les limites de ton abonnement s'appliquent. iaboss ne les mesure pas.</p>`;
   const row = (label, w) => {
     if (!w) return '';
     if (w.expired) return `<li class="g"><div class="g-h"><span>${label}</span><span class="g-v muted">remise à zéro</span></div></li>`;
@@ -175,28 +182,29 @@ function claudeLimits(quota, mode) {
   if (!rows) return `${head}<p class="hint">${quota?.error ? esc(QUOTA_WHY[quota.error] || 'Relevé indisponible.') : 'Pas encore mesuré.'}</p>`;
   const live = quota.source === 'live' && !quota.error;
   return `${head}<ul class="usage-list">${rows}</ul>
-  <p class="hint">${live ? 'Relevé en direct chez Anthropic : il compte tout ton usage de Claude, y compris hors AiTools.' : `Dernière mesure faite pendant un job AiTools${quota.error ? ` (${esc((QUOTA_WHY[quota.error] || 'relevé en direct indisponible').replace(/\.$/, ''))})` : ''}.`}</p>`;
+  <p class="hint">${live ? 'Relevé en direct chez Anthropic : il compte tout ton usage de Claude, y compris hors iaboss.' : `Dernière mesure faite pendant un job iaboss${quota.error ? ` (${esc((QUOTA_WHY[quota.error] || 'relevé en direct indisponible').replace(/\.$/, ''))})` : ''}.`}</p>`;
 }
 
 function linkSection(link, consent, quota = null) {
   if (!link) {
     return `<section class="card">
-  <div class="card-h"><h2>Liaison Claude</h2></div>
-  <p class="card-d">Relie un accès Claude pour utiliser l'application : tant qu'il manque, cette page de liaison reste affichée.</p>
-  <div class="row"><a class="btn primary" href="/link">Relier Claude</a></div>
+  <div class="card-h"><h2>Mon IA</h2></div>
+  <p class="card-d">Relie une IA (Claude, ChatGPT ou Gemini) pour utiliser l'application : tant qu'il manque, cette page de liaison reste affichée.</p>
+  <div class="row"><a class="btn primary" href="/link">Relier mon IA</a></div>
 </section>`;
   }
   return `<section class="card">
-  <div class="card-h"><h2>Liaison Claude</h2>${link.valid ? `<span class="badge ok">${ic('check')}${esc(link.label)}</span>` : `<span class="badge err">${ic('alert')}À revalider</span>`}</div>
-  <p class="card-d">Ton accès à Claude est facturé à part, par Anthropic.</p>
+  <div class="card-h"><h2>Mon IA</h2>${link.valid ? `<span class="badge ok">${ic('check')}${esc(link.label)}</span>` : `<span class="badge err">${ic('alert')}À revalider</span>`}</div>
+  <p class="card-d">Ton accès à ${esc(link.providerLabel)} est facturé à part, par ${esc(link.providerCompany)}. <a href="/link">Changer d'IA</a></p>
   <dl class="account">
+    <dt>IA</dt><dd>${esc(link.providerLabel)}</dd>
     <dt>Mode</dt><dd>${esc(link.label)}</dd>
-    <dt>État</dt><dd>${link.valid ? '<span class="ok">Valide</span>' : '<span class="error">À revalider (déconnecte puis relie Claude)</span>'}</dd>
-    ${link.last4 ? `<dt>Clé API</dt><dd>sk-ant-…${esc(link.last4)}</dd>` : ''}
+    <dt>État</dt><dd>${link.valid ? '<span class="ok">Valide</span>' : '<span class="error">À revalider (relie de nouveau ton IA)</span>'}</dd>
+    ${link.last4 ? `<dt>Clé API</dt><dd>${link.provider === 'claude' ? 'sk-ant-' : ''}…${esc(link.last4)}</dd>` : ''}
     <dt>Reliée le</dt><dd>${fmtDate(link.linkedAt)}</dd>
     ${link.consentAt ? `<dt>Risque accepté</dt><dd>${fmtDate(link.consentAt)} (texte ${esc(link.consentVersion)})</dd>` : ''}
   </dl>
-  ${claudeLimits(quota, link.mode)}
+  ${claudeLimits(quota, link)}
   <div class="row-actions">
     <form method="post" action="/link/unlink"><button class="btn danger">Déconnecter</button></form>
   </div>
@@ -205,7 +213,7 @@ function linkSection(link, consent, quota = null) {
 }
 
 // Barre de chargement avec pourcentage ESTIMÉ (public/app.js, track) : montée vers 95 % selon la durée habituelle, 100 % à la réponse
-const pctBlock = (label) => `<div class="dl-pct" data-pct hidden><div class="bar" role="progressbar" aria-label="${esc(label)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="w-0" data-pct-bar></span></div><p class="dl-pct-t"><span>${esc(label)} · estimation</span><b data-pct-text>0 %</b></p></div>`;
+export const pctBlock = (label) => `<div class="dl-pct" data-pct hidden><div class="bar" role="progressbar" aria-label="${esc(label)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="w-0" data-pct-bar></span></div><p class="dl-pct-t"><span>${esc(label)} · estimation</span><b data-pct-text>0 %</b></p></div>`;
 
 export function accountPage({ user, error, link = null, consent = null, notice = null, usage = null, developer = false, ical = null, appUrl = '', quota = null, profileSet = false }) {
   return layout({
@@ -230,7 +238,7 @@ ${linkSection(link, consent, quota)}
   ${icalBox(ical, '/account')}
 </section>
 <section class="card">
-  <div class="card-h"><h2>Mode développeur</h2><p>L'API d'AiTools et le serveur MCP (relier Claude à ton panel) ne sont disponibles que si tu actives ce mode.</p></div>
+  <div class="card-h"><h2>Mode développeur</h2><p>L'API d'iaboss et le serveur MCP (relier Claude à ton panel) ne sont disponibles que si tu actives ce mode.</p></div>
   <div class="row"><span class="badge ${developer ? 'ok' : ''}">${developer ? 'Activé' : 'Désactivé'}</span><a class="btn small" href="/developer">${ic('key')}${developer ? 'Jetons et documentation' : 'Activer'}</a></div>
   ${developer ? devLinks(appUrl) : `<p class="muted small">Une fois le mode activé, les adresses de l'API et du serveur MCP, leurs documentations et tes jetons s'affichent ici et sur la page Développeur.</p>`}
 </section>
@@ -243,87 +251,6 @@ ${linkSection(link, consent, quota)}
     <div class="row"><button class="btn danger-fill">${ic('trash')}Supprimer mon compte et mes données</button></div>
   </form>
 </section>
-</div>`,
-  });
-}
-
-/**
- * Page « Relier Claude » : onboarding bloquant. Les trois modes sont des formulaires HTML classiques (POST) ;
- * la fenêtre d'avertissement du mode abonnement est un <dialog> ouvert par public/app.js.
- */
-export function linkPage({ user, link, cliModeEnabled, error, start = false }) {
-  const intro = link
-    ? `<p class="lead">Accès actuel : <strong>${esc(link.label)}</strong>${link.valid ? '' : ' (à revalider)'}. Relier un autre accès remplace le précédent, dont le secret est effacé.</p>`
-    : '<p class="lead">Choisis comment AiTools accède à ton Claude. Les analyses, recherches et rédactions s\'exécutent avec <em>ton</em> accès, jamais celui d\'un autre utilisateur.</p>';
-  const box = `<label class="check opt"><input type="checkbox" name="accept" data-consent required><span class="box">${ic('check')}</span><span>${esc(CONSENT_CHECKBOX)}</span></label>`;
-  const notice = `<div class="notice">${CONSENT_TEXT.map((t) => `<p>${esc(t)}</p>`).join('')}</div>`;
-  // Connexion guidée (public/app.js) : le bouton demande le lien au serveur, avec un petit chargement, puis l'étape 2
-  // attend le code que Claude affiche ; le serveur récupère le jeton tout seul.
-  // Alternatives par abonnement : un bloc, avec le risque annoncé dans son titre ; deux lignes (connexion guidée, jeton collé)
-  const cards = cliModeEnabled ? `
-<section class="alts" aria-labelledby="h-alt">
-  <div class="alts-h"><h2 id="h-alt">Avec ton abonnement Claude (Pro, Max)</h2><span class="badge warn">${ic('alert')}Risque pour ton compte</span></div>
-  <p class="hint">Utilise ton abonnement au lieu d'une clé API. Cette option comporte un risque pour ton compte Claude : une fenêtre d'avertissement s'affiche avant de continuer.</p>
-  <div class="alt">
-    <div class="alt-t"><h3>Se connecter avec Claude</h3><p>Connexion guidée : tu te connectes à Claude, puis tu recopies le code qu'il affiche.</p></div>
-    <button type="button" class="btn" data-open-dialog="consent-dialog">Se connecter avec Claude</button>
-  </div>
-  <div class="alt">
-    <div class="alt-t"><h3>Jeton collé à la main</h3><p>Colle un jeton d'abonnement Claude. Pour les cas où la connexion directe ne passe pas.</p></div>
-    <details class="manual"><summary class="btn">Coller un jeton</summary>
-      <form method="post" action="/link/subscription" class="cfg" data-consent-form>
-        ${notice}
-        ${box}
-        <p class="hint">Sur ta propre machine, lance la commande <code>claude setup-token</code>, connecte-toi à ton compte Claude quand le navigateur s'ouvre, puis copie le jeton affiché et colle-le ci-dessous. Le jeton est chiffré, utilisé uniquement pour tes jobs, et n'est jamais réaffiché.</p>
-        <label class="field"><span class="lbl">Jeton d'abonnement</span><input name="token" type="password" autocomplete="new-password" spellcheck="false" required></label>
-        <p class="hint">La vérification lance un appel minimal du CLI : quelques tokens sont décomptés de ton abonnement.</p>
-        <button class="btn primary" data-consent-submit disabled>Relier avec mon jeton</button>
-      </form>
-    </details>
-  </div>
-</section>` : '';
-  const dialog = cliModeEnabled ? `<dialog class="prospect-dialog modal" id="consent-dialog" aria-labelledby="consent-title"${start ? ' data-autoopen' : ''}>
-  <div class="cfg">
-    <h2 id="consent-title">${ic('alert')}Avant de continuer</h2>
-    <form class="cfg" data-claude-login data-consent-form>
-      ${notice}
-      ${box}
-      <p class="hint">Un lien de connexion va s'afficher. Tu te connectes à Claude, puis tu recopies ici le petit code qu'il te montre : AiTools récupère le jeton tout seul. Texte d'avertissement version ${esc(CONSENT_VERSION)}.</p>
-      <div class="modal-f"><button type="button" class="btn" data-close-dialog>Annuler</button><button class="btn primary" data-consent-submit disabled><span data-label>Continuer</span></button></div>
-      <p class="hint" role="status" data-claude-status></p>
-      ${pctBlock('Préparation du lien de connexion')}
-      <p class="msg msg-err" role="alert" data-claude-error hidden></p>
-    </form>
-    <div class="cfg" data-claude-step2 hidden>
-      <p data-claude-hint-popup hidden><strong>1.</strong> Connecte-toi à Claude dans la petite fenêtre qui vient de s'ouvrir.</p>
-      <div data-claude-hint-link><p><strong>1.</strong> Ouvre Claude et connecte-toi :</p>
-      <p><a class="btn primary" data-claude-link href="#" target="_blank" rel="noopener noreferrer">Ouvrir Claude</a></p></div>
-      <p><strong>2.</strong> Copie le code que Claude affiche, puis reviens ici : il est reconnu tout seul (sinon, colle-le dans le champ).</p>
-      <form class="cfg" data-claude-code>
-        <label class="field"><span class="lbl">Code affiché par Claude</span><input name="code" autocomplete="off" spellcheck="false" required></label>
-        <button class="btn primary"><span data-label>Terminer la connexion</span></button>
-        ${pctBlock('Récupération de ton jeton')}
-      </form>
-      <p class="msg msg-err" role="alert" data-claude-error2 hidden></p>
-    </div>
-  </div>
-</dialog>` : '';
-  return layout({
-    title: 'Relier Claude', email: user.email,
-    body: `<div class="narrow"${!link || !link.valid ? ' data-nolink' : ''}>
-<h1 class="h1">Relier Claude</h1>
-${intro}
-${error ? banner('err', error) : ''}
-<section class="panel link-main" aria-labelledby="h-key">
-  <div class="panel-h"><h2 id="h-key">Clé API Anthropic</h2><span class="badge ok">${ic('check')}Recommandée</span></div>
-  <p>Crée une clé sur console.anthropic.com puis colle-la ici. Elle est vérifiée sans consommer de tokens, chiffrée, et ne sera plus jamais affichée (seuls ses 4 derniers caractères le seront). Tu paies à l'usage, directement chez Anthropic.</p>
-  <form method="post" action="/link/api-key" class="cfg link-key">
-    <label class="field"><span class="lbl">Clé API</span><input name="apiKey" type="password" autocomplete="new-password" spellcheck="false" required placeholder="sk-ant-…"></label>
-    <button class="btn primary">Vérifier et relier</button>
-  </form>
-</section>
-${cards}
-${dialog}
 </div>`,
   });
 }
@@ -372,7 +299,7 @@ function configForms(p, smtp, dbCfg, imap) {
   const source = { project: 'Ce projet envoie depuis son adresse (SMTP ci-dessous).', null: "Aucun SMTP : renseigne celui de l'adresse d'envoi de ce projet, sinon rien ne peut partir." }[p.smtpSource ?? 'null'];
   return `<form data-action="smtp" data-id="${p.id}" class="cfg">
   <h4>SMTP d'envoi de ce projet (adresse du projet)</h4>
-  <p class="muted small" data-smtp-source>${source} Les mails de prospection et les relances de ce projet partent de cette adresse (une boîte par projet). Les mails d'AiTools (rapport, évolutions, invitations) partent, eux, du serveur.</p>
+  <p class="muted small" data-smtp-source>${source} Les mails de prospection et les relances de ce projet partent de cette adresse (une boîte par projet). Les mails d'iaboss (rapport, évolutions, invitations) partent, eux, du serveur.</p>
   <div class="grid3">
     <label>Hôte<input name="host" value="${esc(smtp.host)}" placeholder="smtp.exemple.fr"></label>
     <label>Port<input name="port" type="number" value="${esc(smtp.port || 587)}"></label>
@@ -397,7 +324,7 @@ function configForms(p, smtp, dbCfg, imap) {
 </form>
 <form data-action="db" data-id="${p.id}" class="cfg">
   <h4>Base de données (récapitulatif)</h4>
-  <p class="muted small">Utilise un compte en lecture seule. AiTools lit la structure de ta base, te propose les bonnes tables et affiche un aperçu des chiffres : tu n'écris aucune requête.</p>
+  <p class="muted small">Utilise un compte en lecture seule. iaboss lit la structure de ta base, te propose les bonnes tables et affiche un aperçu des chiffres : tu n'écris aucune requête.</p>
   <div class="grid3">
     <label>Type<select name="type"><option value="mysql" ${dbCfg.type !== 'pg' ? 'selected' : ''}>MySQL / MariaDB</option><option value="pg" ${dbCfg.type === 'pg' ? 'selected' : ''}>PostgreSQL</option></select></label>
     <label>Hôte<input name="host" value="${esc(dbCfg.host)}"></label>
@@ -444,7 +371,7 @@ const ROLE_SELECT = `<label class="rolesel"><span class="lbl">Poste</span><span 
 /** Section « Postes et tâches IA » : chaque poste avec ses tâches. Les tâches qui lisent le dépôt sont réservées aux administrateurs. */
 function postesBody(p) {
   const member = p.access === 'member';
-  return `<p class="muted small">Chaque tâche fait écrire à Claude un livrable à partir de la fiche du projet : le livrable reste dans AiTools, à toi de l'utiliser. Les précisions sont facultatives. Les chiffres, prix et références que la fiche ne donne pas restent « à compléter ».</p>
+  return `<p class="muted small">Chaque tâche fait écrire à ${esc(aiName())} un livrable à partir de la fiche du projet : le livrable reste dans iaboss, à toi de l'utiliser. Les précisions sont facultatives. Les chiffres, prix et références que la fiche ne donne pas restent « à compléter ».</p>
   <div class="roles">${ROLES.map((r) => `
     <details class="role" data-role="${r.id}">
       <summary><b>${esc(r.label)}</b><span class="muted small">${esc(r.summary)}</span></summary>
@@ -502,7 +429,7 @@ function projectItem(p, smtp, dbCfg, imap, { open = false, stats = null } = {}) 
 
   <div class="accs">
   ${acc('prospect', 'search', 'Prospecter', 'Recherche, modèle de mail, envoi, relances et CRM', `
-    ${acc('search', 'search', 'Recherche de prospects', 'Claude cherche des entreprises qui collent à la cible', `
+    ${acc('search', 'search', 'Recherche de prospects', `${aiName()} cherche des entreprises qui collent à la cible`, `
     <form data-action="prospect" data-id="${p.id}" class="inline">
       <label>Prospects à chercher<input name="count" type="number" min="1" max="50" value="10"></label>
       <label>Quand<select name="when"><option value="now">Maintenant</option><option value="night">Cette nuit (1h-6h)</option></select></label>
@@ -594,14 +521,14 @@ function projectItem(p, smtp, dbCfg, imap, { open = false, stats = null } = {}) 
       <label>Quand<select name="when"><option value="now">Maintenant</option><option value="night">Cette nuit (1h-6h)</option></select></label>
       <button class="btn primary">${ic('shield')}Lancer l'audit</button>
     </form>
-    <p class="muted small">Claude lit le dépôt (sans rien modifier) et signale les défauts de code, de sécurité, de tests et de dépendances, avec le fichier concerné.</p>
+    <p class="muted small">${esc(aiName())} lit le dépôt (sans rien modifier) et signale les défauts de code, de sécurité, de tests et de dépendances, avec le fichier concerné.</p>
     <div class="job" data-job="audit"></div>`, { cls: 'main' }) : ''}
 
-  ${acc('linkedin', 'linkedin', 'LinkedIn', 'Relie un compte, Claude écrit des posts, tu relis et publies', `
+  ${acc('linkedin', 'linkedin', 'LinkedIn', `Relie un compte, ${aiName()} écrit des posts, tu relis et publies`, `
     <div class="linkedin" data-linkedin>${loadingBlock()}</div>
     <div class="job" data-job="linkedin_post"></div>`, { cls: 'main' })}
 
-  ${acc('promo', 'film', 'Promotion', 'Claude conçoit une vidéo de design motion pour présenter ton projet', `
+  ${acc('promo', 'film', 'Promotion', `${aiName()} conçoit une vidéo de design motion pour présenter ton projet`, `
     <div class="promo" data-promo>${loadingBlock()}</div>
     <div class="job" data-job="promo_video"></div>`, { cls: 'main' })}
 
@@ -640,7 +567,7 @@ ${usageKpis(usage)}
   ${projects.length ? projects.map((x) => projectItem(x.project, x.smtp, x.dbCfg, x.imap, { open: projects.length === 1, stats: stats.get(Number(x.project.id)) })).join('\n') : `<div class="empty">
     <span class="empty-i">${ic('folder')}</span>
     <h3>Aucun projet pour l'instant</h3>
-    <p>Crée ton premier projet : donne-lui un nom et l'adresse de son dépôt Git, Claude s'occupe de l'analyser.</p>
+    <p>Crée ton premier projet : donne-lui un nom et l'adresse de son dépôt Git, ${esc(aiName())} s'occupe de l'analyser.</p>
   </div>`}
   </div>
 </section>
@@ -719,9 +646,11 @@ const SETTINGS_TOC = [['notif', 'Notifications'], ['git', 'Dépôts Git'], ['gar
 export function settingsPage({ email, s, saved }) {
   // Sélecteur de modèle en deux listes : les recommandés (avec une estimation relative du coût), puis tous les autres, plus compacts et sans estimation
   const priced = !!s.priced; // le « $ » relatif n'a de sens qu'avec une clé API (facturée à l'usage)
+  const cat = s.catalog || { recommended: RECOMMENDED, others: OTHERS }; // catalogue de l'IA de l'utilisateur
+  const ai = s.ai || { id: 'claude', name: 'Claude', company: 'Anthropic' };
   const recTier = (m) => (priced ? `${m.tier} · ${m.cost}` : m.tier);
   const model = (name, v, title) => {
-    const cur = RECOMMENDED.find((m) => m.id === v);
+    const cur = cat.recommended.find((m) => m.id === v);
     const radio = (m, extra = '') => `<input type="radio" name="${name}" value="${m.id}"${m.id === v ? ' checked' : ''} data-mp-label="${esc(m.label)}" data-mp-tier="${esc(extra)}">`;
     return `<div class="field modelpick" data-modelpick>
       <span class="lbl" id="${name}-l">${title}</span>
@@ -729,11 +658,11 @@ export function settingsPage({ email, s, saved }) {
         <summary aria-labelledby="${name}-l"><span class="mp-cur"><b data-mp-name>${esc(cur ? cur.label : modelLabel(v))}</b> <em data-mp-tier-out>${cur ? esc(recTier(cur)) : ''}</em></span>${ic('down')}</summary>
         <div class="mp-pop" role="radiogroup" aria-labelledby="${name}-l">
           <p class="mp-h">Recommandés</p>
-          ${RECOMMENDED.map((m) => `<label class="mp-rec">${radio(m, recTier(m))}<span class="mp-n"><b>${esc(m.label)}</b><small>${esc(m.note)}</small></span><span class="mp-t">${esc(m.tier)}${priced ? ` <i>${esc(m.cost)}</i>` : ''}</span></label>`).join('\n          ')}
+          ${cat.recommended.map((m) => `<label class="mp-rec">${radio(m, recTier(m))}<span class="mp-n"><b>${esc(m.label)}</b><small>${esc(m.note)}</small></span><span class="mp-t">${esc(m.tier)}${priced ? ` <i>${esc(m.cost)}</i>` : ''}</span></label>`).join('\n          ')}
           <hr class="mp-sep">
           <p class="mp-h mp-h-s">Autres modèles</p>
           <div class="mp-others">
-            ${OTHERS.map((m) => `<label class="mp-o">${radio(m, '')}<span>${esc(m.label)}</span></label>`).join('\n            ')}
+            ${cat.others.map((m) => `<label class="mp-o">${radio(m, '')}<span>${esc(m.label)}</span></label>`).join('\n            ')}
           </div>
         </div>
       </details>
@@ -751,8 +680,8 @@ ${saved ? banner('ok', 'Réglages enregistrés', { strong: true }) : ''}
 <form method="post" action="/settings" class="settings-form">
 
 <section class="card" id="notif" aria-labelledby="t-notif">
-  <div class="card-h"><h2 id="t-notif">Notifications</h2><p>Où et quand AiTools te prévient : réponses de prospects, jobs terminés ou en erreur, alertes. Les liens et jetons sont stockés chiffrés et ne sont jamais réaffichés.</p></div>
-  <label class="field"><span class="lbl">Email de réception (évolutions, rapport hebdo)</span><input name="notify_email" type="email" value="${esc(s.notify_email)}" placeholder="toi@exemple.fr"><span class="hint">Ces mails partent de l'adresse d'AiTools (SMTP du serveur).</span></label>
+  <div class="card-h"><h2 id="t-notif">Notifications</h2><p>Où et quand iaboss te prévient : réponses de prospects, jobs terminés ou en erreur, alertes. Les liens et jetons sont stockés chiffrés et ne sont jamais réaffichés.</p></div>
+  <label class="field"><span class="lbl">Email de réception (évolutions, rapport hebdo)</span><input name="notify_email" type="email" value="${esc(s.notify_email)}" placeholder="toi@exemple.fr"><span class="hint">Ces mails partent de l'adresse d'iaboss (SMTP du serveur).</span></label>
   ${check('weekly_report', s.weekly_report, 'Rapport hebdo le lundi à 8h (mail + canaux ci-dessous)')}
   <div class="save"><button type="button" class="btn" data-report-send>${ic('send')}Envoyer le rapport maintenant</button></div>
 
@@ -765,7 +694,7 @@ ${saved ? banner('ok', 'Réglages enregistrés', { strong: true }) : ''}
     ${channelCard('slack', 'Slack', s, `<label class="field"><span class="lbl">Lien du webhook Slack</span><input name="slack_url" type="password" placeholder="${s.channels.slack ? '•••••• (inchangé)' : 'https://hooks.slack.com/services/…'}" autocomplete="off"><span class="hint">Slack : Apps → Incoming Webhooks.</span></label>`)}
     ${channelCard('telegram', 'Telegram', s, `<label class="field"><span class="lbl">Jeton du bot</span><input name="telegram_token" type="password" placeholder="${s.channels.telegram ? '•••••• (inchangé)' : '123456789:AA…'}" autocomplete="off"><span class="hint">Crée un bot avec @BotFather.</span></label>
       <label class="field"><span class="lbl">Identifiant de la conversation</span><input name="telegram_chat" value="${esc(s.channels.telegram?.chat || '')}" placeholder="123456789 ou @mon_canal" autocomplete="off"><span class="hint">Écris d'abord à ton bot, puis lis l'identifiant avec @userinfobot.</span></label>`)}
-    ${channelCard('email', 'E-mail', s, `<label class="field"><span class="lbl">Adresse de réception</span><input name="email_to" type="email" value="${esc(s.channels.email?.to || '')}" placeholder="toi@exemple.fr" autocomplete="off"><span class="hint">${s.canEmail ? "Envoyé depuis l'adresse d'AiTools. Au plus 20 notifications par heure." : "Ce canal s'active dès que l'administrateur a réglé le SMTP du serveur."}</span></label>`)}
+    ${channelCard('email', 'E-mail', s, `<label class="field"><span class="lbl">Adresse de réception</span><input name="email_to" type="email" value="${esc(s.channels.email?.to || '')}" placeholder="toi@exemple.fr" autocomplete="off"><span class="hint">${s.canEmail ? "Envoyé depuis l'adresse d'iaboss. Au plus 20 notifications par heure." : "Ce canal s'active dès que l'administrateur a réglé le SMTP du serveur."}</span></label>`)}
   </div>
   <template id="discord-row-tpl">${hookRow('__I__', { id: '', events: [] }, s.discord.all, { fresh: true })}</template>
   <p class="hint" data-chan-empty${s.discord.hooks.length || Object.keys(s.channels).length ? ' hidden' : ''}>Ajoute un canal ci-dessus pour recevoir les notifications.</p>
@@ -838,9 +767,10 @@ ${saved ? banner('ok', 'Réglages enregistrés', { strong: true }) : ''}
 </section>
 
 <section class="card" id="budget" aria-labelledby="t-budget">
+  ${s.aiSwitch ? `<p class="hint" role="status">Tu es passé de ${esc(s.aiSwitch.from)} à ${esc(s.aiSwitch.to)} le ${fmtDate(s.aiSwitch.at)} : tes choix de modèle sont repartis du modèle par défaut de ${esc(s.aiSwitch.to)}. Tes consignes personnalisées de ${esc(s.aiSwitch.from)} sont gardées, et reviennent si tu y retournes.</p>` : ''}
   <div class="card-h"><h2 id="t-budget">${s.priced ? 'Budget IA' : 'Modèles IA'}</h2>${s.priced
-    ? "<p>Avec ta clé API, chaque job est facturé par Anthropic : en équivalent $ API remonté par Claude Code. Au-delà d'un plafond, les jobs IA attendent sans être perdus ; envois et relances continuent. Renseigne un montant pour activer un plafond.</p>"
-    : "<p>Avec ton abonnement Claude rien n'est facturé en plus : le garde-fou est ton quota Claude (affiché en haut), pas un budget en $.</p>"}</div>
+    ? `<p>Avec ta clé API, chaque job est facturé par ${esc(ai.company)}${ai.id === 'claude' ? ' : en équivalent $ API remonté par Claude Code' : ' : le coût est estimé d\'après les jetons utilisés et la grille de prix du modèle'}. Au-delà d'un plafond, les jobs IA attendent sans être perdus, et les envois et relances ne partent pas non plus : chaque mail est relu par ton IA avant de partir. Renseigne un montant pour activer un plafond.</p>`
+    : `<p>Avec ton ${ai.id === 'claude' ? 'abonnement Claude' : `compte ${esc(ai.name)}`} rien n'est facturé en plus par iaboss : ${ai.id === 'claude' ? 'le garde-fou est ton quota Claude (affiché en haut)' : 'les limites de ton abonnement s\'appliquent'}, pas un budget en $.</p>`}</div>
   <div class="grid2">
     ${s.priced ? `<label class="field"><span class="lbl">Plafond sur 24 h glissantes</span><span class="unit"><input name="budget_day_usd" inputmode="decimal" value="${esc(s.budget_day_usd)}" placeholder="ex. 2"><span>$</span></span></label>
     <label class="field"><span class="lbl">Plafond sur 30 jours glissants</span><span class="unit"><input name="budget_month_usd" inputmode="decimal" value="${esc(s.budget_month_usd)}" placeholder="ex. 30"><span>$</span></span></label>` : ''}
@@ -848,12 +778,12 @@ ${saved ? banner('ok', 'Réglages enregistrés', { strong: true }) : ''}
     ${model('analyze_model', s.analyze_model, "Modèle pour l'analyse de projet")}
     ${model('write_model', s.write_model, 'Modèle pour la rédaction (mails, relances, posts LinkedIn)')}
   </div>
-  <p class="hint">Haiku suffit pour la plupart des projets : passe à Sonnet ou Opus seulement si les fiches ou les textes manquent de précision. Les estimations (économe, intermédiaire, plus cher) sont relatives : avec ton abonnement elles se voient dans ton quota Claude, avec une clé API dans le prix. Chaque modèle a ses propres prompts, réglables plus bas.</p>
+  <p class="hint">${esc(cat.recommended[0].label)} suffit pour la plupart des projets : passe à ${esc(cat.recommended[1].label)} ou ${esc(cat.recommended[2].label)} seulement si les fiches ou les textes manquent de précision. Les estimations (économe, intermédiaire, plus cher) sont relatives : avec ton abonnement elles pèsent sur les limites de ton compte${ai.id === 'claude' ? ' (ton quota Claude)' : ''}, avec une clé API dans le prix. Chaque modèle a ses propres prompts, réglables plus bas.</p>
 </section>
 
 
 <section class="card" id="prompts" aria-labelledby="t-prompts" data-prompts data-pscope="*">
-  <div class="card-h"><h2 id="t-prompts">Prompts IA</h2><p>Les consignes que Claude reçoit pour chaque tâche. Modifie-les pour changer le style, le ton ou les règles. Le contexte du projet et le format de réponse restent ajoutés automatiquement : un prompt modifié ne peut pas casser la lecture de la réponse.</p></div>
+  <div class="card-h"><h2 id="t-prompts">Prompts IA</h2><p>Les consignes que ${esc(ai.name)} reçoit pour chaque tâche. Modifie-les pour changer le style, le ton ou les règles. Le contexte du projet et le format de réponse restent ajoutés automatiquement : un prompt modifié ne peut pas casser la lecture de la réponse.</p></div>
   <p class="hint">Chaque gamme de modèle a ses propres consignes, adaptées à sa façon de travailler (un petit modèle a besoin d'une méthode pas à pas, un grand d'un peu plus de recul). Un texte écrit dans « Tous les modèles » s'applique à toutes les gammes qui n'ont pas le leur. Ce qui est vide revient au texte par défaut.</p>
   <div class="pscope-bar" role="group" aria-label="Gamme de modèle">
     ${s.prompts.scopes.map((sc, i) => `<button type="button" class="pscope-tab" data-pscope-tab="${sc.id}" aria-pressed="${i === 0}">${esc(sc.label)}${sc.count ? ` <span class="badge warn">${sc.count}</span>` : ''}</button>`).join('\n    ')}

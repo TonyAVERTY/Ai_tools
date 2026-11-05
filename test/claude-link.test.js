@@ -179,7 +179,7 @@ test('formulaire HTML : l\'erreur revient sur /link, la page affiche la fenêtre
     body: new URLSearchParams({ token: TOKEN }).toString(),
   });
   assert.equal(form.status, 303);
-  assert.match(decodeURIComponent(form.headers.get('location')), /^\/link\?e=.*cocher/);
+  assert.match(decodeURIComponent(form.headers.get('location')), /^\/link\?ia=claude&e=.*cocher/);
   const page = (await (await u.get('/link', { headers: { accept: 'text/html' } })).text()).replace(/&#39;/g, "'");
   assert.match(page, /<dialog[^>]*id="consent-dialog"/);
   assert.match(page, /contrevenir aux conditions d'utilisation d'Anthropic/);
@@ -412,7 +412,7 @@ test('délier : secret effacé, jobs IA en file annulés, autres jobs et autres 
   assert.equal((await a.get('/', { headers: { accept: 'text/html' } })).headers.get('location'), '/link');
   assert.equal(await aiRefusal(s.db, a.id), LINK_REQUIRED_MESSAGE);
   // Mon compte reste accessible et propose de relier
-  assert.match(await (await a.get('/account', { headers: { accept: 'text/html' } })).text(), /Relier Claude/);
+  assert.match(await (await a.get('/account', { headers: { accept: 'text/html' } })).text(), /Relier mon IA/);
 });
 
 test('délier un job IA en cours : il est interrompu', async () => {

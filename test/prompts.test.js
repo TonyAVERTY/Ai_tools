@@ -217,3 +217,40 @@ test('réglages : prompts par gamme dans le formulaire, enregistrés, retrouvés
   await u.post('/settings', { ...base, prompt_template: PROMPT_DEFS.template.text, prompt_haiku_template: '' }, { form: true });
   assert.equal(await getSetting(s.db, u.id, 'prompts_json'), '');
 });
+
+test('mails : les consignes demandent un « Bonjour, », une formule de politesse et une signature, pour chaque gamme de modèle', () => {
+  const profile = { resume: 'Cartes de fidélité.', proposition_valeur: 'Fidéliser.', arguments: ['simple'], ton: 'direct' };
+  for (const model of ['haiku', 'sonnet', 'opus', 'fable']) {
+    const first = templatePrompt({ profile, target: {}, senderName: 'Tony', model }).prompt;
+    const follow = followupTemplatePrompt({ profile, senderName: 'Tony', model }).prompt;
+    assert.match(first, /« Bonjour, » seul sur la première ligne/, `premier mail (${model}) : formule d'appel`);
+    assert.match(first, /Formule de politesse seule sur sa ligne \(« Bien cordialement, »\)/, `premier mail (${model}) : formule de politesse`);
+    assert.match(follow, /commence par une formule d'appel courte[^]*termine par une formule de politesse/, `relance (${model}) : appel et politesse`);
+    assert.doesNotMatch(follow, /Pas de formule d'introduction/, `relance (${model}) : l'ancienne consigne qui supprimait aussi le « Bonjour »`);
+  }
+  assert.match(followupTemplatePrompt({ profile, senderName: 'Tony', model: 'haiku' }).prompt, /garde toujours « Bonjour, » au début/);
+  // On salue une personne, pas une entreprise : aucune consigne ne propose « Bonjour {{entreprise}}, »
+  for (const p of [templatePrompt({ profile, target: {}, senderName: 'Tony' }).prompt, followupTemplatePrompt({ profile, senderName: 'Tony' }).prompt]) {
+    assert.doesNotMatch(p, /« Bonjour \{\{entreprise\}\}, (…|»)/);
+    assert.match(p, /Ne mets jamais \{\{entreprise\}\} juste après « Bonjour »/);
+  }
+  // Le nom de l'entreprise : une tournure qui le porte, et la virgule qui le suit est permise (il n'est jamais vide)
+  for (const p of [templatePrompt({ profile, target: {}, senderName: 'Tony' }).prompt, followupTemplatePrompt({ profile, senderName: 'Tony' }).prompt]) {
+    assert.match(p, /N'écris jamais « Pour \{\{entreprise\}\}, » suivi d'une phrase qui ne s'y rattache pas/);
+    assert.match(p, /la virgule qui le suit est permise/);
+  }
+});
+
+test('mails : aucune consigne ne demande de réponses toutes faites (« oui, non ou plus tard »), et la reformulation d\'une phrase les retire', async () => {
+  const profile = { resume: 'Cartes de fidélité.', proposition_valeur: 'Fidéliser.', arguments: ['simple'], ton: 'direct' };
+  const { rephrasePrompt } = await import('../src/services/prompts.js');
+  for (const model of ['haiku', 'sonnet', 'opus', 'fable']) {
+    const follow = followupTemplatePrompt({ profile, senderName: 'Tony', model }).prompt;
+    assert.doesNotMatch(follow, /oui \/ non \/ plus tard|réponse de trois mots|question fermée/, `relance (${model}) : l'ancienne consigne`);
+    assert.match(follow, /UNE seule question simple et naturelle/, `relance (${model})`);
+    assert.match(follow, /N'énumère jamais les réponses possibles, sous aucune forme[^]*« maintenant, plus tard ou pas du tout »/, `relance (${model})`);
+  }
+  const r = rephrasePrompt({ template: 'Bonjour,\n\nEst-ce un sujet : oui, non ou plus tard ?', sentence: 'Est-ce un sujet : oui, non ou plus tard ?' }).prompt;
+  assert.match(r, /N'énumère jamais les réponses possibles, sous aucune forme/);
+  assert.match(r, /la nouvelle phrase retire cette énumération et pose simplement la question/);
+});

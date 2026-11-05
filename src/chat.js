@@ -3,6 +3,8 @@
 // Seule exception : ce que l'utilisateur JOINT au message. Un projet (dépôt en lecture seule) ou des fichiers (images, PDF, texte, images tirées d'une
 // vidéo) ouvrent les seuls outils de lecture (Read, Glob, Grep), dans le bac à sable, sur ces éléments et rien d'autre.
 // Les conversations sont privées : propres à chaque compte, supprimées avec lui (fichiers compris).
+import { userProvider } from './claudelink.js';
+import { aiName } from './services/ainame.js';
 import { existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { HttpError, json, readBody, html, redirect } from './http.js';
@@ -17,7 +19,7 @@ import { needAccess, accessOn } from './teams.js';
 import { accessibleProjects } from './mailroutes.js';
 import { userChatRoot } from './users.js';
 import { FILES, shapeAttachment, removeAttachmentFiles, conversationAttachments, prepareRunDir, registerChatFileRoutes } from './chatfiles.js';
-import { normalizeModel } from './services/models.js';
+import { normalizeModel, catalogOf, isModel } from './services/models.js';
 import { renderMarkdown } from './services/markdown.js';
 import { budgetState, isPriced } from './services/budget.js';
 import { loadRatio } from './services/load.js';
@@ -47,7 +49,7 @@ export const shapeMessage = (m) => ({
   ...(m.role === 'assistant' ? { html: renderMarkdown(m.content) } : {}),
 });
 
-/** Conversations d'un compte pour un mode : « claude » (assistant classique) ou « support » (aide sur AiTools). */
+/** Conversations d'un compte pour un mode : « claude » (assistant classique) ou « support » (aide sur iaboss). */
 export async function listConversations(db, userId, mode = 'claude') {
   return (await db.prepare('SELECT * FROM chat_conversations WHERE user_id = ? AND mode = ? ORDER BY updated_at DESC, id DESC').all(userId, mode === 'support' ? 'support' : 'claude')).map(shapeConv);
 }
@@ -78,7 +80,11 @@ export const lastProject = (messages) => {
   return p ? { id: p.projectId, name: p.name } : null;
 };
 
-export const chatModel = async (db, userId) => normalizeModel(await getSetting(db, userId, 'chat_model', CHAT.defaultModel), CHAT.defaultModel);
+export const chatModel = async (db, userId) => {
+  const provider = await userProvider(db, userId);
+  const fallback = catalogOf(provider).chatDefault;
+  return normalizeModel(await getSetting(db, userId, 'chat_model', fallback), fallback, provider);
+};
 
 export function registerChatRoutes(router, app) {
   const { db, cfg } = app;
@@ -91,8 +97,10 @@ export function registerChatRoutes(router, app) {
   const page = async (res, session, current, mode = 'claude') => {
     const conversations = await listConversations(db, session.userId, mode);
     const messages = current ? await conversationMessages(db, current.id) : [];
+    const provider = await userProvider(db, session.userId);
     html(res, chatPage({
-      email: session.email, mode, priced: await isPriced(db, session.userId), conversations, current, messages, model: current?.model ?? await chatModel(db, session.userId),
+      email: session.email, mode, priced: await isPriced(db, session.userId), conversations, current, messages, catalog: catalogOf(provider),
+      model: isModel(current?.model, provider) ? current.model : await chatModel(db, session.userId),
       max: CHAT_MAX_MESSAGE, project: lastProject(messages), limits: { files: FILES.perMessage, maxMb: Object.fromEntries(Object.entries(FILES.maxBytes).map(([k, v]) => [k, Math.round(v / 1048576)])) },
     }));
   };
@@ -161,7 +169,8 @@ export function registerChatRoutes(router, app) {
       conv = await getConversation(db, userId, b.conversationId);
       if (!conv) throw new HttpError(404, 'Conversation introuvable');
     }
-    const model = normalizeModel(b.model, conv?.model ?? await chatModel(db, userId));
+    const provider = await userProvider(db, userId);
+    const model = normalizeModel(b.model, isModel(conv?.model, provider) ? conv.model : await chatModel(db, userId), provider);
     // Pièces jointes : les siennes, téléversées et pas encore envoyées. Projet : un projet dont il peut lire le code (propriétaire ou administrateur d'équipe).
     const pending = ids.length
       ? await db.prepare(`SELECT * FROM chat_attachments WHERE user_id = ? AND message_id IS NULL AND kind <> 'project' AND id IN (${ids.map(() => '?').join(',')})`).all(userId, ...ids)
@@ -241,7 +250,7 @@ export function registerChatRoutes(router, app) {
         // Fichiers de TOUTE la conversation (les plus récents d'abord, bornés) : Claude peut y revenir d'un message à l'autre
         const files = (await conversationMessages(db, conv.id)).flatMap((m) => m.attachments).filter((a) => a.kind !== 'project').slice(-12);
         run = files.length ? prepareRunDir(cfg, userId, files) : null;
-        // Support : Claude lit la documentation d'AiTools (dossier partagé, en lecture seule, sans donnée d'aucun compte)
+        // Support : Claude lit la documentation d'iaboss (dossier partagé, en lecture seule, sans donnée d'aucun compte)
         const docs = mode === 'support' ? ensureSupportDocs(cfg, { chat: CHAT, files: FILES }) : null;
         const tools = docs || repo || run?.files.length ? ['Read', 'Glob', 'Grep'] : [];
         const prompts = parseCustomPrompts(await getSetting(db, userId, 'prompts_json', ''));
@@ -275,8 +284,8 @@ export function registerChatRoutes(router, app) {
         if (ctrl.signal.aborted) return;
         // Pas de liaison Claude valide, bac à sable indisponible, CLI introuvable… : message lisible, détail dans les logs
         console.error('[chat]', e.message);
-        if (!e.status) reportError(app, e, { method: 'POST', path: '/api/chat/send', userId });
-        write({ type: 'error', error: e.expose || e.status < 500 ? e.message : "Claude n'a pas pu répondre. Réessaie dans un instant." });
+        if (e.status !== 404) reportError(app, e, { method: 'POST', path: '/api/chat/send', userId, status: e.status ?? null });
+        write({ type: 'error', error: e.expose || e.status < 500 ? e.message : `${aiName()} n'a pas pu répondre. Réessaie dans un instant.` });
       } finally { run?.cleanup(); }
       res.end();
     } finally {
@@ -289,10 +298,10 @@ export function registerChatRoutes(router, app) {
 /** Message lisible pour une réponse en échec de Claude (quota, jeton refusé…), sans détail technique. */
 function friendly(r, text) {
   const t = `${text} ${r?.subtype ?? ''}`.toLowerCase();
-  if (/login|bearer|token|authenticat|credential|401/.test(t)) return "Ton accès Claude n'est plus valide : reconnecte-le depuis Mon compte.";
-  if (/rate.?limit|quota|usage limit|too many|429|overloaded/.test(t)) return 'Ton quota Claude est atteint pour le moment : réessaie plus tard.';
+  if (/login|bearer|token|authenticat|credential|401/.test(t)) return `Ton accès ${aiName()} n'est plus valide : reconnecte-le depuis Mon compte.`;
+  if (/rate.?limit|quota|usage limit|too many|429|overloaded/.test(t)) return `Ton quota ${aiName()} est atteint pour le moment : réessaie plus tard.`;
   if (r?.subtype === 'error_max_turns') return 'La réponse a été interrompue : reformule ou réessaie.';
-  return text ? String(text).slice(0, 300) : "Claude n'a pas répondu. Réessaie dans un instant.";
+  return text ? String(text).slice(0, 300) : `${aiName()} n'a pas répondu. Réessaie dans un instant.`;
 }
 
 /** Ce que Claude est en train de lire, en une ligne pour l'utilisateur (chemins du dépôt joint ou des fichiers joints, jamais ceux du serveur). */

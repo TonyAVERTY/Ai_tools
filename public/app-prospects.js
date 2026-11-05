@@ -2,7 +2,7 @@
 // suppression) et aperçu du mail. Chargé après app.js, qui expose ses outils communs dans window.AiTools ;
 // ajax.js relance ce script à chaque navigation, comme app.js. Aucune fonction n'est appelée de l'extérieur : tout passe par des écouteurs.
 (() => {
-  const { $, $$, api, confirmBox, esc, formData, icon, listen, toast } = window.AiTools;
+  const { $, $$, aiName, api, confirmBox, esc, formData, icon, listen, loadingHtml, toast } = window.AiTools;
 
   // ---------- Liste des prospects (mini CRM) ----------
   const STATUS = { new: 'À contacter', sent: 'Contacté', replied: 'A répondu', client: 'Client', refused: 'Refus', bounced: 'Rejeté', invalid: 'Adresse invalide' };
@@ -101,7 +101,7 @@
         regen.disabled = true;
         try {
           await api(`/api/prospects/${id}/hook`, {});
-          toast("Accroche en cours de rédaction : Claude lit le site du prospect");
+          toast(`Accroche en cours de rédaction : ${aiName()} lit le site du prospect`);
           // La fiche se met à jour toute seule quand le job se termine
           for (let i = 0; i < 60 && dlg.open && dlg.dataset.id === id; i++) {
             await new Promise((r) => setTimeout(r, 3000));
@@ -138,9 +138,10 @@
   // ---------- Aperçu du mail ----------
   // Le serveur construit le mail avec le même code que l'envoi réel (rien n'est envoyé) ; le HTML s'affiche dans un cadre isolé (sans script ni réseau).
   let pvDlg = null;
-  const pv = { form: null, prospectId: '', variant: 'A', tab: 'html', prospects: null };
+  const pv = { form: null, prospectId: '', variant: 'A', tab: 'html', prospects: null, seq: 0, fixBody: null, vars: {}, pick: null, mode: 'idle', rseq: 0, avoid: [], hold: false, proposal: null, instruction: '' };
 
   async function renderPreview() {
+    hideSel();
     const form = pv.form;
     const id = form.closest('.project').dataset.id;
     let r;
@@ -153,6 +154,7 @@
       try { pv.prospects = (await api(`/api/projects/${id}/prospects`)).rows || []; } catch { pv.prospects = []; }
     }
     if (!r.hasB) pv.variant = 'A';
+    pv.vars = r.vars || {};
     const opts = pv.prospects.map((p) => `<option value="${p.id}"${String(p.id) === String(pv.prospectId) ? ' selected' : ''}>${esc(p.company)} · ${esc(p.email)}</option>`).join('');
     $('[data-dialog-body]', pvDlg).innerHTML = `
       <div class="row dlg-head"><div><h3>${icon('eye')} Aperçu du ${r.kind === 'followup' ? 'mail de relance' : 'premier mail'}</h3>
@@ -165,15 +167,155 @@
       </div>
       ${r.note ? `<p class="muted small">${esc(r.note)}</p>` : ''}
       <dl class="pv-head"><dt>De</dt><dd>${esc(r.from)}</dd><dt>À</dt><dd>${esc(r.to)}</dd><dt>Objet</dt><dd><strong>${esc(r.subject) || '<span class="error">(vide)</span>'}</strong></dd></dl>
+      <div class="pv-sense" data-pv-sense aria-live="polite">${loadingHtml("L'IA relit le sens du mail…", { small: true })}</div>
       ${r.warnings.length ? `<ul class="pv-warn" role="status">${r.warnings.map((w) => `<li>${icon('alert')}<span>${esc(w)}</span></li>`).join('')}</ul>` : ''}
       ${r.html ? `<div class="seg" role="group" aria-label="Version du mail">
         <button type="button" class="btn small" data-pv-tab="html" aria-pressed="${pv.tab === 'html'}">Mail</button>
         <button type="button" class="btn small" data-pv-tab="text" aria-pressed="${pv.tab === 'text'}">Version texte</button></div>` : ''}
       ${r.html && pv.tab === 'html'
     ? `<iframe class="pv-frame" sandbox title="Aperçu du mail" src="${esc(r.url)}"></iframe>`
-    : `<pre class="pv-text">${esc(r.text)}</pre>`}
+    : `<pre class="pv-text" data-pv-body>${esc(r.text)}</pre>`}
       <p class="muted small">${r.footer ? `Le lien « Ne plus recevoir de messages » ${r.sample ? 'est un lien d\'exemple' : 'est le vrai lien de ce prospect'} ; il est ajouté automatiquement à chaque mail, avec l'origine de l'adresse.` : 'Le pied de page est retiré dans Réglages → Garde-fous : le mail part tel quel, sans lien de désinscription visible.'}</p>`;
     if (!pvDlg.open) pvDlg.showModal();
+    senseCheck(id, form);
+  }
+
+  // ---------- Phrase sélectionnée dans l'aperçu : « Changer » (l'IA propose une autre phrase) ou « Modifier » (à la main) ----------
+  // La sélection porte sur le texte REMPLI (« Chez Boulangerie Le Fournil, … ») ; la modification se fait dans le MODÈLE (« Chez {{entreprise}}, … »).
+  // On retrouve donc la phrase dans le modèle en remettant les variables à la place de leurs valeurs. Aucun mouvement : la barre apparaît et disparaît d'un coup.
+  const regexEsc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  function locateInTemplate(body, picked, vars) {
+    const t = String(picked).replace(/ /g, ' ').trim();
+    if (t.length < 3) return null;
+    const values = Object.entries(vars || {}).filter(([, v]) => v && String(v).length >= 2).sort((a, b) => String(b[1]).length - String(a[1]).length);
+    let src = '';
+    for (let i = 0; i < t.length;) {
+      const hit = values.find(([, v]) => t.startsWith(String(v), i));
+      if (hit) { src += `(?:\\{\\{\\s*${hit[0]}\\s*\\}\\}|${regexEsc(String(hit[1]))})`; i += String(hit[1]).length; continue; }
+      if (/\s/.test(t[i])) { src += '\\s+'; while (i < t.length && /\s/.test(t[i])) i++; continue; }
+      src += regexEsc(t[i]); i++;
+    }
+    const found = [...body.matchAll(new RegExp(src, 'g'))];
+    if (found.length !== 1) return null; // absente (en-tête, pied de page, texte coupé en deux) ou en double : la barre n'apparaît pas
+    return { start: found[0].index, end: found[0].index + found[0][0].length };
+  }
+
+  const selBox = () => $('[data-pv-sel]', pvDlg);
+  function hideSel() {
+    pv.mode = 'idle'; pv.pick = null; pv.avoid = []; pv.rseq++; pv.hold = false; pv.proposal = null; pv.instruction = '';
+    const box = pvDlg && selBox();
+    if (box) { box.hidden = true; box.className = 'pv-sel'; box.innerHTML = ''; }
+  }
+  function placeSel(rect) {
+    const box = selBox();
+    box.hidden = false;
+    const w = box.offsetWidth, h = box.offsetHeight;
+    const top = rect.top - h - 6 >= 8 ? rect.top - h - 6 : Math.min(rect.bottom + 6, innerHeight - h - 8);
+    box.style.top = `${Math.max(8, top)}px`;
+    box.style.left = `${Math.max(8, Math.min(rect.left + rect.width / 2 - w / 2, innerWidth - w - 8))}px`;
+  }
+  function onSelection() {
+    if (!pvDlg || !pvDlg.open || pv.mode !== 'idle' || pv.hold) return;
+    const sel = getSelection();
+    const pre = $('[data-pv-body]', pvDlg);
+    if (!pre || !sel || sel.isCollapsed || !sel.rangeCount || !pre.contains(sel.getRangeAt(0).commonAncestorContainer)) { selBox().hidden = true; pv.pick = null; return; }
+    const at = locateInTemplate(pv.form.body.value, sel.toString(), pv.vars);
+    if (!at) { selBox().hidden = true; pv.pick = null; return; }
+    if (!pv.pick || pv.pick.start !== at.start || pv.pick.end !== at.end) pv.avoid = [];
+    pv.pick = at;
+    const box = selBox();
+    box.className = 'pv-sel';
+    box.innerHTML = '<button type="button" class="btn small" data-pv-change>Changer</button><button type="button" class="btn small" data-pv-edit>Modifier</button>';
+    showSel();
+  }
+  // Place la barre près de la sélection ; elle suit un défilement et se cache quand la phrase sort de l'écran (jamais elle-même hors de l'écran)
+  function showSel() {
+    const sel = getSelection();
+    if (!sel || !sel.rangeCount || sel.isCollapsed) return;
+    const rect = sel.getRangeAt(0).getBoundingClientRect();
+    if (pv.mode === 'idle' && (rect.bottom <= 0 || rect.top >= innerHeight)) { selBox().hidden = true; return; }
+    placeSel(rect);
+  }
+  // « Modifier » : un champ de consigne pour l'IA, facultatif (vide, elle réécrit seule la phrase). « Changer » est le choix de l'IA en un clic, sans consigne.
+  function openPrompt() {
+    const box = selBox();
+    pv.mode = 'prompt';
+    box.className = 'pv-sel pv-sel-panel';
+    box.innerHTML = `<label class="field"><span class="lbl">Que veux-tu changer ? <span class="muted small">(facultatif)</span></span>
+      <input type="text" maxlength="300" data-pv-instr autocomplete="off" placeholder="Ex. : plus court, plus chaleureux, parle du prix…"></label>
+      <div class="row"><button type="button" class="btn small primary" data-pv-go>Réécrire la phrase</button><button type="button" class="btn small" data-pv-hand>Modifier à la main</button><button type="button" class="btn small" data-pv-cancel>Annuler</button></div>`;
+    $('[data-pv-instr]', box).focus();
+    showSel();
+  }
+  // « Modifier à la main » : l'aperçu se ferme et la phrase est sélectionnée dans le champ du modèle, prête à être retouchée
+  function editPick() {
+    const { start, end } = pv.pick;
+    const field = pv.form.body;
+    hideSel();
+    pvDlg.close();
+    field.focus();
+    field.setSelectionRange(start, end);
+    field.blur(); field.focus(); // le navigateur fait alors défiler le champ jusqu'à la sélection
+    field.scrollIntoView({ block: 'center' });
+  }
+  async function changePick() {
+    const mine = ++pv.rseq;
+    const { start, end } = pv.pick;
+    const box = selBox();
+    pv.mode = 'busy';
+    box.className = 'pv-sel pv-sel-panel';
+    box.innerHTML = loadingHtml(`${aiName()} cherche une autre phrase…`, { small: true });
+    const id = pv.form.closest('.project').dataset.id;
+    let r;
+    try {
+      r = await api(`/api/projects/${id}/template/rephrase`, { kind: pv.form.dataset.kind, body: pv.form.body.value, start, end, prospectId: pv.prospectId, avoid: pv.avoid, instruction: pv.instruction });
+    } catch (err) { r = { unavailable: true, reason: err.message }; }
+    if (mine !== pv.rseq || pv.mode !== 'busy') return;
+    pv.mode = 'proposal';
+    if (r.unavailable) {
+      pv.proposal = null;
+      box.innerHTML = `<p class="small">${esc(aiName())} n'a pas pu proposer une autre phrase : ${esc(String(r.reason || 'réponse indisponible').replace(/[.\s]+$/, ''))}.</p><div class="row"><button type="button" class="btn small" data-pv-more>Réessayer</button><button type="button" class="btn small" data-pv-cancel>Fermer</button></div>`;
+      return;
+    }
+    pv.proposal = r.sentence;
+    box.innerHTML = `<p class="small muted">Nouvelle phrase proposée par ${esc(aiName())} :</p><blockquote class="pv-prop-t">${esc(r.shown)}</blockquote>
+      <div class="row"><button type="button" class="btn small primary" data-pv-use>Utiliser cette phrase</button><button type="button" class="btn small" data-pv-more>Proposer une autre phrase</button><button type="button" class="btn small" data-pv-cancel>Annuler</button></div>`;
+  }
+  function usePick() {
+    const { start, end } = pv.pick;
+    const field = pv.form.body;
+    field.value = field.value.slice(0, start) + pv.proposal + field.value.slice(end);
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+    hideSel();
+    toast('Phrase remplacée');
+    renderPreview();
+  }
+  listen(document, 'selectionchange', onSelection);
+  listen(document, 'scroll', () => { if (pvDlg?.open && pv.pick) showSel(); }, true); // capture : la fenêtre et le cadre du texte défilent chacun
+
+  // L'IA de la personne relit le mail rempli : a-t-il un sens ? Sinon elle propose une version corrigée du modèle, appliquée seulement au clic.
+  // `seq` : un résultat arrivé après un changement de prospect ou d'objet est ignoré.
+  async function senseCheck(id, form) {
+    const mine = ++pv.seq;
+    pv.fixBody = null;
+    let r;
+    try {
+      r = await api(`/api/projects/${id}/template/sense`, { kind: form.dataset.kind, subject: form.subject.value, body: form.body.value, prospectId: pv.prospectId });
+    } catch (err) { r = { unavailable: true, reason: err.message }; }
+    const box = $('[data-pv-sense]', pvDlg);
+    if (mine !== pv.seq || !box) return;
+    if (r.unavailable) {
+      box.innerHTML = `<ul class="pv-warn" role="status"><li>${icon('alert')}<span>${esc(aiName())} n'a pas pu relire le sens de ce mail : ${esc(String(r.reason || 'réponse indisponible').replace(/[.\s]+$/, ''))}. L'envoi attend cette relecture.</span></li></ul>`;
+    } else if (r.sense) {
+      box.innerHTML = `<p class="small"><span class="badge ok">${icon('check')}Sens vérifié</span> ${esc(aiName())} a relu ce mail.</p>`;
+    } else {
+      pv.fixBody = r.fixBody || null;
+      box.innerHTML = `<ul class="pv-warn" role="status"><li>${icon('alert')}<span><strong>Ce mail ne veut pas dire grand-chose.</strong> ${esc(r.problem || '')}</span></li></ul>
+        ${r.fixBody ? `<p class="small">Version corrigée proposée par ${esc(aiName())} :</p><pre class="pv-text">${esc(r.fixedText || r.fixBody)}</pre>
+        <p><button type="button" class="btn small primary" data-pv-apply>Appliquer la correction au modèle</button></p>
+        <p class="muted small">Le modèle ne change pas tant que tu n'as pas cliqué. Tu pourras ensuite le retoucher avant de l'enregistrer et de le valider.</p>`
+    : `<p class="muted small">Aucune correction sûre n'a pu être proposée : retouche le texte du modèle, puis rouvre l'aperçu.</p>`}`;
+    }
   }
 
   listen(document, 'click', async (e) => {
@@ -183,15 +325,35 @@
         pvDlg = document.createElement('dialog');
         pvDlg.className = 'prospect-dialog mailprev';
         pvDlg.setAttribute('aria-label', 'Aperçu du mail');
-        pvDlg.innerHTML = '<div data-dialog-body></div>';
+        pvDlg.innerHTML = '<div data-dialog-body></div><div class="pv-sel" data-pv-sel role="toolbar" aria-label="Actions sur la phrase sélectionnée" hidden></div>';
         document.body.append(pvDlg);
         pvDlg.addEventListener('click', (ev) => {
           if (ev.target === pvDlg || ev.target.closest('[data-close]')) { pvDlg.close(); return; }
+          if (ev.target.closest('[data-pv-change]') && pv.pick) { pv.instruction = ''; changePick(); return; }
+          if (ev.target.closest('[data-pv-edit]') && pv.pick) { openPrompt(); return; }
+          if (ev.target.closest('[data-pv-go]') && pv.pick) { pv.instruction = ($('[data-pv-instr]', selBox())?.value || '').trim(); changePick(); return; }
+          if (ev.target.closest('[data-pv-hand]') && pv.pick) { editPick(); return; }
+          if (ev.target.closest('[data-pv-use]') && pv.proposal) { usePick(); return; }
+          if (ev.target.closest('[data-pv-more]') && pv.pick) { if (pv.proposal) pv.avoid.push(pv.proposal); pv.proposal = null; changePick(); return; }
+          if (ev.target.closest('[data-pv-cancel]')) { hideSel(); return; }
+          if (ev.target.closest('[data-pv-apply]') && pv.fixBody) {
+            pv.form.body.value = pv.fixBody;
+            pv.form.body.dispatchEvent(new Event('input', { bubbles: true }));
+            pv.fixBody = null;
+            toast('Correction appliquée');
+            renderPreview();
+            return;
+          }
           const v = ev.target.closest('[data-pv-variant]');
           const t = ev.target.closest('[data-pv-tab]');
           if (v) { pv.variant = v.dataset.pvVariant; renderPreview(); }
           if (t) { pv.tab = t.dataset.pvTab; renderPreview(); }
         });
+        // Un clic sur la barre ne doit pas faire disparaître la sélection (et donc la barre) avant d'être pris en compte
+        selBox().addEventListener('mousedown', (ev) => { if (!ev.target.closest('input, textarea')) ev.preventDefault(); }); // sauf le champ de consigne : il doit pouvoir prendre le focus
+        selBox().addEventListener('keydown', (ev) => { if (ev.key === 'Enter' && ev.target.matches('[data-pv-instr]')) { ev.preventDefault(); $('[data-pv-go]', selBox()).click(); } });
+        selBox().addEventListener('pointerdown', () => { pv.hold = true; });
+        pvDlg.addEventListener('close', hideSel);
         pvDlg.addEventListener('change', (ev) => { if (ev.target.matches('[data-pv-prospect]')) { pv.prospectId = ev.target.value; renderPreview(); } });
       }
       Object.assign(pv, { form: open.closest('form'), prospectId: '', variant: 'A', tab: 'html', prospects: null });
