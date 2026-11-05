@@ -21,6 +21,11 @@ La recherche de prospects, l'évolution et l'audit proposent « Maintenant » ou
 - **Avec un abonnement Claude, aucun montant en dollars n'est affiché** (ni dans la carte « Consommation Claude », ni dans la carte « Usage du mois », ni dans le récapitulatif d'un projet, ni dans le rapport hebdomadaire ou les notifications) : rien n'est facturé en plus de l'abonnement, le seul repère est le quota Claude (session 5 h, semaine).
 - Avec une clé API : pas de quota d'abonnement, seulement le coût.
 
+## La carte « Consommation ChatGPT » (compte ChatGPT) ou « Consommation Gemini »
+- **ChatGPT session 5 h** et **ChatGPT semaine** (compte ChatGPT) : le taux d'utilisation de ton abonnement ChatGPT, avec « Remise à zéro … » (heure de Paris). Le relevé est lu en direct chez OpenAI avec ton accès ChatGPT (il compte aussi ce que tu fais hors iaboss) ; il se rafraîchit au plus toutes les 2 minutes. Cette lecture passe par une adresse interne d'OpenAI, non documentée : si elle ne répond pas, la carte garde la dernière mesure et le dit, et si aucune mesure n'existe elle écrit « indisponible » avec la raison dans l'infobulle.
+- **ChatGPT via iaboss 24 h / 30 j** (ou le nom de ton IA) : les tokens (entrée + sortie) des jobs lancés par iaboss. Ce que tu fais ailleurs n'y est pas compté, et ce n'est pas la limite de ton abonnement.
+- Aucun montant en dollars n'est affiché avec un abonnement. Gemini n'a pas de relevé de limites : seuls les tokens via iaboss s'affichent.
+
 ## Reports automatiques et budget
 - **Quota Claude serré** (au-delà de 85 % de la session ou de la semaine) : les jobs non urgents (analyse, évolutions, audit, tâches des postes) restent en file et repartent seuls une fois le quota libéré. Prospection et envois continuent normalement.
 - **Budget IA** (clé API seulement, Réglages → Budget IA) : plafonds glissants sur 24 h et sur 30 jours. Plafond atteint : les jobs IA restent en file et repartent seuls quand la fenêtre glisse ; les envois et relances ne partent pas non plus, car chaque mail est relu par l'IA avant l'envoi (message « Budget IA atteint … Aucun mail n'est parti ») : relance-les quand la fenêtre a glissé. Un job en cours n'est jamais coupé : le plafond peut être dépassé d'un job.
