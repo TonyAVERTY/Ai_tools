@@ -25,7 +25,7 @@ Conditions pour que ça parte : un **SMTP** enregistré dans « Configuration du
 - **Délai aléatoire entre deux mails** : entre « Délai min » et « Délai max » (20 et 60 secondes par défaut), réglables dans Réglages → Garde-fous.
 - **Un prospect n'est contacté qu'une seule fois.**
 - **Liste d'opposition** : jamais de mail à une adresse désinscrite, en refus, ou invalide, quel que soit le projet.
-- **Pause d'envoi** : si trop de mails sont rejetés, AiTools met les envois en pause pour protéger la réputation du domaine ; un bandeau rouge l'explique sur la page Projets, et une notification « Envois mis en pause » peut être reçue.
+- **Pause d'envoi** : si trop de mails sont rejetés, iaboss met les envois en pause pour protéger la réputation du domaine ; un bandeau rouge l'explique sur la page Projets, et une notification « Envois mis en pause » peut être reçue.
 - **Désinscription** : chaque mail contient un lien de désinscription dans son pied de page (sauf si tu as retiré le pied de page dans « Réglages → Garde-fous »). Un clic ajoute l'adresse à la liste d'opposition.
 
 ## Relance automatique (Prospecter → Relance automatique)

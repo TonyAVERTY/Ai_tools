@@ -37,7 +37,7 @@ test('questions globales : rien sur un projet (secteur, taille de l\'entreprise,
   assert.deepEqual(Object.keys(p).sort(), ['address', 'detail', 'experience', 'goals', 'job', 'level', 'notes'], 'les anciens champs « secteur » et « taille » sont abandonnés');
   const form = await (await page(await s.newUser({ firstLogin: true }), '/welcome')).text();
   assert.doesNotMatch(form, /Secteur d'activité|Taille de ta structure|name="sector"|name="size"/);
-  assert.match(form, /Quelle est ta fonction \?[\s\S]*Quel est ton niveau technique \?[\s\S]*Quelle est ton expérience de la prospection \?[\s\S]*Quel niveau de détail préfères-tu[\s\S]*Comment Claude doit-il s(?:'|&#39;)adresser à toi \?[\s\S]*Que veux-tu faire avec AiTools \?[\s\S]*Autre chose à savoir sur ta façon de travailler/);
+  assert.match(form, /Quelle est ta fonction \?[\s\S]*Quel est ton niveau technique \?[\s\S]*Quelle est ton expérience de la prospection \?[\s\S]*Quel niveau de détail préfères-tu[\s\S]*Comment Claude doit-il s(?:'|&#39;)adresser à toi \?[\s\S]*Que veux-tu faire avec iaboss \?[\s\S]*Autre chose à savoir sur ta façon de travailler/);
   assert.match(form, /valent pour tous tes projets/);
   // une question à la fois : sept écrans, seul le premier visible, progression et boutons
   assert.equal((form.match(/data-step/g) || []).length, 7);

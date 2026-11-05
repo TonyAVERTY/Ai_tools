@@ -28,7 +28,7 @@ test('trois cartes, dans l\'ordre Claude, ChatGPT, Gemini, chacune avec son logo
     assert.ok(SPRITE.includes(`id="i-${id}"`), `${name} : le logo existe dans le sprite de la page`);
   }
   assert.match(html, /<h1 class="h1">Relier mon IA<\/h1>/);
-  assert.match(html, /<title>Relier mon IA · AiTools<\/title>/);
+  assert.match(html, /<title>Relier mon IA · iaboss<\/title>/);
 });
 
 test('rien n\'est ouvert tant qu\'on n\'a pas cliqué ; ?ia= ouvre les options de cette IA seulement', async () => {

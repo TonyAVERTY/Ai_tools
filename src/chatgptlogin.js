@@ -1,6 +1,6 @@
 // Connexion guidée à ChatGPT : le serveur lance `codex login --device-auth` pour l'utilisateur (connexion par code d'appareil, la méthode
 // que la documentation d'OpenAI indique pour un serveur sans navigateur), lui donne le lien et le code à saisir, puis capte le fichier de
-// connexion (auth.json) que Codex écrit une fois la connexion validée sur chatgpt.com. L'utilisateur n'a rien à recopier vers AiTools.
+// connexion (auth.json) que Codex écrit une fois la connexion validée sur chatgpt.com. L'utilisateur n'a rien à recopier vers iaboss.
 // Prérequis côté compte ChatGPT : « Enable device code login » dans ses paramètres de sécurité (la doc le dit ; le message d'échec le rappelle).
 // Une seule connexion par utilisateur, 15 minutes au plus (durée de vie d'un code), quelques-unes en même temps sur le serveur.
 import { spawn } from 'node:child_process';

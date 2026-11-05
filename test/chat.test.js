@@ -46,7 +46,7 @@ test('un message : flux meta → delta → done, réponse enregistrée, conversa
   for (const flag of ['--no-session-persistence', '--disable-slash-commands', '--include-partial-messages']) assert.ok(c.args.includes(flag), flag);
   assert.equal(c.args[c.args.indexOf('--max-turns') + 1], '1');
   const system = c.args[c.args.indexOf('--append-system-prompt') + 1];
-  assert.match(system, /assistant IA intégré à AiTools/);
+  assert.match(system, /assistant IA intégré à iaboss/);
   // en base
   const list = await listConversations(s.db, u.id);
   assert.equal(list.length, 1);
@@ -196,7 +196,7 @@ test('historique envoyé : fin de la conversation seulement, dans les limites de
   assert.ok(PROMPT_DEFS.chat.text.length > 850);
   assert.match(chatPrompt({ message: 'x', model: 'claude-opus-4-8' }).system, /Prends le temps de bien comprendre/);
   assert.match(chatPrompt({ message: 'x', model: 'haiku' }).system, /huit lignes au plus/);
-  assert.match(chatPrompt({ message: 'x', custom: { '*': { chat: 'Tu es un pirate.' } } }).system, /^Tu es un pirate\.\n\nSavoir-faire d'AiTools/);
+  assert.match(chatPrompt({ message: 'x', custom: { '*': { chat: 'Tu es un pirate.' } } }).system, /^Tu es un pirate\.\n\nSavoir-faire d'iaboss/);
 });
 
 test('conversations supprimées avec le compte', async () => {

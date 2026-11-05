@@ -31,7 +31,7 @@ async function setup() {
   const app = { resolveHost: async () => [{ address: '93.184.216.34', family: 4 }], resolveMx: async () => [{ exchange: 'mx.test', priority: 10 }],
     db,
     cfg: { dataDir: tmp, claudeBin: resolve('test/fixtures/fake-claude.js'), sandbox: { enabled: false, production: false }, secretKey: TEST_SECRET_KEY, appUrl: 'https://ai.test',
-      systemSmtp: { host: 'smtp.serveur', port: 587, user: 'srv', pass: 'p', fromEmail: 'aitools@serveur.test' } }, // mails d'AiTools (évolutions…)
+      systemSmtp: { host: 'smtp.serveur', port: 587, user: 'srv', pass: 'p', fromEmail: 'aitools@serveur.test' } }, // mails d'iaboss (évolutions…)
     // syncRepo refuse file:// (clones d'URL fournies par l'utilisateur : https seulement) : le test clone le dépôt local à la place
     syncRepo: async (url, dir) => {
       if (existsSync(join(dir, '.git'))) execFileSync('git', ['-C', dir, 'pull', '-q']);
@@ -109,7 +109,7 @@ test('flux complet : analyse → cible → prospection → modèle → envoi →
     const ev = await run(s, 'evolution', { count: 3, level: 'rapide' });
     assert.equal(ev.status, 'done', ev.error);
     assert.equal(s.sentMails.at(-1).to, 'moi@x.fr');
-    assert.equal(s.sentMails.at(-1).from, 'aitools@serveur.test', 'les mails d\'AiTools partent du SMTP du serveur, pas de celui du projet');
+    assert.equal(s.sentMails.at(-1).from, 'aitools@serveur.test', 'les mails d\'iaboss partent du SMTP du serveur, pas de celui du projet');
     assert.match(s.sentMails.at(-1).text, /Export CSV/);
     assert.match(s.sentMails.at(-1).html, /class|style/, 'version HTML mise en forme');
     assert.match(s.sentMails.at(-1).html, /Export CSV/);

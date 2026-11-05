@@ -14,13 +14,13 @@ export function registerDeveloperRoutes(router, app) {
   const { db, cfg } = app;
   // Le serveur MCP à télécharger : servi par le panel pour ceux qui ont activé le mode développeur (404 pour les autres).
   // La documentation (API, MCP) est publique : voir /docs.
-  const files = { mcp: read('mcp/aitools-mcp.js') };
+  const files = { mcp: read('mcp/iaboss-mcp.js') };
   const gated = (fn) => async (ctx) => {
     if (!(await developerMode(db, ctx.session.userId))) throw new HttpError(404, 'Page introuvable');
     return fn(ctx);
   };
   router.get('/developer/mcp.js', gated(({ res }) => {
-    res.setHeader('Content-Disposition', 'attachment; filename="aitools-mcp.js"');
+    res.setHeader('Content-Disposition', 'attachment; filename="iaboss-mcp.js"');
     send(res, 200, files.mcp, 'text/javascript; charset=utf-8');
   }));
 

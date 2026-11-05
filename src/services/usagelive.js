@@ -1,5 +1,5 @@
 // Quota réel du compte Claude (session de 5 h + semaine de 7 j), relevé EN DIRECT auprès d'Anthropic avec le jeton d'abonnement
-// de l'utilisateur. Il compte tout ce que la personne fait avec son Claude, y compris en dehors d'AiTools (claude.ai, Claude Code
+// de l'utilisateur. Il compte tout ce que la personne fait avec son Claude, y compris en dehors d'iaboss (claude.ai, Claude Code
 // sur sa machine) : c'est ce qui distingue ce relevé de la mesure que la CLI remonte seulement pendant un job.
 // ATTENTION : /api/oauth/usage n'est pas une API documentée par Anthropic (c'est celle qu'utilise la commande /usage de Claude Code).
 // Son format peut changer : toute réponse inattendue retombe sur la dernière mesure connue, jamais sur une valeur inventée.
@@ -38,7 +38,7 @@ export function parseUsage(body) {
 }
 
 const BETA = 'oauth-2025-04-20';
-const authHeaders = (token) => ({ Authorization: `Bearer ${token}`, 'anthropic-beta': BETA, 'User-Agent': 'AiTools' });
+const authHeaders = (token) => ({ Authorization: `Bearer ${token}`, 'anthropic-beta': BETA, 'User-Agent': 'iaboss' });
 const REASON = (status) => (status === 401 || status === 403 ? 'denied' : status === 429 ? 'rate' : 'unavailable');
 
 /** Méthode 1, gratuite : le point d'accès « usage » de Claude Code. Un jeton de type `setup-token` n'y a souvent pas accès (403). */

@@ -171,7 +171,7 @@ export async function issueDocument(app, { userId, project, doc, legal, raw }) {
       const amount = f.due;
       const vat = f.rate > 0 ? vatOf(amount, f.rate) : 0;
       const label = `${DOC_BY_KEY[kind].label} ${number}`;
-      const note = `Émise le ${values.date.split('-').reverse().join('/')}${values.date_echeance ? `, échéance le ${values.date_echeance.split('-').reverse().join('/')}` : ''}${devis ? `, sur le devis ${devis.number}` : ''}. Facture générée dans AiTools : à marquer payée à l'encaissement.`;
+      const note = `Émise le ${values.date.split('-').reverse().join('/')}${values.date_echeance ? `, échéance le ${values.date_echeance.split('-').reverse().join('/')}` : ''}${devis ? `, sur le devis ${devis.number}` : ''}. Facture générée dans iaboss : à marquer payée à l'encaissement.`;
       const kindKey = kind === 'avoir' ? 'refund_out' : 'payment_in';
       entryId = Number((await db.prepare(`INSERT INTO accounting_entries(user_id, project_id, project_name, kind, entry_date, label, party, category, amount_cents, vat_rate, vat_cents, method, notes,
           doc_name, doc_mime, doc_size, doc_file, pending, invoice_id, created_at, updated_at) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`)

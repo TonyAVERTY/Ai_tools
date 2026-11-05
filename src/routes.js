@@ -407,7 +407,7 @@ export function registerRoutes(router, app) {
   router.post('/api/notify/test', async ({ req, res, session }) => {
     const b = await readBody(req);
     const { hooks } = await notifyConfig(app, session.userId);
-    const test = { title: 'Notification de test', description: 'Les notifications AiTools arrivent bien ici.', level: 'ok' };
+    const test = { title: 'Notification de test', description: 'Les notifications iaboss arrivent bien ici.', level: 'ok' };
     // Un canal précis (Slack, Telegram, e-mail)
     if (b.channel) {
       if (!CHANNEL_TYPES[b.channel]) throw new HttpError(400, 'Canal inconnu');
@@ -431,7 +431,7 @@ export function registerRoutes(router, app) {
     const { queue, scheduled, jobs } = await activitySnapshot(db, userId);
     const link = await getLinkState(db, userId);
     // Le quota d'abonnement n'existe qu'en mode abonnement : relevé en direct chez Anthropic (il compte aussi ce que la personne
-    // fait avec son Claude en dehors d'AiTools), à défaut la dernière mesure d'un job. Jamais de barre en mode clé API.
+    // fait avec son Claude en dehors d'iaboss), à défaut la dernière mesure d'un job. Jamais de barre en mode clé API.
     const quota = link?.mode === MODES.api_key ? null : await currentClaudeQuota(app, userId);
     // Détail pour le menu « jobs » de la barre du haut : en cours d'abord, puis la file, puis les programmés
     json(res, {
@@ -671,7 +671,7 @@ export function registerRoutes(router, app) {
       const target = await pinDb(app, p.userId, conn);
       json(res, { ok: true, ...(await analyzeDb(target, KPI_FIELDS.some((k) => picked[k]) ? picked : null)) });
     } catch (e) {
-      // Une connexion refusée par SA base n'est pas une panne d'AiTools : 400 (un 5xx serait masqué en « Erreur interne » et la raison se perdrait)
+      // Une connexion refusée par SA base n'est pas une panne d'iaboss : 400 (un 5xx serait masqué en « Erreur interne » et la raison se perdrait)
       throw new HttpError(e.status && e.status < 500 ? e.status : 400, e.status && e.status < 500 ? e.message : explainDbError(e));
     }
   }, { limit: 'conn_test' });

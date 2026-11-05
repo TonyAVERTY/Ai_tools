@@ -89,7 +89,7 @@ function systemSmtpConfig() {
   if (set.length < keys.length) throw new Error(`SMTP du serveur : variables incomplètes (manque ${keys.filter((k) => !env[k]).join(', ')})`);
   return {
     host: env.SYSTEM_SMTP_HOST, port: Number(env.SYSTEM_SMTP_PORT || 587), user: env.SYSTEM_SMTP_USER, pass: env.SYSTEM_SMTP_PASSWORD, fromEmail: env.SYSTEM_SMTP_FROM,
-    ...(env.SYSTEM_SMTP_REPLY_TO ? { replyTo: env.SYSTEM_SMTP_REPLY_TO } : {}), // les réponses aux mails d'AiTools arrivent sur l'adresse de contact
+    ...(env.SYSTEM_SMTP_REPLY_TO ? { replyTo: env.SYSTEM_SMTP_REPLY_TO } : {}), // les réponses aux mails d'iaboss arrivent sur l'adresse de contact
   };
 }
 

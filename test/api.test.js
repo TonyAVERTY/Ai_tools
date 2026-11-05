@@ -9,7 +9,7 @@ import { addProject } from './helpers/users.js';
 import { hashSid } from '../src/crypto.js';
 import { setDeveloperMode, createApiToken, MAX_TOKENS } from '../src/apitokens.js';
 import { API_ENDPOINTS } from '../src/apiv1.js';
-import { TOOLS, createMcpServer } from '../mcp/aitools-mcp.js';
+import { TOOLS, createMcpServer } from '../mcp/iaboss-mcp.js';
 
 let s;
 before(async () => { s = await startApp(); });
@@ -40,7 +40,7 @@ test('mode développeur : sans lui, ni jeton ni API ; page, création, affichage
   const created = await u.post('/developer/tokens', { name: 'Claude Desktop', scope_read: 'on', scope_write: 'on' }, { form: true });
   assert.equal(created.status, 200);
   const page = await created.text();
-  const token = /<code data-token>(aitk_[A-Za-z0-9_-]{43})<\/code>/.exec(page)?.[1];
+  const token = /<code data-token>(iaboss_[A-Za-z0-9_-]{43})<\/code>/.exec(page)?.[1];
   assert.ok(token, 'le jeton est affiché à la création');
   const row = await s.db.prepare('SELECT token_hash, prefix, scopes FROM api_tokens WHERE user_id = ?').get(u.id);
   assert.equal(row.token_hash, hashSid(token), 'SHA-256 en base');
@@ -79,9 +79,9 @@ test('authentification : jeton absent, mal formé, inconnu ; cookie de session s
   assert.equal((await api(null, '/me')).status, 401);
   const noAuth = await api(null, '/me');
   assert.equal(noAuth.headers.get('www-authenticate'), 'Bearer');
-  assert.equal((await api('aitk_court', '/me')).status, 401);
-  assert.equal((await api(`aitk_${'x'.repeat(43)}`, '/me')).status, 401);
-  assert.equal((await api(token.replace('aitk_', 'xxxx_'), '/me')).status, 401);
+  assert.equal((await api('iaboss_court', '/me')).status, 401);
+  assert.equal((await api(`iaboss_${'x'.repeat(43)}`, '/me')).status, 401);
+  assert.equal((await api(token.replace('iaboss_', 'xxxx_'), '/me')).status, 401);
   assert.equal((await api(null, '/me', { headers: { cookie: u.cookie } })).status, 401, 'la session du panel n\'ouvre jamais l\'API');
   assert.equal((await api(null, '/projects', { headers: { cookie: u.cookie } })).status, 401);
   const noCache = await api(token, '/me');
@@ -224,7 +224,7 @@ test('MCP (unitaire) : initialize, liste des outils, appels, erreurs, lecture se
   const m = createMcpServer({ url: 'https://panel.test/', token: 'aitk_SECRET', fetch: fetchFn });
   const init = await m.handle({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-03-26' } });
   assert.equal(init.result.protocolVersion, '2025-03-26');
-  assert.equal(init.result.serverInfo.name, 'aitools');
+  assert.equal(init.result.serverInfo.name, 'iaboss');
   assert.equal(await m.handle({ jsonrpc: '2.0', method: 'notifications/initialized' }), null);
   assert.deepEqual((await m.handle({ jsonrpc: '2.0', id: 2, method: 'ping' })).result, {});
   const list = (await m.handle({ jsonrpc: '2.0', id: 3, method: 'tools/list' })).result.tools;
@@ -252,7 +252,7 @@ test('MCP (unitaire) : initialize, liste des outils, appels, erreurs, lecture se
 test('MCP (bout en bout) : le vrai processus parle JSON-RPC sur stdio avec un vrai panel', async () => {
   const { u, token } = await dev(['read', 'write']);
   const pid = await addProject(s.db, u.id, { name: 'Projet MCP', gitUrl: 'https://github.com/u/mcp.git' });
-  const child = spawn(process.execPath, ['mcp/aitools-mcp.js'], { env: { ...process.env, AITOOLS_URL: s.base, AITOOLS_TOKEN: token }, stdio: ['pipe', 'pipe', 'pipe'] });
+  const child = spawn(process.execPath, ['mcp/iaboss-mcp.js'], { env: { ...process.env, IABOSS_URL: s.base, IABOSS_TOKEN: token }, stdio: ['pipe', 'pipe', 'pipe'] });
   const lines = [];
   let buf = '';
   child.stdout.on('data', (d) => { buf += d; const parts = buf.split('\n'); buf = parts.pop(); lines.push(...parts.filter(Boolean).map((l) => JSON.parse(l))); });
@@ -267,9 +267,38 @@ test('MCP (bout en bout) : le vrai processus parle JSON-RPC sur stdio avec un vr
     assert.match(denied.result.content[0].text, /insufficient_scope/);
     assert.ok(!lines.some((l) => JSON.stringify(l).includes(token)), 'le jeton ne ressort jamais');
   } finally { child.kill(); }
-  const noEnv = spawn(process.execPath, ['mcp/aitools-mcp.js'], { env: { PATH: process.env.PATH }, stdio: 'pipe' });
+  const noEnv = spawn(process.execPath, ['mcp/iaboss-mcp.js'], { env: { PATH: process.env.PATH }, stdio: 'pipe' });
   const code = await new Promise((r) => noEnv.on('close', r));
   assert.equal(code, 1, 'sans configuration, le serveur refuse de démarrer');
+});
+
+test('jetons : un nouveau jeton commence par « iaboss_ », un ancien « aitk_ » reste valide', async () => {
+  const { u, token } = await dev(['read']);
+  assert.match(token, /^iaboss_[A-Za-z0-9_-]{43}$/);
+  assert.equal((await api(token, '/me')).status, 200);
+  // Un jeton créé avant le renommage : même forme avec l'ancien préfixe, enregistré tel quel en base
+  const legacy = `aitk_${'Ab1_-'.repeat(8)}xyz`.padEnd(48, 'Z');
+  assert.match(legacy, /^aitk_[A-Za-z0-9_-]{43}$/);
+  await s.db.prepare('INSERT INTO api_tokens(user_id, name, token_hash, prefix, scopes, created_at) VALUES(?, ?, ?, ?, ?, ?)').run(u.id, 'ancien', hashSid(legacy), legacy.slice(0, 9), 'read', now());
+  assert.equal((await api(legacy, '/me')).status, 200, 'un jeton aitk_ existant continue de marcher');
+  assert.equal((await api(`other_${'x'.repeat(43)}`, '/me')).status, 401, 'un autre préfixe reste refusé');
+});
+
+test('MCP : les anciens noms AITOOLS_URL / AITOOLS_TOKEN restent acceptés, les nouveaux l\'emportent', async () => {
+  const { token } = await dev(['read']);
+  const run = async (env) => {
+    const child = spawn(process.execPath, ['mcp/iaboss-mcp.js'], { env: { PATH: process.env.PATH, ...env }, stdio: ['pipe', 'pipe', 'pipe'] });
+    let out = '';
+    child.stdout.on('data', (d) => { out += d; });
+    child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2024-11-05' } })}\n`);
+    for (let i = 0; i < 100 && !out.includes('\n'); i++) await new Promise((r) => setTimeout(r, 50));
+    child.kill();
+    return JSON.parse(out.split('\n')[0]);
+  };
+  const legacy = await run({ AITOOLS_URL: s.base, AITOOLS_TOKEN: token });
+  assert.equal(legacy.result.serverInfo.name, 'iaboss', 'même serveur avec les anciennes variables');
+  const mixed = await run({ IABOSS_URL: s.base, IABOSS_TOKEN: token, AITOOLS_URL: 'http://127.0.0.1:1', AITOOLS_TOKEN: 'x' });
+  assert.equal(mixed.result.serverInfo.name, 'iaboss', 'IABOSS_* est lu avant AITOOLS_*');
 });
 
 // ---------- Documentation ----------

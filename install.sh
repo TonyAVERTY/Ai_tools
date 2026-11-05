@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
-#  AiTools — installation sur Raspberry Pi OS Lite 64 bits
+#  iaboss — installation sur Raspberry Pi OS Lite 64 bits
 #
 #  Usage :  sudo ./install.sh            installation / mise à jour
 #           ./install.sh --dry-run       montre ce qui serait fait, sans rien toucher
@@ -45,7 +45,7 @@ fi
 banner() {
   printf '\n%s' "$BLU$B"
   printf '  ╭──────────────────────────────────────────────╮\n'
-  printf '  │   AiTools · installation Raspberry Pi        │\n'
+  printf '  │   iaboss · installation Raspberry Pi        │\n'
   printf '  ╰──────────────────────────────────────────────╯%s\n' "$R"
   (( DRY_RUN )) && printf '  %s[dry-run] rien ne sera modifié%s\n' "$YLW" "$R"
   return 0
@@ -639,7 +639,7 @@ install_units() {
     install -m 755 "$SRC_DIR/deploy/aitools-backup.sh" /usr/local/sbin/aitools-backup
     cat >/etc/systemd/system/aitools-backup.service <<EOF
 [Unit]
-Description=Sauvegarde quotidienne AiTools
+Description=Sauvegarde quotidienne iaboss
 RequiresMountsFor=$DATA_DIR $BACKUP_DIR
 
 [Service]
@@ -651,7 +651,7 @@ ExecStart=/usr/local/sbin/aitools-backup $DATA_DIR/aitools.sqlite $BACKUP_DIR 14
 EOF
     cat >/etc/systemd/system/aitools-backup.timer <<EOF
 [Unit]
-Description=Sauvegarde quotidienne AiTools (04:30)
+Description=Sauvegarde quotidienne iaboss (04:30)
 
 [Timer]
 OnCalendar=*-*-* 04:30
@@ -742,15 +742,15 @@ do_start() {
     info "Complète $APP_DIR/.env puis : sudo systemctl start aitools"
     return 0
   fi
-  run "Démarrage d'AiTools" systemctl restart aitools
+  run "Démarrage d'iaboss" systemctl restart aitools
   local i code=""
   for i in $(seq 1 20); do
     code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT/login" || true)
     [[ $code == 200 ]] && break
     sleep 1
   done
-  if [[ $code == 200 ]]; then ok "AiTools répond sur http://127.0.0.1:$PORT"
-  else warn "AiTools ne répond pas (HTTP ${code:-aucun}). Voir : journalctl -u aitools -n 50"; fi
+  if [[ $code == 200 ]]; then ok "iaboss répond sur http://127.0.0.1:$PORT"
+  else warn "iaboss ne répond pas (HTTP ${code:-aucun}). Voir : journalctl -u aitools -n 50"; fi
 }
 
 finish() {

@@ -1,11 +1,11 @@
 # Sécurité, isolation des données et confidentialité
-Résumé : comment AiTools protège les secrets et l'isolation entre comptes, ce que ton IA peut lire, la conformité des mails (RGPD, désinscription) et où lire la politique de confidentialité.
+Résumé : comment iaboss protège les secrets et l'isolation entre comptes, ce que ton IA peut lire, la conformité des mails (RGPD, désinscription) et où lire la politique de confidentialité.
 
 ## Isolation des comptes
 Toutes les données (projets, prospects, mails, conversations, vidéos, réglages) sont rattachées à un compte : un autre compte ne peut ni les voir ni les modifier (il reçoit « introuvable »). Un membre d'équipe ne voit que les projets partagés avec lui.
 
 ## Secrets
-Clé API, jeton ou connexion de ton IA (Claude, ChatGPT ou Gemini), mots de passe SMTP/IMAP/base, tokens Git, liens de webhooks, jetons LinkedIn : **chiffrés** en base, jamais réaffichés (au plus les 4 derniers caractères d'une clé API) et jamais écrits dans les journaux. La connexion se fait par Google ou Apple : AiTools ne stocke aucun mot de passe de compte.
+Clé API, jeton ou connexion de ton IA (Claude, ChatGPT ou Gemini), mots de passe SMTP/IMAP/base, tokens Git, liens de webhooks, jetons LinkedIn : **chiffrés** en base, jamais réaffichés (au plus les 4 derniers caractères d'une clé API) et jamais écrits dans les journaux. La connexion se fait par Google ou Apple : iaboss ne stocke aucun mot de passe de compte.
 
 ## Ce que ton IA peut faire
 - Ton IA (Claude, ChatGPT ou Gemini) s'exécute avec le compte de la personne dans un **bac à sable** : dossier de travail propre à chaque compte, aucun accès aux fichiers d'un autre compte, environnement assaini.
@@ -23,7 +23,7 @@ Clé API, jeton ou connexion de ton IA (Claude, ChatGPT ou Gemini), mots de pass
 Les justificatifs de la page « Comptabilité » sont des fichiers rangés dans un dossier propre à chaque compte : lisibles par leur auteur seul (même pour un projet partagé en équipe), reconnus à leur contenu (PDF ou image seulement), ouverts sans exécution, et supprimés avec la ligne ou avec le compte. Une ligne n'est jamais enregistrée sans justificatif. La page n'envoie rien aux impôts ni à l'URSSAF.
 
 ## Données personnelles
-La personne qui utilise AiTools est responsable des prospects qu'elle contacte (elle est responsable de traitement pour ces données) ; AiTools est responsable de traitement pour les données de son compte. La suppression du compte efface tout (sauf la liste d'opposition commune, conservée pour respecter les oppositions). La **Politique de confidentialité**, les **Mentions légales** et les **CGU** sont accessibles depuis le pied de page du site public ; elles détaillent les données collectées, leurs durées de conservation et les destinataires (dont Anthropic, via l'accès Claude de la personne). Si une vidéo de promotion est produite avec « Ajouter une voix », le texte lu (une narration écrite par Claude à partir de la fiche du projet) est envoyé au fournisseur de voix choisi (Google Traduction, ou ElevenLabs, Google Cloud et Microsoft Azure avec ta propre clé API). Les voix locales (Piper, eSpeak NG) s'exécutent sur le serveur : aucun texte n'en sort. Ces clés API sont chiffrées en base, propres au compte, jamais réaffichées ni écrites dans les journaux.
+La personne qui utilise iaboss est responsable des prospects qu'elle contacte (elle est responsable de traitement pour ces données) ; iaboss est responsable de traitement pour les données de son compte. La suppression du compte efface tout (sauf la liste d'opposition commune, conservée pour respecter les oppositions). La **Politique de confidentialité**, les **Mentions légales** et les **CGU** sont accessibles depuis le pied de page du site public ; elles détaillent les données collectées, leurs durées de conservation et les destinataires (dont Anthropic, via l'accès Claude de la personne). Si une vidéo de promotion est produite avec « Ajouter une voix », le texte lu (une narration écrite par Claude à partir de la fiche du projet) est envoyé au fournisseur de voix choisi (Google Traduction, ou ElevenLabs, Google Cloud et Microsoft Azure avec ta propre clé API). Les voix locales (Piper, eSpeak NG) s'exécutent sur le serveur : aucun texte n'en sort. Ces clés API sont chiffrées en base, propres au compte, jamais réaffichées ni écrites dans les journaux.
 
 ## Bonnes pratiques
 - Préférer la **clé API** à l'abonnement Claude ou au compte ChatGPT (voir le risque dans le fichier sur la liaison de l'IA).
