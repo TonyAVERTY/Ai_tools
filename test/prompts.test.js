@@ -240,3 +240,17 @@ test('mails : les consignes demandent un « Bonjour, », une formule de politess
     assert.match(p, /la virgule qui le suit est permise/);
   }
 });
+
+test('mails : aucune consigne ne demande de réponses toutes faites (« oui, non ou plus tard »), et la reformulation d\'une phrase les retire', async () => {
+  const profile = { resume: 'Cartes de fidélité.', proposition_valeur: 'Fidéliser.', arguments: ['simple'], ton: 'direct' };
+  const { rephrasePrompt } = await import('../src/services/prompts.js');
+  for (const model of ['haiku', 'sonnet', 'opus', 'fable']) {
+    const follow = followupTemplatePrompt({ profile, senderName: 'Tony', model }).prompt;
+    assert.doesNotMatch(follow, /oui \/ non \/ plus tard|réponse de trois mots|question fermée/, `relance (${model}) : l'ancienne consigne`);
+    assert.match(follow, /UNE seule question simple et naturelle/, `relance (${model})`);
+    assert.match(follow, /Ne propose jamais de réponses toutes faites à choisir/, `relance (${model})`);
+  }
+  const r = rephrasePrompt({ template: 'Bonjour,\n\nEst-ce un sujet : oui, non ou plus tard ?', sentence: 'Est-ce un sujet : oui, non ou plus tard ?' }).prompt;
+  assert.match(r, /Ne propose jamais de réponses toutes faites à choisir/);
+  assert.match(r, /la nouvelle phrase les retire et pose simplement la question/);
+});

@@ -72,6 +72,8 @@ export function reviewMail({ subject = '', body = '', facts = '' } = {}) {
     if (/^(bonjour|bonsoir|hello|salut)[ \t,]*\{\{\s*entreprise\s*\}\}/i.test(filled[0])) warnings.push("« Bonjour {{entreprise}}, » salue une entreprise comme une personne (« Bonjour Une Bonne Bouteille, ») : écris « Bonjour, » tout court.");
     if (!/cordialement|bien à vous|bonne journée|bonne soirée|bonne continuation|à bientôt|salutations|sincèrement|respectueusement|merci/i.test(filled.slice(-4).join(' '))) warnings.push('Aucune formule de politesse avant la signature (« Bien cordialement, »).');
   }
+  // « Oui, non ou plus tard ? », « répondez par 1 ou 2 » : une personne écrit sa réponse, elle ne coche pas une case
+  if (/\b(oui|non)\b[^.?!\n]{0,12}(?:\bou\b|\/|,)\s*(non|plus tard|peut-être)\b|répon(?:ds|dez)\s+par\s+(?:1|un)\b|vous pouvez répondre\s+(?:oui|non|par)\b/i.test(body)) warnings.push('Le mail propose des réponses toutes faites (« oui, non ou plus tard ») : pose plutôt une question simple, à laquelle on répond avec ses mots.');
   const n = words(body);
   if (n > 220) warnings.push(`Le mail fait ${n} mots : au-delà de 200 mots, la réponse devient plus rare.`);
   if (SPAM_WORDS.test(subject)) warnings.push("L'objet contient un mot que les filtres anti-spam repèrent (gratuit, offre, urgent, promo, garanti).");
