@@ -160,6 +160,14 @@ const QUOTA_WHY = {
   unavailable: 'Le relevé en direct est indisponible chez Anthropic.',
   format: 'Réponse inattendue du relevé en direct.',
 };
+const CHATGPT_WHY = {
+  expired: 'Ton accès ChatGPT sera renouvelé au prochain job iaboss, puis le relevé reviendra.',
+  denied: 'OpenAI refuse le relevé en direct avec cet accès (relie-toi avec « Se connecter avec ChatGPT »).',
+  rate: 'OpenAI limite les relevés : nouvel essai dans quelques minutes.',
+  network: "OpenAI ne répond pas.",
+  unavailable: 'Le relevé en direct est indisponible chez OpenAI.',
+  format: 'Réponse inattendue du relevé en direct.',
+};
 const fmtReset = (ts) => new Date(ts * 1000).toLocaleString('fr-FR', { weekday: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
 
 // Limites d'utilisation du compte Claude : session glissante de 5 h et semaine de 7 j (abonnement seulement ; une clé API n'a pas ces limites).
@@ -167,8 +175,9 @@ function claudeLimits(quota, link) {
   const { mode } = link;
   const head = '<h3 class="sub-h">Limites d\'utilisation</h3>';
   if (mode === 'api_key') return `${head}<p class="hint">Avec une clé API, ${esc(link.providerCompany)} facture ce que tu consommes, à l'usage.</p>`;
-  // Seul Claude remonte une session de 5 h et une semaine : pour un compte ChatGPT, les limites sont celles de l'abonnement, non mesurées par iaboss
-  if (link.provider !== 'claude') return `${head}<p class="hint">Avec ton compte ${esc(link.providerLabel)}, les limites de ton abonnement s'appliquent. iaboss ne les mesure pas.</p>`;
+  // Compte ChatGPT : fenêtres relevées chez OpenAI (src/services/usagechatgpt.js), sinon dernière mesure. Les autres fournisseurs : limites de l'abonnement, non mesurées
+  const chatgpt = link.mode === 'chatgpt_account';
+  if (link.provider !== 'claude' && !chatgpt) return `${head}<p class="hint">Avec ton compte ${esc(link.providerLabel)}, les limites de ton abonnement s'appliquent. iaboss ne les mesure pas.</p>`;
   const row = (label, w) => {
     if (!w) return '';
     if (w.expired) return `<li class="g"><div class="g-h"><span>${label}</span><span class="g-v muted">remise à zéro</span></div></li>`;
@@ -178,11 +187,12 @@ function claudeLimits(quota, link) {
       <div class="bar usage${cls}" role="progressbar" aria-label="${label}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><span class="w-${Math.round(Math.min(100, pct) / 5) * 5}"></span></div>
       ${w.resetsAt ? `<p class="hint">Remise à zéro ${esc(fmtReset(w.resetsAt))}</p>` : ''}</li>`;
   };
-  const rows = quota ? row('Session de 5 h', quota.fiveHour) + row('Semaine de 7 jours', quota.sevenDay) : '';
-  if (!rows) return `${head}<p class="hint">${quota?.error ? esc(QUOTA_WHY[quota.error] || 'Relevé indisponible.') : 'Pas encore mesuré.'}</p>`;
+  const rows = !quota ? '' : chatgpt ? (quota.windows || []).map((w) => row(w.label.charAt(0).toUpperCase() + w.label.slice(1), w)).join('')
+    : row('Session de 5 h', quota.fiveHour) + row('Semaine de 7 jours', quota.sevenDay);
+  if (!rows) return `${head}<p class="hint">${quota?.error ? esc((chatgpt ? CHATGPT_WHY : QUOTA_WHY)[quota.error] || 'Relevé indisponible.') : 'Pas encore mesuré.'}</p>`;
   const live = quota.source === 'live' && !quota.error;
   return `${head}<ul class="usage-list">${rows}</ul>
-  <p class="hint">${live ? 'Relevé en direct chez Anthropic : il compte tout ton usage de Claude, y compris hors iaboss.' : `Dernière mesure faite pendant un job iaboss${quota.error ? ` (${esc((QUOTA_WHY[quota.error] || 'relevé en direct indisponible').replace(/\.$/, ''))})` : ''}.`}</p>`;
+  <p class="hint">${live ? `Relevé en direct chez ${chatgpt ? 'OpenAI' : 'Anthropic'} : il compte tout ton usage de ${chatgpt ? 'ChatGPT' : 'Claude'}, y compris hors iaboss.` : `Dernière mesure faite pendant un job iaboss${quota.error ? ` (${esc((QUOTA_WHY[quota.error] || 'relevé en direct indisponible').replace(/\.$/, ''))})` : ''}.`}</p>`;
 }
 
 function linkSection(link, consent, quota = null) {

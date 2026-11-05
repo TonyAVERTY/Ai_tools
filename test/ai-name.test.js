@@ -73,7 +73,10 @@ test('Mon compte : « Mon IA », l\'IA, son fournisseur, les limites propres à 
   assert.doesNotMatch(a, /sk-ant-|Session de 5 h|Semaine de 7 jours|Anthropic/, 'rien de propre à Claude');
   assert.match(a, /Avec une clé API, Google facture ce que tu consommes, à l'usage\./);
   const cg = await s.newUser({ admin: false, link: linked('openai', 'chatgpt_account') });
-  assert.match((await html(cg, '/account')).replace(/&#39;/g, "'"), /Avec ton compte ChatGPT, les limites de ton abonnement s'appliquent\. iaboss ne les mesure pas\./);
+  const cgPage = (await html(cg, '/account')).replace(/&#39;/g, "'");
+  assert.match(cgPage, /Limites d'utilisation<\/h3><p class="hint">Réponse inattendue du relevé en direct\./, 'compte ChatGPT : ses limites sont relevées chez OpenAI (accès factice : réponse inexploitable, dite honnêtement)');
+  assert.doesNotMatch(cgPage, /Anthropic|Session de 5 h/, 'rien de propre à Claude');
+  assert.match((await html(await s.newUser({ admin: false, link: linked('gemini', 'subscription_token') }), '/account')).replace(/&#39;/g, "'"), /Avec ton compte Gemini, les limites de ton abonnement s'appliquent\. iaboss ne les mesure pas\./, 'Gemini : non mesurées');
   const c = (await html(await s.newUser({ admin: false, link: linked('claude') }), '/account')).replace(/&#39;/g, "'");
   assert.match(c, /Ton accès à Claude est facturé à part, par Anthropic\./);
   assert.match(c, /<dd>sk-ant-…WXYZ<\/dd>/);

@@ -62,6 +62,7 @@ import { notify, notifyConfig, saveDiscordHooks, publicHooks, EVENTS, MAX_HOOKS 
 import { listChannels, saveChannels, publicChannels, notifyChannels, CHANNEL_TYPES } from './services/channels.js';
 import { budgetState, AI_JOBS } from './services/budget.js';
 import { currentClaudeQuota } from './services/usagelive.js';
+import { currentChatgptLimits } from './services/usagechatgpt.js';
 import { sendWeeklyReport } from './services/report.js';
 import { exportProspects, importProspects } from './services/csv.js';
 import { quotaFor, planLimitError, withUserLock, assertRoom, usageView } from './services/plans.js';
@@ -374,7 +375,8 @@ export function registerRoutes(router, app) {
     const t = url.searchParams.get('t');
     const link = await getLinkState(db, session.userId);
     // Le relevé des limites ne doit jamais empêcher d'afficher la page (Anthropic injoignable, réponse inattendue…)
-    const quota = link && link.mode !== MODES.api_key ? await currentClaudeQuota(app, session.userId).catch(() => null) : null;
+    const quota = link?.mode === MODES.chatgpt_account ? await currentChatgptLimits(app, session.userId).catch(() => null)
+      : link && link.mode !== MODES.api_key && link.provider === 'claude' ? await currentClaudeQuota(app, session.userId).catch(() => null) : null;
     const account = { link, quota };
     html(res, accountPage({
       user: session.user, error: url.searchParams.get('e'), link: account.link, quota: account.quota, developer: await developerMode(db, session.userId), appUrl: cfg.appUrl,
@@ -432,11 +434,13 @@ export function registerRoutes(router, app) {
     const link = await getLinkState(db, userId);
     // Le quota d'abonnement n'existe qu'en mode abonnement : relevé en direct chez Anthropic (il compte aussi ce que la personne
     // fait avec son Claude en dehors d'iaboss), à défaut la dernière mesure d'un job. Jamais de barre en mode clé API.
-    const quota = link?.mode === MODES.api_key ? null : await currentClaudeQuota(app, userId);
+    const quota = link?.mode === MODES.api_key || (link && link.provider !== 'claude') ? null : await currentClaudeQuota(app, userId);
+    // Compte ChatGPT : ses limites (fenêtre de 5 h, semaine), relevées en direct chez OpenAI sinon dernière mesure
+    const chatgptLimits = link?.mode === MODES.chatgpt_account ? await currentChatgptLimits(app, userId).catch(() => null) : null;
     // Détail pour le menu « jobs » de la barre du haut : en cours d'abord, puis la file, puis les programmés
     json(res, {
       temp: session.user.isAdmin ? cpuTemp() : null, queue, scheduled, jobs, usage: await usageSummary(db, userId), budget: await budgetState(db, userId),
-      claudeRateLimit: quota, linkMode: link?.mode ?? null, linkValid: link ? !!link.valid : null,
+      claudeRateLimit: quota, chatgptLimits, provider: link?.provider ?? null, linkMode: link?.mode ?? null, linkValid: link ? !!link.valid : null,
     });
   });
 

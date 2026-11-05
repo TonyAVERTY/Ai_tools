@@ -38,7 +38,7 @@ Clique **Enregistrer les informations**. Même incomplètes, elles sont **enregi
 
 ## 4. Les quatre documents
 Après la validation du devis, l'IA prépare les quatre documents avec **la même mise en page, les mêmes lignes et les mêmes prix** : « Devis », « Acompte », « Facture finale » et « Avoir ». Chacun affiche « À valider » puis « Validé ».
-- **Affiner ce document** (via « Affiner avec Claude ») modifie un document. Il repasse à « À valider ». Si tu modifies le **Devis**, l'**Acompte** et la **Facture finale** sont mis à jour avec lui et sont aussi à revalider.
+- **Affiner ce document** (via « Affiner avec Claude ») modifie un document à valider. Un document **validé** est grisé et réduit à un résumé (badge « Validé », « Voir en grand », « Modèle en PDF », « Émettre ce document ») : pour le changer, clique **Modifier**, écris ce que tu veux changer, et il repasse à « À valider ». Si tu modifies le **Devis**, l'**Acompte** et la **Facture finale** sont mis à jour avec lui et sont aussi à revalider.
 - **Valider ce document** valide un document. Quand les quatre sont validés, « Tes documents sont prêts » s'affiche : ils peuvent être utilisés dans iaboss.
 - Les parties qui changent à chaque émission (numéro, date, client…) restent sous forme de variables (« Rempli à l'émission : `{{client_nom}}` … ») : elles sont remplies à l'émission du document.
 - **Recommencer depuis le début** (avec confirmation) efface les exemples et les documents du projet ; tes informations légales sont conservées.
