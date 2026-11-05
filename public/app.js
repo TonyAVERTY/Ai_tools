@@ -837,7 +837,10 @@
   }
 
   // ---------- Rendu d'un job ----------
+  // Un modèle de mail ou de relance rédigé : le résultat est le texte du modèle, juste au-dessus ; la tâche reste visible dans « Activité »
+  const QUIET_WHEN_DONE = ['template', 'followup_template'];
   function renderJob(box, job, type) {
+    if (box && job && job.status === 'done' && QUIET_WHEN_DONE.includes(type)) { box.innerHTML = ''; box._sig = ''; return; }
     renderJobContent(box, job, type);
     if (box && job && job.canViewLogs !== false && !box.querySelector(`a[href="/jobs/${job.id}"]`)) {
       const link = document.createElement('a');
@@ -937,6 +940,17 @@
     }
   }
 
+  // ---------- Modèle validé : grisé et en lecture seule, jusqu'à « Modifier » ----------
+  // Verrouillé : un résumé (titre, badge, texte grisé, Modifier, Aperçu) ; l'aide, « Générer avec l'IA », « Enregistrer » et « Valider le modèle » sont masqués (styles .tpl-locked).
+  function setTplLocked(form, locked) {
+    form.classList.toggle('tpl-locked', locked);
+    for (const f of [form.subject, form.subjectB, form.body]) if (f) f.readOnly = locked;
+    form.html.disabled = locked;
+    for (const b of $$('button[name="mode"]', form)) b.disabled = locked;
+    $('[data-tpl-unlock]', form).hidden = !locked;
+    $('[data-tpl-cancel]', form).hidden = locked || !form.dataset.editing;
+  }
+
   // ---------- État d'un projet ----------
   const state = new Map(); // id -> { timer, tplStamp, analyzing }
 
@@ -994,9 +1008,11 @@
         if (form.subjectB) form.subjectB.value = t.subjectB || '';
         form.body.value = t.body;
         form.html.checked = !!t.html;
+        form._orig = { subject: t.subject, subjectB: t.subjectB || '', body: t.body, html: !!t.html }; // ce que « Annuler » remet
       }
       $('[data-tpl-state]', form).innerHTML = t
         ? (t.status === 'validated' ? '<span class="badge ok">validé</span>' : '<span class="badge warn">brouillon</span>') : '';
+      setTplLocked(form, t?.status === 'validated' && !form.dataset.editing);
     }
 
     // Relance automatique : ce qui est prévu, ou ce qui bloque
@@ -1441,6 +1457,24 @@
       return;
     }
 
+    // Modèle validé : « Modifier » le déverrouille ; « Annuler » remet le texte validé et le reverrouille
+    const unlock = e.target.closest('[data-tpl-unlock]');
+    if (unlock) {
+      const form = unlock.closest('form.tpl');
+      form.dataset.editing = '1';
+      setTplLocked(form, false);
+      form.body.focus();
+      return;
+    }
+    if (e.target.closest('[data-tpl-cancel]')) {
+      const form = e.target.closest('form.tpl');
+      const o = form._orig;
+      if (o) { form.subject.value = o.subject; if (form.subjectB) form.subjectB.value = o.subjectB; form.body.value = o.body; form.html.checked = o.html; }
+      delete form.dataset.editing;
+      setTplLocked(form, true);
+      return;
+    }
+
     const runBtn = e.target.closest('[data-run]');
     if (runBtn) {
       e.preventDefault(); // le bouton « Réanalyser » est dans la ligne du projet : il ne doit pas la replier
@@ -1584,6 +1618,7 @@
     const form = e.target.closest('form[data-action]');
     if (!form) return;
     e.preventDefault();
+    if (form.classList.contains('tpl-locked')) return; // un modèle validé ne s'envoie pas (Entrée dans un champ) tant qu'on n'a pas cliqué sur « Modifier »
     const { action, id, confirm: question } = form.dataset;
     if (question && !(await confirmBox(question, { confirm: form.dataset.confirmLabel }))) return;
     const data = formData(form);
@@ -1628,6 +1663,9 @@
         case 'template': {
           data.kind = form.dataset.kind;
           const r = await api(`/api/projects/${id}/template/save`, data);
+          delete form.dataset.editing;
+          form._orig = { subject: form.subject.value, subjectB: form.subjectB?.value || '', body: form.body.value, html: form.html.checked };
+          form.classList.toggle('tpl-locked', r.status === 'validated'); // validé : verrouillé tout de suite (le rafraîchissement suivant le confirme)
           toast(`${r.status === 'validated' ? 'Modèle validé' : 'Brouillon enregistré'}${r.warnings?.length ? ` · À vérifier : ${r.warnings.slice(0, 2).join(' ')}` : ''}`, r.warnings?.length ? 'error' : 'ok');
           break;
         }
@@ -1662,6 +1700,7 @@
       toast(err.message, 'error');
     } finally {
       btns.forEach((b) => { b.disabled = false; });
+      if (action === 'template') setTplLocked(form, form.classList.contains('tpl-locked')); // les boutons d'un modèle verrouillé restent inactifs
       if (proj && action !== 'send') refreshProject(proj);
     }
   });
