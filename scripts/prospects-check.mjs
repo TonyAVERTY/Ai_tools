@@ -1,13 +1,15 @@
 // Vérifie dans un vrai navigateur (public/app-prospects.js) l'ajout manuel d'un prospect, la modification et la suppression depuis la fiche, l'aperçu du mail
 // (A/B, texte), la vue tableau (Kanban) avec un vrai glisser-déposer entre deux statuts, et le fonctionnement après une navigation sans rechargement.
 // Nécessite Playwright (PLAYWRIGHT_MODULE, PLAYWRIGHT_CHROMIUM). Sortie « TOUT EST BON » attendue.
+import { resolve } from 'node:path';
 import { startApp, APP_URL } from '../test/helpers/server.js';
 import { addProject } from '../test/helpers/users.js';
 import { now } from '../src/db.js';
 
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright-core');
 const exe = process.env.PLAYWRIGHT_CHROMIUM;
-const s = await startApp();
+// Faux Claude : le contrôle du sens (aperçu) répond tout de suite ; « SENSEBAD » dans le mail le fait juger sans sens, avec un modèle corrigé
+const s = await startApp({ cfg: { claudeBin: resolve('test/fixtures/fake-claude.js') } });
 const u = await s.newUser();
 const pid = await addProject(s.db, u.id, { name: 'Atelier', gitUrl: 'https://github.com/u/atelier.git' });
 const b = await chromium.launch(exe ? { executablePath: exe } : {});
@@ -69,8 +71,25 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   await p.waitForSelector('dialog.mailprev .pv-text', { timeout: 8000 }).catch(() => {});
   ok(await p.locator('dialog.mailprev .pv-text').isVisible(), `${tag} l'onglet Version texte s'affiche`);
   ok(!(await p.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)), `${tag} pas de défilement horizontal avec l'aperçu ouvert`);
+  // Contrôle du sens par l'IA : « Sens vérifié » quand tout va bien
+  await p.waitForSelector('dialog.mailprev [data-pv-sense] .badge.ok', { timeout: 15000 }).catch(() => {});
+  ok(((await p.locator('dialog.mailprev [data-pv-sense]').innerText()) || '').includes('Sens vérifié'), `${tag} aperçu : « Sens vérifié » quand le mail a un sens`);
   await p.screenshot({ path: process.env.SHOT_DIR ? `${process.env.SHOT_DIR}/preview-${vp.width}.png` : undefined }).catch(() => {});
   await p.keyboard.press('Escape'); // ferme l'aperçu
+  // Mail sans sens : l'IA l'explique, propose un modèle corrigé, et le modèle ne change qu'au clic sur « Appliquer la correction au modèle »
+  await p.fill(`${tpl} [name=body]`, 'Bonjour SENSEBAD,\n\n{{accroche}}\n\n{{expediteur}}');
+  await p.locator(`${tpl} [data-tpl-preview]`).click();
+  await p.waitForSelector('dialog.mailprev [data-pv-apply]', { timeout: 15000 });
+  const bad = await p.locator('dialog.mailprev [data-pv-sense]').innerText();
+  ok(/Ce mail ne veut pas dire grand-chose/.test(bad) && /Version corrigée proposée/.test(bad), `${tag} aperçu : le problème et la version corrigée sont affichés`);
+  ok((await p.inputValue(`${tpl} [name=body]`)).includes('SENSEBAD'), `${tag} le modèle n'a pas changé tant qu'on n'a pas cliqué`);
+  ok(!(await p.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)), `${tag} pas de défilement horizontal avec la correction proposée`);
+  await p.locator('dialog.mailprev [data-pv-apply]').click();
+  await p.waitForFunction((sel) => !document.querySelector(sel).value.includes('SENSEBAD'), `${tpl} [name=body]`);
+  ok((await p.inputValue(`${tpl} [name=body]`)).startsWith('Bonjour bien,'), `${tag} « Appliquer la correction au modèle » met le texte corrigé dans le modèle`);
+  await p.waitForSelector('dialog.mailprev [data-pv-sense] .badge.ok', { timeout: 15000 }).catch(() => {});
+  ok(((await p.locator('dialog.mailprev [data-pv-sense]').innerText()) || '').includes('Sens vérifié'), `${tag} après correction : « Sens vérifié »`);
+  await p.keyboard.press('Escape');
   // vue tableau : un prospect glissé d'une colonne à l'autre change de statut côté serveur
   const kanbanEmail = `kanban-${vp.width}@atelier.fr`;
   const kanbanName = `Atelier Kanban ${vp.width}`; // un nom par largeur : le prospect du premier passage reste dans la base

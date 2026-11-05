@@ -8,6 +8,7 @@ import { makeHandlers } from '../src/handlers.js';
 import { saveSecretConfig } from '../src/projects.js';
 import { buildProspectMail } from '../src/services/mailer.js';
 import { getSetting, setSetting, now } from '../src/db.js';
+import { withSense } from './helpers/sense.js';
 
 let s;
 const sentMails = [];
@@ -101,7 +102,7 @@ test('envoi réel : le mail part avec ou sans pied de page selon le réglage, en
   await saveSecretConfig(s.app, pid, 'smtp_enc', { host: 'smtp.x', port: 587, user: 'u', pass: 'secret', fromEmail: 'moi@x.fr', fromName: 'Moi' }, 'pass');
   await setSetting(s.db, u.id, 'send_delay_min', '0');
   await setSetting(s.db, u.id, 'send_delay_max', '0');
-  const worker = new Worker(s.db, makeHandlers(s.app), { log: { error: () => {} } });
+  const worker = new Worker(s.db, makeHandlers(s.app, { claude: withSense(s.app) }), { log: { error: () => {} } });
   const add = (email) => s.db.prepare("INSERT INTO prospects(project_id, company, email, source, status, created_at) VALUES(?, 'Fournil', ?, 'https://fournil.fr/contact', 'new', ?)").run(pid, email, now());
   const send = async () => { await enqueue(s.db, { userId: u.id, projectId: pid, type: 'send', params: { count: 1 } }); await worker.tick(); return (await latestJobs(s.db, pid)).send; };
 
