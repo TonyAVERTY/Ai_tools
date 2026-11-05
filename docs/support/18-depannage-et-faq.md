@@ -13,6 +13,9 @@ Aucun lien : active la connexion par code d'appareil dans les paramètres de sé
 ## Avec ChatGPT ou Gemini, je ne vois pas les tokens pendant la tâche
 C'est normal : ChatGPT et Gemini ne communiquent leurs tokens qu'**à la fin** de la tâche, contrairement à Claude qui les envoie au fil de l'eau. Pendant la tâche, la ligne dit « Tokens comptés à la fin de la tâche » (dans « Activité » et dans « Voir »). Le total apparaît dès que la tâche est terminée, et reste affiché même si elle échoue. Si le total reste à 0 après la fin d'une tâche réussie, signale-le à l'administrateur : l'IA n'a pas renvoyé sa mesure.
 
+## Je ne peux plus écrire dans la cible de mon projet
+Elle est **validée** : une cible validée est grisée et en lecture seule pour qu'on ne la change pas par erreur. Clique **Modifier** (section **Cible** du projet), change les champs, puis **Mettre à jour** ; **Annuler** remet la cible validée. Les prospects déjà trouvés ne changent pas : la nouvelle cible sert aux prochaines recherches.
+
 ## Je ne peux plus écrire dans mon modèle de mail ou de relance
 Il est **validé** : un modèle validé est verrouillé (grisé, en lecture seule) pour qu'on ne le change pas par erreur. Clique **Modifier** pour le déverrouiller, change le texte, puis **Valider le modèle** (ou **Enregistrer** pour le garder en brouillon, ou **Annuler** pour revenir au texte validé). **Générer avec l'IA** réapparaît aussi avec **Modifier**.
 
