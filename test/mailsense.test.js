@@ -48,8 +48,14 @@ test('parseSense : un avis par mail ; une correction n\'est gardée que si elle 
   assert.equal(ok.get(2).ok, false);
   assert.match(ok.get(2).problem, /ne veut rien dire/);
   assert.equal(ok.get(2).fixBody, 'Chez {{entreprise}}, un client revient. Voir https://x.fr');
-  const lost = parseSense('{"results":[{"id":1,"ok":false,"problem":"p","fix_body":"Chez Fournil, un client revient. Voir https://x.fr"}]}', [1], tpl);
-  assert.equal(lost.get(1).fixBody, undefined, 'une variable perdue : pas de correction');
+  const added = parseSense('{"results":[{"id":1,"ok":false,"problem":"p","fix_body":"Chez {{entreprise}} à {{ville}}, un client revient. Voir https://x.fr"}]}', [1], tpl);
+  assert.equal(added.get(1).fixBody, undefined, 'une variable ajoutée : pas de correction');
+  const unknown = parseSense('{"results":[{"id":1,"ok":false,"problem":"p","fix_body":"Chez {{nom}}, un client revient. Voir https://x.fr"}]}', [1], tpl);
+  assert.equal(unknown.get(1).fixBody, undefined, 'une variable inconnue : pas de correction');
+  // Retirer une variable est permis : « Bonjour {{entreprise}}, » devient « Bonjour, »
+  const greet = 'Bonjour {{entreprise}},\n\nUn client revient et présente sa carte.\n\nBien cordialement,\nTony';
+  const dropped = parseSense(JSON.stringify({ results: [{ id: 1, ok: false, problem: 'Bonjour salue une entreprise', fix_body: greet.replace(' {{entreprise}}', '') }] }), [1], greet);
+  assert.equal(dropped.get(1).fixBody, 'Bonjour,\n\nUn client revient et présente sa carte.\n\nBien cordialement,\nTony');
   const url = parseSense('{"results":[{"id":1,"ok":false,"problem":"p","fix_body":"Chez {{entreprise}}, un client revient. Voir https://autre.fr"}]}', [1], tpl);
   assert.equal(url.get(1).fixBody, undefined, 'une adresse changée : pas de correction');
   const same = parseSense('{"results":[{"id":1,"ok":false,"problem":"p","fix_body":"Pour {{entreprise}}, un client revient. Voir https://x.fr"}]}', [1], tpl);
@@ -159,4 +165,13 @@ test('aperçu : corps vide, projet d\'un autre compte, prospect d\'un autre proj
   const foreign = await s.db.prepare('SELECT id FROM prospects WHERE project_id = ?').get(w2.pid);
   assert.equal((await sense(w.u, w.pid, { prospectId: foreign.id })).status, 404, 'un prospect d\'un autre projet est introuvable');
   assert.equal((await sense(s.anon, w.pid)).status, 401);
+});
+
+test('question posée à l\'IA : « Bonjour Une Bonne Bouteille, » est un défaut, et la correction peut retirer la variable fautive', async () => {
+  const { senseMailPrompt } = await import('../src/services/prompts.js');
+  const { prompt } = senseMailPrompt({ template: 'Bonjour {{entreprise}},\n\nUne question.', items: [{ id: 7, subject: '', body: 'Bonjour Une Bonne Bouteille,\n\nUne question.' }] });
+  assert.match(prompt, /l'appel salue une entreprise comme une personne/);
+  assert.match(prompt, /\[id=7\]/);
+  assert.match(prompt, /tu peux alors la retirer de cette phrase/);
+  assert.match(prompt, /N'ajoute aucune variable/);
 });
