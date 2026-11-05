@@ -231,7 +231,7 @@ export function docsMcpPage({ appUrl }) {
       { id: 'exemples', title: 'Exemples de demandes', html: `<p>Une fois branché, parle à Claude normalement :</p>
         <ul><li>« Quelles réponses de prospects n'ai-je pas encore lues ? Résume-les et dis-moi lesquelles sont intéressées. » <em>(<code>read</code>)</em></li>
         <li>« Ajoute une note à ce prospect : veut un devis avant fin novembre, et programme une relance le 3 novembre. » <em>(<code>write</code>)</em></li>
-        <li>« Lance une recherche de 20 prospects sur le projet Atelier. » <em>(<code>jobs</code>, consomme du quota Claude)</em></li></ul>` },
+        <li>« Lance une recherche de 20 prospects sur le projet Atelier. » <em>(<code>jobs</code>, consomme le quota de ton IA)</em></li></ul>` },
       { id: 'securite', title: 'Sécurité', html: `<ul>
         <li><strong>Moindre droit.</strong> Crée un jeton dédié à Claude avec seulement <code>read</code>. Avec <code>AITOOLS_READONLY=1</code>, les outils d'écriture n'existent même plus pour Claude.</li>
         <li><strong>Envoi de mails.</strong> L'outil <code>run_job</code> avec <code>type: "send"</code> exige <code>confirm: true</code>, et le serveur demande à Claude de recueillir ton accord explicite avant. N'accorde le droit <code>jobs</code> que si tu veux cet usage.</li>
