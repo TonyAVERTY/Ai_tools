@@ -239,14 +239,14 @@ Réservé aux administrateurs (`404` pour tous les autres). Liste paginée des c
 
 ## Installation sur un serveur (CloudPanel ou autre, sans Raspberry)
 
-Pré-requis : Node 22.13 ou plus, git, la CLI `claude` si les jobs IA doivent tourner sur ce serveur, et une base MySQL 8.0.16 ou plus / MariaDB 10.4 ou plus (contraintes `CHECK`).
+Pré-requis : Node 22.13 ou plus, git, la CLI de l'IA que les utilisateurs relieront si les jobs IA doivent tourner sur ce serveur (`claude` pour Claude, `codex` pour ChatGPT, `gemini` pour Gemini : voir « Installer les outils des autres IA »), et une base MySQL 8.0.16 ou plus / MariaDB 10.4 ou plus (contraintes `CHECK`).
 
 1. **Base de données** : dans CloudPanel, Databases > Add Database. Note le nom, l'utilisateur et le mot de passe. Les tables sont créées par l'application au premier démarrage, rien à importer à la main.
 2. **Code** :
 
    ```bash
    git clone -b develop https://git.tony-averty.dev/Tony/AiTools.git
-   cd iaboss
+   cd AiTools
    npm ci --omit=dev
    cp .env.example .env     # puis renseigne le fichier, voir ci-dessous
    chmod 600 .env
@@ -267,8 +267,9 @@ Pré-requis : Node 22.13 ou plus, git, la CLI `claude` si les jobs IA doivent to
    | `NODE_ENV`, `SANDBOX`, `SANDBOX_RO_BINDS`, `BWRAP_BIN` | bac à sable : obligatoire en production, `SANDBOX=off` en développement seulement |
    | `DATA_DIR` | clones Git des projets analysés, rangés par utilisateur (`repos/<utilisateur>/<projet>`) |
 
-4. **Démarrage** : `npm start`. Au lancement, les migrations en attente sont appliquées (table `schema_migrations`, verrou pour éviter deux migrations simultanées). Lance le service sous un gestionnaire de processus (systemd ou celui de CloudPanel) et mets un reverse proxy TLS devant `HOST:PORT`.
-5. **Sauvegardes** : sauvegarde quotidienne de la base avec `mysqldump --single-transaction` (ou la sauvegarde CloudPanel) ; teste une restauration.
+4. **Outils des IA (facultatif)** : voir « Installer les outils des autres IA » ci-dessous.
+5. **Démarrage** : `npm start`. Au lancement, les migrations en attente sont appliquées (table `schema_migrations`, verrou pour éviter deux migrations simultanées). Lance le service sous un gestionnaire de processus (systemd ou celui de CloudPanel) et mets un reverse proxy TLS devant `HOST:PORT`.
+6. **Sauvegardes** : sauvegarde quotidienne de la base avec `mysqldump --single-transaction` (ou la sauvegarde CloudPanel) ; teste une restauration.
 
 ### Reprendre les données de l'ancienne instance SQLite
 
@@ -283,6 +284,18 @@ Toutes les tables sont copiées dans une seule transaction, ids conservés, avec
 
 Une base MySQL/MariaDB déjà utilisée **avant les comptes** (migration 1) se met à niveau toute seule au démarrage : la migration « comptes_multi_tenant » rattache ses données au propriétaire (`ADMIN_EMAILS` doit alors être défini, sinon le démarrage s'arrête avec un message clair). Au premier login Google ou Apple avec cet email, tu retrouves tes données.
 
+### Installer les outils des autres IA
+
+Chaque utilisateur choisit son IA sur la page « Relier mon IA » : Claude, ChatGPT ou Gemini. Une IA n'est proposée que si son outil en ligne de commande est installé sur le serveur ; sinon sa carte est grisée (« Pas encore disponible sur ce serveur »).
+
+```bash
+sudo npm install -g @anthropic-ai/claude-code   # Claude
+sudo npm install -g @openai/codex               # ChatGPT
+sudo npm install -g @google/gemini-cli          # Gemini
+```
+
+Puis, si les binaires ne sont pas dans le `PATH` du service, renseigne leur chemin dans `.env` (`CLAUDE_BIN`, `CODEX_BIN`, `GEMINI_BIN`) et redémarre. Le bac à sable monte lui-même le dossier d'installation de ces outils (y compris `node_modules` pour les installations npm) : `SANDBOX_RO_BINDS` ne devrait pas être nécessaire pour eux (s'ils restent introuvables dans le bac à sable, ajoute leur dossier d'installation à `SANDBOX_RO_BINDS`). `install.sh` propose d'installer Codex et Gemini CLI et renseigne `CODEX_BIN` et `GEMINI_BIN` quand ils sont présents.
+
 ## Installation sur le Pi (instance perso, héritage)
 
 > `install.sh` date de la version SQLite : il ne renseigne pas encore les variables `DB_*` ni ne sauvegarde MySQL. À reprendre avec le déploiement (jalon J6) ; en attendant, suis la section ci-dessus.
@@ -292,7 +305,7 @@ Pré-requis : **Raspberry Pi OS Lite 64 bits** fraîchement installé, accès SS
 ```bash
 sudo apt install -y git
 git clone -b develop https://git.tony-averty.dev/Tony/AiTools.git
-cd iaboss
+cd AiTools
 sudo ./install.sh
 ```
 
@@ -307,7 +320,8 @@ Pour voir ce qui serait fait sans rien toucher : `./install.sh --dry-run`.
    - nettoyage du système ;
    - config de l'app ;
    - token Cloudflare ;
-   - connexion Claude.
+   - connexion Claude ;
+   - installation facultative de Codex (ChatGPT) et de Gemini CLI.
 
    Puis un **récapitulatif à valider**. Rien n'est modifié avant.
 2. **Installation sans interruption** :
