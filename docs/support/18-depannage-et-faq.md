@@ -10,6 +10,9 @@ La clé est fausse, supprimée ou limitée : crée-en une nouvelle sur aistudio.
 ## ChatGPT : aucun lien ne s'affiche, ou mes tâches attendent chacune leur tour
 Aucun lien : active la connexion par code d'appareil dans les paramètres de sécurité de ton compte ChatGPT, ou utilise « Coller le fichier ». Les tâches qui s'enchaînent sont normales avec un compte ChatGPT : une seule tourne à la fois pour ton compte (avec une clé API, elles tournent ensemble).
 
+## Avec ChatGPT ou Gemini, je ne vois pas les tokens pendant la tâche
+C'est normal : ChatGPT et Gemini ne communiquent leurs tokens qu'**à la fin** de la tâche, contrairement à Claude qui les envoie au fil de l'eau. Pendant la tâche, la ligne dit « Tokens comptés à la fin de la tâche » (dans « Activité » et dans « Voir »). Le total apparaît dès que la tâche est terminée, et reste affiché même si elle échoue. Si le total reste à 0 après la fin d'une tâche réussie, signale-le à l'administrateur : l'IA n'a pas renvoyé sa mesure.
+
 ## Mon job reste « En attente »
 Lire le message « En attente : … » dans le menu **Activité**. Raisons possibles : budget IA atteint (clé API) ; quota Claude serré (au-delà de 85 %) ; charge élevée du serveur ; job programmé « Cette nuit » ; déjà un job IA en cours pour le compte. Il repart seul. On peut l'**Annuler** depuis Activité.
 
