@@ -40,7 +40,7 @@ test('page /support : titre, suggestions, pas de projet joint ; /chat reste l\'a
   assert.match(sup, /<title>Support · AiTools<\/title>/);
   assert.match(sup, /data-mode="support"/);
   assert.match(sup, /Une question sur AiTools \?<\/h2>/);
-  assert.match(sup, /Comment relier mon compte Claude \?/);
+  assert.match(sup, /Comment relier mon IA \?/);
   assert.match(sup, /href="\/support" class="btn primary chat-new"|class="btn primary chat-new" href="\/support"/);
   assert.doesNotMatch(sup, /data-chat-projmenu/, 'pas de bouton « projet » dans le Support');
   assert.match(sup, /data-chat-attach/, 'mais on peut joindre une capture d\'écran');
@@ -48,7 +48,7 @@ test('page /support : titre, suggestions, pas de projet joint ; /chat reste l\'a
   const chat = await (await html(u, '/chat')).text();
   assert.match(chat, /data-mode="claude"/);
   assert.match(chat, /data-chat-projmenu/);
-  assert.doesNotMatch(chat, /Comment relier mon compte Claude \?/);
+  assert.doesNotMatch(chat, /Comment relier mon IA \?/);
 });
 
 test('une conversation du Support : documentation en dossier de travail (lecture seule), consignes du Support, liste séparée, redirections', async () => {

@@ -69,7 +69,7 @@
   }
 
   // Outils communs pour les fichiers public/app-*.js (chargés après celui-ci)
-  Object.assign(window.AiTools, { $, $$, api, esc, every, formData, go, icon, liDay, listen, refreshProject, httpErrorText, networkErrorText, toLogin, confirmBox, loadingHtml, loadFailed, sentence });
+  Object.assign(window.AiTools, { $, $$, api, esc, every, formData, go, icon, liDay, listen, refreshProject, httpErrorText, networkErrorText, toLogin, confirmBox, loadingHtml, loadFailed, sentence, aiName });
 
   // Une erreur dit ce qui s'est passé et quoi faire ensuite : jamais « Failed to fetch » ni un code brut. Le message du serveur, quand il y en a un, passe en premier.
   function httpErrorText(status) {
@@ -81,6 +81,8 @@
   }
   // Une erreur est une phrase : elle finit par un point (les messages du serveur n'en ont pas toujours). Sans effet si le message finit déjà par « . ! ? … ».
   function sentence(msg) { const t = String(msg ?? ''); return t && !/[.!?…]$/.test(t) ? `${t}.` : t; } // déclaration (hoistée) : exportée plus haut dans window.AiTools
+  // Nom de l'IA reliée à ce compte (Claude, ChatGPT, Gemini) : le serveur le pose sur <body data-ai>, « Claude » sans liaison.
+  function aiName() { return document.body?.dataset.ai || 'Claude'; } // déclaration (hoistée) : exportée plus haut dans window.AiTools
   function networkErrorText() { return 'Connexion impossible : réessaie dans un instant.'; } // déclaration (hoistée) : exportée plus haut dans window.AiTools
   // Session expirée : on revient à la connexion avec l'explication (la page de connexion affiche déjà `?e=`), plutôt qu'une redirection muette
   function toLogin() { location.href = `/login?e=${encodeURIComponent('Ta session a expiré : reconnecte-toi.')}`; }
@@ -105,9 +107,10 @@
     const dlg = document.createElement('dialog');
     dlg.className = 'prospect-dialog modal reconnect';
     dlg.setAttribute('aria-labelledby', 'reconnect-title');
-    dlg.innerHTML = `<h2 id="reconnect-title"><svg class="ic" aria-hidden="true" viewBox="0 0 24 24"><use href="#i-alert"></use></svg>Claude est déconnecté</h2>
-      <p>Ton accès Claude n'est plus valide (jeton expiré ou révoqué). Tant qu'il n'est pas relié de nouveau, les tâches IA sont à l'arrêt.</p>
-      <div class="row"><a class="btn primary" href="/link">Reconnecter Claude</a><button type="button" class="btn" data-close>Plus tard</button></div>`;
+    const ai = esc(aiName());
+    dlg.innerHTML = `<h2 id="reconnect-title"><svg class="ic" aria-hidden="true" viewBox="0 0 24 24"><use href="#i-alert"></use></svg>${ai} est déconnecté</h2>
+      <p>Ton accès ${ai} n'est plus valide (clé, jeton ou connexion expirés ou révoqués). Tant qu'il n'est pas relié de nouveau, les tâches IA sont à l'arrêt.</p>
+      <div class="row"><a class="btn primary" href="/link">Reconnecter ${ai}</a><button type="button" class="btn" data-close>Plus tard</button></div>`;
     dlg.addEventListener('click', (ev) => { if (ev.target === dlg || ev.target.closest('[data-close]')) dlg.close(); });
     document.body.append(dlg);
     dlg.showModal();
@@ -772,7 +775,7 @@
     const addEntry = (entry) => {
       $('[data-console-empty]', consoleBox)?.remove();
       if (entry.kind === 'delta' && lastDelta?.isConnected) { lastDelta.textContent += entry.text; return; }
-      const types = { output: 'Sortie de Claude', delta: 'Claude écrit', tool: 'Outil utilisé', turn: 'Nouvelle étape', model: 'Modèle', status: 'État de la tâche', progress: 'Progression', error: 'Erreur', activity: 'Activité de réflexion' };
+      const types = { output: `Sortie de ${aiName()}`, delta: `${aiName()} écrit`, tool: 'Outil utilisé', turn: 'Nouvelle étape', model: 'Modèle', status: 'État de la tâche', progress: 'Progression', error: 'Erreur', activity: 'Activité de réflexion' };
       const article = document.createElement('article');
       article.className = 'console-entry';
       article.dataset.kind = Object.hasOwn(types, entry.kind) ? entry.kind : 'status';
@@ -807,7 +810,7 @@
         setText('[data-console-remaining]', remainingTime(r));
         // Vidéo livrée avec les avertissements des agents : elle se relance ou se corrige comme une scène refusée
         const warned = r.type === 'promo_video' && r.status === 'done' && r.qualityWarnings > 0;
-        const fixable = warned || (r.type === 'promo_video' && /^La scène écrite par Claude ne passe pas au rendu/.test(r.error || ''));
+        const fixable = warned || (r.type === 'promo_video' && /^La scène écrite par .+? ne passe pas au rendu/.test(r.error || ''));
         for (const retry of $$('[data-retry]', consoleBox)) retry.hidden = !(r.status === 'error' || warned) || ('fix' in retry.dataset && !fixable);
         if (r.entries.length) {
           if ((cursor && r.firstId > cursor + 1) || (!cursor && r.firstId > 1)) output.append(document.createTextNode('[Début du journal abrégé]\n'));
@@ -843,7 +846,7 @@
         const retry = document.createElement('button');
         retry.type = 'button'; retry.className = 'btn small primary'; retry.dataset.retry = job.id; retry.textContent = 'Réessayer';
         box.append(retry);
-        if (type === 'promo_video' && /^La scène écrite par Claude ne passe pas au rendu/.test(job.error || '')) {
+        if (type === 'promo_video' && /^La scène écrite par .+? ne passe pas au rendu/.test(job.error || '')) {
           const fix = document.createElement('button');
           fix.type = 'button'; fix.className = 'btn small primary'; fix.dataset.retry = job.id; fix.dataset.fix = ''; fix.textContent = 'Corriger';
           box.append(fix);
@@ -865,7 +868,7 @@
     if (later) {
       const at = new Date(job.runAfter * 1000).toLocaleString('fr-FR', { weekday: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
       box.innerHTML = `<div class="running scheduled"><span class="moon" aria-hidden="true"></span>
-        <div><div>${name} programmé(e) : ${esc(at)}</div><div class="small muted">Démarrage la nuit, quand ton quota Claude est libre.</div></div>
+        <div><div>${name} programmé(e) : ${esc(at)}</div><div class="small muted">Démarrage la nuit, quand ton quota ${esc(aiName())} est libre.</div></div>
         ${job.canViewLogs !== false ? `<a class="btn small" href="/jobs/${job.id}">Voir</a>` : ''}<button class="btn small" data-cancel="${job.id}">Annuler</button></div>`;
       return;
     }
@@ -1436,7 +1439,7 @@
     if (runBtn) {
       e.preventDefault(); // le bouton « Réanalyser » est dans la ligne du projet : il ne doit pas la replier
       const { run, id } = runBtn.dataset;
-      if (run === 'analyze' && runBtn.hasAttribute('data-reanalyze') && !(await confirmBox('Relancer l\'analyse complète du dépôt ?\nElle consomme du quota Claude.', { confirm: 'Relancer' }))) return;
+      if (run === 'analyze' && runBtn.hasAttribute('data-reanalyze') && !(await confirmBox('Relancer l\'analyse complète du dépôt ?\nElle consomme du quota ' + aiName() + '.', { confirm: 'Relancer' }))) return;
       try {
         const r = await api(`/api/projects/${id}/${run}`, {});
         toast(r.existing ? 'Déjà en cours' : 'Lancé');
