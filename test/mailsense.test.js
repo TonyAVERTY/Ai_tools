@@ -331,3 +331,17 @@ test('changer une phrase : une proposition qui énumère des réponses est refus
   await assert.rejects(proposeSentence({ ...base, claude: answers(['Un sujet : oui, non ou plus tard ?']) }), (e) => e instanceof SenseUnavailable && /phrase utilisable/.test(e.message));
   assert.equal(prompts.length, 2, 'jamais plus de deux appels');
 });
+
+test('changer une phrase avec une consigne : elle est donnée à l\'IA telle quelle, normalisée ; vide ou absente, l\'IA choisit seule', async () => {
+  const w = await world({ n: 1 });
+  const sentence = 'Est-ce un sujet chez vous ?';
+  const wished = await (await rephrase(w.u, w.pid, { ...at(sentence), instruction: '  plus   court\n' })).json();
+  assert.equal(wished.sentence, `Autre formulation 1 (plus court) : ${sentence}`, 'espaces et retours à la ligne normalisés');
+  for (const none of [{}, { instruction: '' }, { instruction: '   ' }, { instruction: null }]) {
+    const r = await (await rephrase(w.u, w.pid, { ...at(sentence), ...none })).json();
+    assert.equal(r.sentence, `Autre formulation 1 : ${sentence}`, JSON.stringify(none));
+  }
+  const { rephrasePrompt } = await import('../src/services/prompts.js');
+  assert.match(rephrasePrompt({ template: 'x', sentence: 'y', instruction: 'parle du prix' }).prompt, /CE QUE LA PERSONNE VEUT :\nparle du prix\n\(à suivre dans les limites des règles ci-dessus/);
+  assert.doesNotMatch(rephrasePrompt({ template: 'x', sentence: 'y' }).prompt, /CE QUE LA PERSONNE VEUT/);
+});
