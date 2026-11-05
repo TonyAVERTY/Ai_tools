@@ -12,6 +12,7 @@ import { checkInbox } from '../src/services/inbox.js';
 import { saveSecretConfig } from '../src/projects.js';
 import { now } from '../src/db.js';
 import { startApp } from './helpers/server.js';
+import { withSense } from './helpers/sense.js';
 
 // Filtrage des hôtes saisis par l'utilisateur (SSRF) : adresses, résolution, ports, rebinding, branchement sur chaque service.
 // Aucune requête DNS ni connexion réelle : le résolveur est injecté.
@@ -223,7 +224,7 @@ test('à l\'usage : un hôte devenu interne fait échouer l\'envoi, la lecture I
     await saveSecretConfig(s.app, p, 'imap_enc', { host: 'imap.exemple.fr', port: 993 }, 'pass');
     await s.db.prepare("INSERT INTO templates(project_id, kind, subject, body, status, updated_at) VALUES(?, 'initial', 's', 'b', 'validated', ?)").run(p, now());
     await s.db.prepare("INSERT INTO prospects(project_id, company, email, created_at) VALUES(?, 'E', 'e@x.fr', ?)").run(p, now());
-    const worker = new Worker(s.db, makeHandlers(s.app), { log: { error() {} } });
+    const worker = new Worker(s.db, makeHandlers(s.app, { claude: withSense(s.app) }), { log: { error() {} } });
 
     // Tout est public : les pièces reçoivent l'adresse vérifiée
     await checkInbox(s.app, u.id, p);

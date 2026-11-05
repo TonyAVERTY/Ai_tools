@@ -13,6 +13,7 @@ import { Scheduler } from '../src/services/scheduler.js';
 import { makeHandlers } from '../src/handlers.js';
 import { createProject, saveSecretConfig, getProject } from '../src/projects.js';
 import { addUser, TEST_SECRET_KEY } from './helpers/users.js';
+import { withSense } from './helpers/sense.js';
 
 const paris = (iso) => new Date(iso); // ISO avec décalage explicite
 
@@ -65,7 +66,7 @@ async function setup() {
       .run(id, pid, email, t, `Une idée pour ${email}`, `<orig-${pid}@codebzh.fr>`);
     return pid;
   };
-  const worker = new Worker(db, makeHandlers(app), { log: { error() {} } });
+  const worker = new Worker(db, makeHandlers(app, { claude: withSense(app) }), { log: { error() {} } });
   const scheduler = new Scheduler(app, { log: { error() {} } });
   return { tmp, db, app, id, userId, add, inboxOk, worker, scheduler, sentMails };
 }
