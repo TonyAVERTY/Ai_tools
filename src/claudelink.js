@@ -53,6 +53,15 @@ export const OPENAI_CONSENT_TEXT = [
   "La clé API OpenAI reste l'option recommandée : elle est prévue pour cet usage.",
 ];
 
+// Même avertissement pour le compte Google (abonnement Google AI), avec sa propre version. Ici la règle de Google n'est PAS tranchée : le texte le dit.
+export const GOOGLE_CONSENT_VERSION = '2026-11-06.1';
+export const GOOGLE_CONSENT_TEXT = [
+  "Utiliser ton abonnement Google AI (Plus, Pro, Ultra) à travers une application tierce n'est pas clairement autorisé par Google. Pour Gemini CLI, Google l'interdit explicitement et a suspendu des comptes ; pour Antigravity CLI, il n'a pas répondu clairement. Ton compte Google pourrait être limité ou suspendu.",
+  "iaboss ne peut en être tenu responsable. Tu utilises ton abonnement à tes propres risques. Une clé API Google AI Studio est prévue pour cet usage et reste l'option recommandée.",
+  "Tes tâches passent l'une après l'autre : un seul exécutable utilise ta connexion à la fois. Elle peut te demander de te reconnecter de temps en temps.",
+  "Chaque tâche envoie les consignes d'Antigravity CLI avant ta demande : quelques milliers de tokens de plus par appel sont décomptés de ton abonnement.",
+];
+
 const TOKEN_RE = /^[A-Za-z0-9_.-]{20,800}$/;
 
 
@@ -213,6 +222,29 @@ export async function saveRefreshedAuth(app, userId, linkedAt, authJson) {
 }
 
 /**
+ * Compte Google (abonnement Google AI) : fichier de connexion d'Antigravity CLI, collé par l'utilisateur ou produit par la connexion guidée
+ * (src/googlelogin.js). Désactivé tant que l'administrateur n'a pas mis GOOGLE_ACCOUNT_ENABLED. Le consentement est vérifié AVANT tout, la connexion
+ * par un appel minimal à agy (quelques milliers de tokens décomptés de l'abonnement).
+ */
+export async function linkGoogleAccount(app, userId, { authFile, accept, via = 'paste' }) {
+  assertGoogleConsent(app.cfg, accept);
+  const provider = getProvider('gemini');
+  const compact = checkOpaqueAuth(authFile);
+  const checked = await (app.validateGoogleAccount || provider.validateAccount)(app, compact);
+  const stored = checked?.authFile ? checkOpaqueAuth(checked.authFile) : compact; // le test a pu renouveler le fichier : on garde le plus récent
+  const consent = { at: now(), version: GOOGLE_CONSENT_VERSION };
+  await saveLink(app, userId, { provider: 'gemini', mode: MODES.google_account, secret_enc: encrypt(app.cfg.secretKey, stored), consent, via });
+  await setSetting(app.db, userId, 'google_consent_json', JSON.stringify(consent));
+}
+
+/** Consentement obligatoire avant tout lancement d'une connexion Google (guidée ou collée), et mode activé par l'administrateur. */
+export function assertGoogleConsent(cfg, accept) {
+  if (cfg.cliModeEnabled === false) throw new HttpError(403, CLI_DISABLED_MESSAGE);
+  if (!googleEnabled) throw new HttpError(403, GOOGLE_DISABLED_MESSAGE);
+  if (!truthy(accept)) throw new HttpError(400, `Tu dois cocher « ${CONSENT_CHECKBOX} » pour utiliser ton abonnement Google`);
+}
+
+/**
  * Compte ChatGPT : fichier de connexion collé par l'utilisateur, ou produit par la connexion guidée (src/chatgptlogin.js).
  * Le consentement est vérifié AVANT tout. La connexion est vérifiée par un appel minimal à Codex (quelques tokens décomptés de l'abonnement).
  */
@@ -370,8 +402,9 @@ export async function testLink(app, userId) {
     try { secret = decrypt(app.cfg.secretKey, link.secret_enc); } catch { secret = null; }
     if (!secret) { await mark(false); return { ok: false, message: 'Secret illisible : relie de nouveau ton accès Claude' }; }
     if (link.mode === MODES.api_key) await (app.validateApiKey || getProvider(link.provider).apiKey.validate)(secret, app.fetch || fetch);
-    else if (link.mode === MODES.chatgpt_account) {
+    else if (link.mode === MODES.chatgpt_account || link.mode === MODES.google_account) {
       if (app.cfg.cliModeEnabled === false) return { ok: false, message: CLI_DISABLED_MESSAGE };
+      if (link.mode === MODES.google_account && !googleEnabled) return { ok: false, message: GOOGLE_DISABLED_MESSAGE };
       // File d'attente du compte : un test ne passe jamais en même temps qu'un job (le jeton de rafraîchissement est à usage unique)
       await withUserLock(userId, async () => {
         const fresh = await readLink(app.db, userId);

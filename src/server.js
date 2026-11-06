@@ -224,6 +224,7 @@ export async function createApp(cfg, { db, worker = true, createTransport, fetch
     clearInterval(purge);
     app.claudeLogins?.closeAll();
     app.chatgptLogins?.closeAll();
+    app.googleLogins?.closeAll();
     await new Promise((r) => { server.close(r); server.closeIdleConnections?.(); });
     await w?.stop();
     await scheduler?.stop();

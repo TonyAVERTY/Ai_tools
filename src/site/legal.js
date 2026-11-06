@@ -16,7 +16,7 @@ export const ADDRESS = '4 rue Alcide de Gasperi, 35340 Liffré';
 export const HOST = 'ElypseCloud, 29 rue Lebrix Mesmin, 33700 Mérignac';
 const PAGES = [['/mentions-legales', 'Mentions légales'], ['/confidentialite', 'Confidentialité'], ['/cgu', 'CGU']];
 
-export const LEGAL_UPDATED = '5 novembre 2026';
+export const LEGAL_UPDATED = '6 novembre 2026';
 
 /** Gabarit commun (design Claude Design) : onglets des trois pages, titre, date, sommaire numéroté, texte. */
 function legalPage({ appUrl, path, title, description, h1, lead, sections }) {
@@ -126,7 +126,7 @@ export function privacyPage({ appUrl, apple = false, captcha = false, inactiveMo
   <tbody>
     <tr><th scope="row">Compte</th><td>Email et nom fournis par ${apple ? 'Google ou Apple' : 'Google'}, fournisseur de connexion et identifiant chez lui, plan, dates de création et de dernière connexion.</td><td>Créer ton compte et te connecter. Exécution du contrat.</td></tr>
     <tr><th scope="row">Session</th><td>Un identifiant de session aléatoire (cookie), un cookie de liaison pendant la connexion.</td><td>Te garder connecté et sécuriser la connexion. Exécution du contrat, intérêt légitime.</td></tr>
-    <tr><th scope="row">Liaison de ton IA (Claude, ChatGPT ou Gemini)</th><td>Ta clé API, ton jeton d'abonnement ou ton fichier de connexion, chiffrés. Les 4 derniers caractères d'une clé API, les dates de liaison et de test, la date et la version du texte d'avertissement accepté pour le mode abonnement.</td><td>Lancer tes jobs avec ton accès, garder la preuve de ton acceptation. Exécution du contrat, intérêt légitime.</td></tr>
+    <tr><th scope="row">Liaison de ton IA (Claude, ChatGPT ou Gemini)</th><td>Ta clé API, ton jeton d'abonnement ou ton fichier de connexion (ChatGPT, Google), chiffrés. Les 4 derniers caractères d'une clé API, les dates de liaison et de test, la date et la version du texte d'avertissement accepté pour le mode abonnement.</td><td>Lancer tes jobs avec ton accès, garder la preuve de ton acceptation. Exécution du contrat, intérêt légitime.</td></tr>
     <tr><th scope="row">Projets</th><td>Nom, adresse du dépôt Git, fiche projet, cible, modèles de mail, copie du dépôt sur le serveur.</td><td>Fournir le service. Exécution du contrat.</td></tr>
     <tr><th scope="row">Configuration</th><td>Identifiants SMTP et IMAP, accès à la base de données de ton projet (récapitulatif), jeton Forgejo, adresse du webhook Discord, plafonds et budgets. Les mots de passe, jetons et adresses de webhook sont chiffrés.</td><td>Envoyer, lire les réponses, notifier. Exécution du contrat.</td></tr>
     <tr><th scope="row">Prospects</th><td>Entreprise, adresse professionnelle, site, ville, secteur, phrase d'accroche, page source, score, statut, notes, prochaine action, historique d'envoi, objet et date d'une réponse.</td><td>Fournir le service pour ton compte (voir « rôles »). La base légale du démarchage est la tienne, en B2B en règle générale l'intérêt légitime.</td></tr>
@@ -264,7 +264,7 @@ export function termsPage({ appUrl, apple = false }) {
         html: `<p>Pour lancer un job, tu relies ton propre accès à une IA : Claude (Anthropic), ChatGPT (OpenAI) ou Gemini (Google). iaboss ne fournit ni crédits ni abonnement.</p>
 <ul>
   <li><strong>Clé API (Anthropic, OpenAI ou Google) :</strong> ton fournisseur te facture directement, selon ses tarifs. Tu es responsable de cette dépense. Les budgets réglables dans iaboss sont des garde-fous, pas une garantie.</li>
-  <li><strong>Abonnement Claude (jeton) ou compte ChatGPT :</strong> les conditions d'Anthropic ou d'OpenAI peuvent ne pas autoriser l'usage d'un abonnement via une application tierce. Si tu choisis ce mode, <strong>ton compte Claude ou ChatGPT peut être limité, suspendu ou fermé</strong> par ton fournisseur. Gemini ne se relie que par clé API. L'éditeur d'iaboss n'a aucun contrôle sur cette décision et n'en est pas responsable, dans la mesure permise par la loi. Avant la liaison, une fenêtre d'avertissement te demande de cocher « J'ai compris et j'accepte ce risque ». Cette acceptation est enregistrée avec sa date et la version du texte. Ce mode peut être désactivé à tout moment.</li>
+  <li><strong>Abonnement Claude (jeton), compte ChatGPT ou abonnement Google AI :</strong> les conditions d'Anthropic, d'OpenAI ou de Google peuvent ne pas autoriser l'usage d'un abonnement via une application tierce. Si tu choisis ce mode, <strong>ton compte Claude, ChatGPT ou Google peut être limité, suspendu ou fermé</strong> par ton fournisseur. Pour Google, cette option n'existe que si l'éditeur l'a activée, et la règle de Google n'est pas tranchée : le texte d'avertissement le dit. Gemini se relie sinon par clé API. L'éditeur d'iaboss n'a aucun contrôle sur cette décision et n'en est pas responsable, dans la mesure permise par la loi. Avant la liaison, une fenêtre d'avertissement te demande de cocher « J'ai compris et j'accepte ce risque ». Cette acceptation est enregistrée avec sa date et la version du texte. Ce mode peut être désactivé à tout moment.</li>
 </ul>
 <p>Tu peux délier ton accès à tout moment depuis Mon compte : le secret est alors effacé et tes jobs IA en attente sont annulés.</p>`,
       },

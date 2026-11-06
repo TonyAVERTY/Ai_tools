@@ -22,6 +22,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { prepareLaunch } from '../sandbox.js';
 import { estimateCost } from '../pricing.js';
+import { HttpError } from '../../http.js';
 
 export const TOKEN_FILE = ['.gemini', 'antigravity-cli', 'antigravity-oauth-token'];
 export const CATALOG_DEFAULT = 'gemini-3.8-flash-high';
@@ -192,4 +193,29 @@ export function runAgy(o) {
       });
     });
   });
+}
+
+/**
+ * Vérifie une connexion de compte Google par un appel minimal à agy (aucun outil) : ce n'est PAS gratuit, quelques milliers de tokens sont décomptés de
+ * l'abonnement (agy envoie ses consignes à chaque appel). Renvoie le fichier de connexion, renouvelé s'il l'a été. 400 = refus de connexion ;
+ * 502 = impossible de juger (agy absent, bac à sable, réseau).
+ */
+export async function validateAccount(app, authFile) {
+  let renewed = null, r;
+  try {
+    r = await runAgy({
+      bin: app.cfg.agyBin, prompt: 'Réponds uniquement : ok', model: CATALOG_DEFAULT, maxTurns: 1, tools: [], timeoutMs: 120_000,
+      sandbox: app.cfg.sandbox, authFile, onAuthFile: (t) => { renewed = t; },
+      workRoot: app.cfg.dataDir ? join(app.cfg.dataDir, 'run') : undefined,
+    });
+  } catch (e) {
+    if (isAuthRefusal(e.message)) throw new HttpError(400, 'Connexion refusée par Google (expirée ou révoquée). Reconnecte-toi.');
+    console.warn(`Vérification de la connexion Google : agy n'a pas pu s'exécuter : ${String(e.message).slice(0, 3000)}`);
+    throw new HttpError(502, "Antigravity CLI n'a pas pu être lancé sur le serveur (bac à sable ou installation). Préviens l'administrateur.", { expose: true });
+  }
+  if (r.ok) return { authFile: renewed };
+  const said = String(r.text ?? '').replace(/\s+/g, ' ').trim().slice(0, 240) || `(sans texte, ${r.subtype ?? 'erreur'})`;
+  console.warn(`Vérification de la connexion Google refusée (${r.subtype ?? 'erreur'}) : ${said}`);
+  if (isAuthRefusal(`${r.text} ${r.subtype}`)) throw new HttpError(400, `Connexion refusée par Google (expirée ou révoquée). Réponse d'agy : ${said}`);
+  throw new HttpError(502, `La connexion n'a pas pu être vérifiée : agy a répondu « ${said} ». Réessaie plus tard.`, { expose: true });
 }

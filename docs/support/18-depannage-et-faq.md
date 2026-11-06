@@ -13,6 +13,13 @@ Aucun lien : active la connexion par code d'appareil dans les paramètres de sé
 ## Une tâche terminée n'affiche plus qu'une ligne (résultat, « Voir », tokens)
 C'est voulu pour alléger la page : sous une recherche, un envoi ou une relance terminés, le résultat, le bouton **Voir** (le détail de la tâche) et le nombre de tokens tiennent sur une même ligne. Rien n'est perdu : **Voir** ouvre le détail complet, et le menu « Activité » garde l'historique.
 
+## « Se connecter avec Google » : le lien ne s'affiche pas, ou « Google a refusé le code »
+- **Je ne vois pas l'option** : elle est désactivée par défaut. L'administrateur doit l'activer sur le serveur (et y installer Antigravity CLI, `agy`).
+- **« Google n'a pas donné de lien de connexion »** : `agy` n'est pas installé ou pas joignable sur le serveur. Préviens l'administrateur.
+- **« Google a refusé le code »** ou **« Le délai de Google est passé »** : Antigravity CLI n'attend le code que 60 secondes. Clique **Nouveau lien**, et recopie le code dès que Google l'affiche (en entier, sans espace).
+- **« Connexion refusée par Google (expirée ou révoquée) »** pendant une tâche : reconnecte-toi avec **Se connecter avec Google**.
+- **Mon compte Google est limité** : Google n'a pas tranché la règle sur l'usage depuis une autre application. Repasse à la clé API Google AI Studio.
+
 ## Avec ChatGPT, la carte « Consommation ChatGPT » dit « indisponible » ou ne montre pas mes limites
 - **« ton accès ChatGPT sera renouvelé au prochain job iaboss »** : l'accès enregistré a expiré. iaboss ne le renouvelle pas tout seul (le renouvellement appartient à Codex) : lance une tâche IA, la carte revient ensuite.
 - **« OpenAI refuse le relevé en direct »** : relie-toi de nouveau avec « Se connecter avec ChatGPT ».
