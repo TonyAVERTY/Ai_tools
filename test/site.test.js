@@ -468,13 +468,13 @@ test('site public : l\'IA est « ton IA » (Claude, ChatGPT ou Gemini), les troi
   assert.match(tarifs, /id="acces-ia"/);
   assert.doesNotMatch(tarifs, /id="acces-claude"/);
   assert.match(tarifs, /Ton abonnement Claude ou ChatGPT, avec un risque/);
-  assert.match(tarifs, /Gemini n'a pas ce mode : il se relie par clé API seulement/);
+  assert.match(tarifs, /Gemini se relie par clé API ; l'abonnement Google AI n'est proposé que si l'éditeur l'a activé/);
   assert.match(tarifs, /Google peut alors utiliser les données envoyées pour améliorer ses produits/, 'la clé Gemini gratuite est signalée');
   const how = await page('/fonctionnement');
   assert.match(how, /href="\/tarifs#acces-ia"/);
   const confid = await page('/confidentialite');
   for (const f of ['Anthropic (Claude), OpenAI (ChatGPT) ou Google (Gemini)', 'Google, Anthropic et OpenAI peuvent traiter des données aux États-Unis']) assert.ok(confid.replace(/&#39;/g, "'").includes(f), f);
   const cgu = (await page('/cgu')).replace(/&#39;/g, "'");
-  assert.match(cgu, /ton compte Claude ou ChatGPT peut être limité, suspendu ou fermé/);
-  assert.match(cgu, /Gemini ne se relie que par clé API/);
+  assert.match(cgu, /ton compte Claude, ChatGPT ou Google peut être limité, suspendu ou fermé/);
+  assert.match(cgu, /Gemini se relie sinon par clé API/);
 });

@@ -9,7 +9,7 @@ import { startLogin, finishLogin, destroySession, getSession, checkOrigin } from
 import { verifyCaptcha } from './captcha.js';
 import { deleteUser, normalizeEmail, getUser } from './users.js';
 import {
-  assertCanRunAi, getLinkState, linkChatgptAccount, assertLoginConsent, linkLoginToken, validateSubscriptionToken, linkApiKey, linkSubscriptionToken, unlink, testLink, lastConsent,
+  assertCanRunAi, getLinkState, linkChatgptAccount, linkGoogleAccount, assertGoogleConsent, googleAccountEnabled, assertLoginConsent, linkLoginToken, validateSubscriptionToken, linkApiKey, linkSubscriptionToken, unlink, testLink, lastConsent,
   MODES,
   isPriced, userProvider, aiSwitchOf,
 } from './claudelink.js';
@@ -18,6 +18,7 @@ import { registerSiteRoutes } from './site/routes.js';
 import { registerAdminRoutes } from './adminroutes.js';
 import { loginsOf } from './claudelogin.js';
 import { chatgptLoginsOf } from './chatgptlogin.js';
+import { googleLoginsOf } from './googlelogin.js';
 import { accessOn, memberTeamIds, needAccess } from './teams.js';
 import { registerTeamRoutes } from './teamroutes.js';
 import { registerProfileRoutes, getProfile, isEmpty } from './userprofile.js';
@@ -280,9 +281,10 @@ export function registerRoutes(router, app) {
   // Page d'onboarding (bloquante tant qu'aucune liaison valide n'existe). Les secrets arrivent par POST, ne sont jamais
   // relus ni réaffichés ; les erreurs ne contiennent que des messages fixes.
   router.get('/link', async ({ res, session, url }) => {
+    const available = availableProviders(cfg, { googleEnabled: googleAccountEnabled() });
     html(res, linkPage({
-      user: session.user, link: await getLinkState(db, session.userId), cliModeEnabled, error: url.searchParams.get('e'),
-      start: url.searchParams.get('start') === 'claude', selected: url.searchParams.get('ia'), available: availableProviders(cfg),
+      user: session.user, link: await getLinkState(db, session.userId), cliModeEnabled, googleEnabled: available.googleAccount, error: url.searchParams.get('e'),
+      start: url.searchParams.get('start') === 'claude', selected: url.searchParams.get('ia'), available,
     }));
   });
 
@@ -357,6 +359,24 @@ export function registerRoutes(router, app) {
   }, LINK_LIMIT);
   router.post('/link/chatgpt/login/cancel', async ({ req, res, session }) => {
     chatgptLoginsOf(app).cancel(session.userId, (await readBody(req)).id);
+    json(res, { ok: true });
+  }, LINK_LIMIT);
+  // Compte Google (abonnement Google AI, Antigravity CLI) : désactivé par défaut. Fichier de connexion collé (secours) ou connexion guidée (src/googlelogin.js) :
+  // le serveur donne le lien de Google, l'utilisateur recopie le code (60 secondes), la connexion est vérifiée par un appel minimal puis rangée (chiffrée).
+  router.post('/link/google/auth', linkAction((b, s) => linkGoogleAccount(app, s.userId, { authFile: b.authFile, accept: b.accept, via: 'paste' }), '/', 'gemini'), LINK_LIMIT);
+  router.post('/link/google/login', async ({ req, res, session }) => {
+    const b = await readBody(req);
+    assertGoogleConsent(cfg, b.accept); // case cochée et mode activé, avant tout lancement
+    json(res, await googleLoginsOf(app).start(session.userId));
+  }, LINK_LIMIT);
+  router.post('/link/google/login/code', async ({ req, res, session }) => {
+    const b = await readBody(req);
+    const authFile = await googleLoginsOf(app).finish(session.userId, b.id, b.code);
+    await linkGoogleAccount(app, session.userId, { authFile, accept: true, via: 'login' });
+    json(res, { ok: true });
+  }, LINK_LIMIT);
+  router.post('/link/google/login/cancel', async ({ req, res, session }) => {
+    googleLoginsOf(app).cancel(session.userId, (await readBody(req)).id);
     json(res, { ok: true });
   }, LINK_LIMIT);
   router.post('/link/test', async ({ req, res, session }) => {

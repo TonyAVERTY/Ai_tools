@@ -5,13 +5,13 @@ import { esc } from './http.js';
 import { ic } from './icons.js';
 import { banner } from './banner.js';
 import { layout, pctBlock } from './views.js';
-import { CONSENT_TEXT, CONSENT_CHECKBOX, CONSENT_VERSION, OPENAI_CONSENT_TEXT, OPENAI_CONSENT_VERSION } from './claudelink.js';
+import { CONSENT_TEXT, CONSENT_CHECKBOX, CONSENT_VERSION, OPENAI_CONSENT_TEXT, OPENAI_CONSENT_VERSION, GOOGLE_CONSENT_TEXT } from './claudelink.js';
 
 /** Les trois IA proposées, dans l'ordre d'affichage. `how(cli)` : ce que la carte dit en une ligne (l'abonnement n'est cité que s'il est proposé). */
 export const AI_CARDS = [
   { id: 'claude', name: 'Claude', company: 'Anthropic', how: (cli) => (cli ? 'Clé API ou abonnement' : 'Clé API') },
   { id: 'openai', name: 'ChatGPT', company: 'OpenAI', how: (cli) => (cli ? 'Clé API ou compte ChatGPT' : 'Clé API') },
-  { id: 'gemini', name: 'Gemini', company: 'Google', how: () => 'Clé API Google AI Studio' },
+  { id: 'gemini', name: 'Gemini', company: 'Google', how: (cli, google) => (google ? 'Clé API ou compte Google' : 'Clé API Google AI Studio') },
 ];
 
 const notice = (texts) => `<div class="notice">${texts.map((t) => `<p>${esc(t)}</p>`).join('')}</div>`;
@@ -91,17 +91,67 @@ function openaiPanel(cliModeEnabled) {
   return key + alts;
 }
 
-function geminiPanel() {
-  const key = keyPanel({
+function geminiPanel(googleEnabled = false, keyEnabled = true) {
+  const key = !keyEnabled ? '' : keyPanel({
     id: 'h-key-gemini', title: 'Clé API Google AI Studio', provider: 'gemini', placeholder: 'AIza…', badge: '',
     body: `<p>Crée une clé sur aistudio.google.com puis colle-la ici. Elle est vérifiée sans consommer de tokens, chiffrée, et ne sera plus jamais affichée (seuls ses 4 derniers caractères le seront).</p>
-  <p class="hint">Gemini se connecte uniquement avec une clé API : Google ne permet plus de se connecter avec un compte pour ce type d'usage.</p>
+  <p class="hint">${googleEnabled ? 'Tu peux aussi utiliser ton abonnement Google AI, plus bas sur cette page.' : 'Gemini se connecte uniquement avec une clé API : Google ne permet plus de se connecter avec un compte pour ce type d\'usage.'}</p>
   <div class="notice warn" role="note">
     <p><strong>Une clé gratuite suffit pour essayer</strong> (modèles Flash, avec des limites quotidiennes fixées par Google).</p>
     <p><strong>Avec une clé gratuite, Google peut utiliser les données envoyées pour améliorer ses produits, et des personnes peuvent les relire.</strong> N'y mets pas de données de prospects. Pour un vrai usage, active la facturation sur ton projet Google : tes données ne sont alors plus utilisées pour améliorer ses produits.</p>
   </div>`,
   });
-  return key;
+  // Abonnement Google AI (Plus, Pro, Ultra) par Antigravity CLI : proposé seulement si l'administrateur l'a activé (GOOGLE_ACCOUNT_ENABLED)
+  const alts = googleEnabled ? `
+<section class="alts" aria-labelledby="h-alt-gemini">
+  <div class="alts-h"><h2 id="h-alt-gemini">Avec ton abonnement Google AI (Plus, Pro, Ultra)</h2><span class="badge warn">${ic('alert')}Risque pour ton compte</span></div>
+  <p class="hint">Utilise ton abonnement Google AI au lieu d'une clé API. Google n'a pas dit clairement si c'est permis depuis une application comme iaboss : une fenêtre d'avertissement s'affiche avant de continuer. Tes tâches passent l'une après l'autre.</p>
+  <div class="alt">
+    <div class="alt-t"><h3>Se connecter avec Google</h3><p>Connexion guidée : un lien s'affiche, tu te connectes à Google, tu copies le code affiché et tu le colles ici. Tu as 60 secondes pour le coller.</p></div>
+    <button type="button" class="btn" data-open-dialog="google-dialog">Se connecter avec Google</button>
+  </div>
+  <div class="alt">
+    <div class="alt-t"><h3>Fichier de connexion collé</h3><p>Pour les cas où la connexion directe ne passe pas : tu t'es connecté à Antigravity CLI sur une machine Linux ou WSL, et tu colles le fichier de connexion.</p></div>
+    <details class="manual"><summary class="btn">Coller le fichier</summary>
+      <form method="post" action="/link/google/auth" class="cfg" data-consent-form>
+        ${notice(GOOGLE_CONSENT_TEXT)}
+        ${consentBox()}
+        <p class="hint">Sur ta machine, lance <code>agy</code> et connecte-toi avec Google, puis colle ci-dessous le contenu complet du fichier <code>~/.gemini/antigravity-cli/antigravity-oauth-token</code>. Il est chiffré, utilisé uniquement pour tes tâches, et ne sera plus jamais affiché. Sous Windows et sur Mac, la connexion est rangée ailleurs : utilise la connexion guidée.</p>
+        <label class="field"><span class="lbl">Contenu du fichier de connexion</span><textarea name="authFile" rows="5" autocomplete="off" spellcheck="false" required></textarea></label>
+        <p class="hint">La vérification lance un appel minimal du CLI : quelques milliers de tokens sont décomptés de ton abonnement.</p>
+        <button class="btn primary" data-consent-submit disabled>Relier avec mon fichier</button>
+      </form>
+    </details>
+  </div>
+</section>` : '';
+  return key + alts;
+}
+
+/** Fenêtre de la connexion guidée Google : avertissement, puis lien et code à recopier dans les 60 secondes que laisse le CLI. */
+function googleDialog() {
+  return `<dialog class="prospect-dialog modal" id="google-dialog" aria-labelledby="google-title">
+  <div class="cfg">
+    <h2 id="google-title">${ic('alert')}Avant de continuer</h2>
+    <form class="cfg" data-google-login data-consent-form>
+      ${notice(GOOGLE_CONSENT_TEXT)}
+      ${consentBox()}
+      <p class="hint">Un lien va s'afficher. Tu te connectes à Google avec le compte qui porte ton abonnement, tu copies le code que Google affiche, et tu le colles ici. Tu as 60 secondes pour le coller : prépare-toi avant de cliquer.</p>
+      <div class="modal-f"><button type="button" class="btn" data-close-dialog>Annuler</button><button class="btn primary" data-consent-submit disabled><span data-label>Continuer</span></button></div>
+      <p class="hint" role="status" data-google-status></p>
+      ${pctBlock('Préparation du lien de connexion')}
+      <p class="msg msg-err" role="alert" data-google-error hidden></p>
+    </form>
+    <form class="cfg" data-google-step2 hidden>
+      <p><strong>1.</strong> Ouvre Google et connecte-toi :</p>
+      <p><a class="btn primary" data-google-link href="#" target="_blank" rel="noopener noreferrer">Ouvrir Google</a></p>
+      <p><strong>2.</strong> Copie le code que Google affiche, puis colle-le ici :</p>
+      <label class="field"><span class="lbl">Code de Google</span><input name="code" autocomplete="off" spellcheck="false" required></label>
+      <p class="hint" role="timer" data-google-timer></p>
+      <div class="modal-f"><button type="button" class="btn" data-close-dialog>Annuler</button><button type="button" class="btn" data-google-again hidden>Nouveau lien</button><button class="btn primary" data-google-send><span data-label>Valider le code</span></button></div>
+      <p class="msg msg-err" role="alert" data-google-error2 hidden></p>
+    </form>
+  </div>
+</dialog>`;
 }
 
 /** Fenêtre de la connexion guidée ChatGPT : avertissement, puis lien et code à saisir sur chatgpt.com pendant que le serveur attend la validation. */
@@ -167,7 +217,7 @@ function claudeDialog(start) {
  * @param {Record<string,boolean>} [o.available]  IA utilisables sur ce serveur (providers/availability.js)
  * @param {string|null} [o.selected] IA dont les options sont ouvertes (?ia=) ; sinon celle qui est reliée ; sinon aucune
  */
-export function linkPage({ user, link, cliModeEnabled, error, start = false, available = { claude: true, openai: true, gemini: true }, selected = null }) {
+export function linkPage({ user, link, cliModeEnabled, googleEnabled = false, error, start = false, available = { claude: true, openai: true, gemini: true }, selected = null }) {
   const current = link?.provider ?? null;
   const known = AI_CARDS.map((c) => c.id);
   const open = known.includes(selected) && available[selected] !== false ? selected : (start ? 'claude' : current);
@@ -179,10 +229,10 @@ export function linkPage({ user, link, cliModeEnabled, error, start = false, ava
     const on = c.id === open;
     const badge = current === c.id ? `<span class="badge ok">${ic('check')}Connectée</span>` : '';
     if (off) return `<div class="ai-card" aria-disabled="true">${ic(c.id)}<b>${c.name}</b><small>${c.company}</small><span class="ai-how">Pas encore disponible sur ce serveur</span></div>`;
-    return `<a class="ai-card${on ? ' on' : ''}" href="/link?ia=${c.id}" data-ai-card="${c.id}" aria-pressed="${on}" aria-controls="ai-panel-${c.id}">${ic(c.id)}<b>${c.name}</b><small>${c.company}</small><span class="ai-how">${c.how(cliModeEnabled)}</span>${badge}</a>`;
+    return `<a class="ai-card${on ? ' on' : ''}" href="/link?ia=${c.id}" data-ai-card="${c.id}" aria-pressed="${on}" aria-controls="ai-panel-${c.id}">${ic(c.id)}<b>${c.name}</b><small>${c.company}</small><span class="ai-how">${c.how(cliModeEnabled, cliModeEnabled && googleEnabled)}</span>${badge}</a>`;
   }).join('');
   const panels = {
-    claude: claudePanel(cliModeEnabled), openai: openaiPanel(cliModeEnabled), gemini: geminiPanel(),
+    claude: claudePanel(cliModeEnabled), openai: openaiPanel(cliModeEnabled), gemini: geminiPanel(cliModeEnabled && googleEnabled, available.geminiKey !== false),
   };
   const sections = AI_CARDS.filter((c) => available[c.id] !== false).map((c) => `<div class="ai-panel" id="ai-panel-${c.id}" data-ai-panel="${c.id}" role="region" aria-label="Se connecter avec ${c.name}"${c.id === open ? '' : ' hidden'}>${panels[c.id]}</div>`).join('\n');
   return layout({
@@ -196,6 +246,7 @@ ${open ? '' : '<p class="hint ai-pick">Clique sur une IA pour voir comment t\'y 
 ${sections}
 ${cliModeEnabled ? claudeDialog(start) : ''}
 ${cliModeEnabled && available.openai !== false ? chatgptDialog() : ''}
+${cliModeEnabled && googleEnabled && available.gemini !== false ? googleDialog() : ''}
 </div>`,
   });
 }
