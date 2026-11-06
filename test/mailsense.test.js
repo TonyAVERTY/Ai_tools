@@ -262,13 +262,24 @@ test('aperçu : renvoie les valeurs des variables, pour retrouver dans le modèl
 const { styleProblems } = await import('../src/services/mailcheck.js');
 const GEN = 'Est-ce un sujet chez {{entreprise}}, oui, non ou plus tard ? Si ce n\'est pas le bon moment, dites-le-moi.';
 
-/** Génère un modèle de relance avec un lanceur d'IA simulé : `gen` = texte généré, `fix(prompt)` = réponse à la correction de forme (ou lève). */
-async function generate({ gen = GEN, fix }) {
-  const calls = { gen: 0, fix: 0 };
+/**
+ * Génère un modèle de relance avec un lanceur d'IA simulé : `gen` = texte généré, `fix(prompt)` = réponse à la correction de forme (ou lève),
+ * `review(prompt)` = réponse à la relecture (par défaut : illisible, donc ignorée), `sense(prompt)` = réponse au contrôle du sens (par défaut : le texte a un sens).
+ * `calls.order` : l'ordre des appels ; le modèle n'est enregistré qu'à la fin.
+ */
+async function generate({ gen = GEN, fix, review = () => 'pas du json', sense }) {
+  const calls = { gen: 0, fix: 0, review: 0, sense: 0, order: [] };
+  const ok = (text) => ({ ok: true, subtype: 'success', costUsd: 0, tokensIn: 0, tokensOut: 0, turns: 1, text });
   const claude = async (userId, o) => {
-    if (String(o.prompt).includes('CORRECTION DE FORME')) { calls.fix++; return { ok: true, subtype: 'success', costUsd: 0, tokensIn: 0, tokensOut: 0, turns: 1, text: fix(o.prompt) }; }
-    calls.gen++;
-    return { ok: true, subtype: 'success', costUsd: 0, tokensIn: 0, tokensOut: 0, turns: 1, text: JSON.stringify({ body: gen }) };
+    const prompt = String(o.prompt);
+    if (prompt.includes('CORRECTION DE FORME')) { calls.fix++; calls.order.push('fix'); return ok(fix(prompt)); }
+    if (prompt.includes('RELECTURE DU MAIL')) { calls.review++; calls.order.push('review'); return ok(review(prompt)); }
+    if (prompt.includes('CONTRÔLE DU SENS')) {
+      calls.sense++; calls.order.push('sense');
+      return ok(sense ? sense(prompt) : JSON.stringify({ results: [{ id: 1, ok: true }] }));
+    }
+    calls.gen++; calls.order.push('gen');
+    return ok(JSON.stringify({ body: gen }));
   };
   const u = await s.newUser({ admin: false, link: testTokenLink() });
   const pid = await addProject(s.db, u.id, { name: 'Fidélio', gitUrl: 'https://github.com/u/fidelio.git' });
@@ -288,7 +299,7 @@ test('génération : un texte avec des défauts de forme est corrigé une fois p
   const r = await generate({ fix: () => fixed(GOOD) });
   assert.equal(r.job.status, 'done', r.job.error);
   assert.equal(r.body, GOOD);
-  assert.deepEqual(r.calls, { gen: 1, fix: 1 }, 'une seule correction, pas de boucle');
+  assert.deepEqual([r.calls.gen, r.calls.fix], [1, 1], 'une seule correction, pas de boucle');
   assert.equal(r.job.result.styleFixed.length, 3);
   assert.deepEqual(styleProblems(r.body), []);
 });
@@ -344,4 +355,45 @@ test('changer une phrase avec une consigne : elle est donnée à l\'IA telle que
   const { rephrasePrompt } = await import('../src/services/prompts.js');
   assert.match(rephrasePrompt({ template: 'x', sentence: 'y', instruction: 'parle du prix' }).prompt, /CE QUE LA PERSONNE VEUT :\nparle du prix\n\(à suivre dans les limites des règles ci-dessus/);
   assert.doesNotMatch(rephrasePrompt({ template: 'x', sentence: 'y' }).prompt, /CE QUE LA PERSONNE VEUT/);
+});
+
+// ---------- Relecture et contrôle du sens AVANT d'enregistrer, donc avant que la personne voie le modèle généré ----------
+const reviewed = (body) => JSON.stringify({ subject: 'Relance', body, corrections: ['virgule en trop'] });
+const REVIEWED = 'Bonjour,\n\nEst-ce un sujet chez {{entreprise}} ? Sinon, dites-le-moi simplement.\n\nBien cordialement,\nTony';
+
+test('génération d\'une relance : relecture, correction de forme puis contrôle du sens, dans cet ordre, et seulement ensuite l\'enregistrement', async () => {
+  const r = await generate({ gen: GOOD, fix: () => { throw new Error('rien à corriger'); }, review: () => reviewed(REVIEWED) });
+  assert.equal(r.job.status, 'done', r.job.error);
+  assert.deepEqual(r.calls.order, ['gen', 'review', 'sense'], 'rédaction, relecture, contrôle du sens (rien à corriger dans la forme)');
+  assert.equal(r.body, REVIEWED, 'le texte enregistré est le texte relu');
+  assert.deepEqual([r.job.result.reviewed, r.job.result.senseChecked], [true, true]);
+  assert.deepEqual(r.job.result.corrections, ['virgule en trop']);
+  assert.equal(r.job.result.senseFixed, undefined);
+});
+
+test('génération : un texte qui ne veut rien dire est remplacé par la version corrigée AVANT l\'enregistrement', async () => {
+  const BAD = 'Bonjour,\n\nPour {entreprise_nom} la ça veut rien dire chez {{entreprise}} ?\n\nBien cordialement,\nTony';
+  const r = await generate({
+    gen: BAD, fix: () => { throw new Error('pas de défaut de forme'); },
+    sense: () => JSON.stringify({ results: [{ id: 1, ok: false, problem: 'La phrase d\'ouverture ne veut rien dire', fix_body: GOOD }] }),
+  });
+  assert.equal(r.job.status, 'done', r.job.error);
+  assert.equal(r.body, GOOD, 'le modèle montré est le modèle corrigé, jamais le texte brut');
+  assert.equal(r.job.result.senseFixed, 'La phrase d\'ouverture ne veut rien dire');
+});
+
+test('génération : contrôle du sens sans correction sûre, ou IA indisponible : le texte est gardé, le résultat le dit', async () => {
+  const noFix = await generate({ gen: GOOD, fix: () => { throw new Error('x'); }, sense: () => JSON.stringify({ results: [{ id: 1, ok: false, problem: 'Une phrase est étrange' }] }) });
+  assert.equal(noFix.body, GOOD);
+  assert.deepEqual([noFix.job.result.senseChecked, noFix.job.result.senseFixed], [true, undefined]);
+  const down = await generate({ gen: GOOD, fix: () => { throw new Error('x'); }, sense: () => 'pas du json' });
+  assert.equal(down.job.status, 'done', down.job.error);
+  assert.equal(down.body, GOOD, 'l\'aperçu et l\'envoi le contrôleront de toute façon');
+  assert.equal(down.job.result.senseChecked, false);
+});
+
+test('génération : une relecture qui change une variable est ignorée, le texte généré est gardé', async () => {
+  const r = await generate({ gen: GOOD, fix: () => { throw new Error('x'); }, review: () => reviewed(REVIEWED.replace('{{entreprise}}', '{{entreprise}} à {{ville}}')) });
+  assert.equal(r.body, GOOD);
+  assert.equal(r.job.result.reviewed, false);
 });
