@@ -2,7 +2,8 @@
 
 Deux façons de travailler :
 
-- **Carte blanche** : le **prompt A** ci-dessous. Claude lit l'inventaire complet du produit (`docs/PRODUIT.md`), analyse iaboss, refait toute la mise en page comme il l'entend et propose lui-même les pages ou fonctionnalités à venir. Il s'arrête à chaque étape pour que tu valides.
+- **Carte blanche** : le **prompt A** ci-dessous. Claude lit l'inventaire complet du produit (`docs/PRODUIT.md`), analyse iaboss, **retravaille toute la charte graphique (trois couleurs : deux dominantes et une d'accent)**, refait toute la mise en page comme il l'entend et propose lui-même les pages ou fonctionnalités à venir. Il s'arrête à chaque étape pour que tu valides.
+- **Charte graphique seule** : le **prompt B**, si tu veux d'abord figer les couleurs, la typographie et les composants avant de toucher aux pages.
 - **Page par page** : les prompts 0 à 14, quand tu veux garder la main sur chaque écran.
 
 Comment t'en servir (page par page) :
@@ -13,32 +14,57 @@ Comment t'en servir (page par page) :
 
 ---
 
-## Prompt A : carte blanche (analyse du produit, refonte complète, idées futures)
+## Prompt A : carte blanche (analyse du produit, charte graphique, refonte complète, idées futures)
 
 ```
-Tu es designer produit et développeur senior sur iaboss. Tu as carte blanche : tu analyses le produit, tu décides de la mise en page de TOUTE l'application, et tu proposes les pages et fonctionnalités qui, selon toi, manquent.
+Tu es designer produit et développeur senior sur iaboss. Tu as carte blanche : tu analyses le produit, tu retravailles toute la charte graphique (trois couleurs : deux dominantes et une d'accent), tu décides de la mise en page de TOUTE l'application, et tu proposes les pages et fonctionnalités qui, selon toi, manquent.
 
 Lis dans cet ordre : docs/PRODUIT.md (l'inventaire complet de ce qu'iaboss fait), CLAUDE.md (règles du dépôt, à suivre à la lettre), docs/DESIGN.md (direction artistique), docs/UX.md (retours d'action, rédaction, animations), docs/support/*.md, public/tokens.css. Prends des captures de chaque page à 1280 px et 390 px (scripts/responsive-audit.mjs, mode « shots ») et regarde-les vraiment.
 
-Tu travailles en trois temps. À la fin de CHAQUE temps tu t'arrêtes, tu me rends le document et tu attends ma validation. Tu n'écris aucun code d'application avant la fin du temps 2.
+Tu travailles en quatre temps. À la fin de CHAQUE temps tu t'arrêtes, tu me rends le document et tu attends ma validation. Tu n'écris aucun code d'application avant la fin du temps 3.
 
 TEMPS 1 : analyser le produit (docs/ANALYSE-PRODUIT.md)
 - Qui est la personne, ce qu'elle veut accomplir (ses « jobs to be done »), le parcours de bout en bout : découvrir, relier son IA, créer un projet, trouver des prospects, écrire et envoyer, suivre les réponses, conclure, facturer, tenir sa comptabilité.
 - Ce qui est le cœur du produit et ce qui est périphérique ; ce qui est répété, caché, ou au mauvais endroit ; ce qui surcharge l'écran ; ce qui manque pour que le parcours soit fluide. Appuie chaque constat sur une capture ou sur un fichier du code.
 - Les forces à garder.
 
-TEMPS 2 : la mise en page de toute l'application (docs/REFONTE-UI.md)
-- Tu es libre de tout refaire : l'architecture de l'information (quelles pages, quels regroupements, quelle navigation, quel tableau de bord), la hiérarchie de chaque écran, les composants, la densité, le mobile.
+TEMPS 2 : la charte graphique (docs/CHARTE-GRAPHIQUE.md, et une page de démonstration docs/maquettes/charte.html)
+- Tu retravailles TOUTE la charte graphique d'iaboss. La charte actuelle est décrite dans docs/DESIGN.md et vit dans public/tokens.css (indigo du logo, bleu et cyan, plus des couleurs d'état, de surlignage et de code) : analyse-la, dis ce qui est à garder, et remplace-la.
+- La contrainte, non négociable : TROIS COULEURS. Deux couleurs DOMINANTES (celles qui font l'identité : surfaces, titres, action principale, navigation) et UNE couleur d'ACCENT (pour de petites touches de couleur : un état actif, un chiffre clé, un détail qui guide l'œil). Tu choisis les trois, avec leur code hexadécimal, ce qu'elles évoquent, leur rôle exact et la part de l'écran qu'elles occupent (par exemple 60 / 30 / 10).
+- Les neutres (blanc, gris, texte) ne comptent pas comme des couleurs : tu les dérives des deux dominantes, en une échelle courte et nommée.
+- Les couleurs d'état (succès, avertissement, erreur) et les couleurs de graphique sont un point que je dois trancher avec toi : propose comment les traiter sous la contrainte des trois couleurs (par exemple icône + libellé + nuance des trois couleurs, ou une exception limitée et justifiée), sans jamais coder un état par la couleur seule. Tu me poses la question, tu ne choisis pas seul.
+- Pour la charte, livre : la palette (jetons nommés, valeur claire et valeur du thème sombre), les rapports de contraste mesurés (WCAG AA : 4,5 pour le texte, 3 pour les grands éléments et les bordures de champ), la typographie (familles, tailles, graisses, interlignes ; les polices sont embarquées, aucune ressource externe), l'espacement, les rayons, les ombres, l'iconographie, l'usage du logo, les composants (boutons, champs, badges, cartes, tableaux, fenêtres, notifications, onglets, états chargement/vide/erreur) à chaque état (repos, survol, focus, actif, désactivé, grisé « validé »), les graphiques du Récapitulatif, et les visuels de marque à refaire (logo, bannières, image de partage des réseaux).
+- Montre la charte dans une page HTML statique (docs/maquettes/charte.html) qui n'utilise que les jetons.
+- Tu proposes aussi UNE option d'identité alternative (autre paire de dominantes) pour que je compare. Tu recommandes.
+
+TEMPS 3 : la mise en page de toute l'application (docs/REFONTE-UI.md)
+- Tu es libre de tout refaire : l'architecture de l'information (quelles pages, quels regroupements, quelle navigation, quel tableau de bord), la hiérarchie de chaque écran, les composants, la densité, le mobile. Tout est écrit avec la charte validée au temps 2.
 - Propose DEUX architectures différentes, compare-les (clarté, nombre de clics, coût de mise en œuvre, risque), et recommande-en une.
 - Pour la recommandée : le plan de navigation, la mise en page de chaque écran à 1280 px et 390 px (des maquettes en HTML statique dans docs/maquettes/, qui utilisent les jetons de tokens.css), et un tableau AVANT/APRÈS qui dit où va chaque fonctionnalité de docs/PRODUIT.md. AUCUNE fonctionnalité ne disparaît sans ma décision : si tu veux en retirer ou en fusionner une, tu me poses la question.
-- Un plan de livraison en petites PR (une par écran ou par lot), du plus rentable au moins rentable.
+- Un plan de livraison en petites PR (une par écran ou par lot), du plus rentable au moins rentable ; la première PR est celle des jetons de couleur et de typographie (public/tokens.css, l'application garde la même mise en page, seule la peinture change).
 
-TEMPS 3 : pages et fonctionnalités à venir (docs/IDEES-FUTURES.md)
+TEMPS 4 : pages et fonctionnalités à venir (docs/IDEES-FUTURES.md)
 - Tu peux imaginer toutes les pages ou fonctionnalités que tu juges utiles, y compris très différentes de l'existant. Pour chacune : le problème de la personne, ce que ça ferait, la valeur, le coût, les risques (légaux, conformité des mails, sécurité, isolation des comptes), ce dont elle dépend, et une priorité.
-- Tu ne construis RIEN de fonctionnel sans mon accord. Seule la mise en page validée au temps 2 est implémentée.
+- Tu ne construis RIEN de fonctionnel sans mon accord. Seules la charte et la mise en page validées aux temps 2 et 3 sont implémentées.
 
-Après ma validation du temps 2 seulement : tu implémentes, une PR par écran vers la branche de travail.
+Après ma validation des temps 2 et 3 seulement : tu implémentes, d'abord les jetons de la charte (une PR), puis une PR par écran vers la branche de travail.
 Règles : le prompt 0 (CSP stricte, rédaction, jetons de couleur, AUCUNE animation sans mon accord présentée une par une, docs/support et visite guidée mises à jour dans le même commit, isolation par compte, tests : npm run lint, npm test, npm run ui:check). Dis clairement ce que tu n'as PAS pu tester. Si une décision est de produit, pose-moi une question précise.
+```
+
+---
+
+## Prompt B : la charte graphique seule (trois couleurs)
+
+```
+Tu es directeur artistique et développeur front sur iaboss. Tu retravailles TOUTE la charte graphique, sans toucher à la mise en page des pages.
+
+Lis : CLAUDE.md (règles du dépôt), docs/DESIGN.md (la charte actuelle), docs/UX.md, docs/PRODUIT.md (ce que fait l'application), public/tokens.css (où vivent les valeurs), public/app.css et public/site.css (où elles servent). Prends des captures de toutes les pages à 1280 px et 390 px, en clair et en sombre.
+
+La contrainte : TROIS COULEURS. Deux dominantes (l'identité : surfaces, titres, action principale, navigation) et une d'accent (de petites touches de couleur qui guident l'œil). Les neutres (blanc, gris, texte) ne comptent pas : dérive-les des deux dominantes. Les couleurs d'état (succès, avertissement, erreur) et celles des graphiques sont un point à trancher avec moi : propose des solutions, ne choisis pas seul, et ne code jamais un état par la couleur seule.
+
+1. Rends-moi docs/CHARTE-GRAPHIQUE.md : la palette (3 couleurs, codes hexadécimaux, rôle, part de l'écran), les neutres nommés, le thème sombre, les contrastes MESURÉS (WCAG AA), la typographie (polices embarquées, aucune ressource externe), l'espacement, les rayons, les ombres, l'iconographie, l'usage du logo, chaque composant à chaque état (repos, survol, focus, actif, désactivé, grisé « validé »), les graphiques du Récapitulatif, les visuels de marque à refaire (logo, bannières, image de partage). Joins une page statique docs/maquettes/charte.html qui n'utilise que les jetons, et UNE option d'identité alternative à comparer. STOP : j'ai validé.
+2. Après ma validation : une première PR qui ne change QUE public/tokens.css (et ce qui en dépend directement), puis une PR par famille de composants. Plus aucune couleur en dur ailleurs que dans tokens.css ; ajoute un test qui échoue si une couleur en dur apparaît dans app.css ou site.css.
+3. Règles : le prompt 0 (CSP stricte, rédaction, AUCUNE animation sans mon accord présentée une par une, tests npm run lint, npm test, npm run ui:check, docs/support à jour si un libellé change). Vérifie dans Chromium (clair, sombre, 1280 px et 390 px) et dis ce que tu n'as pas pu tester.
 ```
 
 ---
@@ -58,6 +84,7 @@ Lis d'abord, dans cet ordre : CLAUDE.md (règles du dépôt, à suivre à la let
 
 Règles non négociables (détail dans CLAUDE.md) :
 - CSP stricte : aucun style="…" ni <script> en ligne, aucune ressource externe. Les couleurs viennent des jetons de public/tokens.css, jamais en dur dans app.css ou site.css.
+- Charte graphique : une fois validée, docs/CHARTE-GRAPHIQUE.md fait foi (trois couleurs : deux dominantes et une d'accent, plus des neutres dérivés). Tu n'ajoutes jamais une quatrième couleur ni une valeur en dur.
 - Rédaction : on tutoie ; un succès se dit « Nom + participe passé » sans point ni « ! » ; une erreur dit ce qui n'a pas marché puis la suite après « : » ; boutons à l'infinitif. test/wording.test.js échoue sinon.
 - AUCUNE animation n'est ajoutée, changée ni retirée sans mon accord, présentée une par une (l'élément, le comportement actuel, la proposition, la valeur, le coût). Une animation en boucle n'anime que transform et opacity. Un gain de performance s'annonce mesuré avant et après.
 - Chaque nouveau bouton, section ou changement de comportement visible met à jour docs/support/ dans le même commit (les libellés exacts entre « » sont comparés par test/support-docs.test.js). Un nouvel onglet de la barre du haut ajoute son étape dans TOUR_STEPS (src/tour.js).

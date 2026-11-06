@@ -93,3 +93,5 @@ Connexion (Google ou Apple), usage du mois et plafonds, carte « Mon IA » (IA, 
 ## 5. Contraintes de réalisation
 
 CSP stricte (ni style ni script en ligne, aucune ressource externe), couleurs par jetons (`public/tokens.css`), icônes par sprite (`src/icons.js`), rédaction (tutoiement, succès en « Nom + participe passé », boutons à l'infinitif), animations seulement avec l'accord du propriétaire du produit, documentation Support et visite guidée à jour dans le même commit que toute nouveauté visible. Détail : `CLAUDE.md`, `docs/DESIGN.md`, `docs/UX.md`.
+
+**La charte graphique actuelle** (`docs/DESIGN.md` : indigo du logo, bleu et cyan, plus des couleurs d'état, de surlignage et de code) est **en cours de refonte** : la nouvelle charte tient en trois couleurs, deux dominantes et une d'accent, plus des neutres dérivés (voir `docs/REDESIGN-PROMPTS.md`, prompts A et B).
