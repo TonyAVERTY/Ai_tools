@@ -37,6 +37,9 @@ export function makeMessageId(fromEmail) {
  * `footer: false` : l'utilisateur a retiré le pied de page (Réglages → Garde-fous, avec avertissement) : aucun lien de désinscription, visible ou non.
  */
 /** Valeurs des variables {{entreprise}}, {{ville}}… pour un prospect : une seule source pour l'envoi, l'aperçu et le contrôle du sens. */
+// Exemple fictif de l'aperçu quand aucun prospect n'est choisi
+export const SAMPLE_PERSON = { company: 'Boulangerie Le Fournil', email: 'contact@lefournil.exemple', city: 'Rennes', hook: 'Vos fournées au levain naturel ont de quoi séduire les gourmands du centre-ville.', source: 'https://lefournil.exemple/contact' };
+
 export const mailVars = (prospect, smtp, site = '') => ({
   entreprise: prospect.company,
   ville: prospect.city || '',
