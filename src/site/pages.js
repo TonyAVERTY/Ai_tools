@@ -396,7 +396,7 @@ export function pricingPage({ appUrl }) {
       </article>
       <article class="card">
         <h3>Ton abonnement Claude ou ChatGPT, avec un risque</h3>
-        <p>Avec Claude (Pro, Max) ou ChatGPT (Plus, Pro, Business), tu te connectes à ton compte et iaboss récupère l'accès tout seul. Pas de facture en plus, mais les règles d'Anthropic et d'OpenAI peuvent ne pas autoriser d'utiliser un abonnement à travers une application comme iaboss. Ton compte pourrait être limité, suspendu ou fermé. Gemini n'a pas ce mode : il se relie par clé API seulement.</p>
+        <p>Avec Claude (Pro, Max) ou ChatGPT (Plus, Pro, Business), tu te connectes à ton compte et iaboss récupère l'accès tout seul. Pas de facture en plus, mais les règles d'Anthropic et d'OpenAI peuvent ne pas autoriser d'utiliser un abonnement à travers une application comme iaboss. Ton compte pourrait être limité, suspendu ou fermé. Gemini se relie par clé API ; l'abonnement Google AI n'est proposé que si l'éditeur l'a activé, et Google n'a pas dit clairement si c'est permis.</p>
         <p>iaboss ne peut pas l'empêcher et n'en est pas responsable. Une fenêtre d'avertissement et une case à cocher te le rappellent avant toute connexion, et ton accord est enregistré avec sa date. Lis les <a href="https://www.anthropic.com/legal/consumer-terms" rel="noopener noreferrer">conditions d'Anthropic</a> ou celles d'OpenAI avant de choisir. Ce mode peut aussi être désactivé sur le service.</p>
         <a class="btn btn-secondary" href="/link?start=claude">Choisir mon IA</a>
         <p class="fine">Pas encore de compte iaboss ? Le bouton te demande d'abord de te connecter, puis te ramène ici.</p>
