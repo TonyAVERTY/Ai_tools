@@ -138,18 +138,20 @@
   // ---------- Aperçu du mail ----------
   // Le serveur construit le mail avec le même code que l'envoi réel (rien n'est envoyé) ; le HTML s'affiche dans un cadre isolé (sans script ni réseau).
   let pvDlg = null;
-  const pv = { form: null, prospectId: '', variant: 'A', tab: 'html', prospects: null, seq: 0, fixBody: null, vars: {}, pick: null, mode: 'idle', rseq: 0, avoid: [], hold: false, proposal: null, instruction: '' };
+  const pv = { form: null, prospectId: '', variant: 'A', tab: 'html', prospects: null, seq: 0, verdict: null, undo: null, vars: {}, pick: null, mode: 'idle', rseq: 0, avoid: [], hold: false, proposal: null, instruction: '' };
 
   async function renderPreview() {
     hideSel();
     const form = pv.form;
     const id = form.closest('.project').dataset.id;
+    // L'IA relit D'ABORD : le texte n'est montré qu'une fois relu, et corrigé dans le modèle s'il ne voulait rien dire (voir reviewFirst)
+    if (!(await reviewFirst(id, form))) return;
     let r;
     try {
       r = await api(`/api/projects/${id}/template/preview`, {
         kind: form.dataset.kind, subject: form.subject.value, subjectB: form.subjectB?.value || '', body: form.body.value, html: form.html.checked ? 'on' : '', variant: pv.variant, prospectId: pv.prospectId,
       });
-    } catch (err) { toast(err.message, 'error'); return; }
+    } catch (err) { toast(err.message, 'error'); if (pvDlg.open && !$('[data-pv-body], .pv-frame', pvDlg)) pvDlg.close(); return; }
     if (!pv.prospects) {
       try { pv.prospects = (await api(`/api/projects/${id}/prospects`)).rows || []; } catch { pv.prospects = []; }
     }
@@ -167,7 +169,7 @@
       </div>
       ${r.note ? `<p class="muted small">${esc(r.note)}</p>` : ''}
       <dl class="pv-head"><dt>De</dt><dd>${esc(r.from)}</dd><dt>À</dt><dd>${esc(r.to)}</dd><dt>Objet</dt><dd><strong>${esc(r.subject) || '<span class="error">(vide)</span>'}</strong></dd></dl>
-      <div class="pv-sense" data-pv-sense aria-live="polite">${loadingHtml("L'IA relit le sens du mail…", { small: true })}</div>
+      <div class="pv-sense" data-pv-sense aria-live="polite">${senseHtml(pv.verdict)}</div>
       ${r.warnings.length ? `<ul class="pv-warn" role="status">${r.warnings.map((w) => `<li>${icon('alert')}<span>${esc(w)}</span></li>`).join('')}</ul>` : ''}
       ${r.html ? `<div class="seg" role="group" aria-label="Version du mail">
         <button type="button" class="btn small" data-pv-tab="html" aria-pressed="${pv.tab === 'html'}">Mail</button>
@@ -177,7 +179,6 @@
     : `<pre class="pv-text" data-pv-body>${esc(r.text)}</pre>`}
       <p class="muted small">${r.footer ? `Le lien « Ne plus recevoir de messages » ${r.sample ? 'est un lien d\'exemple' : 'est le vrai lien de ce prospect'} ; il est ajouté automatiquement à chaque mail, avec l'origine de l'adresse.` : 'Le pied de page est retiré dans Réglages → Garde-fous : le mail part tel quel, sans lien de désinscription visible.'}</p>`;
     if (!pvDlg.open) pvDlg.showModal();
-    senseCheck(id, form);
   }
 
   // ---------- Phrase sélectionnée dans l'aperçu : « Changer » (l'IA propose une autre phrase) ou « Modifier » (à la main) ----------
@@ -293,29 +294,60 @@
   listen(document, 'selectionchange', onSelection);
   listen(document, 'scroll', () => { if (pvDlg?.open && pv.pick) showSel(); }, true); // capture : la fenêtre et le cadre du texte défilent chacun
 
-  // L'IA de la personne relit le mail rempli : a-t-il un sens ? Sinon elle propose une version corrigée du modèle, appliquée seulement au clic.
-  // `seq` : un résultat arrivé après un changement de prospect ou d'objet est ignoré.
-  async function senseCheck(id, form) {
+  // L'IA de la personne relit le mail rempli AVANT qu'on le lui montre : a-t-il un sens ? Sinon elle le corrige dans le MODÈLE (sauf s'il est validé et grisé :
+  // alors elle propose, et la personne clique « Modifier »), pour que le champ et l'aperçu disent la même chose ; « Annuler la correction » remet l'ancien texte.
+  // Le résultat est gardé pour le même texte et le même prospect : changer d'onglet ou d'objet ne relance pas l'IA. `seq` : une réponse arrivée après une
+  // autre demande, ou après la fermeture de la fenêtre, est ignorée. Renvoie false si la page doit s'arrêter là.
+  const senseKey = (form) => JSON.stringify([form.dataset.kind, form.subject.value, form.body.value, pv.prospectId]);
+  function showReviewing() {
+    hideSel();
+    $('[data-dialog-body]', pvDlg).innerHTML = `
+      <div class="row dlg-head"><div><h3>${icon('eye')} Aperçu du ${pv.form.dataset.kind === 'followup' ? 'mail de relance' : 'premier mail'}</h3>
+        <p class="muted small">Voilà ce que le prospect reçoit. Rien n'est envoyé.</p></div><button type="button" class="btn small" data-close>Fermer</button></div>
+      <div class="pv-sense" aria-live="polite">${loadingHtml(`${aiName()} relit le mail avant de te le montrer…`)}</div>`;
+    if (!pvDlg.open) pvDlg.showModal();
+  }
+  async function reviewFirst(id, form) {
+    const key = senseKey(form);
+    if (pv.verdict?.key === key) return true;
     const mine = ++pv.seq;
-    pv.fixBody = null;
+    showReviewing();
     let r;
     try {
       r = await api(`/api/projects/${id}/template/sense`, { kind: form.dataset.kind, subject: form.subject.value, body: form.body.value, prospectId: pv.prospectId });
     } catch (err) { r = { unavailable: true, reason: err.message }; }
-    const box = $('[data-pv-sense]', pvDlg);
-    if (mine !== pv.seq || !box) return;
+    if (mine !== pv.seq || !pvDlg.open) return false;
+    const locked = form.classList.contains('tpl-locked');
     if (r.unavailable) {
-      box.innerHTML = `<ul class="pv-warn" role="status"><li>${icon('alert')}<span>${esc(aiName())} n'a pas pu relire le sens de ce mail : ${esc(String(r.reason || 'réponse indisponible').replace(/[.\s]+$/, ''))}. L'envoi attend cette relecture.</span></li></ul>`;
+      pv.verdict = { key: null, kind: 'down', reason: r.reason }; // pas gardé : on réessaie à la prochaine ouverture
     } else if (r.sense) {
-      box.innerHTML = `<p class="small"><span class="badge ok">${icon('check')}Sens vérifié</span> ${esc(aiName())} a relu ce mail.</p>`;
+      pv.verdict = { key, kind: 'ok' };
+    } else if (r.fixBody && !locked) {
+      pv.undo = form.body.value;
+      form.body.value = r.fixBody;
+      form.body.dispatchEvent(new Event('input', { bubbles: true }));
+      pv.verdict = { key: senseKey(form), kind: 'fixed', problem: r.problem };
     } else {
-      pv.fixBody = r.fixBody || null;
-      box.innerHTML = `<ul class="pv-warn" role="status"><li>${icon('alert')}<span><strong>Ce mail ne veut pas dire grand-chose.</strong> ${esc(r.problem || '')}</span></li></ul>
-        ${r.fixBody ? `<p class="small">Version corrigée proposée par ${esc(aiName())} :</p><pre class="pv-text">${esc(r.fixedText || r.fixBody)}</pre>
-        <p><button type="button" class="btn small primary" data-pv-apply>Appliquer la correction au modèle</button></p>
-        <p class="muted small">Le modèle ne change pas tant que tu n'as pas cliqué. Tu pourras ensuite le retoucher avant de l'enregistrer et de le valider.</p>`
-    : `<p class="muted small">Aucune correction sûre n'a pu être proposée : retouche le texte du modèle, puis rouvre l'aperçu.</p>`}`;
+      pv.verdict = { key, kind: 'bad', problem: r.problem, proposal: r.fixedText || r.fixBody || null, locked };
     }
+    return true;
+  }
+  function senseHtml(v) {
+    const ai = esc(aiName());
+    if (!v) return '';
+    if (v.kind === 'down') {
+      return `<ul class="pv-warn" role="status"><li>${icon('alert')}<span>${ai} n'a pas pu relire le sens de ce mail : ${esc(String(v.reason || 'réponse indisponible').replace(/[.\s]+$/, ''))}. L'envoi attend cette relecture.</span></li></ul>`;
+    }
+    if (v.kind === 'ok') return `<p class="small"><span class="badge ok">${icon('check')}Sens vérifié</span> ${ai} a relu ce mail.</p>`;
+    if (v.kind === 'fixed') {
+      return `<p class="small"><span class="badge ok">${icon('check')}Corrigé</span> ${ai} a relu ce mail avant de te le montrer et l'a corrigé : ${esc(v.problem || '')}</p>
+        <p class="muted small">La correction est dans le modèle (champ du mail), pas encore enregistrée. <button type="button" class="btn small" data-pv-undo>Annuler la correction</button></p>`;
+    }
+    if (v.kind === 'declined') return '<p class="muted small">Correction annulée : ton texte d\'origine est gardé. L\'envoi relira le sens du mail de toute façon.</p>';
+    return `<ul class="pv-warn" role="status"><li>${icon('alert')}<span><strong>Ce mail ne veut pas dire grand-chose.</strong> ${esc(v.problem || '')}</span></li></ul>
+      ${v.proposal ? `<p class="small">Version corrigée proposée par ${ai} :</p><pre class="pv-text">${esc(v.proposal)}</pre>
+      <p class="muted small">Le modèle est validé, donc grisé : clique « Modifier » sur le modèle, puis rouvre l'aperçu, et ${ai} le corrigera avant de te le montrer.</p>`
+    : '<p class="muted small">Aucune correction sûre n\'a pu être proposée : retouche le texte du modèle, puis rouvre l\'aperçu.</p>'}`;
   }
 
   listen(document, 'click', async (e) => {
@@ -336,11 +368,12 @@
           if (ev.target.closest('[data-pv-use]') && pv.proposal) { usePick(); return; }
           if (ev.target.closest('[data-pv-more]') && pv.pick) { if (pv.proposal) pv.avoid.push(pv.proposal); pv.proposal = null; changePick(); return; }
           if (ev.target.closest('[data-pv-cancel]')) { hideSel(); return; }
-          if (ev.target.closest('[data-pv-apply]') && pv.fixBody) {
-            pv.form.body.value = pv.fixBody;
+          if (ev.target.closest('[data-pv-undo]') && pv.undo !== null) {
+            pv.form.body.value = pv.undo;
             pv.form.body.dispatchEvent(new Event('input', { bubbles: true }));
-            pv.fixBody = null;
-            toast('Correction appliquée');
+            pv.undo = null;
+            pv.verdict = { key: senseKey(pv.form), kind: 'declined' }; // le texte d'origine est gardé : l'IA ne le re-corrige pas à l'affichage
+            toast('Correction annulée');
             renderPreview();
             return;
           }
@@ -356,7 +389,7 @@
         pvDlg.addEventListener('close', hideSel);
         pvDlg.addEventListener('change', (ev) => { if (ev.target.matches('[data-pv-prospect]')) { pv.prospectId = ev.target.value; renderPreview(); } });
       }
-      Object.assign(pv, { form: open.closest('form'), prospectId: '', variant: 'A', tab: 'html', prospects: null });
+      Object.assign(pv, { form: open.closest('form'), prospectId: '', variant: 'A', tab: 'html', prospects: null, undo: null });
       open.disabled = true;
       await renderPreview();
       open.disabled = false;

@@ -18,7 +18,7 @@ import { createJobStream } from './services/jobstream.js';
 import { reserveVideo, finishVideo, removeVideo, countVideos, keepScene, takeScene, getVoiceKey, getVoiceRegion } from './promo.js';
 import { linkedinAccount, saveDraft, recentDrafts } from './linkedin.js';
 import { followupCandidates, followupSubject, isBusinessHours } from './services/followup.js';
-import { EMAIL_RE, createTransport, buildProspectMail, allowedToSend, makeMessageId, mailVars } from './services/mailer.js';
+import { EMAIL_RE, createTransport, buildProspectMail, allowedToSend, makeMessageId, mailVars, SAMPLE_PERSON } from './services/mailer.js';
 import { unsubToken } from './crypto.js';
 import { resolveCredentials, markLinkInvalid, userProvider, saveRefreshedAuth } from './claudelink.js';
 import { userRepoRoot, userChatRoot } from './users.js';
@@ -258,6 +258,53 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
       if (ctx.signal?.aborted || e.status === 403) throw e;
     }
     return { body, fixed: [] };
+  }
+
+  /**
+   * Relecture de la forme par l'IA (langue, ponctuation, signature) : facultative, retenue seulement si elle ne change ni variables ni adresses.
+   * Même relecture pour le premier mail et pour la relance : la personne ne voit jamais un texte que l'IA n'a pas relu.
+   */
+  async function reviewTemplate(ctx, userId, model, mail, label) {
+    let corrections = [];
+    let reviewed = false;
+    await ctx.progress({ message: `Relecture ${label} par l'IA…`, pct: 80 });
+    try {
+      const rp = reviewMailPrompt(mail);
+      const rr = await creeping(ctx, `Relecture ${label} par l'IA…`, 80, () => claude(userId, { prompt: rp.prompt, system: rp.system, model, maxTurns: 1, tools: [], signal: ctx.signal }), { to: 98, ms: 20_000 });
+      addUsage(ctx, rr);
+      const fixed = extractJson(rr.text);
+      if (acceptReview(mail, fixed)) {
+        mail = { subject: fixed.subject.trim(), subjectB: mail.subjectB ? String(fixed.subject_b).replace(/\s+/g, ' ').trim() : '', body: tidyTemplateText(fixed.body) };
+        corrections = (Array.isArray(fixed.corrections) ? fixed.corrections : []).map((c) => String(c).trim().slice(0, 100)).filter(Boolean).slice(0, 6);
+        reviewed = true;
+      }
+    } catch (e) {
+      if (ctx.signal?.aborted || e.status === 403) throw e; // annulation, ou accès à l'IA perdu : on ne l'avale pas
+    }
+    return { mail, corrections, reviewed };
+  }
+
+  /**
+   * Contrôle du sens d'un modèle tout juste écrit, rempli avec l'exemple fictif de l'aperçu : « Pour {entreprise_nom} » ne veut rien dire.
+   * Une correction sûre (mêmes variables, texte proche) remplace le corps avant l'enregistrement. IA indisponible : le modèle est gardé,
+   * l'aperçu et l'envoi le contrôleront de toute façon.
+   * @returns {Promise<{mail: object, checked: boolean, problem: string|null, fixed: boolean}>}
+   */
+  async function senseGate(ctx, userId, model, kind, mail, project) {
+    const vars = mailVars(SAMPLE_PERSON, { fromName: project.smtp?.fromName || '' }, project.siteUrl);
+    const item = { id: 1, subject: kind === 'initial' ? fillSubject(mail.subject, vars) : '', body: fillBody(mail.body, vars).replace(/\n{3,}/g, '\n\n').trim() };
+    await ctx.progress({ message: "L'IA vérifie que le texte veut dire quelque chose…", pct: 96 });
+    try {
+      const { verdicts, run } = await checkSense({ claude, userId, model, signal: ctx.signal, kind, template: mail.body, items: [item] });
+      addUsage(ctx, run);
+      const v = verdicts.get(1);
+      if (v.ok) return { mail, checked: true, problem: null, fixed: false };
+      if (v.fixBody) return { mail: { ...mail, body: tidyTemplateText(v.fixBody) }, checked: true, problem: v.problem, fixed: true };
+      return { mail, checked: true, problem: v.problem, fixed: false };
+    } catch (e) {
+      if (ctx.signal?.aborted || !(e instanceof SenseUnavailable)) throw e;
+      return { mail, checked: false, problem: null, fixed: false };
+    }
   }
 
   // Premier mail ou relance : mêmes plafonds, mêmes délais, même journal
@@ -557,27 +604,16 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
       const sb = String(t.subject_b ?? '').replace(/\s+/g, ' ').trim();
       const subjectB = sb && sb.length <= 120 && sb.toLowerCase() !== String(t.subject).trim().toLowerCase() ? sb : '';
       let mail = { subject: String(t.subject).trim(), subjectB, body: tidyTemplateText(t.body) };
-      // Relecture par Claude (langue, ponctuation, signature) : facultative, retenue seulement si elle ne change ni variables ni adresses
-      let corrections = [];
-      let reviewed = false;
-      await ctx.progress({ message: 'Relecture du mail par Claude…', pct: 80 });
-      try {
-        const rp = reviewMailPrompt(mail);
-        const rr = await creeping(ctx, 'Relecture du mail par Claude…', 80, () => claude(userId, { prompt: rp.prompt, system: rp.system, model, maxTurns: 1, tools: [], signal: ctx.signal }), { to: 98, ms: 20_000 });
-        addUsage(ctx, rr);
-        const fixed = extractJson(rr.text);
-        if (acceptReview(mail, fixed)) {
-          mail = { subject: fixed.subject.trim(), subjectB: mail.subjectB ? String(fixed.subject_b).replace(/\s+/g, ' ').trim() : '', body: tidyTemplateText(fixed.body) };
-          corrections = (Array.isArray(fixed.corrections) ? fixed.corrections : []).map((c) => String(c).trim().slice(0, 100)).filter(Boolean).slice(0, 6);
-          reviewed = true;
-        }
-      } catch (e) {
-        if (ctx.signal?.aborted || e.status === 403) throw e; // annulation, ou accès Claude perdu : on ne l'avale pas
-      }
+      // Relecture par l'IA (langue, ponctuation, signature), puis contrôle du sens : le modèle n'est enregistré, donc montré, qu'après
+      const rv = await reviewTemplate(ctx, userId, model, mail, 'du mail');
+      const { corrections, reviewed } = rv;
+      mail = rv.mail;
       const mended = await mendStyle(ctx, userId, model, 'initial', mail.body);
       mail = { ...mail, body: mended.body };
+      const gate = await senseGate(ctx, userId, model, 'initial', mail, project);
+      mail = gate.mail;
       await saveTemplate(db, project.id, 'initial', mail);
-      return { ok: true, reviewed, corrections, ...(mended.fixed.length ? { styleFixed: mended.fixed } : {}) };
+      return { ok: true, reviewed, corrections, senseChecked: gate.checked, ...(gate.fixed ? { senseFixed: gate.problem } : {}), ...(mended.fixed.length ? { styleFixed: mended.fixed } : {}) };
     },
 
     async followup_template(ctx) {
@@ -591,9 +627,13 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
       addUsage(ctx, r);
       const t = extractJson(r.text);
       if (!t.body) throw new Error('Modèle de relance invalide');
-      const mended = await mendStyle(ctx, userId, model, 'followup', tidyTemplateText(t.body));
-      await saveTemplate(db, project.id, 'followup', { subject: '', body: mended.body });
-      return { ok: true, ...(mended.fixed.length ? { styleFixed: mended.fixed } : {}) };
+      // Comme le premier mail : relecture de la forme, correction de style, contrôle du sens, PUIS enregistrement
+      // La relance n'a pas d'objet à elle (« Re: » + celui du premier mail) : la relecture en demande un, on lui en donne un d'attente qui est ignoré ensuite
+      const rv = await reviewTemplate(ctx, userId, model, { subject: 'Relance', subjectB: '', body: tidyTemplateText(t.body) }, 'de la relance');
+      const mended = await mendStyle(ctx, userId, model, 'followup', rv.mail.body);
+      const gate = await senseGate(ctx, userId, model, 'followup', { subject: '', subjectB: '', body: mended.body }, project);
+      await saveTemplate(db, project.id, 'followup', { subject: '', body: gate.mail.body });
+      return { ok: true, reviewed: rv.reviewed, corrections: rv.corrections, senseChecked: gate.checked, ...(gate.fixed ? { senseFixed: gate.problem } : {}), ...(mended.fixed.length ? { styleFixed: mended.fixed } : {}) };
     },
 
     // Facturation : trois exemples de devis. Claude écrit le texte et propose les lignes ; les mentions légales et les totaux viennent du code.
