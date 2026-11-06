@@ -83,7 +83,7 @@ export function buildArgs(o) {
 }
 
 /** Réponse qui signifie « accès refusé » (connexion absente, expirée, révoquée) : au sens strict, jamais une panne réseau ni un quota épuisé. */
-export const isAuthRefusal = (text) => /authentication required|please visit the url to log in|invalid_grant|unauthenticated|token (has )?(expired|been revoked)|not logged in|login required/i.test(String(text ?? ''));
+export const isAuthRefusal = (text) => /authentication (required|failed)|please visit the url to log in|invalid_grant|unauthenticated|token (has )?(expired|been revoked)|not logged in|login required/i.test(String(text ?? ''));
 
 /** Valeurs du fichier de connexion à masquer dans tout ce qui sort : le fichier entier, et chaque texte assez long s'il est en JSON. */
 export function tokenSecrets(authFile) {
@@ -155,6 +155,7 @@ export function runAgy(o) {
         }
       } else if (ev.event === 'result') {
         result = ev.result || {};
+        if (result.error) errors.push(String(result.error)); // sans connexion valable, agy répond « authentication failed or timed out » (sans terminal, il ne peut pas demander de se reconnecter)
       } else if (ev.event === 'error' || ev.error) {
         errors.push(String(ev.message ?? ev.error?.message ?? ev.error ?? ''));
       }
@@ -172,7 +173,7 @@ export function runAgy(o) {
     child.on('close', (code) => {
       done();
       if (buf.trim()) handle(buf.trim());
-      if (needLogin) return reject(new Error('Authentication required : la connexion du compte Google est expirée ou révoquée.'));
+      if (needLogin || isAuthRefusal(result?.error)) return reject(new Error('Authentication required : la connexion du compte Google est expirée ou révoquée.'));
       if (!result && !tooMany) return reject(new Error(redact(`Antigravity s'est arrêté sans résultat (code ${code}). ${[...errors, stderr.trim()].filter(Boolean).join(' ')}`)));
       const u = result?.usage || {};
       const tokensIn = (Number(u.input_tokens) || 0) + (Number(u.cache_read_tokens) || 0);

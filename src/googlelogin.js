@@ -1,8 +1,9 @@
 // Connexion guidée à Google (abonnement Google AI) : le serveur lance Antigravity CLI (`agy`) pour l'utilisateur, lui donne le lien de connexion,
 // puis, quand il recopie le code que Google affiche, transmet ce code au CLI et capte le fichier de connexion qu'il écrit.
 // Comportement observé sur un vrai agy 1.5.2 : sans connexion, `agy -p …` affiche « Authentication required. Please visit the URL to log in: <lien> »,
-// puis « Waiting for authentication (timeout 60s)… Or paste the authorization code here and press Enter » : le code se donne sur l'entrée standard,
-// et le CLI n'attend que 60 secondes. Le HOME est jetable (le fichier de connexion y est écrit, jamais ailleurs), l'environnement assaini.
+// puis « Waiting for authentication (timeout 60s)… Or paste the authorization code here and press Enter », et le CLI n'attend que 60 secondes.
+// IL A BESOIN D'UN TERMINAL : lancé sans terminal (comme le fait le serveur), il s'arrête tout de suite sur « authentication failed or timed out », sans lien
+// (constaté sur le serveur le 6 novembre 2026). Il est donc lancé dans `script` (util-linux), comme la connexion à Claude (claudelogin.js) : le code est écrit sur ce terminal. Le HOME est jetable (le fichier de connexion y est écrit, jamais ailleurs), l'environnement assaini.
 // Le lancement exécute aussi une toute petite demande (« ok ») : tous les outils sont refusés (mêmes règles que le moteur, providers/agy.js).
 // Une seule connexion par utilisateur, quelques-unes en même temps sur le serveur.
 import { spawn } from 'node:child_process';
@@ -29,6 +30,7 @@ const CODE_RE = /^[A-Za-z0-9_\-/.~#%]{8,600}$/;
 // eslint-disable-next-line no-control-regex
 const ANSI = /\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g;
 const clean = (out) => String(out).replace(ANSI, '').replace(/\r/g, '');
+const shq = (s) => `'${String(s).split("'").join("'\\''")}'`;
 const busy = (msg) => new HttpError(503, msg, { expose: true });
 
 /** Lien de connexion contenu dans la sortie du CLI (https, chez Google, SANS coupure : toute l'adresse), ou null. */
@@ -84,8 +86,10 @@ export class GoogleLogins {
     mkdirSync(join(home, ...TOKEN_FILE.slice(0, -1)), { recursive: true, mode: 0o700 });
     const id = randomId(18);
     const s = { userId, home, out: '', done: false, exit: null, events: new EventEmitter() };
+    // stty : un terminal très large, pour que le lien (près de 1000 caractères) ne soit jamais coupé sur deux lignes
+    const cmd = `stty cols 4000 rows 50; exec ${[cfg.agyBin, ...buildArgs({ prompt: 'Réponds uniquement : ok', model: CATALOG_DEFAULT, tools: [], maxTurns: 1 })].map(shq).join(' ')}`;
     try {
-      s.proc = spawn(cfg.agyBin, buildArgs({ prompt: 'Réponds uniquement : ok', model: CATALOG_DEFAULT, tools: [], maxTurns: 1 }), {
+      s.proc = spawn('script', ['-qefc', cmd, '/dev/null'], {
         cwd: home, env: buildChildEnv(process.env, { home }), stdio: ['pipe', 'pipe', 'pipe'],
       });
     } catch {
@@ -122,7 +126,8 @@ export class GoogleLogins {
     const c = String(code ?? '').trim();
     if (!CODE_RE.test(c)) throw new HttpError(400, 'Code invalide : recopie-le en entier, sans espace, tel que Google l\'affiche.');
     if (s.done) { this.#drop(String(id)); throw new HttpError(400, 'Le délai de Google est passé (60 secondes) : recommence, avec un nouveau lien.'); }
-    s.proc.stdin.write(`${c}\n`);
+    s.code = c;
+    s.proc.stdin.write(`${c}\r`); // sur le terminal du CLI, « Entrée » est un retour chariot
     await new Promise((resolve) => {
       if (s.done) return resolve();
       const t = setTimeout(resolve, FINISH_WAIT_MS);
@@ -131,7 +136,7 @@ export class GoogleLogins {
     });
     let authFile = '';
     try { authFile = readFileSync(join(s.home, ...TOKEN_FILE), 'utf8'); } catch { /* pas de fichier : code refusé */ }
-    const tail = readableTail(s.out);
+    const tail = readableTail(s.out.split(c).join('***')); // le terminal répète ce qu'on tape : le code n'entre jamais dans le journal
     this.#drop(String(id));
     if (!authFile.trim()) {
       console.warn(`Connexion Google refusée (compte ${Number(userId)}) : ${tail}`);
