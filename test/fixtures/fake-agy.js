@@ -25,6 +25,11 @@ if (process.env.FAKE_LOG) appendFileSync(process.env.FAKE_LOG, `end ${Date.now()
 // Pas de connexion, ou connexion révoquée : comme le vrai agy, un lien et l'attente d'un code sur l'entrée standard.
 // Entrée fermée (lancement d'une tâche) : on attend, c'est le moteur qui l'arrête. Entrée ouverte (connexion guidée) : le code « GOODCODE… » connecte, tout autre est refusé.
 if (!token || token.includes('EXPIRED')) {
+  // Comme le vrai agy 1.5.2 SANS terminal : il ne peut pas demander le code, il s'arrête tout de suite, sans lien (constaté sur le serveur le 6 novembre 2026)
+  if (!process.stdin.isTTY) {
+    out({ event: 'result', result: { conversation_id: '', status: 'ERROR', response: '', error: 'authentication failed or timed out', duration_seconds: 0, num_turns: 0, usage: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, cache_read_tokens: 0, total_tokens: 0 }, finished_reason: 'error' } });
+    process.exit(1);
+  }
   const url = 'https://accounts.google.com/o/oauth2/auth?access_type=offline&client_id=x.apps.googleusercontent.com&code_challenge=abc&code_challenge_method=S256&redirect_uri=http%3A%2F%2Flocalhost%3A1&response_type=code&scope=openid&state=s';
   process.stdout.write(`Authentication required. Please visit the URL to log in:\n  ${url}\n\nWaiting for authentication (timeout 60s)...\nOr paste the authorization code here and press Enter:\n`);
   const line = await new Promise((resolve) => {
