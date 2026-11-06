@@ -630,7 +630,7 @@ EOF
   set_env DATA_DIR "$DATA_DIR"
   set_env CLAUDE_BIN "$claude_bin"
   local bin
-  for bin in codex:CODEX_BIN gemini:GEMINI_BIN; do
+  for bin in codex:CODEX_BIN gemini:GEMINI_BIN agy:AGY_BIN; do
     command -v "${bin%%:*}" >/dev/null && set_env "${bin##*:}" "$(command -v "${bin%%:*}")"
   done
   chown "$APP_USER:" "$f"; chmod 600 "$f"

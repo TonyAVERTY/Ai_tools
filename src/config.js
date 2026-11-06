@@ -156,6 +156,9 @@ export function loadConfig() {
     dataDir: resolve(env.DATA_DIR || './data'),
     claudeBin: env.CLAUDE_BIN || 'claude',
     geminiBin: env.GEMINI_BIN || 'gemini',
+    agyBin: env.AGY_BIN || 'agy',
+    // Connexion par compte Google (Antigravity CLI) : désactivée par défaut, la règle de Google sur l'usage depuis un autre logiciel n'est pas tranchée
+    googleAccountEnabled: /^(1|true|yes|on)$/i.test(String(env.GOOGLE_ACCOUNT_ENABLED || '')),
     codexBin: env.CODEX_BIN || 'codex',
     // Mode « abonnement » (jeton claude setup-token) : désactivable globalement
     cliModeEnabled: flag(env.CLAUDE_CLI_MODE_ENABLED, true),
