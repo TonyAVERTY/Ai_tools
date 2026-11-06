@@ -1,10 +1,45 @@
 # Prompts pour retravailler l'UI/UX d'iaboss avec Claude Code
 
-Comment t'en servir :
+Deux façons de travailler :
+
+- **Carte blanche** : le **prompt A** ci-dessous. Claude lit l'inventaire complet du produit (`docs/PRODUIT.md`), analyse iaboss, refait toute la mise en page comme il l'entend et propose lui-même les pages ou fonctionnalités à venir. Il s'arrête à chaque étape pour que tu valides.
+- **Page par page** : les prompts 0 à 14, quand tu veux garder la main sur chaque écran.
+
+Comment t'en servir (page par page) :
 
 1. **Une session par prompt**, dans cet ordre : le prompt 0 (contexte) puis le prompt 1 (audit) dans la même session ; ensuite **un prompt de page par session** (2 à 13), toujours précédé du prompt 0.
 2. Claude Code **ne code rien avant d'avoir montré son plan** : tu valides, puis il fait une PR par page vers `develop`.
 3. Chaque prompt dit ce que la page fait, ce que la personne veut y faire, ce qui est déjà connu comme gênant, et ce qu'il ne faut pas casser. Le reste (mise en page, composants, détails) est laissé à Claude Code, qui lit `docs/DESIGN.md`, `docs/UX.md` et le code.
+
+---
+
+## Prompt A : carte blanche (analyse du produit, refonte complète, idées futures)
+
+```
+Tu es designer produit et développeur senior sur iaboss. Tu as carte blanche : tu analyses le produit, tu décides de la mise en page de TOUTE l'application, et tu proposes les pages et fonctionnalités qui, selon toi, manquent.
+
+Lis dans cet ordre : docs/PRODUIT.md (l'inventaire complet de ce qu'iaboss fait), CLAUDE.md (règles du dépôt, à suivre à la lettre), docs/DESIGN.md (direction artistique), docs/UX.md (retours d'action, rédaction, animations), docs/support/*.md, public/tokens.css. Prends des captures de chaque page à 1280 px et 390 px (scripts/responsive-audit.mjs, mode « shots ») et regarde-les vraiment.
+
+Tu travailles en trois temps. À la fin de CHAQUE temps tu t'arrêtes, tu me rends le document et tu attends ma validation. Tu n'écris aucun code d'application avant la fin du temps 2.
+
+TEMPS 1 : analyser le produit (docs/ANALYSE-PRODUIT.md)
+- Qui est la personne, ce qu'elle veut accomplir (ses « jobs to be done »), le parcours de bout en bout : découvrir, relier son IA, créer un projet, trouver des prospects, écrire et envoyer, suivre les réponses, conclure, facturer, tenir sa comptabilité.
+- Ce qui est le cœur du produit et ce qui est périphérique ; ce qui est répété, caché, ou au mauvais endroit ; ce qui surcharge l'écran ; ce qui manque pour que le parcours soit fluide. Appuie chaque constat sur une capture ou sur un fichier du code.
+- Les forces à garder.
+
+TEMPS 2 : la mise en page de toute l'application (docs/REFONTE-UI.md)
+- Tu es libre de tout refaire : l'architecture de l'information (quelles pages, quels regroupements, quelle navigation, quel tableau de bord), la hiérarchie de chaque écran, les composants, la densité, le mobile.
+- Propose DEUX architectures différentes, compare-les (clarté, nombre de clics, coût de mise en œuvre, risque), et recommande-en une.
+- Pour la recommandée : le plan de navigation, la mise en page de chaque écran à 1280 px et 390 px (des maquettes en HTML statique dans docs/maquettes/, qui utilisent les jetons de tokens.css), et un tableau AVANT/APRÈS qui dit où va chaque fonctionnalité de docs/PRODUIT.md. AUCUNE fonctionnalité ne disparaît sans ma décision : si tu veux en retirer ou en fusionner une, tu me poses la question.
+- Un plan de livraison en petites PR (une par écran ou par lot), du plus rentable au moins rentable.
+
+TEMPS 3 : pages et fonctionnalités à venir (docs/IDEES-FUTURES.md)
+- Tu peux imaginer toutes les pages ou fonctionnalités que tu juges utiles, y compris très différentes de l'existant. Pour chacune : le problème de la personne, ce que ça ferait, la valeur, le coût, les risques (légaux, conformité des mails, sécurité, isolation des comptes), ce dont elle dépend, et une priorité.
+- Tu ne construis RIEN de fonctionnel sans mon accord. Seule la mise en page validée au temps 2 est implémentée.
+
+Après ma validation du temps 2 seulement : tu implémentes, une PR par écran vers la branche de travail.
+Règles : le prompt 0 (CSP stricte, rédaction, jetons de couleur, AUCUNE animation sans mon accord présentée une par une, docs/support et visite guidée mises à jour dans le même commit, isolation par compte, tests : npm run lint, npm test, npm run ui:check). Dis clairement ce que tu n'as PAS pu tester. Si une décision est de produit, pose-moi une question précise.
+```
 
 ---
 
