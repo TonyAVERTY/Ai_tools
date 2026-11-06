@@ -103,8 +103,12 @@ test('une IA dont l\'outil manque sur le serveur est grisée, sans options, et ?
     assert.match(h, /data-ai-card="claude"/);
     assert.match(h, /data-ai-card="gemini"/);
   } finally { await off.close(); }
-  assert.deepEqual(availableProviders({ codexBin: '/nulle/part/codex', geminiBin: BIN }), { claude: true, openai: false, gemini: true });
-  assert.deepEqual(availableProviders({ codexBin: 'codex', geminiBin: 'gemini' }, { resolveBin: (b) => (b === 'gemini' ? '/usr/bin/gemini' : null) }), { claude: true, openai: false, gemini: true });
+  assert.deepEqual(availableProviders({ codexBin: '/nulle/part/codex', geminiBin: BIN }), { claude: true, openai: false, gemini: true, geminiKey: true, googleAccount: false });
+  assert.deepEqual(availableProviders({ codexBin: 'codex', geminiBin: 'gemini' }, { resolveBin: (b) => (b === 'gemini' ? '/usr/bin/gemini' : null) }), { claude: true, openai: false, gemini: true, geminiKey: true, googleAccount: false });
+  // Compte Google : la carte Gemini est proposée si Antigravity CLI est installé ET que l'administrateur a activé le mode, même sans Gemini CLI
+  const onlyAgy = (b) => (b === 'agy' ? '/usr/bin/agy' : null);
+  assert.deepEqual(availableProviders({}, { resolveBin: onlyAgy }), { claude: true, openai: false, gemini: false, geminiKey: false, googleAccount: false }, 'désactivé : agy seul ne suffit pas');
+  assert.deepEqual(availableProviders({}, { resolveBin: onlyAgy, googleEnabled: true }), { claude: true, openai: false, gemini: true, geminiKey: false, googleAccount: true });
 });
 
 test('abonnement désactivé sur le service : seules les clés API sont proposées, rien ne parle d\'abonnement ni de compte', async () => {

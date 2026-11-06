@@ -17,7 +17,7 @@ import { prepareLaunch } from '../sandbox.js';
 import { estimateCost } from '../pricing.js';
 import { HttpError } from '../../http.js';
 import { SECRET_ENV } from './secretenv.js';
-import { runAgy, isAuthRefusal as isAgyRefusal } from './agy.js';
+import { runAgy, validateAccount, isAuthRefusal as isAgyRefusal } from './agy.js';
 
 const MODELS_URL = 'https://generativelanguage.googleapis.com/v1beta/models?pageSize=1';
 
@@ -172,6 +172,7 @@ export const geminiProvider = {
   bin: (cfg, mode) => (mode === 'google_account' ? cfg.agyBin : cfg.geminiBin),
   // Avec un compte Google (fichier de connexion), c'est Antigravity CLI ; avec une clé API, Gemini CLI
   run: (o) => (o.authFile ? runAgy(o) : runGemini(o)),
+  validateAccount,
   rateLimitWindows: () => null,
   isAuthRefusal: (text) => isAuthRefusal(text) || isAgyRefusal(text),
 };
