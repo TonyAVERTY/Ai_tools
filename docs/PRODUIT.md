@@ -8,7 +8,7 @@ Ce document liste **tout ce qu'iaboss fait aujourd'hui**, page par page, pour qu
 - **Pour qui** : des personnes proches du code (elles ont un dépôt Git), sans service commercial. Ton : franc, concret, on se tutoie.
 - **Principe de fond** : l'IA tourne toujours **avec l'accès de la personne** (clé API, abonnement Claude, compte ChatGPT ou abonnement Google AI), jamais un compte partagé ; elle ne peut que **lire** (pas de commande, pas d'écriture de fichiers) ; chaque donnée est filtrée par compte ; la personne relit tout avant l'envoi.
 - **Stack** : Node 22 sans framework, HTML rendu côté serveur, scripts navigateur en JS natif, SQLite (tests) ou MySQL/MariaDB (production), tâches IA en arrière-plan dans un bac à sable.
-- **Offres** (`plans-et-limites.md`) : gratuit, Démarrage (10 €/mois), Croissance (25 €/mois), Business (50 €/mois, annuel avec deux mois offerts) ; plafonds mensuels de projets, prospects, mails, jobs IA, jobs simultanés et places d'équipe.
+- **Offres** (`plans-et-limites.md`) : gratuit, Démarrage (10 €/mois), Croissance (25 €/mois), Business (50 €/mois), Intensif (100 €/mois) et pro (illimité, sur demande) ; annuel avec deux mois offerts ; plafonds mensuels de projets, prospects, mails, jobs IA, jobs simultanés et places d'équipe.
 
 ## 2. Les pages et leurs fonctions
 
