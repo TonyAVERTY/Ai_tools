@@ -109,20 +109,20 @@ const badge = (cls, icon, text) => `<span class="badge${cls ? ` ${cls}` : ''}">$
 
 // La lettre d'exemple : le produit réel (un mail préparé pour un prospect, l'accroche tirée de son site, la validation avant l'envoi).
 // Entreprise, adresse et contenu sont fictifs et signalés comme tels.
-const LETTER = `<figure class="letter" aria-labelledby="lt-cap">
-  <figcaption class="letter-cap" id="lt-cap">Exemple fictif : un mail préparé pour un cabinet de kinésithérapie.</figcaption>
-  <dl class="letter-head">
+const LETTER = `<figure class="v-letter" aria-labelledby="lt-cap">
+  <figcaption class="v-letter-cap" id="lt-cap">Exemple fictif : un mail préparé pour un cabinet de kinésithérapie.</figcaption>
+  <dl class="v-letter-head">
     <dt>À</dt><dd class="mono">accueil@cabinet-exemple.fr</dd>
     <dt>Objet</dt><dd>Vos patients qui appellent pour décaler un rendez-vous</dd>
   </dl>
-  <div class="letter-body">
+  <div class="v-letter-body">
     <p>Bonjour,</p>
     <p><mark>Sur votre site, vous demandez de téléphoner pour déplacer un rendez-vous.</mark> Agenda Kiné laisse vos patients le faire seuls, et leur envoie le rappel à votre place.</p>
     <p>Je peux vous montrer ça en dix minutes ?</p>
-    <p class="letter-sign">Tony</p>
+    <p>Tony</p>
   </div>
-  <p class="margin-note"><b>Accroche tirée de leur site.</b> L'IA cite une phrase de la page « Contact » du cabinet pour que le mail ne ressemble pas à un envoi en masse.</p>
-  <div class="letter-foot">${badge('b-warn', 'clock', 'À valider')}<span>Rien ne part tant que tu n'as pas relu et confirmé.</span></div>
+  <p class="v-note"><b>Accroche tirée de leur site.</b> L'IA cite une phrase de la page « Contact » du cabinet pour que le mail ne ressemble pas à un envoi en masse.</p>
+  <div class="v-letter-foot"><span class="v-flag">${ic('clock')}À valider</span><span>Rien ne part tant que tu n'as pas relu et confirmé.</span></div>
 </figure>`;
 
 const FACTS = [
@@ -156,11 +156,11 @@ const TRUST = (apple) => [
 
 const planLimits = (l) => LIMIT_COLS.map(([label, f]) => [label, f(l)]);
 // Une carte par offre payante : prix selon la période (public/site.js bascule data-billing), plafonds, prévenir à l'ouverture
-const planCard = (k) => `<article class="pcard${k === 'growth' ? ' pcard-hi' : ''}" aria-labelledby="pc-${k}">
-        <div class="ph"><h3 id="pc-${k}">${PLAN_LABELS[k]}</h3>${badge('b-info', 'clock', 'Bientôt')}</div>
-        <p class="price"><span class="when-month">${euros(PLAN_PRICES[k])} <small>par mois, TTC</small></span><span class="when-year">${euros(annualPrice(k))} <small>par an, TTC (${12 - ANNUAL_FREE_MONTHS} mois payés)</small></span></p>
-        <p class="tag">${PLAN_BLURBS[k]}</p>
-        <dl class="plim">${planLimits(PLAN_LIMITS[k]).map(([lab, v]) => `<div><dt>${lab}</dt><dd>${v}</dd></div>`).join('')}</dl>
+const planCard = (k) => `<article class="v-plan${k === 'growth' ? ' v-plan-hi' : ''}" aria-labelledby="pc-${k}">
+        <div class="v-plan-h"><h3 id="pc-${k}">${PLAN_LABELS[k]}</h3><span class="v-flag v-flag-n">Bientôt</span></div>
+        <p class="v-plan-p"><span class="when-month">${euros(PLAN_PRICES[k])}<small>par mois, TTC</small></span><span class="when-year">${euros(annualPrice(k))}<small>par an, TTC (${12 - ANNUAL_FREE_MONTHS} mois payés)</small></span></p>
+        <p class="v-plan-t">${PLAN_BLURBS[k]}</p>
+        <dl class="v-plim">${planLimits(PLAN_LIMITS[k]).map(([lab, v]) => `<div><dt>${lab}</dt><dd>${v}</dd></div>`).join('')}</dl>
         <a class="btn btn-secondary" href="mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(`Me prévenir : offre ${PLAN_LABELS[k]}`)}">Me prévenir à l'ouverture</a>
       </article>`;
 const HOME_FAQ = [
@@ -178,105 +178,109 @@ export function homePage({ appUrl, apple = false }) {
     title: 'iaboss : trouve des clients par mail avec ta propre IA',
     description: 'iaboss lit ton projet, trouve des entreprises qui pourraient avoir besoin de toi, écrit et envoie tes mails, relance et suit les réponses. Gratuit pour commencer.',
     jsonLd: HOME_JSON_LD(appUrl),
-    body: `<section class="hero" aria-labelledby="h1">
-  <div class="wrap hero-in">
-    <div>
-      <h1 class="h1" id="h1">Ton IA écrit tes mails de prospection. Toi, tu les relis et tu les signes.</h1>
-      <p class="lead">Pour les indépendants qui vendent un projet. iaboss part de ton dépôt Git, cherche des entreprises qui pourraient avoir besoin de ton projet et prépare un mail pour chacune. Les mails partent de ta propre boîte, et jamais sans ton accord.</p>
-      <div class="hero-btns">
+    body: `<section class="v-hero" aria-labelledby="h1">
+  <div class="wrap v-hero-g">
+    <div class="v-hero-t">
+      <h1 class="v-h1" id="h1">Ton IA écrit tes mails de prospection. Toi, tu les relis et tu les signes.</h1>
+      <p class="v-lead-xl">Pour les indépendants qui vendent un projet. iaboss part de ton dépôt Git, cherche des entreprises qui pourraient avoir besoin de ton projet et prépare un mail pour chacune. Les mails partent de ta propre boîte, et jamais sans ton accord.</p>
+      <div class="v-btns">
         ${guest('big', btn('btn-primary btn-lg', '/login', 'Créer mon compte'))}
-        <a class="btn btn-secondary btn-lg" href="/fonctionnement">Voir comment ça marche</a>
+        <a class="btn btn-secondary btn-lg" href="#etapes">Voir comment ça marche</a>
       </div>
-      <p class="hero-note">Gratuit pour commencer, sans carte bancaire. Connexion avec ${providersText(apple)}.</p>
+      <p class="v-fine">Gratuit pour commencer, sans carte bancaire. Connexion avec ${providersText(apple)}.</p>
     </div>
     ${LETTER}
   </div>
 </section>
 
-<section class="sec sec-edge" aria-labelledby="h-b">
-  <div class="wrap split">
-    <div class="split-h">
-      <h2 class="h2" id="h-b">Ce que ton IA fait pour toi</h2>
-      <p class="sec-lead">Elle travaille avec ton propre accès, Claude, ChatGPT ou Gemini, pendant que tu fais autre chose.</p>
+<section class="v-sec v-paper" aria-labelledby="h-b">
+  <div class="wrap v-split">
+    <div class="v-split-h">
+      <h2 class="v-h2" id="h-b">Ce que ton IA fait pour toi</h2>
+      <p class="v-lead v-narrow">Elle travaille avec ton propre accès, Claude, ChatGPT ou Gemini, pendant que tu fais autre chose.</p>
     </div>
-    <dl class="facts">
+    <dl class="v-facts">
       ${FACTS.map(([t, p]) => `<div><dt>${esc(t)}</dt><dd>${esc(p)}</dd></div>`).join('\n      ')}
     </dl>
   </div>
 </section>
 
-<section class="sec sec-edge" id="suite" aria-labelledby="h-x">
-  <div class="wrap">
-    <h2 class="h2" id="h-x">Du premier mail à la facture</h2>
-    <p class="sec-lead">Quand un prospect dit oui, tu continues au même endroit : devis, facture, encaissement et déclaration.</p>
-    <ol class="fil fil-5">
-      ${CHAIN.map(([n, t, p]) => `<li><span class="num" aria-hidden="true">${n}</span><h3>${esc(t)}</h3><p>${esc(p)}</p></li>`).join('\n      ')}
+<section class="v-sec" id="suite" aria-labelledby="h-x">
+  <div class="wrap v-stack">
+    <h2 class="v-h2" id="h-x">Du premier mail à la facture</h2>
+    <p class="v-lead">Quand un prospect dit oui, tu continues au même endroit : devis, facture, encaissement et déclaration.</p>
+    <ol class="v-chain">
+      ${CHAIN.map(([n, t, p]) => `<li><span class="v-n">${n}</span><h3>${esc(t)}</h3><p>${esc(p)}</p></li>`).join('\n      ')}
     </ol>
   </div>
 </section>
 
-<section class="sec sec-edge" id="etapes" aria-labelledby="h-e">
-  <div class="wrap">
-    <h2 class="h2" id="h-e">Comment ça marche</h2>
-    <p class="sec-lead">Quatre étapes, et la main reste chez toi du début à la fin.</p>
-    <ol class="fil">
-      ${STEPS.map(([t, p], i) => `<li><span class="num" aria-hidden="true">${i + 1}</span><h3>${esc(t)}</h3><p>${esc(p)}</p></li>`).join('\n      ')}
+<section class="v-sec v-edge" id="etapes" aria-labelledby="h-e">
+  <div class="wrap v-stack">
+    <h2 class="v-h2" id="h-e">Comment ça marche</h2>
+    <p class="v-lead">Quatre étapes, et la main reste chez toi du début à la fin.</p>
+    <ol class="v-steps">
+      ${STEPS.map(([t, p], i) => `<li><span class="v-step-n">${i + 1}</span><h3>${esc(t)}</h3><p>${esc(p)}</p></li>`).join('\n      ')}
     </ol>
-    <a class="lnk" href="/fonctionnement">Voir chaque étape en détail</a>
+    <a class="v-link" href="/fonctionnement">Voir chaque étape en détail</a>
   </div>
 </section>
 
-<section class="inv" aria-labelledby="h-c">
-  <div class="wrap">
-    <h2 class="h2" id="h-c">Tu gardes la main</h2>
-    <p class="sec-lead">Une IA peut se tromper : relis les fiches avant d'envoyer, et n'écris qu'à des professionnels.</p>
-    <div class="inv-g">
+<section class="v-sec v-ink" aria-labelledby="h-c">
+  <div class="wrap v-stack">
+    <h2 class="v-h2" id="h-c">Tu gardes la main</h2>
+    <p class="v-lead">Une IA peut se tromper : relis les fiches avant d'envoyer, et n'écris qu'à des professionnels.</p>
+    <div class="v-trust">
       ${TRUST(apple).map(([t, p]) => `<div><h3>${esc(t)}</h3><p>${esc(p)}</p></div>`).join('\n      ')}
     </div>
-    <a class="lnk" href="/fonctionnement#envois">Voir comment les envois sont encadrés</a>
+    <a class="v-link" href="/fonctionnement#envois">Voir comment les envois sont encadrés</a>
   </div>
 </section>
 
-<section class="sec" id="tarifs" aria-labelledby="h-t">
-  <div class="wrap">
-    <div class="sec-row">
-      <div>
-        <h2 class="h2" id="h-t">Des tarifs simples</h2>
-        <p class="sec-lead">Seul le plan Gratuit est ouvert aujourd'hui. Les ${['', 'un', 'deux', 'trois', 'quatre', 'cinq', 'six'][PAID.length] || PAID.length} plans payants ouvrent prochainement.</p>
+<section class="v-sec" id="tarifs" aria-labelledby="h-t">
+  <div class="wrap v-stack v-stack-l">
+    <div class="v-row">
+      <div class="v-stack">
+        <h2 class="v-h2" id="h-t">Des tarifs simples</h2>
+        <p class="v-lead">Seul le plan Gratuit est ouvert aujourd'hui. Les ${['', 'un', 'deux', 'trois', 'quatre', 'cinq', 'six'][PAID.length] || PAID.length} plans payants ouvrent prochainement.</p>
       </div>
-      <div class="bill" data-bill hidden>
-        <div class="seg" role="group" aria-label="Période de facturation">
+      <div class="v-bill" data-bill hidden>
+        <div class="v-seg" role="group" aria-label="Période de facturation">
           <button class="seg-b" type="button" data-period="month" aria-pressed="true">Au mois</button>
           <button class="seg-b" type="button" data-period="year" aria-pressed="false">À l'année</button>
         </div>
-        ${badge('b-ok', 'check', `${ANNUAL_FREE_MONTHS} mois offerts à l'année`)}
+        <span class="v-flag v-flag-ok">${ic('check')}${ANNUAL_FREE_MONTHS} mois offerts à l'année</span>
       </div>
     </div>
-    <div class="pgrid" data-billing="month">
-      <article class="pcard pcard-free" aria-labelledby="pc-free">
-        <div class="ph"><h3 id="pc-free">Gratuit</h3>${badge('b-ok', 'check', 'Disponible')}</div>
-        <p class="price">0 € <small>sans limite de durée, sans carte bancaire</small></p>
-        <ul class="plim-row">${planLimits(FREE).map(([k, v]) => `<li><b>${v}</b><span>${k}</span></li>`).join('')}</ul>
+    <div class="v-plans" data-billing="month">
+      <article class="v-free" aria-labelledby="pc-free">
+        <div class="v-free-t">
+          <div class="v-plan-h"><h3 id="pc-free">Gratuit</h3><span class="v-flag v-flag-ok">${ic('check')}Disponible</span></div>
+          <p class="v-free-p"><b>0 €</b> · sans limite de durée, sans carte bancaire</p>
+        </div>
+        <ul class="v-free-l">${planLimits(FREE).map(([k, v]) => `<li><b>${v}</b><span>${k}</span></li>`).join('')}</ul>
         ${guest('plan', '<a class="btn btn-primary" href="/login">Créer mon compte</a>')}
       </article>
-      ${PAID.map(planCard).join('\n      ')}
+      <div class="v-plan-g">
+        ${PAID.map(planCard).join('\n        ')}
+      </div>
     </div>
-    <p class="price-n">Prix TTC : l'éditeur est en franchise de TVA (art. 293 B du CGI). Ton accès à l'IA est facturé par son fournisseur (Anthropic, OpenAI ou Google), directement à toi. Un compte n'envoie jamais plus de 300 mails par 24 heures, quelle que soit l'offre.</p>
-    <a class="lnk" href="/tarifs">Voir tous les tarifs</a>
+    <p class="v-small">Prix TTC : l'éditeur est en franchise de TVA (art. 293 B du CGI). Ton accès à l'IA est facturé par son fournisseur (Anthropic, OpenAI ou Google), directement à toi. Un compte n'envoie jamais plus de 300 mails par 24 heures, quelle que soit l'offre.</p>
+    <a class="v-link" href="/tarifs">Voir tous les tarifs</a>
   </div>
 </section>
 
-<section class="sec sec-edge faq" aria-labelledby="faq-h">
-  <div class="wrap">
-    <h2 class="h2" id="faq-h">Questions fréquentes</h2>
-    <div class="acc">
-      ${HOME_FAQ.map(([q, a], i) => `<details${i === 0 ? ' open' : ''}><summary>${esc(q)}${ic('chev')}</summary><p class="acc-b">${esc(a)}</p></details>`).join('\n      ')}
+<section class="v-sec v-edge" aria-labelledby="faq-h">
+  <div class="wrap v-faq-g">
+    <h2 class="v-h2" id="faq-h">Questions fréquentes</h2>
+    <div class="v-faq">
+      ${HOME_FAQ.map(([q, a], i) => `<details${i === 0 ? ' open' : ''}><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join('\n      ')}
     </div>
   </div>
 </section>
 
-<div class="wrap">
-  <section class="end" aria-labelledby="h-f">
+<div class="wrap v-end-w">
+  <section class="v-end" aria-labelledby="h-f">
     <div><h2 id="h-f">Essaie sur un de tes projets</h2><p>Crée ton compte avec ${providersText(apple)}, ajoute un dépôt et regarde ce que ton IA prépare. Rien ne part sans ta validation.</p></div>
     ${guest('big', btn('btn-primary btn-lg', '/login', 'Créer mon compte'))}
   </section>
