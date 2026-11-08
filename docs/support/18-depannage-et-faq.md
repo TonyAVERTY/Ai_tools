@@ -52,6 +52,13 @@ Avant l'envoi, ton IA relit chaque mail rempli avec les vraies valeurs, par lots
 ## « Relecture par l'IA impossible » : l'envoi ne part pas
 L'envoi vérifie le sens de chaque mail avec ton IA : quand elle ne peut pas répondre (budget IA atteint, IA déconnectée, réponse illisible), **rien ne part** plutôt que d'envoyer un texte non relu. Le message donne la raison. Reconnecte ton IA (voir « Je ne peux rien lancer »), attends que le budget se libère (Réglages → Budget IA) ou relance un peu plus tard : les prospects restent « à contacter ».
 
+## La page « Aujourd'hui » : une ligne manque, ou la liste est vide
+- **Une réponse de prospect n'y est pas** : seules les réponses **non lues** y figurent, et seulement si la boîte de réception (IMAP) du projet est connectée. Vérifie « Connecter ta boîte de réception » dans la liste de mise en route du projet.
+- **Une ligne a disparu après « Marquer traité »** : c'est voulu, elle disparaît au rechargement. Clique sur **Annuler** avant de quitter la page pour la garder.
+- **Une tâche IA en échec n'est plus là** : la liste ne montre que les 48 dernières heures ; l'historique complet est dans le menu « Activité ».
+- **Le message « Ligne non mise à jour »** : le serveur n'a pas pu enregistrer ; la ligne est revenue à son état d'avant, réessaie.
+- **Pas de rendez-vous dans l'agenda du jour** : seul le calendrier d'iaboss est lu, pas un agenda externe.
+
 ## Mon job reste « En attente »
 Lire le message « En attente : … » dans le menu **Activité**. Raisons possibles : budget IA atteint (clé API) ; quota Claude serré (au-delà de 85 %) ; charge élevée du serveur ; job programmé « Cette nuit » ; déjà un job IA en cours pour le compte. Il repart seul. On peut l'**Annuler** depuis Activité.
 
