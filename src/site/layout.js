@@ -91,7 +91,7 @@ ${SPRITE}
       ${NAV.map(([href, label]) => `<a href="${href}"${here(href)}>${esc(label)}</a>`).join('\n      ')}
     </nav>
     <div class="top-cta">
-      ${guest('cta', `<a class="btn btn-secondary" href="/login"${here('/login')}>Connexion</a>
+      ${guest('cta', `<a class="top-login" href="/login"${here('/login')}>Connexion</a>
       <a class="btn btn-primary" href="/login">Créer mon compte</a>`)}
     </div>
   </div>
