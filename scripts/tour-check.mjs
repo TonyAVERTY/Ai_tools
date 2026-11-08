@@ -94,7 +94,7 @@ for (const [vp, scheme, tag] of [[{ width: 1280, height: 800 }, 'dark', '1280px 
   }
   const dim = await p.locator('.tour-hole').evaluate((e) => getComputedStyle(e).boxShadow);
   const spread = Number((dim.match(/(\d+)px\s*$/) || [])[1]);
-  ok(/rgba\(5, 9, 26, 0\.76\)/.test(dim) && spread >= Math.max(vp.width, vp.height), `${tag} tout le reste de la page est assombri (ombre de ${spread} px autour de l'élément éclairé)`);
+  ok(/rgba\(7, 29, 34, 0\.78\)/.test(dim) && spread >= Math.max(vp.width, vp.height), `${tag} tout le reste de la page est assombri (ombre de ${spread} px autour de l'élément éclairé)`);
   ok(/Terminer/.test(await p.locator('[data-tour-next]').innerText()), `${tag} dernière étape : « Terminer »`);
   ok(await p.locator('[data-tour-skip]').isHidden(), `${tag} plus de « Passer la visite » à la dernière étape`);
   await p.locator('[data-tour-next]').click();
