@@ -67,7 +67,7 @@ const STATIC = {
   // Les navigateurs réclament /favicon.ico d'office
   '/favicon.ico': asset('favicon.ico', 'image/x-icon', 86400),
   '/static/site.js': asset('site.js', 'text/javascript; charset=utf-8', 3600),
-  // Polices embarquées (Source Serif 4, Hanken Grotesk : licence OFL, textes de licence à côté)
+  // Polices embarquées (Fraunces, Instrument Sans : licence OFL, textes de licence à côté)
   ...Object.fromEntries(readdirSync(join(ROOT, 'public', 'fonts')).filter((f) => extname(f) === '.woff2').map((f) => [`/static/fonts/${f}`, asset(`fonts/${f}`, FONT_TYPE['.woff2'], 604800)])),
   ...Object.fromEntries(readdirSync(join(ROOT, 'public', 'img')).map((f) => [`/static/img/${f}`, asset(`img/${f}`, IMG_TYPES[extname(f)] || 'application/octet-stream', 86400)])),
 };
