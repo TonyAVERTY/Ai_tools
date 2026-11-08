@@ -28,7 +28,7 @@ for (const [who, u, priced] of [['abonnement', sub, false], ['clé API', api, tr
       const t = Math.floor(Date.now() / 1000);
       await route.fulfill({ json: { ...j, claudeRateLimit: { source: 'live', at: t, fiveHour: { utilization: 0.73, resetsAt: t + 7200 }, sevenDay: { utilization: 0.38, resetsAt: t + 3 * 86400 } } } });
     });
-    await p.goto(`${s.base}/`);
+    await p.goto(`${s.base}/projets`);
     await p.waitForSelector('html[data-nav="ready"]');
     ok(await p.locator('#sys, .strip').count() === 0, `${tag} plus de ligne d'état sous la barre du haut`);
     if (priced) {

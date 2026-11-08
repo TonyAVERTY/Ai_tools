@@ -74,7 +74,7 @@ test('les anciennes requêtes envoyées par l\'API restent vérifiées (SELECT s
 
 test('le formulaire ne contient plus aucun champ SQL : des listes de tables et un bouton pour analyser', async () => {
   const { u } = await setup({ kpi: { users: { table: 'utilisateurs' }, clients: { table: 'abonnements', statusColumn: 'statut', statusValues: ['active'] }, revenue: { table: 'paiements', amountColumn: 'montant', cents: false } } });
-  const html = await (await u.get('/', { headers: { accept: 'text/html' } })).text();
+  const html = await (await u.get('/projets', { headers: { accept: 'text/html' } })).text();
   assert.doesNotMatch(html, /name="sql_(users|clients|revenue)"|SELECT COUNT|placeholder="SELECT/, 'aucun champ où écrire du SQL');
   for (const k of ['Table des utilisateurs', 'Table des clients payants', 'Table des paiements', 'Colonne du montant', 'Montants en', 'Se connecter et analyser', 'Enregistrer BDD']) assert.ok(html.includes(k), `« ${k} » dans le formulaire`);
   assert.match(html, /<option value="utilisateurs" selected>utilisateurs<\/option>/, 'la table enregistrée est présélectionnée');
@@ -83,7 +83,7 @@ test('le formulaire ne contient plus aucun champ SQL : des listes de tables et u
 
 test('un projet qui a encore d\'anciennes requêtes le sait, sans voir de SQL', async () => {
   const { u } = await setup({ sql_users: 'SELECT COUNT(*) FROM users' });
-  const html = await (await u.get('/', { headers: { accept: 'text/html' } })).text();
+  const html = await (await u.get('/projets', { headers: { accept: 'text/html' } })).text();
   assert.match(html, /requêtes personnalisées enregistrées avant/);
   assert.doesNotMatch(html, /SELECT COUNT\(\*\) FROM users/, 'la requête n\'est pas réaffichée');
 });

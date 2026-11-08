@@ -39,7 +39,7 @@ for (const [mode, reduced] of [['normal', 'no-preference'], ['mouvement réduit'
     const ring = (sel) => p.evaluate((q) => { const el = document.querySelector(q); if (!el) return null; const sp = el.querySelector('.spinner, .spin-inline'); if (!sp) return { ring: false, text: el.textContent.trim() }; const c = getComputedStyle(sp); const r = sp.getBoundingClientRect(); return { ring: true, anim: c.animationName, w: Math.round(r.width), visible: r.width > 0 && r.height > 0, text: el.textContent.trim() }; }, sel);
 
     // 1) les blocs du projet : on ouvre la section, la réponse est retenue
-    await p.goto(`${s.base}/`); await p.waitForSelector('html[data-nav="ready"]');
+    await p.goto(`${s.base}/projets`); await p.waitForSelector('html[data-nav="ready"]');
     await p.evaluate(() => { for (const k of ['linkedin', 'promo', 'recap']) { const d = document.querySelector(`details[data-acc="${k}"]`); if (d) d.open = true; } });
     for (const k of ['linkedin', 'promo', 'recap']) {
       await p.locator(`[data-${k}]`).first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});

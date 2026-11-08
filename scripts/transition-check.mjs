@@ -46,7 +46,7 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   ok(r && r.overflowX === false, `${tag} pas de défilement horizontal pendant la transition`);
   r = await go(p, pill('Calendrier'), '/calendar');
   ok(r?.move === 'right', `${tag} Mails → Calendrier : par la droite`);
-  r = await go(p, pill('Projets'), '/');
+  r = await go(p, pill('Projets'), '/projets');
   ok(r?.move === 'left' && r.name === 'page-from-left' && r.x < 0, `${tag} Calendrier → Projets (vers la gauche) : le contenu arrive par la gauche`);
   ok(await p.locator('#contenu > .page').evaluate((e) => !e.dataset.move) && await p.locator('#contenu').evaluate((e) => !e.classList.contains('pt-run')), `${tag} nettoyage après la transition`);
   // Hors onglets : fondu vers le haut

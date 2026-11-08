@@ -25,7 +25,7 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   const errs = [];
   p.on('pageerror', (e) => errs.push(e.message));
   p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
-  await p.goto(`${s.base}/`);
+  await p.goto(`${s.base}/projets`);
   await p.waitForSelector('html[data-nav="ready"]');
   if (!(await p.locator('details.project').evaluate((d) => d.open))) await p.locator('details.project > summary').click();
   for (const k of ['prospect', 'prospects', 'template']) await p.evaluate((x) => { const d = document.querySelector(`details[data-acc="${x}"]`); if (d) d.open = true; }, k);
@@ -221,7 +221,7 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   await p.waitForURL(/calendar/);
   await p.waitForSelector('html[data-nav="ready"]');
   await p.locator('.pills a.pill', { hasText: 'Projets' }).click();
-  await p.waitForURL((url) => url.pathname === '/');
+  await p.waitForURL((url) => url.pathname === '/projets');
   await p.waitForSelector('html[data-nav="ready"]');
   ok(await p.evaluate(() => window.__marker) === 'vivante', `${tag} aller-retour sans rechargement de la page`);
   if (!(await p.locator('details.project').evaluate((d) => d.open))) await p.locator('details.project > summary').click();

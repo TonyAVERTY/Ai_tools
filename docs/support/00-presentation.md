@@ -22,7 +22,8 @@ Tout ce que fait l'IA passe par le accès de la personne à son IA, jamais par u
 
 ## La barre du haut (de gauche à droite)
 - **iaboss** (logo) : retour à la page des projets.
-- **Projets** : la page d'accueil de l'application (liste des projets). 
+- **Aujourd'hui** : la page d'accueil de l'application, ce qui demande ton attention maintenant (voir le fichier « La page Aujourd'hui »).
+- **Projets** : la liste de tes projets (adresse `/projets`). 
 - **Mails** : tous les mails envoyés et les réponses reçues.
 - **Calendrier** : le mois, les événements et l'agenda externe.
 - **Comptabilité** : tes paiements, dépenses et remboursements avec leurs justificatifs, tes chiffres, le guide « Faire ma déclaration » et les exports (voir « Comptabilité : lignes, justificatifs, déclaration et exports »).
@@ -35,7 +36,7 @@ Tout ce que fait l'IA passe par le accès de la personne à son IA, jamais par u
 - **Avatar** (la première lettre de l'email) : un menu au survol avec **Mon compte**, **Réglages** et **Déconnexion**.
 - Le **quota Claude** (session de 5 h et semaine) et, avec une clé API seulement, la consommation « IA via iaboss » en $ sur 24 h et 30 jours se lisent dans la carte « Consommation Claude » de la page Projets (le nom suit ton IA : « Consommation Gemini »…) (avec un abonnement Claude, aucun montant en dollars n'est affiché).
 - Pour un administrateur du service, la page « Administration » est accessible depuis « Mon compte ».
-- **Transitions de page** : en passant d'un onglet de la barre du haut à un autre (Projets, Mails, Calendrier, Équipe), le contenu arrive en fondu par la droite quand tu vas vers la droite, et par la gauche quand tu vas vers la gauche ; pour les autres pages (Réglages, Mon compte, IA…) il monte en fondu. Recliquer sur la page déjà ouverte ou enregistrer un formulaire n'anime rien. Si ton système demande moins d'animations (« Réduire les animations »), il n'y a aucune transition.
+- **Transitions de page** : en passant d'un onglet de la barre du haut à un autre (Aujourd'hui, Projets, Mails, Calendrier, Équipe), le contenu arrive en fondu par la droite quand tu vas vers la droite, et par la gauche quand tu vas vers la gauche ; pour les autres pages (Réglages, Mon compte, IA…) il monte en fondu. Recliquer sur la page déjà ouverte ou enregistrer un formulaire n'anime rien. Si ton système demande moins d'animations (« Réduire les animations »), il n'y a aucune transition.
 
 ## Où trouver quoi
 | Je veux… | Où aller |

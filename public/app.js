@@ -662,7 +662,7 @@
     const link = e.target.closest('[data-goto]');
     if (!link) return;
     const d = $(`details.project[data-id="${link.dataset.goto}"]`);
-    if (!d) { sessionStorageSet('reopenProject', link.dataset.goto); go('/'); return; } // pas sur la page Projets : elle ouvrira ce projet à l'arrivée
+    if (!d) { sessionStorageSet('reopenProject', link.dataset.goto); go('/projets'); return; } // pas sur la page Projets : elle ouvrira ce projet à l'arrivée
     toggleJobs(false);
     d.open = true;
     d.scrollIntoView({ behavior: 'smooth', block: 'start' });

@@ -19,7 +19,7 @@ async function pageAt(stage) {
   const u = await s.newUser();
   const pid = await addProject(s.db, u.id, { name: `Projet ${stage}`, gitUrl: `https://github.com/u${u.id}/${stage}.git` });
   if (stage !== 'brut') await s.db.prepare('UPDATE projects SET profile_json = ?, target_json = ?, target_validated = ? WHERE id = ?').run(PROFILE, TARGET, stage === 'cible-validee' ? 1 : 0, pid);
-  return html(u, '/');
+  return html(u, '/projets');
 }
 const tag = (page, key) => page.match(new RegExp(`<details class="acc anim [^"]*" data-acc="${key}"[^>]*>`))?.[0] || null;
 const isOpen = (page, key) => { const t = tag(page, key); assert.ok(t, `section « ${key} » absente`); return /\sopen>$/.test(t); };

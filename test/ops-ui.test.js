@@ -40,10 +40,10 @@ test('page Projets : les chiffres réels sont sur la ligne du projet ; un projet
   const p1 = await addProject(s.db, u.id, { name: 'Avec prospects', gitUrl: 'https://github.com/u/a.git' });
   await addProject(s.db, u.id, { name: 'Sans prospect', gitUrl: 'https://github.com/u/b.git' });
   await seedProspects(p1);
-  const page = await html(u, '/');
+  const page = await html(u, '/projets');
   assert.match(page, /<span class="pfacts"><span><b>6<\/b> prospects<\/span><span><b>2<\/b> à contacter<\/span><span class="ok"><b>2<\/b> réponses<\/span><span>dernier envoi le /);
   assert.match(page, /<span class="pfacts"><span class="muted">aucun prospect<\/span><\/span>/);
-  assert.doesNotMatch(await html(other, '/'), /Avec prospects|à contacter/, 'isolation');
+  assert.doesNotMatch(await html(other, '/projets'), /Avec prospects|à contacter/, 'isolation');
 });
 
 test('page Mails : la barre de chiffres filtre la liste, la cause d\'un échec est visible, les états vides guident', async () => {

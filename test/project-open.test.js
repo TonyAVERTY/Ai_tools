@@ -8,7 +8,7 @@ import { addProject } from './helpers/users.js';
 let s;
 before(async () => { s = await startApp(); });
 after(async () => { await s.close(); });
-const page = async (u) => (await u.get('/', { headers: { accept: 'text/html' } })).text();
+const page = async (u) => (await u.get('/projets', { headers: { accept: 'text/html' } })).text();
 const openOf = (html) => [...html.matchAll(/<details class="project anim" data-id="(\d+)"( open)?>/g)].map((m) => [Number(m[1]), !!m[2]]);
 
 test('un seul projet : ouvert par défaut', async () => {

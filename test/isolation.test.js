@@ -109,7 +109,7 @@ test('A accède bien à ses propres ressources (contre-épreuve)', async () => {
 });
 
 test('listes et pages de B : aucune donnée de A (tableau de bord, réglages, système)', async () => {
-  const dash = await (await B.get('/')).text();
+  const dash = await (await B.get('/projets')).text();
   assert.doesNotMatch(dash, /Projet Secret|secret-a/i);
   assert.match(dash, /Aucun projet/);
 
@@ -128,7 +128,7 @@ test('listes et pages de B : aucune donnée de A (tableau de bord, réglages, sy
   assert.equal(sysA.usage.month.cost, 3.5);
   assert.equal(sysA.jobs[0].project, 'Projet Secret A');
 
-  const dashA = await (await A.get('/')).text();
+  const dashA = await (await A.get('/projets')).text();
   assert.match(dashA, /Projet Secret A/);
 });
 

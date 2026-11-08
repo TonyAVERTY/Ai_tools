@@ -17,7 +17,7 @@ Les questions s'affichent **une à la fois** (7 au total) :
 5. La page ne revient plus d'elle-même. Tu peux la rouvrir et la modifier à tout moment : avatar → Mon compte → **Modifier mon profil** (toutes les questions s'affichent alors sur une seule page, avec **Enregistrer mon profil** et **Annuler**).
 Pourquoi : l'IA adapte son vocabulaire, ses exemples et son niveau de détail à ton métier. Les réponses restent dans ton compte.
 
-À la fin du questionnaire, un écran « Merci, ton espace est prêt » apparaît en fondu, puis le tableau de bord prend la place sans coupure. Une **visite guidée** démarre alors toute seule (voir le fichier « Visite guidée du tableau de bord ») : la page s'assombrit et chaque élément important est éclairé et expliqué l'un après l'autre. **Passer la visite** l'arrête ; avatar → **Visite guidée** la relance à tout moment.
+À la fin du questionnaire, un écran « Merci, ton espace est prêt » apparaît en fondu, puis la page « Aujourd'hui » (l'accueil de l'application) prend la place sans coupure. Une **visite guidée** démarre alors toute seule (voir le fichier « Visite guidée du tableau de bord ») : la page s'assombrit et chaque élément important est éclairé et expliqué l'un après l'autre. **Passer la visite** l'arrête ; avatar → **Visite guidée** la relance à tout moment.
 
 ## 3. Créer le premier projet
 1. Page **Projets** → bouton **Nouveau projet**.

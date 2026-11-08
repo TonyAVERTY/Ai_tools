@@ -23,8 +23,10 @@ body.site {
 
 /* marque : le vrai logo (version claire ou sombre selon le thème) + le mot */
 .lockup { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; }
-.lockup .brand-mark { display: inline-flex; flex: none; }
-.lockup .brand-mark img { display: block; height: 32px; width: auto; }
+.lockup .brand-mark { display: block; flex: none; width: 32px; height: 32px; }
+.brand-mark .lg-bg { fill: var(--logo-ink); }
+.brand-mark .lg-dot { fill: var(--accent); }
+.brand-mark .lg-stem { fill: var(--bg); }
 .wordmark { font-family: var(--serif); font-size: 1.5rem; font-weight: 600; letter-spacing: -.01em; color: var(--text); }
 
 /* boutons : plein indigo pour l'action principale, feuille bordée pour le reste ; aucun soulèvement */
@@ -254,7 +256,7 @@ body.site {
 /* connexion et 404 : texte à gauche, une feuille pour le formulaire */
 .stage-p { padding: 40px 0 56px; }
 .auth { max-width: 460px; margin: 0 auto; background: var(--card); border: 1px solid var(--line-strong); border-radius: var(--radius-lg); padding: 28px 22px; display: flex; flex-direction: column; align-items: flex-start; gap: 20px; }
-.auth .brand-mark img { height: 48px; width: auto; display: block; }
+.auth .brand-mark { width: 48px; height: 48px; display: block; }
 .auth h1 { font-size: 2rem; line-height: 1.15; letter-spacing: -.01em; }
 .auth .sub { color: var(--muted); font-size: .9375rem; min-height: 0; margin-top: 8px; }
 .auth-b { display: flex; flex-direction: column; gap: 12px; width: 100%; }
