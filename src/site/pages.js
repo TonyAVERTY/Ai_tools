@@ -126,23 +126,50 @@ const LETTER = `<figure class="letter" aria-labelledby="lt-cap">
 </figure>`;
 
 const FACTS = [
-  ['Il cherche des entreprises', "À partir de ton dépôt, il repère celles qui pourraient avoir besoin de ton projet, ne garde que des adresses professionnelles publiées au grand jour, et note la page d'où vient chacune pour que tu puisses la vérifier."],
+  ['Il cherche des entreprises', "À partir de ton dépôt, il repère celles qui pourraient avoir besoin de ton projet, ne garde que des adresses professionnelles publiées au grand jour, et note la page d'où vient chacune."],
   ['Il écrit chaque mail', "Un mail court par entreprise, avec une accroche tirée de son site. Tu relis, tu corriges, tu valides."],
   ['Il relance une fois', "Pas de réponse ? Si tu l'as activée, une seule relance part dans la même conversation."],
   ['Il suit les réponses', "Tu vois qui a répondu, qui attend et qui reste à contacter, sans ouvrir ta boîte pour le savoir."],
   ['Il écrit tes posts LinkedIn', "Il rédige, tu relis et tu publies quand ça te va."],
+  ['Il prépare tes devis', "Quand un prospect dit oui, le devis, l'acompte et la facture se font depuis le même projet."],
+];
+// Du premier mail à la facture : la suite logique, dans l'application
+const CHAIN = [
+  ['01', 'Prospecter', 'La cible, les contacts et les mails, relus par toi.'],
+  ['02', 'Suivre', 'Les réponses et les rendez-vous, sans ouvrir ta boîte.'],
+  ['03', 'Facturer', 'Devis, acompte, facture et avoir, rattachés au projet.'],
+  ['04', 'Encaisser', 'Ce qui reste à encaisser, marqué payé en un clic.'],
+  ['05', 'Déclarer', 'Le montant à saisir sur ta déclaration URSSAF.'],
 ];
 const STEPS = [
-  ['Relie ton IA', "Tu choisis Claude, ChatGPT ou Gemini et tu connectes ta propre clé ou ton compte. C'est ton accès qui travaille, pas celui d'iaboss."],
+  ['Relie ton IA', "Tu choisis Claude, ChatGPT ou Gemini et tu connectes ta propre clé ou ton compte."],
   ['Ajoute ton dépôt Git', 'GitHub ou ton propre serveur : ton IA lit ton projet pour comprendre ce que tu proposes.'],
   ['Valide la cible', "Il te dit à qui il pense parler. Tu corriges, puis tu valides."],
   ['Lance la recherche', "Il trouve les contacts et écrit les mails. Tu les relis et tu confirmes l'envoi."],
 ];
 const TRUST = (apple) => [
-  ['Rien ne part sans ton accord', "Le premier envoi attend ta confirmation, chaque post attend ton clic. La relance, c'est toi qui l'actives."],
-  ['Tes données restent cloisonnées', "Personne d'autre ne voit tes prospects ni tes brouillons. Un clic dans Mon compte et tout est effacé."],
+  ['Rien ne part sans ton accord', "Le premier envoi attend ta confirmation, chaque post attend ton clic."],
+  ['Tes données restent cloisonnées', "Personne d'autre ne voit tes prospects ni tes brouillons."],
   ['Tes secrets sont chiffrés', 'Tes accès sont stockés chiffrés, jamais affichés en clair.'],
-  ['Une connexion en un clic', `Tu te connectes avec ${providersText(apple)}.`],
+  ['Une connexion en un clic', `Tu te connectes avec ${providersText(apple)}, sans mot de passe à retenir.`],
+];
+
+const planLimits = (l) => LIMIT_COLS.map(([label, f]) => [label, f(l)]);
+// Une carte par offre payante : prix selon la période (public/site.js bascule data-billing), plafonds, prévenir à l'ouverture
+const planCard = (k) => `<article class="pcard${k === 'growth' ? ' pcard-hi' : ''}" aria-labelledby="pc-${k}">
+        <div class="ph"><h3 id="pc-${k}">${PLAN_LABELS[k]}</h3>${badge('b-info', 'clock', 'Bientôt')}</div>
+        <p class="price"><span class="when-month">${euros(PLAN_PRICES[k])} <small>par mois, TTC</small></span><span class="when-year">${euros(annualPrice(k))} <small>par an, TTC (${12 - ANNUAL_FREE_MONTHS} mois payés)</small></span></p>
+        <p class="tag">${PLAN_BLURBS[k]}</p>
+        <dl class="plim">${planLimits(PLAN_LIMITS[k]).map(([lab, v]) => `<div><dt>${lab}</dt><dd>${v}</dd></div>`).join('')}</dl>
+        <a class="btn btn-secondary" href="mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(`Me prévenir : offre ${PLAN_LABELS[k]}`)}">Me prévenir à l'ouverture</a>
+      </article>`;
+const HOME_FAQ = [
+  ['Faut-il une carte bancaire ?', "Non. Le plan Gratuit s'ouvre sans carte bancaire et sans limite de durée."],
+  ['Dois-je fournir mon propre accès à une IA ?', "Oui, Claude, ChatGPT ou Gemini au choix. Ton accès est facturé par son fournisseur, directement à toi : c'est ce qui explique les prix bas."],
+  ['Mon projet doit-il avoir un dépôt Git ?', "Oui. Ton IA lit ton dépôt (GitHub ou ton propre serveur) pour comprendre ce que tu proposes, sans rien y modifier."],
+  ['Les mails partent-ils tout seuls ?', "Non. Chaque lot attend ta confirmation, et les mails partent de ta propre boîte, avec un lien de désinscription. Tu n'écris qu'à des professionnels."],
+  ['Puis-je facturer mes clients avec iaboss ?', "Oui : devis, acompte, facture et avoir, rattachés au projet, puis le suivi des encaissements et le montant à déclarer à l'URSSAF."],
+  ["Que se passe-t-il quand j'atteins un plafond ?", "La nouvelle action est refusée, mais rien n'est supprimé. Les plafonds repartent de zéro le 1er du mois, à l'heure de Paris."],
 ];
 
 export function homePage({ appUrl, apple = false }) {
@@ -155,7 +182,7 @@ export function homePage({ appUrl, apple = false }) {
   <div class="wrap hero-in">
     <div>
       <h1 class="h1" id="h1">Ton IA écrit tes mails de prospection. Toi, tu les relis et tu les signes.</h1>
-      <p class="lead">Pour les développeurs et les indépendants. iaboss part de ton dépôt Git, cherche des entreprises qui pourraient avoir besoin de ton projet et prépare un mail pour chacune. Les mails partent de ta propre boîte, et jamais sans ton accord.</p>
+      <p class="lead">Pour les indépendants qui vendent un projet. iaboss part de ton dépôt Git, cherche des entreprises qui pourraient avoir besoin de ton projet et prépare un mail pour chacune. Les mails partent de ta propre boîte, et jamais sans ton accord.</p>
       <div class="hero-btns">
         ${guest('big', btn('btn-primary btn-lg', '/login', 'Créer mon compte'))}
         <a class="btn btn-secondary btn-lg" href="/fonctionnement">Voir comment ça marche</a>
@@ -178,19 +205,13 @@ export function homePage({ appUrl, apple = false }) {
   </div>
 </section>
 
-<section class="sec sec-edge" aria-labelledby="h-s">
-  <div class="wrap split">
-    <div class="split-h">
-      <h2 class="h2" id="h-s">Le suivi des envois</h2>
-      <p class="sec-lead">Chaque mail a un état : envoyé, lu, répondu, rejeté ou non envoyé, avec la cause quand l'envoi échoue. Un clic sur un chiffre filtre la liste.</p>
-    </div>
-    <figure class="real">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="${assetUrl('/static/img/capture-mails-sombre.png')}">
-        <img src="${assetUrl('/static/img/capture-mails-clair.png')}" width="1132" height="710" loading="lazy" alt="Page Mails de l'application : une barre de chiffres par état (Tous 5, Envoyé 2, Répondu 2, Non envoyé 1) et un tableau avec la date, le destinataire, l'objet et l'état de chaque mail ; le mail non envoyé indique « SMTP : connexion refusée ».">
-      </picture>
-      <figcaption>Capture de la page Mails. Le projet et les contacts sont des exemples.</figcaption>
-    </figure>
+<section class="sec sec-edge" id="suite" aria-labelledby="h-x">
+  <div class="wrap">
+    <h2 class="h2" id="h-x">Du premier mail à la facture</h2>
+    <p class="sec-lead">Quand un prospect dit oui, tu continues au même endroit : devis, facture, encaissement et déclaration.</p>
+    <ol class="fil fil-5">
+      ${CHAIN.map(([n, t, p]) => `<li><span class="num" aria-hidden="true">${n}</span><h3>${esc(t)}</h3><p>${esc(p)}</p></li>`).join('\n      ')}
+    </ol>
   </div>
 </section>
 
@@ -218,16 +239,39 @@ export function homePage({ appUrl, apple = false }) {
 
 <section class="sec" id="tarifs" aria-labelledby="h-t">
   <div class="wrap">
-    <h2 class="h2" id="h-t">Des tarifs simples</h2>
-    <p class="sec-lead">Tu commences gratuitement, tu passes à un plan payant quand ça te rapporte.</p>
-    <div class="rates">
-      <div><div class="ph"><h3>Gratuit</h3>${badge('b-ok', 'check', 'Disponible')}</div><p class="price">0 €</p>
-        <ul class="list"><li>${ic('check')}${FREE.projects} projet, ${fr(FREE.prospects)} contacts, ${fr(FREE.mails)} mails et ${FREE.aiJobs} tâches IA par mois</li><li>${ic('check')}Sans carte bancaire, sans limite de durée</li></ul></div>
-      <div><div class="ph"><h3>Plans payants</h3>${badge('', 'clock', 'Bientôt')}</div><p class="price">${PLAN_PRICES.starter} à ${PLAN_PRICES.intensive} € <small>TTC par mois</small></p>
-        <ul class="list"><li>${ic('check')}${['Un', 'Deux', 'Trois', 'Quatre', 'Cinq', 'Six'][PAID.length - 1] ?? PAID.length} plans, de ${PLAN_LABELS[PAID[0]]} à ${PLAN_LABELS[PAID.at(-1)]}</li><li>${ic('check')}En annuel, ${ANNUAL_FREE_MONTHS} mois offerts</li></ul></div>
+    <div class="sec-row">
+      <div>
+        <h2 class="h2" id="h-t">Des tarifs simples</h2>
+        <p class="sec-lead">Seul le plan Gratuit est ouvert aujourd'hui. Les ${['', 'un', 'deux', 'trois', 'quatre', 'cinq', 'six'][PAID.length] || PAID.length} plans payants ouvrent prochainement.</p>
+      </div>
+      <div class="bill" data-bill hidden>
+        <div class="seg" role="group" aria-label="Période de facturation">
+          <button class="seg-b" type="button" data-period="month" aria-pressed="true">Au mois</button>
+          <button class="seg-b" type="button" data-period="year" aria-pressed="false">À l'année</button>
+        </div>
+        ${badge('b-ok', 'check', `${ANNUAL_FREE_MONTHS} mois offerts à l'année`)}
+      </div>
     </div>
-    <p class="price-n">Ton accès à l'IA est facturé par son fournisseur (Anthropic, OpenAI ou Google), directement à toi.</p>
+    <div class="pgrid" data-billing="month">
+      <article class="pcard pcard-free" aria-labelledby="pc-free">
+        <div class="ph"><h3 id="pc-free">Gratuit</h3>${badge('b-ok', 'check', 'Disponible')}</div>
+        <p class="price">0 € <small>sans limite de durée, sans carte bancaire</small></p>
+        <ul class="plim-row">${planLimits(FREE).map(([k, v]) => `<li><b>${v}</b><span>${k}</span></li>`).join('')}</ul>
+        ${guest('plan', '<a class="btn btn-primary" href="/login">Créer mon compte</a>')}
+      </article>
+      ${PAID.map(planCard).join('\n      ')}
+    </div>
+    <p class="price-n">Prix TTC : l'éditeur est en franchise de TVA (art. 293 B du CGI). Ton accès à l'IA est facturé par son fournisseur (Anthropic, OpenAI ou Google), directement à toi. Un compte n'envoie jamais plus de 300 mails par 24 heures, quelle que soit l'offre.</p>
     <a class="lnk" href="/tarifs">Voir tous les tarifs</a>
+  </div>
+</section>
+
+<section class="sec sec-edge faq" aria-labelledby="faq-h">
+  <div class="wrap">
+    <h2 class="h2" id="faq-h">Questions fréquentes</h2>
+    <div class="acc">
+      ${HOME_FAQ.map(([q, a], i) => `<details${i === 0 ? ' open' : ''}><summary>${esc(q)}${ic('chev')}</summary><p class="acc-b">${esc(a)}</p></details>`).join('\n      ')}
+    </div>
   </div>
 </section>
 
