@@ -265,7 +265,12 @@ const lum = (hex) => {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 };
 const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
-const tokens = (block) => Object.fromEntries([...block.matchAll(/--([\w-]+):\s*(#[0-9a-fA-F]{3,6})\b/g)].map((m) => [m[1], m[2]]));
+// Lit les déclarations « --nom: valeur; » et résout les var(--autre) : les jetons de la charte s'appuient sur des échelles (--pet-700…)
+const declsOf = (css) => Object.fromEntries([...css.matchAll(/--([\w-]+):\s*([^;]+);/g)].map((m) => [m[1], m[2].trim()]));
+const resolved = (map) => {
+  const val = (v, depth = 0) => { const r = /^var\(--([\w-]+)\)$/.exec(v || ''); return r && depth < 8 ? val(map[r[1]], depth + 1) : v; };
+  return Object.fromEntries(Object.entries(map).map(([k, v]) => [k, val(v)]));
+};
 
 test('couleurs : site.css lit les jetons de tokens.css, sans valeur en dur ni seconde palette', () => {
   const site = read('public/site.css');
@@ -285,23 +290,30 @@ test('couleurs : site.css lit les jetons de tokens.css, sans valeur en dur ni se
   assert.match(layout, /\/static\/tokens\.css[\s\S]*\/static\/site\.css/, 'site.css chargé après tokens.css');
 });
 
-test('contrastes AA (4,5:1) des couples texte/fond du design, thèmes clair et sombre', () => {
+test('contrastes AA (4,5:1) des couples texte/fond de la charte, thèmes clair et sombre', () => {
   const tk = read('public/tokens.css');
-  const light = tokens(tk.match(/:root\s*\{([^}]*)\}/)[1]);
-  const dark = tokens(tk.match(/prefers-color-scheme: dark\)\s*\{\s*:root\s*\{([^}]*)\}/)[1]);
-  const themes = { clair: light, sombre: { ...light, ...dark } };
+  const dm = tk.match(/@media \(prefers-color-scheme: dark\) \{\s*:root \{([\s\S]*?)\n  \}\n\}/);
+  assert.ok(dm, 'bloc du thème sombre');
+  const lightRaw = declsOf(tk.replace(dm[0], ''));
+  const themes = { clair: resolved(lightRaw), sombre: resolved({ ...lightRaw, ...declsOf(dm[1]) }) };
   for (const [name, t] of Object.entries(themes)) {
     const pairs = [
-      ['text/bg', t.text, t.bg], ['text/card', t.text, t.card], ['text/bg-sunk', t.text, t['bg-sunk']],
+      ['text/bg', t.text, t.bg], ['text/card', t.text, t.card], ['text/bg-sunk', t.text, t['bg-sunk']], ['text/card-2', t.text, t['card-2']],
       ['muted/bg', t.muted, t.bg], ['muted/card', t.muted, t.card], ['muted/bg-sunk', t.muted, t['bg-sunk']],
-      ['link/bg', t.link, t.bg], ['link/card', t.link, t.card],
-      ['texte sur le début du dégradé (barres)', t['on-grad'], t.accent], ['texte sur la fin du dégradé (barres)', t['on-grad'], t['accent-2']],
+      ['link/bg', t.link, t.bg], ['link/card', t.link, t.card], ['lien sur le fond du bureau creux', t.link, t['bg-sunk']],
       ['ok', t.ok, t['ok-bg']], ['warn', t.warn, t['warn-bg']], ['err', t.err, t['err-bg']], ['info', t.info, t['info-bg']],
-      ['bouton principal (indigo)', t['on-primary'], t.primary], ['bouton principal au survol', t['on-primary'], t['primary-hover']],
-      ['accroche surlignée', t['on-mark'], t.mark], ['lien sur le fond du bureau creux', t.link, t['bg-sunk']],
-      ['barre active', t['nav-on-text'], t['nav-on-bg']],
+      ['bouton principal', t['on-primary'], t.primary], ['bouton principal au survol', t['on-primary'], t['primary-hover']],
+      ['texte sur le Safran', t['on-accent'], t.accent], ['texte safran sur la feuille', t['accent-text'], t.card], ['texte safran sur son fond', t['accent-text'], t['accent-bg']],
+      ['accroche surlignée', t['on-mark'], t.mark], ['barre du haut', t['nav-on'], t['nav-bg']], ["bouton d'erreur", t['on-err'], t.err],
+      ['méthode GET', t['on-m'], t['m-get']], ['méthode POST', t['on-m'], t['m-post']], ['code', t['code-fg'], t['code-bg']],
     ];
-    for (const [label, fg, bg] of pairs) assert.ok(ratio(fg, bg) >= 4.5, `${name} : ${label} = ${ratio(fg, bg).toFixed(2)}`);
+    for (const [label, fg, bg] of pairs) {
+      assert.match(fg || '', /^#[0-9a-fA-F]{3,6}$/, `${name} : ${label} : premier plan introuvable`);
+      assert.match(bg || '', /^#[0-9a-fA-F]{3,6}$/, `${name} : ${label} : fond introuvable`);
+      assert.ok(ratio(fg, bg) >= 4.5, `${name} : ${label} = ${ratio(fg, bg).toFixed(2)}`);
+    }
+    // Le contour des champs doit se voir (3:1) sur la feuille
+    assert.ok(ratio(t.control, t.card) >= 3, `${name} : contour des champs = ${ratio(t.control, t.card).toFixed(2)}`);
   }
 });
 
