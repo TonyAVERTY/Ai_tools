@@ -1155,6 +1155,26 @@ export const MIGRATIONS = [
       { sql: 'ALTER TABLE mail_log ADD COLUMN body TEXT NULL', when: colMissing('mail_log', 'body') },
       { sql: 'ALTER TABLE mail_log ADD COLUMN note VARCHAR(400) NULL', when: colMissing('mail_log', 'note') },
     ],
+  },  {
+    // Page « Aujourd'hui » : les lignes de la liste « À traiter » que la personne a marquées traitées (clé de la ligne, jamais son contenu).
+    name: 'today_done',
+    sqlite: [
+      `CREATE TABLE today_done (
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        item_key TEXT NOT NULL,
+        done_at INTEGER NOT NULL,
+        PRIMARY KEY (user_id, item_key)
+      )`,
+    ],
+    mysql: [
+      `CREATE TABLE IF NOT EXISTS today_done (
+        user_id BIGINT NOT NULL,
+        item_key VARCHAR(40) NOT NULL,
+        done_at BIGINT NOT NULL,
+        PRIMARY KEY (user_id, item_key),
+        CONSTRAINT today_done_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      ) ${T}`,
+    ],
   },
 ];
 
