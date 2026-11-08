@@ -42,9 +42,10 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   ok(!(await d1.isVisible()) && (await t1.getAttribute('aria-expanded')) === 'false', `${tag} replié au second clic`);
   const t2 = p.locator('.mail-toggle', { hasText: 'Autre' });
   await t2.click();
-  await p.waitForFunction(() => /jetable/.test(document.body.textContent));
-  const d2 = p.locator(`#${await t2.getAttribute('aria-controls')}`);
-  await d2.waitFor({ state: 'visible' }); // le texte est dans la page avant que le panneau soit déplié : on attend qu'il se voie
+  // Le panneau se remplit après un appel réseau : on attend SON contenu (le mot « jetable » peut déjà être ailleurs dans la page), pas la page
+  const id2 = await t2.getAttribute('aria-controls');
+  await p.waitForFunction((id) => /Non envoyé/.test(document.getElementById(id)?.innerText || ''), id2, { timeout: 8000 }).catch(() => {});
+  const d2 = p.locator(`#${id2}`);
   ok((await d2.innerText()).includes('Non envoyé'), `${tag} mail non envoyé : la cause s'affiche`);
   ok(await p.locator('.mail-toggle', { hasText: 'suffisamment long' }).evaluate((e) => e.getBoundingClientRect().right <= innerWidth), `${tag} un objet très long passe à la ligne dans son bouton`);
   ok(!(await p.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)), `${tag} pas de défilement horizontal`);
