@@ -129,11 +129,18 @@ Principe : le mouvement répond à une action ou signale un changement ; il n'es
 
 ## 8. Responsive
 
-Trois paliers : téléphone (< 640 px), tablette (640 à 899 px), bureau (≥ 900 px).
-- Téléphone : une colonne ; la lettre d'exemple passe sous le titre, pleine largeur ; la chronologie garde son fil à gauche ; les
-  grilles d'offres deviennent des lignes ; la navigation défile horizontalement ; cibles tactiles de 44 px.
-- Tablette : deux colonnes lorsque le contenu s'y prête ; la lettre reste sous le titre jusqu'à 900 px.
+Conteneur du site : 1160 px au plus, 20 px de marge sur téléphone, 24 px dès 640 px. Les grilles de l'accueil ont des points de rupture
+**explicites** (pas de colonnes « auto-fit » qui laissent des cases vides) : 560 px (deux colonnes : chaîne, étapes, confiance), 600 px
+(faits, offres en 2×2), 940 px (accroche et lettre côte à côte, lettre inclinée d'un degré, titre et contenu en deux colonnes),
+1000 px (chaîne en 5 colonnes, étapes en 4), 1060 px (quatre offres sur une ligne). Quand une grille a un nombre impair d'éléments sur
+deux colonnes, le dernier prend toute la largeur.
+- Téléphone : une colonne ; en-tête sur deux lignes (marque et « Créer mon compte » en haut, liens dessous), « Connexion » masqué sous
+  420 px de large ; boutons de l'accroche et de l'appel final pleins ; tailles de titres fluides (`clamp`) ; cibles tactiles de 44 px.
+- Tablette : deux colonnes lorsque le contenu s'y prête ; l'en-tête tient sur une ligne dès 760 px.
 - Bureau : compositions asymétriques, lettre à droite du titre, sommaire collant dans la documentation.
+
+Vérification : `scripts/vitrine-check.mjs` (Chromium) parcourt l'accueil et les pages intérieures de 320 à 1920 px, en clair et en sombre :
+aucun défilement horizontal, aucun élément qui dépasse, cibles de 44 px, en-tête sur une ligne dès 760 px.
 
 ## 9. Ton des textes
 
