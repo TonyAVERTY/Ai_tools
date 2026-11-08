@@ -63,8 +63,8 @@ export function siteLayout({ appUrl, path, title, description, body, noindex = f
 <meta name="description" content="${esc(description)}">
 <meta name="robots" content="${noindex ? 'noindex, follow' : 'index, follow'}">
 ${noindex ? '' : `<link rel="canonical" href="${esc(url)}">\n`}<meta name="color-scheme" content="light dark">
-<meta name="theme-color" content="#f1f3f9" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#0b1224" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f6f1e6" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#071d22" media="(prefers-color-scheme: dark)">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="${SITE_NAME}">
 <meta property="og:locale" content="fr_FR">
@@ -102,7 +102,7 @@ ${body}
 <footer class="foot">
   <div class="wrap">
     <div class="foot-g">
-      <div>${lockup()}<p class="foot-n">Prospection, relances et posts LinkedIn pilotés par ton IA.</p></div>
+      <div>${lockup()}<p class="foot-n">De la prospection à la facture, avec ta propre IA.</p></div>
       <nav aria-label="Produit"><p class="foot-h">Produit</p><ul>
         <li><a href="/">Accueil</a></li>
         ${NAV.map(([href, label]) => `<li><a href="${href}"${here(href)}>${esc(label)}</a></li>`).join('\n        ')}

@@ -1,5 +1,5 @@
 /* Site public d'iaboss : accueil, fonctionnement, tarifs, connexion, 404, pages légales, documentation.
-   Direction artistique : docs/DESIGN.md (un bureau bleu-gris, des feuilles blanches, l'indigo pour l'action).
+   Direction artistique : docs/DESIGN.md (charte Lin, Pétrole, Safran : du papier, de l'encre, un surligneur).
    Les couleurs, rayons, ombres, durées et polices viennent de tokens.css (jamais de valeur en dur ici).
    Mobile d'abord ; deux paliers : 640 px (tablette) et 900 px (bureau). */
 *, *::before, *::after { box-sizing: border-box; }
@@ -417,7 +417,7 @@ body.site {
 .ctabs.js-tabs .ctab[hidden] { display: none; }
 .tabbar { display: flex; gap: 4px; flex-wrap: wrap; }
 .tabbar button { min-height: 40px; padding: 0 14px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--card); color: var(--muted); font: inherit; font-size: .875rem; font-weight: 600; cursor: pointer; }
-.tabbar button[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-grad); }
+.tabbar button[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .ctabs.js-tabs .code-h > span { display: none; }
 .ctabs.js-tabs .code-h { justify-content: flex-end; }
 
@@ -437,6 +437,40 @@ body.site {
 .fields { margin-top: 16px; }
 .errs { margin-top: 14px; font-size: .9375rem; line-height: 1.9; }
 @media (max-width: 700px) { .ep { padding: 16px; } .scope { margin-left: 0; } }
+
+/* accueil : chaîne en cinq temps, offres en cartes avec bascule mois / année */
+.sec-row { display: flex; flex-direction: column; gap: 20px; align-items: flex-start; }
+.sec-row .bill { margin: 0; }
+.pgrid { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); margin-top: 28px; }
+.pgrid[data-billing="year"] .when-month, .pgrid[data-billing="month"] .when-year { display: none; }
+.pcard { display: flex; flex-direction: column; gap: 12px; padding: 20px; border: 1px solid var(--line-strong); border-radius: var(--radius-lg); background: var(--card); }
+.pcard .price { font-size: 2rem; }
+.pcard .price span { display: block; }
+.pcard .tag { margin: 0; color: var(--muted); }
+.pcard .btn { margin-top: auto; width: 100%; justify-content: center; text-align: center; white-space: normal; line-height: 1.25; }
+.pcard-free { border-top: 3px solid var(--primary); }
+.plim { margin: 0; display: flex; flex-direction: column; }
+.plim > div { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-top: 1px solid var(--line); }
+.plim dt { color: var(--muted); font-size: .9375rem; }
+.plim dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+.plim-row { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; }
+.plim-row li { display: flex; flex-direction: column; }
+.plim-row b { font-size: 1.25rem; font-variant-numeric: tabular-nums; }
+.plim-row span { color: var(--muted); font-size: .875rem; }
+.pcard-hi { background: var(--nav-bg); color: var(--nav-on); border-color: var(--nav-bg); }
+.pcard-hi .tag, .pcard-hi .price small, .pcard-hi .plim dt { color: var(--on-nav-muted); }
+.pcard-hi .plim > div { border-top-color: color-mix(in srgb, var(--nav-on) 22%, transparent); }
+.pcard-hi .badge { background: var(--accent); color: var(--on-accent); }
+.pcard-hi .btn { background: var(--nav-on); color: var(--nav-bg); border-color: var(--nav-on); }
+@media (min-width: 760px) {
+  .pgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pcard-free { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto; align-items: center; column-gap: 32px; }
+  .pcard-free .ph { grid-column: 1; }
+  .pcard-free .price { grid-column: 1; }
+  .pcard-free .plim-row { grid-column: 2; grid-row: 1 / span 2; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .pcard-free .btn { grid-column: 3; grid-row: 1 / span 2; width: auto; margin: 0; }
+}
+@media (min-width: 900px) { .sec-row { flex-direction: row; justify-content: space-between; align-items: flex-end; } }
 
 /* Repère des contenus réservés aux visiteurs (remplacé pour un compte connecté) : sans effet sur la mise en page */
 x-guest { display: contents; }
