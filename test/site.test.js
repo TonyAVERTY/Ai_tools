@@ -276,7 +276,7 @@ test('couleurs : site.css lit les jetons de tokens.css, sans valeur en dur ni se
   const site = read('public/site.css');
   const code = site.replace(/\/\*[\s\S]*?\*\//g, ''); // les commentaires peuvent citer ce qu'on évite
   const tk = read('public/tokens.css');
-  for (const t of ['bg', 'card', 'text', 'muted', 'line', 'accent', 'grad', 'on-grad', 'nav-on-bg']) {
+  for (const t of ['bg', 'card', 'text', 'muted', 'line', 'accent', 'primary', 'on-primary', 'on-accent', 'nav-bg', 'nav-on']) {
     assert.match(site, new RegExp(`var\\(--${t}\\)`), `--${t} utilisé par le site`);
     assert.match(tk, new RegExp(`--${t}:`), `--${t} défini dans tokens.css`);
     assert.doesNotMatch(site, new RegExp(`--${t}\\s*:`), `--${t} ne doit pas être redéfini`);

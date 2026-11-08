@@ -52,6 +52,7 @@
   --nav-bg: var(--pet-850);
   --nav-on: var(--lin-100);
   --logo-ink: var(--pet-900);
+  --on-nav-muted: var(--pet-200);   /* texte secondaire sur un fond Pétrole (barre du haut, offre mise en avant) */
 
   /* ——— Accent (Safran) : petites touches, jamais seul pour porter une information ——— */
   --accent: var(--saf-500);
