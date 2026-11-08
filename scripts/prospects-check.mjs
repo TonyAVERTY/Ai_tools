@@ -76,20 +76,33 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   ok(((await p.locator('dialog.mailprev [data-pv-sense]').innerText()) || '').includes('Sens vérifié'), `${tag} aperçu : « Sens vérifié » quand le mail a un sens`);
   await p.screenshot({ path: process.env.SHOT_DIR ? `${process.env.SHOT_DIR}/preview-${vp.width}.png` : undefined }).catch(() => {});
   await p.keyboard.press('Escape'); // ferme l'aperçu
-  // Mail sans sens : l'IA l'explique, propose un modèle corrigé, et le modèle ne change qu'au clic sur « Appliquer la correction au modèle »
+  // Mail sans sens : l'IA le relit AVANT de le montrer, le corrige dans le modèle (le champ et l'aperçu disent la même chose), le dit, et « Annuler la correction » remet l'ancien texte
   await p.fill(`${tpl} [name=body]`, 'Bonjour SENSEBAD,\n\n{{accroche}}\n\n{{expediteur}}');
   await p.locator(`${tpl} [data-tpl-preview]`).click();
-  await p.waitForSelector('dialog.mailprev [data-pv-apply]', { timeout: 15000 });
-  const bad = await p.locator('dialog.mailprev [data-pv-sense]').innerText();
-  ok(/Ce mail ne veut pas dire grand-chose/.test(bad) && /Version corrigée proposée/.test(bad), `${tag} aperçu : le problème et la version corrigée sont affichés`);
-  ok((await p.inputValue(`${tpl} [name=body]`)).includes('SENSEBAD'), `${tag} le modèle n'a pas changé tant qu'on n'a pas cliqué`);
-  ok(!(await p.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)), `${tag} pas de défilement horizontal avec la correction proposée`);
-  await p.locator('dialog.mailprev [data-pv-apply]').click();
-  await p.waitForFunction((sel) => !document.querySelector(sel).value.includes('SENSEBAD'), `${tpl} [name=body]`);
-  ok((await p.inputValue(`${tpl} [name=body]`)).startsWith('Bonjour bien,'), `${tag} « Appliquer la correction au modèle » met le texte corrigé dans le modèle`);
-  await p.waitForSelector('dialog.mailprev [data-pv-sense] .badge.ok', { timeout: 15000 }).catch(() => {});
-  ok(((await p.locator('dialog.mailprev [data-pv-sense]').innerText()) || '').includes('Sens vérifié'), `${tag} après correction : « Sens vérifié »`);
+  await p.waitForSelector('dialog.mailprev [data-pv-undo]', { timeout: 15000 });
+  const fixedBox = await p.locator('dialog.mailprev [data-pv-sense]').innerText();
+  ok(/Corrigé/.test(fixedBox) && /avant de te le montrer/.test(fixedBox), `${tag} aperçu : l'IA dit qu'elle a relu et corrigé le mail avant de le montrer`);
+  ok((await p.inputValue(`${tpl} [name=body]`)).startsWith('Bonjour bien,'), `${tag} le texte corrigé est déjà dans le modèle : le champ et l'aperçu disent la même chose`);
+  const pvFrame = await p.locator('dialog.mailprev iframe').elementHandle().then((h) => h.contentFrame());
+  await pvFrame.waitForLoadState();
+  ok((await pvFrame.locator('body').innerText()).includes('Bonjour bien'), `${tag} l'aperçu montre le texte corrigé, jamais le texte brut`);
+  ok(!(await p.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)), `${tag} pas de défilement horizontal avec la correction`);
+  await p.locator('dialog.mailprev [data-pv-undo]').click();
+  await p.waitForFunction((sel) => document.querySelector(sel).value.includes('SENSEBAD'), `${tpl} [name=body]`);
+  await p.waitForSelector('dialog.mailprev [data-pv-sense]:has-text("Correction annulée")', { timeout: 15000 });
+  ok(true, `${tag} « Annuler la correction » remet le texte d'origine, sans que l'IA le corrige de nouveau`);
   await p.keyboard.press('Escape');
+  // Relecture AVANT l'affichage : tant que l'IA n'a pas répondu, aucun texte du mail n'est visible (texte jamais relu, donc pas de résultat en mémoire)
+  await p.route('**/template/sense', async (route) => { await new Promise((r) => setTimeout(r, 1500)); const rq = route.request(); await route.fulfill({ response: await route.fetch({ headers: { ...rq.headers(), origin: APP_URL }, maxRedirects: 0 }) }); });
+  await p.fill(`${tpl} [name=body]`, 'Bonjour {{entreprise}},\n\n{{accroche}}\n\n{{expediteur}} merci');
+  await p.locator(`${tpl} [data-tpl-preview]`).click();
+  await p.waitForSelector('dialog.mailprev[open]');
+  ok(/relit le mail avant de te le montrer/.test(await p.locator('dialog.mailprev').innerText()) && (await p.locator('dialog.mailprev iframe, dialog.mailprev [data-pv-body]').count()) === 0, `${tag} pendant la relecture, l'IA le dit et aucun texte du mail n'est affiché`);
+  await p.waitForSelector('dialog.mailprev iframe', { timeout: 20000 });
+  ok(true, `${tag} le texte n'apparaît qu'une fois relu`);
+  await p.unroute('**/template/sense');
+  await p.keyboard.press('Escape');
+  await p.fill(`${tpl} [name=body]`, 'Bonjour bien,\n\n{{accroche}}\n\n{{expediteur}}');
   // Phrase sélectionnée dans l'aperçu : « Changer | Modifier »
   const SENT = 'Est-ce un sujet chez vous ?';
   const bodyOf = () => p.inputValue(`${tpl} [name=body]`);
