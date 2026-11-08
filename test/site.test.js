@@ -346,7 +346,7 @@ test('liens entre pages : chaque lien et chaque image du site mène quelque part
   assert.match(tarifs, /href="\/link\?start=claude"/);
   assert.doesNotMatch(tarifs, /setup-token/);
   // Le design : la lettre d'exemple (signalée comme fictive) sur l'accueil, quatre étapes détaillées sur Fonctionnement
-  assert.match(html['/'], /<figure class="letter"/);
+  assert.match(html['/'], /<figure class="v-letter"/);
   assert.match(html['/'], /Exemple fictif/);
   assert.match(html['/'], /<mark>/, "l'accroche est surlignée");
   assert.equal((html['/fonctionnement'].match(/<section class="stp/g) || []).length, 4);
@@ -448,7 +448,7 @@ test('un seul moment animé hors action : l\'accroche de la lettre ; pages de do
     const js = readFileSync(new URL('../public/site.js', import.meta.url), 'utf8');
     assert.doesNotMatch(js, /requestAnimationFrame|IntersectionObserver\(\(entries\) => \{\s*for \(const e of entries\) if \(e\.isIntersecting\) \{\s*const el/, 'plus de bulles ni d\'apparition au défilement');
     const css = readFileSync(new URL('../public/site.css', import.meta.url), 'utf8');
-    assert.match(css, /@media \(prefers-reduced-motion: no-preference\) \{\s*\.letter-body mark \{ animation: hook/, 'l\'accroche ne s\'anime que si le système l\'autorise');
+    assert.match(css, /@media \(prefers-reduced-motion: no-preference\) \{\s*\.v-letter-body mark \{ animation: hook/, 'l\'accroche ne s\'anime que si le système l\'autorise');
     assert.doesNotMatch(css, /translateY|\.reveal|float|\.rb-b/, 'aucun soulèvement, aucune apparition au défilement, aucune bulle');
     assert.match(css, /\.toc \{[^}]*position: sticky/, 'le sommaire légal reste visible');
   } finally { await s.close(); }
@@ -473,7 +473,7 @@ test('confidentialité : les vidéos de promotion sont déclarées (données, du
 test('site public : l\'IA est « ton IA » (Claude, ChatGPT ou Gemini), les trois fournisseurs sont cités, le risque d\'abonnement couvre ChatGPT', async () => {
   const page = async (p) => (await s.anon.get(p, { headers: { accept: 'text/html' } })).text();
   const home = await page('/');
-  assert.match(home, /<h1 class="h1" id="h1">Ton IA écrit tes mails de prospection/);
+  assert.match(home, /<h1 class="v-h1" id="h1">Ton IA écrit tes mails de prospection/);
   assert.match(home, /avec ta propre IA<\/title>/);
   assert.match(home, /pilotés par ton IA/);
   assert.doesNotMatch(home.replace(/<script[^]*?<\/script>/g, ''), /Claude écrit|ton propre Claude|facturé par Anthropic, directement/);
