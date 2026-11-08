@@ -156,9 +156,9 @@ test('HTTP et tableau de bord : 403 send_paused avec le message, bandeau d\'aver
     const body = await r.json();
     assert.equal(body.code, 'send_paused');
     assert.match(body.error, /Tes envois sont en pause/);
-    assert.match(await (await u.get('/', { headers: { accept: 'text/html' } })).text(), /Tes envois sont en pause/);
+    assert.match(await (await u.get('/projets', { headers: { accept: 'text/html' } })).text(), /Tes envois sont en pause/);
     const other = await s.newUser({ admin: false, link: { v: 1, mode: 'api_key', valid: true } });
-    assert.doesNotMatch(await (await other.get('/', { headers: { accept: 'text/html' } })).text(), /Tes envois sont en pause/);
+    assert.doesNotMatch(await (await other.get('/projets', { headers: { accept: 'text/html' } })).text(), /Tes envois sont en pause/);
   } finally { await s.close(); }
 });
 

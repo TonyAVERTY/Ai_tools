@@ -24,7 +24,7 @@ async function open(u, vp) {
   const errs = [];
   p.on('pageerror', (e) => errs.push(e.message));
   p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
-  await p.goto(`${s.base}/`);
+  await p.goto(`${s.base}/projets`);
   await p.waitForSelector('html[data-nav="ready"]');
   return { ctx, p, errs };
 }

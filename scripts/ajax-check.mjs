@@ -50,7 +50,7 @@ const base = await p.evaluate(() => window.__live());
 const navsAfterLoad = navs.length;
 
 // 1. liens : Mails, Calendrier, Équipe, puis retour au tableau de bord
-for (const [label, path] of [['Mails', '/mails'], ['Calendrier', '/calendar'], ['Équipe', '/team'], ['Projets', '/']]) {
+for (const [label, path] of [['Mails', '/mails'], ['Calendrier', '/calendar'], ['Équipe', '/team'], ['Projets', '/projets']]) {
   await p.locator('.pills a.pill', { hasText: label }).click();
   await p.waitForFunction((x) => location.pathname === x, path);
   await ready();
@@ -126,7 +126,7 @@ await p.waitForFunction(() => document.querySelectorAll('.chat-msg.bot .msg-acti
 check((await p.locator('.chat-msg.bot .bubble').last().innerText()).includes('Écho : ECHO deuxième visite'), 'page IA : revenir dessus relance bien son script');
 
 // 7. rechargement doux (remplace location.reload d'app.js) : défilement conservé
-await p.goto(`${s.base}/`);
+await p.goto(`${s.base}/projets`);
 await p.evaluate(() => { window.__marker = 'vivante'; });
 if (!(await p.locator('details.project').first().evaluate((d) => d.open))) await p.locator('details.project summary').first().click(); // un seul projet : déjà ouvert
 await p.waitForTimeout(400);

@@ -31,7 +31,7 @@ async function setup({ profile = true, ...opts } = {}) {
   return { u, pid };
 }
 const run = (u, pid, task, body = {}) => u.post(`/api/projects/${pid}/poste/${task}`, body);
-const page = async (u) => (await u.get('/', { headers: { accept: 'text/html' } })).text();
+const page = async (u) => (await u.get('/projets', { headers: { accept: 'text/html' } })).text();
 
 test('catalogue : identifiants uniques et courts, chaque tâche a une mission et des rubriques, chaque tâche est un job IA', () => {
   assert.ok(ROLES.length >= 10, 'les postes d\'une entreprise');
@@ -150,7 +150,7 @@ test('droits : un simple membre lance les tâches courantes, pas celles qui lise
   const refused = await run(member, pid, 'doc_tech');
   assert.equal(refused.status, 403, 'lit le dépôt : réservé aux administrateurs');
   assert.equal((await run(member, pid, 'faq')).status, 200, 'les autres tâches sont ouvertes aux membres');
-  const html = await (await member.get('/', { headers: { accept: 'text/html' } })).text();
+  const html = await (await member.get('/projets', { headers: { accept: 'text/html' } })).text();
   assert.match(html, /Réservé aux administrateurs du projet/);
   assert.equal((await run(owner, pid, 'doc_tech')).status, 200, 'le propriétaire peut');
 });

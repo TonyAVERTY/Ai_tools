@@ -64,7 +64,7 @@ async function openLinkedin(tag) {
   ok(true, `${tag} la section LinkedIn s'est chargée : « ${(await p.locator('[data-linkedin]').innerText()).trim().replace(/\s+/g, ' ').slice(0, 60)}… »`);
 }
 
-await p.goto(`${s.base}/`);
+await p.goto(`${s.base}/projets`);
 await openRecap('1re page :');
 await openPromo('1re page :');
 await openLinkedin('1re page :');
@@ -84,7 +84,7 @@ await p.locator('.pills a.pill', { hasText: 'Calendrier' }).click();
 await p.waitForURL(/calendar/);
 await p.waitForSelector('html[data-nav="ready"]');
 await p.locator('.pills a.pill', { hasText: 'Projets' }).click();
-await p.waitForURL((url) => url.pathname === '/');
+await p.waitForURL((url) => url.pathname === '/projets');
 await p.waitForSelector('html[data-nav="ready"]');
 ok(await p.evaluate(() => window.__marker) === 'vivante', 'aller-retour sans rechargement de la page');
 ok(await p.evaluate(() => typeof window.AiTools?.loadRecap) === 'function', 'app-recap.js a été relancé : window.AiTools.loadRecap existe');

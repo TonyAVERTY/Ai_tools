@@ -73,7 +73,7 @@ for (const vp of [{ width: 1280, height: 900 }, { width: 390, height: 844 }]) {
 
   // 1) les blocs du projet
   const tag = `${vp.width}px`;
-  await p.goto(`${s.base}/`); await p.waitForSelector('html[data-nav="ready"]');
+  await p.goto(`${s.base}/projets`); await p.waitForSelector('html[data-nav="ready"]');
   await p.evaluate(() => { const d = document.querySelector('details.project'); if (d) d.open = true; for (const k of ['setup', 'linkedin', 'promo', 'recap']) { const a = document.querySelector(`details[data-acc="${k}"]`); if (a) a.open = true; } });
   for (const k of ['setup', 'linkedin', 'promo', 'recap']) await p.locator(ZONES[k].sel).first().waitFor({ state: 'visible', timeout: 8000 }).catch(() => {});
   ok(!(await p.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)), `${tag} pas de défilement horizontal avec les quatre erreurs`);

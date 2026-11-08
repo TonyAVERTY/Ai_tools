@@ -20,7 +20,7 @@ await ctx.route('**/*', async (route) => { const r = route.request(); if (r.meth
 const p = await ctx.newPage();
 const errs = [];
 p.on('pageerror', (e) => errs.push(e.message));
-const open = async () => { await p.goto(`${s.base}/`); await p.evaluate(() => { document.querySelector('details.project').open = true; }); await p.waitForTimeout(500); };
+const open = async () => { await p.goto(`${s.base}/projets`); await p.evaluate(() => { document.querySelector('details.project').open = true; }); await p.waitForTimeout(500); };
 await open();
 const input = p.locator('input[name="site_url"]').first();
 ok(await input.isVisible(), 'champ « Site du produit » visible dans l\'En-tête');
