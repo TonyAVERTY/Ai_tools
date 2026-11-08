@@ -60,7 +60,6 @@ code { font-family: var(--mono); font-size: .875rem; background: var(--bg-sunk);
 .pills { display: flex; gap: 6px; order: 3; width: 100%; overflow-x: auto; padding-bottom: 2px; }
 .pills form { margin: 0; display: contents; }
 .pill { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px; border-radius: 0; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); font: inherit; font-weight: 600; font-size: .9375rem; text-decoration: none; white-space: nowrap; cursor: pointer; transition: color var(--t-fast) var(--ease), border-color var(--t-fast) var(--ease); }
-.pill-s { display: none; }
 .pill:hover { color: var(--text); border-bottom-color: var(--line-strong); }
 .pill[aria-current="page"] { color: var(--text); border-bottom-color: var(--primary); }
 
@@ -1621,3 +1620,11 @@ body.tour-active { padding-bottom: var(--tour-pad, 0px); }
   .td-item { grid-template-columns: 36px minmax(0, 1fr) auto; }
   .td-acts { grid-column: auto; justify-content: flex-end; }
 }
+
+/* Page dédiée d'un projet : fil d'Ariane et lien depuis la ligne repliée de la liste */
+.crumb { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 8px; font-size: .875rem; color: var(--muted); }
+.crumb a { display: inline-flex; align-items: center; min-height: 44px; color: var(--primary); font-weight: 600; text-decoration: none; }
+.crumb a:hover { text-decoration: underline; }
+.pname-l { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 8px; color: var(--primary); font-size: .875rem; font-weight: 600; text-decoration: none; }
+.pname-l:hover { text-decoration: underline; }
+.projects-one > .project > summary { cursor: default; }

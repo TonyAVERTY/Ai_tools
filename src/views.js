@@ -29,11 +29,11 @@ function acc(key, icon, title, sub, body, { open = false, cls = '' } = {}) {
 }
 
 /** Entrées de la barre du haut : chacune doit avoir son étape dans la visite guidée (test/tour.test.js). */
-export const NAV = [['/', 'check', "Aujourd'hui"], ['/projets', 'folder', 'Projets'], ['/mails', 'mail', 'Mails'], ['/calendar', 'clock', 'Calendrier'], ['/compta', 'wallet', 'Comptabilité'], ['/facturation', 'receipt', 'Facturation'], ['/clients', 'user', 'Clients'], ['/team', 'users', 'Équipe']];
+export const NAV = [['/', 'check', "Aujourd'hui"], ['/projets', 'folder', 'Projets'], ['/mails', 'mail', 'Mails'], ['/calendar', 'clock', 'Agenda'], ['/compta', 'wallet', 'Compta']];
 
-/** Libellé court d'un onglet sur écran étroit (< 450 px) : « Comptabilité » ne tient pas dans sa case. Le nom complet reste dans le HTML pour les lecteurs d'écran. */
-const NAV_SHORT = { '/compta': 'Compta' };
-const pillLabel = (href, label) => (NAV_SHORT[href] ? `<span class="pill-l">${label}</span><span class="pill-s" aria-hidden="true">${NAV_SHORT[href]}</span>` : label);
+/** Pages qui ne sont plus dans la barre du haut mais restent à un clic : menu du compte (avatar). */
+export const MORE_PAGES = [['/facturation', 'receipt', 'Facturation'], ['/clients', 'user', 'Clients'], ['/team', 'users', 'Équipe']];
+
 
 // `named` : « Claude » dans ce corps de page veut dire « l'IA de la personne » : il est remplacé par son nom (Gemini, ChatGPT…).
 // À ne pas mettre sur une page qui parle de Claude comme fournisseur (liaison, abonnement, quota de session).
@@ -72,7 +72,7 @@ ${email ? `<header class="top">
   <div class="top-in">
     <a class="lockup" href="/" aria-label="iaboss, accueil">${brandMark()}<span class="wordmark">iaboss</span></a>
     <nav class="pills" aria-label="Navigation de l'application">
-      ${NAV.map(([href, icon, label]) => `<a class="pill" href="${href}">${ic(icon)}${pillLabel(href, label)}</a>`).join('\n      ')}
+      ${NAV.map(([href, icon, label]) => `<a class="pill" href="${href}">${ic(icon)}${label}</a>`).join('\n      ')}
     </nav>
     <div class="top-r">
       <div class="jobs" id="jobs" hidden>
@@ -94,6 +94,7 @@ ${email ? `<header class="top">
         <summary aria-label="Menu du compte : ${esc(email)}"><span class="avatar" aria-hidden="true">${esc(String(email).trim().charAt(0).toUpperCase())}</span></summary>
         <div class="user-pop">
           <p class="user-mail">${esc(email)}</p>
+          ${MORE_PAGES.map(([href, icon, label]) => `<a href="${href}">${ic(icon)}${label}</a>`).join('\n          ')}
           <a href="/account">${ic('user')}Mon compte</a>
           <a href="/settings">${ic('gear')}Réglages</a>
           <a href="/?tour=1">${ic('help')}Visite guidée</a>
@@ -418,7 +419,7 @@ function projectFacts(st) {
   return `<span class="pfacts">${parts.join('')}</span>`;
 }
 
-function projectItem(p, smtp, dbCfg, imap, { open = false, stats = null } = {}) {
+function projectItem(p, smtp, dbCfg, imap, { open = false, stats = null, onPage = false } = {}) {
   const profile = p.profile;
   // « En-tête » (dépôt, site, fiche, sortie de l'analyse) : en haut et ouvert tant que le projet n'est pas analysé, puis replié en bas, juste avant « Configuration ».
   const headerAcc = acc('header', 'git', 'En-tête', 'Dépôt Git et fiche projet', `
@@ -434,7 +435,7 @@ function projectItem(p, smtp, dbCfg, imap, { open = false, stats = null } = {}) 
   </section>` : ''}
   <div class="job" data-job="analyze"></div>`, { open: !profile });
   return `<details class="project anim" data-id="${p.id}"${open ? ' open' : ''}>
-<summary><span class="pname">${esc(p.name)}</span>${p.access !== 'owner' ? `<span class="badge" title="Projet partagé par ${esc(p.ownerEmail || '')}">équipe de ${esc(p.ownerEmail || '')}</span>` : p.teamId ? '<span class="badge ok">partagé</span>' : ''}<button type="button" class="pcfg badge" data-cfg title="Voir la liste « Mise en route »" hidden></button><button type="button" class="btn small secondary prean" data-run="analyze" data-id="${p.id}"${profile ? ' data-reanalyze' : ''} title="${profile ? "Relancer l'analyse du dépôt" : "Lancer l'analyse du dépôt"}" aria-label="${profile ? 'Réanalyser' : 'Analyser'} le projet">${ic(profile ? 'repeat' : 'spark')}<span>${profile ? 'Réanalyser' : 'Analyser'}</span></button><span class="pstate" data-state></span>${projectFacts(stats)}</summary>
+<summary><span class="pname">${esc(p.name)}</span>${onPage ? '' : `<a class="pname-l" href="/projets/${p.id}" aria-label="Ouvrir la page de ${esc(p.name)}" title="Ouvrir la page du projet">${ic('arrow')}<span>Page du projet</span></a>`}${p.access !== 'owner' ? `<span class="badge" title="Projet partagé par ${esc(p.ownerEmail || '')}">équipe de ${esc(p.ownerEmail || '')}</span>` : p.teamId ? '<span class="badge ok">partagé</span>' : ''}<button type="button" class="pcfg badge" data-cfg title="Voir la liste « Mise en route »" hidden></button><button type="button" class="btn small secondary prean" data-run="analyze" data-id="${p.id}"${profile ? ' data-reanalyze' : ''} title="${profile ? "Relancer l'analyse du dépôt" : "Lancer l'analyse du dépôt"}" aria-label="${profile ? 'Réanalyser' : 'Analyser'} le projet">${ic(profile ? 'repeat' : 'spark')}<span>${profile ? 'Réanalyser' : 'Analyser'}</span></button><span class="pstate" data-state></span>${projectFacts(stats)}</summary>
 <div class="pbody"><div class="pcard">
   ${acc('setup', 'target', 'Mise en route', 'Ce qu\'il reste à faire avant ton premier envoi', `<div class="setup" data-setup>${loadingBlock()}</div>`, { cls: 'setup-acc' })}
   ${profile ? '' : headerAcc}
@@ -590,6 +591,22 @@ ${usageKpis(usage)}
 <aside class="col-s">${claudePanel()}</aside>
 </div>
 ${tour ? `<script type="application/json" id="tour-data" data-mode="${esc(tour)}">${tourJson()}</script>` : ''}`,
+  });
+}
+
+/** Page dédiée d'un projet : ses sections (mise en route, cible, prospection…) seules, sans les autres projets. */
+export function projectPage({ email, entry, stats = null }) {
+  const p = entry.project;
+  return layout({
+    title: p.name, email,
+    body: `<div class="dash">
+<nav class="crumb" aria-label="Fil d'Ariane"><a href="/projets">Projets</a><span aria-hidden="true">/</span><span>${esc(p.name)}</span></nav>
+<div class="hd dash-hd"><h1 id="h-projet">${esc(p.name)}</h1></div>
+<dialog class="prospect-dialog" id="prospect-dialog" aria-label="Fiche prospect"><div data-dialog-body></div></dialog>
+<section class="col-p" aria-labelledby="h-projet"><div class="projects projects-one">
+  ${projectItem(p, entry.smtp, entry.dbCfg, entry.imap, { open: true, stats, onPage: true })}
+</div></section>
+</div>`,
   });
 }
 

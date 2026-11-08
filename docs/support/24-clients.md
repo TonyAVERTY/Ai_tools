@@ -1,8 +1,8 @@
 # Clients : liste par projet, fiches, documents et échanges
-Résumé : la page « Clients » (barre du haut) : les projets en déroulants avec leurs clients et leurs prospects, la recherche, l'ajout et la modification d'un client, la fiche client (documents générés, chiffres, échanges), le passage d'un prospect en client et l'export CSV.
+Résumé : la page « Clients » (menu de l'avatar) : les projets en déroulants avec leurs clients et leurs prospects, la recherche, l'ajout et la modification d'un client, la fiche client (documents générés, chiffres, échanges), le passage d'un prospect en client et l'export CSV.
 
 ## À quoi sert la page
-« Clients » (barre du haut, après « Facturation ») rassemble, **projet par projet**, les personnes et entreprises avec qui tu travailles : tes **clients** et tes **prospects**. Elle est **personnelle** : tu ne vois que tes propres projets, et la fiche d'un autre compte répond « introuvable ».
+« Clients » (menu de l'avatar → Clients) rassemble, **projet par projet**, les personnes et entreprises avec qui tu travailles : tes **clients** et tes **prospects**. Elle est **personnelle** : tu ne vois que tes propres projets, et la fiche d'un autre compte répond « introuvable ».
 En haut, trois chiffres résument tous tes projets : « Clients », « Prospects » et « À encaisser » (le total des factures émises et pas encore payées, voir « Comptabilité »).
 
 ## 1. La liste des projets

@@ -1,8 +1,8 @@
 # Facturation : modèles de devis, d'acompte, de facture finale et d'avoir
-Résumé : la page « Facturation » (barre du haut) : le récapitulatif de tes projets, tes informations légales, les trois exemples de devis générés par l'IA, le choix et l'affinage du devis, puis les quatre documents (Devis, Acompte, Facture finale, Avoir) à valider un par un.
+Résumé : la page « Facturation » (menu de l'avatar) : le récapitulatif de tes projets, tes informations légales, les trois exemples de devis générés par l'IA, le choix et l'affinage du devis, puis les quatre documents (Devis, Acompte, Facture finale, Avoir) à valider un par un.
 
 ## À quoi sert la page
-« Facturation » (barre du haut, après « Comptabilité ») prépare, **projet par projet**, des modèles de documents de facturation écrits avec l'IA : un **Devis**, un **Acompte**, une **Facture finale** et un **Avoir**. Quand les quatre sont validés, ils sont prêts à être utilisés dans iaboss.
+« Facturation » (menu de l'avatar → Facturation) prépare, **projet par projet**, des modèles de documents de facturation écrits avec l'IA : un **Devis**, un **Acompte**, une **Facture finale** et un **Avoir**. Quand les quatre sont validés, ils sont prêts à être utilisés dans iaboss.
 La page est **personnelle** : tu ne vois que tes projets, et le projet d'un autre compte répond « introuvable ». Chaque génération est une **tâche IA** (dans « Activité » : « Facturation : exemples de devis », « Facturation : affinage » et « Facturation : documents ») (elle compte dans le plafond de ton offre, voir « Offres, plafonds et limites »).
 **Qui écrit quoi ?** l'IA rédige les textes (introduction, désignations, conditions, modalités). Les **mentions légales** (identité, SIRET, TVA, pénalités de retard, indemnité de 40 €…) et les **totaux** (HT, TVA, TTC, reste à payer) sont fixés par iaboss d'après tes informations : l'IA ne les écrit pas et ne peut pas les changer. Fais tout de même relire les documents par un expert-comptable avant un usage officiel.
 
