@@ -2,7 +2,7 @@
 // Chargé après app.js, qui expose ses outils communs dans window.AiTools ; ajax.js relance ce script à chaque navigation. Tout passe par listen().
 (() => {
   const { $, $$, api, listen, toast } = window.AiTools;
-  const root = $('[data-today]');
+  const root = $('[data-today-root]'); // pas « data-today » seul : la page Comptabilité l'emploie déjà
   if (!root) return;
   const items = () => $$('[data-today-item]', root);
   const isOpen = (el) => $('[data-today-done]', el).hidden;
