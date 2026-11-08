@@ -61,13 +61,13 @@ test('réglages : un serveur ajouté s\'ajoute à GitHub, il ne le remplace pas'
   const bad = await create(u, 'https://gitlab.com/a/b.git');
   assert.equal(bad.status, 400);
   assert.match((await bad.json()).error, /github\.com ou git\.mon-serveur\.fr/);
-  const html = await (await u.get('/', { headers: { accept: 'text/html' } })).text();
+  const html = await (await u.get('/projets', { headers: { accept: 'text/html' } })).text();
   assert.match(html, /GitHub et git\.mon-serveur\.fr sont acceptés/);
 });
 
 test('la page d\'accueil annonce GitHub par défaut et renvoie vers les Réglages', async () => {
   const u = await user();
-  const html = await (await u.get('/', { headers: { accept: 'text/html' } })).text();
+  const html = await (await u.get('/projets', { headers: { accept: 'text/html' } })).text();
   assert.match(html, /placeholder="https:\/\/github\.com\/utilisateur\/projet\.git"/);
   assert.match(html, /GitHub est accepté\. Dépôt privé ou autre serveur Git : ajoute un token dans <a href="\/settings">Réglages<\/a>/);
 });

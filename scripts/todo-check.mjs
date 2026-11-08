@@ -37,7 +37,7 @@ for (const vp of [{ width: 1280, height: 800, touch: false }, { width: 390, heig
   const errs = [];
   p.on('pageerror', (e) => errs.push(e.message));
   p.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errs.push(m.text()); });
-  await p.goto(`${s.base}/`);
+  await p.goto(`${s.base}/projets`);
   await p.waitForSelector('html[data-nav="ready"]');
   await p.waitForSelector('[data-cfg]:not([hidden])');
   const setup = 'details[data-acc="setup"]';

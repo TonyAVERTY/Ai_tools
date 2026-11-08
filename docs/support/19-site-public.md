@@ -12,7 +12,7 @@ Résumé : les pages du site public (accueil, Fonctionnement, Tarifs, Docs, ment
 
 ## Du site à l'application (et retour)
 - Pour un **visiteur** : les boutons **Connexion** et **Créer mon compte** mènent à la page de connexion.
-- Pour une personne **déjà connectée**, ces boutons deviennent **Dashboard** (ou « Ouvrir le dashboard ») : un clic ramène à l'application. La racine du site mène alors directement au tableau de bord.
+- Pour une personne **déjà connectée**, ces boutons deviennent **Dashboard** (ou « Ouvrir le dashboard ») : un clic ramène à l'application. La racine du site mène alors directement à la page « Aujourd'hui », l'accueil de l'application.
 - Depuis l'application, le bouton **Site internet** (barre du haut, une icône de globe sur téléphone) ouvre la page d'accueil du site, y compris pour une personne connectée.
 
 ## Contact

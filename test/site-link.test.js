@@ -10,7 +10,7 @@ const html = (c, p) => c.get(p, { headers: { accept: 'text/html' } }).then((r) =
 
 test('le tableau de bord a un bouton vers le site internet', async () => {
   const u = await s.newUser();
-  const page = await html(u, '/');
+  const page = await html(u, '/projets');
   assert.match(page, /<a class="ia-link site-link" href="\/accueil" data-noajax aria-label="Accès au site internet"[^>]*>[\s\S]*?Site internet<\/span><\/a>/);
   assert.match(page, /<svg class="ic" aria-hidden="true" viewBox="0 0 24 24"><use href="#i-globe">/);
 });
