@@ -64,7 +64,7 @@ for (const [mode, reduced] of [['normal', 'no-preference'], ['mouvement réduit'
     }
 
     // 2) la page Projets : on suit les animations qui démarrent
-    await p.goto(`${s.base}/`); await p.waitForSelector('html[data-nav="ready"]');
+    await p.goto(`${s.base}/projets`); await p.waitForSelector('html[data-nav="ready"]');
     await p.evaluate(() => { window.__a = []; document.addEventListener('animationstart', (e) => { const t = e.target; window.__a.push({ n: e.animationName, tag: t.tagName, cls: String(t.className?.baseVal ?? t.className), zone: t.matches?.('[data-recap]') || false, props: t.getAnimations().filter((a) => a.animationName === e.animationName).flatMap((a) => a.effect.getKeyframes().flatMap((k) => Object.keys(k).filter((x) => !['offset', 'easing', 'composite', 'computedOffset'].includes(x)))) }); }, true); });
     await p.evaluate(() => { document.querySelector('details.project').open = true; });
     ok(await waitFor(async () => (await p.locator('[data-setup-go]').count()) > 5), `${tag} la liste « Mise en route » est affichée`);

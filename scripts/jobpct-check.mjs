@@ -26,7 +26,7 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   const errs = [];
   p.on('pageerror', (e) => errs.push(e.message));
   p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
-  await p.goto(`${s.base}/`);
+  await p.goto(`${s.base}/projets`);
   await p.waitForSelector('html[data-nav="ready"]');
   await p.waitForSelector('.jobs-btn:not([hidden])', { state: 'attached' });
   await p.locator('.jobs-btn').click();

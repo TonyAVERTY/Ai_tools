@@ -34,9 +34,10 @@ test('chaque onglet de la barre du haut a son étape dans la visite, dans l\'ord
 
 test('chaque cible de la visite existe dans le tableau de bord rendu', async () => {
   const u = await s.newUser();
-  const html = await text(u, '/');
+  // Les étapes visent l'accueil (Aujourd'hui) ou la page Projets : une étape dont l'élément n'est pas à l'écran est sautée, mais chacune doit exister quelque part
+  const html = (await text(u, '/')) + (await text(u, '/projets'));
   const has = {
-    '.pills a[href="/"]': /<nav class="pills"[^]*?href="\/"/, '.pills a[href="/mails"]': /class="pill" href="\/mails"/, '.pills a[href="/calendar"]': /class="pill" href="\/calendar"/, '.pills a[href="/compta"]': /class="pill" href="\/compta"/,
+    '.pills a[href="/"]': /<nav class="pills"[^]*?href="\/"/, '.pills a[href="/projets"]': /class="pill" href="\/projets"/, '.td-todo': /class="td-todo"/, '.td-usage': /class="td-usage"/, '[data-new-project]': /data-new-project/, '.pills a[href="/mails"]': /class="pill" href="\/mails"/, '.pills a[href="/calendar"]': /class="pill" href="\/calendar"/, '.pills a[href="/compta"]': /class="pill" href="\/compta"/,
     '.pills a[href="/facturation"]': /class="pill" href="\/facturation"/, '.pills a[href="/clients"]': /class="pill" href="\/clients"/, '.pills a[href="/team"]': /class="pill" href="\/team"/, '.ukpis': /class="ukpis"/, '[data-new-toggle]': /data-new-toggle/, '.ia-menu > summary': /<details class="ia-menu">\s*<summary/,
     '.ia-menu .ia-pop': /class="user-pop ia-pop"/, '[data-claude-card]': /data-claude-card/, 'details.user > summary': /<details class="user">\s*<summary/, 'details.user .user-pop': /<details class="user">[^]*?class="user-pop"/,
   };

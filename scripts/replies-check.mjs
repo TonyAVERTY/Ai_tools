@@ -36,7 +36,7 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   const errs = [];
   p.on('pageerror', (e) => errs.push(e.message));
   p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
-  await p.goto(`${s.base}/`);
+  await p.goto(`${s.base}/projets`);
   await p.waitForSelector('html[data-nav="ready"]');
 
   // arrivée : deux popups au plus, le reste en une ligne, pastille sur l'onglet Mails
@@ -85,7 +85,7 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   await p.waitForSelector('html[data-nav="ready"]');
   const fresh = await addReply('Re: nouvelle', `Réponse tardive ${vp.width}`);
   await p.locator('.pills a.pill', { hasText: 'Projets' }).click();
-  await p.waitForURL((url) => url.pathname === '/');
+  await p.waitForURL((url) => url.pathname === '/projets');
   await p.waitForSelector('html[data-nav="ready"]');
   ok(await p.evaluate(() => window.__marker) === 'vivante', `${tag} aller-retour sans rechargement de la page`);
   ok(await waitFor(async () => (await p.locator('.reply-pop, .reply-more').count()) > 0), `${tag} après navigation : les popups des réponses non lues reviennent`);

@@ -66,7 +66,7 @@ test('réglages : chaque rubrique du sommaire est documentée', () => {
 
 // Pages de l'application : toute nouvelle page doit être ajoutée ici ET documentée.
 const PAGES = {
-  '/': 'Projets', '/chat': 'Claude', '/support': 'Support', '/settings': 'Réglages', '/account': 'Mon compte', '/mails': 'Mails', '/calendar': 'Calendrier',
+  '/': "Aujourd'hui", '/projets': 'Projets', '/chat': 'Claude', '/support': 'Support', '/settings': 'Réglages', '/account': 'Mon compte', '/mails': 'Mails', '/calendar': 'Calendrier',
   '/team': 'Équipe', '/compta': 'Comptabilité', '/facturation': 'Facturation', '/clients': 'Clients', '/developer': 'Développeur', '/link': 'Relier mon IA', '/admin': 'Administration', '/accueil': 'Site internet',
   '/login': 'Connexion', '/fonctionnement': 'Fonctionnement', '/tarifs': 'Tarifs', '/docs': 'Documentation', '/mentions-legales': 'Mentions légales',
   '/confidentialite': 'Politique de confidentialité', '/cgu': 'CGU',
@@ -103,12 +103,12 @@ test('boutons : tout bouton affiché par l\'application est cité dans la docume
   const pid = await addProject(s.db, u.id, { name: 'Exemple', gitUrl: 'https://github.com/u/ex.git' });
   await s.db.prepare('UPDATE projects SET profile_json = ?, target_json = ? WHERE id = ?').run(JSON.stringify({ resume: 'Un produit.', proposition_valeur: 'v', arguments: ['a'], stack: 'node' }), JSON.stringify({ description: 'cible', secteurs: [], zone: '', taille: '', decideur: '', requetes: [] }), pid);
   const missing = new Set();
-  for (const p of ['/', '/settings', '/account', '/mails', '/calendar', '/compta', '/compta?declarer=1', '/facturation', '/clients', '/team', '/developer', '/link', '/chat', '/support']) {
+  for (const p of ['/', '/projets', '/settings', '/account', '/mails', '/calendar', '/compta', '/compta?declarer=1', '/facturation', '/clients', '/team', '/developer', '/link', '/chat', '/support']) {
     const html = await (await u.get(p, { headers: { accept: 'text/html' } })).text();
     for (const l of labelsOf(html)) check(l, p, missing);
   }
   // Modèles de boutons écrits en JavaScript (rendus côté navigateur)
-  for (const f of ['public/app.js', 'public/app-recap.js', 'public/app-promo.js', 'public/app-linkedin.js', 'public/app-prospects.js', 'public/app-replies.js', 'public/app-bdd.js', 'public/chat.js']) {
+  for (const f of ['public/app.js', 'public/app-recap.js', 'public/app-today.js', 'public/app-promo.js', 'public/app-linkedin.js', 'public/app-prospects.js', 'public/app-replies.js', 'public/app-bdd.js', 'public/chat.js']) {
     const js = read(f);
     for (const m of js.matchAll(/<button[^>]*>(?:<svg[\s\S]*?<\/svg>|\$\{icon\([^)]*\)\})?([^<>${}`]{3,70})<\/button>/g)) { const l = norm(m[1]); if (l.length >= 3 && !GENERIC.has(l)) check(l, f, missing); }
     for (const m of js.matchAll(/class="btn[^"]*"[^>]*>(?:\$\{icon\([^)]*\)\})?([^<>${}`]{3,70})<\/(?:a|button)>/g)) { const l = norm(m[1]); if (l.length >= 3 && !GENERIC.has(l)) check(l, f, missing); }

@@ -233,7 +233,7 @@ test('Mon compte et tableau de bord : barres d\'usage du mois, plafond atteint s
     assert.match(acc, /Projets<\/span><span class="g-v">1 \/ 1/);
     assert.doesNotMatch(acc, /style="/, 'pas de style en ligne (CSP)');
     // Projets : quatre indicateurs en tête, mêmes chiffres, plafond atteint signalé ; plus de panneau « Usage du mois » en doublon
-    const dash = await (await u.get('/', { headers: { accept: 'text/html' } })).text();
+    const dash = await (await u.get('/projets', { headers: { accept: 'text/html' } })).text();
     assert.equal((dash.match(/class="ukpi-c/g) || []).length, 4);
     assert.match(dash, /<div class="ukpi-c full"><dt>[^]*?Mails envoyés<\/dt><dd><b>100<\/b><span>ce mois-ci · sur 100 · plafond atteint<\/span>/);
     assert.match(dash, /<dt>[^]*?Projets<\/dt><dd><b>1<\/b><span>sur 1 · plafond atteint<\/span>/);

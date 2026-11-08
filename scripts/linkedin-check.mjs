@@ -59,7 +59,7 @@ async function openLinkedin(tag, expected) {
   ok((await p.locator('[data-li-body]').inputValue()) === expected, `${tag} le brouillon s'affiche : « ${expected} »`);
 }
 
-await p.goto(`${s.base}/`);
+await p.goto(`${s.base}/projets`);
 await openLinkedin('1re page :', 'Un premier brouillon de post.');
 // Édition : le compteur suit la frappe, l'enregistrement est gardé côté serveur
 await p.locator('[data-li-body]').fill('Brouillon modifié à la main.');
@@ -92,7 +92,7 @@ await p.locator('.pills a.pill', { hasText: 'Calendrier' }).click();
 await p.waitForURL(/calendar/);
 await p.waitForSelector('html[data-nav="ready"]');
 await p.locator('.pills a.pill', { hasText: 'Projets' }).click();
-await p.waitForURL((url) => url.pathname === '/');
+await p.waitForURL((url) => url.pathname === '/projets');
 await p.waitForSelector('html[data-nav="ready"]');
 ok(await p.evaluate(() => window.__marker) === 'vivante', 'aller-retour sans rechargement de la page');
 ok(await p.evaluate(() => typeof window.AiTools?.loadLinkedin) === 'function', 'app-linkedin.js a été relancé : window.AiTools.loadLinkedin existe');
