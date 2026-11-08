@@ -64,7 +64,7 @@ const probe = (W) => {
   }
   // Un libellé d'onglet du haut ne doit jamais dépasser de sa case (sinon il recouvre l'onglet voisin, sans faire défiler la page : la mesure de page ne le voit pas)
   for (const a of document.querySelectorAll('.pills a.pill')) {
-    const shown = [...a.querySelectorAll('.pill-l, .pill-s')].find((e) => getComputedStyle(e).display !== 'none' && e.getBoundingClientRect().width > 2);
+    const shown = null;
     const node = shown || [...a.childNodes].find((n) => n.nodeType === 3 && n.textContent.trim());
     if (!node) continue;
     const rg = document.createRange(); rg.selectNodeContents(node);
