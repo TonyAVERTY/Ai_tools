@@ -189,3 +189,11 @@ test('marquage « traité » : au-delà de 500 lignes, les plus anciennes (plus 
   assert.equal(await setDone(s.db, u.id, 'injection', true), false);
   for (const label of Object.values(JOB_LABELS)) assert.ok(label.length > 3);
 });
+
+test('public/app-today.js ne s\'accroche qu\'à la page Aujourd\'hui : son repère n\'existe sur aucune autre page', async () => {
+  const u = await s.newUser({ email: 'repere@x.fr' });
+  for (const p of ['/projets', '/compta', '/mails', '/calendar', '/facturation', '/clients', '/team', '/settings', '/account']) {
+    assert.doesNotMatch(await text(u, p), /data-today-root/, p);
+  }
+  assert.match(await text(u, '/'), /data-today-root/);
+});

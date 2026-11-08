@@ -54,7 +54,7 @@ const item = (it) => `<li class="td-item" data-today-item data-kind="${it.kind}"
   </div>
 </li>`;
 
-const todo = (d) => `<section class="td-todo" aria-labelledby="at-h" data-today>
+const todo = (d) => `<section class="td-todo" aria-labelledby="at-h" data-today-root>
   <div class="td-sec-h">
     <h2 id="at-h">À traiter <span class="td-count" data-today-count>${d.counts.all}</span></h2>
     <div role="tablist" aria-label="Filtrer" class="td-tabs">
