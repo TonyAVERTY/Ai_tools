@@ -4,6 +4,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { resolve } from 'node:path';
 import { mkdirSync } from 'node:fs';
+import { setSetting } from '../src/db.js';
 import { startApp } from './helpers/server.js';
 import { addProject } from './helpers/users.js';
 import { saveDraft, listDrafts, getDraft, getImage, editDraft, removeDraft, cleanHashtags, LIMITS } from '../src/contentdrafts.js';
@@ -189,6 +190,21 @@ test('Instagram : un document refusé au rendu repart en correction, une image f
   try { await gen(u, p, 'instagram', { direction: 'IGREVIEWDOWN' }); } finally { s.app.reviewStill = async () => reviews.shift() ?? { approved: true, score: 8, issues: [] }; }
   d = (await state(u, p, 'instagram')).drafts[0];
   assert.match(d.extra.toCheck[0], /contrôle qualité[^]*n'a pas pu être fait/);
+});
+
+test('Instagram : un petit modèle (Haiku) est remplacé par Sonnet, un modèle plus puissant est gardé', async () => {
+  const { u, p } = await setup('ig-modele@x.fr');
+  const user = await s.db.prepare('SELECT id FROM users WHERE email = ?').get('ig-modele@x.fr');
+  const modelUsed = async () => JSON.parse((await job(p, 'instagram_post')).result_json).model;
+  await setSetting(s.db, user.id, 'analyze_model', 'haiku');
+  await gen(u, p, 'instagram', {});
+  assert.equal(await modelUsed(), 'sonnet', 'Haiku choisi : le dessin tourne en sonnet');
+  await setSetting(s.db, user.id, 'analyze_model', 'opus');
+  await gen(u, p, 'instagram', {});
+  assert.equal(await modelUsed(), 'opus', 'Opus choisi : il est gardé');
+  await setSetting(s.db, user.id, 'analyze_model', 'sonnet');
+  await gen(u, p, 'instagram', {});
+  assert.equal(await modelUsed(), 'sonnet');
 });
 
 test('Instagram : refus clairs (projet non analysé, Chromium absent), jamais de fichier ni de job inutile', async () => {
