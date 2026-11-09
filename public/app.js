@@ -885,8 +885,9 @@
   }
 
   // ---------- Rendu d'un job ----------
-  // Un modèle de mail ou de relance rédigé : le résultat est le texte du modèle, juste au-dessus ; la tâche reste visible dans « Activité »
-  const QUIET_WHEN_DONE = ['template', 'followup_template'];
+  // Un modèle de mail ou de relance rédigé, ou une analyse : le résultat est affiché juste au-dessus (le texte du modèle, la fiche projet), donc ni « Voir » ni tokens
+  // en pleine largeur sous les onglets ; la tâche reste visible dans « Activité ». « Voir » reste à côté d'un bouton d'action : tâche en cours (Annuler), échec (Réessayer).
+  const QUIET_WHEN_DONE = ['template', 'followup_template', 'analyze'];
   function renderJob(box, job, type) {
     if (box && job && job.status === 'done' && QUIET_WHEN_DONE.includes(type)) { box.innerHTML = ''; box._sig = ''; return; }
     renderJobContent(box, job, type);
