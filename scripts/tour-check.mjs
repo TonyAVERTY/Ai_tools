@@ -79,7 +79,7 @@ for (const [vp, scheme, tag] of [[{ width: 1280, height: 800 }, 'dark', '1280px 
       const el = await p.locator(step.target).first().boundingBox();
       const also = step.also ? await p.locator(step.also).first().boundingBox().catch(() => null) : null;
       const covers = el && hole.x <= el.x + 1 && hole.y <= el.y + 1 && hole.x + hole.width >= el.x + el.width - 1 && hole.y + hole.height >= el.y + el.height - 1;
-      ok(covers, `${tag} étape ${n} « ${title} » : l'élément est dans la zone éclairée`);
+      ok(covers, `${tag} étape ${n} « ${title} » : l'élément est dans la zone éclairée${covers ? '' : ` (élément ${JSON.stringify(el)}, trou ${JSON.stringify(hole)})`}`);
       if (step.open) ok(await p.locator(step.open).evaluate((d) => d.open), `${tag} étape ${n} : le menu est bien déplié pendant l'étape`);
       if (also) {
         ok(hole.x <= also.x + 1 && hole.y <= also.y + 1 && hole.x + hole.width >= also.x + also.width - 1 && hole.y + hole.height >= also.y + also.height - 1, `${tag} étape ${n} : le menu déplié est éclairé aussi`);
@@ -88,7 +88,7 @@ for (const [vp, scheme, tag] of [[{ width: 1280, height: 800 }, 'dark', '1280px 
         ok(await p.locator('.tour-dim').evaluate((e) => /evenodd/.test(getComputedStyle(e).clipPath) || getComputedStyle(e).clipPath !== 'none'), `${tag} étape ${n} : l'ombre est découpée autour de cette forme`);
       }
       ok(inView, `${tag} étape ${n} : la carte reste dans l'écran`);
-      ok(vp.width < 640 ? card.y >= hole.y + hole.height - 2 : !inter(card, hole), `${tag} étape ${n} : la carte ne recouvre pas l'élément éclairé`);
+      ok(vp.width < 640 ? card.y >= hole.y + hole.height - 2 : !inter(card, hole), `${tag} étape ${n} : la carte ne recouvre pas l'élément éclairé${vp.width < 640 ? ` (carte y ${Math.round(card.y)} h ${Math.round(card.height)}, trou bas ${Math.round(hole.y + hole.height)})` : ''}`);
     }
     if (i === 3 || i === 7 || i === total - 2 || title.startsWith('Ta consommation')) await shot(p, `tour-${n}-${vp.width}`);
   }

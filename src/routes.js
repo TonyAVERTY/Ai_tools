@@ -24,6 +24,7 @@ import { registerTeamRoutes } from './teamroutes.js';
 import { registerProfileRoutes, getProfile, isEmpty } from './userprofile.js';
 import { registerTourRoutes } from './tour.js';
 import { registerTodayRoutes } from './todayroutes.js';
+import { registerSearchRoutes } from './searchroutes.js';
 import { registerMailRoutes } from './mailroutes.js';
 import { registerApiV1 } from './apiv1.js';
 import { registerDeveloperRoutes } from './developerroutes.js';
@@ -97,6 +98,7 @@ export function registerRoutes(router, app) {
   registerProfileRoutes(router, app);
   registerTourRoutes(router, app);
   registerTodayRoutes(router, app);
+  registerSearchRoutes(router, app);
   registerMailRoutes(router, app);
   registerLinkedinRoutes(router, app, { project, aiOpts });
   registerPromoRoutes(router, app, { project, aiOpts });

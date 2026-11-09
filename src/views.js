@@ -55,6 +55,7 @@ ${iconLinks()}
 <script src="${assetUrl('/static/app.js')}" defer></script>
 <script src="${assetUrl('/static/app-recap.js')}" defer></script>
 <script src="${assetUrl('/static/app-today.js')}" defer></script>
+<script src="${assetUrl('/static/app-search.js')}" defer></script>
 <script src="${assetUrl('/static/app-promo.js')}" defer></script>
 <script src="${assetUrl('/static/app-linkedin.js')}" defer></script>
 <script src="${assetUrl('/static/app-prospects.js')}" defer></script>
@@ -75,11 +76,12 @@ ${email ? `<header class="top">
       ${NAV.map(([href, icon, label]) => `<a class="pill" href="${href}">${ic(icon)}${label}</a>`).join('\n      ')}
     </nav>
     <div class="top-r">
-      <div class="jobs" id="jobs" hidden>
-        <button type="button" class="jobs-btn" aria-expanded="false" aria-controls="jobs-pop"><span class="spin-inline"></span><span data-jobs-count></span><span class="chev" aria-hidden="true"></span></button>
+      <button type="button" class="search-btn" data-search-open aria-haspopup="dialog" aria-keyshortcuts="Control+K Meta+K">${ic('search')}<span class="search-l">Rechercher</span><kbd aria-hidden="true">⌘K</kbd></button>
+      <div class="jobs" id="jobs">
+        <button type="button" class="jobs-btn" aria-label="Activité" aria-expanded="false" aria-controls="jobs-pop"><span class="jobs-dot" aria-hidden="true"></span><span class="spin-inline" hidden></span><span class="jobs-l">Activité</span><span class="jobs-n" data-jobs-count></span><span class="chev" aria-hidden="true"></span></button>
         <div class="jobs-pop" id="jobs-pop" role="region" aria-label="Jobs en cours" hidden>
           <div class="jobs-head"><strong>Activité</strong><span class="muted small" data-jobs-sub></span></div>
-          <div data-jobs-list></div>
+          <div data-jobs-list><p class="jobs-none">Aucune tâche en cours.</p></div>
         </div>
       </div>
       <a class="ia-link site-link" href="/accueil" data-noajax aria-label="Accès au site internet" title="Accès au site internet">${ic('globe')}<span>Site internet</span></a>
@@ -103,7 +105,12 @@ ${email ? `<header class="top">
       </details>
     </div>
   </div>
-</header>` : ''}
+</header>
+<dialog class="search-dialog" id="search" aria-label="Recherche">
+  <label class="s-in">${ic('search')}<span class="sr-only">Rechercher un projet, un prospect, un client ou un mail</span><input type="text" role="searchbox" data-search-q placeholder="Rechercher un projet, un prospect, un mail…" autocomplete="off" spellcheck="false" aria-controls="search-out"></label>
+  <div class="s-out" id="search-out" data-search-out aria-live="polite"></div>
+  <p class="s-hint" aria-hidden="true"><kbd>↑</kbd> <kbd>↓</kbd> pour choisir · <kbd>Entrée</kbd> pour ouvrir · <kbd>Échap</kbd> pour fermer</p>
+</dialog>` : ''}
 <main id="contenu" tabindex="-1"><div class="page">${body}</div></main>
 </body>
 </html>`;
