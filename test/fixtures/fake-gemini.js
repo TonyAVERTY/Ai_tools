@@ -33,6 +33,6 @@ if (prompt.includes('TOOLS')) {
   out({ type: 'tool_result', tool_id: 't2', status: 'success', output: '' });
 }
 // Chunks d'une réponse JSON (comme une analyse de projet) : le texte final est leur mise bout à bout
-const text = prompt.includes('JSON') ? '{"resume":"Cartes de fidélité","cible":{"description":"commerces"}}' : 'Bonjour, voici la réponse.';
+const text = prompt.includes("Recherche d'inspiration (outils WebSearch") ? '<inspiration>Secteur : cartes de fidélité. Marques observées : Fidme, Stocard. Principes : produit en grand, un seul message.</inspiration>' : prompt.includes('UNE newsletter') ? `<objet>Sujet choisi : ${prompt.includes('Inspiration recueillie sur le web') ? 'avec recherche' : 'sans recherche'}</objet>\n<apercu>Un aperçu qui complète l\'objet.</apercu>\n<texte>## Introduction\n${'Un paragraphe utile et concret pour le lecteur. '.repeat(8)}\n\n## Une nouveauté\n${'Une phrase qui explique le bénéfice. '.repeat(6)}\n\nÀ très vite.</texte>` : prompt.includes('JSON') ? '{"resume":"Cartes de fidélité","cible":{"description":"commerces"}}' : 'Bonjour, voici la réponse.';
 for (let i = 0; i < text.length; i += 12) out({ type: 'message', role: 'assistant', content: text.slice(i, i + 12) });
 out({ type: 'result', status: 'success', stats: { input_tokens: 1000, output_tokens: 200, cached: 0 } });
