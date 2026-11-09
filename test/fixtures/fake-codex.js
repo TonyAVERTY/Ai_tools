@@ -56,6 +56,6 @@ if (prompt.includes('ACTIONS')) {
 }
 if (prompt.includes('TOOMANY')) for (let i = 1; i <= 50; i++) { action(i, 'command_execution', { command: 'bash -lc ls' }); await new Promise((r) => setTimeout(r, 20)); }
 out({ type: 'item.completed', item: { id: 'item_m', type: 'agent_message', text: 'Je regarde.' } });
-const text = prompt.includes('JSON') ? '{"resume":"Cartes de fidélité","cible":{"description":"commerces"}}' : 'Bonjour, voici la réponse.';
+const text = prompt.includes("Recherche d'inspiration (outils WebSearch") ? '<inspiration>Secteur : cartes de fidélité. Marques observées : Fidme, Stocard. Principes : produit en grand, un seul message.</inspiration>' : prompt.includes('UNE newsletter') ? `<objet>Sujet choisi : ${prompt.includes('Inspiration recueillie sur le web') ? 'avec recherche' : 'sans recherche'}</objet>\n<apercu>Un aperçu qui complète l\'objet.</apercu>\n<texte>## Introduction\n${'Un paragraphe utile et concret pour le lecteur. '.repeat(8)}\n\n## Une nouveauté\n${'Une phrase qui explique le bénéfice. '.repeat(6)}\n\nÀ très vite.</texte>` : prompt.includes('JSON') ? '{"resume":"Cartes de fidélité","cible":{"description":"commerces"}}' : 'Bonjour, voici la réponse.';
 out({ type: 'item.completed', item: { id: 'item_f', type: 'agent_message', text } });
 out({ type: 'turn.completed', usage: { input_tokens: 1000, cached_input_tokens: 0, output_tokens: 200, reasoning_output_tokens: 0 } });
