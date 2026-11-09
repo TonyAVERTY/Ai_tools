@@ -20,8 +20,8 @@ Clique une carte : la page du projet s'ouvre (adresse `/p/` suivie du numéro du
 | **Vue d'ensemble** | `/p/N` | **Mise en route**, **Fiche projet**, les chiffres **Prospection** et la carte **En cours** |
 | **Prospection** (avec le nombre de prospects) | `/p/N/prospection` | **Cible**, **Recherche de prospects**, **Prospects** (liste, Kanban, fiches, import et export CSV) |
 | **Envoi** | `/p/N/envoi` | **Modèle de mail**, **Envoi** (avec la boîte de réception et le test A/B), **Relance automatique** |
-| **Clients** | `/p/N/clients` | les clients du projet (voir « Clients : liste par projet, fiches, documents et échanges ») |
-| **Facturation** | `/p/N/facturation` | les documents du projet (voir « Facturation : modèles de devis, d'acompte, de facture finale et d'avoir ») |
+| **Clients** | `/p/N/clients` | les clients et les prospects du projet, avec la recherche, « Ajouter un client » et l'export CSV, directement dans l'onglet (voir « Clients : liste par projet, fiches, documents et échanges ») |
+| **Facturation** | `/p/N/facturation` | toute la facturation du projet (informations légales, devis, acompte, facture finale, avoir), sans quitter la page du projet (voir « Facturation : modèles de devis, d'acompte, de facture finale et d'avoir »). L'ancienne adresse `/facturation/projet/N` renvoie vers cet onglet |
 | **Communication** | `/p/N/communication` | **LinkedIn** (à gauche), **Promotion** et **Programmés** (les posts LinkedIn programmés, avec « Voir dans l'agenda ») à droite |
 | **Outils IA** | `/p/N/outils` | un menu à gauche (**Évolution et audit**, puis les postes : **Direction**, **Commerce**… **Opérations et qualité**) ; à droite, **Évolution** et **Audit du projet**, ou les tâches du poste choisi |
 | **Récapitulatif** | `/p/N/recap` | chiffres business, prospection et courbes (propriétaire et administrateurs) |

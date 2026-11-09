@@ -57,9 +57,8 @@ export function clientListsHtml({ projectId, q, limit, clients, prospects }) {
 
 // ---------- Page Clients ----------
 
-export function clientsPage({ email, rows, openId, flash }) {
-  const total = rows.reduce((a, r) => ({ clients: a.clients + r.counts.clients, prospects: a.prospects + r.counts.prospects, pending: a.pending + r.counts.pending }), { clients: 0, prospects: 0, pending: 0 });
-  const items = rows.map((r) => `<details class="cl-proj" data-cl-project="${r.id}"${r.id === openId ? ' open' : ''}>
+/** Le déroulant d'un projet (recherche, ajout, export, listes chargées à l'ouverture) ; réutilisé par la page Clients et par l'onglet Clients du projet. */
+export const clientProjectBlock = (r, openId) => `<details class="cl-proj" data-cl-project="${r.id}"${r.id === openId ? ' open' : ''}>
     <summary><span class="pname">${esc(r.name)}</span>
       <span class="cl-sum"><span class="badge">${r.counts.clients} client${r.counts.clients > 1 ? 's' : ''}</span><span class="badge">${r.counts.prospects} prospect${r.counts.prospects > 1 ? 's' : ''}</span>${r.counts.pending ? `<span class="badge warn">À encaisser ${esc(money(r.counts.pending))}</span>` : ''}</span></summary>
     <div class="cl-body">
@@ -82,7 +81,11 @@ export function clientsPage({ email, rows, openId, flash }) {
         <a class="btn small" href="/clients/projet/${r.id}/export.csv" data-noajax>${ic('file')}Exporter les clients (CSV)</a>
       </div>
       <div class="cl-lists" data-cl-lists aria-live="polite">${loadingBlock()}</div>
-    </div></details>`).join('');
+    </div></details>`;
+
+export function clientsPage({ email, rows, openId, flash }) {
+  const total = rows.reduce((a, r) => ({ clients: a.clients + r.counts.clients, prospects: a.prospects + r.counts.prospects, pending: a.pending + r.counts.pending }), { clients: 0, prospects: 0, pending: 0 });
+  const items = rows.map((r) => clientProjectBlock(r, openId)).join('');
   const body = `<div class="bill-page" data-clients>
   <section class="card"><div class="row-between"><div><h1>Clients</h1>
     <p class="muted">Pour chaque projet : tes clients et tes prospects, leurs coordonnées, les documents que tu leur as générés et vos échanges.</p></div></div>
@@ -125,7 +128,7 @@ export function clientSheetPage({ email, project: p, client: c, documents, total
   const body = `<div class="bill-page" data-client-sheet>
   <section class="card"><p><a class="link" href="/clients?projet=${p.id}">${ic('back')} Tous les clients</a></p>
     <div class="row-between"><div><h1>${esc(c.name)}</h1><p class="muted small">Client de « ${esc(p.name)} » · ${esc(host(p.gitUrl))}</p></div>
-      <div class="row-actions"><a class="btn primary" href="/facturation/projet/${p.id}?client=${c.id}&type=facture#generer">${ic('receipt')}Générer un document</a>
+      <div class="row-actions"><a class="btn primary" href="/p/${p.id}/facturation?client=${c.id}&type=facture#generer">${ic('receipt')}Générer un document</a>
         <form method="post" action="/clients/c/${c.id}/supprimer" data-confirm="Retirer ce client de la liste ? Les documents déjà émis restent dans « Facturation » et dans la Comptabilité."><button class="btn danger">${ic('trash')}Retirer ce client</button></form></div></div>
     ${flashOf(flash)}
     <dl class="cl-kpis"><div><dt>Facturé TTC</dt><dd>${esc(money(totals.billed))}</dd></div><div><dt>Encaissé</dt><dd>${esc(money(totals.paid))}</dd></div><div><dt>À encaisser</dt><dd>${esc(money(totals.pending))}</dd></div><div><dt>Documents</dt><dd>${totals.docs}</dd></div></dl>

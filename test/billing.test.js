@@ -168,6 +168,7 @@ async function setup(over = {}) {
   return { u, pid, ...over };
 }
 const base = (pid) => `/facturation/projet/${pid}`;
+const page = (pid) => `/p/${pid}/facturation`; // l'onglet Facturation de la page projet
 const saveLegal = (u, pid, over = {}) => post(u, `${base(pid)}/legal`, { ...LEGAL, ...over });
 const jobOf = async (pid, type) => { await worker.tick(); return (await latestJobs(s.db, pid))[type]; };
 const docsOf = async (pid) => (await s.db.prepare('SELECT * FROM billing_docs WHERE project_id = ? ORDER BY kind, variant').all(pid));
@@ -184,7 +185,7 @@ test('recap : mes projets seulement, avec leur état ; la page d\'un projet est 
   assert.match(h, /17 informations légales à compléter|\d+ informations légales à compléter/);
   assert.match(h, /Compléter les informations/);
   assert.match(h, /<b>0<\/b> projet prêt sur <b>1<\/b>/);
-  assert.equal((await v.get(base(pid), { headers: { accept: 'text/html' } })).status, 404, 'le projet d\'un autre');
+  assert.equal((await v.get(page(pid), { headers: { accept: 'text/html' } })).status, 404, 'le projet d\'un autre');
   assert.equal((await post(v, `${base(pid)}/legal`, LEGAL)).status, 404);
   assert.equal((await post(v, `${base(pid)}/generer`)).status, 404);
   const empty = await html(await s.newUser(), '/facturation');
@@ -194,7 +195,7 @@ test('recap : mes projets seulement, avec leur état ; la page d\'un projet est 
 test('informations légales : prérempli depuis le projet, enregistré même incomplet, le bouton de génération n\'apparaît qu\'une fois tout rempli', async () => {
   const { u, pid } = await setup();
   await post(u, '/compta/situation', { regime: 'micro', activity: 'services', vat: 'franchise', freq: 'quarterly' });
-  let h = await html(u, base(pid));
+  let h = await html(u, page(pid));
   assert.match(h, /Repris de l'analyse du projet/);
   assert.match(h, /Cartes de fidélité digitales\./, 'résumé de l\'analyse proposé comme description de l\'offre');
   assert.match(h, /Repris de ta comptabilité/);
@@ -203,7 +204,7 @@ test('informations légales : prérempli depuis le projet, enregistré même inc
   let r = await saveLegal(u, pid, { siret: '123', address: '' });
   assert.equal(r.status, 303);
   assert.match(r.headers.get('location'), /verif=1/);
-  h = await html(u, base(pid) + '?verif=1&ok=legal_incomplet');
+  h = await html(u, page(pid) + '?verif=1&ok=legal_incomplet');
   assert.match(h, /Le SIRET compte 14 chiffres\./);
   assert.match(h, /Informations enregistrées : il en manque encore/);
   assert.doesNotMatch(h, /Générer un modèle de document/);
@@ -211,7 +212,7 @@ test('informations légales : prérempli depuis le projet, enregistré même inc
   // Complet
   r = await saveLegal(u, pid);
   assert.match(r.headers.get('location'), /ok=legal$/);
-  h = await html(u, base(pid));
+  h = await html(u, page(pid));
   assert.match(h, /Complet/);
   assert.match(h, /Générer un modèle de document/);
   assert.match(h, /value="12345678900012"/);
@@ -220,7 +221,7 @@ test('informations légales : prérempli depuis le projet, enregistré même inc
 test('préremplissage : l\'analyse et les autres projets proposent des valeurs, rien n\'est enregistré avant la validation', async () => {
   const { u, pid } = await setup();
   await s.db.prepare('UPDATE projects SET profile_json = ? WHERE id = ?').run(JSON.stringify({ resume: 'Cartes.', facturation: { legal_name: 'Atelier Averty', siret: '123 456 789 00012', city: 'Rennes', website: 'javascript:x' } }), pid);
-  let h = await html(u, base(pid));
+  let h = await html(u, page(pid));
   assert.match(h, /value="Atelier Averty"/);
   assert.match(h, /value="12345678900012"/);
   assert.match(h, /Repris de l'analyse du projet/);
@@ -230,12 +231,12 @@ test('préremplissage : l\'analyse et les autres projets proposent des valeurs, 
   // Un 2e projet reprend l'identité déjà validée sur le 1er
   await saveLegal(u, pid);
   const pid2 = await addProject(s.db, u.id, { name: 'Autre', gitUrl: 'https://github.com/u/autre.git' });
-  h = await html(u, base(pid2));
+  h = await html(u, page(pid2));
   assert.match(h, /value="Tony Averty"/);
   assert.match(h, /Repris d'un autre de tes projets/);
   const w = await s.newUser();
   const pidW = await addProject(s.db, w.id, { name: 'Étranger', gitUrl: 'https://github.com/w/x.git' });
-  assert.doesNotMatch(await html(w, base(pidW)), /value="Tony Averty"/, 'jamais les informations d\'un autre compte');
+  assert.doesNotMatch(await html(w, page(pidW)), /value="Tony Averty"/, 'jamais les informations d\'un autre compte');
 });
 
 test('parcours complet : trois devis, choix, affinage, validation, quatre documents, tous validés', async () => {
@@ -248,7 +249,7 @@ test('parcours complet : trois devis, choix, affinage, validation, quatre docume
   assert.equal(q.status, 'done', q.error);
   let docs = await docsOf(pid);
   assert.deepEqual(docs.map((d) => `${d.kind}${d.variant}:${d.layout}`), ['quote_option1:classique', 'quote_option2:moderne', 'quote_option3:epure']);
-  let h = await html(u, base(pid));
+  let h = await html(u, page(pid));
   assert.match(h, /Choisir cet exemple/);
   assert.match(h, /Forfait clair/);
   assert.match(h, /prix d'exemple/, 'sans tarifs donnés, les prix sont signalés comme exemples');
@@ -259,7 +260,7 @@ test('parcours complet : trois devis, choix, affinage, validation, quatre docume
   assert.equal((await post(u, `${base(pid)}/affiner`, { doc: o2, request: 'plus court' })).status, 400);
   // 2. choisir l'exemple 2, l'affiner
   assert.equal((await post(u, `${base(pid)}/choisir`, { variant: 2 })).status, 303);
-  h = await html(u, base(pid));
+  h = await html(u, page(pid));
   assert.match(h, /Ton devis : exemple 2/);
   assert.match(h, /Affiner ce devis/);
   assert.equal((await post(u, `${base(pid)}/affiner`, { doc: o2, request: 'ab' })).status, 400, 'demande trop courte');
@@ -272,7 +273,7 @@ test('parcours complet : trois devis, choix, affinage, validation, quatre docume
   assert.equal(refined.layout, 'moderne', 'la mise en page ne change pas');
   // 3. valider le devis : Claude prépare les quatre documents
   assert.equal((await post(u, `${base(pid)}/valider`, { doc: o2 })).status, 303);
-  assert.match(await html(u, base(pid)), /Claude travaille/);
+  assert.match(await html(u, page(pid)), /Claude travaille/);
   const dj = await jobOf(pid, 'billing_docs');
   assert.equal(dj.status, 'done', dj.error);
   docs = await docsOf(pid);
@@ -284,7 +285,7 @@ test('parcours complet : trois devis, choix, affinage, validation, quatre docume
   for (const k of ['devis', 'acompte', 'facture']) assert.deepEqual(lines(finals.find((d) => d.kind === k)), quoteLines, `${k} : lignes et prix repris du devis validé`);
   assert.equal(lines(finals.find((d) => d.kind === 'avoir')).length, 1, 'l\'avoir peut ne reprendre qu\'une ligne');
   assert.equal(JSON.parse(finals.find((d) => d.kind === 'facture').content_json).deposit_percent, 30);
-  h = await html(u, base(pid));
+  h = await html(u, page(pid));
   assert.match(h, /0<\/b> sur 4<\/b>|<b>0 sur 4<\/b>|0 sur 4/);
   for (const t of ['Devis', 'Acompte', 'Facture finale', 'Avoir']) assert.match(h, new RegExp(`<h3 id="bd-\\d+">${t}</h3>`));
   // un devis validé ne se change plus
@@ -292,9 +293,9 @@ test('parcours complet : trois devis, choix, affinage, validation, quatre docume
   // 4. valider les quatre documents un par un
   for (const [i, d] of finals.entries()) {
     assert.equal((await post(u, `${base(pid)}/valider`, { doc: d.id })).status, 303);
-    assert.match(await html(u, base(pid)), new RegExp(`${i + 1} sur 4`));
+    assert.match(await html(u, page(pid)), new RegExp(`${i + 1} sur 4`));
   }
-  h = await html(u, base(pid));
+  h = await html(u, page(pid));
   assert.match(h, /Tes documents sont prêts/);
   assert.match(await html(u, '/facturation'), /Documents prêts à l'emploi/);
   assert.match(await html(u, '/facturation'), /<b>1<\/b> projet prêt sur <b>1<\/b>/);
@@ -310,7 +311,7 @@ test('affiner un document définitif : il repasse à valider, et le devis modifi
   const finals = (await docsOf(pid)).filter((d) => d.kind !== 'quote_option');
   const byKind = (k) => finals.find((d) => d.kind === k);
   for (const d of finals) await post(u, `${base(pid)}/valider`, { doc: d.id });
-  const ready = await html(u, base(pid));
+  const ready = await html(u, page(pid));
   assert.match(ready, /Tes documents sont prêts/);
   assert.match(ready, /<article class="bill-doc ok locked"/, 'un document validé est un résumé grisé');
   assert.doesNotMatch(ready.split('id="documents"')[1] || '', /<iframe/, 'sans aperçu intégré : « Voir en grand » suffit');
@@ -325,7 +326,7 @@ test('affiner un document définitif : il repasse à valider, et le devis modifi
   assert.equal(await price('acompte'), 1080, 'l\'acompte suit le devis');
   assert.equal(await price('facture'), 1080, 'la facture suit le devis');
   assert.equal((await row('acompte')).status, 'draft');
-  assert.doesNotMatch(await html(u, base(pid)), /Tes documents sont prêts/);
+  assert.doesNotMatch(await html(u, page(pid)), /Tes documents sont prêts/);
 });
 
 test('une réponse inutilisable de Claude ne casse rien : l\'erreur est dite, on peut réessayer', async () => {
@@ -335,7 +336,7 @@ test('une réponse inutilisable de Claude ne casse rien : l\'erreur est dite, on
   const j = await jobOf(pid, 'billing_quotes');
   assert.equal(j.status, 'error');
   assert.equal((await docsOf(pid)).length, 0);
-  const h = await html(u, base(pid));
+  const h = await html(u, page(pid));
   assert.match(h, /La dernière demande à Claude a échoué/);
   assert.match(h, /Générer un modèle de document/, 'on peut réessayer');
 });
@@ -347,7 +348,7 @@ test('recommencer efface exemples et documents, garde les informations légales'
   assert.equal((await docsOf(pid)).length, 3);
   assert.equal((await post(u, `${base(pid)}/recommencer`)).status, 303);
   assert.equal((await docsOf(pid)).length, 0);
-  assert.match(await html(u, base(pid)), /Générer un modèle de document/);
+  assert.match(await html(u, page(pid)), /Générer un modèle de document/);
   assert.equal(legalComplete((await s.db.prepare('SELECT legal_json FROM billing_projects WHERE project_id = ?').get(pid)).legal_json ? JSON.parse((await s.db.prepare('SELECT legal_json FROM billing_projects WHERE project_id = ?').get(pid)).legal_json) : {}), true);
 });
 
@@ -400,7 +401,7 @@ test('pourcentage : le bandeau « Claude travaille… » affiche le pourcentage 
   await post(u, `${base(pid)}/generer`);
   const job = (await latestJobs(s.db, pid)).billing_quotes;
   await s.db.prepare("UPDATE jobs SET status = 'running', progress_json = ? WHERE id = ?").run(JSON.stringify({ message: 'Claude rédige trois exemples de devis…', pct: 42 }), job.id);
-  const h = await html(u, base(pid));
+  const h = await html(u, page(pid));
   assert.match(h, /data-bill-pct>42 %</);
   assert.match(h, /role="progressbar"[^>]*aria-valuenow="42"/);
   const st = await (await u.get(`/api/facturation/${pid}/state`)).json();

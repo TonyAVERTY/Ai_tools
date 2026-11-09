@@ -11,7 +11,7 @@ const chromium = pw.chromium || pw.default.chromium;
 const s = await startApp(); s.app.cfg.claudeBin = makeClaudeBin(s.tmp);
 const worker = new Worker(s.db, makeHandlers(s.app), { log: { error: () => {} } });
 const u = await s.newUser({ link: testTokenLink() });
-let pid = 0; let B = '';
+let pid = 0; let B = ''; let PAGE = '';
 const L = { legal_form: 'micro', legal_name: 'Tony Averty', siret: '12345678900012', address: '12 rue des Lilas', postal_code: '35000', city: 'Rennes', vat_mode: 'franchise', email: 't@e.fr', payment_terms_days: '30', quote_validity_days: '30', activity_label: 'Dev', offer_description: 'Apps.' };
 const post = (p, b) => u.post(p, b, { form: true });
 await post('/compta/situation', { regime: 'micro', activity: 'services', vat: 'franchise', freq: 'quarterly' });
@@ -20,7 +20,7 @@ const b = await chromium.launch({ executablePath: process.env.PLAYWRIGHT_CHROMIU
 let bad = 0; const ok = (c, m) => { console.log(`${c ? 'OK ' : 'KO '} ${m}`); if (!c) bad++; };
 /** Un projet neuf dont les quatre modèles sont validés (devis, acompte, facture finale, avoir). */
 async function freshProject(name) {
-  pid = await addProject(s.db, u.id, { name, gitUrl: `https://github.com/u/${name}.git` }); B = `/facturation/projet/${pid}`;
+  pid = await addProject(s.db, u.id, { name, gitUrl: `https://github.com/u/${name}.git` }); B = `/facturation/projet/${pid}`; PAGE = `/p/${pid}/facturation`;
   await post(`${B}/legal`, L0); await post(`${B}/generer`, {}); await worker.tick(); await post(`${B}/choisir`, { variant: 1 });
   const o = (await s.db.prepare('SELECT * FROM billing_docs WHERE project_id=?').all(pid))[0]; await post(`${B}/valider`, { doc: o.id }); await worker.tick();
   for (const d of await s.db.prepare("SELECT * FROM billing_docs WHERE project_id=? AND kind<>'quote_option'").all(pid)) await post(`${B}/valider`, { doc: d.id });
@@ -32,7 +32,7 @@ for (const w of [1280, 390]) {
   const p = await ctx.newPage(); const errs = [];
   p.on('pageerror', (e) => errs.push(e.message)); p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
   const wait = () => p.waitForTimeout(900);
-  await p.goto(`${s.base}${B}`); await wait();
+  await p.goto(`${s.base}${PAGE}`); await wait();
   const form = p.locator('[data-issue]');
   ok(await form.isVisible(), `${w} section « Générer un document » visible`);
   const opt = (label) => form.locator('[data-issue-kind] option', { hasText: label });
