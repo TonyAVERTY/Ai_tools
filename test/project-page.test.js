@@ -1,4 +1,4 @@
-// Page dédiée d'un projet (/projets/:id) et barre du haut : lien depuis la liste, isolation entre comptes, entrées déplacées dans le menu du compte.
+// Page d'un projet (/p/:id) à onglets, liste en cartes, recherche et barre du haut : lien depuis la liste, isolation entre comptes, entrées déplacées dans le menu du compte.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { startApp } from './helpers/server.js';
@@ -10,32 +10,52 @@ before(async () => { s = await startApp(); });
 after(async () => { await s.close(); });
 const text = async (u, p) => (await u.get(p, { headers: { accept: 'text/html' } })).text();
 
-test('la page d\'un projet montre ce projet seul, avec un fil d\'Ariane vers Projets', async () => {
+test('la page d\'un projet : nom, dépôt, fil d\'Ariane, neuf onglets avec une adresse chacun, « Vue d\'ensemble » courant', async () => {
   const u = await s.newUser({ email: 'page@x.fr' });
-  const a = await addProject(s.db, u.id, { name: 'Agenda Kiné', gitUrl: 'https://github.com/u/kine.git' });
+  const a = await addProject(s.db, u.id, { name: 'Agenda Kiné', gitUrl: 'https://github.com/atelier/agenda-kine.git' });
   const b = await addProject(s.db, u.id, { name: 'Atelier Bois', gitUrl: 'https://github.com/u/bois.git' });
-  const h = await text(u, `/projets/${a}`);
+  const h = await text(u, `/p/${a}`);
   assert.match(h, /<h1 id="h-projet">Agenda Kiné<\/h1>/);
   assert.match(h, /<nav class="crumb"[^]*?href="\/projets">Projets<\/a>/);
-  assert.match(h, new RegExp(`<details class="project anim" data-id="${a}" open>`), 'le projet est ouvert');
+  assert.match(h, /github\.com\/atelier\/agenda-kine/);
+  assert.match(h, /<title>Agenda Kiné · Vue d(?:'|&#39;)ensemble · iaboss<\/title>/);
+  const tabs = h.match(/<nav class="ptabs"[^]*?<\/nav>/)[0];
+  const hrefs = [...tabs.matchAll(/href="([^"]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(hrefs, ['', '/prospection', '/envoi', '/clients', '/facturation', '/communication', '/outils', '/recap', '/reglages'].map((x) => `/p/${a}${x}`));
+  assert.match(tabs, /<a href="\/p\/\d+" aria-current="page">Vue d(?:'|&#39;)ensemble/);
   assert.doesNotMatch(h, new RegExp(`data-id="${b}"`), 'les autres projets ne sont pas sur cette page');
-  assert.doesNotMatch(h, /class="pname-l"/, 'pas de lien vers soi-même');
-  assert.match(h, /<title>Agenda Kiné · iaboss<\/title>/);
 });
 
-test('la liste Projets renvoie vers la page de chaque projet', async () => {
+test('chaque onglet répond avec son titre ; un onglet inconnu est introuvable ; l\'ancienne adresse /projets/:id redirige', async () => {
+  const u = await s.newUser({ email: 'onglets@x.fr' });
+  const a = await addProject(s.db, u.id, { name: 'Alpha', gitUrl: 'https://github.com/u/alpha.git' });
+  for (const [slug, label] of [['prospection', 'Prospection'], ['envoi', 'Envoi'], ['clients', 'Clients'], ['facturation', 'Facturation'], ['communication', 'Communication'], ['outils', 'Outils IA'], ['recap', 'Récapitulatif'], ['reglages', 'Réglages du projet']]) {
+    const r = await u.get(`/p/${a}/${slug}`, { headers: { accept: 'text/html' } });
+    assert.equal(r.status, 200, slug);
+    assert.match(await r.text(), new RegExp(`<title>Alpha · ${label} · iaboss</title>`), slug);
+  }
+  assert.equal((await u.get(`/p/${a}/nimportequoi`, { headers: { accept: 'text/html' } })).status, 404);
+  const old = await u.get(`/projets/${a}`, { redirect: 'manual' });
+  assert.equal(old.status, 303);
+  assert.equal(old.headers.get('location'), `/p/${a}`);
+});
+
+test('la liste Projets : une carte par projet, avec l\'état, le dépôt et le lien vers la page ; « Nouveau projet » demande aussi le site', async () => {
   const u = await s.newUser({ email: 'liste@x.fr' });
   const a = await addProject(s.db, u.id, { name: 'Alpha', gitUrl: 'https://github.com/u/alpha.git' });
   const h = await text(u, '/projets');
-  assert.match(h, new RegExp(`<a class="pname-l" href="/projets/${a}" aria-label="Ouvrir la page de Alpha"`));
+  assert.match(h, new RegExp(`<a class="sheet pj-card" href="/p/${a}"><div class="sheet-h"><h2>Alpha</h2><span class="badge warn">`));
+  assert.match(h, /github\.com\/u\/alpha/);
+  assert.match(h, /name="site_url"[^>]*placeholder="https:\/\/monproduit\.fr"/);
+  assert.match(h, /1 projet sur 1 avec ton offre|1 projet avec ton offre/);
 });
 
-test('le projet d\'un autre compte, ou un numéro inconnu, est « introuvable »', async () => {
+test('le projet d\'un autre compte, ou un numéro inconnu, est « introuvable » ; un membre d\'équipe n\'a ni Clients, ni Facturation, ni Récapitulatif, ni Réglages', async () => {
   const u = await s.newUser({ email: 'moi@x.fr' });
   const v = await s.newUser({ email: 'autre@x.fr' });
   const theirs = await addProject(s.db, v.id, { name: 'Secret', gitUrl: 'https://github.com/v/secret.git' });
-  assert.equal((await u.get(`/projets/${theirs}`, { headers: { accept: 'text/html' } })).status, 404);
-  assert.equal((await u.get('/projets/999999', { headers: { accept: 'text/html' } })).status, 404);
+  for (const slug of ['', '/envoi', '/reglages']) assert.equal((await u.get(`/p/${theirs}${slug}`, { headers: { accept: 'text/html' } })).status, 404, `/p/${theirs}${slug}`);
+  assert.equal((await u.get('/p/999999', { headers: { accept: 'text/html' } })).status, 404);
   assert.doesNotMatch(await text(u, '/projets'), /Secret/);
 });
 
@@ -64,7 +84,7 @@ test('recherche : projets, prospects et mails du compte seulement, 2 lettres min
   assert.deepEqual((await search('g')).groups, [], 'une lettre ne cherche rien');
   const kine = await search('kiné');
   assert.deepEqual(names(kine), ['Agenda Kiné']);
-  assert.equal(kine.groups[0].items[0].href, `/projets/${a}`);
+  assert.equal(kine.groups[0].items[0].href, `/p/${a}`);
   const gall = await search('gall');
   assert.deepEqual(names(gall), ['Cabinet Le Gall'], 'le prospect d\'un autre compte reste invisible');
   assert.match(gall.groups[0].items[0].sub, /^Client · a@legall\.fr/);

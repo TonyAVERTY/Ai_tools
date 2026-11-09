@@ -24,7 +24,7 @@ await ctx.addCookies([{ name, value, url: s.base }]);
 const p = await ctx.newPage();
 const errs = [];
 p.on('pageerror', (e) => errs.push(e.message));
-await p.goto(`${s.base}/projets`);
+await p.goto(`${s.base}/`);
 await p.waitForSelector('.jobs-btn:visible');
 // Un bouton bas dans la page, comme « Générer un post » : on le met à mi-hauteur de l'écran, puis on lance
 await p.evaluate(() => {

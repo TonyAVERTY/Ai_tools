@@ -7,7 +7,6 @@ import { assetUrl, brandMark, iconLinks } from './assets.js';
 import { SPRITE, ic } from './icons.js';
 import { GIT_SERVER_TYPES, MAX_GIT_SERVERS } from './gitservers.js';
 import { ROLES, MAX_NOTES, rolesOfSection } from './services/roles.js';
-import { tourJson } from './tour.js';
 import { describeKpi } from './services/dbschema.js';
 import { MODE_LABELS } from './claudelink.js';
 import { aiName, forAi } from './services/ainame.js';
@@ -22,7 +21,7 @@ const SECTION_ICONS = { target: 'target', search: 'search', spark: 'spark', char
 /** Section dépliable. `title` peut contenir du HTML de confiance (badges), jamais de donnée utilisateur brute. */
 function acc(key, icon, title, sub, body, { open = false, cls = '' } = {}) {
   const roles = rolesOfSection(key); // postes auxquels la section se rattache : le filtre par poste du projet la garde ou la cache
-  return `<details class="acc anim ${cls}" data-acc="${key}"${roles.length ? ` data-roles="${roles.join(' ')}"` : ''}${open ? ' open' : ''}>
+  return `<details class="acc anim ${cls}" id="acc-${key}" data-acc="${key}"${roles.length ? ` data-roles="${roles.join(' ')}"` : ''}${open ? ' open' : ''}>
   <summary><span class="acc-ico">${ic(SECTION_ICONS[icon])}</span><span class="acc-txt"><span class="acc-title">${title}</span>${sub ? `<span class="acc-sub">${sub}</span>` : ''}</span><span class="chev" aria-hidden="true"></span></summary>
   <div class="acc-body">${body}</div>
 </details>`;
@@ -386,12 +385,6 @@ function templateForm(p, kind) {
     <div class="job" data-job="${job}"></div>`;
 }
 
-/** Filtre par poste, dans l'en-tête de la page Projets : il s'applique à tous les projets. */
-const ROLE_SELECT = `<label class="rolesel"><span class="lbl">Poste</span><span class="sel"><select data-role-select aria-label="Filtrer les projets par poste">
-    <option value="">Tous les postes</option>
-    ${ROLES.map((r) => `<option value="${r.id}">${esc(r.label)}</option>`).join('\n    ')}
-  </select>${ic('down')}</span></label>`;
-
 /** Section « Postes et tâches IA » : chaque poste avec ses tâches. Les tâches qui lisent le dépôt sont réservées aux administrateurs. */
 function postesBody(p) {
   const member = p.access === 'member';
@@ -414,19 +407,7 @@ function postesBody(p) {
   </div>`;
 }
 
-const shortDay = (ts) => new Date(ts * 1000).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', timeZone: 'Europe/Paris' });
-/** Chiffres réels d'un projet dans sa ligne repliée (voir projectStats) : seuls les compteurs non nuls s'ajoutent à « prospects ». */
-function projectFacts(st) {
-  if (!st) return '';
-  if (!st.prospects) return '<span class="pfacts"><span class="muted">aucun prospect</span></span>';
-  const parts = [`<span><b>${st.prospects.toLocaleString('fr-FR')}</b> prospect${st.prospects > 1 ? 's' : ''}</span>`];
-  if (st.toContact) parts.push(`<span><b>${st.toContact.toLocaleString('fr-FR')}</b> à contacter</span>`);
-  if (st.replies) parts.push(`<span class="ok"><b>${st.replies.toLocaleString('fr-FR')}</b> réponse${st.replies > 1 ? 's' : ''}</span>`);
-  if (st.lastSentAt) parts.push(`<span>dernier envoi le ${esc(shortDay(st.lastSentAt))}</span>`);
-  return `<span class="pfacts">${parts.join('')}</span>`;
-}
-
-function projectItem(p, smtp, dbCfg, imap, { open = false, stats = null, onPage = false } = {}) {
+export function projectBlocks(p, smtp, dbCfg, imap) {
   const profile = p.profile;
   // « En-tête » (dépôt, site, fiche, sortie de l'analyse) : en haut et ouvert tant que le projet n'est pas analysé, puis replié en bas, juste avant « Configuration ».
   const headerAcc = acc('header', 'git', 'En-tête', 'Dépôt Git et fiche projet', `
@@ -440,39 +421,28 @@ function projectItem(p, smtp, dbCfg, imap, { open = false, stats = null, onPage 
     <div class="fiche-h"><b>Fiche projet</b></div>
     <p>${esc(profile.resume)}</p><p class="meta"><span>Analysé le ${fmtDate(p.profileAt)}</span><span>Commit <code>${esc((p.profileCommit || '').slice(0, 8))}</code></span><span>${esc(profile.stack || '')}</span></p>
   </section>` : ''}
-  <div class="job" data-job="analyze"></div>`, { open: !profile });
-  return `<details class="project anim" data-id="${p.id}"${open ? ' open' : ''}>
-<summary><span class="pname">${esc(p.name)}</span>${onPage ? '' : `<a class="pname-l" href="/projets/${p.id}" aria-label="Ouvrir la page de ${esc(p.name)}" title="Ouvrir la page du projet">${ic('arrow')}<span>Page du projet</span></a>`}${p.access !== 'owner' ? `<span class="badge" title="Projet partagé par ${esc(p.ownerEmail || '')}">équipe de ${esc(p.ownerEmail || '')}</span>` : p.teamId ? '<span class="badge ok">partagé</span>' : ''}<button type="button" class="pcfg badge" data-cfg title="Voir la liste « Mise en route »" hidden></button><button type="button" class="btn small secondary prean" data-run="analyze" data-id="${p.id}"${profile ? ' data-reanalyze' : ''} title="${profile ? "Relancer l'analyse du dépôt" : "Lancer l'analyse du dépôt"}" aria-label="${profile ? 'Réanalyser' : 'Analyser'} le projet">${ic(profile ? 'repeat' : 'spark')}<span>${profile ? 'Réanalyser' : 'Analyser'}</span></button><span class="pstate" data-state></span>${projectFacts(stats)}</summary>
-<div class="pbody"><div class="pcard">
-  ${acc('setup', 'target', 'Mise en route', 'Ce qu\'il reste à faire avant ton premier envoi', `<div class="setup" data-setup>${loadingBlock()}</div>`, { cls: 'setup-acc' })}
-  ${profile ? '' : headerAcc}
-
-  ${profile ? acc('target', 'target',
-    `Cible${p.targetValidated ? '' : ' <span class="badge warn">à valider</span>'}`, // une cible validée est signalée par la coche verte de la section
-    esc((p.target?.description || '').slice(0, 120)), targetForm(p), { open: !p.targetValidated, cls: 'target-acc' }) : ''}
-
-  <div class="accs">
-  ${acc('prospect', 'search', 'Prospecter', 'Recherche, modèle de mail, envoi, relances et CRM', `
-    ${acc('search', 'search', 'Recherche de prospects', `${aiName()} cherche des entreprises qui collent à la cible`, `
+  <div class="job" data-job="analyze"></div>`, { open: true });
+  const setup = acc('setup', 'target', 'Mise en route', 'Ce qu\'il reste à faire avant ton premier envoi', `<div class="setup" data-setup>${loadingBlock()}</div>`, { cls: 'setup-acc' });
+  const target = profile ? acc('target', 'target',
+    `${p.targetValidated ? ic('lock', 'ic-s') : ''}Cible ${p.targetValidated ? `<span class="badge ok">${ic('check')}Validée</span>` : '<span class="badge warn">à valider</span>'}`,
+    esc((p.target?.description || '').slice(0, 120)), targetForm(p), { open: true, cls: 'target-acc' }) : '';
+  const search = acc('search', 'search', 'Recherche de prospects', `${aiName()} cherche des entreprises qui collent à la cible`, `
     <form data-action="prospect" data-id="${p.id}" class="inline">
       <label>Prospects à chercher<input name="count" type="number" min="1" max="50" value="10"></label>
       <label>Quand<select name="when"><option value="now">Maintenant</option><option value="night">Cette nuit (1h-6h)</option></select></label>
       <button class="btn primary">Lancer la recherche</button>
     </form>
-    <div class="job" data-job="prospect"></div>`, { open: true, cls: 'sub' })}
-
-    ${acc('template', 'mail', 'Modèle de mail', 'Objet, test A/B et corps du premier mail', templateForm(p, 'initial'), { cls: 'sub' })}
-
-    ${acc('send', 'send', 'Envoi', 'Envoi par lots, boîte de réception et test A/B', `
+    <div class="job" data-job="prospect"></div>`, { open: true, cls: 'main' });
+  const template = acc('template', 'mail', 'Modèle de mail', 'Objet, test A/B et corps du premier mail', templateForm(p, 'initial'), { open: true, cls: 'main' });
+  const send = acc('send', 'send', 'Envoi', 'Envoi par lots, boîte de réception et test A/B', `
     <form data-action="send" data-id="${p.id}" class="inline send">
       <label>Mails à envoyer<input name="count" type="number" min="1" value="10"></label>
       <button class="btn primary" disabled>Envoyer</button>
       <span class="muted small" data-send-info></span>
     </form>
     <div class="job" data-job="send"></div>
-    <p class="inbox small" data-inbox></p>`, { cls: 'sub' })}
-
-    ${acc('followup', 'repeat', 'Relance automatique', 'Une relance dans le même fil après quelques jours', `
+    <p class="inbox small" data-inbox></p>`, { open: true, cls: 'main' });
+  const followup = acc('followup', 'repeat', 'Relance automatique', 'Une relance dans le même fil après quelques jours', `
     <section class="followup">
       <form data-action="followup" data-id="${p.id}" class="inline">
         <label class="check"><input type="checkbox" name="enabled" ${p.followupEnabled ? 'checked' : ''}> Relancer une fois les prospects sans réponse</label>
@@ -482,26 +452,36 @@ function projectItem(p, smtp, dbCfg, imap, { open = false, stats = null, onPage 
       <p class="muted small" data-followup-info></p>
       ${templateForm(p, 'followup')}
       <div class="job" data-job="followup"></div>
-    </section>`, { cls: 'sub' })}
-
-    ${acc('prospects', 'users', 'Prospects <span data-count></span>', 'Recherche, filtres, fiches, import et export CSV', `
-      <div class="viewtoggle" role="group" aria-label="Affichage des prospects">
-        <button type="button" class="btn small on" data-view-mode="list" aria-pressed="true">Liste</button>
-        <button type="button" class="btn small" data-view-mode="board" aria-pressed="false">Kanban</button>
+    </section>`, { open: true, cls: 'main' });
+  const prospects = acc('prospects', 'users', 'Prospects <span data-count></span>', 'Recherche, filtres, fiches, import et export CSV', `
+      <div class="pr-head">
+        <h2>Prospects</h2>
+        <div class="seg" role="group" aria-label="Affichage des prospects">
+          <button type="button" class="on" data-view-mode="list" aria-pressed="true">Liste</button>
+          <button type="button" data-view-mode="board" aria-pressed="false">Kanban</button>
+        </div>
+        <button type="button" class="btn secondary small" data-pform-toggle aria-expanded="false">${ic('plus')}Ajouter un prospect</button>
       </div>
       <form class="pfilters" data-filters>
-        <input type="search" name="q" placeholder="Rechercher : entreprise, email, ville, secteur" aria-label="Rechercher">
-        <select name="status" aria-label="Statut"><option value="">Tous les statuts</option>${Object.entries(STATUSES).map(([k, l]) => `<option value="${k}">${l}</option>`).join('')}</select>
-        <select name="minScore" aria-label="Score minimum"><option value="0">Tous les scores</option><option value="5">Score ≥ 5</option><option value="7">Score ≥ 7</option><option value="9">Score ≥ 9</option></select>
-        <label class="opt"><input type="checkbox" name="todo" value="1"><span class="box">${ic('check')}</span><span>Actions à faire</span></label>
-        <select name="sort" aria-label="Tri"><option value="score">Tri : score</option><option value="recent">Plus récents</option><option value="contacted">Dernier contact</option><option value="company">Entreprise A → Z</option></select>
+        <div class="pr-bar">
+          <div class="chips" role="group" aria-label="Filtrer par statut">
+            <button type="button" class="chip on" data-chip="" aria-pressed="true">Tous <span data-chip-n="all"></span></button>
+            <button type="button" class="chip" data-chip="new" aria-pressed="false">À contacter <span data-chip-n="new"></span></button>
+            <button type="button" class="chip" data-chip="sent" aria-pressed="false">Contacté <span data-chip-n="sent"></span></button>
+            <button type="button" class="chip" data-chip="replied" aria-pressed="false">A répondu <span data-chip-n="replied"></span></button>
+            <button type="button" class="chip" data-chip-todo aria-pressed="false">Actions à faire <span data-chip-n="todo"></span></button>
+          </div>
+          <label class="pr-search">${ic('search', 'ic-s')}<input type="search" name="q" placeholder="Rechercher" aria-label="Rechercher : entreprise, email, ville, secteur"></label>
+        </div>
+        <details class="pr-more"><summary>Plus de filtres</summary>
+          <div class="pr-more-b">
+            <select name="status" aria-label="Statut"><option value="">Tous les statuts</option>${Object.entries(STATUSES).map(([k, l]) => `<option value="${k}">${l}</option>`).join('')}</select>
+            <select name="minScore" aria-label="Score minimum"><option value="0">Tous les scores</option><option value="5">Score ≥ 5</option><option value="7">Score ≥ 7</option><option value="9">Score ≥ 9</option></select>
+            <label class="opt"><input type="checkbox" name="todo" value="1"><span class="box">${ic('check')}</span><span>Actions à faire</span></label>
+            <select name="sort" aria-label="Tri"><option value="score">Tri : score</option><option value="recent">Plus récents</option><option value="contacted">Dernier contact</option><option value="company">Entreprise A → Z</option></select>
+          </div>
+        </details>
       </form>
-      <div class="row csv">
-        <button type="button" class="btn small primary" data-pform-toggle aria-expanded="false">${ic('plus')}Ajouter un prospect</button>
-        <a class="btn small" data-export href="/api/projects/${p.id}/prospects.csv" download>Exporter (CSV)</a>
-        <label class="btn small file">Importer un CSV<input type="file" accept=".csv,text/csv" data-import="${p.id}" hidden></label>
-        <span class="muted small">Colonnes reconnues : entreprise, email, site, ville, secteur, score, source, accroche.</span>
-      </div>
       <form class="pform panel" data-pform data-id="${p.id}" hidden>
         <div class="panel-h"><h4>Ajouter un prospect</h4></div>
         <p class="muted small">Pour un contact que tu as déjà : le prospect est ajouté avec le statut « À contacter ». Il est écarté s'il existe déjà dans ce projet ou s'il ne doit pas être contacté.</p>
@@ -519,10 +499,12 @@ function projectItem(p, smtp, dbCfg, imap, { open = false, stats = null, onPage 
       </form>
       <div data-import-report></div>
       <div data-prospects></div>
-      <div class="pager" data-pager></div>`, { cls: 'sub prospects' })}
-  `, { cls: 'main', open: !!profile && !!p.targetValidated })}
-
-  ${acc('evolution', 'spark', 'Évolution', 'Idées de fonctionnalités tirées du code, envoyées par mail', `
+      <div class="pr-foot">
+        <div class="pager" data-pager></div>
+        <span class="acts"><a data-export href="/api/projects/${p.id}/prospects.csv" download>Exporter (CSV)</a><label class="file">Importer un CSV<input type="file" accept=".csv,text/csv" data-import="${p.id}" hidden></label></span>
+      </div>
+      <p class="muted small pr-hint">Colonnes reconnues à l'import : entreprise, email, site, ville, secteur, score, source, accroche.</p>`, { open: true, cls: 'main prospects' });
+  const evolution = acc('evolution', 'spark', 'Évolution', 'Idées de fonctionnalités tirées du code, envoyées par mail', `
     <form data-action="evolution" data-id="${p.id}" class="inline">
       <label>Nombre d'évolutions<input name="count" type="number" min="1" max="20" value="5"></label>
       <label>Raisonnement<select name="level">
@@ -533,9 +515,8 @@ function projectItem(p, smtp, dbCfg, imap, { open = false, stats = null, onPage 
       <label>Quand<select name="when"><option value="now">Maintenant</option><option value="night">Cette nuit (1h-6h)</option></select></label>
       <button class="btn primary">Chercher et envoyer par mail</button>
     </form>
-    <div class="job" data-job="evolution"></div>`, { cls: 'main' })}
-
-  ${p.access !== 'member' ? acc('audit', 'computer', 'Audit du projet', 'Rapport qualité et sécurité du code, en lecture seule', `
+    <div class="job" data-job="evolution"></div>`, { open: true, cls: 'main' });
+  const audit = p.access !== 'member' ? acc('audit', 'computer', 'Audit du projet', 'Rapport qualité et sécurité du code, en lecture seule', `
     <form data-action="audit" data-id="${p.id}" class="inline">
       <label>Raisonnement<select name="level">
         <option value="rapide" selected>Rapide (Haiku, économe)</option>
@@ -546,75 +527,18 @@ function projectItem(p, smtp, dbCfg, imap, { open = false, stats = null, onPage 
       <button class="btn primary">${ic('shield')}Lancer l'audit</button>
     </form>
     <p class="muted small">${esc(aiName())} lit le dépôt (sans rien modifier) et signale les défauts de code, de sécurité, de tests et de dépendances, avec le fichier concerné.</p>
-    <div class="job" data-job="audit"></div>`, { cls: 'main' }) : ''}
-
-  ${acc('linkedin', 'linkedin', 'LinkedIn', `Relie un compte, ${aiName()} écrit des posts, tu relis et publies`, `
+    <div class="job" data-job="audit"></div>`, { open: true, cls: 'main' }) : '';
+  const linkedin = acc('linkedin', 'linkedin', 'LinkedIn', `Relie un compte, ${aiName()} écrit des posts, tu relis et publies`, `
     <div class="linkedin" data-linkedin>${loadingBlock()}</div>
-    <div class="job" data-job="linkedin_post"></div>`, { cls: 'main' })}
-
-  ${acc('promo', 'film', 'Promotion', `${aiName()} conçoit une vidéo de design motion pour présenter ton projet`, `
+    <div class="job" data-job="linkedin_post"></div>`, { open: true, cls: 'main' });
+  const promo = acc('promo', 'film', 'Promotion', `${aiName()} conçoit une vidéo de design motion pour présenter ton projet`, `
     <div class="promo" data-promo>${loadingBlock()}</div>
-    <div class="job" data-job="promo_video"></div>`, { cls: 'main' })}
-
-  ${p.access !== 'member' ? acc('recap', 'chart', 'Récapitulatif', 'Chiffres business, prospection et courbes', `
-    <div class="recap" data-recap>${loadingBlock()}</div>`, { cls: 'main' }) : ''}
-
-  ${acc('postes', 'users', 'Postes et tâches IA', 'Les postes d\'une entreprise, chacun avec ses tâches faites par l\'IA', postesBody(p), { cls: 'main' })}
-  </div>
-
-  ${profile ? headerAcc : ''}
-
-  ${p.access !== 'member' ? acc('config', 'gear', 'Configuration du projet', 'SMTP, boîte IMAP, base de données', configForms(p, smtp, dbCfg, imap), { cls: 'config' }) : ''}
-</div></div>
-</details>`;
-}
-
-export function dashboardPage({ email, projects, stats = new Map(), gitHosts = [], usage = null, pauseMessage = null, tour = null }) {
-  return layout({
-    title: 'Projets', email,
-    body: `<div class="dash">
-<div class="hd dash-hd"><h1 id="h-projets">Projets</h1><div class="hd-tools">${projects.length ? ROLE_SELECT : ''}<button type="button" class="btn primary" data-new-toggle aria-expanded="false" aria-controls="new-project">${ic('plus')}Nouveau projet</button></div></div>
-${usageKpis(usage)}
-<section class="col-p" aria-label="Liste des projets">
-  ${pauseMessage ? `<p class="ban ban-err" role="alert">${ic('alert')}<span class="ban-t"><b>${esc(pauseMessage)}</b></span></p>` : ''}
-  <form data-action="create" class="panel cfg" id="new-project" aria-labelledby="h-new" hidden>
-    <div class="panel-h"><h2 id="h-new">Nouveau projet</h2></div>
-    <div class="form">
-      <label class="field"><span class="lbl">Nom</span><input name="name" required maxlength="80" placeholder="Ex. Atelier Exemple"></label>
-      <label class="field"><span class="lbl">Dépôt Git</span><input name="gitUrl" required placeholder="https://github.com/utilisateur/projet.git">
-        <span class="hint">${gitHosts.length ? `GitHub et ${gitHosts.map(esc).join(', ')} sont acceptés.` : 'GitHub est accepté.'} Dépôt privé ou autre serveur Git : ajoute un token dans <a href="/settings">Réglages</a>. Le lien ne pourra plus être modifié. Le projet est cloné et analysé une fois (Sonnet).</span></label>
-    </div>
-    <div class="form-b"><button class="btn primary">Créer et analyser</button><button type="button" class="btn" data-new-toggle>Annuler</button></div>
-  </form>
-  <dialog class="prospect-dialog" id="prospect-dialog" aria-label="Fiche prospect"><div data-dialog-body></div></dialog>
-  <div class="projects">
-  ${projects.length ? projects.map((x) => projectItem(x.project, x.smtp, x.dbCfg, x.imap, { open: projects.length === 1, stats: stats.get(Number(x.project.id)) })).join('\n') : `<div class="empty">
-    <span class="empty-i">${ic('folder')}</span>
-    <h3>Aucun projet pour l'instant</h3>
-    <p>Crée ton premier projet : donne-lui un nom et l'adresse de son dépôt Git, ${esc(aiName())} s'occupe de l'analyser.</p>
-  </div>`}
-  </div>
-</section>
-<aside class="col-s">${claudePanel()}</aside>
-</div>
-${tour ? `<script type="application/json" id="tour-data" data-mode="${esc(tour)}">${tourJson()}</script>` : ''}`,
-  });
-}
-
-/** Page dédiée d'un projet : ses sections (mise en route, cible, prospection…) seules, sans les autres projets. */
-export function projectPage({ email, entry, stats = null }) {
-  const p = entry.project;
-  return layout({
-    title: p.name, email,
-    body: `<div class="dash">
-<nav class="crumb" aria-label="Fil d'Ariane"><a href="/projets">Projets</a><span aria-hidden="true">/</span><span>${esc(p.name)}</span></nav>
-<div class="hd dash-hd"><h1 id="h-projet">${esc(p.name)}</h1></div>
-<dialog class="prospect-dialog" id="prospect-dialog" aria-label="Fiche prospect"><div data-dialog-body></div></dialog>
-<section class="col-p" aria-labelledby="h-projet"><div class="projects projects-one">
-  ${projectItem(p, entry.smtp, entry.dbCfg, entry.imap, { open: true, stats, onPage: true })}
-</div></section>
-</div>`,
-  });
+    <div class="job" data-job="promo_video"></div>`, { open: true, cls: 'main' });
+  const recap = p.access !== 'member' ? acc('recap', 'chart', 'Récapitulatif', 'Chiffres business, prospection et courbes', `
+    <div class="recap" data-recap>${loadingBlock()}</div>`, { open: true, cls: 'main' }) : '';
+  const postes = acc('postes', 'users', 'Postes et tâches IA', 'Les postes d\'une entreprise, chacun avec ses tâches faites par l\'IA', postesBody(p), { open: true, cls: 'main' });
+  const config = p.access !== 'member' ? acc('config', 'gear', 'Configuration du projet', 'SMTP, boîte IMAP, base de données', configForms(p, smtp, dbCfg, imap), { open: true, cls: 'config' }) : '';
+  return { setup, header: headerAcc, target, search, template, send, followup, prospects, evolution, audit, linkedin, promo, recap, postes, config };
 }
 
 /** Une ligne « serveur Git » : URL et token. `i` : numéro de la ligne (champs git_*_i) ; `fresh` : ligne qui vient d'être ajoutée (gabarit). */

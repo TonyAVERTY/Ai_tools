@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { now } from '../src/db.js';
 import { startApp } from './helpers/server.js';
 import { addProject } from './helpers/users.js';
+import { projectsHtml } from './helpers/pages.js';
 
 let s;
 before(async () => { s = await startApp(); });
@@ -61,6 +62,6 @@ test('audit : réservé aux administrateurs du projet, jamais à un simple membr
   assert.equal(ok.status, 200);
   const job = await s.db.prepare("SELECT params_json FROM jobs WHERE project_id = ? AND type = 'audit'").get(pid);
   assert.equal(JSON.parse(job.params_json).level, 'rapide', 'niveau inconnu : rapide');
-  const html = await (await owner.get('/projets', { headers: { accept: 'text/html' } })).text();
+  const html = await projectsHtml(owner);
   assert.match(html, /data-job="audit"/);
 });

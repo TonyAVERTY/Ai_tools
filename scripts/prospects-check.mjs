@@ -25,11 +25,11 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   const errs = [];
   p.on('pageerror', (e) => errs.push(e.message));
   p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
-  await p.goto(`${s.base}/projets`);
+  await p.goto(`${s.base}/p/${pid}/prospection`);
   await p.waitForSelector('html[data-nav="ready"]');
-  if (!(await p.locator('details.project').evaluate((d) => d.open))) await p.locator('details.project > summary').click();
   for (const k of ['prospect', 'prospects', 'template']) await p.evaluate((x) => { const d = document.querySelector(`details[data-acc="${x}"]`); if (d) d.open = true; }, k);
   const email = `neuf-${vp.width}@boulangerie.fr`;
+  const goTab = async (t) => { await p.evaluate(([id, x]) => window.AiNav.go(`/p/${id}/${x}`), [pid, t]); await p.waitForURL((url) => url.pathname === `/p/${pid}/${t}`); await p.waitForSelector('html[data-nav="ready"]'); await p.waitForTimeout(300); }; // changer d'onglet sans recharger
   // ajout manuel
   await p.locator('[data-pform-toggle]').click();
   ok(await p.locator('form[data-pform]').isVisible(), `${tag} le formulaire d'ajout s'ouvre`);
@@ -53,7 +53,8 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   await p.locator('dialog.confirm [data-yes]').click();
   await p.waitForFunction(() => !document.querySelector('[data-prospects]')?.textContent.includes('Boulangerie Neuve'));
   ok(true, `${tag} le prospect supprimé disparaît de la liste`);
-  // aperçu
+  // aperçu (le modèle de mail est dans l'onglet Envoi)
+  await goTab('envoi');
   const tpl = 'form[data-action=template][data-kind=initial]';
   await p.fill(`${tpl} [name=subject]`, 'Bonjour {{entreprise}}');
   await p.fill(`${tpl} [name=subjectB]`, 'Une idée pour {{entreprise}}');
@@ -203,6 +204,7 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   await p.locator('dialog.mailprev [data-pv-hand]').click();
   const edit = await p.evaluate((sel) => { const f = document.querySelector(sel); return { active: document.activeElement === f, text: f.value.slice(f.selectionStart, f.selectionEnd), open: !!document.querySelector('dialog.mailprev[open]') }; }, `${tpl} [name=body]`);
   ok(!edit.open && edit.active && edit.text === 'Bien cordialement,', `${tag} Modifier à la main : l'aperçu se ferme et la phrase est sélectionnée dans le champ du modèle (« ${edit.text} »)`);
+  await goTab('prospection');
   // vue tableau : un prospect glissé d'une colonne à l'autre change de statut côté serveur
   const kanbanEmail = `kanban-${vp.width}@atelier.fr`;
   const kanbanName = `Atelier Kanban ${vp.width}`; // un nom par largeur : le prospect du premier passage reste dans la base
@@ -223,8 +225,12 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   await p.locator('.pills a.pill', { hasText: 'Projets' }).click();
   await p.waitForURL((url) => url.pathname === '/projets');
   await p.waitForSelector('html[data-nav="ready"]');
+  await p.locator('.pj-card').first().click(); // la carte du projet, puis son onglet Prospection (navigation douce)
+  await p.waitForURL((url) => url.pathname === `/p/${pid}`);
+  await p.evaluate((id) => window.AiNav.go(`/p/${id}/prospection`), pid);
+  await p.waitForURL((url) => url.pathname === `/p/${pid}/prospection`);
+  await p.waitForSelector('html[data-nav="ready"]');
   ok(await p.evaluate(() => window.__marker) === 'vivante', `${tag} aller-retour sans rechargement de la page`);
-  if (!(await p.locator('details.project').evaluate((d) => d.open))) await p.locator('details.project > summary').click();
   for (const k of ['prospect', 'prospects']) await p.evaluate((x) => { const d = document.querySelector(`details[data-acc="${x}"]`); if (d) d.open = true; }, k);
   await p.waitForSelector(`[data-prospects] >> text=${kanbanName}`, { timeout: 10000 });
   await p.locator(`[data-prospects] >> text=${kanbanName}`).first().click();

@@ -7,6 +7,7 @@ import { startApp } from './helpers/server.js';
 import { addProject } from './helpers/users.js';
 import { projectStats } from '../src/projects.js';
 import { readFileSync } from 'node:fs';
+import { projectsHtml } from './helpers/pages.js';
 
 let s;
 before(async () => { s = await startApp(); });
@@ -29,20 +30,21 @@ test('projectStats : prospects, à contacter, réponses et dernier envoi, projet
   const p2 = await addProject(s.db, u.id, { name: 'Vide', gitUrl: 'https://github.com/u/vide.git' });
   await seedProspects(p1);
   const st = await projectStats(s.db, [p1, p2]);
-  assert.deepEqual({ ...st.get(Number(p1)), lastSentAt: typeof st.get(Number(p1)).lastSentAt }, { prospects: 6, toContact: 2, replies: 2, lastSentAt: 'number' });
-  assert.deepEqual(st.get(Number(p2)), { prospects: 0, toContact: 0, replies: 0, lastSentAt: null }, 'un projet vide renvoie des zéros, pas de valeur inventée');
+  assert.deepEqual({ ...st.get(Number(p1)), lastSentAt: typeof st.get(Number(p1)).lastSentAt }, { prospects: 6, toContact: 2, replies: 2, clients: 1, lastSentAt: 'number' });
+  assert.deepEqual(st.get(Number(p2)), { prospects: 0, toContact: 0, replies: 0, clients: 0, lastSentAt: null }, 'un projet vide renvoie des zéros, pas de valeur inventée');
   assert.equal((await projectStats(s.db, [])).size, 0);
 });
 
-test('page Projets : les chiffres réels sont sur la ligne du projet ; un projet vide le dit ; un autre compte ne les voit pas', async () => {
+test('page Projets : les chiffres réels sont sur la carte du projet ; un projet vide le dit ; un autre compte ne les voit pas', async () => {
   const u = await s.newUser();
   const other = await s.newUser();
   const p1 = await addProject(s.db, u.id, { name: 'Avec prospects', gitUrl: 'https://github.com/u/a.git' });
   await addProject(s.db, u.id, { name: 'Sans prospect', gitUrl: 'https://github.com/u/b.git' });
   await seedProspects(p1);
   const page = await html(u, '/projets');
-  assert.match(page, /<span class="pfacts"><span><b>6<\/b> prospects<\/span><span><b>2<\/b> à contacter<\/span><span class="ok"><b>2<\/b> réponses<\/span><span>dernier envoi le /);
-  assert.match(page, /<span class="pfacts"><span class="muted">aucun prospect<\/span><\/span>/);
+  assert.match(page, /<span class="k-l">Prospects<\/span><span class="k-v">6<\/span><span class="k-s">2 à contacter<\/span>/);
+  assert.match(page, /<span class="k-l">Réponses<\/span><span class="k-v hl">2<\/span><span class="k-s">dernier envoi : /);
+  assert.match(page, /Aucun prospect pour l'instant/);
   assert.doesNotMatch(await html(other, '/projets'), /Avec prospects|à contacter/, 'isolation');
 });
 

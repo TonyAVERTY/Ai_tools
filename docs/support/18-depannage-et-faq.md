@@ -63,7 +63,7 @@ L'envoi vérifie le sens de chaque mail avec ton IA : quand elle ne peut pas ré
 Lire le message « En attente : … » dans le menu **Activité**. Raisons possibles : budget IA atteint (clé API) ; quota Claude serré (au-delà de 85 %) ; charge élevée du serveur ; job programmé « Cette nuit » ; déjà un job IA en cours pour le compte. Il repart seul. On peut l'**Annuler** depuis Activité.
 
 ## Une section ou une liste n'a pas pu se charger : « Réessayer »
-Quand une partie de la page se charge après coup (la section **Mise en route**, **LinkedIn**, **Promotion** ou **Récapitulatif** d'un projet, la liste de la page **Clients**, le menu **Joindre un projet iaboss** de la page IA), un petit cercle accompagne « Chargement… ». Si la requête échoue, le cercle laisse la place à **un message et un bouton « Réessayer »** : le cercle ne tourne jamais pour toujours.
+Quand une partie de la page se charge après coup (la section **LinkedIn**, **Promotion** ou **Récapitulatif** d'un projet, la liste de la page **Clients**, le menu **Joindre un projet iaboss** de la page IA), un petit cercle accompagne « Chargement… ». Si la requête échoue, le cercle laisse la place à **un message et un bouton « Réessayer »** : le cercle ne tourne jamais pour toujours.
 1. Lis le message : « **Connexion impossible : réessaie dans un instant.** » (réseau coupé), « **Erreur interne : réessaie dans un instant.** » (problème du serveur), « **Tu n'as pas accès à cette action.** » (ton rôle sur le projet ne le permet pas) ou « **Introuvable : recharge la page.** ».
 2. Clique sur **Réessayer** : le cercle revient et la demande repart. Si elle échoue encore, le message revient et tu peux recliquer.
 3. Si le message persiste après plusieurs essais, recharge la page ; s'il revient, signale-le avec l'heure et le nom de la section.
@@ -105,8 +105,8 @@ Vérifier dans l'ordre : 1) SMTP enregistré (« Configuration du projet ») ; 2
 ## Mes mails arrivent en spam
 Configurer SPF, DKIM et DMARC pour le domaine d'envoi ; envoyer de petits lots au début et augmenter progressivement ; garder des délais entre les mails ; éviter les liens et pièces jointes dans le premier mail ; soigner l'accroche. iaboss ajoute déjà un lien de désinscription dans le pied de page des mails.
 
-## Le filtre par poste cache une section que je cherche
-Choisis **Tous les postes** dans la liste **Poste**, en haut de la page Projets : le filtre choisi est mémorisé dans ton navigateur et s'applique à tous tes projets. Un poste ne montre que ses sections (Commerce : Cible et Prospecter ; Communication : LinkedIn et Promotion ; Produit : Évolution ; Développement : Audit du projet ; Direction : Récapitulatif) plus **Postes et tâches IA**. Voir « Postes et filtre par poste : les tâches IA d'une entreprise ».
+## Où est passé le filtre par poste, ou une section que je cherche ?
+Le filtre « Poste » de la page Projets n'existe plus. Un projet a maintenant des onglets (**Vue d'ensemble**, **Prospection**, **Envoi**, **Clients**, **Facturation**, **Communication**, **Outils IA**, **Récapitulatif**, **Réglages du projet**), chacun avec ses sections déjà ouvertes : Cible, Recherche de prospects et Prospects dans Prospection ; Modèle de mail, Envoi et Relance automatique dans Envoi ; LinkedIn et Promotion dans Communication ; Évolution, Audit du projet et Postes et tâches IA dans Outils IA ; SMTP, IMAP, base de données et suppression dans Réglages du projet. Voir « Les projets : cartes, pages à onglets, création, suppression ».
 
 ## Une tâche d'un poste ne démarre pas, échoue ou n'a pas de résultat
 - « Analyse le projet d'abord » : lance l'analyse du projet (la fiche sert de contexte à toutes les tâches).

@@ -32,7 +32,7 @@ async function tokensByJob(u, vp) {
   const p = await ctx.newPage();
   const errs = [];
   p.on('pageerror', (e) => errs.push(e.message));
-  await p.goto(`${s.base}/projets`);
+  await p.goto(`${s.base}/`);
   await p.waitForSelector('html[data-nav="ready"]');
   await p.waitForSelector('.jobs-btn:not([hidden])', { state: 'attached' });
   await p.locator('.jobs-btn').click();
