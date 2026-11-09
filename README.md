@@ -169,6 +169,17 @@ Chaque utilisateur relie SON accès ; ses jobs IA tournent avec cet accès uniqu
 
 Les seuils, fenêtres et plafonds vivent dans **un seul module : `src/limits.js`**. Les pages Tarifs lisent les mêmes chiffres.
 
+### Offres payantes (Stripe)
+
+Facultatif : `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` (les deux ou aucun, voir `.env.example` pour les quatre étapes côté Stripe). Sans elles, rien ne change : la page Tarifs garde « Me prévenir à l'ouverture » et un administrateur attribue les plans à la main. Avec elles :
+
+- **Aucune donnée de carte chez nous** : le paiement passe par Stripe Checkout, la gestion (moyen de paiement, factures, résiliation) par le portail client Stripe. Aucune dépendance ajoutée : `src/services/stripe.js` appelle l'API REST.
+- **Prix créés à la demande** : `src/limits.js` reste la seule source des tarifs. Chaque offre et périodicité devient un prix Stripe (clé de recherche `iaboss_<plan>_<mois|an>_<centimes>`), créé la première fois et retrouvé ensuite ; changer un tarif crée un nouveau prix, les abonnés en cours gardent l'ancien.
+- **Les événements signés font foi** (`POST /stripe/webhook`, public, signature HMAC vérifiée à temps constant, tolérance de 5 minutes, événement traité une seule fois) : `customer.subscription.*` donne le plan du compte, `checkout.session.completed` lie le client Stripe au compte. Un événement en échec renvoie 500 : Stripe le rejoue.
+- **Règles** : un administrateur et un plan « pro » donné à la main ne sont jamais modifiés ; paiement refusé = droits gardés `SUBSCRIPTION.graceDays` (7) jours puis retour au plan gratuit (le planificateur) ; abonnement terminé = plan gratuit, aucune donnée supprimée (les plafonds ne bloquent que les nouvelles actions) ; changement d'offre = mise à jour de l'abonnement au prorata, jamais un second abonnement.
+- **Suppression du compte** : l'abonnement est résilié chez Stripe AVANT l'effacement ; si Stripe ne répond pas, rien n'est supprimé.
+- Mode test ou production : lu dans le préfixe de la clé (`sk_test_` / `sk_live_`) ; en mode test, Mon compte le dit.
+
 ### Limitation de débit
 
 En mémoire (fenêtre glissante, sans dépendance), par adresse IP et par compte. Au-delà du seuil : `429` avec `Retry-After`. Règles : démarrage et retours de connexion, routes `/link/*`, export et import CSV, envois (lot, rapport, notification de test), création de projet, suppression de compte, tests de connexion (IMAP, base du récap), back-office. Les compteurs sont perdus à un redémarrage et non partagés entre instances (une seule instance en production).

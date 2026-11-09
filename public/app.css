@@ -1999,3 +1999,8 @@ a.pj-card:hover { border-color: var(--primary); }
 .ct-li-t { display: flex; flex-direction: column; min-width: 0; }
 .ct-li-t b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 640px) { .ct-img { max-width: 100%; } .ct-format { max-width: none; } }
+
+/* Mon compte : bloc « Ton offre » (abonnement) */
+.offer { margin: 16px 0 4px; padding-top: 16px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 10px; }
+.offer p { margin: 0; }
+.offer form { margin: 0; display: inline; }

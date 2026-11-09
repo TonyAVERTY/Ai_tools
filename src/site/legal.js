@@ -3,7 +3,7 @@
 // individuel Tony AVERTY. Ce sont des modèles sérieux, pas un avis juridique : voir docs/JOURNAL.md pour ce qui reste
 // à compléter (marqueurs visibles) et à faire relire.
 import { siteLayout, ic, CONTACT_EMAIL } from './layout.js';
-import { PLAN_LIMITS, PLAN_PRICES, PLAN_LABELS, ANNUAL_FREE_MONTHS, annualPrice } from '../limits.js';
+import { PLAN_LIMITS, PLAN_PRICES, PLAN_LABELS, ANNUAL_FREE_MONTHS, annualPrice, SUBSCRIPTION } from '../limits.js';
 
 /**
  * Marqueurs visibles tant que l'information n'est pas fournie ou validée. Leur liste est aussi dans docs/JOURNAL.md
@@ -102,7 +102,7 @@ export function mentionsPage({ appUrl }) {
 
 // ---------- Politique de confidentialité ----------
 // `captcha` : reCAPTCHA configuré. Les paragraphes qui le concernent n'apparaissent que dans ce cas, comme Apple.
-export function privacyPage({ appUrl, apple = false, captcha = false, inactiveMonths = 24 }) {
+export function privacyPage({ appUrl, apple = false, captcha = false, inactiveMonths = 24, billing = false }) {
   return legalPage({
     appUrl, path: '/confidentialite',
     title: 'Politique de confidentialité · iaboss',
@@ -173,6 +173,7 @@ export function privacyPage({ appUrl, apple = false, captcha = false, inactiveMo
   <li><strong>Ton fournisseur d'IA : Anthropic (Claude), OpenAI (ChatGPT) ou Google (Gemini), un seul à la fois,</strong> par l'intermédiaire de <em>ton</em> accès : le code de ton projet lu par ton IA, la fiche et la cible, les domaines des prospects déjà connus pour éviter les doublons, les messages et les pièces jointes (photos, PDF, textes, images tirées d'une vidéo, code d'un projet joint) que tu envoies sur la page IA, la fiche du projet et le sujet que tu donnes pour une vidéo de promotion (la scène animée écrite par ton IA est ensuite dessinée sur le serveur d'iaboss, sans accès au réseau), et ce que ton IA trouve sur le web transitent par ton compte chez ce fournisseur, selon les conditions que tu as acceptées avec lui. <a href="https://www.anthropic.com/legal/privacy" rel="noopener noreferrer">Politique d'Anthropic</a>, <a href="https://openai.com/policies/privacy-policy" rel="noopener noreferrer">politique d'OpenAI</a>, <a href="https://policies.google.com/privacy" rel="noopener noreferrer">politique de Google</a>. Avec une clé Gemini gratuite, Google peut utiliser les données envoyées pour améliorer ses produits : n'y mets pas de données de prospects, ou active la facturation sur ton projet Google.</li>
   <li><strong>Google, ElevenLabs ou Microsoft (voix des vidéos de promotion, facultatif) :</strong> si tu coches « Ajouter une voix », le texte de la narration, écrit par ton IA à partir de la fiche de ton projet, est envoyé au service de synthèse vocale que tu choisis (Google Traduction, ou, avec ta propre clé API, ElevenLabs, Google Cloud ou Microsoft Azure) pour être transformé en audio. Une clé API que tu enregistres est chiffrée et n'est utilisée que pour ces appels. Aucun autre élément de ton compte n'y est transmis ; sans la case cochée, rien n'est envoyé, et les voix locales (Piper, eSpeak NG) s'exécutent sur le serveur d'iaboss sans rien transmettre à un tiers.</li>
   ${captcha ? `<li><strong>Google reCAPTCHA</strong> (Google Ireland Limited, Google LLC) : protège la connexion contre les envois automatisés. Son script est chargé automatiquement à l'ouverture de la page de connexion, sans action de ta part. Il dépose des cookies et transmet à Google ton adresse IP, des informations sur ton navigateur et sur ton comportement sur la page. Base légale : l'intérêt légitime d'iaboss à protéger la connexion contre les abus. iaboss ne conserve pas le résultat de la vérification. Sans elle, la connexion n'est pas possible. Si cela te pose problème, écris-nous. <a href="https://policies.google.com/privacy" rel="noopener noreferrer">Politique de Google</a>.</li>` : ''}
+  ${billing ? `<li><strong>Stripe</strong> (Stripe Payments Europe, Ltd., Irlande) pour le paiement des offres payantes : la saisie de ta carte se fait sur une page de Stripe, iaboss ne voit et ne conserve jamais ton numéro de carte. Stripe reçoit ton email, le nom de l'offre choisie et les données de paiement, et nous renvoie l'état de ton abonnement (offre, période, paiement réussi ou refusé). Base légale : l'exécution du contrat. <a href="https://stripe.com/fr/privacy" rel="noopener noreferrer">Politique de Stripe</a>.</li>` : ''}
   <li><strong>L'hébergeur</strong> du serveur : ${HOST}</li>
   <li><strong>Tes propres services</strong>, quand tu les configures : serveur SMTP et IMAP de ta messagerie, Forgejo, base de données de ton projet, Discord. iaboss s'y connecte avec tes identifiants.</li>
 </ul>
@@ -238,7 +239,7 @@ ${captcha
 }
 
 // ---------- Conditions générales d'utilisation ----------
-export function termsPage({ appUrl, apple = false }) {
+export function termsPage({ appUrl, apple = false, billing = false }) {
   return legalPage({
     appUrl, path: '/cgu',
     title: "Conditions générales d'utilisation · iaboss",
@@ -271,7 +272,10 @@ export function termsPage({ appUrl, apple = false }) {
       {
         id: 'plans', title: 'Plan gratuit et plans payants',
         html: `<p>Le plan gratuit comprend ${PLAN_LIMITS.free.projects} projet, ${PLAN_LIMITS.free.prospects} prospects, ${PLAN_LIMITS.free.mails} mails et ${PLAN_LIMITS.free.aiJobs} jobs IA par mois. Ces limites peuvent évoluer, avec information préalable.</p>
-<p>Des plans payants sont prévus : ${Object.keys(PLAN_PRICES).map((k) => `${PLAN_LABELS[k]} (${PLAN_PRICES[k]} € TTC par mois, ou ${annualPrice(k)} € TTC par an, ${ANNUAL_FREE_MONTHS} mois offerts)`).join(', ')}. Les prix sont TTC ; l'éditeur est en franchise de TVA (art. 293 B du CGI). Ces plans ouvrent prochainement ; seul le plan Gratuit est ouvert aujourd'hui, et rien ne sera facturé sans ton accord exprès.</p>`,
+${billing ? `<p>Les plans payants sont ouverts : ${Object.keys(PLAN_PRICES).map((k) => `${PLAN_LABELS[k]} (${PLAN_PRICES[k]} € TTC par mois, ou ${annualPrice(k)} € TTC par an, ${ANNUAL_FREE_MONTHS} mois offerts)`).join(', ')}. Les prix sont TTC ; l'éditeur est en franchise de TVA (art. 293 B du CGI).</p>
+<p><strong>Paiement.</strong> Il se fait par carte sur une page sécurisée de Stripe ; iaboss ne voit ni ne conserve ton numéro de carte. Tu choisis la périodicité (mensuelle ou annuelle) et le prix affiché au moment du paiement est celui que tu paies.</p>
+<p><strong>Renouvellement et résiliation.</strong> L'abonnement se renouvelle automatiquement à chaque période jusqu'à ta résiliation. Tu peux le résilier à tout moment depuis Mon compte (« Gérer mon abonnement ») : l'offre reste active jusqu'à la fin de la période déjà payée, puis ton compte repasse au plan Gratuit. La période commencée n'est pas remboursée, sauf obligation légale. Tu peux aussi changer d'offre ; la différence est calculée au prorata.</p>
+<p><strong>Paiement refusé.</strong> Si un paiement échoue, tu gardes les droits de ton offre pendant ${SUBSCRIPTION.graceDays} jours pour mettre ta carte à jour ; sans régularisation, ton compte repasse au plan Gratuit. Dans tous les cas, tes projets et tes données sont conservés : seuls les plafonds du plan Gratuit s'appliquent aux nouvelles actions.</p>` : `<p>Des plans payants sont prévus : ${Object.keys(PLAN_PRICES).map((k) => `${PLAN_LABELS[k]} (${PLAN_PRICES[k]} € TTC par mois, ou ${annualPrice(k)} € TTC par an, ${ANNUAL_FREE_MONTHS} mois offerts)`).join(', ')}. Les prix sont TTC ; l'éditeur est en franchise de TVA (art. 293 B du CGI). Ces plans ouvrent prochainement ; seul le plan Gratuit est ouvert aujourd'hui, et rien ne sera facturé sans ton accord exprès.</p>`}`,
       },
       {
         id: 'envois', title: 'Tes envois',
