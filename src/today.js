@@ -19,7 +19,7 @@ const marks = (ids) => ids.map(() => '?').join(',');
 export const JOB_LABELS = {
   analyze: "Analyse du projet", prospect: 'Recherche de prospects', template: 'Mail de prospection', followup_template: 'Mail de relance',
   linkedin: 'Post LinkedIn', evolution: 'Idées d\'évolution', billing_quotes: 'Exemples de devis', billing_docs: 'Devis, acompte, facture et avoir',
-  billing_refine: 'Affinage d\'un document', promo: 'Vidéo de promotion', audit: 'Audit du projet', poste: 'Tâches des postes',
+  billing_refine: 'Affinage d\'un document', instagram_post: 'Post Instagram', newsletter: 'Newsletter', promo: 'Vidéo de promotion', audit: 'Audit du projet', poste: 'Tâches des postes',
 };
 const INTENT = {
   interested: ['Intéressé', 'ok', 'check'], question: ['Question', 'info', 'info'], later: ['Plus tard', 'warn', 'clock'],

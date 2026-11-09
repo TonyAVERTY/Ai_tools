@@ -1176,5 +1176,41 @@ export const MIGRATIONS = [
       ) ${T}`,
     ],
   },
+  {
+    // Communication : brouillons de posts Instagram (texte + image dessinée d'après le design du projet) et de newsletters, par projet.
+    // `kind` : instagram | newsletter. `title` : objet de la newsletter ; `extra_json` : hashtags, texte alternatif, format, aperçu. `image` : PNG de l'Instagram.
+    name: 'content_drafts',
+    sqlite: [
+      `CREATE TABLE content_drafts (
+        id INTEGER PRIMARY KEY,
+        project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        kind TEXT NOT NULL,
+        direction TEXT,
+        title TEXT,
+        body TEXT NOT NULL,
+        extra_json TEXT,
+        image BLOB,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )`,
+      'CREATE INDEX content_drafts_project ON content_drafts(project_id, kind, id)',
+    ],
+    mysql: [
+      `CREATE TABLE IF NOT EXISTS content_drafts (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        project_id BIGINT NOT NULL,
+        kind VARCHAR(20) NOT NULL,
+        direction VARCHAR(500) NULL,
+        title VARCHAR(300) NULL,
+        body MEDIUMTEXT NOT NULL,
+        extra_json TEXT NULL,
+        image MEDIUMBLOB NULL,
+        created_at BIGINT NOT NULL,
+        updated_at BIGINT NOT NULL,
+        KEY content_drafts_project (project_id, kind, id),
+        CONSTRAINT content_drafts_project_fk FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+      ) ${T}`,
+    ],
+  },
 ];
 

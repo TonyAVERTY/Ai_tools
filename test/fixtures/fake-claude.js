@@ -22,6 +22,29 @@ const profile = { resume: 'Cartes de fidélité digitales.', proposition_valeur:
 // Post LinkedIn : reprend la direction donnée (si elle existe) ; un 2e passage (brouillons déjà produits) donne un autre texte
 const liDirection = /Direction donnée par l'auteur \(le sujet du post\) : « (.*?) »/s.exec(prompt)?.[1];
 const liPost = () => JSON.stringify({ post: `${prompt.includes('Brouillons déjà produits') ? 'Autre angle' : 'Premier angle'} : ${liDirection ? `sur ${liDirection}` : 'sujet choisi par Claude'}. ${'Un texte de post assez long pour passer le contrôle de taille. '.repeat(2)}` });
+// Post Instagram (légende + visuel HTML). Mots dans la direction : IGSCRIPT = un <script> au premier essai (refusé au rendu), IGSHABBY = visuel faible refusé par le directeur
+// artistique au premier essai (corrigé ensuite), IGFOREVER = toujours refusé (livré avec les constats au dernier essai), IGREVIEWDOWN = verdict du directeur illisible.
+const igDirection = /Direction donnée par l'auteur \(le sujet du post\) : « (.*?) »/s.exec(prompt)?.[1] || '';
+const igFixed = prompt.includes('Ta version précédente de l\'image a été refusée');
+const igResearch = prompt.includes("Recherche d'inspiration (outils WebSearch");
+const igHtml = (label) => `<!doctype html><html><head><style>body{margin:0;width:1080px;height:1080px;overflow:hidden;background:linear-gradient(135deg,#0b3d48,#0f5c6c);font-family:system-ui,sans-serif;color:#f6f1e6}h1{position:absolute;left:80px;top:300px;width:900px;font-size:96px;margin:0}</style></head><body><h1>${label}</h1><svg style="position:absolute;right:80px;bottom:80px" width="240" height="240"><circle cx="120" cy="120" r="100" fill="#f2b134"/></svg></body></html>`;
+const igPost = () => {
+  const bad = igDirection.includes('IGSCRIPT') && !igFixed;
+  const html = bad ? igHtml('Titre').replace('<h1>', '<script>1</script><h1>') : igHtml(igFixed ? 'Version améliorée du visuel' : `Visuel ${igDirection || 'libre'}`);
+  if (igResearch) return prompt.includes('IGRESEARCHDOWN') ? 'pas de blocs' : '<inspiration>Secteur : cartes de fidélité. Marques observées : Fidme, Stocard. Principes : produit en grand, un seul message.</inspiration>';
+  return `<legende>${prompt.includes('Légendes déjà produites') ? 'Autre angle' : 'Premier angle'} : ${igDirection || 'sujet choisi par Claude'}. Une légende assez longue pour passer le contrôle de qualité minimal du texte.</legende>\n<hashtags>#fidelite #commerce #pme</hashtags>\n<alt>Un titre sur fond bleu pétrole avec un disque jaune.</alt>\n<visuel>${html}</visuel>`;
+};
+const igReview = () => {
+  if (igDirection.includes('IGREVIEWDOWN') || prompt.includes('IGREVIEWDOWN')) return 'pas du json';
+  const forever = prompt.includes('IGFOREVER');
+  const shabby = prompt.includes('IGSHABBY') && !prompt.includes('Version améliorée');
+  return forever || shabby
+    ? JSON.stringify({ approved: false, score: 4, issues: [{ severity: 'major', problem: 'Le visuel est vide et sans produit.', fix: 'Ajoute un extrait de carte de fidélité et une vraie hiérarchie.' }] })
+    : JSON.stringify({ approved: true, score: 8, issues: [{ severity: 'minor', problem: 'Marge un peu serrée à droite.', fix: 'Passe-la à 80 px.' }] });
+};
+// Newsletter : objet, aperçu, texte. NLBAD dans la direction = réponse inutilisable
+const nlDirection = /Direction donnée par l'auteur \(le sujet de la newsletter\) : « (.*?) »/s.exec(prompt)?.[1] || '';
+const newsletterReply = () => (nlDirection.includes('NLBAD') ? 'pas de blocs' : `<objet>${prompt.includes('Newsletters déjà produites') ? 'Autre sujet' : 'Premier sujet'} : ${nlDirection || 'choisi par Claude'}</objet>\n<apercu>Un aperçu qui complète l'objet.</apercu>\n<texte>## Introduction\n${'Un paragraphe utile et concret pour le lecteur. '.repeat(8)}\n\n## Une nouveauté\n${'Une phrase qui explique le bénéfice. '.repeat(6)}\n\nÀ très vite.</texte>`);
 // Vidéo de promotion : une scène HTML. SCENEBAD (dans le sujet) = scène sans renderFrame au premier essai, bonne après la demande de correction ;
 // SCENEFOREVER = toujours fautive.
 const promoSubject = /Sujet demandé : « (.*?) »/s.exec(prompt)?.[1] || 'présentation';
@@ -88,6 +111,9 @@ const lines = prompt.includes('CORRECTION DE FORME') ? [styleReply()]
   : prompt.includes('Affine ce document') ? [billRefine()]
   : prompt.includes('QUATRE modèles de documents') ? [billDocs()]
   : prompt.includes('ECHO') ? ['Écho : ' + prompt.split('Utilisateur : ').pop().trim()]
+  : prompt.includes("Juge l'image d'un post Instagram") ? [igReview()]
+  : prompt.includes('UN post Instagram') || igResearch ? [igPost()]
+  : prompt.includes('UNE newsletter') ? [newsletterReply()]
   : prompt.includes('UN post LinkedIn') ? [liPost()]
   : prompt.includes('window.renderFrame') ? [promoScene()]
   : prompt.includes('Audite ce projet') ? ['## Résumé\nCode correct.\n## Constats\n**[FAIBLE]** Pas de tests — `src/a.js:1` — manque de couverture.']
