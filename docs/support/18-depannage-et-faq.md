@@ -270,3 +270,6 @@ Le message précise maintenant la cause : produits manquants dans l'application 
 - Message **« L'image écrite par Claude ne passe pas au rendu »** : trois essais d'image ont été refusés au contrôle (script, adresse externe, texte qui déborde, image vide). Réessaie avec un sujet plus précis.
 - Bannière **« À vérifier avant de publier »** : le directeur artistique (second contrôle) a relevé des défauts que les essais n'ont pas corrigés. Lis-les, puis **Régénérer un autre post**.
 - Couleurs ou polices qui ne ressemblent pas à ton produit : l'IA les lit dans le dépôt ; sans interface dans le dépôt elle reste sobre. Détails dans « Instagram et newsletter : posts, images et lettres d'information ».
+
+## Je viens de payer une offre et mon plan n'a pas changé
+L'activation arrive par un message signé de Stripe, en général en quelques secondes : recharge « Mon compte ». Au bout de quelques minutes sans changement, écris-nous avec l'email de ton compte. Détails dans « Abonnement et paiement : choisir, changer ou résilier son offre ».

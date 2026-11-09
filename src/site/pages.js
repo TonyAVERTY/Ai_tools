@@ -5,6 +5,7 @@ import { esc } from '../http.js';
 import { brandMark, assetUrl } from '../assets.js';
 import { siteLayout, ic, guest, CONTACT_EMAIL } from './layout.js';
 import { PLAN_LIMITS, PLAN_PRICES, PLAN_LABELS, ANNUAL_FREE_MONTHS, annualPrice } from '../limits.js';
+import { PERIODS } from '../services/stripe.js';
 
 const FREE = PLAN_LIMITS.free;
 /** Montant en euros à la française (« 8,33 € ») ; entier sans décimales. */
@@ -156,12 +157,14 @@ const TRUST = (apple) => [
 
 const planLimits = (l) => LIMIT_COLS.map(([label, f]) => [label, f(l)]);
 // Une carte par offre payante : prix selon la période (public/site.js bascule data-billing), plafonds, prévenir à l'ouverture
-const planCard = (k) => `<article class="v-plan${k === 'growth' ? ' v-plan-hi' : ''}" aria-labelledby="pc-${k}">
-        <div class="v-plan-h"><h3 id="pc-${k}">${PLAN_LABELS[k]}</h3><span class="v-flag v-flag-n">Bientôt</span></div>
+/** Les deux formulaires d'achat d'une offre (un par période : public/site.js montre celui de la période choisie). Un visiteur non connecté est envoyé se connecter. */
+const buyForms = (k, label = 'Choisir cette offre') => PERIODS.map((p) => `<form method="post" action="/abonnement/choisir" class="plan-buy when-${p}" data-noajax><input type="hidden" name="plan" value="${k}"><input type="hidden" name="period" value="${p}"><button class="btn btn-primary">${label}</button></form>`).join('');
+const planCard = (billing) => (k) => `<article class="v-plan${k === 'growth' ? ' v-plan-hi' : ''}" aria-labelledby="pc-${k}">
+        <div class="v-plan-h"><h3 id="pc-${k}">${PLAN_LABELS[k]}</h3>${billing ? '' : '<span class="v-flag v-flag-n">Bientôt</span>'}</div>
         <p class="v-plan-p"><span class="when-month">${euros(PLAN_PRICES[k])}<small>par mois, TTC</small></span><span class="when-year">${euros(annualPrice(k))}<small>par an, TTC (${12 - ANNUAL_FREE_MONTHS} mois payés)</small></span></p>
         <p class="v-plan-t">${PLAN_BLURBS[k]}</p>
         <dl class="v-plim">${planLimits(PLAN_LIMITS[k]).map(([lab, v]) => `<div><dt>${lab}</dt><dd>${v}</dd></div>`).join('')}</dl>
-        <a class="btn btn-secondary" href="mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(`Me prévenir : offre ${PLAN_LABELS[k]}`)}">Me prévenir à l'ouverture</a>
+        ${billing ? buyForms(k) : `<a class="btn btn-secondary" href="mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(`Me prévenir : offre ${PLAN_LABELS[k]}`)}">Me prévenir à l'ouverture</a>`}
       </article>`;
 const HOME_FAQ = [
   ['Faut-il une carte bancaire ?', "Non. Le plan Gratuit s'ouvre sans carte bancaire et sans limite de durée."],
@@ -172,7 +175,7 @@ const HOME_FAQ = [
   ["Que se passe-t-il quand j'atteins un plafond ?", "La nouvelle action est refusée, mais rien n'est supprimé. Les plafonds repartent de zéro le 1er du mois, à l'heure de Paris."],
 ];
 
-export function homePage({ appUrl, apple = false }) {
+export function homePage({ appUrl, apple = false, billing = false }) {
   return siteLayout({
     appUrl, path: '/',
     title: 'iaboss : trouve des clients par mail avec ta propre IA',
@@ -242,7 +245,7 @@ export function homePage({ appUrl, apple = false }) {
     <div class="v-row">
       <div class="v-stack">
         <h2 class="v-h2" id="h-t">Des tarifs simples</h2>
-        <p class="v-lead">Seul le plan Gratuit est ouvert aujourd'hui. Les ${['', 'un', 'deux', 'trois', 'quatre', 'cinq', 'six'][PAID.length] || PAID.length} plans payants ouvrent prochainement.</p>
+        <p class="v-lead">${billing ? `Le plan Gratuit pour commencer, puis ${['', 'un', 'deux', 'trois', 'quatre', 'cinq', 'six'][PAID.length] || PAID.length} offres payantes, résiliables à tout moment.` : `Seul le plan Gratuit est ouvert aujourd'hui. Les ${['', 'un', 'deux', 'trois', 'quatre', 'cinq', 'six'][PAID.length] || PAID.length} plans payants ouvrent prochainement.`}</p>
       </div>
       <div class="v-bill" data-bill hidden>
         <div class="v-seg" role="group" aria-label="Période de facturation">
@@ -262,7 +265,7 @@ export function homePage({ appUrl, apple = false }) {
         ${guest('plan', '<a class="btn btn-primary" href="/login">Créer mon compte</a>')}
       </article>
       <div class="v-plan-g">
-        ${PAID.map(planCard).join('\n        ')}
+        ${PAID.map(planCard(billing)).join('\n        ')}
       </div>
     </div>
     <p class="v-small">Prix TTC : l'éditeur est en franchise de TVA (art. 293 B du CGI). Ton accès à l'IA est facturé par son fournisseur (Anthropic, OpenAI ou Google), directement à toi. Un compte n'envoie jamais plus de 300 mails par 24 heures, quelle que soit l'offre.</p>
@@ -382,14 +385,19 @@ const FAQ = [
   ['Puis-je supprimer mon compte ?', 'Oui, quand tu veux, depuis Mon compte. Ça efface tes projets, tes contacts, tes modèles, tes réglages et la copie de ton code. Seule la liste d\'opposition, qui protège les personnes désinscrites, est gardée.'],
 ];
 
-export function pricingPage({ appUrl }) {
+export function pricingPage({ appUrl, billing = false }) {
+  // Paiements ouverts : la réponse sur l'ouverture des plans payants change, et on explique la résiliation
+  const faq = billing ? FAQ.flatMap(([q, a]) => (q.startsWith('Quand puis-je passer') ? [
+    [q, "Dès maintenant : le plan Gratuit te permet de tout tester, puis tu choisis une offre payante sur cette page. Elle s'active dès le paiement, et tu peux changer d'offre ou résilier à tout moment depuis Mon compte."],
+    ['Comment résilier un abonnement ?', "Depuis Mon compte, « Gérer mon abonnement » : ton offre reste active jusqu'à la fin de la période payée, puis ton compte repasse au plan Gratuit, sans rien perdre. Si un paiement échoue, tu gardes ton offre 7 jours le temps de mettre ta carte à jour."],
+  ] : [[q, a]])) : FAQ;
   // Une ligne par offre, une colonne par plafond : on compare d'un coup d'œil. Sur téléphone, chaque ligne devient un bloc libellé par plafond.
   const paidRow = (k) => `<tr class="plan-row" aria-labelledby="plan-${k}">
-        <th scope="row"><h2 id="plan-${k}">${PLAN_LABELS[k]}</h2>${badge('b-info', 'clock', 'Bientôt')}<p class="tag">${PLAN_BLURBS[k]}</p></th>
+        <th scope="row"><h2 id="plan-${k}">${PLAN_LABELS[k]}</h2>${billing ? '' : badge('b-info', 'clock', 'Bientôt')}<p class="tag">${PLAN_BLURBS[k]}</p></th>
         <td data-label="Prix"><span class="price when-month">${euros(PLAN_PRICES[k])} <small>par mois, TTC</small></span><span class="price when-year">${euros(annualPrice(k))} <small>par an, TTC</small></span>
           <small class="sub when-month">ou ${euros(annualPrice(k))} par an, ${ANNUAL_FREE_MONTHS} mois offerts</small><small class="sub when-year">soit ${euros(annualPrice(k) / 12)} par mois, ${ANNUAL_FREE_MONTHS} mois offerts</small></td>
         ${limitCells(PLAN_LIMITS[k])}
-        <td class="plan-act"><a class="btn btn-secondary" href="mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(`Me prévenir : offre ${PLAN_LABELS[k]}`)}">Me prévenir à l'ouverture</a></td>
+        <td class="plan-act">${billing ? buyForms(k) : `<a class="btn btn-secondary" href="mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(`Me prévenir : offre ${PLAN_LABELS[k]}`)}">Me prévenir à l'ouverture</a>`}</td>
       </tr>`;
   return siteLayout({
     appUrl, path: '/tarifs',
@@ -398,7 +406,7 @@ export function pricingPage({ appUrl }) {
     body: `<div class="page">
 <div class="wrap">
   <h1 class="h1">Des tarifs simples, sans surprise</h1>
-  <p class="lead">Seul le plan Gratuit est ouvert aujourd'hui, sans carte bancaire. Les plans payants, de ${euros(PLAN_PRICES.starter)} à ${euros(PLAN_PRICES.intensive)} TTC par mois, ouvrent prochainement.</p>
+  <p class="lead">${billing ? `Le plan Gratuit s'ouvre sans carte bancaire. Les offres payantes, de ${euros(PLAN_PRICES.starter)} à ${euros(PLAN_PRICES.intensive)} TTC par mois, se paient par carte sur une page sécurisée de Stripe et se résilient à tout moment depuis Mon compte.` : `Seul le plan Gratuit est ouvert aujourd'hui, sans carte bancaire. Les plans payants, de ${euros(PLAN_PRICES.starter)} à ${euros(PLAN_PRICES.intensive)} TTC par mois, ouvrent prochainement.`}</p>
 
   <div class="claude-n" role="note">
     ${ic('info')}
@@ -430,7 +438,7 @@ export function pricingPage({ appUrl }) {
   </div>
 
   <div class="mentions">
-    <p>Prix TTC. L'éditeur est en franchise de TVA (art. 293 B du CGI) : le prix affiché est le prix payé. En annuel, tu paies ${12 - ANNUAL_FREE_MONTHS} mois et tu en profites 12. Les offres payantes ouvrent prochainement : tu seras prévenu avant toute facturation.</p>
+    <p>Prix TTC. L'éditeur est en franchise de TVA (art. 293 B du CGI) : le prix affiché est le prix payé. En annuel, tu paies ${12 - ANNUAL_FREE_MONTHS} mois et tu en profites 12. ${billing ? 'Le paiement est sécurisé par Stripe : iaboss ne voit jamais ton numéro de carte. Tu peux résilier à tout moment ; l\'offre reste active jusqu\'à la fin de la période payée, puis tu repasses au plan Gratuit sans rien perdre.' : 'Les offres payantes ouvrent prochainement : tu seras prévenu avant toute facturation.'}</p>
     <p>Ces plafonds sont appliqués par le serveur. Les mails et les tâches IA se comptent par mois (heure de Paris) et repartent de zéro le 1er. Quand un plafond est atteint, la nouvelle action est refusée, mais rien n'est supprimé. Un compte ne peut pas envoyer plus de 300 mails par 24 heures, quelle que soit l'offre : c'est une protection pour la réputation de ton adresse.</p>
   </div>
 
@@ -474,7 +482,7 @@ export function pricingPage({ appUrl }) {
   <section class="faq" aria-labelledby="faq-h">
     <h2 class="h2" id="faq-h">Questions fréquentes</h2>
     <div class="acc">
-      ${FAQ.map(([q, a], i) => `<details${i === 0 ? ' open' : ''}><summary>${esc(q)}${ic('chev')}</summary><p class="acc-b">${a}</p></details>`).join('\n      ')}
+      ${faq.map(([q, a], i) => `<details${i === 0 ? ' open' : ''}><summary>${esc(q)}${ic('chev')}</summary><p class="acc-b">${a}</p></details>`).join('\n      ')}
     </div>
   </section>
 </div>

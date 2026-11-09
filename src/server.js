@@ -144,7 +144,7 @@ export async function createApp(cfg, { db, worker = true, createTransport, fetch
           // Visiteur sur la racine : le site public. Connecté, la même adresse mène au tableau de bord.
           if (isRead && url.pathname === '/') {
             res.setHeader('Vary', 'Cookie');
-            return html(res, homePage({ appUrl: cfg.appUrl, apple: !!cfg.apple }));
+            return html(res, homePage({ appUrl: cfg.appUrl, apple: !!cfg.apple, billing: !!cfg.stripe }));
           }
           if (url.pathname.startsWith('/api/')) throw new HttpError(401, 'Non connecté');
           return redirect(res, '/login');

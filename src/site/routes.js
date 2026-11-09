@@ -9,7 +9,7 @@ import { robotsTxt, sitemapXml } from './seo.js';
 
 export function registerSiteRoutes(router, { cfg, db }) {
   const apple = !!cfg.apple;
-  const ctx = { appUrl: cfg.appUrl, apple, captcha: !!cfg.recaptcha, inactiveMonths: cfg.inactiveMonths ?? 24 };
+  const ctx = { appUrl: cfg.appUrl, apple, captcha: !!cfg.recaptcha, inactiveMonths: cfg.inactiveMonths ?? 24, billing: !!cfg.stripe };
   const open = { public: true };
   // Les pages dépendent du cookie de connexion : ni cache partagé, ni cache du navigateur sans le cookie
   const show = async (req, res, page) => {
