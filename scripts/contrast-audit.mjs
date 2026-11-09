@@ -16,6 +16,8 @@ const u = await s.newUser({ email: 'tony@exemple.fr', admin: true });
 const pid = await addProject(s.db, u.id, { name: 'Agenda Kiné', gitUrl: 'https://github.com/atelier/agenda-kine.git' });
 await s.db.prepare('UPDATE projects SET profile_json = ?, target_json = ?, target_validated = 1 WHERE id = ?').run(JSON.stringify({ resume: 'Un agenda pour les kinés.', proposition_valeur: 'Gagnez du temps.' }), JSON.stringify({ description: 'Cabinets de kinésithérapie', zone: 'Bretagne', taille: '2 à 10', decideur: 'Titulaire', secteurs: ['Santé'], requetes: ['cabinet kiné'] }), pid);
 const t = Math.floor(Date.now() / 1000);
+// une tâche IA en cours : le bouton « Activité » s'épingle quand on défile, hors de la barre sombre (cas qui était illisible)
+await s.db.prepare("INSERT INTO jobs(user_id, project_id, type, status, params_json, created_at, started_at) VALUES(?, ?, 'prospect', 'running', '{}', ?, ?)").run(u.id, pid, t, t);
 let firstProspect = 0;
 for (let i = 0; i < 6; i++) {
   const st = ['new', 'sent', 'replied', 'client', 'refused', 'bounced'][i];
@@ -30,7 +32,8 @@ for (let i = 0; i < 4; i++) await s.db.prepare('INSERT INTO metrics_daily(projec
 
 const PUBLIC = ['/', '/fonctionnement', '/tarifs', '/docs', '/mentions-legales', '/login'];
 const TABS = ['', '/prospection', '/envoi', '/clients', '/facturation', '/communication', '/outils', '/recap', '/reglages'];
-const APP = ['/', '/projets', ...TABS.map((x) => `/p/${pid}${x}`), `/p/${pid}/contact/${firstProspect}`, '/mails', '/mails?v=sent', '/calendar', '/compta', '/facturation', '/clients', '/account', '/settings', '/team', '/chat', '/support', '/developer', '/admin', '/link'];
+const QUICK = process.env.AUDIT_QUICK === '1'; // AUDIT_QUICK=1 : la page d'un projet à 390 px, pour un essai rapide
+const APP = QUICK ? [`/p/${pid}`] : ['/', '/projets', ...TABS.map((x) => `/p/${pid}${x}`), `/p/${pid}/contact/${firstProspect}`, '/mails', '/mails?v=sent', '/calendar', '/compta', '/facturation', '/clients', '/account', '/settings', '/team', '/chat', '/support', '/developer', '/admin', '/link'];
 
 const probe = ({ min, mobile }) => {
   const parse = (c) => {
@@ -53,6 +56,7 @@ const probe = ({ min, mobile }) => {
       if (cs.backgroundImage !== 'none') return null;
       const c = parse(cs.backgroundColor);
       if (c && c[3] > 0) { chain.push(c); if (c[3] >= 1) break; }
+      if (cs.position === 'fixed') break; // un élément fixe flotte au-dessus de la page : ses ancêtres dans le HTML (l'en-tête) ne sont pas derrière lui
     }
     let bg = base;
     for (const c of chain.reverse()) bg = over(c, bg);
@@ -101,7 +105,7 @@ const b = await chromium.launch(process.env.PLAYWRIGHT_CHROMIUM ? { executablePa
 const out = [];
 let warns = 0;
 for (const scheme of ['light', 'dark']) {
-  for (const w of [390, 768, 1280]) {
+  for (const w of QUICK ? [390] : [390, 768, 1280]) {
     for (const [label, paths, cookie] of [['public', PUBLIC, null], ['app', APP, u.cookie]]) {
       const ctx = await b.newContext({ viewport: { width: w, height: 800 }, colorScheme: scheme, hasTouch: w < 800 });
       if (cookie) await ctx.addCookies([{ name: 'sid', value: cookie.split('=')[1], url: s.base }]);
@@ -109,7 +113,9 @@ for (const scheme of ['light', 'dark']) {
       for (const path of paths) {
         await p.goto(s.base + path, { waitUntil: 'load' }); await p.waitForTimeout(500);
         await p.evaluate(() => document.querySelectorAll('details').forEach((d) => { d.open = true; }));
-        await p.waitForTimeout(500);
+        if (label === 'app') await p.waitForSelector('#jobs.has-jobs', { timeout: 4000 }).catch(() => {}); // la tâche en cours arrive par sondage
+        await p.evaluate(() => window.scrollTo(0, 600)); // la barre se replie : le bouton « Activité » s'épingle
+        await p.waitForTimeout(900);
         const r = await p.evaluate(probe, { min: MIN, mobile: w <= 700 && label === 'app' });
         warns += r.warn;
         if (r.bad.length || r.hidden || r.overflow > 0) out.push(`${scheme} ${w}px ${path}${r.overflow > 0 ? ` DÉBORDE +${r.overflow}px` : ''}${r.hidden ? ` ${r.hidden}` : ''}${r.bad.length ? `\n     ${r.bad.join('\n     ')}` : ''}`);
