@@ -3,7 +3,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { startApp } from './helpers/server.js';
 import { addProject } from './helpers/users.js';
-import { weekStarts, declarationNote, usageRows, setDone, JOB_LABELS } from '../src/today.js';
+import { weekStarts, declarationNote, usageRows, setDone, JOB_LABELS, jobHref } from '../src/today.js';
 import { now } from '../src/db.js';
 
 let s;
@@ -63,6 +63,7 @@ test('« À traiter » : réponses non lues, actions du jour et tâches IA, chac
   assert.match(home, /Audit du projet/);
   assert.match(home, /Dépôt inaccessible/);
   assert.match(home, /Réessayer/);
+  assert.match(home, new RegExp(`href="/p/${pid}/outils\\?vu=1#acc-audit"`), 'le lien mène à la section du résultat, pas à la liste des projets');
   assert.doesNotMatch(home, /Assistant IA/, 'une conversation n\'est pas une tâche à traiter');
   assert.match(home, /data-today-n="rep">2</);
   assert.match(home, /data-today-n="act">1</);
@@ -196,4 +197,14 @@ test('public/app-today.js ne s\'accroche qu\'à la page Aujourd\'hui : son repè
     assert.doesNotMatch(await text(u, p), /data-today-root/, p);
   }
   assert.match(await text(u, '/'), /data-today-root/);
+});
+
+test('jobHref : chaque tâche mène à la section de son résultat', () => {
+  assert.equal(jobHref('instagram_post', 7), '/p/7/communication?vu=1#acc-instagram');
+  assert.equal(jobHref('newsletter', 7), '/p/7/communication?vu=1#acc-newsletter');
+  assert.equal(jobHref('template', 7), '/p/7/envoi?vu=1#acc-template');
+  assert.equal(jobHref('billing_docs', 7), '/p/7/facturation');
+  assert.equal(jobHref('analyze', 7), '/p/7');
+  assert.equal(jobHref('audit', null), '/projets', 'sans projet : la liste');
+  assert.equal(jobHref('inconnu', 7), '/projets');
 });
