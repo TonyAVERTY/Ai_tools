@@ -40,7 +40,7 @@ test('tableau de bord : le nom de l\'IA de l\'utilisateur, dans le menu, les sec
   const g = await s.newUser({ admin: false, link: linked('gemini') });
   const c = await s.newUser({ admin: false, link: linked('claude') });
   const gp = await html(g, '/');
-  assert.match(gp, /<body class="app" data-ai="Gemini">/);
+  assert.match(gp, /<body class="app" data-ai="Gemini"[ >]/);
   assert.match(gp, /<span class="pop-t">Gemini<small>Discute avec ton Gemini<\/small><\/span>/, 'menu Assistant');
   assert.match(gp, /aria-label="Assistant : discuter avec Gemini ou demander de l'aide sur iaboss"/);
   assert.match(gp, /Consommation Gemini/);
