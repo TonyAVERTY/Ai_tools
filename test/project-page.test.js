@@ -1,4 +1,4 @@
-// Page dédiée d'un projet (/projets/:id) et barre du haut : lien depuis la liste, isolation entre comptes, entrées déplacées dans le menu du compte.
+// Page d'un projet (/p/:id) à onglets, liste en cartes, recherche et barre du haut : lien depuis la liste, isolation entre comptes, entrées déplacées dans le menu du compte.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { startApp } from './helpers/server.js';
@@ -84,7 +84,7 @@ test('recherche : projets, prospects et mails du compte seulement, 2 lettres min
   assert.deepEqual((await search('g')).groups, [], 'une lettre ne cherche rien');
   const kine = await search('kiné');
   assert.deepEqual(names(kine), ['Agenda Kiné']);
-  assert.equal(kine.groups[0].items[0].href, `/projets/${a}`);
+  assert.equal(kine.groups[0].items[0].href, `/p/${a}`);
   const gall = await search('gall');
   assert.deepEqual(names(gall), ['Cabinet Le Gall'], 'le prospect d\'un autre compte reste invisible');
   assert.match(gall.groups[0].items[0].sub, /^Client · a@legall\.fr/);
