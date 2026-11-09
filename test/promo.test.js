@@ -198,7 +198,7 @@ test('prompt modifiable dans les Réglages : le texte de l\'utilisateur remplace
     await gen(u, pid, { fps: 12, seconds: 5, format: 'vertical' });
     const job = await runJob(pid);
     assert.equal(job.status, 'done', job.error);
-    const p = calls().slice(n0)[0].prompt;
+    const p = calls().slice(n0).find((c) => c.prompt.includes('Contrat technique')).prompt;
     assert.match(p, /Fais une vidéo TRÈS sobre : fond blanc, un seul mot par plan, 5 s\./);
     assert.doesNotMatch(p, /Direction artistique :\n- Remplis l'image/, 'le texte de l\'utilisateur remplace les règles par défaut');
     assert.match(p, /Direction artistique imposée : « [^»]+ »[\s\S]*Couleurs exactes : fond en dégradé #[0-9a-f]{6} → #[0-9a-f]{6}/, 'la direction artistique choisie reste imposée');
