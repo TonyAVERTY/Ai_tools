@@ -1530,6 +1530,11 @@
     setTimeout(() => target.classList.remove('flash'), 1800);
   })();
 
+  // Agenda : le formulaire « Ajouter un événement » est replié ; le bouton du haut (#evenements) le déplie
+  const openEvents = () => { const d = document.getElementById('evenements'); if (d?.tagName === 'DETAILS') { d.open = true; d.scrollIntoView({ block: 'start' }); $('input', d)?.focus({ preventScroll: true }); } };
+  if (location.hash === '#evenements') openEvents();
+  listen(document, 'click', (e) => { if (e.target.closest('a[href="#evenements"]')) { e.preventDefault(); openEvents(); } });
+
   listen(document, 'click', async (e) => {
     const retry = e.target.closest('[data-retry]');
     if (retry) {

@@ -152,11 +152,23 @@
       loadFailed(cell, err.message || 'Détail indisponible : réessaie dans un instant', () => { row.dataset.loaded = ''; btn.setAttribute('aria-expanded', 'false'); toggleMail(btn); }, { small: true });
     }
   }
+  listen(document, 'submit', async (e) => {
+    const f = e.target.closest('form[data-remind]');
+    if (!f) return;
+    e.preventDefault();
+    try {
+      await api(`/api/prospects/${f.dataset.remind}/next`, { action: 'Relancer', day: f.elements.day.value });
+      toast('Rappel programmé');
+      f.hidden = true;
+    } catch (err) { toast(err.message, 'error'); }
+  });
   listen(document, 'click', async (e) => {
     const mt = e.target.closest('[data-mail]');
     if (mt) { toggleMail(mt); return; }
     const c = e.target.closest('[data-copy-draft]');
     if (c) { copyText($('[data-draft]', c.closest('.reply-body')).value, c); return; }
+    const rt = e.target.closest('[data-remind-toggle]');
+    if (rt) { const f = $('[data-remind]', rt.closest('.reply-body')); f.hidden = !f.hidden; rt.setAttribute('aria-expanded', String(!f.hidden)); if (!f.hidden) $('input', f).focus(); return; }
     const s = e.target.closest('[data-reply-seen]');
     if (s) { await markSeen(s.dataset.replySeen); s.closest('.reply-row')?.classList.remove('unseen'); s.remove(); pollReplies(); }
   });

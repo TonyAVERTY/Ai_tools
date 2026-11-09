@@ -1923,3 +1923,28 @@ a.pj-card:hover { border-color: var(--primary); }
   .toasts { bottom: calc(76px + env(safe-area-inset-bottom)); }
   .reply-pops { bottom: calc(72px + env(safe-area-inset-bottom)); max-height: calc(100vh - 100px); }
 }
+
+/* Mails : programmer un rappel depuis une réponse */
+.remind-f { display: flex; flex-flow: row wrap; align-items: flex-end; gap: 10px; margin-top: 10px; }
+.remind-f[hidden] { display: none; }
+.remind-f .field { margin: 0; }
+
+/* Agenda : formulaire d'événement replié derrière « Ajouter un événement » */
+.ev-fold > summary { list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.ev-fold > summary::-webkit-details-marker { display: none; }
+.ev-fold > summary h2 { margin: 0; }
+.ev-fold > summary::after { content: '+'; font-size: 1.25rem; color: var(--muted); }
+.ev-fold[open] > summary::after { content: '−'; }
+
+/* Récapitulatif (maquette 11) : le graphique de prospection à gauche en grande carte, les courbes empilées à droite */
+.recap .chart-head { margin: 22px 0 12px; }
+.recap .chart-head h4 { font-family: var(--display); font-weight: 600; font-size: 1.125rem; }
+.recap figure.chart { background: var(--card); border-radius: var(--radius-lg); padding: 20px 22px; }
+.recap figure.chart figcaption { font-family: var(--display); font-weight: 600; font-size: 1.125rem; margin-bottom: 10px; }
+@media (min-width: 900px) {
+  .recap .charts { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); align-items: start; }
+  .recap .charts figure.chart[data-kind="bars"] { grid-column: 1; grid-row: 1 / span 3; order: -1; }
+  .recap .charts figure.chart[data-kind="line"] { grid-column: 2; }
+}
+.recap .legend { gap: 8px 14px; }
+.recap > details summary, .recap details.small > summary { display: inline-flex; align-items: center; min-height: 36px; padding: 0 14px; margin-top: 12px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--card); color: var(--text); font-weight: 600; cursor: pointer; }

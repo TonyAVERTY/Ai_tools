@@ -50,7 +50,7 @@ export function registerMailRoutes(router, app) {
 
   const shapeReply = async (r, userId) => {
     const out = {
-      id: Number(r.id), projectId: Number(r.project_id), project: r.project, from: r.from_email, company: r.company || null,
+      id: Number(r.id), prospectId: r.prospect_id ? Number(r.prospect_id) : null, projectId: Number(r.project_id), project: r.project, from: r.from_email, company: r.company || null,
       subject: r.subject || '', text: r.body || '', intent: r.intent, intentLabel: INTENTS[r.intent] || INTENTS.other,
       draft: draftReply(r.intent, { company: r.company, senderName: await senderName(r.project_id, userId) }),
       receivedAt: Number(r.received_at), seen: !!r.seen_at,
