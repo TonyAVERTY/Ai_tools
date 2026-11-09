@@ -1728,3 +1728,57 @@ a.pj-card:hover { border-color: var(--primary); }
 .pj-flat > .acc > summary { pointer-events: none; cursor: default; }
 .pj-flat > .acc > summary .chev { display: none; }
 .pj-list, .pj-page { display: flex; flex-direction: column; gap: 16px; }
+
+/* ---------- Onglet Prospection (maquette 04) : Cible et Recherche à gauche, Prospects à droite ---------- */
+.pj-grid-p { grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 900px) { .pj-grid-p { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); } }
+.pj-left { min-width: 0; }
+.pj-flat > .acc.target-acc:has(.target-locked) { background: var(--bg-sunk); }
+.pj-left .acc > summary { min-height: 56px; }
+.pj-left form.inline { display: flex; flex-direction: column; align-items: stretch; gap: 12px; }
+.pj-left form.inline .btn { width: 100%; justify-content: center; }
+.pj-flat > .prospects > summary { display: none; }
+.pj-flat > .prospects { border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--card); overflow: hidden; }
+.prospects > .acc-body { padding: 0; }
+.pr-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 16px; padding: 20px 24px 12px; }
+.pr-head h2 { margin: 0; font: 600 1.375rem/1.25 var(--display); }
+.seg { display: inline-flex; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); overflow: hidden; }
+.seg > button, .seg > a { min-height: 44px; padding: 0 16px; border: 0; background: var(--card); color: var(--text); font: inherit; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; }
+.seg > .on { background: var(--primary); color: var(--on-primary); }
+.pfilters { display: flex; flex-direction: column; gap: 8px; padding: 0 24px 12px; border-bottom: 1px solid var(--line); }
+.pr-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { min-height: 44px; padding: 0 14px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--card); color: var(--text); font: inherit; font-size: .9375rem; font-weight: 600; cursor: pointer; }
+.chip.on { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+.pr-search { display: flex; align-items: center; gap: 8px; min-height: 44px; min-width: 220px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--card); color: var(--muted); }
+.pr-search input { flex: 1; min-width: 0; border: 0; background: transparent; color: var(--text); font: inherit; outline: none; }
+.pr-more > summary { display: inline-flex; align-items: center; min-height: 44px; color: var(--primary); font-weight: 600; cursor: pointer; }
+.pr-more-b { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding-bottom: 8px; }
+.prospects .pform { margin: 12px 24px; }
+.prospects [data-import-report]:not(:empty) { margin: 8px 24px; }
+.prospects .table-wrap { overflow-x: auto; }
+.pr-table { width: 100%; border-collapse: collapse; }
+.pr-table th { padding: 12px 16px; text-align: left; font-size: .875rem; font-weight: 600; color: var(--muted); border-bottom: 1px solid var(--line); }
+.pr-table td { padding: 14px 16px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.pr-table .r { text-align: right; }
+.pr-table .link { padding: 0; text-align: left; }
+.pr-table select[data-prospect] { min-height: 44px; padding: 0 28px 0 12px; border: 0; border-radius: 999px; background-color: var(--info-bg); color: var(--text); font: inherit; font-size: .875rem; font-weight: 600; }
+.pr-table select.st-replied, .pr-table select.st-client { background-color: var(--ok-bg); }
+.pr-table select.st-new { background-color: var(--bg-sunk); }
+.pr-table select.st-bounced, .pr-table select.st-refused { background-color: var(--err-bg); }
+.sc { display: inline-grid; place-items: center; min-width: 28px; height: 28px; padding: 0 6px; border-radius: 6px; background: var(--bg-sunk); font-weight: 700; font-variant-numeric: tabular-nums; }
+.sc.hi { background: var(--accent); color: var(--on-accent); }
+.pr-none { padding: 20px 24px; }
+.pr-foot { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 16px; padding: 12px 24px; }
+.pr-foot .acts { display: flex; gap: 16px; }
+.pr-foot .acts a, .pr-foot .acts label { display: inline-flex; align-items: center; min-height: 44px; color: var(--primary); cursor: pointer; }
+.pr-hint { padding: 0 24px 16px; }
+@media (max-width: 699px) { .sm-hide { display: none; } .pr-head, .pfilters, .pr-foot { padding-left: 16px; padding-right: 16px; } }
+.pr-search input[type="search"] { padding: 0; min-height: 40px; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.pj-left .grid2, .pj-left .grid3 { grid-template-columns: minmax(0, 1fr); }
+.pr-more > summary { width: fit-content; justify-content: flex-start; text-align: left; }
+.pr-foot .acts a, .pr-foot .acts label.file { font-size: .875rem; font-weight: 400; text-decoration: underline; background: transparent; border: 0; padding: 0; }
+.pr-search { position: relative; min-height: 0; padding: 0; border: 0; background: none; }
+.pr-search .ic { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); pointer-events: none; }
+.pr-search input[type="search"] { padding: 0 12px 0 36px; min-height: 44px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--card); }
+.pr-table select[data-prospect] { min-width: 140px; }

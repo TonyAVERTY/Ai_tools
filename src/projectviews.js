@@ -136,7 +136,8 @@ export function projectTabPage({ email, entry, tab, stats = null, checklist = nu
   const profile = p.profile;
   const body = tab === '' ? overview(p, checklist, stats, jobs)
     : tab === 'clients' || tab === 'facturation' ? external(p, tab)
-      : `<div class="pj-flat">${(TAB_BLOCKS[tab] || []).map((k) => blocks[k]).join('\n')}</div>`;
+      : tab === 'prospection' ? `<div class="pj-grid pj-grid-p"><div class="pj-flat pj-left">${blocks.target}\n${blocks.search}</div><div class="pj-flat">${blocks.prospects}</div></div>`
+        : `<div class="pj-flat">${(TAB_BLOCKS[tab] || []).map((k) => blocks[k]).join('\n')}</div>`;
   const summary = `<summary><span class="pname">${esc(p.name)}</span><button type="button" class="pcfg badge" data-cfg hidden></button><span class="pstate" data-state></span></summary>`;
   return layout({
     title: `${p.name} · ${label}`, email,

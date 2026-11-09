@@ -26,6 +26,17 @@ test('parseFilters ignore tout ce qui n\'est pas prévu', () => {
     { q: 'zen', status: '', minScore: 10, sort: 'score', todo: false, page: 1 });
 });
 
+test('compteurs des puces : tout le projet, quels que soient les filtres', async () => {
+  const db = await setup();
+  const all = (await listProspects(db, 1, f())).counts;
+  const filtered = (await listProspects(db, 1, f({ q: 'ZEN', status: 'sent' }))).counts;
+  assert.deepEqual(filtered, all, 'les puces ne changent pas avec la recherche ni le statut choisi');
+  assert.equal(all.all, 4);
+  assert.equal(all.new + all.sent + all.replied + (all.all - all.new - all.sent - all.replied), 4);
+  assert.equal(all.sent, 1, '« Contacté » = statut envoyé');
+  assert.equal(all.todo, 0, 'aucune action due');
+});
+
 test('recherche, filtres, tri, et isolation entre projets', async () => {
   const db = await setup();
   assert.deepEqual(names(await listProspects(db, 1, f())), ['Le Fournil', '100% Bio', 'Coiffure Zen', 'Fleurs & Co'], 'tri par score');
