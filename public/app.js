@@ -1051,6 +1051,7 @@
     for (const kind of ['initial', 'followup']) {
       const t = s.templates[kind];
       const form = $(`form[data-action="template"][data-kind="${kind}"]`, el);
+      if (!form) continue; // la section n'est pas sur cet onglet
       if (t && st.tplStamp[kind] !== t.updated_at) {
         st.tplStamp[kind] = t.updated_at;
         form.subject.value = t.subject;
@@ -1066,7 +1067,8 @@
 
     // Relance automatique : ce qui est prévu, ou ce qui bloque
     const f = s.followup;
-    $('[data-followup-info]', el).innerHTML = !f.enabled
+    const followInfo = $('[data-followup-info]', el);
+    if (followInfo) followInfo.innerHTML = !f.enabled
       ? 'Désactivée.'
       : f.blockers.length
         ? `<span class="warn">En attente : ${esc(f.blockers.join(', '))}.</span> ${f.due} relance(s) due(s).`
@@ -1084,20 +1086,23 @@
     if (s.templates.initial?.status !== 'validated') blockers.push('modèle à valider');
     if (!s.hasSmtp) blockers.push('SMTP à configurer');
     if (!s.sendMax) blockers.push(s.stats.new ? 'plafond du jour atteint' : 'aucun prospect à contacter');
-    $('button', sendForm).disabled = blockers.length > 0;
-    sendForm.count.max = s.sendMax || 1;
-    sendForm.dataset.warmup = JSON.stringify(s.warmup || {});
-    if (Number(sendForm.count.value) > s.sendMax && s.sendMax) sendForm.count.value = s.sendMax;
-    $('[data-send-info]', sendForm).textContent = blockers.length
-      ? `Bloqué : ${blockers.join(', ')}`
-      : `${s.stats.new} prospect(s) en attente · max ${s.sendMax} maintenant${warmupLine(s.warmup)}`;
-    $('[data-count]', el).textContent = `(${s.stats.total || 0})`;
+    if (sendForm) {
+      $('button', sendForm).disabled = blockers.length > 0;
+      sendForm.count.max = s.sendMax || 1;
+      sendForm.dataset.warmup = JSON.stringify(s.warmup || {});
+      if (Number(sendForm.count.value) > s.sendMax && s.sendMax) sendForm.count.value = s.sendMax;
+      $('[data-send-info]', sendForm).textContent = blockers.length
+        ? `Bloqué : ${blockers.join(', ')}`
+        : `${s.stats.new} prospect(s) en attente · max ${s.sendMax} maintenant${warmupLine(s.warmup)}`;
+    }
+    const countBox = $('[data-count]', el);
+    if (countBox) countBox.textContent = `(${s.stats.total || 0})`;
 
     // Boîte de réception + test A/B
     const ib = $('[data-inbox]', el);
     const ab = s.ab.length > 1
       ? `<br>Test A/B : ${s.ab.map((v) => `<strong>${v.variant}</strong> ${v.replied}/${v.sent} réponses (${pct(v.rate)})`).join(' · ')}` : '';
-    if (!s.hasImap) {
+    if (!ib) { /* la boîte de réception est sur l'onglet Envoi */ } else if (!s.hasImap) {
       ib.innerHTML = `<span class="muted">Boîte non connectée : configure l'IMAP (Configuration du projet) pour détecter les réponses.</span>${ab}`;
     } else {
       const i = s.inbox || {};
@@ -1488,7 +1493,20 @@
   });
 
   // Le récap se charge à l'ouverture de sa section
-  $$('details[data-acc="recap"]').forEach((d) => d.addEventListener('toggle', () => { if (d.open) window.AiTools.loadRecap?.(d.closest('.project')); }));
+  $$('details[data-acc="recap"]').forEach((d) => { d.addEventListener('toggle', () => { if (d.open) window.AiTools.loadRecap?.(d.closest('.project')); }); if (d.open) window.AiTools.loadRecap?.(d.closest('.project')); });
+
+  // Page d'un projet : le sélecteur « Section » (téléphone) change d'onglet ; #acc-… (ligne de « Mise en route ») ouvre la section visée et la fait clignoter
+  listen(document, 'change', (e) => { const sel = e.target.closest?.('[data-psel]'); if (sel && sel.value) go(sel.value); });
+  (() => {
+    const m = location.hash.match(/^#(acc-[a-z-]+)$/);
+    const target = m && document.getElementById(m[1]);
+    if (!target) return;
+    for (let n = target; n; n = n.parentElement) if (n.tagName === 'DETAILS') n.open = true;
+    const calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    target.scrollIntoView({ behavior: calm ? 'auto' : 'smooth', block: 'start' });
+    target.classList.add('flash');
+    setTimeout(() => target.classList.remove('flash'), 1800);
+  })();
 
   listen(document, 'click', async (e) => {
     const retry = e.target.closest('[data-retry]');

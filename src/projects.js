@@ -61,15 +61,16 @@ export async function getProject(app, id, { userId, secrets = false, need = null
  * @returns {Promise<Map<number, {prospects:number, toContact:number, replies:number, lastSentAt:number|null}>>}
  */
 export async function projectStats(db, ids) {
-  const out = new Map(ids.map((id) => [Number(id), { prospects: 0, toContact: 0, replies: 0, lastSentAt: null }]));
+  const out = new Map(ids.map((id) => [Number(id), { prospects: 0, toContact: 0, replies: 0, clients: 0, lastSentAt: null }]));
   if (!ids.length) return out;
   const rows = await db.prepare(`SELECT project_id,
       COUNT(*) n,
       SUM(CASE WHEN status = 'new' THEN 1 ELSE 0 END) fresh,
       SUM(CASE WHEN status IN ('replied', 'client') THEN 1 ELSE 0 END) replies,
+      SUM(CASE WHEN status = 'client' THEN 1 ELSE 0 END) clients,
       MAX(sent_at) last
     FROM prospects WHERE project_id IN (${ids.map(() => '?').join(',')}) GROUP BY project_id`).all(...ids.map(Number));
-  for (const r of rows) out.set(Number(r.project_id), { prospects: Number(r.n), toContact: Number(r.fresh || 0), replies: Number(r.replies || 0), lastSentAt: r.last == null ? null : Number(r.last) });
+  for (const r of rows) out.set(Number(r.project_id), { prospects: Number(r.n), toContact: Number(r.fresh || 0), replies: Number(r.replies || 0), clients: Number(r.clients || 0), lastSentAt: r.last == null ? null : Number(r.last) });
   return out;
 }
 

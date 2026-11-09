@@ -25,7 +25,7 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
   const errs = [];
   p.on('pageerror', (e) => errs.push(e.message));
   p.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) errs.push(m.text()); });
-  await p.goto(`${s.base}/projets`);
+  await p.goto(`${s.base}/`);
   await p.waitForSelector('html[data-nav="ready"]');
   const toast = (msg, kind) => p.evaluate(([m, k]) => window.AiTools.toast(m, k), [msg, kind]);
   const apiError = (path) => p.evaluate(async (x) => { try { await window.AiTools.api(x); return 'aucune erreur'; } catch (e) { return e.message; } }, path);

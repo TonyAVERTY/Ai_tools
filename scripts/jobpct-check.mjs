@@ -26,7 +26,7 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   const errs = [];
   p.on('pageerror', (e) => errs.push(e.message));
   p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
-  await p.goto(`${s.base}/projets`);
+  await p.goto(`${s.base}/`);
   await p.waitForSelector('html[data-nav="ready"]');
   await p.waitForSelector('.jobs-btn:not([hidden])', { state: 'attached' });
   await p.locator('.jobs-btn').click();
@@ -39,7 +39,8 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   if (process.env.SHOT_DIR) await p.screenshot({ path: `${process.env.SHOT_DIR}/jobs-${vp.width}.png` });
   // Zone du projet
   await p.keyboard.press('Escape');
-  if (!(await p.locator('details.project').evaluate((d) => d.open))) await p.locator('details.project > summary').click();
+  await p.goto(`${s.base}/p/${pid}/outils`); // Évolution et Audit sont dans l'onglet Outils IA
+  await p.waitForSelector('html[data-nav="ready"]');
   await p.waitForFunction(() => document.querySelector('[data-job="audit"] .jpct') && document.querySelector('[data-job="evolution"] .jpct'), null, { timeout: 15000 }).catch(() => {});
   ok(((await p.locator('[data-job="audit"] .jpct').first().textContent().catch(() => '')) || '').trim() === '0 %', `${tag} zone du projet : la tâche en attente affiche « 0 % »`);
   ok(((await p.locator('[data-job="evolution"] .jpct').first().textContent().catch(() => '')) || '').trim() === '42 %', `${tag} zone du projet : la tâche en cours affiche « 42 % »`);

@@ -544,6 +544,7 @@
       loadProspects(d);
     });
     d.addEventListener('toggle', () => { if (d.open) loadProspects(d); });
+    if (d.open) loadProspects(d); // onglet Prospection : la liste est ouverte d'office, elle se charge tout de suite
     const form = $('[data-filters]', d);
     let t;
     form.addEventListener('input', (e) => { if (e.target.name === 'q') { clearTimeout(t); t = setTimeout(() => loadProspects(d), 300); } });

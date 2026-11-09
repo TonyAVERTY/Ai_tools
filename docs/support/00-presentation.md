@@ -46,8 +46,8 @@ Tout ce que fait l'IA passe par le accès de la personne à son IA, jamais par u
 | Relier, changer ou déconnecter son IA | Avatar → **Mon compte** → « Mon IA » |
 | Créer un projet | **Projets** → « Nouveau projet » |
 | Configurer l'adresse d'envoi (SMTP) | Dans le projet → « Configuration du projet » |
-| Chercher des prospects | Dans le projet → « Prospecter » → « Recherche de prospects » |
-| Envoyer des mails | Dans le projet → « Prospecter » → « Envoi » |
+| Chercher des prospects | Dans le projet → onglet « Prospection » → « Recherche de prospects » |
+| Envoyer des mails | Dans le projet → onglet « Envoi » → « Envoi » |
 | Voir les réponses | **Mails** → « Réponses » |
 | Régler les notifications, plafonds, modèles, prompts | Avatar → **Réglages** |
 | Partager un projet | **Équipe** |

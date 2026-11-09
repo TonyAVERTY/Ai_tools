@@ -12,14 +12,14 @@ Dans « Configuration du projet → Boîte de réception (IMAP) », renseigne l'
 **À contacter**, **Contacté**, **A répondu**, **Client**, **Refus**, **Rejeté**, **Adresse invalide**.
 Marquer un prospect en **Refus** ajoute son adresse à la liste d'opposition (une confirmation est demandée).
 
-## La liste des prospects (Prospecter → Prospects)
+## La liste des prospects (onglet Prospection → Prospects)
 - Deux affichages : **Liste** et **Kanban**.
 - **Recherche** par entreprise, email, ville ou secteur.
 - Filtres : **statut**, **score minimum** (≥ 5, ≥ 7, ≥ 9), case **« Actions à faire »** (prospects dont la prochaine action est due), **tri** (score, plus récents, dernier contact, entreprise A → Z). Pagination par 100.
 - **Kanban** : une colonne par statut ; on glisse une carte pour changer son statut, ou on utilise le menu de statut de la carte (au clavier). Une carte montre l'entreprise, l'email, la ville, le score et la prochaine action.
 
 ## Ajouter un prospect à la main
-Dans **Prospecter → Prospects**, bouton **Ajouter un prospect** : un formulaire s'ouvre sous les boutons de la liste. Champs : **Email** (obligatoire), **Entreprise** (si elle est vide, c'est le domaine de l'adresse qui est utilisé), **Site**, **Ville**, **Secteur**, **Score (1 à 10)**, **Accroche** (la phrase qui ouvre le mail) et **Origine de l'adresse** (où tu l'as trouvée ; si elle est vide, iaboss écrit « Ajout manuel du JJ/MM/AAAA » : l'origine d'un contact est toujours renseignée, pour le RGPD). Clique **Ajouter le prospect** (ou **Annuler** pour refermer le formulaire). Dans la vue **Liste**, la ligne du nouveau prospect est surlignée un instant et amenée à l'écran si elle était cachée (elle peut être sur une autre page de la liste selon le tri choisi : cherche-la par son nom).
+Dans l'onglet **Prospection → Prospects**, bouton **Ajouter un prospect** : un formulaire s'ouvre sous les boutons de la liste. Champs : **Email** (obligatoire), **Entreprise** (si elle est vide, c'est le domaine de l'adresse qui est utilisé), **Site**, **Ville**, **Secteur**, **Score (1 à 10)**, **Accroche** (la phrase qui ouvre le mail) et **Origine de l'adresse** (où tu l'as trouvée ; si elle est vide, iaboss écrit « Ajout manuel du JJ/MM/AAAA » : l'origine d'un contact est toujours renseignée, pour le RGPD). Clique **Ajouter le prospect** (ou **Annuler** pour refermer le formulaire). Dans la vue **Liste**, la ligne du nouveau prospect est surlignée un instant et amenée à l'écran si elle était cachée (elle peut être sur une autre page de la liste selon le tri choisi : cherche-la par son nom).
 - Le prospect est créé avec le statut **À contacter**. Il apparaît tout de suite dans la liste et le Kanban.
 - Il est refusé si l'adresse est invalide, si le site n'est pas une adresse web correcte, si le score n'est pas un nombre de 1 à 10, **si l'adresse existe déjà dans ce projet** ou **si elle ne doit pas être contactée** (liste d'opposition). Dans les deux derniers cas le message est volontairement le même : « Cette adresse ne peut pas être ajoutée » ; la liste d'opposition étant commune à tous les comptes, iaboss ne révèle jamais pourquoi.
 - Le plafond mensuel de **prospects** de l'offre s'applique (voir « Offres, plafonds et limites ») : une fois atteint, l'ajout est refusé avec un message.

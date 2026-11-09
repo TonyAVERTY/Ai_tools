@@ -14,6 +14,7 @@ import { userPromoRoot, deleteUser } from '../src/users.js';
 import { PROMO, promoSupported, renderPromo, SceneError } from '../src/services/promovideo.js';
 import { PROMPT_DEFS } from '../src/services/prompts.js';
 import { reserveVideo, finishVideo, removeVideo, keepScene, takeScene } from '../src/promo.js';
+import { projectsHtml } from './helpers/pages.js';
 
 const chromium = process.env.CHROMIUM_BIN || spawnSync('sh', ['-c', 'ls /opt/pw-browsers/chromium-*/chrome-linux/chrome 2>/dev/null | head -1']).stdout.toString().trim() || undefined;
 let s, spy, worker;
@@ -55,7 +56,7 @@ test('état de l\'onglet : limites, formats, aucune vidéo ; section présente d
   assert.deepEqual(st.videos, []);
   assert.deepEqual(st.limits.fps, PROMO.fps);
   assert.deepEqual(st.formats.map((f) => f.id), ['paysage', 'vertical', 'carre']);
-  const page = await (await u.get('/projets', { headers: { accept: 'text/html' } })).text();
+  const page = await projectsHtml(u);
   assert.match(page, /data-acc="promo"[\s\S]*Promotion[\s\S]*data-promo[\s\S]*data-job="promo_video"/);
   const settings = await (await u.get('/settings', { headers: { accept: 'text/html' } })).text();
   assert.match(settings, /Vidéo de promotion \(design motion\)/);

@@ -29,8 +29,7 @@ for (const scheme of ['light', 'dark']) {
     let native = 0;
     p.on('dialog', async (d) => { native++; await d.dismiss(); }); // une boîte native, quelle qu'elle soit, est une erreur
     p.on('pageerror', (e) => errs.push(e.message));
-    await p.goto(`${s.base}/projets`); await p.waitForSelector('html[data-nav="ready"]');
-    await p.evaluate(() => { const d = document.querySelector('details[data-acc="config"]'); if (d) d.open = true; });
+    await p.goto(`${s.base}/p/${pid}/reglages`); await p.waitForSelector('html[data-nav="ready"]');
     const del = p.locator('form[data-action="delete"] button').first();
     const openBox = async () => { await del.scrollIntoViewIfNeeded(); await del.click(); await p.locator('dialog.confirm').waitFor({ timeout: 4000 }); };
     const closed = () => waitFor(async () => (await p.locator('dialog.confirm').count()) === 0, 3000);
@@ -68,7 +67,7 @@ for (const scheme of ['light', 'dark']) {
     ok(errs.length === 0, `${tag} aucune erreur JS${errs.length ? ` : ${errs.join(' | ')}` : ''}`);
 
     // variante non destructive : bouton principal, focus sur l'action, message sans question
-    await p.goto(`${s.base}/projets`); await p.waitForSelector('html[data-nav="ready"]');
+    await p.goto(`${s.base}/`); await p.waitForSelector('html[data-nav="ready"]');
     const r1 = p.evaluate(() => window.AiTools.confirmBox('Publier ce post sur LinkedIn ?\nIl sera visible publiquement par tout le monde.', { confirm: 'Publier' }));
     await p.locator('dialog.confirm').waitFor();
     const calm = await p.evaluate(() => ({ cls: document.querySelector('dialog.confirm [data-yes]').className, focus: document.activeElement?.textContent.trim(), detail: document.querySelector('.confirm-d')?.textContent }));

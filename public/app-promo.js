@@ -195,7 +195,7 @@
       loadPromo(t.closest('.project'));
     } catch (err) { toast(err.message, 'error'); }
   });
-  $$('details[data-acc="promo"]').forEach((d) => d.addEventListener('toggle', () => { if (d.open) loadPromo(d.closest('.project')); }));
+  $$('details[data-acc="promo"]').forEach((d) => { d.addEventListener('toggle', () => { if (d.open) loadPromo(d.closest('.project')); }); if (d.open) loadPromo(d.closest('.project')); });
 
   // Retour de LinkedIn : message, puis on rouvre le projet concerné
   (() => {
