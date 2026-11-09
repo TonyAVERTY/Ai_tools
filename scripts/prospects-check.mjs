@@ -221,6 +221,13 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   let status = '';
   for (let i = 0; i < 40 && status !== 'sent'; i++) { status = (await s.db.prepare('SELECT status FROM prospects WHERE email = ?').get(kanbanEmail)).status; if (status !== 'sent') await new Promise((r) => setTimeout(r, 150)); }
   ok(status === 'sent', `${tag} glisser-déposer : le statut passe de « new » à « ${status} »`);
+  // Un filtre qui ne laisse rien (« Actions à faire » à 0) : le tableau le dit au lieu d'afficher cinq colonnes « Vide », et « Voir tous les prospects » rend la main
+  await p.locator('[data-chip-todo]').click();
+  await p.waitForSelector('.pr-none', { timeout: 10000 });
+  ok((await p.locator('[data-card]').count()) === 0 && /ne correspond/.test(await p.locator('.pr-none').innerText()), `${tag} tableau : un filtre sans résultat est expliqué`);
+  await p.locator('[data-pr-reset]').click();
+  await p.waitForSelector('[data-card]', { timeout: 10000 });
+  ok((await p.locator('[data-card]').count()) > 0 && (await p.locator('[data-chip-todo]').getAttribute('aria-pressed')) !== 'true', `${tag} tableau : « Voir tous les prospects » remet les cartes et retire le filtre`);
   await p.locator('[data-view-mode="list"]').click();
   // navigation sans rechargement, puis retour : les écouteurs du fichier doivent être posés de nouveau
   await p.evaluate(() => { window.__marker = 'vivante'; });
