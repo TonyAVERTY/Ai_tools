@@ -669,7 +669,6 @@
       if (!en.isIntersecting && !document.body.classList.contains('hdr-off')) {
         const r = jobsBox.getBoundingClientRect();
         document.body.style.setProperty('--jobs-w', `${Math.round(r.width)}px`);
-        document.body.style.setProperty('--jobs-h', `${Math.round(r.height)}px`);
       }
       document.body.classList.toggle('hdr-off', !en.isIntersecting);
     }).observe(topBar);

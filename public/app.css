@@ -45,7 +45,7 @@ code { font-family: var(--mono); font-size: .875rem; background: var(--bg-sunk);
 .brand-mark { display: inline-flex; flex: none; }
 .brand-mark img { display: block; height: 32px; width: auto; }
 .wordmark { font-family: var(--serif); font-size: 1.375rem; font-weight: 600; letter-spacing: -.01em; color: var(--text); }
-.top-r { margin-left: auto; display: flex; align-items: center; gap: 12px; order: 2; }
+.top-r { --gap: 12px; margin-left: auto; display: flex; align-items: center; gap: var(--gap); order: 2; }
 .avatar { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 999px; background: var(--nav-on-bg); color: var(--nav-on-text); font-weight: 700; font-size: .9375rem; flex: none; }
 .user { position: relative; }
 .user > summary { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 999px; cursor: pointer; list-style: none; }
@@ -883,7 +883,8 @@ input.copy { font-family: var(--mono); font-size: .8125rem; }
 @media (prefers-reduced-motion: reduce) { .jitem.new { animation: none; } }
 /* Page défilée : le menu « Activité » reste visible, épinglé en haut à droite */
 body.hdr-off .jobs { position: fixed; top: 10px; right: 12px; z-index: 60; }
-body.hdr-off .top-r::after { content: ''; flex: none; width: var(--jobs-w, 0); height: var(--jobs-h, 0); }
+/* Le bouton épinglé laisse sa place (largeur + espacement) juste où il était : les boutons voisins ne bougent pas */
+body.hdr-off .search-btn { margin-right: calc(var(--jobs-w, 0px) + var(--gap)); }
 body.hdr-off .jobs-btn { box-shadow: var(--shadow-3); }
 
 /* ---------- Navigation sans rafraîchissement (public/ajax.js) : filet de chargement en haut de page ---------- */
@@ -1427,7 +1428,7 @@ body.tour-active { padding-bottom: var(--tour-pad, 0px); }
   .top-in { gap: 12px; padding-left: 16px; padding-right: 16px; }
   .pills { gap: 0; margin-left: 0; }
   .pill { padding: 0 9px; gap: 6px; font-size: .9rem; }
-  .top-r { gap: 8px; }
+  .top-r { --gap: 8px; }
   .top-r .btn { padding: 0 12px; font-size: .875rem; white-space: nowrap; }
 }
 @media (min-width: 900px) and (max-width: 1399px) { .pill .ic { display: none; } }
