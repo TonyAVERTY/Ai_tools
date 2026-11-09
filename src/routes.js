@@ -43,6 +43,7 @@ import { isRoleJob, roleTaskByJob } from './services/roles.js';
 import { registerProspectRoutes } from './prospectroutes.js';
 import { settingsPage, unsubPage, accountPage, layout } from './views.js';
 import { projectsPage, projectTabPage, tabSlugs } from './projectviews.js';
+import { contactPage } from './contactviews.js';
 import { fmtEur } from './services/accounting.js';
 import { linkPage } from './linkviews.js';
 import { availableProviders } from './services/providers/availability.js';
@@ -215,8 +216,19 @@ export function registerRoutes(router, app) {
       email: session.email, entry, tab, stats: (await projectStats(db, [full.id])).get(Number(full.id)),
       checklist: await projectChecklist(app, full), jobs: await latestJobs(db, full.id),
       journal: tab === 'envoi' ? await journalOf(db, full.id) : null,
+      scheduled: tab === 'communication' ? (await db.prepare("SELECT body, scheduled_at at FROM linkedin_posts WHERE project_id = ? AND status = 'scheduled' ORDER BY scheduled_at LIMIT 5").all(full.id)).map((r) => ({ body: r.body, at: Number(r.at) })) : [],
     }));
   };
+  // Fiche contact : un prospect ou un client du projet (introuvable si le prospect est d'un autre projet ou d'un autre compte)
+  router.get('/p/:id/contact/:cid', async ({ res, params, session }) => {
+    const full = await getProject(app, params.id, { userId: session.userId });
+    const detail = await prospectDetail(db, Number(params.cid));
+    if (!detail || Number(detail.prospect.project_id) !== Number(full.id)) throw new HttpError(404, 'Prospect introuvable');
+    const reply = await db.prepare('SELECT body, subject, intent, received_at FROM replies WHERE prospect_id = ? ORDER BY received_at DESC, id DESC LIMIT 1').get(detail.prospect.id);
+    const job = await db.prepare("SELECT status FROM jobs WHERE project_id = ? AND type = 'hook' AND params_json = ? ORDER BY id DESC LIMIT 1").get(full.id, JSON.stringify({ prospectId: detail.prospect.id }));
+    html(res, contactPage({ email: session.email, project: full, detail, reply: reply ? { ...reply, received_at: Number(reply.received_at) } : null, hookBusy: !!job && ['queued', 'running'].includes(job.status) }));
+  });
+
   router.get('/p/:id', projectTab);
   router.get('/p/:id/:tab', projectTab);
   router.get('/projets/:id', async ({ res, params }) => redirect(res, `/p/${params.id}`));

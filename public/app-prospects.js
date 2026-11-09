@@ -468,7 +468,7 @@
       d.dataset.page = r.page;
       const due = (x) => x.next_action && x.next_action_at * 1000 <= Date.now();
       box.innerHTML = r.rows.length ? `<div class="table-wrap"><table class="pr-table"><thead><tr><th>Entreprise</th><th class="sm-hide">Ville</th><th class="r">Score</th><th>Statut</th><th class="sm-hide">Prochaine action</th></tr></thead><tbody>
-        ${r.rows.map((x) => `<tr data-row="${x.id}"><td><button type="button" class="link" data-open-prospect="${x.id}"><b>${esc(x.company)}</b></button><br><span class="mono muted">${esc(x.email)}</span></td>
+        ${r.rows.map((x) => `<tr data-row="${x.id}"><td><a class="link" href="/p/${proj.dataset.id}/contact/${x.id}"><b>${esc(x.company)}</b></a><br><span class="mono muted">${esc(x.email)}</span></td>
           <td class="sm-hide">${esc(x.city)}</td><td class="r">${x.score != null ? `<span class="sc${x.score >= 9 ? ' hi' : ''}">${x.score}</span>` : ''}</td>
           <td><select data-prospect="${x.id}" class="st-${x.status}" aria-label="Statut de ${esc(x.company)}">${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${k === x.status ? 'selected' : ''}>${v}</option>`).join('')}</select>
             ${x.sent_at ? `<div class="small muted">contacté le ${fmtDay(x.sent_at)}${x.followup_at ? ' + relance' : ''}</div>` : ''}</td>
@@ -496,7 +496,7 @@
       const { status: _ignored, ...f } = filters; // les colonnes sont les statuts
       const r = await api(`/api/projects/${proj.dataset.id}/kanban?${new URLSearchParams(f)}`);
       const card = (x) => `<article class="kcard" draggable="true" data-card="${x.id}">
-        <button type="button" class="link" data-open-prospect="${x.id}">${esc(x.company)}</button>
+        <a class="link" href="/p/${proj.dataset.id}/contact/${x.id}">${esc(x.company)}</a>
         <div class="small muted">${esc(x.email)}${x.city ? ` · ${esc(x.city)}` : ''}${x.score ? ` · ${x.score}/10` : ''}</div>
         ${x.next_action ? `<div class="small ${x.next_action_at * 1000 <= Date.now() ? 'warn' : 'muted'}">→ ${esc(x.next_action)} (${fmtDay(x.next_action_at)})</div>` : ''}
         <select data-prospect="${x.id}" class="st-${x.status}" aria-label="Statut de ${esc(x.company)}">${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${k === x.status ? 'selected' : ''}>${v}</option>`).join('')}</select>

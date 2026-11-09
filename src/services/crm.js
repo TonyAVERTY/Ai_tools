@@ -67,7 +67,7 @@ export async function listProspects(db, projectId, f, { limit = 100 } = {}) {
 export async function prospectDetail(db, id) {
   const p = await db.prepare('SELECT * FROM prospects WHERE id = ?').get(id);
   if (!p) return null;
-  const mails = await db.prepare(`SELECT kind, subject, variant, sent_at, error FROM mail_log
+  const mails = await db.prepare(`SELECT kind, subject, variant, sent_at, error, read_at FROM mail_log
     WHERE prospect_id = ? ORDER BY sent_at, id`).all(id);
   const notes = await db.prepare('SELECT id, body, created_at FROM prospect_notes WHERE prospect_id = ? ORDER BY created_at DESC, id DESC').all(id);
   // La liste d'opposition est commune à tous les comptes : on n'en révèle que le strict nécessaire. Le motif d'un
