@@ -166,7 +166,7 @@ Les agendas se rafraîchissent tout seuls mais lentement (Google : 12 à 24 heur
 Pour rédiger un mail, trouver des idées de posts, réfléchir à une stratégie commerciale : menu **Assistant** (l'entrée de ton IA).
 
 ## FAQ rapide
-- **Qui paie l'IA ?** La personne, directement chez son fournisseur d'IA : Anthropic, OpenAI ou Google (clé API : à l'usage ; abonnement ou compte : son abonnement Claude ou ChatGPT). iaboss facture seulement son offre.
+- **Qui paie l'IA ?** La personne, directement chez son fournisseur d'IA : Anthropic, OpenAI ou Google (clé API : à l'usage ; abonnement ou compte : son abonnement Claude, ChatGPT ou Google AI, ce dernier seulement si le service l'a activé). iaboss facture seulement son offre.
 - **iaboss modifie-t-il mon code ?** Non : le dépôt est cloné et lu en lecture seule.
 - **Puis-je changer le dépôt d'un projet ?** Non : créer un nouveau projet.
 - **Combien de temps dure une recherche ou une vidéo ?** Quelques minutes ; l'avancement est dans Activité.

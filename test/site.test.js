@@ -480,8 +480,10 @@ test('site public : l\'IA est « ton IA » (Claude, ChatGPT ou Gemini), les troi
   const tarifs = await page('/tarifs');
   assert.match(tarifs, /id="acces-ia"/);
   assert.doesNotMatch(tarifs, /id="acces-claude"/);
-  assert.match(tarifs, /Ton abonnement Claude ou ChatGPT, avec un risque/);
-  assert.match(tarifs, /Gemini se relie par clé API ; l'abonnement Google AI n'est proposé que si l'éditeur l'a activé/);
+  assert.match(tarifs, /Ton abonnement Claude, ChatGPT ou Google AI, avec un risque/);
+  assert.match(tarifs, /Google AI \(Plus, Pro, Ultra, par Antigravity/, 'l\'abonnement Google AI, relié par Antigravity, est cité avec Claude et ChatGPT');
+  assert.match(tarifs, /Pour Gemini, la connexion par abonnement n'est proposée que si le service l'a activée ; la clé API reste toujours possible/);
+  assert.match(tarifs, /Google n'a pas dit clairement si c'est permis/, 'la réserve sur les conditions de Google reste dite');
   assert.match(tarifs, /Google peut alors utiliser les données envoyées pour améliorer ses produits/, 'la clé Gemini gratuite est signalée');
   const how = await page('/fonctionnement');
   assert.match(how, /href="\/tarifs#acces-ia"/);
