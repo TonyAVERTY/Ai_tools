@@ -10,7 +10,7 @@ const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright-c
 const s = await startApp();
 s.app.cfg.claudeBin = makeClaudeBin(s.tmp, { fixture: 'fake-claude.js' });
 const u = await s.newUser();
-await addProject(s.db, u.id, { name: 'Atelier', gitUrl: 'https://github.com/u/atelier.git' });
+const pid = await addProject(s.db, u.id, { name: 'Atelier', gitUrl: 'https://github.com/u/atelier.git' });
 const b = await chromium.launch(process.env.PLAYWRIGHT_CHROMIUM ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM } : {});
 const ctx = await b.newContext({ viewport: { width: 1280, height: 700 } });
 const [name, value] = u.cookie.split('=');
@@ -126,9 +126,8 @@ await p.waitForFunction(() => document.querySelectorAll('.chat-msg.bot .msg-acti
 check((await p.locator('.chat-msg.bot .bubble').last().innerText()).includes('Écho : ECHO deuxième visite'), 'page IA : revenir dessus relance bien son script');
 
 // 7. rechargement doux (remplace location.reload d'app.js) : défilement conservé
-await p.goto(`${s.base}/projets`);
+await p.goto(`${s.base}/p/${pid}/prospection`); // une page de projet assez longue pour défiler
 await p.evaluate(() => { window.__marker = 'vivante'; });
-if (!(await p.locator('details.project').first().evaluate((d) => d.open))) await p.locator('details.project summary').first().click(); // un seul projet : déjà ouvert
 await p.waitForTimeout(400);
 await p.evaluate(() => window.scrollBy(0, 120));
 const y1 = await p.evaluate(() => Math.round(scrollY));

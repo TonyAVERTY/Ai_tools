@@ -6,6 +6,7 @@ import { addProject, testTokenLink } from './helpers/users.js';
 import { buildChecklist } from '../src/checklist.js';
 import { saveTemplate } from '../src/projects.js';
 import { now } from '../src/db.js';
+import { projectsHtml } from './helpers/pages.js';
 
 let s, off;
 const user = (srv) => srv.newUser({ admin: false, link: testTokenLink() });
@@ -121,18 +122,20 @@ test('sans clés LinkedIn : la liste n\'en parle pas', async () => {
   assert.ok(!c.steps.some((x) => x.key === 'linkedin'));
 });
 
-test('page : la liste est une section du projet (badge « config » cliquable), sans panneau flottant ni style en ligne', async () => {
+test('page : la mise en route est la première carte de la vue d\'ensemble (étape en cours en Safran, lignes qui mènent au bon onglet), sans panneau flottant ni style en ligne', async () => {
   const u = await user(s);
-  await addProject(s.db, u.id, { name: 'Mon projet' });
-  const html = await (await u.get('/projets', { headers: { accept: 'text/html' } })).text();
-  // la section « Mise en route » est la première du projet, avec son contenu rempli par le navigateur
-  assert.match(html, /<details class="acc anim setup-acc" data-acc="setup"[^>]*>\s*<summary>[^]*?Mise en route[^]*?<div class="setup" data-setup>/);
-  assert.ok(html.indexOf('data-acc="setup"') < html.indexOf('data-acc="header"'), 'la première section du projet');
-  // le badge est un vrai bouton (clavier, lecteur d'écran)
+  const id = await addProject(s.db, u.id, { name: 'Mon projet' });
+  const html = await (await u.get(`/p/${id}`, { headers: { accept: 'text/html' } })).text();
+  assert.match(html, /<section class="sheet" aria-labelledby="mr-h"><div class="sheet-h"><h2 id="mr-h">Mise en route<\/h2>/);
+  assert.match(html, /<ol class="pj-steps">/);
+  assert.match(html, /<li class="cur">/, 'la première étape à faire est mise en avant');
+  // chaque ligne ouvre l'onglet qui porte la section (adresse + ancre), pas une section d'accordéon
+  assert.match(html, /href="\/p\/\d+\/prospection#acc-target"/);
+  assert.match(html, /href="\/p\/\d+\/reglages#acc-config"/);
+  // le badge « config » masqué reste un vrai bouton pour public/app.js
   assert.match(html, /<button type="button" class="pcfg badge" data-cfg[^>]*>/);
-  // plus aucun panneau qui flotte, plus de lien pour le récupérer
   assert.doesNotMatch(html, /id="todo"|class="todo"|data-todo-restore|Afficher la mise en route/);
-  assert.doesNotMatch(html.match(/<details class="acc anim setup-acc"[^>]*>/)[0], /style=/);
+  assert.doesNotMatch(html, /style="/);
   const empty = await user(s);
-  assert.doesNotMatch(await (await empty.get('/projets', { headers: { accept: 'text/html' } })).text(), /data-acc="setup"/, 'pas de projet : pas de liste');
+  assert.doesNotMatch(await (await empty.get('/projets', { headers: { accept: 'text/html' } })).text(), /pj-steps/, 'pas de projet : pas de liste');
 });

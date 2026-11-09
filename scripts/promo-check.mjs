@@ -35,9 +35,7 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   const errs = [];
   p.on('pageerror', (e) => errs.push(e.message));
   p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
-  await p.goto(`${s.base}/projets`);
-  await p.evaluate(() => { document.querySelector('details.project')?.setAttribute('open', ''); });
-  await p.locator('details[data-acc="promo"] > summary').click();
+  await p.goto(`${s.base}/p/${pid}/communication`);
   await p.waitForSelector('[data-promo-form]', { timeout: 8000 });
   ok(await p.locator('[data-promo-form] input[name="fps"]').inputValue() === '30', `${tag} 30 images/s par défaut`);
   ok(await p.locator('[data-promo-form] input[name="seconds"]').inputValue() === '15', `${tag} 15 s par défaut`);

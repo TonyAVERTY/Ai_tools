@@ -48,12 +48,11 @@ const p = await ctx.newPage();
 const errs = [];
 p.on('pageerror', (e) => errs.push(e.message));
 p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
+const tabOf = async (t) => { if (new URL(p.url()).pathname !== `/p/${pid}/${t}`) { await p.evaluate(([id, x]) => window.AiNav.go(`/p/${id}/${x}`), [pid, t]); await p.waitForURL((u) => u.pathname === `/p/${pid}/${t}`); } await p.waitForSelector('html[data-nav="ready"]'); }; // aller sur l'onglet d'un projet sans recharger
 
 async function openLinkedin(tag, expected) {
   await p.waitForSelector('html[data-nav="ready"]');
-  const project = p.locator('details.project').first();
-  if (!(await project.evaluate((d) => d.open))) await project.locator('summary').first().click();
-  await p.locator('details[data-acc="linkedin"] > summary').click();
+  await tabOf('communication');
   await p.waitForSelector('[data-li-body]', { timeout: 15000 });
   ok((await p.locator('[data-linkedin]').innerText()).includes('Tony Averty'), `${tag} le compte relié est affiché`);
   ok((await p.locator('[data-li-body]').inputValue()) === expected, `${tag} le brouillon s'affiche : « ${expected} »`);

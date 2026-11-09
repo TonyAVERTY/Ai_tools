@@ -178,4 +178,5 @@
   }
 
   window.AiTools.loadRecap = loadRecap;
+  $$('details[data-acc="recap"][open]').forEach((d) => loadRecap(d.closest('.project'))); // onglet Récapitulatif : la section est ouverte d'office
 })();

@@ -140,7 +140,7 @@
     const area = e.target.closest('[data-li-body]');
     if (area) $('[data-li-count]', area.closest('.project')).textContent = area.value.length;
   });
-  $$('details[data-acc="linkedin"]').forEach((d) => d.addEventListener('toggle', () => { if (d.open) loadLinkedin(d.closest('.project')); }));
+  $$('details[data-acc="linkedin"]').forEach((d) => { d.addEventListener('toggle', () => { if (d.open) loadLinkedin(d.closest('.project')); }); if (d.open) loadLinkedin(d.closest('.project')); }); // déjà ouverte (onglet Communication) : chargée tout de suite
 
   window.AiTools.loadLinkedin = loadLinkedin;
 })();

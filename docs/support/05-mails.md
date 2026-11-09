@@ -1,7 +1,7 @@
 # Mails : modèle, envoi par lots, relance, page Mails, garde-fous
 Résumé : écrire et valider un modèle de mail, envoyer par lots avec les garde-fous, relance automatique dans le même fil, test A/B, page Mails (statuts), accusé de lecture et désinscription.
 
-## Le modèle de mail (Prospecter → Modèle de mail)
+## Le modèle de mail (onglet Envoi → Modèle de mail)
 - Boutons : **Générer avec l'IA** (l'IA rédige à partir de la fiche et de la cible : un mail commercial de 150 à 180 mots au plus (sans compter l'appel, la formule de clôture et la signature), qui commence par « Bonjour, », présente le produit, c'est-à-dire ce que c'est, pour qui, 2 à 3 bénéfices concrets, comment démarrer, et le prix ou l'adresse du produit seulement s'ils sont dans la fiche projet, puis se termine par une formule de politesse (« Bien cordialement, ») et la signature ; un modèle déjà généré n'est pas réécrit tout seul : clique de nouveau sur **Générer avec l'IA** pour obtenir la nouvelle version, puis **Valider le modèle**), **Enregistrer**, **Valider le modèle**. Seul un modèle **validé** peut être envoyé.
 - **Texte simple ou HTML** : par défaut, le mail part en **texte simple**, comme un mail écrit à la main (c'est ce qui passe le mieux les filtres anti-spam). Pour un mail mis en forme, coche **Envoyer en mail HTML** sous le corps avant de cliquer **Valider le modèle** ; décoche la case et enregistre pour revenir au texte simple. Le choix se fait pour chaque modèle (premier mail et relance) et s'applique à tous les envois de ce modèle.
 - Champs : **Objet**, **Objet B** (facultatif : active le test A/B, les envois alternent entre les deux objets) et **Corps**. **Générer avec l'IA** remplit aussi l'**Objet B** : un second objet avec un angle différent (question ou fait, bénéfice ou nom du produit), jamais une simple reformulation ; s'il est identique à l'objet A ou absent, il reste vide et il n'y a pas de test A/B. Tu peux l'effacer pour désactiver le test A/B.
@@ -28,7 +28,7 @@ Résumé : écrire et valider un modèle de mail, envoyer par lots avec les gard
 - **Relecture du sens à l'envoi** : avant de partir, **chaque mail est relu par l'IA, par lots de 10**. Un mail jugé sans sens **ne part pas** : il reste « à contacter » et le journal des mails indique « Non envoyé : le texte n'a pas de sens (…) » avec la raison ; les autres partent. Si un lot entier est refusé, c'est le modèle qui est en cause : l'envoi s'arrête avec « Aucun mail n'est parti : ton IA juge que le texte n'a pas de sens (…). Ouvre « Aperçu » » : corrige avec la version proposée, valide, relance. **Si l'IA ne peut pas relire** (budget IA atteint, IA déconnectée, réponse illisible), **rien ne part** : « Relecture par l'IA impossible : … Aucun mail n'est parti » (ou, si un premier lot est déjà parti, le reste attend et le résultat l'indique). Relance l'envoi quand l'IA répond de nouveau.
 - **Test A/B** : le taux de réponse de chaque objet s'affiche sous le bouton Envoyer ; l'objet gagnant est annoncé dans le rapport hebdomadaire dès 10 envois par objet.
 
-## Envoyer (Prospecter → Envoi)
+## Envoyer (onglet Envoi → Envoi)
 1. **Mails à envoyer** : le nombre voulu (un lot fait 100 mails au plus).
 2. Bouton **Envoyer** : une confirmation est demandée à chaque envoi.
 3. L'envoi tourne en arrière-plan (« Activité ») : « Envoi terminé : N envoyé(s), M échec(s) ».
@@ -42,7 +42,7 @@ Conditions pour que ça parte : un **SMTP** enregistré dans « Configuration du
 - **Pause d'envoi** : si trop de mails sont rejetés, iaboss met les envois en pause pour protéger la réputation du domaine ; un bandeau rouge l'explique sur la page Projets, et une notification « Envois mis en pause » peut être reçue.
 - **Désinscription** : chaque mail contient un lien de désinscription dans son pied de page (sauf si tu as retiré le pied de page dans « Réglages → Garde-fous »). Un clic ajoute l'adresse à la liste d'opposition.
 
-## Relance automatique (Prospecter → Relance automatique)
+## Relance automatique (onglet Envoi → Relance automatique)
 - Case **« Relancer une fois les prospects sans réponse »** et champ **« Après (jours) »** (7 par défaut), puis **Enregistrer**.
 - Une seule relance par prospect, dans **le même fil** (« Re: » + objet du premier mail).
 - Elle part seulement si : le modèle de relance est validé ; la boîte IMAP a été lue avec succès il y a moins de 2 heures (sinon on risquerait de relancer quelqu'un qui a répondu) ; on est en heures ouvrées, du lundi au vendredi de 9h à 18h (heure de Paris) ; les plafonds quotidiens ne sont pas atteints.
