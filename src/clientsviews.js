@@ -99,6 +99,13 @@ export function clientsPage({ email, rows, openId, flash }) {
 
 // ---------- Fiche d'un échange (client ou prospect) ----------
 
+/** Ce qui est parti : le texte exact du mail, replié (« Voir le mail »). Les mails partis avant que le texte soit gardé le disent. */
+export function mailPreview(x) {
+  return `<details class="cl-mail"><summary>Voir le mail envoyé</summary>
+    <p class="muted small">À ${esc(x.to)}${x.subject ? ` · objet : ${esc(x.subject)}` : ''}</p>
+    ${x.body ? `<div class="mail-text">${esc(x.body)}</div>` : '<p class="muted small">Contenu non conservé : ce mail est parti avant que iaboss ne garde le texte des mails envoyés.</p>'}</details>`;
+}
+
 /** `freshNote` : on vient d'ajouter une note, la plus récente (la première du fil) est surlignée un instant. */
 function timeline(items, { freshNote = false } = {}) {
   if (!items.length) return '<p class="muted">Aucun échange pour l\'instant : les mails envoyés, les réponses et les notes de ce contact apparaîtront ici.</p>';
@@ -106,7 +113,8 @@ function timeline(items, { freshNote = false } = {}) {
   return `<ol class="cl-tl">${items.map((x, i) => {
     if (x.type === 'sent') {
       return `<li class="cl-tl-i out"><span class="cl-tl-ic">${ic('send')}</span><div><div class="cl-tl-h"><b>${x.kind === 'initial' ? 'Mail envoyé' : 'Relance envoyée'}</b><span class="muted small">${esc(dayTime(x.at))}</span></div>
-        <p>${esc(x.subject || '(sans objet)')}</p>${x.error ? `<p class="small err">Échec de l'envoi : ${esc(x.error)}</p>` : x.read ? '<p class="muted small">Lu par le destinataire</p>' : ''}</div></li>`;
+        <p>${esc(x.subject || '(sans objet)')}</p>${x.error ? `<p class="small err">Échec de l'envoi : ${esc(x.error)}</p>` : x.read ? '<p class="muted small">Lu par le destinataire</p>' : ''}
+        ${x.bounced ? `<p class="small err"><b>Rejeté :</b> ${esc(x.note || "le serveur du destinataire n'a pas donné de raison.")}</p>` : ''}${x.error ? '' : mailPreview(x)}</div></li>`;
     }
     if (x.type === 'reply') {
       const [label, tone] = INTENTS[x.intent] || INTENTS.other;
