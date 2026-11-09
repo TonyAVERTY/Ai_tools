@@ -69,7 +69,7 @@
   }
 
   // Outils communs pour les fichiers public/app-*.js (chargés après celui-ci)
-  Object.assign(window.AiTools, { $, $$, api, esc, every, formData, go, icon, liDay, listen, refreshProject, httpErrorText, networkErrorText, toLogin, confirmBox, loadingHtml, loadFailed, sentence, aiName });
+  Object.assign(window.AiTools, { $, $$, api, esc, every, formData, go, icon, later, liDay, listen, refreshProject, httpErrorText, networkErrorText, toLogin, confirmBox, loadingHtml, loadFailed, sentence, aiName });
 
   // Une erreur dit ce qui s'est passé et quoi faire ensuite : jamais « Failed to fetch » ni un code brut. Le message du serveur, quand il y en a un, passe en premier.
   function httpErrorText(status) {

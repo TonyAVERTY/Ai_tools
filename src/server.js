@@ -53,6 +53,7 @@ const STATIC = {
   '/static/app-today.js': asset('app-today.js', 'text/javascript; charset=utf-8', 3600),
   '/static/app-contact.js': asset('app-contact.js', 'text/javascript; charset=utf-8', 3600),
   '/static/app-search.js': asset('app-search.js', 'text/javascript; charset=utf-8', 3600),
+  '/static/app-shortcuts.js': asset('app-shortcuts.js', 'text/javascript; charset=utf-8', 3600),
   '/static/app-link.js': asset('app-link.js', 'text/javascript; charset=utf-8', 3600),
   '/static/app-promo.js': asset('app-promo.js', 'text/javascript; charset=utf-8', 3600),
   '/static/app-linkedin.js': asset('app-linkedin.js', 'text/javascript; charset=utf-8', 3600),

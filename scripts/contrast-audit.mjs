@@ -38,7 +38,7 @@ await saveDraft(s.db, pid, 'newsletter', { direction: 'une nouveauté', title: '
 const PUBLIC = ['/', '/fonctionnement', '/tarifs', '/docs', '/mentions-legales', '/login'];
 const TABS = ['', '/prospection', '/envoi', '/clients', '/facturation', '/communication', '/outils', '/recap', '/reglages'];
 const QUICK = process.env.AUDIT_QUICK === '1'; // AUDIT_QUICK=1 : la page d'un projet à 390 px, pour un essai rapide
-const APP = QUICK ? [`/p/${pid}`] : ['/', '/projets', ...TABS.map((x) => `/p/${pid}${x}`), `/p/${pid}/contact/${firstProspect}`, '/mails', '/mails?v=sent', '/calendar', '/compta', '/facturation', '/clients', '/account', '/settings', '/team', '/chat', '/support', '/developer', '/admin', '/link'];
+const APP = QUICK ? [`/p/${pid}`] : ['/', '/projets', ...TABS.map((x) => `/p/${pid}${x}`), `/p/${pid}/contact/${firstProspect}`, '/mails', '/mails?v=sent', '/calendar', '/compta', '/facturation', '/clients', '/account', '/settings', '/team', '/raccourcis', '/chat', '/support', '/developer', '/admin', '/link'];
 
 const probe = ({ min, mobile }) => {
   const parse = (c) => {
