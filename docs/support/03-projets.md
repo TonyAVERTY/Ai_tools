@@ -18,7 +18,7 @@ Clique une carte : la page du projet s'ouvre (adresse `/p/` suivie du numéro du
 | Onglet | Adresse | Ce qu'il contient |
 |---|---|---|
 | **Vue d'ensemble** | `/p/N` | **Mise en route**, **Fiche projet**, les chiffres **Prospection** et la carte **En cours** |
-| **Prospection** (avec le nombre de prospects) | `/p/N/prospection` | **Cible**, **Recherche de prospects**, **Prospects** (liste, Kanban, fiches, import et export CSV) |
+| **Prospection** (avec une pastille quand quelque chose t'attend) | `/p/N/prospection` | **Cible**, **Recherche de prospects**, **Prospects** (liste, Kanban, fiches, import et export CSV). La pastille jaune compte ce qui attend une action : les prospects qui ont répondu (statut « A répondu ») et ceux dont la « Prochaine action » est arrivée à échéance. Elle n'est pas affichée quand il n'y a rien à faire ; le nombre total de prospects se lit dans « Tous » |
 | **Envoi** | `/p/N/envoi` | **Modèle de mail**, **Envoi** (avec la boîte de réception et le test A/B), **Relance automatique** |
 | **Clients** | `/p/N/clients` | les clients et les prospects du projet, avec la recherche, « Ajouter un client » et l'export CSV, directement dans l'onglet (voir « Clients : liste par projet, fiches, documents et échanges ») |
 | **Facturation** | `/p/N/facturation` | toute la facturation du projet (informations légales, devis, acompte, facture finale, avoir), sans quitter la page du projet (voir « Facturation : modèles de devis, d'acompte, de facture finale et d'avoir »). L'ancienne adresse `/facturation/projet/N` renvoie vers cet onglet |
