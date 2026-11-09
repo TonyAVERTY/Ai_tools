@@ -101,3 +101,24 @@ test('la barre du haut porte « Rechercher » et la fenêtre de recherche ; « A
   assert.match(h, /<div class="jobs" id="jobs">/, 'plus de hidden au repos');
   assert.match(h, /Aucune tâche en cours\./);
 });
+
+test('onglet Envoi : bandeau, modèles, Journal du projet (compteurs réels vers Mails), Envoyer, Relance et Boîte de réception', async () => {
+  const u = await s.newUser({ email: 'envoi@x.fr' });
+  const a = await addProject(s.db, u.id, { name: 'Courrier', gitUrl: 'https://github.com/u/courrier.git' });
+  const now = Math.floor(Date.now() / 1000);
+  const pr = Number((await s.db.prepare("INSERT INTO prospects(project_id, company, email, status, created_at) VALUES(?, 'Boulangerie', 'b@x.fr', 'replied', ?)").run(a, now)).lastInsertRowid);
+  await s.db.prepare('INSERT INTO mail_log(project_id, prospect_id, email, sent_at, kind) VALUES(?, ?, ?, ?, ?)').run(a, pr, 'b@x.fr', now, 'initial');
+  await s.db.prepare('INSERT INTO mail_log(project_id, prospect_id, email, sent_at, error, kind) VALUES(?, ?, ?, ?, ?, ?)').run(a, null, 'c@x.fr', now, 'refusé', 'initial');
+  const h = await text(u, `/p/${a}/envoi`);
+  assert.match(h, /<p class="ban ban-info pj-ready" data-ready/);
+  for (const id of ['acc-template', 'acc-followuptpl', 'acc-send', 'acc-followup', 'acc-inbox']) assert.match(h, new RegExp(`id="${id}"`), id);
+  assert.match(h, /<h2 id="jr-h">Journal du projet<\/h2>/);
+  assert.match(h, new RegExp(`href="/mails\\?project=${a}"><span class="k-l">Tous</span><span class="k-v">2</span>`));
+  assert.match(h, new RegExp(`filter=sent"><span class="k-l">Envoyé</span><span class="k-v">1</span>`));
+  assert.match(h, new RegExp(`filter=replied"><span class="k-l">Répondu</span><span class="k-v">1</span>`));
+  assert.match(h, new RegExp(`filter=failed"><span class="k-l">Non envoyé</span><span class="k-v">1</span><span class="badge err">`));
+  assert.match(h, /<h2 id="send-h">Envoyer<\/h2>/);
+  assert.match(h, /data-followup-badge>Désactivée</);
+  const other = await s.newUser({ email: 'autre-envoi@x.fr' });
+  assert.equal((await other.get(`/p/${a}/envoi`, { headers: { accept: 'text/html' } })).status, 404, 'le journal d\'un autre compte reste introuvable');
+});
