@@ -501,6 +501,12 @@
         ${x.next_action ? `<div class="small ${x.next_action_at * 1000 <= Date.now() ? 'warn' : 'muted'}">→ ${esc(x.next_action)} (${fmtDay(x.next_action_at)})</div>` : ''}
         <select data-prospect="${x.id}" class="st-${x.status}" aria-label="Statut de ${esc(x.company)}">${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${k === x.status ? 'selected' : ''}>${v}</option>`).join('')}</select>
       </article>`;
+      // Un filtre qui ne laisse aucun prospect : on le dit (sinon le tableau affiche cinq colonnes « Vide » sans explication) et on propose de tout réafficher
+      if (r.columns.every((c) => !c.total) && Object.values(f).some((v) => v)) {
+        box.innerHTML = '<p class="muted small pr-none">Aucun prospect ne correspond à ces filtres.</p><p><button type="button" class="btn small" data-pr-reset>Voir tous les prospects</button></p>';
+        $('[data-pager]', d).innerHTML = '';
+        return;
+      }
       box.innerHTML = `<div class="kanban">${r.columns.map((c) => `<section class="kcol${c.total ? '' : ' empty'}" data-col="${c.status}" aria-label="${esc(c.label)}">
         <h4>${esc(c.label)} <span class="n">${c.total}</span></h4>
         <div class="kcards" data-drop="${c.status}">${c.rows.map(card).join('') || '<p class="muted small">Vide</p>'}
@@ -548,6 +554,8 @@
     if (t) { t.classList.toggle('on', !!todo); t.setAttribute('aria-pressed', String(!!todo)); }
   };
   listen(document, 'click', (e) => {
+    const reset = e.target.closest?.('[data-pr-reset]');
+    if (reset) { const d = reset.closest('details.prospects'); $('[data-filters]', d).reset(); syncChips(d); loadProspects(d); return; }
     const chip = e.target.closest?.('[data-chip], [data-chip-todo]');
     if (!chip) return;
     const d = chip.closest('details.prospects');
