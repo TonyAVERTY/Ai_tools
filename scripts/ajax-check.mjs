@@ -50,7 +50,7 @@ const base = await p.evaluate(() => window.__live());
 const navsAfterLoad = navs.length;
 
 // 1. liens : Mails, Calendrier, Équipe, puis retour au tableau de bord
-for (const [label, path] of [['Mails', '/mails'], ['Calendrier', '/calendar'], ['Équipe', '/team'], ['Projets', '/projets']]) {
+for (const [label, path] of [['Mails', '/mails'], ['Agenda', '/calendar'], ['Compta', '/compta'], ['Projets', '/projets']]) {
   await p.locator('.pills a.pill', { hasText: label }).click();
   await p.waitForFunction((x) => location.pathname === x, path);
   await ready();
@@ -63,10 +63,10 @@ check(after.listeners <= base.listeners && after.intervals <= base.intervals, `p
 for (const k of Object.keys(after.keys)) if ((after.keys[k] || 0) > (base.keys[k] || 0)) console.log('   +', base.keys[k] || 0, '→', after.keys[k], k);
 
 // 2. précédent / suivant
-await p.goBack(); await p.waitForFunction(() => location.pathname === '/team' && document.title.startsWith('Équipe')); await ready();
+await p.goBack(); await p.waitForFunction(() => location.pathname === '/compta' && document.title.startsWith('Comptabilité')); await ready();
 await p.goBack(); await p.waitForFunction(() => location.pathname === '/calendar' && document.title.startsWith('Calendrier')); await ready();
 check(/Calendrier/.test(await p.title()), 'retour arrière : la bonne page revient');
-await p.goForward(); await p.waitForFunction(() => location.pathname === '/team'); await ready();
+await p.goForward(); await p.waitForFunction(() => location.pathname === '/compta'); await ready();
 check(await p.evaluate(() => window.__marker) === 'vivante' && navs.length === navsAfterLoad, 'précédent / suivant : sans rechargement');
 
 // 3. un seul sondage /api/system après toutes ces navigations (pas de chaînes en double)
@@ -142,7 +142,7 @@ check(await p.locator('details.project').first().evaluate((d) => d.open), 'recha
 // Une date relative à aujourd'hui : « À venir » ne liste que ce qui n'est pas passé, une date en dur faisait échouer ce contrôle dès qu'elle était dépassée (la CI est tombée le 4 novembre)
 const mk = await u.post('/calendar/events', { title: 'Appel test', date: new Date(Date.now() + 5 * 86_400_000).toISOString().slice(0, 10), time: '09:30', minutes: '30' }, { form: true });
 console.log('   création événement :', mk.status, mk.headers.get('location'), '| page :', p.url());
-await p.locator('.pills a.pill', { hasText: 'Calendrier' }).click();
+await p.locator('.pills a.pill', { hasText: 'Agenda' }).click();
 await p.waitForURL('**/calendar**'); await ready();
 await p.evaluate(() => { window.__marker = 'vivante'; });
 const ics = p.locator('a[href$=".ics"]').first();

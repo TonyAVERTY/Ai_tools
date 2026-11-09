@@ -36,12 +36,7 @@ td:has(> select), td:has(> .badge) { min-width: 7.5rem; }
   .tokenbox code { flex-basis: auto; }
   .row-between { align-items: stretch; }
 }
-/* Libellé court (« Compta ») sous 450 px : le nom complet reste dans la page pour les lecteurs d'écran */
-@media (max-width: 450px) {
-  .pill-s { display: inline; }
-  .pill-l { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-}
-/* Très petit écran (320 px) : sept libellés ne tiennent qu'en retirant les marges des cases */
+/* Très petit écran (320 px) : cinq libellés ne tiennent qu'en retirant les marges des cases */
 @media (max-width: 340px) {
   .pill { padding-left: 0; padding-right: 0; }
 }

@@ -25,18 +25,19 @@ Tout ce que fait l'IA passe par le accès de la personne à son IA, jamais par u
 - **Aujourd'hui** : la page d'accueil de l'application, ce qui demande ton attention maintenant (voir le fichier « La page Aujourd'hui »).
 - **Projets** : la liste de tes projets (adresse `/projets`). 
 - **Mails** : tous les mails envoyés et les réponses reçues.
-- **Calendrier** : le mois, les événements et l'agenda externe.
-- **Comptabilité** : tes paiements, dépenses et remboursements avec leurs justificatifs, tes chiffres, le guide « Faire ma déclaration » et les exports (voir « Comptabilité : lignes, justificatifs, déclaration et exports »).
-- **Facturation** : pour chaque projet, tes informations légales puis un devis, un acompte, une facture finale et un avoir écrits avec l'IA, validés un par un, puis émis en PDF (les factures émises arrivent toutes seules dans la Comptabilité, à encaisser) (voir « Facturation : modèles de devis, d'acompte, de facture finale et d'avoir »).
-- **Clients** : pour chaque projet, tes clients et tes prospects (recherche, ajout, modification), la fiche client avec ses documents générés et ses échanges, le passage d'un prospect en client et l'export CSV (voir « Clients : liste par projet, fiches, documents et échanges »).
-- **Équipe** : partager des projets avec des collègues.
+- **Agenda** : le mois, les événements et l'agenda externe (la page s'appelle « Calendrier »).
+- **Compta** : tes paiements, dépenses et remboursements avec leurs justificatifs, tes chiffres, le guide « Faire ma déclaration » et les exports (voir « Comptabilité : lignes, justificatifs, déclaration et exports »).
 - **Activité** (apparaît quand une tâche tourne) : la liste des jobs en cours, en attente ou programmés, avec leur avancement.
 - **Site internet** : ouvre le site public d'iaboss (page d'accueil du site). Sur téléphone, seule l'icône (un globe) s'affiche.
 - **Assistant** : un menu qui s'ouvre au survol (ou au clic sur téléphone) avec deux choix : le nom de ton IA, **Claude**, **ChatGPT** ou **Gemini** (l'assistant classique, pour discuter, rédiger, réfléchir) et **Support** (pose une question sur iaboss).
-- **Avatar** (la première lettre de l'email) : un menu au survol avec **Mon compte**, **Réglages** et **Déconnexion**.
+- **Avatar** (la première lettre de l'email) : un menu au survol avec **Facturation**, **Clients**, **Équipe**, **Mon compte**, **Réglages**, **Visite guidée** et **Déconnexion**. Ces trois pages ne sont plus dans la barre du haut :
+  - **Facturation** : pour chaque projet, tes informations légales puis un devis, un acompte, une facture finale et un avoir écrits avec l'IA, validés un par un, puis émis en PDF (les factures émises arrivent toutes seules dans la Comptabilité, à encaisser) (voir « Facturation : modèles de devis, d'acompte, de facture finale et d'avoir »).
+  - **Clients** : pour chaque projet, tes clients et tes prospects (recherche, ajout, modification), la fiche client avec ses documents générés et ses échanges, le passage d'un prospect en client et l'export CSV (voir « Clients : liste par projet, fiches, documents et échanges »).
+  - **Équipe** : partager des projets avec des collègues.
+
 - Le **quota Claude** (session de 5 h et semaine) et, avec une clé API seulement, la consommation « IA via iaboss » en $ sur 24 h et 30 jours se lisent dans la carte « Consommation Claude » de la page Projets (le nom suit ton IA : « Consommation Gemini »…) (avec un abonnement Claude, aucun montant en dollars n'est affiché).
 - Pour un administrateur du service, la page « Administration » est accessible depuis « Mon compte ».
-- **Transitions de page** : en passant d'un onglet de la barre du haut à un autre (Aujourd'hui, Projets, Mails, Calendrier, Équipe), le contenu arrive en fondu par la droite quand tu vas vers la droite, et par la gauche quand tu vas vers la gauche ; pour les autres pages (Réglages, Mon compte, IA…) il monte en fondu. Recliquer sur la page déjà ouverte ou enregistrer un formulaire n'anime rien. Si ton système demande moins d'animations (« Réduire les animations »), il n'y a aucune transition.
+- **Transitions de page** : en passant d'un onglet de la barre du haut à un autre (Aujourd'hui, Projets, Mails, Agenda, Compta), le contenu arrive en fondu par la droite quand tu vas vers la droite, et par la gauche quand tu vas vers la gauche ; pour les autres pages (Réglages, Mon compte, IA…) il monte en fondu. Recliquer sur la page déjà ouverte ou enregistrer un formulaire n'anime rien. Si ton système demande moins d'animations (« Réduire les animations »), il n'y a aucune transition.
 
 ## Où trouver quoi
 | Je veux… | Où aller |
