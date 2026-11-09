@@ -1505,6 +1505,18 @@
   // Le récap se charge à l'ouverture de sa section
   $$('details[data-acc="recap"]').forEach((d) => { d.addEventListener('toggle', () => { if (d.open) window.AiTools.loadRecap?.(d.closest('.project')); }); if (d.open) window.AiTools.loadRecap?.(d.closest('.project')); });
 
+  // Outils IA : le menu des postes (à gauche) choisit ce qu'affiche la colonne de droite : « Évolution et audit », ou les tâches d'un poste
+  listen(document, 'click', (e) => {
+    const b = e.target.closest?.('[data-tool]');
+    if (!b) return;
+    const root = b.closest('.pj-tools');
+    for (const o of $$('[data-tool]', root)) { const on = o === b; o.classList.toggle('on', on); o.setAttribute('aria-pressed', String(on)); }
+    const evo = b.dataset.tool === 'evo';
+    $('[data-tool-panel="evo"]', root).hidden = !evo;
+    $('[data-tool-panel="postes"]', root).hidden = evo;
+    if (!evo) for (const d of $$('details.role', root)) { d.hidden = d.dataset.role !== b.dataset.tool; d.open = true; }
+  });
+
   // Page d'un projet : le sélecteur « Section » (téléphone) change d'onglet ; #acc-… (ligne de « Mise en route ») ouvre la section visée et la fait clignoter
   listen(document, 'change', (e) => { const sel = e.target.closest?.('[data-psel]'); if (sel && sel.value) go(sel.value); });
   (() => {

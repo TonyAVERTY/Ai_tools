@@ -105,7 +105,7 @@ export function registerMailRoutes(router, app) {
     const projects = await myProjects(session.userId);
     const ids = projects.map((p) => Number(p.id));
     const sp = url.searchParams;
-    const view = sp.get('v') === 'replies' ? 'replies' : 'sent';
+    const view = sp.get('v') === 'sent' ? 'sent' : 'replies'; // Réponses d'abord (maquette 13) ; « Envoyés » avec v=sent
     const project = ids.includes(Number(sp.get('project'))) ? Number(sp.get('project')) : null;
     const scope = project ? [project] : ids;
     const page = Math.min(100_000, Math.max(1, Math.floor(Number(sp.get('page'))) || 1));

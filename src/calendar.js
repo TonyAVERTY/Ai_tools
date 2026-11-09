@@ -85,12 +85,12 @@ export function calendarPage({ email, year, month, byDay, feed, today, agenda = 
   }).join('');
   const feedBox = icalBox(feed.url, '/calendar');
   return layout({
-    title: 'Calendrier', email,
+    title: 'Agenda', email,
     body: `<div class="cal-page">
 <div class="cal-layout">
 <section class="card cal-main" aria-labelledby="h-cal">
-  <div class="row-between"><h1 id="h-cal">Calendrier</h1>
-    <nav class="row" aria-label="Mois"><a class="btn small" href="/calendar?m=${prev[0]}-${pad(prev[1])}">← ${MONTHS[prev[1] - 1]}</a><strong>${MONTHS[month - 1]} ${year}</strong><a class="btn small" href="/calendar?m=${next[0]}-${pad(next[1])}">${MONTHS[next[1] - 1]} →</a></nav></div>
+  <div class="row-between cal-top"><h1 id="h-cal">${MONTHS[month - 1].charAt(0).toUpperCase()}${MONTHS[month - 1].slice(1)} ${year}</h1>
+    <nav class="row cal-nav" aria-label="Mois"><a class="btn small" href="/calendar?m=${prev[0]}-${pad(prev[1])}" aria-label="${MONTHS[prev[1] - 1]}">‹</a><a class="btn small" href="/calendar">Aujourd'hui</a><a class="btn small" href="/calendar?m=${next[0]}-${pad(next[1])}" aria-label="${MONTHS[next[1] - 1]}">›</a><a class="btn primary small" href="#evenements">${ic('plus')}Ajouter un événement</a></nav></div>
   <div class="cal"><div class="cal-head">${DAYS.map((d) => `<span>${d}</span>`).join('')}</div><div class="cal-grid">${grid}</div></div>
   <p class="muted small">Heures de Paris. Les posts LinkedIn se programment depuis le projet (section LinkedIn).</p>
 </section>

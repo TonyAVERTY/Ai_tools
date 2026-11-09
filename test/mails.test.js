@@ -151,21 +151,21 @@ test('page Mails : envoyés avec leur état, réponses par intention, échappeme
   const u1 = await s.newUser(), u2 = await s.newUser();
   await world(u1);
   const get = (u, p) => u.get(p, { headers: { accept: 'text/html' } });
-  const sent = await (await get(u1, '/mails')).text();
+  const sent = await (await get(u1, '/mails?v=sent')).text();
   assert.match(sent, /Bonjour Atelier/);
   assert.match(sent, /Répondu/);
   assert.match(sent, /Non envoyé/);
   assert.match(sent, /« Lu » vient de l'accusé de lecture standard/);
-  const failedOnly = await (await get(u1, '/mails?filter=failed')).text();
+  const failedOnly = await (await get(u1, '/mails?v=sent&filter=failed')).text();
   assert.match(failedOnly, /x@y\.fr/);
   assert.doesNotMatch(failedOnly, /Bonjour Atelier/);
   const replies = await (await get(u1, '/mails?v=replies&filter=interested')).text();
   assert.match(replies, /Réponse suggérée/);
   assert.match(replies, /Ça m&#39;intéresse &lt;b&gt;beaucoup&lt;\/b&gt;/, 'texte de la réponse échappé');
   assert.doesNotMatch(replies, /<b>beaucoup/);
-  const other = await (await get(u2, '/mails')).text();
+  const other = await (await get(u2, '/mails?v=sent')).text();
   assert.doesNotMatch(other, /Bonjour Atelier|a@atelier\.fr/);
-  assert.equal((await s.anon.get('/mails', { headers: { accept: 'text/html' } })).status, 303);
+  assert.equal((await s.anon.get('/mails?v=sent', { headers: { accept: 'text/html' } })).status, 303);
 });
 
 test('envoi : une adresse invalide n\'est pas envoyée, marquée « adresse invalide », hors du taux de rejets', async () => {
@@ -242,13 +242,13 @@ test('page Mails : état « Lu (accusé) », filtre, et mention honnête (minimu
   await s.db.prepare('INSERT INTO mail_log(project_id, prospect_id, email, sent_at, kind, subject, read_at) VALUES(?, ?, ?, ?, ?, ?, ?)').run(pid, x, 'l@x.fr', now(), 'initial', 'Lu celui-ci', now());
   await s.db.prepare('INSERT INTO mail_log(project_id, prospect_id, email, sent_at, kind, subject) VALUES(?, ?, ?, ?, ?, ?)').run(pid, x, 'l@x.fr', now(), 'followup', 'Pas d\'accusé');
   const get = async (p) => (await u.get(p, { headers: { accept: 'text/html' } })).text();
-  const all = await get('/mails');
+  const all = await get('/mails?v=sent');
   assert.match(all, /Lu \(accusé\)/);
   assert.match(all, /« Lu » est donc un minimum/);
-  const read = await get('/mails?filter=read');
+  const read = await get('/mails?v=sent&filter=read');
   assert.match(read, /Lu celui-ci/);
   assert.doesNotMatch(read, /Pas d&#39;accusé/);
-  assert.doesNotMatch(await get('/mails?filter=sent'), /Lu celui-ci/, '« Envoyé » exclut ce qui a été lu');
+  assert.doesNotMatch(await get('/mails?v=sent&filter=sent'), /Lu celui-ci/, '« Envoyé » exclut ce qui a été lu');
 });
 
 test('détail d\'un mail : contenu gardé, erreur, raison du rejet, anciens mails, isolation', async () => {
@@ -272,7 +272,7 @@ test('détail d\'un mail : contenu gardé, erreur, raison du rejet, anciens mail
   assert.equal((await u2.get(`/api/mails/${ok}`)).status, 404, 'le mail d\'un autre compte est introuvable');
   assert.equal((await u1.get('/api/mails/abc')).status, 404);
   assert.equal((await s.anon.get(`/api/mails/${ok}`)).status, 401);
-  const page = await (await u1.get('/mails', { headers: { accept: 'text/html' } })).text();
+  const page = await (await u1.get('/mails?v=sent', { headers: { accept: 'text/html' } })).text();
   assert.match(page, new RegExp(`data-mail="${ok}"[^>]*aria-expanded="false"`));
   assert.doesNotMatch(page, /Texte <b>gardé/, 'le contenu n\'est chargé qu\'à l\'ouverture');
 });
