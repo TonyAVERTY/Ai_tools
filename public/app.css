@@ -889,6 +889,10 @@ body.hdr-off .jobs.has-jobs { position: fixed; top: 10px; right: 12px; z-index: 
 /* Le bouton épinglé laisse sa place (largeur + espacement) juste où il était : les boutons voisins ne bougent pas */
 body.hdr-off:has(.jobs.has-jobs) .search-btn { margin-right: calc(var(--jobs-w, 0px) + var(--gap)); }
 body.hdr-off .jobs-btn { box-shadow: var(--shadow-3); }
+/* Épinglé hors de la barre sombre, le bouton garde son propre fond Pétrole : sinon son texte crème tombe sur la page crème */
+body.hdr-off .jobs.has-jobs .jobs-btn { background: var(--nav-bg); color: var(--nav-on); border-color: color-mix(in srgb, var(--nav-on) 45%, transparent); }
+body.hdr-off .jobs.has-jobs .jobs-btn .spin-inline { border-color: color-mix(in srgb, var(--nav-on) 35%, transparent); border-top-color: var(--accent); }
+body.hdr-off .jobs.has-jobs .jobs-btn .chev { border-color: var(--nav-on); }
 
 /* ---------- Navigation sans rafraîchissement (public/ajax.js) : filet de chargement en haut de page ---------- */
 html.nav-busy { cursor: progress; }
