@@ -102,7 +102,7 @@ export function clientsPage({ email, rows, openId, flash }) {
 /** Ce qui est parti : le texte exact du mail, replié (« Voir le mail »). Les mails partis avant que le texte soit gardé le disent. */
 export function mailPreview(x) {
   return `<details class="cl-mail"><summary>Voir le mail envoyé</summary>
-    <p class="muted small">À ${esc(x.to)}${x.subject ? ` · objet : ${esc(x.subject)}` : ''}</p>
+    <div class="muted small">À ${esc(x.to)}${x.subject ? ` · objet : ${esc(x.subject)}` : ''}</div>
     ${x.body ? `<div class="mail-text">${esc(x.body)}</div>` : '<p class="muted small">Contenu non conservé : ce mail est parti avant que iaboss ne garde le texte des mails envoyés.</p>'}</details>`;
 }
 
