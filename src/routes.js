@@ -39,6 +39,9 @@ import { feedToken, feedUrl } from './services/ical.js';
 import { developerMode } from './apitokens.js';
 import { registerLinkedinRoutes } from './linkedinroutes.js';
 import { registerContentRoutes } from './contentroutes.js';
+import { registerSubscriptionRoutes } from './subscriptionroutes.js';
+import { subscriptionOf, billingView } from './subscriptions.js';
+import { stripeCall } from './services/stripe.js';
 import { registerPromoRoutes, removeProjectVideos } from './promo.js';
 import { registerPosteRoutes } from './posteroutes.js';
 import { isRoleJob, roleTaskByJob } from './services/roles.js';
@@ -107,6 +110,7 @@ export function registerRoutes(router, app) {
   registerMailRoutes(router, app);
   registerLinkedinRoutes(router, app, { project, aiOpts });
   registerContentRoutes(router, app, { project, aiOpts });
+  registerSubscriptionRoutes(router, app);
   registerPromoRoutes(router, app, { project, aiOpts });
   registerPosteRoutes(router, app, { project, aiOpts });
   registerProspectRoutes(router, app, { project });
@@ -458,7 +462,7 @@ export function registerRoutes(router, app) {
     html(res, accountPage({
       user: session.user, error: url.searchParams.get('e'), link: account.link, quota: account.quota, developer: await developerMode(db, session.userId), appUrl: cfg.appUrl,
       ical: await (async () => { const t = await feedToken(app, session.userId); return t ? feedUrl(cfg, t) : null; })(),
-      consent: await lastConsent(db, session.userId), profileSet: !isEmpty(await getProfile(db, session.userId)), cliModeEnabled, usage: await usageView(db, await getUser(db, session.userId)),
+      consent: await lastConsent(db, session.userId), profileSet: !isEmpty(await getProfile(db, session.userId)), cliModeEnabled, usage: { ...(await usageView(db, await getUser(db, session.userId))), billing: await billingView(app, session.userId), flash: url.searchParams.get('abonnement') },
       notice: t === 'unlinked' ? { ok: true, text: 'Liaison supprimée : le secret a été effacé et tes jobs IA en attente ont été annulés.' }
         : t === 'ok' || t === 'ko' ? { ok: t === 'ok', text: String(url.searchParams.get('m') || '').slice(0, 300) } : null,
     }));
@@ -469,6 +473,12 @@ export function registerRoutes(router, app) {
     const b = await readBody(req);
     if (normalizeEmail(b.confirm) !== normalizeEmail(session.user.email)) {
       return redirect(res, `/account?e=${encodeURIComponent("L'email saisi ne correspond pas à celui du compte")}`);
+    }
+    // Un abonnement payant est résilié chez Stripe AVANT l'effacement : sinon la personne continuerait d'être facturée sans compte. Si Stripe ne répond pas, on ne supprime rien.
+    const sub = await subscriptionOf(db, session.userId);
+    if (cfg.stripe && sub?.subscription_id && !['canceled', 'incomplete_expired'].includes(sub.status)) {
+      try { await stripeCall(app, 'DELETE', `/subscriptions/${encodeURIComponent(sub.subscription_id)}`); }
+      catch (e) { return redirect(res, `/account?e=${encodeURIComponent("Ton abonnement n'a pas pu être résilié chez Stripe : rien n'a été supprimé. Réessaie dans un instant, ou résilie-le d'abord dans « Gérer mon abonnement ».")}`); }
     }
     app.worker?.abortUser(session.userId); // un job en cours pour ce compte s'arrête avant l'effacement
     await deleteUser(app, session.userId);

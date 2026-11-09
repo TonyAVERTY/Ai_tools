@@ -10,6 +10,7 @@ import { ROLES, MAX_NOTES, rolesOfSection } from './services/roles.js';
 import { describeKpi } from './services/dbschema.js';
 import { MODE_LABELS } from './claudelink.js';
 import { aiName, forAi } from './services/ainame.js';
+import { PLAN_PRICES, PLAN_LABELS, annualPrice } from './limits.js';
 import { banner } from './banner.js';
 import { loadingBlock } from './loading.js';
 
@@ -147,6 +148,31 @@ export function claudePanel() {
 }
 
 // Usage du mois : une barre par plafond du plan (largeurs par classes w-N, la CSP interdit le style en ligne)
+const frDay = (ts) => new Date(ts * 1000).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Paris' });
+
+/** Bloc « Ton offre » de Mon compte : abonnement en cours, fin, paiement à régulariser, ou invitation à passer à une offre payante. Rien si les paiements ne sont pas ouverts. */
+export function offerBlock(bl) {
+  if (!bl?.enabled && !bl?.sub) return '';
+  const sub = bl.sub;
+  const flash = bl.flash === 'ok' ? `<p class="ban ban-info" role="status">${ic('check')}<span>Paiement reçu : ton offre est activée dans quelques secondes. Si le plan affiché n'a pas changé, recharge la page.</span></p>` : '';
+  const test = bl.enabled && !bl.live ? '<p class="muted small">Mode test : aucun paiement réel n\'est fait avec cette configuration.</p>' : '';
+  const portal = (label, cls = 'btn') => `<form method="post" action="/abonnement/portail" data-noajax><button class="${cls}">${esc(label)}</button></form>`;
+  let body;
+  if (sub?.entitled) {
+    const price = sub.plan && PLAN_PRICES[sub.plan] ? (sub.period === 'year' ? `${annualPrice(sub.plan)} € TTC par an` : `${PLAN_PRICES[sub.plan]} € TTC par mois`) : '';
+    const end = sub.periodEnd ? (sub.cancelAtEnd ? `Se termine le ${frDay(sub.periodEnd)} : tu repasseras ensuite au plan gratuit, tes données sont gardées.` : `Prochain paiement le ${frDay(sub.periodEnd)}.`) : '';
+    const late = sub.status === 'past_due' ? `<p class="cap" role="alert">${ic('alert')}<span>Ton dernier paiement a échoué. Mets ta carte à jour${sub.graceUntil ? ` avant le ${frDay(sub.graceUntil)}` : ''} pour garder ton offre.</span></p>` : '';
+    body = `<p><b>Ton offre : ${esc(PLAN_LABELS[sub.plan] || 'payante')}</b>${price ? ` · ${esc(price)}` : ''}</p>${end ? `<p class="muted">${esc(end)}</p>` : ''}${late}
+      <div class="row-actions">${portal('Gérer mon abonnement', sub.status === 'past_due' ? 'btn primary' : 'btn')}<a class="btn" href="/tarifs">Changer d'offre</a></div>`;
+  } else if (sub) {
+    body = `<p class="muted">Ton abonnement est terminé : tu es revenu au plan gratuit. Tes projets et tes données sont gardés ; seuls les plafonds du plan gratuit s'appliquent aux nouvelles actions.</p>
+      <div class="row-actions"><a class="btn primary" href="/tarifs">Voir les offres</a>${sub.hasCustomer ? portal('Mes factures') : ''}</div>`;
+  } else {
+    body = `<p class="muted">Tu es sur le plan gratuit. Une offre payante relève les plafonds (projets, prospects, mails, jobs IA).</p><div class="row-actions"><a class="btn primary" href="/tarifs">Passer à une offre payante</a></div>`;
+  }
+  return `<div class="offer" id="offre">${flash}${body}${test}</div>`;
+}
+
 export function usagePanel(u) {
   if (!u) return '';
   const rows = u.items.map((i) => `<li class="g"><div class="g-h"><span>${esc(i.label)}</span><span class="g-v">${i.used}${i.limit == null ? '' : ` / ${i.limit}`}</span></div>${i.limit == null ? '' : `<div class="bar usage${i.full ? ' full' : ''}" role="progressbar" aria-label="${esc(i.label)}" aria-valuemin="0" aria-valuemax="${i.limit}" aria-valuenow="${i.used}"><span class="w-${Math.round(i.pct / 5) * 5}"></span></div>`}</li>`).join('');
@@ -154,6 +180,7 @@ export function usagePanel(u) {
   return `<section class="panel usage-card" aria-labelledby="h-usage">
   <div class="panel-h"><h2 id="h-usage">Usage du mois</h2><span class="badge">plan ${esc(u.planLabel)}</span></div>
   <ul class="usage-list">${rows}</ul>
+  ${offerBlock(u.billing ? { ...u.billing, flash: u.flash } : null)}
   <div data-claude-card hidden><ul class="usage-list usage-claude" data-usage-claude aria-label="Usage de ${esc(aiName())}"></ul></div>
   ${full.length ? `<p class="cap" role="alert">${ic('alert')}<span>Plafond atteint : ${full.map((i) => esc(i.label.toLowerCase())).join(', ')}. Rien n'est perdu. <a href="/tarifs">Voir les tarifs</a></span></p>` : u.plan === 'free' ? '<p class="foot-n">Les plafonds se renouvellent le 1er du mois (heure de Paris). <a href="/tarifs">Voir les tarifs</a></p>' : ''}
 </section>`;

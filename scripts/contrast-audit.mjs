@@ -12,7 +12,7 @@ import { now } from '../src/db.js';
 import { saveDraft } from '../src/contentdrafts.js';
 
 const MIN = Number(process.argv[2]) || 3;
-const s = await startApp({ cfg: { systemSmtp: { host: 'x', port: 587, user: 'u', pass: 'p', fromEmail: 'a@b.fr' }, linkedin: null } });
+const s = await startApp({ cfg: { systemSmtp: { host: 'x', port: 587, user: 'u', pass: 'p', fromEmail: 'a@b.fr' }, linkedin: null, stripe: { secretKey: 'sk_test_51AuditAuditAuditAudit', webhookSecret: 'whsec_AuditAuditAuditAudit12', live: false } } }); // paiements ouverts : boutons d'achat et bloc « Ton offre » mesurés
 const u = await s.newUser({ email: 'tony@exemple.fr', admin: true });
 const pid = await addProject(s.db, u.id, { name: 'Agenda Kiné', gitUrl: 'https://github.com/atelier/agenda-kine.git' });
 await s.db.prepare('UPDATE projects SET profile_json = ?, target_json = ?, target_validated = 1 WHERE id = ?').run(JSON.stringify({ resume: 'Un agenda pour les kinés.', proposition_valeur: 'Gagnez du temps.' }), JSON.stringify({ description: 'Cabinets de kinésithérapie', zone: 'Bretagne', taille: '2 à 10', decideur: 'Titulaire', secteurs: ['Santé'], requetes: ['cabinet kiné'] }), pid);
