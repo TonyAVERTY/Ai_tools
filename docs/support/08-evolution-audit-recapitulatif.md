@@ -18,5 +18,5 @@ Chiffres du produit et de la prospection, avec courbes.
 - **Utilisateurs**, **Clients payants**, **Revenu total** : lus dans la base de données du projet, d'après les tables que tu as choisies (voir « Configuration du projet → Base de données (récapitulatif) » : **Se connecter et analyser**, puis tes listes de tables, sans aucune requête à écrire). Mis en cache 10 minutes ; bouton **Rafraîchir**.
 - **Prospection** : **Trouvés**, **Contactés**, **Réponses**, **Convertis**.
 - **Coût IA du projet** (équivalent API), uniquement avec une clé API : avec un abonnement Claude, rien n'est facturé en plus et aucun montant n'est affiché.
-- **Courbes** sur 30 ou 90 jours : utilisateurs, clients payants et revenu (une photo quotidienne est prise automatiquement, plus une à chaque ouverture), mails envoyés et réponses par semaine. Les graphiques ont des infobulles au survol et une vue tableau (« Voir les données »).
+- **Courbes** sur 30 ou 90 jours : utilisateurs, clients payants et revenu (une photo quotidienne est prise automatiquement, plus une à chaque ouverture), mails envoyés, réponses et relances par semaine (trois barres par semaine ; la légende « Mails envoyés / Réponses / Relances » les distingue). Les graphiques ont des infobulles au survol et une vue tableau (« Voir les données »).
 - Les données business commencent le jour où la base est configurée.

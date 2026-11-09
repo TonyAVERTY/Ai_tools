@@ -7,7 +7,7 @@ html { -webkit-text-size-adjust: 100%; }
 body {
   margin: 0; background: var(--bg); color: var(--text); font-family: var(--font); font-size: 1rem; line-height: 1.55;
   -webkit-font-smoothing: antialiased; min-height: 100vh;
-  --series-1: var(--link); --series-2: var(--warn); /* paire de courbes : bleu et ambre, lisibles dans les deux thèmes */
+  --series-1: var(--link); --series-2: var(--warn); --series-3: var(--info); /* paire de courbes : bleu et ambre, lisibles dans les deux thèmes */
 }
 h1, h2, h3, h4, h5, p { margin: 0; }
 .page h1 > .ic, .card h1 > .ic { display: none; } /* un titre de page n'a pas besoin d'icône : le mot suffit */
@@ -377,12 +377,14 @@ figure.chart figcaption { font-size: .9375rem; font-weight: 600; margin-bottom: 
 .chart.hovering .cross, .chart.hovering .dot.hover { visibility: visible; }
 .chart .b1 { fill: var(--series-1); }
 .chart .b2 { fill: var(--series-2); }
+.chart .b3 { fill: var(--series-3); }
 .chart .hit { fill: transparent; cursor: crosshair; }
 .chart .tip { position: absolute; transform: translate(-50%, -100%); pointer-events: none; background: var(--card); color: var(--text); border: 1px solid var(--line-strong); border-radius: var(--radius-sm); padding: 4px 8px; font-size: 12px; white-space: nowrap; box-shadow: var(--shadow-2); z-index: 2; }
 .legend { margin: 0 0 4px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; color: var(--muted); }
 .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-left: 8px; }
 .sw.s1 { background: var(--series-1); margin-left: 0; }
 .sw.s2 { background: var(--series-2); }
+.sw.s3 { background: var(--series-3); }
 
 /* ---------- Évolution ---------- */
 .evo-done { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
