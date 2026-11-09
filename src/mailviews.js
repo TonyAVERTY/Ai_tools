@@ -12,7 +12,7 @@ const KIND = { initial: 'Premier mail', followup: 'Relance' };
 const when = (ts) => new Date(ts * 1000).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' });
 
 /** Proposition d'ajout à l'agenda (ou événement déjà ajouté) pour une réponse. */
-function suggestBlock(r) {
+export function suggestBlock(r) {
   if (r.event) {
     return `<div class="suggest done" data-suggest="${r.id}"><p class="why"><b>${ic('check')} Ajouté à ton calendrier :</b> ${esc(r.event.title)}</p>
       <div class="sg-row"><a class="btn small" href="${esc(r.event.links.google)}" target="_blank" rel="noopener noreferrer">Google Agenda</a><a class="btn small" href="${esc(r.event.links.ics)}">Fichier .ics</a></div></div>`;

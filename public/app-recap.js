@@ -118,12 +118,22 @@
       return figure('line', title, { unit, xs: pts.map((d) => d.day), ys: pts.map((d) => d[key]) },
         pts.length < 2 ? 'Pas encore assez de données : une photo est prise chaque jour (et à chaque ouverture du récap).' : '');
     };
+    // « Revenu du produit » : le revenu lu dans la base du produit, situé entre zéro et le plus haut atteint sur la période (la barre est pleine au sommet)
+    const revs = h.daily.filter((d) => d.revenue != null);
+    const peak = Math.max(0, ...revs.map((d) => d.revenue));
+    const nowRev = revs.length ? revs[revs.length - 1].revenue : null;
+    const pct = peak > 0 ? Math.max(0, Math.min(100, Math.round((nowRev / peak) * 100))) : 0;
+    const revCard = nowRev == null ? '' : `<section class="chart rev-card" aria-labelledby="rev-h"><h3 id="rev-h">Revenu du produit</h3>
+        <p class="muted small">Lu dans ta base (lecture seule) depuis le ${shortDay(revs[0].day)}.</p>
+        <p class="rev-v"><strong>${esc(fmtVal(nowRev, '€'))}</strong> <span class="muted small">sur un plus haut de ${esc(fmtVal(peak, '€'))}</span></p>
+        <div class="bar" role="progressbar" aria-label="Revenu actuel par rapport au plus haut de la période" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><span class="w-${Math.floor(pct / 5) * 5}"></span></div>
+        <p class="small">${box.dataset.cost ? `Coût IA du projet : $${esc(box.dataset.cost)}` : 'Coût IA du projet : affiché seulement avec une clé API'}</p></section>`;
     box.innerHTML = `
       <div class="row chart-head"><h4>Évolution</h4>
         <div class="seg" role="group" aria-label="Période">${[30, 90].map((d) => `<button type="button" class="btn small" data-days="${d}" aria-pressed="${d === days}">${d} jours</button>`).join('')}</div>
       </div>
       <div class="charts">
-        ${kpi('users', 'Utilisateurs', '')}${kpi('clients', 'Clients payants', '')}${kpi('revenue', 'Revenu total', '€')}
+        ${revCard}${kpi('users', 'Utilisateurs', '')}${kpi('clients', 'Clients payants', '')}${kpi('revenue', 'Revenu total', '€')}
         ${figure('bars', 'Prospection par semaine', { weeks: h.weeks })}
       </div>
       <details class="small"><summary>Voir les données</summary>
@@ -172,7 +182,7 @@
         </div>
         <p class="muted small">${r.priced ? `Coût IA du projet (équivalent API) : $${r.aiCostUsd.toFixed(2)}${b?.cached ? ' · chiffres en cache (10 min)' : ''}` : (b?.cached ? 'Chiffres en cache (10 min)' : '')}
         <button class="btn small" data-recap-refresh>Rafraîchir</button></p>
-        <div data-charts></div>`;
+        <div data-charts${r.priced ? ` data-cost="${r.aiCostUsd.toFixed(2)}"` : ''}></div>`;
       loadHistory(proj);
     } catch (err) { loadFailed(box, err.message, () => loadRecap(proj, force)); }
   }

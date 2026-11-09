@@ -33,9 +33,8 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   const btn = (n) => f.getByRole('button', { name: n, exact: true });
   ok(await f.evaluate((e) => e.classList.contains('target-locked')) && await f.locator('[name=description]').evaluate((e) => e.readOnly), `${tag} validée : verrouillée, lecture seule`);
   ok(await btn('Modifier').isVisible() && !(await btn('Mettre à jour').isVisible()), `${tag} validée : « Modifier » visible, pas de « Mettre à jour »`);
-  await f.locator('[name=description]').click();
-  await p.keyboard.type('zzz');
-  ok((await f.locator('[name=description]').inputValue()) === 'TPE du bâtiment', `${tag} validée : rien ne se tape`);
+  // Cible validée : un résumé en une phrase, les champs sont masqués (maquette 04)
+  ok(!(await f.locator('[name=description]').isVisible()) && (await f.locator('.target-sum').innerText()) === 'TPE du bâtiment, 1-10, Bretagne, décideur : Gérant.', `${tag} validée : résumé en une phrase, champs masqués`);
   await btn('Modifier').click();
   ok(!(await f.locator('[name=secteurs]').evaluate((e) => e.readOnly)) && await btn('Mettre à jour').isVisible() && await btn('Annuler').isVisible() && !(await btn('Modifier').isVisible()), `${tag} Modifier : champs modifiables, « Mettre à jour » et « Annuler »`);
   await f.locator('[name=description]').fill('Autre');

@@ -34,7 +34,7 @@ import { registerBillingRoutes } from './billingroutes.js';
 import { registerClientsRoutes } from './clientsroutes.js';
 import { clientsOverview } from './clientsdata.js';
 import { registerChatRoutes } from './chat.js';
-import { registerEventRoutes } from './events.js';
+import { registerEventRoutes, suggestionFor } from './events.js';
 import { feedToken, feedUrl } from './services/ical.js';
 import { developerMode } from './apitokens.js';
 import { registerLinkedinRoutes } from './linkedinroutes.js';
@@ -228,9 +228,9 @@ export function registerRoutes(router, app) {
     const full = await getProject(app, params.id, { userId: session.userId });
     const detail = await prospectDetail(db, Number(params.cid));
     if (!detail || Number(detail.prospect.project_id) !== Number(full.id)) throw new HttpError(404, 'Prospect introuvable');
-    const reply = await db.prepare('SELECT body, subject, intent, received_at FROM replies WHERE prospect_id = ? ORDER BY received_at DESC, id DESC LIMIT 1').get(detail.prospect.id);
+    const reply = await db.prepare('SELECT id, project_id, body, subject, intent, received_at, from_email FROM replies WHERE prospect_id = ? ORDER BY received_at DESC, id DESC LIMIT 1').get(detail.prospect.id);
     const job = await db.prepare("SELECT status FROM jobs WHERE project_id = ? AND type = 'hook' AND params_json = ? ORDER BY id DESC LIMIT 1").get(full.id, JSON.stringify({ prospectId: detail.prospect.id }));
-    html(res, contactPage({ email: session.email, project: full, detail, reply: reply ? { ...reply, received_at: Number(reply.received_at) } : null, hookBusy: !!job && ['queued', 'running'].includes(job.status) }));
+    html(res, contactPage({ email: session.email, project: full, detail, reply: reply ? { ...reply, received_at: Number(reply.received_at), ...(await suggestionFor(db, session.userId, { id: reply.id, subject: reply.subject, text: reply.body, intent: reply.intent, company: detail.prospect.company, from: reply.from_email, receivedAt: Number(reply.received_at) })) } : null, hookBusy: !!job && ['queued', 'running'].includes(job.status) }));
   });
 
   router.get('/p/:id', projectTab);

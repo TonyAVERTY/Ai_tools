@@ -139,6 +139,7 @@ test('fiche contact : dernière réponse, échanges, prochaine action, accroche 
   assert.match(h, /« Bonjour, ça nous intéresse\. Pouvez-vous m&#39;appeler jeudi \? »/);
   assert.match(h, /<b>Mail envoyé<\/b> · Objet A « Un agenda partagé »/);
   assert.match(h, /<b>Prospect trouvé<\/b> · source : legall-kine\.fr\/contact/);
+  assert.match(h, /data-ev-add="\d+">[^]*?Ajouter à mon calendrier/, 'la date évoquée (jeudi) est proposée pour l\'agenda');
   assert.match(h, /<mark>Votre cabinet accueille des remplaçants\.<\/mark>/);
   assert.match(h, /data-contact-form="next"/);
   assert.match(h, /data-contact-client/, 'un prospect peut passer en client');
