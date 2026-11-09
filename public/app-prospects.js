@@ -507,14 +507,48 @@
         $('[data-pager]', d).innerHTML = '';
         return;
       }
+      // 3 fiches par colonne au départ ; « Voir + » en montre 3 de plus (en allant chercher la suite sur le serveur quand elles ne sont pas encore chargées). La colonne défile.
+      // Les compteurs survivent à un rechargement du tableau (changement de statut) tant que les filtres ne changent pas.
+      const key = JSON.stringify(f);
+      if (box._kkey !== key) { box._kkey = key; box._kshown = new Map(); }
+      box._kctx = { id: proj.dataset.id, f, key, card };
+      box._kcols = new Map(r.columns.map((c) => [c.status, c]));
       box.innerHTML = `<div class="kanban">${r.columns.map((c) => `<section class="kcol${c.total ? '' : ' empty'}" data-col="${c.status}" aria-label="${esc(c.label)}">
         <h4>${esc(c.label)} <span class="n">${c.total}</span></h4>
-        <div class="kcards" data-drop="${c.status}">${c.rows.map(card).join('') || '<p class="muted small">Vide</p>'}
-          ${c.total > c.rows.length ? `<p class="muted small">+ ${c.total - c.rows.length} autre(s) : affine avec les filtres ou passe en liste.</p>` : ''}</div>
+        <div class="kcards" data-drop="${c.status}">${kcards(box, c)}</div>
       </section>`).join('')}</div>`;
       $('[data-pager]', d).innerHTML = '';
     } catch (err) { box.innerHTML = `<p class="error small">${esc(err.message)}</p>`; }
   }
+  const K_STEP = 3;
+  // Le contenu d'une colonne : les fiches visibles, puis « Voir + » s'il en reste
+  function kcards(box, c) {
+    const shown = Math.min(box._kshown.get(c.status) || K_STEP, c.total);
+    const rest = c.total - shown;
+    return `${c.rows.slice(0, shown).map(box._kctx.card).join('') || '<p class="muted small">Vide</p>'}${rest > 0
+      ? `<button type="button" class="btn small kmore" data-kmore="${c.status}">Voir + <span class="muted">(${rest} autre${rest > 1 ? 's' : ''})</span></button>` : ''}`;
+  }
+  listen(document, 'click', async (e) => {
+    const b = e.target.closest?.('[data-kmore]');
+    const box = b?.closest('.kanban')?.parentElement;
+    if (!b || !box?._kcols) return;
+    const c = box._kcols.get(b.dataset.kmore);
+    if (!c || b.disabled) return;
+    const want = (box._kshown.get(c.status) || K_STEP) + K_STEP;
+    b.disabled = true;
+    try {
+      // Les fiches déjà chargées ne suffisent pas : la suite de cette colonne vient du serveur
+      if (want > c.rows.length && c.total > c.rows.length) {
+        const q = new URLSearchParams({ ...box._kctx.f, col: c.status, offset: String(c.rows.length) });
+        const more = (await api(`/api/projects/${box._kctx.id}/kanban?${q}`)).columns[0];
+        if (box._kctx.key !== box._kkey) return; // les filtres ont changé entre-temps
+        if (more?.rows.length) c.rows.push(...more.rows);
+      }
+      box._kshown.set(c.status, want);
+      const zone = $(`.kcards[data-drop="${c.status}"]`, box);
+      if (zone) zone.innerHTML = kcards(box, c);
+    } catch (err) { b.disabled = false; toast(err.message, 'error'); }
+  });
   const moveProspect = async (d, id, status) => {
     if (status === 'refused' && !(await confirmBox('Marquer ce prospect en refus ?\nSon adresse est ajoutée à la liste d\'opposition.', { confirm: 'Marquer en refus' }))) return;
     try { await api(`/api/prospects/${id}/status`, { status }); toast('Statut mis à jour'); } catch (err) { toast(err.message, 'error'); }
