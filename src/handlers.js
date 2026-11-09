@@ -9,7 +9,7 @@ import { tidyTemplateText, acceptReview, fillBody, fillSubject, styleProblems } 
 import { checkSense, acceptSenseFix, SenseUnavailable, SENSE_BATCH } from './services/mailsense.js';
 import { addUsage, jobContext, liveJobUsage } from './services/jobs.js';
 import { syncRepo } from './services/git.js';
-import { normalizeModel, defaultModelOf, tierEquivalent } from './services/models.js';
+import { normalizeModel, defaultModelOf, tierEquivalent, modelFamily } from './services/models.js';
 import { analyzePrompt, prospectPrompt, templatePrompt, reviewMailPrompt, fixStylePrompt, followupTemplatePrompt, evolutionPrompt, linkedinPostPrompt, instagramPrompt, instagramResearchPrompt, newsletterPrompt, hookPrompt, auditPrompt, promoPrompt, rolePrompt, parseCustomPrompts, LEVELS } from './services/prompts.js';
 import { VOICE_PROVIDERS, parseVoiceParams, extractVoiceScript, prepareVoice, cleanVoice, mixVoice, synthesize, langName } from './services/voiceover.js';
 import { PROMO, FORMATS, SCENE_REFUSED, SceneError, parsePromoParams, extractScene, promoSupported, renderPromo } from './services/promovideo.js';
@@ -754,7 +754,10 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
       await ctx.progress({ message: 'Mise à jour du repo…', pct: 3 });
       const dir = repoDir(cfg, userId, project.id);
       await sync(userId, project.gitUrl, dir);
-      const model = await writeModel(userId, await modelOf(userId, 'analyze_model'));
+      // Dessiner une image de designer demande au moins un modèle de milieu de gamme : un petit modèle (Haiku) produit des mises en page qui débordent et sans finition
+      const provider = await userProvider(db, userId);
+      const chosen = await writeModel(userId, await modelOf(userId, 'analyze_model'));
+      const model = provider === 'claude' && modelFamily(chosen) === 'haiku' ? tierEquivalent('sonnet', provider) : chosen;
       const previous = await recentBodies(db, project.id, 'instagram');
       const ATTEMPTS = 3;
       const field = (text, tag) => (String(text ?? '').match(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`, 'i')) || [])[1]?.trim() ?? '';
