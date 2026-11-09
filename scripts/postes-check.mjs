@@ -30,8 +30,9 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   await p.goto(`${s.base}/p/${pid}/outils`); // les postes et leurs tâches sont dans l'onglet Outils IA (plus de filtre par poste : décision F2 de la refonte)
   await p.waitForSelector('html[data-nav="ready"]');
   ok((await p.locator('[data-role-select]').count()) === 0, `${tag} plus de filtre par poste`);
-  ok(await p.locator('details[data-acc="postes"]').first().isVisible() && await p.locator('details[data-acc="audit"]').first().isVisible(), `${tag} Évolution, Audit et Postes sont dans le même onglet`);
-  await p.evaluate(() => document.querySelectorAll('details.role').forEach((d) => { d.open = true; }));
+  ok(await p.locator('#acc-evolution').isVisible() && await p.locator('#acc-audit').isVisible(), `${tag} « Évolution et audit » est affiché d'abord`);
+  await p.locator('[data-tool="support"]').click(); // le menu des postes choisit les tâches affichées
+  ok(!(await p.locator('#acc-evolution').isVisible()) && await p.locator('details.role[data-role="support"]').isVisible() && !(await p.locator('details.role[data-role="finance"]').isVisible()), `${tag} un poste choisi : seules ses tâches s'affichent`);
 
   // Lancer une tâche et lire le livrable
   const task = p.locator('li.task[data-task="faq"]');

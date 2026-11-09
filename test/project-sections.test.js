@@ -46,14 +46,14 @@ test('projet analysé, cible validée : Prospection montre cible, recherche et p
   assert.doesNotMatch(page, /Cible <span class="badge warn">à valider/);
 });
 
-test('Réglages du projet : dépôt, site et analyse, puis la configuration (SMTP, IMAP, base)', async () => {
+test('Réglages du projet : SMTP, IMAP, dépôt et site, base de données, partage, zone de danger, dans l\'ordre du menu', async () => {
   const tab = await at('cible-validee');
   const page = await tab('reglages');
-  const from = page.indexOf('id="acc-header"');
-  const config = page.indexOf('id="acc-config"');
-  assert.ok(from > 0 && config > from, 'En-tête (dépôt et site) avant Configuration');
-  const body = page.slice(from, config);
-  for (const piece of ['Dépôt Git', 'Site du produit', 'Enregistrer le site', 'Fiche projet', 'data-job="analyze"']) assert.ok(body.includes(piece), `« ${piece} » dans En-tête`);
+  const order = ['id="set-smtp"', 'id="set-imap"', 'id="acc-header"', 'id="set-db"', 'id="set-share"', 'id="set-danger"'].map((k) => page.indexOf(k));
+  assert.ok(order.every((x) => x > 0), `toutes les rubriques sont là (${order.join(', ')})`);
+  assert.deepEqual([...order].sort((a, b) => a - b), order, 'ordre du menu : SMTP, IMAP, dépôt et site, base de données, partage, zone de danger');
+  const body = page.slice(page.indexOf('id="acc-header"'), page.indexOf('id="set-db"'));
+  for (const piece of ['Dépôt Git', 'Site du produit', 'Enregistrer le site', 'Fiche projet', 'data-job="analyze"']) assert.ok(body.includes(piece), `« ${piece} » dans « Dépôt et site »`);
 });
 
 test('chaque onglet ne montre que ses sections', async () => {

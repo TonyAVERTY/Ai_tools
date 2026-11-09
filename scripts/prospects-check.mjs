@@ -40,17 +40,22 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   await p.waitForSelector('[data-prospects] >> text=Boulangerie Neuve');
   if (process.env.DBG) { console.log(await p.evaluate(() => { const b = document.querySelector('[data-open-prospect]'); const r = b.getBoundingClientRect(); const chain = []; for (let e = b; e; e = e.parentElement) { const cs = getComputedStyle(e); if (cs.display === 'none' || cs.visibility === 'hidden' || e.tagName === 'DETAILS') chain.push(e.tagName + '.' + e.className + ' open=' + e.open + ' disp=' + cs.display); } return JSON.stringify({ r, chain }); })); }
   ok(true, `${tag} le prospect ajouté apparaît dans la liste`);
-  // fiche : modification
+  // fiche contact : modification (le nom de l'entreprise de la liste mène à la page du contact)
   await p.locator('[data-prospects] >> text=Boulangerie Neuve').first().click();
-  await p.waitForSelector('dialog[open] form[data-dlg="edit"]');
-  await p.fill('dialog[open] form[data-dlg="edit"] [name=city]', 'Rennes');
-  await p.locator('dialog[open] form[data-dlg="edit"] button.primary, dialog[open] form[data-dlg="edit"] button:not([type=button])').first().click();
-  await p.waitForFunction(() => document.querySelector('[data-prospects]')?.textContent.includes('Rennes'));
-  ok(true, `${tag} la modification (ville) est enregistrée et visible dans la liste`);
-  ok(!(await p.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)), `${tag} pas de défilement horizontal avec la fiche ouverte`);
+  await p.waitForSelector('[data-contact]');
+  ok(/^Boulangerie Neuve$/.test((await p.locator('[data-contact] h1').innerText()).trim()), `${tag} la fiche contact s'ouvre sur ce prospect`);
+  await p.locator('[data-contact-edit-toggle]').click();
+  await p.fill('[data-contact-form="edit"] [name=city]', 'Rennes');
+  await p.locator('[data-contact-form="edit"] button.primary').click();
+  await p.waitForFunction(() => document.querySelector('.pj-info')?.textContent.includes('Rennes'));
+  ok(true, `${tag} la modification (ville) est enregistrée et visible dans la fiche`);
+  ok(!(await p.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)), `${tag} pas de défilement horizontal sur la fiche contact`);
   // suppression
-  await p.locator('dialog[open] [data-del-prospect]').click();
+  await p.locator('[data-contact-delete]').click();
   await p.locator('dialog.confirm [data-yes]').click();
+  await p.waitForURL((url) => url.pathname === `/p/${pid}/prospection`);
+  await p.waitForSelector('html[data-nav="ready"]');
+  await p.evaluate(() => { const d = document.querySelector('details[data-acc="prospects"]'); if (d) d.open = true; });
   await p.waitForFunction(() => !document.querySelector('[data-prospects]')?.textContent.includes('Boulangerie Neuve'));
   ok(true, `${tag} le prospect supprimé disparaît de la liste`);
   // aperçu (le modèle de mail est dans l'onglet Envoi)
@@ -234,9 +239,8 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   for (const k of ['prospect', 'prospects']) await p.evaluate((x) => { const d = document.querySelector(`details[data-acc="${x}"]`); if (d) d.open = true; }, k);
   await p.waitForSelector(`[data-prospects] >> text=${kanbanName}`, { timeout: 10000 });
   await p.locator(`[data-prospects] >> text=${kanbanName}`).first().click();
-  await p.waitForSelector('dialog[open] form[data-dlg="edit"]', { timeout: 10000 });
-  ok(true, `${tag} après navigation : la liste se recharge et la fiche d'un prospect s'ouvre`);
-  await p.keyboard.press('Escape');
+  await p.waitForSelector('[data-contact]', { timeout: 10000 });
+  ok(true, `${tag} après navigation : la liste se recharge et la fiche contact d'un prospect s'ouvre`);
   ok(errs.length === 0, `${tag} aucune erreur console${errs.length ? ` : ${errs.join(' | ')}` : ''}`);
   await ctx.close();
 }
