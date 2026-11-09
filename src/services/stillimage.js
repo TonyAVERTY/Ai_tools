@@ -81,14 +81,14 @@ export async function renderStill({ cfg, html, width, height, signal }) {
     }
     await cdp.send('Runtime.evaluate', { expression: 'document.fonts.ready.then(() => 1)', awaitPromise: true, returnByValue: true }, STILL.timeoutMs);
     if (navigated) throw new SceneError("L'image a cherché à quitter la page : rendu refusé.");
-    // Du texte lisible : une image sans aucun mot n'est pas un post
+    // Du texte lisible : une image sans aucun mot n'est pas un post.
+    // Un élément qui dépasse le cadre n'est PAS un défaut : un produit rogné par le bord est un choix de composition courant, et la capture est de toute façon
+    // découpée à la taille du format. Un texte coupé par le bord, lui, est jugé par le directeur artistique en regardant l'image.
     const m = await cdp.send('Runtime.evaluate', {
-      expression: `(() => { const b = document.body; return { text: (b.innerText || '').replace(/\\s+/g, ' ').trim().length, w: Math.max(document.documentElement.scrollWidth, b.scrollWidth), h: Math.max(document.documentElement.scrollHeight, b.scrollHeight) }; })()`,
+      expression: `(() => ({ text: (document.body.innerText || '').replace(/\\s+/g, ' ').trim().length }))()`,
       returnByValue: true,
     });
-    const { text, w, h } = m.result?.value || {};
-    if (!(text >= 8)) throw new SceneError("L'image ne contient presque aucun texte : ajoute un titre lisible (au moins quelques mots).");
-    if (w > width + 2 || h > height + 2) throw new SceneError(`Le contenu dépasse l'image (${w} × ${h} pixels pour ${width} × ${height}) : fixe la taille du body à ${width} × ${height} pixels avec overflow: hidden et fais tenir tout le texte dedans.`);
+    if (!((m.result?.value?.text ?? 0) >= 8)) throw new SceneError("L'image ne contient presque aucun texte : ajoute un titre lisible (au moins quelques mots).");
     const s = await cdp.send('Page.captureScreenshot', { format: 'png', fromSurface: true, clip: { x: 0, y: 0, width, height, scale: 1 } }, STILL.timeoutMs);
     const png = Buffer.from(s.data, 'base64');
     if (png.length < STILL.minPng) throw new SceneError("L'image est vide ou unie : dessine un vrai visuel (fond, titre, éléments du produit).");
