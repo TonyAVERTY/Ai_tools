@@ -664,7 +664,15 @@
   // Barre du haut hors de l'écran (page défilée) : le bouton « Activité » reste épinglé en haut à droite, avec son menu et la destination de l'agent
   const topBar = $('.top');
   if (jobsBox && topBar && 'IntersectionObserver' in window) {
-    new IntersectionObserver(([en]) => document.body.classList.toggle('hdr-off', !en.isIntersecting)).observe(topBar);
+    new IntersectionObserver(([en]) => {
+      // Le bouton quitte la barre en s'épinglant : on garde sa place (mesurée avant) pour que la barre ne rétrécisse pas et que le contenu ne saute pas
+      if (!en.isIntersecting && !document.body.classList.contains('hdr-off')) {
+        const r = jobsBox.getBoundingClientRect();
+        document.body.style.setProperty('--jobs-w', `${Math.round(r.width)}px`);
+        document.body.style.setProperty('--jobs-h', `${Math.round(r.height)}px`);
+      }
+      document.body.classList.toggle('hdr-off', !en.isIntersecting);
+    }).observe(topBar);
   }
   listen(document, 'click', (e) => {
     if (jobsOpen() && !e.target.closest('#jobs')) toggleJobs(false);
