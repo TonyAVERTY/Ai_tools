@@ -49,3 +49,35 @@ test('barre du haut : Aujourd\'hui, Projets, Mails, Agenda, Compta ; Facturation
   const pop = h.match(/<div class="user-pop">[^]*?<\/div>/)[0];
   for (const [href] of MORE_PAGES) assert.match(pop, new RegExp(`href="${href}"`), `${href} est dans le menu du compte`);
 });
+
+test('recherche : projets, prospects et mails du compte seulement, 2 lettres minimum, jokers LIKE neutralisés', async () => {
+  const u = await s.newUser({ email: 'cherche@x.fr' });
+  const v = await s.newUser({ email: 'ailleurs@x.fr' });
+  const a = await addProject(s.db, u.id, { name: 'Agenda Kiné', gitUrl: 'https://github.com/u/kine.git' });
+  const other = await addProject(s.db, v.id, { name: 'Kiné secret', gitUrl: 'https://github.com/v/ksecret.git' });
+  const now = Math.floor(Date.now() / 1000);
+  await s.db.prepare('INSERT INTO prospects(project_id, company, email, status, created_at) VALUES(?, ?, ?, ?, ?)').run(a, 'Cabinet Le Gall', 'a@legall.fr', 'client', now);
+  await s.db.prepare('INSERT INTO prospects(project_id, company, email, status, created_at) VALUES(?, ?, ?, ?, ?)').run(other, 'Cabinet Gall Secret', 'x@secret.fr', 'new', now);
+  await s.db.prepare('INSERT INTO replies(project_id, prospect_id, uid, from_email, subject, body, intent, received_at) VALUES(?, ?, ?, ?, ?, ?, ?, ?)').run(a, null, 1, 'b@armor.fr', 'Devis Doctolib', 'x', 'question', now);
+  const search = async (q) => (await u.get(`/api/search?q=${encodeURIComponent(q)}`, { headers: { accept: 'application/json' } })).json();
+  const names = (d) => d.groups.flatMap((g) => g.items.map((i) => i.title));
+  assert.deepEqual((await search('g')).groups, [], 'une lettre ne cherche rien');
+  const kine = await search('kiné');
+  assert.deepEqual(names(kine), ['Agenda Kiné']);
+  assert.equal(kine.groups[0].items[0].href, `/projets/${a}`);
+  const gall = await search('gall');
+  assert.deepEqual(names(gall), ['Cabinet Le Gall'], 'le prospect d\'un autre compte reste invisible');
+  assert.match(gall.groups[0].items[0].sub, /^Client · a@legall\.fr/);
+  assert.deepEqual(names(await search('doctolib')), ['Devis Doctolib']);
+  assert.deepEqual((await search('%%')).groups, [], '« % » n\'est pas un joker');
+  assert.deepEqual((await search('a_')).groups, [], '« _ » n\'est pas un joker');
+});
+
+test('la barre du haut porte « Rechercher » et la fenêtre de recherche ; « Activité » est toujours là', async () => {
+  const u = await s.newUser({ email: 'barre2@x.fr' });
+  const h = await text(u, '/');
+  assert.match(h, /data-search-open[^]*?Rechercher/);
+  assert.match(h, /<dialog class="search-dialog" id="search"/);
+  assert.match(h, /<div class="jobs" id="jobs">/, 'plus de hidden au repos');
+  assert.match(h, /Aucune tâche en cours\./);
+});

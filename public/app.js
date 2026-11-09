@@ -622,8 +622,17 @@
     if (jobsSeen) for (const id of ids) if (!jobsSeen.has(id)) jobsFresh.set(id, Date.now() + 3500);
     const fresh = new Set(ids.filter((id) => (jobsFresh.get(id) ?? 0) > Date.now()));
     jobsSeen = new Set([...(jobsSeen || []), ...ids]);
-    jobsBox.hidden = !list.length;
-    if (!list.length) { if (jobsOpen()) toggleJobs(false); return; }
+    jobsBox.classList.toggle('is-busy', !!s.queue);
+    if (!list.length) {
+      // Toujours là, même au repos : le point s'éteint et la liste dit qu'il n'y a rien
+      $('.spin-inline', jobsBtn).hidden = true;
+      $('[data-jobs-count]', jobsBtn).textContent = '';
+      $('[data-jobs-sub]', jobsPop).textContent = '';
+      const empty = '<p class="jobs-none">Aucune tâche en cours.</p>';
+      const box0 = $('[data-jobs-list]', jobsPop);
+      if (box0._html !== empty) { box0._html = empty; box0.innerHTML = empty; }
+      return;
+    }
     $('.spin-inline', jobsBtn).hidden = !s.queue;
     const failed = list.filter((j) => j.status === 'error').length;
     $('[data-jobs-count]', jobsBtn).textContent = s.queue
@@ -786,7 +795,7 @@
   // quelques secondes sur la liste des tâches en cours et à venir (comme la bulle de téléchargement de Chrome).
   let activityTimer;
   function showActivity() {
-    if (!jobsBox || jobsBox.hidden) return;
+    if (!jobsBox) return;
     toggleJobs(true);
     clearTimeout(activityTimer);
     activityTimer = setTimeout(() => { if (jobsOpen() && !jobsPop.matches(':hover') && !jobsPop.contains(document.activeElement)) toggleJobs(false); }, 7500);
