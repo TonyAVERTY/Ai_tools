@@ -1212,5 +1212,57 @@ export const MIGRATIONS = [
       ) ${T}`,
     ],
   },
+  {
+    // Offres payantes (Stripe) : l'abonnement d'un compte (un seul), et les événements déjà traités (un événement de Stripe peut arriver plusieurs fois).
+    // `entitled` : le compte a-t-il actuellement les droits de l'offre ? (payée, ou en délai de grâce après un paiement refusé). Aucune donnée de carte n'est gardée.
+    name: 'subscriptions',
+    sqlite: [
+      `CREATE TABLE subscriptions (
+        user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+        customer_id TEXT NOT NULL,
+        subscription_id TEXT,
+        plan TEXT,
+        period TEXT,
+        status TEXT NOT NULL,
+        entitled INTEGER NOT NULL DEFAULT 0,
+        current_period_end INTEGER,
+        cancel_at_period_end INTEGER NOT NULL DEFAULT 0,
+        grace_until INTEGER,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )`,
+      'CREATE INDEX subscriptions_customer ON subscriptions(customer_id)',
+      'CREATE INDEX subscriptions_sub ON subscriptions(subscription_id)',
+      `CREATE TABLE stripe_events (
+        id TEXT PRIMARY KEY,
+        type TEXT NOT NULL,
+        at INTEGER NOT NULL
+      )`,
+    ],
+    mysql: [
+      `CREATE TABLE IF NOT EXISTS subscriptions (
+        user_id BIGINT NOT NULL PRIMARY KEY,
+        customer_id VARCHAR(64) NOT NULL,
+        subscription_id VARCHAR(64) NULL,
+        plan VARCHAR(20) NULL,
+        period VARCHAR(10) NULL,
+        status VARCHAR(30) NOT NULL,
+        entitled TINYINT NOT NULL DEFAULT 0,
+        current_period_end BIGINT NULL,
+        cancel_at_period_end TINYINT NOT NULL DEFAULT 0,
+        grace_until BIGINT NULL,
+        created_at BIGINT NOT NULL,
+        updated_at BIGINT NOT NULL,
+        KEY subscriptions_customer (customer_id),
+        KEY subscriptions_sub (subscription_id),
+        CONSTRAINT subscriptions_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      ) ${T}`,
+      `CREATE TABLE IF NOT EXISTS stripe_events (
+        id VARCHAR(80) NOT NULL PRIMARY KEY,
+        type VARCHAR(80) NOT NULL,
+        at BIGINT NOT NULL
+      ) ${T}`,
+    ],
+  },
 ];
 

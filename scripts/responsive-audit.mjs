@@ -14,7 +14,7 @@ import { now } from '../src/db.js';
 const S = process.argv[2] || tmpdir();
 const WIDTHS = (process.argv[3] || '320,360,390,430,768,1280').split(',').map(Number);
 const SHOTS = process.argv[4] === 'shots';
-const s = await startApp({ cfg: { systemSmtp: { host: 'x', port: 587, user: 'u', pass: 'p', fromEmail: 'a@b.fr' }, linkedin: null } });
+const s = await startApp({ cfg: { systemSmtp: { host: 'x', port: 587, user: 'u', pass: 'p', fromEmail: 'a@b.fr' }, linkedin: null, stripe: { secretKey: 'sk_test_51AuditAuditAuditAudit', webhookSecret: 'whsec_AuditAuditAuditAudit12', live: false } } }); // paiements ouverts : boutons d'achat et bloc « Ton offre » mesurés
 const u = await s.newUser({ email: 'tony.averty.exemple@exemple-tres-long.fr', admin: true });
 const other = await s.newUser({ email: 'membre@exemple.fr' });
 const pid = await addProject(s.db, u.id, { name: 'Atelier Exemple avec un nom de projet vraiment très long', gitUrl: 'https://github.com/utilisateur/atelier-exemple-avec-un-depot-long.git' });
