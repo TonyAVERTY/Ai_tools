@@ -623,6 +623,7 @@
     const fresh = new Set(ids.filter((id) => (jobsFresh.get(id) ?? 0) > Date.now()));
     jobsSeen = new Set([...(jobsSeen || []), ...ids]);
     jobsBox.classList.toggle('is-busy', !!s.queue);
+    jobsBox.classList.toggle('has-jobs', list.length > 0);
     if (!list.length) {
       // Toujours là, même au repos : le point s'éteint et la liste dit qu'il n'y a rien
       $('.spin-inline', jobsBtn).hidden = true;
