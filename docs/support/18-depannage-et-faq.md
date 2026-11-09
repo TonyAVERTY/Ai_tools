@@ -265,3 +265,8 @@ L'IA n'a le droit de proposer que ce que la fiche projet dit exister, et l'**Ape
 ## « LinkedIn a refusé la connexion »
 Le message précise maintenant la cause : produits manquants dans l'application LinkedIn (« onglet Produits »), adresse de retour non déclarée (« onglet Auth → URL de redirection autorisées »), identifiants de l'application faux, ou compte sans droit sur la page. Suis le remède indiqué dans le message, puis recommence la connexion depuis le projet. Les détails sont dans « LinkedIn » (Problèmes fréquents).
 
+## L'image d'un post Instagram est vide, banale ou refusée
+- Message **« Chromium n'est pas installé sur ce serveur »** : l'image est rendue par Chromium sur le serveur ; l'administrateur doit l'installer (variable CHROMIUM_BIN). La newsletter n'en a pas besoin.
+- Message **« L'image écrite par Claude ne passe pas au rendu »** : trois essais d'image ont été refusés au contrôle (script, adresse externe, texte qui déborde, image vide). Réessaie avec un sujet plus précis.
+- Bannière **« À vérifier avant de publier »** : le directeur artistique (second contrôle) a relevé des défauts que les essais n'ont pas corrigés. Lis-les, puis **Régénérer un autre post**.
+- Couleurs ou polices qui ne ressemblent pas à ton produit : l'IA les lit dans le dépôt ; sans interface dans le dépôt elle reste sobre. Détails dans « Instagram et newsletter : posts, images et lettres d'information ».

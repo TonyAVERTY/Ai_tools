@@ -265,7 +265,7 @@
   const ACTIVE = ['queued', 'running'];
   const LABELS = {
     analyze: 'Analyse', prospect: 'Recherche', template: 'Modèle', send: 'Envoi', evolution: 'Évolutions',
-    followup_template: 'Modèle de relance', followup: 'Relances', linkedin_post: 'Post LinkedIn', promo_video: 'Vidéo de promotion', audit: 'Audit', hook: 'Accroche',
+    followup_template: 'Modèle de relance', followup: 'Relances', linkedin_post: 'Post LinkedIn', instagram_post: 'Post Instagram', newsletter: 'Newsletter', promo_video: 'Vidéo de promotion', audit: 'Audit', hook: 'Accroche',
     billing_quotes: 'Facturation : exemples de devis', billing_refine: 'Facturation : affinage', billing_docs: 'Facturation : documents',
   };
 
@@ -1013,7 +1013,7 @@
     }
     const st = state.get(id) || {};
     const jobs = s.jobs;
-    for (const type of ['analyze', 'prospect', 'template', 'send', 'evolution', 'audit', 'followup_template', 'followup', 'linkedin_post', 'promo_video']) renderJob($(`[data-job="${type}"]`, el), jobs[type], type);
+    for (const type of ['analyze', 'prospect', 'template', 'send', 'evolution', 'audit', 'followup_template', 'followup', 'linkedin_post', 'instagram_post', 'newsletter', 'promo_video']) renderJob($(`[data-job="${type}"]`, el), jobs[type], type);
     for (const box of $$('[data-job^="poste_"]', el)) renderJob(box, jobs[box.dataset.job], box.dataset.job);
     // « En-tête » est replié une fois le projet analysé : une analyse qui échoue y affiche son erreur, on l'ouvre (une fois par échec, pour ne pas rouvrir ce qu'on vient de fermer)
     const analyzeJob = jobs.analyze;
@@ -1032,6 +1032,13 @@
     const li = jobs.linkedin_post;
     if (li && ACTIVE.includes(li.status)) st.liRunning = true;
     else if (st.liRunning && li) { st.liRunning = false; window.AiTools.loadLinkedin?.(el); }
+
+    // Fin d'un post Instagram ou d'une newsletter → on recharge la zone pour afficher le brouillon
+    for (const [type, key] of [['instagram_post', 'igRunning'], ['newsletter', 'nlRunning']]) {
+      const j = jobs[type];
+      if (j && ACTIVE.includes(j.status)) st[key] = true;
+      else if (st[key] && j) { st[key] = false; window.AiTools.loadContent?.(el, type === 'instagram_post' ? 'instagram' : 'newsletter'); if (j.status === 'done') toast(type === 'instagram_post' ? 'Post Instagram prêt' : 'Newsletter prête'); }
+    }
 
     // Fin d'une vidéo de promotion → on recharge la liste
     const pv = jobs.promo_video;
