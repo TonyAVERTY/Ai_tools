@@ -1913,7 +1913,7 @@ a.pj-card:hover { border-color: var(--primary); }
 
 /* Barre du bas sur téléphone (maquettes) : les cinq onglets en bas de l'écran, icône au-dessus du mot */
 @media (max-width: 700px) {
-  .pills { position: fixed; left: 0; right: 0; bottom: 0; z-index: 25; order: 0; width: auto; gap: 0; margin: 0; padding: 0 0 env(safe-area-inset-bottom); overflow: visible; background: var(--nav-bg); border-top: 1px solid color-mix(in srgb, var(--nav-on) 22%, transparent); }
+  .pills { position: fixed; left: 0; right: 0; bottom: 0; z-index: 25; order: 0; width: auto; gap: 0; margin: 0; padding: 0 max(14px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)); overflow: visible; background: var(--nav-bg); border-top: 1px solid color-mix(in srgb, var(--nav-on) 22%, transparent); }
   .pill { flex: 1 1 0; min-width: 0; flex-direction: column; justify-content: center; gap: 2px; min-height: 60px; padding: 6px 2px; border-bottom: 0; border-top: 2px solid transparent; font-size: .75rem; }
   .pill:hover { border-bottom-color: transparent; }
   .top .pill, .top .pill:hover { border-bottom: 0; border-top: 3px solid transparent; color: var(--nav-on); }
@@ -1921,10 +1921,10 @@ a.pj-card:hover { border-color: var(--primary); }
   .pill .ic { display: inline-block; }
   .pill { position: relative; }
   .pill-n { position: absolute; top: 4px; left: 50%; margin: 0 0 0 8px; }
-  body.app { padding-bottom: calc(68px + env(safe-area-inset-bottom)); }
-  body.app.tour-active { padding-bottom: calc(68px + env(safe-area-inset-bottom) + var(--tour-pad, 0px)); }
-  .toasts { bottom: calc(76px + env(safe-area-inset-bottom)); }
-  .reply-pops { bottom: calc(72px + env(safe-area-inset-bottom)); max-height: calc(100vh - 100px); }
+  body.app { padding-bottom: calc(82px + env(safe-area-inset-bottom)); }
+  body.app.tour-active { padding-bottom: calc(82px + env(safe-area-inset-bottom) + var(--tour-pad, 0px)); }
+  .toasts { bottom: calc(90px + env(safe-area-inset-bottom)); }
+  .reply-pops { bottom: calc(86px + env(safe-area-inset-bottom)); max-height: calc(100vh - 110px); }
 }
 
 /* Mails : programmer un rappel depuis une réponse */
