@@ -50,7 +50,7 @@ test('page Projets : les chiffres réels sont sur la carte du projet ; un projet
 
 test('page Mails : la barre de chiffres filtre la liste, la cause d\'un échec est visible, les états vides guident', async () => {
   const u = await s.newUser();
-  const empty = await html(u, '/mails');
+  const empty = await html(u, '/mails?v=sent');
   assert.match(empty, /<nav class="mstats" aria-label="Filtrer par état">/);
   assert.match(empty, /Aucun mail envoyé pour l'instant\.<\/b>[^<]*<\/p><a class="btn small" href="\/">Ouvrir mes projets<\/a>/);
   assert.match(await html(u, '/mails?v=replies'), /Aucune réponse pour l'instant\.<\/b>[^]*?Régler la boîte de réception/);
@@ -61,16 +61,16 @@ test('page Mails : la barre de chiffres filtre la liste, la cause d\'un échec e
   const prospect = await s.db.prepare('SELECT id FROM prospects WHERE project_id = ?').get(pid);
   await s.db.prepare("INSERT INTO mail_log(project_id, prospect_id, email, sent_at, error, kind, subject) VALUES(?, ?, 'ok@exemple.fr', ?, NULL, 'initial', 'Bonjour')").run(pid, prospect.id, now() - 60);
   await s.db.prepare("INSERT INTO mail_log(project_id, prospect_id, email, sent_at, error, kind, subject) VALUES(?, NULL, 'ko@exemple.fr', ?, 'SMTP : connexion refusée', 'initial', 'Bonjour')").run(pid, now() - 30);
-  const page = await html(u, '/mails');
-  assert.match(page, /<a class="mstat on" href="\/mails"[^>]*><b>2<\/b><span>Tous<\/span>/);
-  assert.match(page, /<a class="mstat bad" href="\/mails\?filter=failed"><b>1<\/b><span>Non envoyé<\/span>/);
+  const page = await html(u, '/mails?v=sent');
+  assert.match(page, /<a class="mstat on" href="\/mails\?v=sent"[^>]*><b>2<\/b><span>Tous<\/span>/);
+  assert.match(page, /<a class="mstat bad" href="\/mails\?v=sent&amp;filter=failed"><b>1<\/b><span>Non envoyé<\/span>/);
   assert.match(page, /<b>Boulangerie Exemple<\/b><span class="td-s">ok@exemple\.fr<\/span>/);
   assert.match(page, /Non envoyé<\/span><span class="td-s">SMTP : connexion refusée<\/span>/);
-  const filtered = await html(u, '/mails?filter=failed');
+  const filtered = await html(u, '/mails?v=sent&filter=failed');
   assert.match(filtered, /ko@exemple\.fr/);
   assert.doesNotMatch(filtered, /ok@exemple\.fr/);
-  assert.match(await html(u, '/mails?filter=refused'), /Aucun mail dans cet état\.<\/p><a class="btn small" href="\/mails">Voir tous<\/a>/);
-  assert.doesNotMatch(await html(await s.newUser(), '/mails'), /ko@exemple\.fr|Boulangerie Exemple/, 'isolation');
+  assert.match(await html(u, '/mails?v=sent&filter=refused'), /Aucun mail dans cet état\.<\/p><a class="btn small" href="\/mails\?v=sent">Voir tous<\/a>/);
+  assert.doesNotMatch(await html(await s.newUser(), '/mails?v=sent'), /ko@exemple\.fr|Boulangerie Exemple/, 'isolation');
 });
 
 test('Calendrier : « À venir » liste ce qui est réellement prévu, aujourd\'hui est repéré, rien n\'est inventé', async () => {

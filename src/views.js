@@ -54,6 +54,7 @@ ${iconLinks()}
 <script src="${assetUrl('/static/app.js')}" defer></script>
 <script src="${assetUrl('/static/app-recap.js')}" defer></script>
 <script src="${assetUrl('/static/app-today.js')}" defer></script>
+<script src="${assetUrl('/static/app-contact.js')}" defer></script>
 <script src="${assetUrl('/static/app-search.js')}" defer></script>
 <script src="${assetUrl('/static/app-promo.js')}" defer></script>
 <script src="${assetUrl('/static/app-linkedin.js')}" defer></script>
@@ -236,31 +237,36 @@ export const pctBlock = (label) => `<div class="dl-pct" data-pct hidden><div cla
 export function accountPage({ user, error, link = null, consent = null, notice = null, usage = null, developer = false, ical = null, appUrl = '', quota = null, profileSet = false }) {
   return layout({
     title: 'Mon compte', email: user.email,
-    body: `<div class="narrow">
-<h1 class="h1">Mon compte</h1>
-<section class="card">
+    body: `<div class="pj-page acct">
+<div class="ph"><div class="t"><h1>Mon compte</h1><span class="muted small">${esc(user.email)} · connecté avec ${esc(PROVIDER_NAMES[user.provider] || '—')}</span></div></div>
+<div class="pj-tools"><nav class="tools-nav" aria-label="Mon compte">
+  <p class="tools-grp">Moi</p><a href="#mon-ia" aria-current="true">Mon IA</a><a href="#usage">Usage et offre</a><a href="#profil">Mon profil</a><a href="#agenda-ext">Agenda externe</a>
+  <p class="tools-grp">Réglages</p><a href="/settings#notif">Notifications</a><a href="/settings#git">Dépôts Git</a><a href="/settings#garde">Garde-fous</a><a href="/settings#garde">Liste d'opposition</a><a href="/settings#budget">Budget et modèles IA</a><a href="/settings#prompts">Prompts IA</a>
+  <p class="tools-grp">Équipe et avancé</p><a href="/team">Équipe</a><a href="/developer">Mode développeur</a><a href="/?tour=1">Visite guidée</a><a href="#danger">Zone de danger</a></nav>
+<div class="pj-flat tools-main">
+${notice ? banner(notice.ok ? 'ok' : 'err', notice.text) : ''}
+<div id="mon-ia">${linkSection(link, consent, quota)}</div>
+<div id="usage">${usagePanel(usage)}</div>
+<section class="card" id="profil">
+  <div class="card-h"><h2>Mon profil</h2><span class="badge ${profileSet ? 'ok' : ''}">${profileSet ? `${ic('check')}Renseigné` : 'Non renseigné'}</span><p>Ta fonction, ton niveau technique, le niveau de détail et le tutoiement que tu préfères : Claude s'en sert pour te répondre. Valable pour tous tes projets, rien n'est partagé avec un autre compte.</p></div>
+  <div class="row"><a class="btn small" href="/welcome?edit=1">${ic('user')}${profileSet ? 'Modifier mon profil' : 'Renseigner mon profil'}</a></div>
+</section>
+<section class="card" id="agenda-ext">
+  <div class="card-h"><h2>Agenda</h2><a class="btn small" href="/calendar">${ic('clock')}Voir le calendrier</a></div>
+  ${icalBox(ical, '/account')}
+</section>
+<section class="card" id="connexion">
   <div class="card-h"><h2>Connexion</h2></div>
   <div class="ident"><span class="avatar" aria-hidden="true">${esc(String(user.email).trim().charAt(0).toUpperCase())}</span>
     <span class="sp"><b>${esc(user.email)}</b><span class="hint">Connecté avec ${esc(PROVIDER_NAMES[user.provider] || '—')}, sans mot de passe</span></span></div>
   ${user.isAdmin ? '<div class="row"><a class="btn small" href="/admin">Administration</a></div>' : ''}
 </section>
-${notice ? banner(notice.ok ? 'ok' : 'err', notice.text) : ''}
-${usagePanel(usage)}
-${linkSection(link, consent, quota)}
-<section class="card">
-  <div class="card-h"><h2>Mon profil</h2><span class="badge ${profileSet ? 'ok' : ''}">${profileSet ? `${ic('check')}Renseigné` : 'Non renseigné'}</span><p>Ta fonction, ton niveau technique, le niveau de détail et le tutoiement que tu préfères : Claude s'en sert pour te répondre. Valable pour tous tes projets, rien n'est partagé avec un autre compte.</p></div>
-  <div class="row"><a class="btn small" href="/welcome?edit=1">${ic('user')}${profileSet ? 'Modifier mon profil' : 'Renseigner mon profil'}</a></div>
-</section>
-<section class="card">
-  <div class="card-h"><h2>Agenda</h2><a class="btn small" href="/calendar">${ic('clock')}Voir le calendrier</a></div>
-  ${icalBox(ical, '/account')}
-</section>
-<section class="card">
+<section class="card" id="developpeur">
   <div class="card-h"><h2>Mode développeur</h2><p>L'API d'iaboss et le serveur MCP (relier Claude à ton panel) ne sont disponibles que si tu actives ce mode.</p></div>
   <div class="row"><span class="badge ${developer ? 'ok' : ''}">${developer ? 'Activé' : 'Désactivé'}</span><a class="btn small" href="/developer">${ic('key')}${developer ? 'Jetons et documentation' : 'Activer'}</a></div>
   ${developer ? devLinks(appUrl) : `<p class="muted small">Une fois le mode activé, les adresses de l'API et du serveur MCP, leurs documentations et tes jetons s'affichent ici et sur la page Développeur.</p>`}
 </section>
-<section class="card danger">
+<section class="card danger" id="danger">
   <div class="card-h"><h2>Zone de danger</h2></div>
   <p class="card-d">Supprimer ton compte efface définitivement ton compte et toutes tes données : projets, prospects, notes, modèles de mail, journaux d'envoi, lignes de comptabilité et leurs justificatifs, jobs, réglages et clones du code. Les adresses qui ont demandé à ne plus être contactées restent dans la liste d'opposition commune. Cette action est irréversible.</p>
   ${error ? banner('err', error) : ''}
@@ -269,7 +275,7 @@ ${linkSection(link, consent, quota)}
     <div class="row"><button class="btn danger-fill">${ic('trash')}Supprimer mon compte et mes données</button></div>
   </form>
 </section>
-</div>`,
+</div></div></div>`,
   });
 }
 
@@ -318,8 +324,8 @@ function bddTables(dbCfg) {
 
 function configForms(p, smtp, dbCfg, imap) {
   const source = { project: 'Ce projet envoie depuis son adresse (SMTP ci-dessous).', null: "Aucun SMTP : renseigne celui de l'adresse d'envoi de ce projet, sinon rien ne peut partir." }[p.smtpSource ?? 'null'];
-  return `<form data-action="smtp" data-id="${p.id}" class="cfg">
-  <h4>SMTP d'envoi de ce projet (adresse du projet)</h4>
+  return `<form data-action="smtp" data-id="${p.id}" class="cfg" id="set-smtp">
+  <h4>Adresse d'envoi (SMTP)</h4>
   <p class="muted small" data-smtp-source>${source} Les mails de prospection et les relances de ce projet partent de cette adresse (une boîte par projet). Les mails d'iaboss (rapport, évolutions, invitations) partent, eux, du serveur.</p>
   <div class="grid3">
     <label>Hôte<input name="host" value="${esc(smtp.host)}" placeholder="smtp.exemple.fr"></label>
@@ -332,7 +338,7 @@ function configForms(p, smtp, dbCfg, imap) {
   <label>Plafond mails / 24 h (max 200)<input name="dailyCap" type="number" min="1" max="200" value="${p.dailyMailCap}"></label>
   <button class="btn">Enregistrer SMTP</button>
 </form>
-<form data-action="imap" data-id="${p.id}" class="cfg">
+<form data-action="imap" data-id="${p.id}" class="cfg" id="set-imap">
   <h4>Boîte de réception (IMAP)</h4>
   <p class="muted small">Sert à détecter les réponses et les adresses invalides. Utilisateur vide = mêmes identifiants que le SMTP. Hôte vide = désactivé.</p>
   <div class="grid3">
@@ -343,7 +349,7 @@ function configForms(p, smtp, dbCfg, imap) {
   </div>
   <button class="btn">Enregistrer et tester</button>
 </form>
-<form data-action="db" data-id="${p.id}" class="cfg">
+<form data-action="db" data-id="${p.id}" class="cfg" id="set-db">
   <h4>Base de données (récapitulatif)</h4>
   <p class="muted small">Utilise un compte en lecture seule. iaboss lit la structure de ta base, te propose les bonnes tables et affiche un aperçu des chiffres : tu n'écris aucune requête.</p>
   <div class="grid3">
@@ -358,9 +364,9 @@ function configForms(p, smtp, dbCfg, imap) {
   ${bddTables(dbCfg)}
   <div class="row"><button type="button" class="btn" data-bdd-analyze>Se connecter et analyser</button><button class="btn">Enregistrer BDD</button></div>
 </form>
-${p.access === 'owner' ? `<form data-action="delete" data-id="${p.id}" data-confirm="Supprimer ${esc(p.name)} et tous ses prospects ?" data-confirm-label="Supprimer le projet" class="cfg">
+${p.access === 'owner' ? `<section class="cfg danger-card" id="set-danger" aria-labelledby="danger-h"><h4 id="danger-h">Zone de danger</h4><p class="muted small">Efface le projet, ses prospects, ses modèles, ses vidéos et le clone du code. Les adresses en liste d'opposition restent.</p><form data-action="delete" data-id="${p.id}" data-confirm="Supprimer ${esc(p.name)} et tous ses prospects ?" data-confirm-label="Supprimer le projet" class="cfg">
   <button class="btn danger">${ic('trash')}Supprimer le projet</button>
-</form>` : ''}`;
+</form></section>` : ''}`;
 }
 
 function templateForm(p, kind) {
@@ -410,7 +416,7 @@ function postesBody(p) {
 export function projectBlocks(p, smtp, dbCfg, imap) {
   const profile = p.profile;
   // « En-tête » (dépôt, site, fiche, sortie de l'analyse) : en haut et ouvert tant que le projet n'est pas analysé, puis replié en bas, juste avant « Configuration ».
-  const headerAcc = acc('header', 'git', 'En-tête', 'Dépôt Git et fiche projet', `
+  const headerAcc = acc('header', 'git', 'Dépôt et site', 'Dépôt Git, site du produit et fiche projet', `
   <div class="field"><span class="lbl">Dépôt Git</span><div class="ro">${ic('lock', 'ic-s')}<span>${esc(p.gitUrl)}</span><span class="badge">lecture seule</span></div></div>
   ${p.access !== 'member' ? `<form data-action="site" data-id="${p.id}" class="site-form">
     <label class="field"><span class="lbl">Site du produit</span><input name="site_url" maxlength="300" inputmode="url" autocomplete="off" placeholder="https://monproduit.fr" value="${esc(p.siteUrl || '')}"></label>

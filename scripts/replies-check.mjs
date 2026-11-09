@@ -73,7 +73,7 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   const rows = await p.locator('.reply-row.unseen').count();
   if (rows > 0) {
     const before2 = await unseen();
-    await p.locator('.reply-row.unseen > summary').first().click(); // la ligne est repliée : on l'ouvre comme l'utilisateur
+    // les lignes de réponse sont dépliées d’emblée (maquette 13) : pas de clic pour les ouvrir
     await p.locator('.reply-row.unseen [data-reply-seen]').first().click();
     ok(await waitFor(async () => (await unseen()) === before2 - 1), `${tag} « Marquer comme lu » de la page Mails met à jour la base`);
   } else ok(false, `${tag} la page Mails liste des réponses non lues`);
