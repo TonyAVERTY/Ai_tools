@@ -153,7 +153,8 @@ function settingsLayout(p, blocks) {
 function journalCard(p, j) {
   const cell = (label, n, filter, extra = '') => `<a href="/mails?project=${p.id}${filter ? `&filter=${filter}` : ''}"><span class="k-l">${label}</span><span class="k-v">${fr(n || 0)}</span>${extra}</a>`;
   return `<section class="sheet flush pj-journal" aria-labelledby="jr-h"><div class="sheet-h"><h2 id="jr-h">Journal du projet</h2><a class="small" href="/mails?project=${p.id}">Tous les mails</a></div>
-    <div class="pj-kpis4 pj-j">${cell('Tous', j?.all, '')}${cell('Envoyé', j?.sent, 'sent')}${cell('Répondu', j?.replied, 'replied')}${cell('Non envoyé', j?.failed, 'failed', j?.failed ? `<span class="badge err">${ic('x')}échecs</span>` : '')}</div></section>`;
+    <div class="pj-kpis4 pj-j">${cell('Tous', j?.all, '')}${cell('Envoyé', j?.sent, 'sent')}${cell('Répondu', j?.replied, 'replied')}${cell('Non envoyé', j?.failed, 'failed', j?.failed ? `<span class="badge err">${ic('x')}échecs</span>` : '')}</div>
+    <div class="pj-recent" data-recent-mails data-project="${p.id}" aria-live="polite"></div></section>`;
 }
 
 /**
