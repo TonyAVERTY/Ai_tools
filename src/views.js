@@ -284,6 +284,7 @@ function targetForm(p) {
   const list = (a) => esc((a || []).join('\n'));
   const lock = p.targetValidated ? ' readonly' : ''; // cible validée : grisée et en lecture seule jusqu'à « Modifier » (public/app.js)
   return `<form class="target cfg${p.targetValidated ? ' target-locked' : ''}" data-action="target" data-id="${p.id}">
+  ${p.targetValidated ? `<p class="target-sum">${esc([t.description, t.taille, t.zone].filter(Boolean).join(', '))}${t.decideur ? `, décideur : ${esc(t.decideur)}` : ''}${t.description || t.taille || t.zone || t.decideur ? '.' : ''}</p>` : ''}
   <label>Description<input name="description" value="${esc(t.description)}"${lock}></label>
   <div class="grid3">
     <label>Zone<input name="zone" value="${esc(t.zone)}"${lock}></label>

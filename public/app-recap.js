@@ -47,17 +47,17 @@
 
   function drawBars(fig, w) {
     const { weeks } = JSON.parse(fig.dataset.series);
-    const max = niceMax(Math.max(1, ...weeks.flatMap((x) => [x.sent, x.replies])));
+    const max = niceMax(Math.max(1, ...weeks.flatMap((x) => [x.sent, x.replies, x.followups || 0])));
     const base = M.h - M.b;
     const Y = (v) => M.t + (base - M.t) * (1 - v / max);
     const gw = (w - M.l - M.r) / weeks.length;
-    const bw = Math.max(3, Math.min(18, (gw - 8) / 2));
+    const bw = Math.max(3, Math.min(14, (gw - 8) / 3));
     // Une étiquette de date tous les ~56 px au minimum, quelle que soit la largeur
     const every = Math.max(1, Math.ceil(weeks.length / Math.max(1, Math.floor((w - M.l - M.r) / 56))));
     const marks = weeks.map((x, i) => {
-      const x0 = M.l + i * gw + (gw - (2 * bw + 2)) / 2;
+      const x0 = M.l + i * gw + (gw - (3 * bw + 4)) / 2;
       const last = i === weeks.length - 1;
-      return `<path class="b1" d="${bar(x0, Y(x.sent), bw, base)}"/><path class="b2" d="${bar(x0 + bw + 2, Y(x.replies), bw, base)}"/>
+      return `<path class="b1" d="${bar(x0, Y(x.sent), bw, base)}"/><path class="b2" d="${bar(x0 + bw + 2, Y(x.replies), bw, base)}"/><path class="b3" d="${bar(x0 + 2 * bw + 4, Y(x.followups || 0), bw, base)}"/>
         ${(weeks.length - 1 - i) % every === 0 ? `<text class="axis" x="${x0 + bw + 1}" y="${M.h - 6}" text-anchor="middle">${shortDay(x.start)}</text>` : ''}
         ${last ? `<text class="end" x="${x0 + bw / 2}" y="${Y(x.sent) - 5}" text-anchor="middle">${x.sent}</text>
                   <text class="end" x="${x0 + bw * 1.5 + 2}" y="${Y(x.replies) - 5}" text-anchor="middle">${x.replies}</text>` : ''}`;
@@ -70,7 +70,7 @@
       const x = weeks[i];
       const rate = x.sent ? ` (${Math.round((x.replies / x.sent) * 100)} %)` : '';
       return { x: M.l + (i + 0.5) * gw, y: Y(Math.max(x.sent, x.replies)), band: true,
-        html: `Semaine du ${shortDay(x.start)}<br><strong>${x.sent}</strong> envoyé(s) · <strong>${x.replies}</strong> réponse(s)${rate}` };
+        html: `Semaine du ${shortDay(x.start)}<br><strong>${x.sent}</strong> envoyé(s) · <strong>${x.replies}</strong> réponse(s) · <strong>${x.followups || 0}</strong> relance(s)${rate}` };
     };
   }
 
@@ -104,7 +104,7 @@
   function figure(kind, title, series, empty) {
     return `<figure class="chart" data-kind="${kind}" data-title="${esc(title)}" data-series="${esc(JSON.stringify(series))}">
       <figcaption>${esc(title)}</figcaption>
-      ${kind === 'bars' ? '<p class="legend small"><span class="sw s1"></span>Mails envoyés <span class="sw s2"></span>Réponses</p>' : ''}${empty ? `<p class="muted small">${empty}</p>` : '<div class="plot"></div><div class="tip" hidden></div>'}</figure>`;
+      ${kind === 'bars' ? '<p class="legend small"><span class="sw s1"></span>Mails envoyés <span class="sw s2"></span>Réponses <span class="sw s3"></span>Relances</p>' : ''}${empty ? `<p class="muted small">${empty}</p>` : '<div class="plot"></div><div class="tip" hidden></div>'}</figure>`;
   }
 
   async function loadHistory(proj, days = 30) {
@@ -118,20 +118,30 @@
       return figure('line', title, { unit, xs: pts.map((d) => d.day), ys: pts.map((d) => d[key]) },
         pts.length < 2 ? 'Pas encore assez de données : une photo est prise chaque jour (et à chaque ouverture du récap).' : '');
     };
+    // « Revenu du produit » : le revenu lu dans la base du produit, situé entre zéro et le plus haut atteint sur la période (la barre est pleine au sommet)
+    const revs = h.daily.filter((d) => d.revenue != null);
+    const peak = Math.max(0, ...revs.map((d) => d.revenue));
+    const nowRev = revs.length ? revs[revs.length - 1].revenue : null;
+    const pct = peak > 0 ? Math.max(0, Math.min(100, Math.round((nowRev / peak) * 100))) : 0;
+    const revCard = nowRev == null ? '' : `<section class="chart rev-card" aria-labelledby="rev-h"><h3 id="rev-h">Revenu du produit</h3>
+        <p class="muted small">Lu dans ta base (lecture seule) depuis le ${shortDay(revs[0].day)}.</p>
+        <p class="rev-v"><strong>${esc(fmtVal(nowRev, '€'))}</strong> <span class="muted small">sur un plus haut de ${esc(fmtVal(peak, '€'))}</span></p>
+        <div class="bar" role="progressbar" aria-label="Revenu actuel par rapport au plus haut de la période" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><span class="w-${Math.floor(pct / 5) * 5}"></span></div>
+        <p class="small">${box.dataset.cost ? `Coût IA du projet : $${esc(box.dataset.cost)}` : 'Coût IA du projet : affiché seulement avec une clé API'}</p></section>`;
     box.innerHTML = `
       <div class="row chart-head"><h4>Évolution</h4>
         <div class="seg" role="group" aria-label="Période">${[30, 90].map((d) => `<button type="button" class="btn small" data-days="${d}" aria-pressed="${d === days}">${d} jours</button>`).join('')}</div>
       </div>
       <div class="charts">
-        ${kpi('users', 'Utilisateurs', '')}${kpi('clients', 'Clients payants', '')}${kpi('revenue', 'Revenu total', '€')}
+        ${revCard}${kpi('users', 'Utilisateurs', '')}${kpi('clients', 'Clients payants', '')}${kpi('revenue', 'Revenu total', '€')}
         ${figure('bars', 'Prospection par semaine', { weeks: h.weeks })}
       </div>
       <details class="small"><summary>Voir les données</summary>
         <div class="table-wrap"><table><thead><tr><th>Jour</th><th>Utilisateurs</th><th>Clients</th><th>Revenu</th></tr></thead><tbody>
           ${h.daily.map((d) => `<tr><td>${shortDay(d.day)}</td><td>${d.users ?? '–'}</td><td>${d.clients ?? '–'}</td><td>${d.revenue != null ? esc(fmtVal(d.revenue, '€')) : '–'}</td></tr>`).join('') || '<tr><td colspan="4">Aucune photo pour l\'instant.</td></tr>'}
         </tbody></table>
-        <table><thead><tr><th>Semaine du</th><th>Envoyés</th><th>Réponses</th></tr></thead><tbody>
-          ${h.weeks.map((x) => `<tr><td>${shortDay(x.start)}</td><td>${x.sent}</td><td>${x.replies}</td></tr>`).join('')}
+        <table><thead><tr><th>Semaine du</th><th>Envoyés</th><th>Réponses</th><th>Relances</th></tr></thead><tbody>
+          ${h.weeks.map((x) => `<tr><td>${shortDay(x.start)}</td><td>${x.sent}</td><td>${x.replies}</td><td>${x.followups || 0}</td></tr>`).join('')}
         </tbody></table></div>
       </details>`;
     $$('.chart', box).forEach((fig) => { if (fig.querySelector('.plot')) drawChart(fig); });
@@ -172,7 +182,7 @@
         </div>
         <p class="muted small">${r.priced ? `Coût IA du projet (équivalent API) : $${r.aiCostUsd.toFixed(2)}${b?.cached ? ' · chiffres en cache (10 min)' : ''}` : (b?.cached ? 'Chiffres en cache (10 min)' : '')}
         <button class="btn small" data-recap-refresh>Rafraîchir</button></p>
-        <div data-charts></div>`;
+        <div data-charts${r.priced ? ` data-cost="${r.aiCostUsd.toFixed(2)}"` : ''}></div>`;
       loadHistory(proj);
     } catch (err) { loadFailed(box, err.message, () => loadRecap(proj, force)); }
   }
