@@ -26,6 +26,7 @@ Dans la **fiche d'un prospect** : « Générer une accroche » ou « Régénére
 Le modèle de la recherche se choisit dans **Réglages → Budget et modèles IA** (« Modèle pour la prospection »). Les consignes se modifient dans **Réglages → Prompts IA** (« Recherche de prospects : accroche et pertinence »). Haiku suffit pour la plupart des projets.
 
 ## Problèmes fréquents
+- **Cible validée** : la section Cible se résume alors en une phrase (par exemple « Cabinets de kinésithérapie, 2 à 10 praticiens, Bretagne, décideur : titulaire du cabinet. ») et les champs sont masqués. **Modifier** les rouvre ; **Mettre à jour** enregistre et **Annuler** remet les valeurs validées.
 - **0 prospect trouvé** : la cible est trop étroite ou les requêtes trop vagues → corriger la section Cible (secteurs, zone, requêtes de recherche, une par ligne) et relancer.
 - **Le job reste « En attente »** : plafond ou quota atteint, charge du serveur élevée, ou job programmé « Cette nuit ». Le message « En attente : … » donne la raison dans « Activité ».
 - **« Plafond atteint »** : la limite mensuelle de l'offre est atteinte ; rien n'est perdu, voir « Offres, plafonds et limites ».

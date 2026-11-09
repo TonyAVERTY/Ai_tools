@@ -66,5 +66,5 @@ test('historique : fenêtre 30/90 jours et semaines du lundi au dimanche (heure 
   const w = (await history(s.db, s.id, { days: 30, at })).weeks;
   assert.equal(w.length, 5);
   assert.equal(w.at(-1).start, '2026-10-19');
-  assert.deepEqual(w.slice(-2).map((x) => [x.start, x.sent, x.replies]), [['2026-10-12', 1, 0], ['2026-10-19', 2, 1]]);
+  assert.deepEqual(w.slice(-2).map((x) => [x.start, x.sent, x.replies, x.followups]), [['2026-10-12', 1, 0, 0], ['2026-10-19', 2, 1, 1]]);
 });
