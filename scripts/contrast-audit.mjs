@@ -9,6 +9,7 @@ const chromium = pw.chromium || pw.default.chromium;
 import { startApp } from '../test/helpers/server.js';
 import { addProject } from '../test/helpers/users.js';
 import { now } from '../src/db.js';
+import { saveDraft } from '../src/contentdrafts.js';
 
 const MIN = Number(process.argv[2]) || 3;
 const s = await startApp({ cfg: { systemSmtp: { host: 'x', port: 587, user: 'u', pass: 'p', fromEmail: 'a@b.fr' }, linkedin: null } });
@@ -28,6 +29,10 @@ await s.db.prepare("INSERT INTO linkedin_posts(project_id, body, status, schedul
 const day = (n) => new Date(Date.now() - n * 86_400_000).toISOString().slice(0, 10);
 for (let i = 0; i < 4; i++) await s.db.prepare('INSERT INTO metrics_daily(project_id, day, users, clients, revenue) VALUES(?, ?, ?, ?, ?)').run(pid, day(15 - i * 4), 100 + i * 10, 10 + i, 1000 * (i + 1));
 
+// Communication : un post Instagram (avec image, note et points à vérifier) et une newsletter, pour mesurer aussi ces écrans
+const PIXEL = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
+await saveDraft(s.db, pid, 'instagram', { direction: 'une nouveauté', body: 'Une légende de post Instagram.\n\nUn second paragraphe.', extra: { hashtags: ['#agenda', '#kine'], alt: 'Un visuel', format: 'carre', width: 1080, height: 1080, score: 6, toCheck: ['Le titre manque de contraste'], inspiration: 'Secteur : santé.\nPrincipes : un seul message.' }, image: PIXEL });
+await saveDraft(s.db, pid, 'newsletter', { direction: 'une nouveauté', title: 'Un objet de newsletter', body: '## Titre\n\nUn texte de newsletter assez long pour la mise en page.', extra: { preview: 'Un aperçu' } });
 const PUBLIC = ['/', '/fonctionnement', '/tarifs', '/docs', '/mentions-legales', '/login'];
 const TABS = ['', '/prospection', '/envoi', '/clients', '/facturation', '/communication', '/outils', '/recap', '/reglages'];
 const APP = ['/', '/projets', ...TABS.map((x) => `/p/${pid}${x}`), `/p/${pid}/contact/${firstProspect}`, '/mails', '/mails?v=sent', '/calendar', '/compta', '/facturation', '/clients', '/account', '/settings', '/team', '/chat', '/support', '/developer', '/admin', '/link'];
