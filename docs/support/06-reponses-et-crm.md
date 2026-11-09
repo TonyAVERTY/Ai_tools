@@ -13,9 +13,11 @@ Dans « Configuration du projet → Boîte de réception (IMAP) », renseigne l'
 Marquer un prospect en **Refus** ajoute son adresse à la liste d'opposition (une confirmation est demandée).
 
 ## La liste des prospects (onglet Prospection → Prospects)
-- Deux affichages : **Liste** et **Kanban**.
-- **Recherche** par entreprise, email, ville ou secteur.
-- Filtres : **statut**, **score minimum** (≥ 5, ≥ 7, ≥ 9), case **« Actions à faire »** (prospects dont la prochaine action est due), **tri** (score, plus récents, dernier contact, entreprise A → Z). Pagination par 100.
+- Deux affichages, en haut à droite du titre **Prospects** : **Liste** et **Kanban**, avec le bouton **Ajouter un prospect** à côté.
+- Des **puces** filtrent d'un clic : **Tous 48**, **À contacter 22**, **Contacté 21**, **A répondu 3**, **Actions à faire 1** (prospects dont la prochaine action est due). Les nombres comptent tout le projet, quels que soient les autres filtres.
+- **Recherche** (champ « Rechercher ») par entreprise, email, ville ou secteur.
+- **Plus de filtres** (replié) : la liste des **statuts** (tous, y compris Client, Refus, Rejeté), le **score minimum** (≥ 5, ≥ 7, ≥ 9), la case **« Actions à faire »** et le **tri** (score, plus récents, dernier contact, entreprise A → Z). Pagination par 100 ; sous la liste, « 1 à 4 sur 48 », **Exporter (CSV)** et **Importer un CSV**.
+- Le tableau montre, pour chaque prospect : **Entreprise** (avec son email), **Ville**, **Score** (surligné en jaune à partir de 9), **Statut** (un menu : on le change d'un clic, avec la date du dernier envoi dessous) et **Prochaine action** (avec « À faire » quand elle est due). Sur téléphone, la ville et la prochaine action passent dans la fiche.
 - **Kanban** : une colonne par statut ; on glisse une carte pour changer son statut, ou on utilise le menu de statut de la carte (au clavier). Une carte montre l'entreprise, l'email, la ville, le score et la prochaine action.
 
 ## Ajouter un prospect à la main

@@ -424,7 +424,7 @@ export function projectBlocks(p, smtp, dbCfg, imap) {
   <div class="job" data-job="analyze"></div>`, { open: true });
   const setup = acc('setup', 'target', 'Mise en route', 'Ce qu\'il reste à faire avant ton premier envoi', `<div class="setup" data-setup>${loadingBlock()}</div>`, { cls: 'setup-acc' });
   const target = profile ? acc('target', 'target',
-    `Cible${p.targetValidated ? '' : ' <span class="badge warn">à valider</span>'}`, // une cible validée est signalée par la coche verte de la section
+    `${p.targetValidated ? ic('lock', 'ic-s') : ''}Cible ${p.targetValidated ? `<span class="badge ok">${ic('check')}Validée</span>` : '<span class="badge warn">à valider</span>'}`,
     esc((p.target?.description || '').slice(0, 120)), targetForm(p), { open: true, cls: 'target-acc' }) : '';
   const search = acc('search', 'search', 'Recherche de prospects', `${aiName()} cherche des entreprises qui collent à la cible`, `
     <form data-action="prospect" data-id="${p.id}" class="inline">
@@ -454,23 +454,34 @@ export function projectBlocks(p, smtp, dbCfg, imap) {
       <div class="job" data-job="followup"></div>
     </section>`, { open: true, cls: 'main' });
   const prospects = acc('prospects', 'users', 'Prospects <span data-count></span>', 'Recherche, filtres, fiches, import et export CSV', `
-      <div class="viewtoggle" role="group" aria-label="Affichage des prospects">
-        <button type="button" class="btn small on" data-view-mode="list" aria-pressed="true">Liste</button>
-        <button type="button" class="btn small" data-view-mode="board" aria-pressed="false">Kanban</button>
+      <div class="pr-head">
+        <h2>Prospects</h2>
+        <div class="seg" role="group" aria-label="Affichage des prospects">
+          <button type="button" class="on" data-view-mode="list" aria-pressed="true">Liste</button>
+          <button type="button" data-view-mode="board" aria-pressed="false">Kanban</button>
+        </div>
+        <button type="button" class="btn secondary small" data-pform-toggle aria-expanded="false">${ic('plus')}Ajouter un prospect</button>
       </div>
       <form class="pfilters" data-filters>
-        <input type="search" name="q" placeholder="Rechercher : entreprise, email, ville, secteur" aria-label="Rechercher">
-        <select name="status" aria-label="Statut"><option value="">Tous les statuts</option>${Object.entries(STATUSES).map(([k, l]) => `<option value="${k}">${l}</option>`).join('')}</select>
-        <select name="minScore" aria-label="Score minimum"><option value="0">Tous les scores</option><option value="5">Score ≥ 5</option><option value="7">Score ≥ 7</option><option value="9">Score ≥ 9</option></select>
-        <label class="opt"><input type="checkbox" name="todo" value="1"><span class="box">${ic('check')}</span><span>Actions à faire</span></label>
-        <select name="sort" aria-label="Tri"><option value="score">Tri : score</option><option value="recent">Plus récents</option><option value="contacted">Dernier contact</option><option value="company">Entreprise A → Z</option></select>
+        <div class="pr-bar">
+          <div class="chips" role="group" aria-label="Filtrer par statut">
+            <button type="button" class="chip on" data-chip="" aria-pressed="true">Tous <span data-chip-n="all"></span></button>
+            <button type="button" class="chip" data-chip="new" aria-pressed="false">À contacter <span data-chip-n="new"></span></button>
+            <button type="button" class="chip" data-chip="sent" aria-pressed="false">Contacté <span data-chip-n="sent"></span></button>
+            <button type="button" class="chip" data-chip="replied" aria-pressed="false">A répondu <span data-chip-n="replied"></span></button>
+            <button type="button" class="chip" data-chip-todo aria-pressed="false">Actions à faire <span data-chip-n="todo"></span></button>
+          </div>
+          <label class="pr-search">${ic('search', 'ic-s')}<input type="search" name="q" placeholder="Rechercher" aria-label="Rechercher : entreprise, email, ville, secteur"></label>
+        </div>
+        <details class="pr-more"><summary>Plus de filtres</summary>
+          <div class="pr-more-b">
+            <select name="status" aria-label="Statut"><option value="">Tous les statuts</option>${Object.entries(STATUSES).map(([k, l]) => `<option value="${k}">${l}</option>`).join('')}</select>
+            <select name="minScore" aria-label="Score minimum"><option value="0">Tous les scores</option><option value="5">Score ≥ 5</option><option value="7">Score ≥ 7</option><option value="9">Score ≥ 9</option></select>
+            <label class="opt"><input type="checkbox" name="todo" value="1"><span class="box">${ic('check')}</span><span>Actions à faire</span></label>
+            <select name="sort" aria-label="Tri"><option value="score">Tri : score</option><option value="recent">Plus récents</option><option value="contacted">Dernier contact</option><option value="company">Entreprise A → Z</option></select>
+          </div>
+        </details>
       </form>
-      <div class="row csv">
-        <button type="button" class="btn small primary" data-pform-toggle aria-expanded="false">${ic('plus')}Ajouter un prospect</button>
-        <a class="btn small" data-export href="/api/projects/${p.id}/prospects.csv" download>Exporter (CSV)</a>
-        <label class="btn small file">Importer un CSV<input type="file" accept=".csv,text/csv" data-import="${p.id}" hidden></label>
-        <span class="muted small">Colonnes reconnues : entreprise, email, site, ville, secteur, score, source, accroche.</span>
-      </div>
       <form class="pform panel" data-pform data-id="${p.id}" hidden>
         <div class="panel-h"><h4>Ajouter un prospect</h4></div>
         <p class="muted small">Pour un contact que tu as déjà : le prospect est ajouté avec le statut « À contacter ». Il est écarté s'il existe déjà dans ce projet ou s'il ne doit pas être contacté.</p>
@@ -488,7 +499,11 @@ export function projectBlocks(p, smtp, dbCfg, imap) {
       </form>
       <div data-import-report></div>
       <div data-prospects></div>
-      <div class="pager" data-pager></div>`, { open: true, cls: 'main prospects' });
+      <div class="pr-foot">
+        <div class="pager" data-pager></div>
+        <span class="acts"><a data-export href="/api/projects/${p.id}/prospects.csv" download>Exporter (CSV)</a><label class="file">Importer un CSV<input type="file" accept=".csv,text/csv" data-import="${p.id}" hidden></label></span>
+      </div>
+      <p class="muted small pr-hint">Colonnes reconnues à l'import : entreprise, email, site, ville, secteur, score, source, accroche.</p>`, { open: true, cls: 'main prospects' });
   const evolution = acc('evolution', 'spark', 'Évolution', 'Idées de fonctionnalités tirées du code, envoyées par mail', `
     <form data-action="evolution" data-id="${p.id}" class="inline">
       <label>Nombre d'évolutions<input name="count" type="number" min="1" max="20" value="5"></label>

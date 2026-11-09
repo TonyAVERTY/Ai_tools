@@ -53,7 +53,12 @@ export async function listProspects(db, projectId, f, { limit = 100 } = {}) {
   const rows = await db.prepare(`SELECT id, company, email, website, city, sector, score, status, sent_at, followup_at, replied_at,
     next_action, next_action_at
     FROM prospects WHERE ${sql} ORDER BY ${order} LIMIT ? OFFSET ?`).all(...args, limit, (page - 1) * limit);
-  return { total, page, pages, rows };
+  // Compteurs des puces (« Tous », « À contacter »…) : tout le projet, quels que soient les filtres
+  const by = await db.prepare('SELECT status, COUNT(*) n FROM prospects WHERE project_id = ? GROUP BY status').all(projectId);
+  const counts = { all: 0, new: 0, sent: 0, replied: 0, todo: 0 };
+  for (const r of by) { counts.all += Number(r.n); if (r.status in counts) counts[r.status] = Number(r.n); }
+  counts.todo = Number((await db.prepare('SELECT COUNT(*) n FROM prospects WHERE project_id = ? AND next_action_at IS NOT NULL AND next_action_at <= ?').get(projectId, f.at ?? now())).n);
+  return { total, page, pages, rows, counts };
 }
 
 // ---------- Fiche prospect ----------
