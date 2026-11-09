@@ -173,7 +173,7 @@ Pour rédiger un mail, trouver des idées de posts, réfléchir à une stratégi
 - **Où voir ce que j'ai consommé ?** « Mon compte → Usage du mois », la carte « Consommation » de la page Projets (suivie du nom de ton IA : « Consommation Gemini », par exemple) et « Mon compte → Mon IA → Limites d'utilisation ».
 - **Comment arrêter les notifications ?** Réglages → Notifications : décocher les événements ou retirer le canal.
 - **Comment supprimer mes données ?** « Mon compte → Zone de danger → Supprimer mon compte et mes données ».
-- **Y a-t-il une application mobile ?** Non : le site s'adapte aux téléphones. Sur un écran étroit, les onglets de la barre du haut tiennent tous sur une ligne et « Comptabilité » s'affiche « Compta » (c'est le même onglet).
+- **Y a-t-il une application mobile ?** Non : le site s'adapte aux téléphones. Sur un écran étroit, les cinq onglets de la barre du haut (Aujourd'hui, Projets, Mails, Agenda, Compta) tiennent sur une ligne. Facturation, Clients et Équipe sont dans le menu de l'avatar.
 - **Qui contacter si la documentation ne répond pas ?** L'administrateur du service d'iaboss.
 
 ## L'IA ignore la méthode attendue ou la réponse sort du cadre

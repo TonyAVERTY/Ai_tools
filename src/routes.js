@@ -40,7 +40,7 @@ import { registerPromoRoutes, removeProjectVideos } from './promo.js';
 import { registerPosteRoutes } from './posteroutes.js';
 import { isRoleJob, roleTaskByJob } from './services/roles.js';
 import { registerProspectRoutes } from './prospectroutes.js';
-import { dashboardPage, settingsPage, unsubPage, accountPage, layout } from './views.js';
+import { dashboardPage, projectPage, settingsPage, unsubPage, accountPage, layout } from './views.js';
 import { linkPage } from './linkviews.js';
 import { availableProviders } from './services/providers/availability.js';
 import { getProvider } from './services/providers/index.js';
@@ -180,6 +180,14 @@ export function registerRoutes(router, app) {
       email: session.email, projects, stats, gitHosts: (await listGitServers(db, userId)).map((x) => x.host), usage: await usageView(db, await getUser(db, userId)),
       pauseMessage: await sendPause(db, userId).then((p) => (p ? pauseMessageOf(p) : null)),
     }));
+  });
+
+  // Page dédiée d'un projet (le sien ou un projet d'équipe) : tout autre numéro est « introuvable »
+  router.get('/projets/:id', async ({ res, params, session }) => {
+    const userId = session.userId;
+    const full = await getProject(app, params.id, { userId, secrets: true });
+    const entry = { project: full, smtp: publicConfig(full.smtp, 'pass'), dbCfg: publicConfig(full.dbCfg, 'password'), imap: publicConfig(full.imapCfg, 'pass') };
+    html(res, projectPage({ email: session.email, entry, stats: (await projectStats(db, [full.id])).get(Number(full.id)) }));
   });
 
   router.get('/settings', async ({ res, session, url }) => {

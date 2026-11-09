@@ -217,7 +217,7 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   await p.locator('[data-view-mode="list"]').click();
   // navigation sans rechargement, puis retour : les écouteurs du fichier doivent être posés de nouveau
   await p.evaluate(() => { window.__marker = 'vivante'; });
-  await p.locator('.pills a.pill', { hasText: 'Calendrier' }).click();
+  await p.locator('.pills a.pill', { hasText: 'Agenda' }).click();
   await p.waitForURL(/calendar/);
   await p.waitForSelector('html[data-nav="ready"]');
   await p.locator('.pills a.pill', { hasText: 'Projets' }).click();

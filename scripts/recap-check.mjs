@@ -80,7 +80,7 @@ ok(true, 'Rafraîchir recharge le récapitulatif');
 
 // Navigation sans rechargement vers une autre page, puis retour : le récapitulatif doit marcher avec les scripts relancés
 await p.evaluate(() => { window.__marker = 'vivante'; });
-await p.locator('.pills a.pill', { hasText: 'Calendrier' }).click();
+await p.locator('.pills a.pill', { hasText: 'Agenda' }).click();
 await p.waitForURL(/calendar/);
 await p.waitForSelector('html[data-nav="ready"]');
 await p.locator('.pills a.pill', { hasText: 'Projets' }).click();

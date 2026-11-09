@@ -88,7 +88,7 @@ const shown = await p.locator('[data-li-body]').inputValue();
 
 // Navigation sans rechargement, puis retour : la section marche avec les scripts relancés
 await p.evaluate(() => { window.__marker = 'vivante'; });
-await p.locator('.pills a.pill', { hasText: 'Calendrier' }).click();
+await p.locator('.pills a.pill', { hasText: 'Agenda' }).click();
 await p.waitForURL(/calendar/);
 await p.waitForSelector('html[data-nav="ready"]');
 await p.locator('.pills a.pill', { hasText: 'Projets' }).click();

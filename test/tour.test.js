@@ -7,7 +7,7 @@ import { TOUR_STEPS, needsTour, tourJson } from '../src/tour.js';
 import { getSetting } from '../src/db.js';
 import { getProfile } from '../src/userprofile.js';
 import { generatedDocs } from '../src/services/supportdocs.js';
-import { NAV } from '../src/views.js';
+import { NAV, MORE_PAGES } from '../src/views.js';
 
 let s;
 before(async () => { s = await startApp(); });
@@ -25,10 +25,12 @@ test('les étapes : un titre et un texte chacune, des identifiants uniques, la p
 
 test('chaque onglet de la barre du haut a son étape dans la visite, dans l\'ordre du menu (une nouvelle page sans étape fait échouer ce test)', () => {
   const stepFor = (href) => TOUR_STEPS.findIndex((t) => t.target === `.pills a[href="${href}"]`);
+  const moreStep = (href) => TOUR_STEPS.findIndex((t) => t.target === `details.user .user-pop a[href="${href}"]`);
   const missing = NAV.filter(([href]) => stepFor(href) < 0).map(([href, , label]) => `${label} (${href})`);
   assert.deepEqual(missing, [], `ajoute une étape à la visite guidée (src/tour.js) pour : ${missing.join(', ')}`);
   const order = NAV.map(([href]) => stepFor(href));
   assert.deepEqual(order, [...order].sort((a, b) => a - b), 'les étapes suivent l\'ordre des onglets');
+  for (const [href, , label] of MORE_PAGES) assert.ok(moreStep(href) >= 0, `${label} : une étape vise son entrée du menu du compte`);
   for (const [href] of NAV) assert.ok(TOUR_STEPS[stepFor(href)].text.length > 80, `${href} : un texte qui explique vraiment la page`);
 });
 
@@ -38,7 +40,7 @@ test('chaque cible de la visite existe dans le tableau de bord rendu', async () 
   const html = (await text(u, '/')) + (await text(u, '/projets'));
   const has = {
     '.pills a[href="/"]': /<nav class="pills"[^]*?href="\/"/, '.pills a[href="/projets"]': /class="pill" href="\/projets"/, '.td-todo': /class="td-todo"/, '.td-usage': /class="td-usage"/, '[data-new-project]': /data-new-project/, '.pills a[href="/mails"]': /class="pill" href="\/mails"/, '.pills a[href="/calendar"]': /class="pill" href="\/calendar"/, '.pills a[href="/compta"]': /class="pill" href="\/compta"/,
-    '.pills a[href="/facturation"]': /class="pill" href="\/facturation"/, '.pills a[href="/clients"]': /class="pill" href="\/clients"/, '.pills a[href="/team"]': /class="pill" href="\/team"/, '.ukpis': /class="ukpis"/, '[data-new-toggle]': /data-new-toggle/, '.ia-menu > summary': /<details class="ia-menu">\s*<summary/,
+    'details.user .user-pop a[href="/facturation"]': /<details class="user">[^]*?class="user-pop"[^]*?href="\/facturation"/, 'details.user .user-pop a[href="/clients"]': /<details class="user">[^]*?class="user-pop"[^]*?href="\/clients"/, 'details.user .user-pop a[href="/team"]': /<details class="user">[^]*?class="user-pop"[^]*?href="\/team"/, '.ukpis': /class="ukpis"/, '[data-new-toggle]': /data-new-toggle/, '.ia-menu > summary': /<details class="ia-menu">\s*<summary/,
     '.ia-menu .ia-pop': /class="user-pop ia-pop"/, '[data-claude-card]': /data-claude-card/, 'details.user > summary': /<details class="user">\s*<summary/, 'details.user .user-pop': /<details class="user">[^]*?class="user-pop"/,
   };
   for (const x of TOUR_STEPS.filter((t) => t.target)) {

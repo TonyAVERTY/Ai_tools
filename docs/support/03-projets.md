@@ -7,6 +7,9 @@ Barre du haut → **Projets** (adresse `/projets`). Elle liste les projets du co
 ## Créer un projet
 Bouton **Nouveau projet** → champs **Nom** et **Dépôt Git** → **Créer et analyser** (ou **Annuler**). GitHub est accepté ; les autres serveurs Git doivent d'abord être ajoutés dans **Réglages → Dépôts Git** (avec un token pour un dépôt privé). Le lien du dépôt ne peut plus être modifié après la création : pour changer de dépôt, créer un nouveau projet. Si le plafond de projets de l'offre est atteint, la création est refusée avec un message.
 
+## La page d'un projet
+Sur la page **Projets**, chaque ligne de projet porte un lien **Page du projet**. Il ouvre l'adresse `/projets/` suivie du numéro du projet : une page qui ne montre que ce projet, déjà ouvert, avec toutes ses sections, et un fil d'Ariane (**Projets** / nom du projet) pour revenir à la liste. Tu peux la mettre en favori. Le projet d'un autre compte, ou un numéro qui n'existe pas, répond « Projet introuvable ».
+
 ## Ouvrir un projet
 Clique sur son nom. Avec **un seul projet**, il est ouvert par défaut ; avec **plusieurs projets**, ils sont tous fermés à chaque arrivée sur la page (même si on en avait ouvert un avant). Quand l'application recharge la page toute seule (fin d'une analyse, cible validée), le projet en cours reste ouvert. Le bouton **Voir** du menu « Activité » ouvre le projet concerné.
 
