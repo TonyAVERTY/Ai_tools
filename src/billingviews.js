@@ -25,7 +25,7 @@ export function billingOverviewPage({ email, rows }) {
       <div class="bill-proj-h"><div><h2 id="bp-${r.id}">${esc(r.name)}</h2><p class="muted small">${esc(host(r.gitUrl))}</p></div><span class="badge ${tone}">${esc(label)}</span></div>
       ${r.resume ? `<p class="bill-resume">${esc(r.resume.length > 190 ? `${r.resume.slice(0, 190)}…` : r.resume)}</p>` : ''}
       ${stepper(r.stage.steps, stageStep[r.stage.stage])}
-      <div class="row-actions"><a class="btn ${r.stage.stage === 'ready' ? '' : 'primary'}" href="/facturation/projet/${r.id}">${esc(CTA[r.stage.stage])}</a>
+      <div class="row-actions"><a class="btn ${r.stage.stage === 'ready' ? '' : 'primary'}" href="/p/${r.id}/facturation">${esc(CTA[r.stage.stage])}</a>
         ${r.stage.busy ? `<span class="muted small bill-busy"><span class="spin-inline" aria-hidden="true"></span>Claude travaille…</span>` : ''}</div></article>`;
   }).join('') : `<div class="empty-s"><p><b>Aucun projet pour l'instant.</b> La facturation se prépare projet par projet : crée d'abord un projet.</p><a class="btn primary small" href="/">Ouvrir mes projets</a></div>`;
   const body = `<div data-bill class="bill-page">
@@ -208,7 +208,8 @@ function docsSection(p, docs, stage, busy, validatedCount) {
   return `<section class="card bill-sec" id="documents" aria-labelledby="t-docs"><h2 id="t-docs">3. Valide tes documents</h2>${inner}</section>`;
 }
 
-export function billingProjectPage({ email, project: p, legal, errors, suggestions, docs, invoices = [], clients = [], selectedKind = '', selectedClientId = null, chosen, stage, jobs, flash }) {
+/** Le contenu de la facturation d'un projet ; `inTab` : affiché dans l'onglet Facturation de la page projet (pas de lien « Tous les projets », pas de titre propre). */
+export function billingProjectBody({ email, project: p, legal, errors, suggestions, docs, invoices = [], clients = [], selectedKind = '', selectedClientId = null, chosen, stage, jobs, flash, inTab = false }) {
   const running = Object.values(jobs).find((j) => ['queued', 'running'].includes(j.status));
   const lastDoc = docs.reduce((m, d) => Math.max(m, d.updatedAt), 0);
   const failed = !running ? Object.values(jobs).filter((j) => j.status === 'error' && Number(j.finishedAt || 0) >= lastDoc).sort((a, b) => b.finishedAt - a.finishedAt)[0] : null;
@@ -236,8 +237,8 @@ export function billingProjectPage({ email, project: p, legal, errors, suggestio
     <p class="muted">Le devis, l'acompte, la facture finale et l'avoir de « ${esc(p.name)} » sont validés : ils peuvent être utilisés dans iaboss. Les mentions légales se mettent à jour d'après tes informations légales.</p></div></section>` : '';
   const reset = docs.length ? `<form method="post" action="/facturation/projet/${p.id}/recommencer" data-confirm="Effacer les exemples et les documents de ce projet et repartir du début ? Tes informations légales sont conservées."><button class="btn small danger">${ic('trash')}Recommencer depuis le début</button></form>` : '';
   const body = `<div class="bill-page" data-bill data-bill-project="${p.id}" data-busy="${stage.busy ? '1' : '0'}">
-  <section class="card"><p><a class="link" href="/facturation">${ic('back')} Tous les projets</a></p>
-    <div class="row-between"><div><h1>Facturation : ${esc(p.name)}</h1><p class="muted small">${esc(host(p.gitUrl))}</p></div></div>
+  <section class="card">${inTab ? '' : `<p><a class="link" href="/facturation">${ic('back')} Tous les projets</a></p>`}
+    <div class="row-between"><div>${inTab ? '<h2>Facturation</h2>' : `<h1>Facturation : ${esc(p.name)}</h1>`}<p class="muted small">${esc(host(p.gitUrl))}</p></div></div>
     ${stepper(stage.steps, stageStep[stage.stage])}${statusBar}</section>
   ${done}
   ${ready ? [issueSection(p, docs, clients, invoices, selectedKind, selectedClientId), invoicesSection(invoices)].join('\n  ') : ''}
@@ -245,5 +246,9 @@ export function billingProjectPage({ email, project: p, legal, errors, suggestio
   ${reset ? `<div class="bill-foot">${reset}</div>` : ''}
   <p class="muted small bill-disc">Les documents suivent les usages entre professionnels en France. Les mentions légales sont rédigées par iaboss d'après tes informations, jamais par Claude : fais-les vérifier par un expert-comptable avant un usage particulier (client particulier, TVA sur les encaissements, marché public).</p>
 </div>`;
-  return layout({ title: `Facturation · ${p.name}`, email, body, scripts: ['/static/facturation.js'], named: true });
+  return body;
+}
+
+export function billingProjectPage(a) {
+  return layout({ title: `Facturation · ${a.project.name}`, email: a.email, body: billingProjectBody(a), scripts: ['/static/facturation.js'], named: true });
 }

@@ -51,7 +51,7 @@ export function contactPage({ email, project, detail, reply, hookBusy = false })
   <span class="pj-meta"><span class="badge ${BADGE[p.status] ?? ''}">${esc(STATUSES[p.status] || p.status)}</span><span class="mono muted">${esc(p.email)}</span><span class="small muted">${[p.city, p.score ? `score ${p.score}` : ''].filter(Boolean).map(esc).join(' · ')}</span></span></div>
   <div class="acts"><a class="btn primary" href="mailto:${esc(p.email)}${subject ? `?subject=${encodeURIComponent(subject)}` : ''}">${ic('reply')}Répondre</a>
     ${isClient ? '' : '<button type="button" class="btn" data-contact-client>Passer en client</button>'}
-    <a class="btn" href="/facturation/projet/${project.id}#generer">${ic('file')}Faire un devis</a></div></div>
+    <a class="btn" href="/p/${project.id}/facturation#generer">${ic('file')}Faire un devis</a></div></div>
 ${detail.optOut ? `<p class="ban ban-warn" role="note">${ic('alert')}<span>Sur la liste d'opposition (${detail.optOut.reason === 'bounce' ? 'adresse invalide' : detail.optOut.reason === 'refused' ? 'refus' : 'désinscription'}) : ne plus contacter.</span></p>` : ''}
 <div class="pj-grid pj-grid-e">
   <div class="pj-flat pj-left">

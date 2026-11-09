@@ -81,7 +81,7 @@ const agenda = (d) => `<section class="td-card" aria-labelledby="ag-h">
 const money = (d) => `<section class="td-card" aria-labelledby="ar-h">
   <div class="td-sec-h"><h2 id="ar-h">Argent</h2><a href="/compta">Comptabilité</a></div>
   ${d.invoices.length ? `<ul class="td-inv">
-    ${d.invoices.map((i) => `<li><span class="td-ev"><b>${esc(i.client)}</b><span class="${i.late ? 'late' : ''}">${esc(i.ref)} · ${esc(i.due)}</span></span><span class="td-amt"><b>${esc(i.amount)}</b><a href="${i.projectId ? `/facturation/projet/${i.projectId}` : '/compta'}">${i.late ? 'Relancer' : 'Voir la facture'}</a></span></li>`).join('\n    ')}
+    ${d.invoices.map((i) => `<li><span class="td-ev"><b>${esc(i.client)}</b><span class="${i.late ? 'late' : ''}">${esc(i.ref)} · ${esc(i.due)}</span></span><span class="td-amt"><b>${esc(i.amount)}</b><a href="${i.projectId ? `/p/${i.projectId}/facturation` : '/compta'}">${i.late ? 'Relancer' : 'Voir la facture'}</a></span></li>`).join('\n    ')}
   </ul>${d.more ? `<p class="td-none">et ${d.more} de plus dans <a href="/compta">Comptabilité</a>.</p>` : ''}` : '<p class="td-none">Aucune facture en attente d\'encaissement.</p>'}
   ${d.declaration ? `<div class="td-note" role="note">${ic('alert')}<span><b>Déclaration ${esc(d.declaration.label)}</b> à faire avant le ${esc(d.declaration.deadlineLabel)}${d.declaration.left <= 7 ? ` (${d.declaration.left === 0 ? "c'est aujourd'hui" : `dans ${d.declaration.left} jour${d.declaration.left > 1 ? 's' : ''}`})` : ''}. Montant à déclarer : <b>${esc(d.declaration.amount)}</b>.</span></div>
   <a class="td-link" href="/compta?declarer=1">Faire ma déclaration</a>` : ''}

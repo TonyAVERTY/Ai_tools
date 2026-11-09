@@ -20,7 +20,7 @@ const b = await chromium.launch(process.env.PLAYWRIGHT_CHROMIUM ? { executablePa
 const [name, value] = u.cookie.split('=');
 const TABS = {
   '': ['#mr-h', '#fp-h', '#pr-h', '#ec-h'], prospection: ['#acc-target', '#acc-search', '#acc-prospects'], envoi: ['#acc-template', '#acc-send', '#acc-followup'],
-  clients: ['a[href="/clients"]'], facturation: [`a[href="/facturation/projet/${a}"]`], communication: ['#acc-linkedin', '#acc-promo'],
+  clients: ['[data-clients] details[data-cl-project]'], facturation: ['[data-bill]'], communication: ['#acc-linkedin', '#acc-promo'],
   outils: ['#acc-evolution', '#acc-audit', '#acc-postes'], recap: ['#acc-recap'], reglages: ['#acc-header', '#acc-config'],
 };
 

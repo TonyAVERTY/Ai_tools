@@ -32,6 +32,7 @@ import { registerCalendarRoutes } from './calendar.js';
 import { registerAccountingRoutes } from './accountingroutes.js';
 import { registerBillingRoutes } from './billingroutes.js';
 import { registerClientsRoutes } from './clientsroutes.js';
+import { clientsOverview } from './clientsdata.js';
 import { registerChatRoutes } from './chat.js';
 import { registerEventRoutes } from './events.js';
 import { feedToken, feedUrl } from './services/ical.js';
@@ -205,7 +206,8 @@ export function registerRoutes(router, app) {
   };
 
   // Page d'un projet, une adresse par onglet (le sien ou un projet d'équipe) : tout autre numéro ou onglet est « introuvable »
-  const projectTab = async ({ res, params, session }) => {
+  const projectTab = async (ctx) => {
+    const { res, params, session } = ctx;
     const tab = params.tab ?? '';
     if (!tabSlugs().includes(tab)) throw new HttpError(404, 'Page introuvable');
     const userId = session.userId;
@@ -215,6 +217,8 @@ export function registerRoutes(router, app) {
     html(res, projectTabPage({
       email: session.email, entry, tab, stats: (await projectStats(db, [full.id])).get(Number(full.id)),
       checklist: await projectChecklist(app, full), jobs: await latestJobs(db, full.id),
+      billing: tab === 'facturation' ? await app.billingTab(ctx) : null,
+      clientCounts: tab === 'clients' ? (await clientsOverview(db, session.userId, [Number(full.id)])).get(Number(full.id)) : null,
       journal: tab === 'envoi' ? await journalOf(db, full.id) : null,
       scheduled: tab === 'communication' ? (await db.prepare("SELECT body, scheduled_at at FROM linkedin_posts WHERE project_id = ? AND status = 'scheduled' ORDER BY scheduled_at LIMIT 5").all(full.id)).map((r) => ({ body: r.body, at: Number(r.at) })) : [],
     }));

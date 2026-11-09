@@ -7,6 +7,7 @@ import { layout, projectBlocks } from './views.js';
 import { JOB_LABELS } from './today.js';
 import { ROLES } from './services/roles.js';
 import { aiName } from './services/ainame.js';
+import { clientProjectBlock } from './clientsviews.js';
 
 const fr = (n) => Number(n).toLocaleString('fr-FR');
 const shortDay = (ts) => new Date(ts * 1000).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', timeZone: 'Europe/Paris' });
@@ -155,14 +156,10 @@ function journalCard(p, j) {
     <div class="pj-kpis4 pj-j">${cell('Tous', j?.all, '')}${cell('Envoyé', j?.sent, 'sent')}${cell('Répondu', j?.replied, 'replied')}${cell('Non envoyé', j?.failed, 'failed', j?.failed ? `<span class="badge err">${ic('x')}échecs</span>` : '')}</div></section>`;
 }
 
-const external = (p, slug) => (slug === 'facturation'
-  ? `<section class="sheet"><h2>Facturation</h2><p>Informations légales, devis, acomptes, factures et avoirs de ce projet.</p><p><a class="btn primary" href="/facturation/projet/${p.id}">${ic('receipt')}Ouvrir la facturation du projet</a></p></section>`
-  : `<section class="sheet"><h2>Clients</h2><p>Les clients et prospects de ce projet : recherche, fiche, documents générés et export.</p><p><a class="btn primary" href="/clients">${ic('user')}Ouvrir les clients</a></p></section>`);
-
 /**
  * @param {{email:string, entry:object, tab:string, stats:object|null, checklist:object|null, jobs:object}} a
  */
-export function projectTabPage({ email, entry, tab, stats = null, checklist = null, jobs = {}, journal = null, scheduled = [] }) {
+export function projectTabPage({ email, entry, tab, stats = null, checklist = null, jobs = {}, journal = null, scheduled = [], clientCounts = null, billing = null }) {
   const p = entry.project;
   const manage = p.access !== 'member';
   const tabs = TABS.filter(([, , needs]) => manage || !needs);
@@ -170,7 +167,8 @@ export function projectTabPage({ email, entry, tab, stats = null, checklist = nu
   const blocks = projectBlocks(p, entry.smtp, entry.dbCfg, entry.imap);
   const profile = p.profile;
   const body = tab === '' ? overview(p, checklist, stats, jobs)
-    : tab === 'clients' || tab === 'facturation' ? external(p, tab)
+    : tab === 'clients' ? `<div class="bill-page" data-clients><div class="cl-projects">${clientProjectBlock({ id: Number(p.id), name: p.name, counts: clientCounts || { clients: 0, prospects: 0, pending: 0 } }, Number(p.id))}</div></div>`
+    : tab === 'facturation' ? billing || ''
       : tab === 'communication' ? `<div class="pj-grid pj-grid-c"><div class="pj-flat">${blocks.linkedin}</div><div class="pj-flat">${blocks.promo}\n${scheduledCard(p, scheduled)}</div></div>`
       : tab === 'outils' ? toolsLayout(p, blocks)
         : tab === 'reglages' ? settingsLayout(p, blocks)
@@ -197,5 +195,6 @@ ${body}
 </details>
 <dialog class="prospect-dialog" id="prospect-dialog" aria-label="Fiche prospect"><div data-dialog-body></div></dialog>
 </div>`,
+    scripts: tab === 'clients' ? ['/static/clients.js'] : tab === 'facturation' ? ['/static/facturation.js'] : [],
   });
 }

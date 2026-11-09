@@ -119,7 +119,7 @@ test('fiche client : informations modifiables, doublon de nom refusé, jamais la
   for (const v of ['value="Dupont &amp; Fils"', 'value="jean@dupont.fr"', 'value="98765432100011"', 'Paie à 15 jours']) assert.ok(h.includes(v), v);
   assert.match(loc(await post(u, `/clients/c/${id}`, { name: 'martin' })), /e=Un client porte déjà ce nom/);
   assert.match(loc(await post(u, `/clients/c/${id}`, { name: 'Dupont', email: 'oops' })), /e=L'adresse e-mail n'est pas valide/);
-  assert.match(h, new RegExp(`href="/facturation/projet/${pid}\\?client=${id}&amp;type=facture#generer"|href="/facturation/projet/${pid}\\?client=${id}&type=facture#generer"`));
+  assert.match(h, new RegExp(`href="/p/${pid}/facturation\\?client=${id}&amp;type=facture#generer"|href="/p/${pid}/facturation\\?client=${id}&type=facture#generer"`));
   const v = await s.newUser();
   assert.equal((await v.get(`/clients/c/${id}`, { headers: { accept: 'text/html' } })).status, 404);
   assert.equal((await post(v, `/clients/c/${id}`, { name: 'Pirate' })).status, 404);
