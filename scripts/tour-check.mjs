@@ -88,7 +88,7 @@ for (const [vp, scheme, tag] of [[{ width: 1280, height: 800 }, 'dark', '1280px 
         ok(await p.locator('.tour-dim').evaluate((e) => /evenodd/.test(getComputedStyle(e).clipPath) || getComputedStyle(e).clipPath !== 'none'), `${tag} étape ${n} : l'ombre est découpée autour de cette forme`);
       }
       ok(inView, `${tag} étape ${n} : la carte reste dans l'écran`);
-      ok(vp.width < 640 ? card.y >= hole.y + hole.height - 2 : !inter(card, hole), `${tag} étape ${n} : la carte ne recouvre pas l'élément éclairé${vp.width < 640 ? ` (carte y ${Math.round(card.y)} h ${Math.round(card.height)}, trou bas ${Math.round(hole.y + hole.height)})` : ''}`);
+      ok(vp.width < 640 ? (card.y >= hole.y + hole.height - 2 || card.y + card.height <= hole.y + 2) : !inter(card, hole), `${tag} étape ${n} : la carte ne recouvre pas l'élément éclairé${vp.width < 640 ? ` (carte y ${Math.round(card.y)} h ${Math.round(card.height)}, trou bas ${Math.round(hole.y + hole.height)})` : ''}`);
     }
     if (i === 3 || i === 7 || i === total - 2 || title.startsWith('Ta consommation')) await shot(p, `tour-${n}-${vp.width}`);
   }

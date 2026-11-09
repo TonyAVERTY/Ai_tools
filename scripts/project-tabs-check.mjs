@@ -20,7 +20,7 @@ const b = await chromium.launch(process.env.PLAYWRIGHT_CHROMIUM ? { executablePa
 const [name, value] = u.cookie.split('=');
 const TABS = {
   '': ['#mr-h', '#fp-h', '#pr-h', '#ec-h'], prospection: ['#acc-target', '#acc-search', '#acc-prospects'], envoi: ['#acc-template', '#acc-send', '#acc-followup'],
-  clients: ['a[href="/clients"]'], facturation: [`a[href="/facturation/projet/${a}"]`], communication: ['#acc-linkedin', '#acc-promo'],
+  clients: ['[data-clients] details[data-cl-project]'], facturation: ['[data-bill]'], communication: ['#acc-linkedin', '#acc-promo'],
   outils: ['#acc-evolution', '#acc-audit', '#acc-postes'], recap: ['#acc-recap'], reglages: ['#acc-header', '#acc-config'],
 };
 
@@ -61,8 +61,16 @@ for (const [vp, scheme] of [[{ width: 1280, height: 900 }, 'light'], [{ width: 1
     for (const sel of sels) if (!(await p.locator(sel).count())) missing.push(sel);
     ok(!missing.length, `${tag} /p/${a}${slug ? `/${slug}` : ''} : ${sels.length} bloc(s) présent(s)${missing.length ? ` (manque ${missing.join(', ')})` : ''}`);
     ok((await overflow()) <= 1, `${tag} onglet « ${slug || 'vue d\'ensemble'} » : pas de défilement horizontal`);
-    if (process.env.SHOT_DIR && ['', 'prospection', 'envoi'].includes(slug)) await p.screenshot({ path: `${process.env.SHOT_DIR}/projet-${slug || 'vue'}-${vp.width}-${scheme}.png`, fullPage: true });
+    if (process.env.SHOT_DIR && ['', 'prospection', 'envoi', 'communication', 'outils', 'recap', 'reglages'].includes(slug)) await p.screenshot({ path: `${process.env.SHOT_DIR}/projet-${slug || 'vue'}-${vp.width}-${scheme}.png`, fullPage: true });
   }
+
+  // Fiche contact
+  const contact = await s.db.prepare('SELECT id FROM prospects WHERE project_id = ? ORDER BY id LIMIT 1').get(a);
+  await p.goto(`${s.base}/p/${a}/contact/${contact.id}`);
+  await p.waitForSelector('html[data-nav="ready"]');
+  ok((await p.locator('[data-contact] h1').innerText()).startsWith('Cabinet'), `${tag} la fiche contact porte le nom du prospect`);
+  ok((await overflow()) <= 1, `${tag} fiche contact : pas de défilement horizontal`);
+  if (process.env.SHOT_DIR) await p.screenshot({ path: `${process.env.SHOT_DIR}/contact-${vp.width}-${scheme}.png`, fullPage: true });
 
   // Sections qui se chargent toutes seules
   await p.goto(`${s.base}/p/${a}/recap`);

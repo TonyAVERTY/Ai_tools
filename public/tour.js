@@ -122,6 +122,8 @@
       } else {
         Object.assign(hole.style, { left: `${r.left - PAD}px`, top: `${r.top - PAD}px`, width: `${r.width + 2 * PAD}px`, height: `${r.height + 2 * PAD}px`, borderRadius: '14px' });
       }
+      // Téléphone : la fiche est collée en bas ; quand l'élément éclairé est la barre du bas (onglets), elle passe en haut pour ne pas le couvrir
+      card.classList.toggle('tour-top', vw < 640 && !!el1?.closest('.pills'));
       if (vw < 640) { card.classList.add('tour-sheet'); Object.assign(card.style, { left: '', top: '' }); return; }
       card.classList.remove('tour-sheet');
       const w = card.offsetWidth;

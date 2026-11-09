@@ -20,12 +20,12 @@ Clique une carte : la page du projet s'ouvre (adresse `/p/` suivie du numéro du
 | **Vue d'ensemble** | `/p/N` | **Mise en route**, **Fiche projet**, les chiffres **Prospection** et la carte **En cours** |
 | **Prospection** (avec le nombre de prospects) | `/p/N/prospection` | **Cible**, **Recherche de prospects**, **Prospects** (liste, Kanban, fiches, import et export CSV) |
 | **Envoi** | `/p/N/envoi` | **Modèle de mail**, **Envoi** (avec la boîte de réception et le test A/B), **Relance automatique** |
-| **Clients** | `/p/N/clients` | les clients du projet (voir « Clients : liste par projet, fiches, documents et échanges ») |
-| **Facturation** | `/p/N/facturation` | les documents du projet (voir « Facturation : modèles de devis, d'acompte, de facture finale et d'avoir ») |
-| **Communication** | `/p/N/communication` | **LinkedIn** et **Promotion** |
-| **Outils IA** | `/p/N/outils` | **Évolution**, **Audit du projet** et **Postes et tâches IA** |
+| **Clients** | `/p/N/clients` | les clients et les prospects du projet, avec la recherche, « Ajouter un client » et l'export CSV, directement dans l'onglet (voir « Clients : liste par projet, fiches, documents et échanges ») |
+| **Facturation** | `/p/N/facturation` | toute la facturation du projet (informations légales, devis, acompte, facture finale, avoir), sans quitter la page du projet (voir « Facturation : modèles de devis, d'acompte, de facture finale et d'avoir »). L'ancienne adresse `/facturation/projet/N` renvoie vers cet onglet |
+| **Communication** | `/p/N/communication` | **LinkedIn** (à gauche), **Promotion** et **Programmés** (les posts LinkedIn programmés, avec « Voir dans l'agenda ») à droite |
+| **Outils IA** | `/p/N/outils` | un menu à gauche (**Évolution et audit**, puis les postes : **Direction**, **Commerce**… **Opérations et qualité**) ; à droite, **Évolution** et **Audit du projet**, ou les tâches du poste choisi |
 | **Récapitulatif** | `/p/N/recap` | chiffres business, prospection et courbes (propriétaire et administrateurs) |
-| **Réglages du projet** | `/p/N/reglages` | **En-tête** (dépôt, site du produit, fiche) et **Configuration du projet** (SMTP, IMAP, base de données, suppression) |
+| **Réglages du projet** | `/p/N/reglages` | un menu à gauche (**Adresse d'envoi (SMTP)**, **Boîte de réception (IMAP)**, **Dépôt et site**, **Base de données**, **Partage**, **Zone de danger**) et les cartes correspondantes à droite |
 
 Les sections d'un onglet sont déjà ouvertes : plus d'accordéon à déplier. Un membre d'équipe n'a pas les onglets Clients, Facturation, Récapitulatif et Réglages du projet. Le projet d'un autre compte, un numéro qui n'existe pas ou un onglet inconnu répondent « introuvable ». L'ancienne adresse `/projets/N` renvoie vers `/p/N`. Le bouton **Voir** du menu « Activité » et les liens de la page Aujourd'hui mènent au bon onglet.
 
@@ -42,7 +42,7 @@ Les sections d'un onglet sont déjà ouvertes : plus d'accordéon à déplier. U
 - **Évolution** : idées de fonctionnalités tirées du code, envoyées par mail. **Audit du projet** : rapport qualité et sécurité du code (propriétaires et administrateurs). **Postes et tâches IA** : les postes d'une entreprise (Commerce, Communication, Finance…) et les tâches que l'IA y fait. Voir « Évolution, Audit et Récapitulatif » et « Postes : les tâches IA d'une entreprise ». Le filtre « Poste » de l'ancienne page Projets n'existe plus : chaque poste a ses tâches dans l'onglet Outils IA.
 - **LinkedIn** : relier un compte, faire écrire des posts, relire, programmer, publier. **Promotion** : générer une vidéo de design motion.
 - **Récapitulatif** : chiffres business et courbes.
-- **En-tête** : « Dépôt Git et fiche projet ». Le champ **Site du produit** (avec **Enregistrer le site**) reçoit l'adresse du site de ton produit, par exemple `https://monproduit.fr` : elle est ajoutée dans les mails de prospection à la place de `{{site}}` ; laisse le champ vide pour ne pas en mettre (propriétaire et administrateurs). Le dépôt (lecture seule) et la **Fiche projet** y sont aussi. Si une analyse échoue, le message d'erreur s'affiche en haut de la page du projet, avec **Réessayer**.
+- **Dépôt et site** : « Dépôt Git, site du produit et fiche projet ». Le champ **Site du produit** (avec **Enregistrer le site**) reçoit l'adresse du site de ton produit, par exemple `https://monproduit.fr` : elle est ajoutée dans les mails de prospection à la place de `{{site}}` ; laisse le champ vide pour ne pas en mettre (propriétaire et administrateurs). Le dépôt (lecture seule) et la **Fiche projet** y sont aussi. Si une analyse échoue, le message d'erreur s'affiche en haut de la page du projet, avec **Réessayer**.
 - **Configuration du projet** : SMTP, boîte de réception (IMAP) et base de données du récapitulatif, plus le bouton **Supprimer le projet** (réservé aux propriétaires et administrateurs).
 
 ## Supprimer un projet
