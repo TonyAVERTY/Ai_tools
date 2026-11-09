@@ -13,7 +13,7 @@ Page du projet → onglet **Communication** : les sections **Instagram** et **Ne
    - elle **lit ton dépôt** (en lecture seule) pour retrouver le **vrai design** de ton produit : couleurs exactes, polices, formes, logo, allure des écrans ;
    - elle **dessine l'image** en HTML et CSS, sans script ni ressource externe, que le serveur transforme en PNG ;
    - un **directeur artistique** (un second contrôle indépendant) regarde l'image rendue et la juge comme un designer : point focal, lisibilité, fidélité à la marque, finition. En dessous de 7/10 ou au moindre défaut majeur, l'image repart en correction avec ses remarques. Trois essais au plus.
-5. Le brouillon apparaît : l'**image**, sa note, la **Légende (modifiable)**, les **Hashtags**, le **Texte alternatif de l'image** (pour les lecteurs d'écran) et, repliée, la rubrique « Ce que Claude a retenu de ton secteur » (le secteur retenu, les marques et pratiques observées, les principes retenus).
+5. Le brouillon apparaît : l'**image**, sa note, la **Légende (modifiable)** et les **Hashtags**. Sur grand écran l'image est à gauche et le texte à droite (sur téléphone, l'image puis le texte). Le **Texte alternatif de l'image** (pour les lecteurs d'écran) et la rubrique « Ce que Claude a retenu de ton secteur » (le secteur retenu, les marques et pratiques observées, les principes retenus) sont repliés dans « Détails : texte alternatif et… » : un clic les déplie.
 6. Relis, modifie, puis :
    - **Télécharger l'image** : le PNG, à publier tel quel ;
    - **Copier la légende** : la légende suivie des hashtags ;
