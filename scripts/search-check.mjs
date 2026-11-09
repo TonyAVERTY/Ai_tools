@@ -48,9 +48,9 @@ for (const [vp, scheme] of [[{ width: 1280, height: 800 }, 'light'], [{ width: 1
   await p.keyboard.press('Control+k');
   ok(await p.locator('#search').evaluate((d) => d.open), `${tag} Ctrl+K ouvre la recherche`);
   await p.locator('[data-search-q]').fill('kin');
-  await p.waitForSelector('a.s-row');
+  await p.waitForFunction(() => document.querySelector('a.s-row b')?.textContent === 'Agenda Kiné'); // les résultats de la recherche précédente restent affichés jusqu'à l'arrivée des nouveaux
   await p.keyboard.press('Enter');
-  await p.waitForFunction((id) => location.pathname === `/projets/${id}`, pid);
+  await p.waitForFunction((id) => location.pathname === `/p/${id}`, pid);
   ok(true, `${tag} Entrée ouvre la page du projet`);
   await p.waitForSelector('html[data-nav="ready"]');
 

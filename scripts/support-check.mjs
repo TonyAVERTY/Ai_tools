@@ -21,7 +21,7 @@ for (const vp of [{ width: 1280, height: 800, mouse: true }, { width: 390, heigh
   const errs = [];
   p.on('pageerror', (e) => errs.push(e.message));
   p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
-  await p.goto(`${s.base}/projets`);
+  await p.goto(`${s.base}/`);
   await p.waitForSelector('html[data-nav="ready"]');
   const menu = p.locator('details.ia-menu');
   ok(!(await menu.evaluate((d) => d.open)), `${tag} menu IA fermé au départ`);

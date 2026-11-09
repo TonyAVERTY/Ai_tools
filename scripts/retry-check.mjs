@@ -73,17 +73,19 @@ for (const vp of [{ width: 1280, height: 900 }, { width: 390, height: 844 }]) {
 
   // 1) les blocs du projet
   const tag = `${vp.width}px`;
-  await p.goto(`${s.base}/projets`); await p.waitForSelector('html[data-nav="ready"]');
-  await p.evaluate(() => { const d = document.querySelector('details.project'); if (d) d.open = true; for (const k of ['setup', 'linkedin', 'promo', 'recap']) { const a = document.querySelector(`details[data-acc="${k}"]`); if (a) a.open = true; } });
-  for (const k of ['setup', 'linkedin', 'promo', 'recap']) await p.locator(ZONES[k].sel).first().waitFor({ state: 'visible', timeout: 8000 }).catch(() => {});
-  ok(!(await p.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)), `${tag} pas de défilement horizontal avec les quatre erreurs`);
+  // (la liste « Mise en route » est rendue par le serveur : elle n'a plus de zone qui se charge après coup)
+  await p.goto(`${s.base}/p/${id}/communication`); await p.waitForSelector('html[data-nav="ready"]');
+  for (const k of ['linkedin', 'promo']) await p.locator(ZONES[k].sel).first().waitFor({ state: 'visible', timeout: 8000 }).catch(() => {});
+  ok(!(await p.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)), `${tag} pas de défilement horizontal avec les erreurs de LinkedIn et Promotion`);
   if (process.env.SHOT_DIR) await p.screenshot({ path: `${process.env.SHOT_DIR}/retry-${vp.width}.png` });
-  for (const k of ['setup', 'linkedin', 'promo', 'recap']) await check(k, tag);
+  for (const k of ['linkedin', 'promo']) await check(k, tag);
+  await p.goto(`${s.base}/p/${id}/recap`); await p.waitForSelector('html[data-nav="ready"]');
+  await p.locator(ZONES.recap.sel).first().waitFor({ state: 'visible', timeout: 8000 }).catch(() => {});
+  await check('recap', tag);
   // les courbes d'historique du Récap ont leur propre « Réessayer » (dans [data-charts], à l'intérieur de [data-recap])
   fail.add('history');
   await p.locator('[data-recap-refresh]').click();
   await check('history', tag);
-  ok(await p.locator('[data-cfg]:not([hidden])').count() === 1, `${tag} la liste de mise en route rechargée met à jour le badge « config »`);
 
   // 2) liste des clients
   await p.goto(`${s.base}/clients`); await p.waitForSelector('html[data-nav="ready"]');

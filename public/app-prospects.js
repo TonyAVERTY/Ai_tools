@@ -466,18 +466,21 @@
     try {
       const r = await api(`/api/projects/${proj.dataset.id}/prospects?${qs}`);
       d.dataset.page = r.page;
-      box.innerHTML = r.rows.length ? `<div class="table-wrap"><table><thead><tr><th>Entreprise</th><th>Email</th><th>Ville</th><th>Score</th><th>Contacté</th><th>Statut</th></tr></thead><tbody>
-        ${r.rows.map((x) => `<tr data-row="${x.id}"><td><button type="button" class="link" data-open-prospect="${x.id}">${esc(x.company)}</button>
-            ${x.next_action ? `<div class="small ${x.next_action_at * 1000 <= Date.now() ? 'warn' : 'muted'}">→ ${esc(x.next_action)} (${fmtDay(x.next_action_at)})</div>` : ''}</td>
-          <td>${esc(x.email)}</td><td>${esc(x.city)}</td><td>${x.score ?? ''}</td>
-          <td>${fmtDay(x.sent_at)}${x.followup_at ? ' <span class="muted small">+ relance</span>' : ''}</td>
-          <td><select data-prospect="${x.id}" class="st-${x.status}">${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${k === x.status ? 'selected' : ''}>${v}</option>`).join('')}</select></td></tr>`).join('')}
-      </tbody></table></div>` : '<p class="muted small">Aucun prospect ne correspond.</p>';
+      const due = (x) => x.next_action && x.next_action_at * 1000 <= Date.now();
+      box.innerHTML = r.rows.length ? `<div class="table-wrap"><table class="pr-table"><thead><tr><th>Entreprise</th><th class="sm-hide">Ville</th><th class="r">Score</th><th>Statut</th><th class="sm-hide">Prochaine action</th></tr></thead><tbody>
+        ${r.rows.map((x) => `<tr data-row="${x.id}"><td><button type="button" class="link" data-open-prospect="${x.id}"><b>${esc(x.company)}</b></button><br><span class="mono muted">${esc(x.email)}</span></td>
+          <td class="sm-hide">${esc(x.city)}</td><td class="r">${x.score != null ? `<span class="sc${x.score >= 9 ? ' hi' : ''}">${x.score}</span>` : ''}</td>
+          <td><select data-prospect="${x.id}" class="st-${x.status}" aria-label="Statut de ${esc(x.company)}">${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${k === x.status ? 'selected' : ''}>${v}</option>`).join('')}</select>
+            ${x.sent_at ? `<div class="small muted">contacté le ${fmtDay(x.sent_at)}${x.followup_at ? ' + relance' : ''}</div>` : ''}</td>
+          <td class="sm-hide">${x.next_action ? `${due(x) ? '<span class="badge warn">À faire</span> ' : ''}${esc(x.next_action)}<div class="small muted">${fmtDay(x.next_action_at)}</div>` : '—'}</td></tr>`).join('')}
+      </tbody></table></div>` : '<p class="muted small pr-none">Aucun prospect ne correspond.</p>';
+      // Compteurs des puces : tout le projet, quels que soient les filtres
+      for (const n of $$('[data-chip-n]', d)) n.textContent = String(r.counts?.[n.dataset.chipN] ?? '');
       $('[data-pager]', d).innerHTML = r.pages > 1
         ? `<button type="button" class="btn small" data-page="${r.page - 1}" ${r.page <= 1 ? 'disabled' : ''}>←</button>
            <span class="small muted">Page ${r.page} / ${r.pages} · ${r.total} prospect(s)</span>
            <button type="button" class="btn small" data-page="${r.page + 1}" ${r.page >= r.pages ? 'disabled' : ''}>→</button>`
-        : `<span class="small muted">${r.total} prospect(s)</span>`;
+        : `<span class="small muted">${r.total ? `1 à ${r.rows.length} sur ${r.total}` : '0 prospect'}</span>`;
       const row = fresh ? $(`tr[data-row="${fresh}"]`, box) : null;
       if (row) {
         row.classList.add('row-new');
@@ -536,14 +539,34 @@
     if (card && card.closest('.kcol') !== col) moveProspect(col.closest('details.prospects'), id, col.dataset.col);
   });
 
+  // Puces de statut : elles règlent le champ « statut » du formulaire de filtres (ou la case « Actions à faire »), puis la liste se recharge
+  const syncChips = (d) => {
+    const f = $('[data-filters]', d);
+    const todo = f.elements.todo?.checked;
+    for (const c of $$('[data-chip]', d)) { const on = !todo && c.dataset.chip === f.elements.status.value; c.classList.toggle('on', on); c.setAttribute('aria-pressed', String(on)); }
+    const t = $('[data-chip-todo]', d);
+    if (t) { t.classList.toggle('on', !!todo); t.setAttribute('aria-pressed', String(!!todo)); }
+  };
+  listen(document, 'click', (e) => {
+    const chip = e.target.closest?.('[data-chip], [data-chip-todo]');
+    if (!chip) return;
+    const d = chip.closest('details.prospects');
+    const f = $('[data-filters]', d);
+    if (chip.matches('[data-chip-todo]')) { f.elements.todo.checked = !f.elements.todo.checked; if (f.elements.todo.checked) f.elements.status.value = ''; } else { f.elements.status.value = chip.dataset.chip; f.elements.todo.checked = false; }
+    syncChips(d);
+    loadProspects(d);
+  });
+
   $$('details.prospects').forEach((d) => {
     d.dataset.view = 'list';
+    $('[data-filters]', d).addEventListener('change', () => syncChips(d));
     for (const b of $$('[data-view-mode]', d)) b.addEventListener('click', () => {
       d.dataset.view = b.dataset.viewMode;
       for (const o of $$('[data-view-mode]', d)) { o.classList.toggle('on', o === b); o.setAttribute('aria-pressed', String(o === b)); }
       loadProspects(d);
     });
     d.addEventListener('toggle', () => { if (d.open) loadProspects(d); });
+    if (d.open) loadProspects(d); // onglet Prospection : la liste est ouverte d'office, elle se charge tout de suite
     const form = $('[data-filters]', d);
     let t;
     form.addEventListener('input', (e) => { if (e.target.name === 'q') { clearTimeout(t); t = setTimeout(() => loadProspects(d), 300); } });

@@ -63,17 +63,12 @@ for (const [mode, reduced] of [['normal', 'no-preference'], ['mouvement réduit'
       ok(up === 'none', `${tag} il revient à sa taille au relâchement (« ${up} »)`);
     }
 
-    // 2) la page Projets : on suit les animations qui démarrent
-    await p.goto(`${s.base}/projets`); await p.waitForSelector('html[data-nav="ready"]');
-    await p.evaluate(() => { window.__a = []; document.addEventListener('animationstart', (e) => { const t = e.target; window.__a.push({ n: e.animationName, tag: t.tagName, cls: String(t.className?.baseVal ?? t.className), zone: t.matches?.('[data-recap]') || false, props: t.getAnimations().filter((a) => a.animationName === e.animationName).flatMap((a) => a.effect.getKeyframes().flatMap((k) => Object.keys(k).filter((x) => !['offset', 'easing', 'composite', 'computedOffset'].includes(x)))) }); }, true); });
-    await p.evaluate(() => { document.querySelector('details.project').open = true; });
-    ok(await waitFor(async () => (await p.locator('[data-setup-go]').count()) > 5), `${tag} la liste « Mise en route » est affichée`);
-    await p.waitForTimeout(400);
-    ok(!(await starts()).some((x) => x.n === 'wiz-pop'), `${tag} aucune coche ne saute au premier affichage de la liste`);
-
-    // 3) le contenu arrive à la place du cercle : fondu, une seule fois
+    // 2) l'onglet Récapitulatif d'un projet : la réponse du récap est retenue, puis on suit les animations qui démarrent
     hold = true;
-    await p.evaluate(() => { document.querySelector('details[data-acc="recap"]').open = true; });
+    await p.goto(`${s.base}/p/${id}/recap`); await p.waitForSelector('html[data-nav="ready"]');
+    const track = () => p.evaluate(() => { window.__a = []; document.addEventListener('animationstart', (e) => { const t = e.target; window.__a.push({ n: e.animationName, tag: t.tagName, cls: String(t.className?.baseVal ?? t.className), zone: t.matches?.('[data-recap]') || false, props: t.getAnimations().filter((a) => a.animationName === e.animationName).flatMap((a) => a.effect.getKeyframes().flatMap((k) => Object.keys(k).filter((x) => !['offset', 'easing', 'composite', 'computedOffset'].includes(x)))) }); }, true); });
+    await track();
+    // 3) le contenu arrive à la place du cercle : fondu, une seule fois
     ok(await waitFor(async () => (await p.locator('[data-recap] .loading').count()) === 1), `${tag} le récapitulatif montre son cercle`);
     await p.evaluate(() => { window.__a.length = 0; });
     hold = false;
@@ -90,30 +85,10 @@ for (const [mode, reduced] of [['normal', 'no-preference'], ['mouvement réduit'
       ok(!(await p.locator('[data-recap]').evaluate((e) => e.classList.contains('reveal'))), `${tag} la classe de fondu se retire d'elle-même`);
     }
 
-    // 4) une étape de « Mise en route » faite : sa coche saute (seulement les nouvelles) ; tout fait : le badge « config ✓ » aussi
-    const reopen = () => p.evaluate(async () => { const d = document.querySelector('details.project'); d.open = false; await new Promise((r) => setTimeout(r, 200)); d.open = true; });
-    await p.evaluate(() => { document.querySelector('details[data-acc="setup"]').open = true; }); // la section est repliée par défaut : sans elle ouverte, rien ne s'anime
-    await p.waitForTimeout(700); // le fondu de la zone, démarré quand la section s'ouvre, est fini
-    const before = await p.locator('.setup li.done').count();
-    await p.evaluate(() => { window.__a.length = 0; });
-    doneN = 6; await reopen();
-    ok(await waitFor(async () => (await p.locator('.setup li.done').count()) > before), `${tag} de nouvelles étapes sont cochées (${before} avant)`);
-    await p.waitForTimeout(500);
-    const after = await p.locator('.setup li.done').count();
-    const ticks = (await starts()).filter((x) => x.n === 'wiz-pop' && x.tag === 'svg');
-    if (calm) ok(ticks.length === 0, `${tag} aucune coche ne saute`);
-    else {
-      ok(ticks.length === after - before && ticks.length > 0, `${tag} seules les coches nouvelles sautent : ${ticks.length} pour ${after - before} étape(s) nouvelle(s), pas celles d'avant`);
-      ok(ticks.every((x) => x.props.every((k) => ['transform', 'opacity'].includes(k))), `${tag} la coche n'anime que transform et opacity`);
-    }
-    await p.evaluate(() => { window.__a.length = 0; });
-    doneN = 99; await reopen();
-    ok(await waitFor(async () => (await p.locator('[data-cfg]').innerText()).trim() === 'config ✓'), `${tag} tout est fait : « config ✓ »`);
-    await p.waitForTimeout(500);
-    const pops = (await starts()).filter((x) => x.n === 'wiz-pop' && x.tag === 'BUTTON');
-    ok(calm ? pops.length === 0 : pops.length === 1, `${tag} ${calm ? 'le badge ne bouge pas' : 'le badge « config ✓ » apparaît d\'un petit saut, une fois'} (${pops.length})`);
+    // 4) (retiré : « Mise en route » est une carte fixe sur la vue d'ensemble, rendue par le serveur ; ses coches et le badge « config ✓ » ne sautent plus)
 
     // 5) un prospect ajouté : sa ligne est surlignée puis redevient normale
+    await p.goto(`${s.base}/p/${id}/prospection`); await p.waitForSelector('html[data-nav="ready"]'); await track();
     await p.evaluate(() => { document.querySelector('details.prospects').open = true; });
     ok(await waitFor(async () => (await p.locator('tr[data-row]').count()) === 3), `${tag} trois prospects listés`);
     await p.locator('[data-pform-toggle]').click();

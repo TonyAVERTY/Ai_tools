@@ -9,6 +9,7 @@ import { addProject } from './helpers/users.js';
 import { getProject } from '../src/projects.js';
 import { ownedTeam } from '../src/teams.js';
 import { PLAN_LIMITS } from '../src/limits.js';
+import { projectsHtml } from './helpers/pages.js';
 
 const LINK = { v: 1, mode: 'api_key', valid: true };
 const HTML = { headers: { accept: 'text/html' } };
@@ -138,7 +139,7 @@ test('un membre travaille sur les projets partagés, et sur eux seulement', asyn
   // Et l'étranger ne voit rien du projet partagé
   assert.equal((await w.stranger.get(`/api/projects/${w.shared}/status`)).status, 404);
   assert.equal((await w.stranger.get(`/api/projects/${w.shared}/prospects.csv`)).status, 404);
-  assert.doesNotMatch(await text(w.stranger, '/projets'), /Partagé/);
+  assert.doesNotMatch(await projectsHtml(w.stranger), /Partagé/);
 
   // Le job part au nom du propriétaire : son accès Claude, son plan, son compteur d'usage
   const job = await w.member.post(`/api/projects/${w.shared}/analyze`, {});
@@ -169,9 +170,9 @@ test('rôles : un membre ne règle rien, un administrateur règle sans supprimer
 
   assert.equal((await admin.post(`/api/projects/${w.shared}/smtp`, smtp)).status, 200);
   assert.equal((await admin.post(`/api/projects/${w.shared}/delete`, {})).status, 403, 'l\'administrateur ne supprime pas');
-  assert.match(await text(admin, '/projets'), /Configuration du projet/);
+  assert.match(await projectsHtml(admin), /Configuration du projet/);
   // Le mot de passe saisi n'est jamais relu par l'administrateur
-  assert.doesNotMatch(await text(admin, '/projets'), /value="p"/);
+  assert.doesNotMatch(await projectsHtml(admin), /value="p"/);
 
   // Ni l'un ni l'autre ne gère l'équipe
   assert.equal((await form(admin, '/team/invite', { email: 'x@exemple.fr' })).status, 404);
@@ -263,8 +264,8 @@ test('SMTP du projet : le sien ou rien, et la page l\'explique ; hôte vide = on
   const p = await addProject(s.db, u.id, { name: 'Boîte propre' });
   const src = async () => (await (await u.get(`/api/projects/${p}/status`)).json()).smtpSource;
   assert.equal(await src(), null);
-  assert.match(await text(u, '/projets'), /Aucun SMTP/);
-  assert.doesNotMatch(await text(u, '/projets'), /SMTP des Réglages|Laisse l'hôte vide/);
+  assert.match(await projectsHtml(u), /Aucun SMTP/);
+  assert.doesNotMatch(await projectsHtml(u), /SMTP des Réglages|Laisse l'hôte vide/);
 
   // Il n'y a plus de SMTP « global » dans les Réglages : la page n'en propose plus, et un envoi de formulaire le recevant l'ignore
   assert.doesNotMatch(await text(u, '/settings'), /SMTP global|name="smtp_host"/);
@@ -274,7 +275,7 @@ test('SMTP du projet : le sien ou rien, et la page l\'explique ; hôte vide = on
   const own = { host: 'smtp.projet.fr', port: 587, user: 'u', pass: 'p', fromEmail: 'p@exemple.fr', dailyCap: 20 };
   assert.equal((await u.post(`/api/projects/${p}/smtp`, own)).status, 200);
   assert.equal(await src(), 'project');
-  assert.match(await text(u, '/projets'), /depuis son adresse/);
+  assert.match(await projectsHtml(u), /depuis son adresse/);
 
   const r = await u.post(`/api/projects/${p}/smtp`, { host: '', dailyCap: 25 });
   assert.equal((await r.json()).reset, true);

@@ -24,7 +24,7 @@ for (const scheme of ['light', 'dark']) {
     const errs = [];
     p.on('pageerror', (e) => errs.push(e.message));
     p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
-    for (const path of ['/', '/projets', `/projets/${a}`]) {
+    for (const path of ['/', '/projets', `/p/${a}`, `/p/${a}/prospection`]) {
       await p.goto(`${s.base}${path}`);
       await p.waitForSelector('html[data-nav="ready"]');
       const m = await p.evaluate(() => {
@@ -49,13 +49,13 @@ for (const scheme of ['light', 'dark']) {
   const p = await ctx.newPage();
   await p.goto(`${s.base}/projets`);
   await p.waitForSelector('html[data-nav="ready"]');
-  const link = p.locator('a.pname-l', { hasText: 'Page du projet' }).first();
-  ok((await link.boundingBox()).height >= 43.5, 'le lien « Page du projet » fait au moins 44 px de haut');
-  await link.click();
-  await p.waitForFunction((id) => location.pathname === `/projets/${id}`, a);
+  const card = p.locator('a.pj-card').first();
+  ok((await card.boundingBox()).height >= 43.5, 'la carte du projet est une grande cible (au moins 44 px)');
+  await card.click();
+  await p.waitForFunction((id) => location.pathname === `/p/${id}`, a);
   await p.waitForSelector('html[data-nav="ready"]');
   ok((await p.locator('h1').innerText()) === 'Agenda Kiné', 'la page du projet porte son nom');
-  ok((await p.locator('.project').count()) === 1 && (await p.locator('.project').getAttribute('open')) !== null, 'un seul projet, ouvert');
+  ok((await p.locator('.project').count()) === 1 && (await p.locator('.project').getAttribute('open')) !== null, 'un seul projet, ouvert d\'office');
   ok((await p.locator('.pills a.pill[aria-current="page"]').count()) === 0 || (await p.locator('.pills a.pill[aria-current="page"]').innerText()).includes('Projets'), 'l\'onglet Projets reste surligné (ou aucun)');
   await p.locator('.crumb a', { hasText: 'Projets' }).click();
   await p.waitForFunction(() => location.pathname === '/projets');

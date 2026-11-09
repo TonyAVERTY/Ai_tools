@@ -49,7 +49,7 @@ for (const vp of [{ width: 1280, height: 900 }, { width: 390, height: 844 }]) {
   const errs = [];
   p.on('pageerror', (e) => errs.push(e.message));
   p.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource|status of 500/.test(m.text())) errs.push(m.text()); });
-  await p.goto(`${s.base}/projets`);
+  await p.goto(`${s.base}/p/${pid}/prospection`);
   await p.waitForSelector('html[data-nav="ready"]');
   await p.waitForSelector('[data-pform-toggle]', { state: 'attached' });
   await p.evaluate(() => { for (const k of ['prospect', 'prospects']) { const d = document.querySelector(`details[data-acc="${k}"]`); if (d) d.open = true; } });
@@ -88,7 +88,7 @@ for (const vp of [{ width: 1280, height: 900 }, { width: 390, height: 844 }]) {
   await ctxF.addCookies([{ name, value, url: s.base }]);
   await slowRoute(ctxF, [{ pattern: /\/api\/projects\/\d+\/prospects$/, ms: 600, fail: true }]);
   const pf = await ctxF.newPage();
-  await pf.goto(`${s.base}/projets`); await pf.waitForSelector('[data-pform-toggle]', { state: 'attached' });
+  await pf.goto(`${s.base}/p/${pid}/prospection`); await pf.waitForSelector('[data-pform-toggle]', { state: 'attached' });
   await pf.evaluate(() => { for (const k of ['prospect', 'prospects']) { const d = document.querySelector(`details[data-acc="${k}"]`); if (d) d.open = true; } });
   await pf.locator('[data-pform-toggle]').click();
   await pf.fill('form[data-pform] [name=email]', `echec-${vp.width}@atelier.fr`);
@@ -102,7 +102,7 @@ for (const vp of [{ width: 1280, height: 900 }, { width: 390, height: 844 }]) {
   await ctxR.addCookies([{ name, value, url: s.base }]);
   await slowRoute(ctxR, [{ pattern: /\/api\/projects\/\d+\/prospects$/ }]);
   const pr = await ctxR.newPage();
-  await pr.goto(`${s.base}/projets`); await pr.waitForSelector('[data-pform-toggle]', { state: 'attached' });
+  await pr.goto(`${s.base}/p/${pid}/prospection`); await pr.waitForSelector('[data-pform-toggle]', { state: 'attached' });
   await pr.evaluate(() => { for (const k of ['prospect', 'prospects']) { const d = document.querySelector(`details[data-acc="${k}"]`); if (d) d.open = true; } });
   await pr.locator('[data-pform-toggle]').click();
   await pr.fill('form[data-pform] [name=email]', `calme-${vp.width}@atelier.fr`);

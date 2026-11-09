@@ -6,6 +6,7 @@ import { Worker } from '../src/services/jobs.js';
 import { aiName, withAiName, forAi, DEFAULT_AI_NAME } from '../src/services/ainame.js';
 import { saveLink } from '../src/claudelink.js';
 import { startApp } from './helpers/server.js';
+import { projectsHtml } from './helpers/pages.js';
 
 // Le nom de l'IA de l'utilisateur (Claude, ChatGPT, Gemini) dans les pages, les réglages et les messages de tâches.
 let s;
@@ -38,13 +39,13 @@ test('aiName : propre à la requête, « Claude » hors requête, jamais mélang
 test('tableau de bord : le nom de l\'IA de l\'utilisateur, dans le menu, les sections et la page', async () => {
   const g = await s.newUser({ admin: false, link: linked('gemini') });
   const c = await s.newUser({ admin: false, link: linked('claude') });
-  const gp = await html(g, '/projets');
+  const gp = await html(g, '/');
   assert.match(gp, /<body class="app" data-ai="Gemini">/);
   assert.match(gp, /<span class="pop-t">Gemini<small>Discute avec ton Gemini<\/small><\/span>/, 'menu Assistant');
   assert.match(gp, /aria-label="Assistant : discuter avec Gemini ou demander de l'aide sur iaboss"/);
   assert.match(gp, /Consommation Gemini/);
   assert.doesNotMatch(gp.replace(/<script[^]*?<\/script>/g, ''), /Discute avec ton Claude|Consommation Claude/, 'aucun Claude là où c\'est l\'IA de la personne');
-  const cp = await html(c, '/projets');
+  const cp = await html(c, '/');
   assert.match(cp, /data-ai="Claude"/);
   assert.match(cp, /Discute avec ton Claude/);
   assert.match(cp, /Consommation Claude/);
@@ -54,7 +55,7 @@ test('tableau de bord : le nom de l\'IA de l\'utilisateur, dans le menu, les sec
 test('sections d\'un projet : « Gemini cherche des entreprises… », « Gemini écrit des posts », « Gemini conçoit une vidéo »', async () => {
   const g = await s.newUser({ admin: false, link: linked('gemini') });
   await s.db.prepare(`INSERT INTO projects(user_id, name, git_url, profile_json, target_json, target_validated, created_at) VALUES(?, 'P', 'https://git.test/p.git', '{}', '{}', 1, 1)`).run(g.id);
-  const page = await html(g, '/projets');
+  const page = await projectsHtml(g);
   assert.match(page, /Gemini cherche des entreprises qui collent à la cible/);
   assert.match(page, /Relie un compte, Gemini écrit des posts, tu relis et publies/);
   assert.match(page, /Gemini conçoit une vidéo de design motion/);

@@ -41,7 +41,9 @@ import { registerPromoRoutes, removeProjectVideos } from './promo.js';
 import { registerPosteRoutes } from './posteroutes.js';
 import { isRoleJob, roleTaskByJob } from './services/roles.js';
 import { registerProspectRoutes } from './prospectroutes.js';
-import { dashboardPage, projectPage, settingsPage, unsubPage, accountPage, layout } from './views.js';
+import { settingsPage, unsubPage, accountPage, layout } from './views.js';
+import { projectsPage, projectTabPage, tabSlugs } from './projectviews.js';
+import { fmtEur } from './services/accounting.js';
 import { linkPage } from './linkviews.js';
 import { availableProviders } from './services/providers/availability.js';
 import { getProvider } from './services/providers/index.js';
@@ -178,19 +180,37 @@ export function registerRoutes(router, app) {
       projects.push({ project: p, smtp: publicConfig(full.smtp, 'pass'), dbCfg: publicConfig(full.dbCfg, 'password'), imap: publicConfig(full.imapCfg, 'pass') });
     }
     const stats = await projectStats(db, projects.map((x) => x.project.id));
-    html(res, dashboardPage({
-      email: session.email, projects, stats, gitHosts: (await listGitServers(db, userId)).map((x) => x.host), usage: await usageView(db, await getUser(db, userId)),
+    // État de mise en route et argent à encaisser de chaque projet, pour les cartes
+    const checks = new Map();
+    for (const x of projects) {
+      const full = await getProject(app, x.project.id, { userId, secrets: true });
+      checks.set(Number(x.project.id), await projectChecklist(app, full));
+    }
+    const cash = new Map();
+    for (const r of await db.prepare(`SELECT i.project_id, SUM(i.amount_cents) cents FROM billing_invoices i JOIN accounting_entries e ON e.id = i.entry_id
+        WHERE i.user_id = ? AND e.pending = 1 AND i.kind <> 'avoir' AND i.project_id IS NOT NULL GROUP BY i.project_id`).all(Number(userId))) cash.set(Number(r.project_id), Number(r.cents || 0));
+    html(res, projectsPage({
+      email: session.email, projects, stats, checks, cash, fmtEur, gitHosts: (await listGitServers(db, userId)).map((x) => x.host), usage: await usageView(db, await getUser(db, userId)),
       pauseMessage: await sendPause(db, userId).then((p) => (p ? pauseMessageOf(p) : null)),
     }));
   });
 
-  // Page dédiée d'un projet (le sien ou un projet d'équipe) : tout autre numéro est « introuvable »
-  router.get('/projets/:id', async ({ res, params, session }) => {
+  // Page d'un projet, une adresse par onglet (le sien ou un projet d'équipe) : tout autre numéro ou onglet est « introuvable »
+  const projectTab = async ({ res, params, session }) => {
+    const tab = params.tab ?? '';
+    if (!tabSlugs().includes(tab)) throw new HttpError(404, 'Page introuvable');
     const userId = session.userId;
     const full = await getProject(app, params.id, { userId, secrets: true });
+    if (full.access === 'member' && ['clients', 'facturation', 'recap', 'reglages'].includes(tab)) throw new HttpError(404, 'Page introuvable');
     const entry = { project: full, smtp: publicConfig(full.smtp, 'pass'), dbCfg: publicConfig(full.dbCfg, 'password'), imap: publicConfig(full.imapCfg, 'pass') };
-    html(res, projectPage({ email: session.email, entry, stats: (await projectStats(db, [full.id])).get(Number(full.id)) }));
-  });
+    html(res, projectTabPage({
+      email: session.email, entry, tab, stats: (await projectStats(db, [full.id])).get(Number(full.id)),
+      checklist: await projectChecklist(app, full), jobs: await latestJobs(db, full.id),
+    }));
+  };
+  router.get('/p/:id', projectTab);
+  router.get('/p/:id/:tab', projectTab);
+  router.get('/projets/:id', async ({ res, params }) => redirect(res, `/p/${params.id}`));
 
   router.get('/settings', async ({ res, session, url }) => {
     const userId = session.userId;
