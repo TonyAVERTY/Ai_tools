@@ -154,7 +154,7 @@ test('sujet vide : Claude présente le projet ; scène fautive renvoyée une foi
   await s.db.prepare("DELETE FROM jobs WHERE project_id = ?").run(pid);
   await gen(u, pid, { fps: 10, seconds: 3 });
   assert.equal((await runJob(pid)).status, 'done');
-  assert.match(calls().slice(n1)[0].prompt, /Aucun sujet précisé : la vidéo présente le projet/);
+  assert.match(calls().slice(n1).find((x) => !isResearch(x)).prompt, /Aucun sujet précisé : la vidéo présente le projet/);
 });
 
 test('scène toujours fautive : job en erreur lisible, aucune ligne ni fichier laissés', { skip: !supported.ok && supported.reason }, async () => {
