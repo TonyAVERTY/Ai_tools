@@ -26,6 +26,17 @@ test('la page d\'un projet : nom, dépôt, fil d\'Ariane, neuf onglets avec une 
   assert.doesNotMatch(h, new RegExp(`data-id="${b}"`), 'les autres projets ne sont pas sur cette page');
 });
 
+test('la pastille de l\'onglet Prospection compte ce qui attend une action, pas le nombre de prospects', async () => {
+  const u = await s.newUser({ email: 'pastille@x.fr' });
+  const a = await addProject(s.db, u.id, { name: 'Calme', gitUrl: 'https://github.com/u/calme.git' });
+  const t = Math.floor(Date.now() / 1000);
+  for (let i = 0; i < 4; i++) await s.db.prepare("INSERT INTO prospects(project_id, company, email, status, created_at, sent_at) VALUES(?, ?, ?, 'sent', ?, ?)").run(a, `E${i}`, `e${i}@x.fr`, t, t);
+  const tab = (h) => h.match(/<nav class="ptabs"[^]*?<\/nav>/)[0];
+  assert.doesNotMatch(tab(await text(u, `/p/${a}`)), /class="count"/, 'quatre prospects contactés, rien à faire : pas de pastille');
+  await s.db.prepare("UPDATE prospects SET status = 'replied', replied_at = ? WHERE project_id = ? AND email = 'e0@x.fr'").run(t, a);
+  assert.match(tab(await text(u, `/p/${a}`)), /Prospection <span class="count" title="[^"]+">1<\/span>/, 'une réponse à traiter : la pastille affiche 1, pas 4');
+});
+
 test('chaque onglet répond avec son titre ; un onglet inconnu est introuvable ; l\'ancienne adresse /projets/:id redirige', async () => {
   const u = await s.newUser({ email: 'onglets@x.fr' });
   const a = await addProject(s.db, u.id, { name: 'Alpha', gitUrl: 'https://github.com/u/alpha.git' });

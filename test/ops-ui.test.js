@@ -30,9 +30,17 @@ test('projectStats : prospects, à contacter, réponses et dernier envoi, projet
   const p2 = await addProject(s.db, u.id, { name: 'Vide', gitUrl: 'https://github.com/u/vide.git' });
   await seedProspects(p1);
   const st = await projectStats(s.db, [p1, p2]);
-  assert.deepEqual({ ...st.get(Number(p1)), lastSentAt: typeof st.get(Number(p1)).lastSentAt }, { prospects: 6, toContact: 2, replies: 2, clients: 1, lastSentAt: 'number' });
-  assert.deepEqual(st.get(Number(p2)), { prospects: 0, toContact: 0, replies: 0, clients: 0, lastSentAt: null }, 'un projet vide renvoie des zéros, pas de valeur inventée');
+  assert.deepEqual({ ...st.get(Number(p1)), lastSentAt: typeof st.get(Number(p1)).lastSentAt }, { prospects: 6, toContact: 2, replies: 2, clients: 1, toHandle: 1, lastSentAt: 'number' });
+  assert.deepEqual(st.get(Number(p2)), { prospects: 0, toContact: 0, replies: 0, clients: 0, toHandle: 0, lastSentAt: null }, 'un projet vide renvoie des zéros, pas de valeur inventée');
   assert.equal((await projectStats(s.db, [])).size, 0);
+  // « À traiter » : seulement ce qui attend une action (réponse à traiter, prochaine action échue), jamais le total des prospects
+  const p3 = await addProject(s.db, u.id, { name: 'Calme', gitUrl: 'https://github.com/u/calme.git' });
+  const t = Math.floor(Date.now() / 1000);
+  for (let i = 0; i < 5; i++) await s.db.prepare("INSERT INTO prospects(project_id, company, email, status, created_at, sent_at) VALUES(?, ?, ?, 'sent', ?, ?)").run(p3, `E${i}`, `e${i}@x.fr`, t, t);
+  assert.equal((await projectStats(s.db, [p3])).get(Number(p3)).toHandle, 0, 'cinq prospects contactés, aucune action : rien à traiter');
+  await s.db.prepare('UPDATE prospects SET next_action = ?, next_action_at = ? WHERE project_id = ? AND email = ?').run('Rappeler', t - 60, p3, 'e0@x.fr');
+  await s.db.prepare('UPDATE prospects SET next_action = ?, next_action_at = ? WHERE project_id = ? AND email = ?').run('Plus tard', t + 86400, p3, 'e1@x.fr');
+  assert.equal((await projectStats(s.db, [p3])).get(Number(p3)).toHandle, 1, 'une action échue compte, une action future non');
 });
 
 test('page Projets : les chiffres réels sont sur la carte du projet ; un projet vide le dit ; un autre compte ne les voit pas', async () => {
