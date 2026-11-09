@@ -195,6 +195,14 @@ export function registerRoutes(router, app) {
     }));
   });
 
+  // Journal du projet (onglet Envoi) : mails de ce projet, par état
+  const journalOf = async (database, projectId) => {
+    const r = await database.prepare(`SELECT COUNT(*) n, SUM(CASE WHEN m.error IS NULL THEN 1 ELSE 0 END) ok, SUM(CASE WHEN m.error IS NOT NULL THEN 1 ELSE 0 END) failed,
+        SUM(CASE WHEN m.error IS NULL AND x.status IN ('replied', 'client') THEN 1 ELSE 0 END) replied
+      FROM mail_log m LEFT JOIN prospects x ON x.id = m.prospect_id WHERE m.project_id = ?`).get(projectId);
+    return { all: Number(r?.n || 0), sent: Number(r?.ok || 0), failed: Number(r?.failed || 0), replied: Number(r?.replied || 0) };
+  };
+
   // Page d'un projet, une adresse par onglet (le sien ou un projet d'équipe) : tout autre numéro ou onglet est « introuvable »
   const projectTab = async ({ res, params, session }) => {
     const tab = params.tab ?? '';
@@ -206,6 +214,7 @@ export function registerRoutes(router, app) {
     html(res, projectTabPage({
       email: session.email, entry, tab, stats: (await projectStats(db, [full.id])).get(Number(full.id)),
       checklist: await projectChecklist(app, full), jobs: await latestJobs(db, full.id),
+      journal: tab === 'envoi' ? await journalOf(db, full.id) : null,
     }));
   };
   router.get('/p/:id', projectTab);

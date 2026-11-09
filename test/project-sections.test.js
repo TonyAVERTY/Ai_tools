@@ -58,7 +58,7 @@ test('Réglages du projet : dépôt, site et analyse, puis la configuration (SMT
 
 test('chaque onglet ne montre que ses sections', async () => {
   const tab = await at('cible-validee');
-  const only = { prospection: ['target', 'search', 'prospects'], envoi: ['template', 'send', 'followup'], communication: ['linkedin', 'promo'], outils: ['evolution', 'audit', 'postes'], recap: ['recap'], reglages: ['header', 'config'] };
+  const only = { prospection: ['target', 'search', 'prospects'], envoi: ['template', 'followuptpl'], communication: ['linkedin', 'promo'], outils: ['evolution', 'audit', 'postes'], recap: ['recap'], reglages: ['header', 'config'] };
   const all = [...new Set(Object.values(only).flat())];
   for (const [slug, keys] of Object.entries(only)) {
     const page = await tab(slug);

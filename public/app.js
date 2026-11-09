@@ -1067,6 +1067,8 @@
 
     // Relance automatique : ce qui est prévu, ou ce qui bloque
     const f = s.followup;
+    const followBadge = $('[data-followup-badge]', el);
+    if (followBadge) { followBadge.textContent = f.enabled ? 'Activée' : 'Désactivée'; followBadge.classList.toggle('ok', !!f.enabled); }
     const followInfo = $('[data-followup-info]', el);
     if (followInfo) followInfo.innerHTML = !f.enabled
       ? 'Désactivée.'
@@ -1095,18 +1097,26 @@
         ? `Bloqué : ${blockers.join(', ')}`
         : `${s.stats.new} prospect(s) en attente · max ${s.sendMax} maintenant${warmupLine(s.warmup)}`;
     }
+    const ready = $('[data-ready]', el);
+    if (ready) {
+      ready.classList.toggle('ban-warn', blockers.length > 0);
+      ready.textContent = blockers.length
+        ? `À régler avant d'envoyer : ${blockers.join(', ')}.`
+        : `Prêt à envoyer : ${s.hasSmtp ? 'SMTP réglé, ' : ''}modèle validé, ${s.stats.new} prospect${s.stats.new > 1 ? 's' : ''} à contacter, ${s.sendMax} mail${s.sendMax > 1 ? 's' : ''} possible${s.sendMax > 1 ? 's' : ''} maintenant.`;
+    }
     const countBox = $('[data-count]', el);
     if (countBox) countBox.textContent = `(${s.stats.total || 0})`;
 
     // Boîte de réception + test A/B
     const ib = $('[data-inbox]', el);
-    const ab = s.ab.length > 1
-      ? `<br>Test A/B : ${s.ab.map((v) => `<strong>${v.variant}</strong> ${v.replied}/${v.sent} réponses (${pct(v.rate)})`).join(' · ')}` : '';
+    const abBox = $('[data-ab]', el);
+    if (abBox) abBox.textContent = s.ab.length > 1 ? `Test A/B : ${s.ab.map((v) => `Objet ${v.variant} : ${pct(v.rate)} de réponses`).join(' · ')}` : '';
+    const ab = '';
     if (!ib) { /* la boîte de réception est sur l'onglet Envoi */ } else if (!s.hasImap) {
       ib.innerHTML = `<span class="muted">Boîte non connectée : configure l'IMAP (Configuration du projet) pour détecter les réponses.</span>${ab}`;
     } else {
       const i = s.inbox || {};
-      const head = i.lastError ? `<span class="error">Boîte en erreur : ${esc(i.lastError)}</span>` : `Boîte vérifiée ${ago(i.lastOk)}`;
+      const head = i.lastError ? `<span class="error">Boîte en erreur : ${esc(i.lastError)}</span>` : `Lue ${ago(i.lastOk)} · <span class="badge ok">${icon('check')}Reliée</span>`;
       ib.innerHTML = `${head} · ${i.replies || 0} réponse(s) · ${i.bounces || 0} adresse(s) invalide(s)
         <button class="btn small" data-inbox-check="${id}">Vérifier maintenant</button>${ab}`;
     }

@@ -21,11 +21,11 @@ const tabHref = (id, slug) => (slug ? `/p/${id}/${slug}` : `/p/${id}`);
 /** Où vit chaque section (data-acc) : sert aux lignes de « Mise en route » et aux liens `#section`. */
 export const TAB_OF_ACC = {
   header: 'reglages', config: 'reglages', target: 'prospection', search: 'prospection', prospects: 'prospection',
-  template: 'envoi', send: 'envoi', followup: 'envoi', evolution: 'outils', audit: 'outils', postes: 'outils',
+  template: 'envoi', followuptpl: 'envoi', send: 'envoi', followup: 'envoi', inbox: 'envoi', evolution: 'outils', audit: 'outils', postes: 'outils',
   linkedin: 'communication', promo: 'communication', recap: 'recap', setup: '',
 };
 const TAB_BLOCKS = {
-  prospection: ['target', 'search', 'prospects'], envoi: ['template', 'send', 'followup'], communication: ['linkedin', 'promo'],
+  prospection: ['target', 'search', 'prospects'], envoi: ['template', 'followuptpl', 'send', 'followup', 'inbox'], communication: ['linkedin', 'promo'],
   outils: ['evolution', 'audit', 'postes'], recap: ['recap'], reglages: ['header', 'config'],
 };
 
@@ -120,6 +120,13 @@ function overview(p, c, st, jobs) {
 </div>`;
 }
 
+/** Journal du projet (maquette 05) : quatre compteurs qui mènent à la page Mails filtrée sur ce projet. */
+function journalCard(p, j) {
+  const cell = (label, n, filter, extra = '') => `<a href="/mails?project=${p.id}${filter ? `&filter=${filter}` : ''}"><span class="k-l">${label}</span><span class="k-v">${fr(n || 0)}</span>${extra}</a>`;
+  return `<section class="sheet flush pj-journal" aria-labelledby="jr-h"><div class="sheet-h"><h2 id="jr-h">Journal du projet</h2><a class="small" href="/mails?project=${p.id}">Tous les mails</a></div>
+    <div class="pj-kpis4 pj-j">${cell('Tous', j?.all, '')}${cell('Envoyé', j?.sent, 'sent')}${cell('Répondu', j?.replied, 'replied')}${cell('Non envoyé', j?.failed, 'failed', j?.failed ? `<span class="badge err">${ic('x')}échecs</span>` : '')}</div></section>`;
+}
+
 const external = (p, slug) => (slug === 'facturation'
   ? `<section class="sheet"><h2>Facturation</h2><p>Informations légales, devis, acomptes, factures et avoirs de ce projet.</p><p><a class="btn primary" href="/facturation/projet/${p.id}">${ic('receipt')}Ouvrir la facturation du projet</a></p></section>`
   : `<section class="sheet"><h2>Clients</h2><p>Les clients et prospects de ce projet : recherche, fiche, documents générés et export.</p><p><a class="btn primary" href="/clients">${ic('user')}Ouvrir les clients</a></p></section>`);
@@ -127,7 +134,7 @@ const external = (p, slug) => (slug === 'facturation'
 /**
  * @param {{email:string, entry:object, tab:string, stats:object|null, checklist:object|null, jobs:object}} a
  */
-export function projectTabPage({ email, entry, tab, stats = null, checklist = null, jobs = {} }) {
+export function projectTabPage({ email, entry, tab, stats = null, checklist = null, jobs = {}, journal = null }) {
   const p = entry.project;
   const manage = p.access !== 'member';
   const tabs = TABS.filter(([, , needs]) => manage || !needs);
@@ -137,7 +144,9 @@ export function projectTabPage({ email, entry, tab, stats = null, checklist = nu
   const body = tab === '' ? overview(p, checklist, stats, jobs)
     : tab === 'clients' || tab === 'facturation' ? external(p, tab)
       : tab === 'prospection' ? `<div class="pj-grid pj-grid-p"><div class="pj-flat pj-left">${blocks.target}\n${blocks.search}</div><div class="pj-flat">${blocks.prospects}</div></div>`
-        : `<div class="pj-flat">${(TAB_BLOCKS[tab] || []).map((k) => blocks[k]).join('\n')}</div>`;
+        : tab === 'envoi' ? `<p class="ban ban-info pj-ready" data-ready role="status"></p>
+          <div class="pj-grid pj-grid-e"><div class="pj-flat pj-left">${blocks.template}\n${blocks.followuptpl}\n${journalCard(p, journal)}</div><div class="pj-flat">${blocks.send}\n${blocks.followup}\n${blocks.inbox}</div></div>`
+          : `<div class="pj-flat">${(TAB_BLOCKS[tab] || []).map((k) => blocks[k]).join('\n')}</div>`;
   const summary = `<summary><span class="pname">${esc(p.name)}</span><button type="button" class="pcfg badge" data-cfg hidden></button><span class="pstate" data-state></span></summary>`;
   return layout({
     title: `${p.name} · ${label}`, email,

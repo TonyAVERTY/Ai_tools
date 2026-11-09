@@ -434,25 +434,25 @@ export function projectBlocks(p, smtp, dbCfg, imap) {
     </form>
     <div class="job" data-job="prospect"></div>`, { open: true, cls: 'main' });
   const template = acc('template', 'mail', 'Modèle de mail', 'Objet, test A/B et corps du premier mail', templateForm(p, 'initial'), { open: true, cls: 'main' });
-  const send = acc('send', 'send', 'Envoi', 'Envoi par lots, boîte de réception et test A/B', `
-    <form data-action="send" data-id="${p.id}" class="inline send">
-      <label>Mails à envoyer<input name="count" type="number" min="1" value="10"></label>
-      <button class="btn primary" disabled>Envoyer</button>
+  const send = `<section class="sheet pj-send" id="acc-send" data-acc="send" aria-labelledby="send-h"><h2 id="send-h">Envoyer</h2>
+    <form data-action="send" data-id="${p.id}" class="send">
+      <label class="field"><span class="lbl">Mails à envoyer</span><input name="count" type="number" min="1" value="10"></label>
+      <p class="muted small">Un lot fait 100 mails au plus. Chaque mail est relu par ${esc(aiName())} avant de partir.</p>
+      <button class="btn primary" disabled>${ic('send')}Envoyer</button>
       <span class="muted small" data-send-info></span>
     </form>
     <div class="job" data-job="send"></div>
-    <p class="inbox small" data-inbox></p>`, { open: true, cls: 'main' });
-  const followup = acc('followup', 'repeat', 'Relance automatique', 'Une relance dans le même fil après quelques jours', `
-    <section class="followup">
-      <form data-action="followup" data-id="${p.id}" class="inline">
-        <label class="check"><input type="checkbox" name="enabled" ${p.followupEnabled ? 'checked' : ''}> Relancer une fois les prospects sans réponse</label>
-        <label>Après (jours)<input name="days" type="number" min="2" max="30" value="${p.followupDays}"></label>
-        <button class="btn">Enregistrer</button>
-      </form>
-      <p class="muted small" data-followup-info></p>
-      ${templateForm(p, 'followup')}
-      <div class="job" data-job="followup"></div>
-    </section>`, { open: true, cls: 'main' });
+    <p class="muted small" data-ab></p></section>`;
+  const followup = `<section class="sheet pj-follow" id="acc-followup" data-acc="followup" aria-labelledby="follow-h"><div class="sheet-h"><h2 id="follow-h">Relance automatique</h2><span class="badge" data-followup-badge>Désactivée</span></div>
+    <form data-action="followup" data-id="${p.id}" class="followup">
+      <label class="check"><input type="checkbox" name="enabled" ${p.followupEnabled ? 'checked' : ''}> Relancer une fois les prospects sans réponse</label>
+      <label class="field"><span class="lbl">Après (jours)</span><input name="days" type="number" min="2" max="30" value="${p.followupDays}"></label>
+      <button class="btn">Enregistrer</button>
+    </form>
+    <p class="muted small" data-followup-info></p>
+    <div class="job" data-job="followup"></div></section>`;
+  const followuptpl = acc('followuptpl', 'repeat', 'Modèle de relance', 'Le texte envoyé dans le même fil, après quelques jours', templateForm(p, 'followup'), { open: true, cls: 'main' });
+  const inbox = `<section class="sheet pj-inbox" id="acc-inbox" aria-labelledby="inbox-h"><h2 id="inbox-h">Boîte de réception</h2><p class="small" data-inbox></p></section>`;
   const prospects = acc('prospects', 'users', 'Prospects <span data-count></span>', 'Recherche, filtres, fiches, import et export CSV', `
       <div class="pr-head">
         <h2>Prospects</h2>
@@ -538,7 +538,7 @@ export function projectBlocks(p, smtp, dbCfg, imap) {
     <div class="recap" data-recap>${loadingBlock()}</div>`, { open: true, cls: 'main' }) : '';
   const postes = acc('postes', 'users', 'Postes et tâches IA', 'Les postes d\'une entreprise, chacun avec ses tâches faites par l\'IA', postesBody(p), { open: true, cls: 'main' });
   const config = p.access !== 'member' ? acc('config', 'gear', 'Configuration du projet', 'SMTP, boîte IMAP, base de données', configForms(p, smtp, dbCfg, imap), { open: true, cls: 'config' }) : '';
-  return { setup, header: headerAcc, target, search, template, send, followup, prospects, evolution, audit, linkedin, promo, recap, postes, config };
+  return { setup, header: headerAcc, target, search, template, send, followup, followuptpl, inbox, prospects, evolution, audit, linkedin, promo, recap, postes, config };
 }
 
 /** Une ligne « serveur Git » : URL et token. `i` : numéro de la ligne (champs git_*_i) ; `fresh` : ligne qui vient d'être ajoutée (gabarit). */

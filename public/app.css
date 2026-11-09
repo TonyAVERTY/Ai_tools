@@ -1782,3 +1782,25 @@ a.pj-card:hover { border-color: var(--primary); }
 .pr-search .ic { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); pointer-events: none; }
 .pr-search input[type="search"] { padding: 0 12px 0 36px; min-height: 44px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--card); }
 .pr-table select[data-prospect] { min-width: 140px; }
+
+/* ---------- Onglet Envoi (maquette 05) : modèles et journal à gauche, Envoyer, Relance et Boîte de réception à droite ---------- */
+.ban-info { background: var(--info-bg); border-color: var(--info); color: var(--text); }
+.ban-warn { background: var(--warn-bg); border-color: var(--warn); color: var(--text); }
+.pj-ready { margin: 0; }
+.pj-ready:empty { display: none; }
+.pj-grid-e { grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 900px) { .pj-grid-e { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); } }
+.pj-grid-e > .pj-flat { min-width: 0; }
+.pj-flat > .acc:has(.tpl-locked) { background: var(--bg-sunk); }
+.pj-send .send { display: flex; flex-direction: column; align-items: stretch; gap: 10px; }
+.pj-send .send .btn { width: 100%; justify-content: center; }
+.pj-follow form.followup { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+.pj-inbox [data-inbox] { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+.pj-journal { padding-bottom: 0; }
+.pj-journal .sheet-h { padding: 0; }
+.pj-j { grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 0 -24px; border-radius: 0 0 var(--radius-lg) var(--radius-lg); background: var(--bg-sunk); }
+@media (min-width: 700px) { .pj-j { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.pj-j a { flex-direction: column; align-items: flex-start; gap: 2px; padding: 12px 24px; }
+.pj-j .k-v { font-size: 1.75rem; }
+.pj-grid-e .pj-flat > .acc > summary { display: none; }
+.pj-follow .sheet-h { flex-wrap: nowrap; }
