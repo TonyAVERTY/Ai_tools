@@ -19,6 +19,8 @@ export const RATE_LIMITS = {
   chat: { user: { max: 40, windowMs: 10 * MIN } },
   chat_upload: { user: { max: 60, windowMs: 10 * MIN } },
   // Ajout, modification et suppression de prospects ; aperçu d'un mail (rendu sans envoi)
+  // Recherche (⌘K) : une requête par frappe ralentie côté navigateur
+  search: { user: { max: 300, windowMs: 10 * MIN } },
   prospect_write: { user: { max: 120, windowMs: 10 * MIN } },
   preview: { user: { max: 120, windowMs: 10 * MIN } },
   // Contrôle du sens d'un mail dans l'aperçu : chacun coûte un appel à l'IA de la personne

@@ -34,7 +34,7 @@ function onboarding(o) {
   <ol class="td-steps" aria-label="Étapes">
     ${steps.map((s) => `<li class="${s.done ? 'done' : s === cur ? 'cur' : ''}" aria-label="${esc(s.label)}, ${s.done ? 'fait' : s === cur ? 'en cours' : 'à faire'}"></li>`).join('\n    ')}
   </ol>
-  <a class="btn primary" href="/projets">${esc(cur.label)}</a>
+  <a class="btn" href="/projets">${esc(cur.label)}</a>
 </section>`;
 }
 
@@ -74,7 +74,7 @@ const todo = (d) => `<section class="td-todo" aria-labelledby="at-h" data-today-
 const agenda = (d) => `<section class="td-card" aria-labelledby="ag-h">
   <div class="td-sec-h"><h2 id="ag-h">Aujourd'hui dans l'agenda</h2><a href="/calendar">Calendrier</a></div>
   ${d.agenda.length ? `<ol class="td-agenda">
-    ${d.agenda.map((e) => `<li${e.past ? ' class="past"' : ''}><span class="td-time">${esc(e.time)}</span><span class="td-ev"><b>${esc(e.title)}</b><span>${esc(e.meta)}</span></span></li>`).join('\n    ')}
+    ${d.agenda.map((e) => `<li class="k-${esc(e.kind)}${e.past ? ' past' : ''}"><span class="td-time">${esc(e.time)}</span><span class="td-ev"><b>${esc(e.title)}</b><span>${esc(e.meta)}</span></span></li>`).join('\n    ')}
   </ol>` : '<p class="td-none">Rien de prévu aujourd\'hui.</p>'}
 </section>`;
 
@@ -98,8 +98,10 @@ function series(label, key, cls, weeks) {
   }).join('');
   return `<div class="td-ser">
     <div class="td-ser-h"><b><i class="td-dot ${cls}"></i>${esc(label)}</b><span>maximum ${fr(max)}</span></div>
-    <div class="td-vals">${vals.map((v, i) => `<span${i === vals.length - 1 ? ' class="last"' : ''}>${fr(v)}</span>`).join('')}</div>
-    <svg class="td-bars" viewBox="0 0 80 ${H}" preserveAspectRatio="none" aria-hidden="true" focusable="false">${bars}</svg>
+    <div class="td-ser-c">
+      <div class="td-vals">${vals.map((v, i) => `<span${i === vals.length - 1 ? ' class="last"' : ''}>${fr(v)}</span>`).join('')}</div>
+      <svg class="td-bars" viewBox="0 0 80 ${H}" preserveAspectRatio="none" aria-hidden="true" focusable="false">${bars}</svg>
+    </div>
   </div>`;
 }
 

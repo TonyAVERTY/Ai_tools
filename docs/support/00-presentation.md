@@ -27,7 +27,8 @@ Tout ce que fait l'IA passe par le accès de la personne à son IA, jamais par u
 - **Mails** : tous les mails envoyés et les réponses reçues.
 - **Agenda** : le mois, les événements et l'agenda externe (la page s'appelle « Calendrier »).
 - **Compta** : tes paiements, dépenses et remboursements avec leurs justificatifs, tes chiffres, le guide « Faire ma déclaration » et les exports (voir « Comptabilité : lignes, justificatifs, déclaration et exports »).
-- **Activité** (apparaît quand une tâche tourne) : la liste des jobs en cours, en attente ou programmés, avec leur avancement.
+- **Rechercher** (ou **⌘K** sur Mac, **Ctrl+K** sous Windows et Linux) : ouvre la recherche (voir « Rechercher partout »).
+- **Activité** (toujours visible, avec un point Safran quand une tâche tourne) : la liste des jobs en cours, en attente ou programmés, avec leur avancement ; au repos, elle dit « Aucune tâche en cours. ».
 - **Site internet** : ouvre le site public d'iaboss (page d'accueil du site). Sur téléphone, seule l'icône (un globe) s'affiche.
 - **Assistant** : un menu qui s'ouvre au survol (ou au clic sur téléphone) avec deux choix : le nom de ton IA, **Claude**, **ChatGPT** ou **Gemini** (l'assistant classique, pour discuter, rédiger, réfléchir) et **Support** (pose une question sur iaboss).
 - **Avatar** (la première lettre de l'email) : un menu au survol avec **Facturation**, **Clients**, **Équipe**, **Mon compte**, **Réglages**, **Visite guidée** et **Déconnexion**. Ces trois pages ne sont plus dans la barre du haut :

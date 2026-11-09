@@ -622,8 +622,18 @@
     if (jobsSeen) for (const id of ids) if (!jobsSeen.has(id)) jobsFresh.set(id, Date.now() + 3500);
     const fresh = new Set(ids.filter((id) => (jobsFresh.get(id) ?? 0) > Date.now()));
     jobsSeen = new Set([...(jobsSeen || []), ...ids]);
-    jobsBox.hidden = !list.length;
-    if (!list.length) { if (jobsOpen()) toggleJobs(false); return; }
+    jobsBox.classList.toggle('is-busy', !!s.queue);
+    jobsBox.classList.toggle('has-jobs', list.length > 0);
+    if (!list.length) {
+      // Toujours là, même au repos : le point s'éteint et la liste dit qu'il n'y a rien
+      $('.spin-inline', jobsBtn).hidden = true;
+      $('[data-jobs-count]', jobsBtn).textContent = '';
+      $('[data-jobs-sub]', jobsPop).textContent = '';
+      const empty = '<p class="jobs-none">Aucune tâche en cours.</p>';
+      const box0 = $('[data-jobs-list]', jobsPop);
+      if (box0._html !== empty) { box0._html = empty; box0.innerHTML = empty; }
+      return;
+    }
     $('.spin-inline', jobsBtn).hidden = !s.queue;
     const failed = list.filter((j) => j.status === 'error').length;
     $('[data-jobs-count]', jobsBtn).textContent = s.queue
@@ -655,7 +665,14 @@
   // Barre du haut hors de l'écran (page défilée) : le bouton « Activité » reste épinglé en haut à droite, avec son menu et la destination de l'agent
   const topBar = $('.top');
   if (jobsBox && topBar && 'IntersectionObserver' in window) {
-    new IntersectionObserver(([en]) => document.body.classList.toggle('hdr-off', !en.isIntersecting)).observe(topBar);
+    new IntersectionObserver(([en]) => {
+      // Le bouton quitte la barre en s'épinglant : on garde sa place (mesurée avant) pour que la barre ne rétrécisse pas et que le contenu ne saute pas
+      if (!en.isIntersecting && !document.body.classList.contains('hdr-off')) {
+        const r = jobsBox.getBoundingClientRect();
+        document.body.style.setProperty('--jobs-w', `${Math.round(r.width)}px`);
+      }
+      document.body.classList.toggle('hdr-off', !en.isIntersecting);
+    }).observe(topBar);
   }
   listen(document, 'click', (e) => {
     if (jobsOpen() && !e.target.closest('#jobs')) toggleJobs(false);
@@ -786,7 +803,7 @@
   // quelques secondes sur la liste des tâches en cours et à venir (comme la bulle de téléchargement de Chrome).
   let activityTimer;
   function showActivity() {
-    if (!jobsBox || jobsBox.hidden) return;
+    if (!jobsBox) return;
     toggleJobs(true);
     clearTimeout(activityTimer);
     activityTimer = setTimeout(() => { if (jobsOpen() && !jobsPop.matches(':hover') && !jobsPop.contains(document.activeElement)) toggleJobs(false); }, 7500);
