@@ -2004,3 +2004,6 @@ a.pj-card:hover { border-color: var(--primary); }
 .offer { margin: 16px 0 4px; padding-top: 16px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 10px; }
 .offer p { margin: 0; }
 .offer form { margin: 0; display: inline; }
+/* Mise en route : les étapes facultatives sont rangées à part, hors du décompte (cercle en tirets) */
+.pj-opt-h { margin: 18px 0 2px; }
+.pj-opt .n { border-style: dashed; font-weight: 500; }

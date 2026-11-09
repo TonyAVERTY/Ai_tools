@@ -25,18 +25,18 @@ const STEPS = [
 
 /**
  * Fonction pure : des faits sur le projet vers la liste.
- * `ready` : tout ce qui est obligatoire est fait (le projet peut prospecter). `complete` : tout est fait, facultatif compris.
+ * `done` / `total` ne comptent que les étapes obligatoires. `ready` : tout ce qui est obligatoire est fait (le projet peut prospecter) ; `complete` : idem,
+ * la mise en route est terminée (les étapes facultatives restent proposées, sans compter).
  */
 export function buildChecklist(f) {
   const steps = STEPS
     .filter((s) => (f.canConfigure || !s.needsConfig) && (f.linkedinAvailable || !s.needsLinkedin))
     .map((s) => ({ key: s.key, label: s.label, hint: forAi(s.hint, aiName()), acc: s.acc ?? null, sel: s.sel ?? null, optional: !!s.optional, done: !!s.done(f) }));
-  const done = steps.filter((s) => s.done).length;
-  return {
-    steps, done, total: steps.length,
-    ready: steps.filter((s) => !s.optional).every((s) => s.done),
-    complete: done === steps.length,
-  };
+  // Seules les étapes obligatoires comptent : une étape facultative ne se « termine » pas forcément et ne doit pas laisser croire qu'il reste quelque chose à faire
+  const required = steps.filter((s) => !s.optional);
+  const done = required.filter((s) => s.done).length;
+  const ready = done === required.length;
+  return { steps, done, total: required.length, ready, complete: ready };
 }
 
 /** Rassemble les faits d'un projet (déjà chargé par getProject) et construit sa liste. */
