@@ -1067,6 +1067,8 @@
 
     // Relance automatique : ce qui est prévu, ou ce qui bloque
     const f = s.followup;
+    const followBadge = $('[data-followup-badge]', el);
+    if (followBadge) { followBadge.textContent = f.enabled ? 'Activée' : 'Désactivée'; followBadge.classList.toggle('ok', !!f.enabled); }
     const followInfo = $('[data-followup-info]', el);
     if (followInfo) followInfo.innerHTML = !f.enabled
       ? 'Désactivée.'
@@ -1095,18 +1097,26 @@
         ? `Bloqué : ${blockers.join(', ')}`
         : `${s.stats.new} prospect(s) en attente · max ${s.sendMax} maintenant${warmupLine(s.warmup)}`;
     }
+    const ready = $('[data-ready]', el);
+    if (ready) {
+      ready.classList.toggle('ban-warn', blockers.length > 0);
+      ready.textContent = blockers.length
+        ? `À régler avant d'envoyer : ${blockers.join(', ')}.`
+        : `Prêt à envoyer : ${s.hasSmtp ? 'SMTP réglé, ' : ''}modèle validé, ${s.stats.new} prospect${s.stats.new > 1 ? 's' : ''} à contacter, ${s.sendMax} mail${s.sendMax > 1 ? 's' : ''} possible${s.sendMax > 1 ? 's' : ''} maintenant.`;
+    }
     const countBox = $('[data-count]', el);
     if (countBox) countBox.textContent = `(${s.stats.total || 0})`;
 
     // Boîte de réception + test A/B
     const ib = $('[data-inbox]', el);
-    const ab = s.ab.length > 1
-      ? `<br>Test A/B : ${s.ab.map((v) => `<strong>${v.variant}</strong> ${v.replied}/${v.sent} réponses (${pct(v.rate)})`).join(' · ')}` : '';
+    const abBox = $('[data-ab]', el);
+    if (abBox) abBox.textContent = s.ab.length > 1 ? `Test A/B : ${s.ab.map((v) => `Objet ${v.variant} : ${pct(v.rate)} de réponses`).join(' · ')}` : '';
+    const ab = '';
     if (!ib) { /* la boîte de réception est sur l'onglet Envoi */ } else if (!s.hasImap) {
       ib.innerHTML = `<span class="muted">Boîte non connectée : configure l'IMAP (Configuration du projet) pour détecter les réponses.</span>${ab}`;
     } else {
       const i = s.inbox || {};
-      const head = i.lastError ? `<span class="error">Boîte en erreur : ${esc(i.lastError)}</span>` : `Boîte vérifiée ${ago(i.lastOk)}`;
+      const head = i.lastError ? `<span class="error">Boîte en erreur : ${esc(i.lastError)}</span>` : `Lue ${ago(i.lastOk)} · <span class="badge ok">${icon('check')}Reliée</span>`;
       ib.innerHTML = `${head} · ${i.replies || 0} réponse(s) · ${i.bounces || 0} adresse(s) invalide(s)
         <button class="btn small" data-inbox-check="${id}">Vérifier maintenant</button>${ab}`;
     }
@@ -1495,6 +1505,18 @@
   // Le récap se charge à l'ouverture de sa section
   $$('details[data-acc="recap"]').forEach((d) => { d.addEventListener('toggle', () => { if (d.open) window.AiTools.loadRecap?.(d.closest('.project')); }); if (d.open) window.AiTools.loadRecap?.(d.closest('.project')); });
 
+  // Outils IA : le menu des postes (à gauche) choisit ce qu'affiche la colonne de droite : « Évolution et audit », ou les tâches d'un poste
+  listen(document, 'click', (e) => {
+    const b = e.target.closest?.('[data-tool]');
+    if (!b) return;
+    const root = b.closest('.pj-tools');
+    for (const o of $$('[data-tool]', root)) { const on = o === b; o.classList.toggle('on', on); o.setAttribute('aria-pressed', String(on)); }
+    const evo = b.dataset.tool === 'evo';
+    $('[data-tool-panel="evo"]', root).hidden = !evo;
+    $('[data-tool-panel="postes"]', root).hidden = evo;
+    if (!evo) for (const d of $$('details.role', root)) { d.hidden = d.dataset.role !== b.dataset.tool; d.open = true; }
+  });
+
   // Page d'un projet : le sélecteur « Section » (téléphone) change d'onglet ; #acc-… (ligne de « Mise en route ») ouvre la section visée et la fait clignoter
   listen(document, 'change', (e) => { const sel = e.target.closest?.('[data-psel]'); if (sel && sel.value) go(sel.value); });
   (() => {
@@ -1507,6 +1529,11 @@
     target.classList.add('flash');
     setTimeout(() => target.classList.remove('flash'), 1800);
   })();
+
+  // Agenda : le formulaire « Ajouter un événement » est replié ; le bouton du haut (#evenements) le déplie
+  const openEvents = () => { const d = document.getElementById('evenements'); if (d?.tagName === 'DETAILS') { d.open = true; d.scrollIntoView({ block: 'start' }); $('input', d)?.focus({ preventScroll: true }); } };
+  if (location.hash === '#evenements') openEvents();
+  listen(document, 'click', (e) => { if (e.target.closest('a[href="#evenements"]')) { e.preventDefault(); openEvents(); } });
 
   listen(document, 'click', async (e) => {
     const retry = e.target.closest('[data-retry]');

@@ -48,6 +48,7 @@ for (const [mode, reduced] of [['normal', 'no-preference'], ['mouvement réduit'
 
     // 1) un bouton s'enfonce au clic (calendrier : le formulaire vide ne part pas, le navigateur le refuse)
     await p.goto(`${s.base}/calendar`); await p.waitForSelector('html[data-nav="ready"]');
+    await p.evaluate(() => { document.getElementById('evenements').open = true; });
     const btn = p.locator('.evform button.primary');
     await btn.scrollIntoViewIfNeeded();
     const box = await btn.boundingBox();

@@ -124,6 +124,7 @@ after(async () => { await s.close(); });
 const html = (u, p) => u.get(p, { headers: { accept: 'text/html' } }).then((r) => r.text()).then((t) => t.replaceAll('&#39;', "'"));
 const post = (u, p, body = {}) => u.post(p, body, { form: true });
 const base = (pid) => `/facturation/projet/${pid}`;
+const page = (pid) => `/p/${pid}/facturation`; // l'onglet Facturation de la page projet
 const docsOf = (pid) => s.db.prepare('SELECT * FROM billing_docs WHERE project_id = ? ORDER BY kind, variant').all(pid);
 
 /** Un projet dont les quatre documents sont validés, prêt à émettre. */
@@ -165,7 +166,7 @@ test('modèle en PDF : téléchargeable, variables laissées vides ; interdit au
   const buf = Buffer.from(await r.arrayBuffer());
   assert.equal(buf.subarray(0, 5).toString(), '%PDF-');
   assert.ok(flat(buf).includes('{{client_nom}}'));
-  assert.match(await html(u, base(byKind.facture.projectId ?? 0)).catch(() => ''), /./);
+  assert.match(await html(u, page(byKind.facture.projectId ?? 0)).catch(() => ''), /./);
   const v = await s.newUser();
   assert.equal((await v.get(`/facturation/documents/${byKind.facture.id}/pdf`, { headers: { accept: '*/*' } })).status, 404);
 });
@@ -270,14 +271,14 @@ test('facture émise : PDF numéroté, ajoutée à la Comptabilité « à encais
   assert.match(c, /Marquer payée/);
   assert.doesNotMatch(c, /Journal des lignes[\s\S]*Facture finale F-/, 'pas dans le journal tant qu\'elle n\'est pas payée');
   assert.doesNotMatch(await (await u.get('/compta/journal.csv?periode=tout')).text(), /F-20/);
-  assert.match(await html(u, base(pid)), /Documents émis[\s\S]*À encaisser/);
+  assert.match(await html(u, page(pid)), /Documents émis[\s\S]*À encaisser/);
   const paid = await post(u, `/compta/entries/${e.id}/paid`, { date: todayIso() });
   assert.equal(paid.status, 303);
   assert.equal((await entries(u.id))[0].pending, 0);
   const c2 = await compta(u, '?periode=tout');
   assert.doesNotMatch(c2, /Factures émises, à encaisser/);
   assert.match(c2, new RegExp(`Facture finale F-${year}-0001`));
-  assert.match(await html(u, base(pid)), /Payée/);
+  assert.match(await html(u, page(pid)), /Payée/);
   assert.equal((await post(u, `/compta/entries/${e.id}/paid`, { date: todayIso() })).status, 400, 'déjà payée');
   assert.match(await (await u.get('/compta/journal.csv?periode=tout')).text(), new RegExp(`F-${year}-0001`));
 });
@@ -297,7 +298,7 @@ test('émission refusée : champs manquants, document non validé, autre compte'
   const miss = await emit(u, pid, byKind.devis, { client_nom: '', ...LINES });
   assert.equal(miss.status, 303);
   assert.match(location(miss), /e=Indique le nom du client\./);
-  assert.match(await html(u, base(pid) + miss.headers.get('location').replace(base(pid), '')), /Indique le nom du client\./);
+  assert.match(await html(u, miss.headers.get('location')), /Indique le nom du client\./);
   assert.equal((await invoices(pid)).length, 0);
   assert.equal((await entries(u.id)).length, 0);
   assert.match(location(await emit(u, pid, byKind.devis, { client_nom: 'X', ...LINES })), /adresse du client/);
@@ -329,7 +330,7 @@ test('case « Joindre automatiquement à la comptabilité » : décochée, la fa
   assert.ok(inv && inv.entry_id == null);
   assert.equal((await entries(u.id)).length, 0, 'rien dans la Comptabilité');
   assert.doesNotMatch(await compta(u, '?periode=tout'), /Factures émises, à encaisser/);
-  const h = await html(u, base(pid));
+  const h = await html(u, page(pid));
   assert.match(h, /Non jointe à la comptabilité/);
   assert.equal((await u.get(`/facturation/factures/${inv.id}/pdf`, { headers: { accept: '*/*' } })).status, 200);
   assert.match(h, /name="to_accounting" value="1" checked/);
@@ -341,7 +342,7 @@ test('case « Joindre automatiquement à la comptabilité » : décochée, la fa
 
 test('section « Générer un document » : devis d\'abord (lignes à saisir), puis les autres pièces avec devis de référence', async () => {
   const { u, pid, byKind } = await ready();
-  let h = await html(u, `${base(pid)}?type=avoir`);
+  let h = await html(u, `${page(pid)}?type=avoir`);
   assert.match(h, /<h2 id="t-gen">Générer un document<\/h2>/);
   assert.match(h, /data-kind="devis" selected/, 'sans devis émis, seul le devis est possible');
   for (const t of ['Acompte', 'Facture finale', 'Avoir']) assert.match(h, new RegExp(`<option value="\\d+" data-kind="[a-z]+" disabled>${t} \\(génère d'abord un devis\\)</option>`));
@@ -353,13 +354,13 @@ test('section « Générer un document » : devis d\'abord (lignes à saisir), p
   assert.match(h, /href="\?type=facture#generer"/);
   const d = await devisOf(u, pid, byKind);
   await emit(u, pid, byKind.facture, { devis_id: d.id });
-  h = await html(u, `${base(pid)}?type=avoir`);
+  h = await html(u, `${page(pid)}?type=avoir`);
   assert.match(h, /data-kind="avoir" selected/, 'le type demandé est présélectionné quand il est possible');
   assert.match(h, new RegExp(`<option value="${d.id}">D-\\d{4}-0001 — Boulangerie Dupont — 6\\s300,00\\s€ TTC</option>`));
   assert.match(h, /<option value="\d+" data-devis="\d+">F-\d{4}-0001 — Facture finale — /);
   assert.match(h, /Documents émis[\s\S]*Facture finale · devis D-/);
   await s.db.prepare("UPDATE billing_docs SET status = 'draft' WHERE project_id = ? AND kind = 'acompte'").run(pid);
-  assert.match(await html(u, base(pid)), /<option value="\d+" data-kind="acompte" disabled>Acompte \(à valider d'abord\)<\/option>/);
+  assert.match(await html(u, page(pid)), /<option value="\d+" data-kind="acompte" disabled>Acompte \(à valider d'abord\)<\/option>/);
 });
 
 test('clients par projet : enregistrés à l\'émission d\'un devis, repris pour les devis suivants, mis à jour sans doublon, jamais partagés', async () => {
@@ -368,7 +369,7 @@ test('clients par projet : enregistrés à l\'émission d\'un devis, repris pour
   await devisOf(u, pid, byKind);
   let cl = await listClients(s.db, u.id, pid);
   assert.deepEqual(cl.map((c) => [c.name, c.address, c.siret]), [['Boulangerie Dupont', '5 place du Marché, 35000 Rennes', '98765432100011']]);
-  let h = await html(u, base(pid));
+  let h = await html(u, page(pid));
   assert.match(h, new RegExp(`<option value="${cl[0].id}" data-name="Boulangerie Dupont" data-address="5 place du Marché, 35000 Rennes" data-siret="98765432100011">Boulangerie Dupont</option>`));
   // Même client choisi dans la liste, adresse corrigée : mise à jour, pas de doublon
   await devisOf(u, pid, byKind, { client_id: cl[0].id, client_adresse: '8 rue Neuve, 35000 Rennes' });
@@ -387,7 +388,7 @@ test('clients par projet : enregistrés à l\'émission d\'un devis, repris pour
   const pid2 = await addProject(s.db, u.id, { name: 'Autre', gitUrl: 'https://github.com/u/autre.git' });
   assert.equal((await listClients(s.db, u.id, pid2)).length, 0);
   const other = await ready();
-  assert.doesNotMatch(await html(other.u, base(other.pid)), /Atelier Martin/);
+  assert.doesNotMatch(await html(other.u, page(other.pid)), /Atelier Martin/);
   await devisOf(other.u, other.pid, other.byKind, { client_id: cl[0].id, client_nom: 'Pirate', client_adresse: 'ailleurs', client_siret: '' });
   assert.equal((await listClients(s.db, u.id, pid)).find((c) => c.id === cl[0].id).name, 'BOULANGERIE DUPONT', 'le client d\'un autre compte n\'est pas modifié');
   assert.deepEqual((await listClients(s.db, other.u.id, other.pid)).map((c) => c.name), ['Pirate']);

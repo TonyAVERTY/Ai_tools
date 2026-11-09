@@ -5,6 +5,9 @@ import { esc } from './http.js';
 import { ic } from './icons.js';
 import { layout, projectBlocks } from './views.js';
 import { JOB_LABELS } from './today.js';
+import { ROLES } from './services/roles.js';
+import { aiName } from './services/ainame.js';
+import { clientProjectBlock } from './clientsviews.js';
 
 const fr = (n) => Number(n).toLocaleString('fr-FR');
 const shortDay = (ts) => new Date(ts * 1000).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', timeZone: 'Europe/Paris' });
@@ -21,11 +24,11 @@ const tabHref = (id, slug) => (slug ? `/p/${id}/${slug}` : `/p/${id}`);
 /** Où vit chaque section (data-acc) : sert aux lignes de « Mise en route » et aux liens `#section`. */
 export const TAB_OF_ACC = {
   header: 'reglages', config: 'reglages', target: 'prospection', search: 'prospection', prospects: 'prospection',
-  template: 'envoi', send: 'envoi', followup: 'envoi', evolution: 'outils', audit: 'outils', postes: 'outils',
+  template: 'envoi', followuptpl: 'envoi', send: 'envoi', followup: 'envoi', inbox: 'envoi', evolution: 'outils', audit: 'outils', postes: 'outils',
   linkedin: 'communication', promo: 'communication', recap: 'recap', setup: '',
 };
 const TAB_BLOCKS = {
-  prospection: ['target', 'search', 'prospects'], envoi: ['template', 'send', 'followup'], communication: ['linkedin', 'promo'],
+  prospection: ['target', 'search', 'prospects'], envoi: ['template', 'followuptpl', 'send', 'followup', 'inbox'], communication: ['linkedin', 'promo'],
   outils: ['evolution', 'audit', 'postes'], recap: ['recap'], reglages: ['header', 'config'],
 };
 
@@ -120,14 +123,43 @@ function overview(p, c, st, jobs) {
 </div>`;
 }
 
-const external = (p, slug) => (slug === 'facturation'
-  ? `<section class="sheet"><h2>Facturation</h2><p>Informations légales, devis, acomptes, factures et avoirs de ce projet.</p><p><a class="btn primary" href="/facturation/projet/${p.id}">${ic('receipt')}Ouvrir la facturation du projet</a></p></section>`
-  : `<section class="sheet"><h2>Clients</h2><p>Les clients et prospects de ce projet : recherche, fiche, documents générés et export.</p><p><a class="btn primary" href="/clients">${ic('user')}Ouvrir les clients</a></p></section>`);
+/** Posts LinkedIn programmés du projet (maquette 09). */
+function scheduledCard(p, rows) {
+  const day = (ts) => new Date(ts * 1000).toLocaleString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', timeZone: 'Europe/Paris' }).replace(':', ' h ').replace(' h 00', ' h').replace(/\s+/g, ' ');
+  return `<section class="sheet pj-sched" aria-labelledby="sch-h"><h2 id="sch-h">Programmés</h2>
+    ${rows?.length ? `<ul class="pj-sched-l">${rows.map((r) => `<li><b>${esc(day(r.at))}</b> · « ${esc(String(r.body).replace(/\s+/g, ' ').slice(0, 60))}${String(r.body).length > 60 ? '…' : ''} »</li>`).join('')}</ul>` : '<p class="small muted">Aucun post programmé.</p>'}
+    <a class="small" href="/calendar">Voir dans l'agenda</a></section>`;
+}
+
+/** Outils IA (maquette 10) : le menu des postes à gauche, la tâche choisie à droite (public/app.js bascule les panneaux). */
+function toolsLayout(p, blocks) {
+  const roles = ROLES.map((r) => `<button type="button" data-tool="${r.id}" aria-pressed="false">${esc(r.label)}</button>`).join('');
+  return `<p class="pj-lead">Les tâches que ${esc(aiName())} peut faire pour ce projet, rangées par poste. Rien n'est envoyé ni publié : chaque livrable est un texte à relire.</p>
+    <div class="pj-tools"><nav class="tools-nav" aria-label="Postes">
+      <p class="tools-grp">Produit</p><button type="button" data-tool="evo" aria-pressed="true" class="on">Évolution et audit</button>
+      <p class="tools-grp">Entreprise</p>${roles}</nav>
+      <div class="pj-flat tools-main"><div data-tool-panel="evo" class="pj-flat">${blocks.evolution}\n${blocks.audit}</div><div data-tool-panel="postes" class="pj-flat" hidden>${blocks.postes}</div></div></div>`;
+}
+
+/** Réglages du projet (maquette 12) : le menu des rubriques à gauche, les cartes à droite. */
+function settingsLayout(p, blocks) {
+  const shared = p.teamId ? 'Ce projet est partagé avec une équipe.' : 'Ce projet n\'est partagé avec personne.';
+  const items = [['set-smtp', "Adresse d'envoi (SMTP)"], ['set-imap', 'Boîte de réception (IMAP)'], ['acc-header', 'Dépôt et site'], ['set-db', 'Base de données'], ['set-share', 'Partage'], ['set-danger', 'Zone de danger']];
+  return `<div class="pj-tools pj-settings"><nav class="tools-nav" aria-label="Rubriques">${items.map(([id, l], i) => `<a href="#${id}"${i === 0 ? ' aria-current="true"' : ''}>${esc(l)}</a>`).join('')}</nav>
+    <div class="pj-flat tools-main">${blocks.config.replace('<form data-action="db"', `${blocks.header}<form data-action="db"`).replace('<section class="cfg danger-card"', `<section class="sheet" id="set-share" aria-labelledby="share-h"><h2 id="share-h">Partage</h2><p class="muted small">${esc(shared)} Le partage se règle dans <a href="/team">Équipe</a>.</p></section><section class="cfg danger-card"`)}</div></div>`;
+}
+
+/** Journal du projet (maquette 05) : quatre compteurs qui mènent à la page Mails filtrée sur ce projet. */
+function journalCard(p, j) {
+  const cell = (label, n, filter, extra = '') => `<a href="/mails?project=${p.id}${filter ? `&filter=${filter}` : ''}"><span class="k-l">${label}</span><span class="k-v">${fr(n || 0)}</span>${extra}</a>`;
+  return `<section class="sheet flush pj-journal" aria-labelledby="jr-h"><div class="sheet-h"><h2 id="jr-h">Journal du projet</h2><a class="small" href="/mails?project=${p.id}">Tous les mails</a></div>
+    <div class="pj-kpis4 pj-j">${cell('Tous', j?.all, '')}${cell('Envoyé', j?.sent, 'sent')}${cell('Répondu', j?.replied, 'replied')}${cell('Non envoyé', j?.failed, 'failed', j?.failed ? `<span class="badge err">${ic('x')}échecs</span>` : '')}</div></section>`;
+}
 
 /**
  * @param {{email:string, entry:object, tab:string, stats:object|null, checklist:object|null, jobs:object}} a
  */
-export function projectTabPage({ email, entry, tab, stats = null, checklist = null, jobs = {} }) {
+export function projectTabPage({ email, entry, tab, stats = null, checklist = null, jobs = {}, journal = null, scheduled = [], clientCounts = null, billing = null }) {
   const p = entry.project;
   const manage = p.access !== 'member';
   const tabs = TABS.filter(([, , needs]) => manage || !needs);
@@ -135,9 +167,15 @@ export function projectTabPage({ email, entry, tab, stats = null, checklist = nu
   const blocks = projectBlocks(p, entry.smtp, entry.dbCfg, entry.imap);
   const profile = p.profile;
   const body = tab === '' ? overview(p, checklist, stats, jobs)
-    : tab === 'clients' || tab === 'facturation' ? external(p, tab)
-      : tab === 'prospection' ? `<div class="pj-grid pj-grid-p"><div class="pj-flat pj-left">${blocks.target}\n${blocks.search}</div><div class="pj-flat">${blocks.prospects}</div></div>`
-        : `<div class="pj-flat">${(TAB_BLOCKS[tab] || []).map((k) => blocks[k]).join('\n')}</div>`;
+    : tab === 'clients' ? `<div class="bill-page" data-clients><div class="cl-projects">${clientProjectBlock({ id: Number(p.id), name: p.name, counts: clientCounts || { clients: 0, prospects: 0, pending: 0 } }, Number(p.id))}</div></div>`
+    : tab === 'facturation' ? billing || ''
+      : tab === 'communication' ? `<div class="pj-grid pj-grid-c"><div class="pj-flat">${blocks.linkedin}</div><div class="pj-flat">${blocks.promo}\n${scheduledCard(p, scheduled)}</div></div>`
+      : tab === 'outils' ? toolsLayout(p, blocks)
+        : tab === 'reglages' ? settingsLayout(p, blocks)
+          : tab === 'prospection' ? `<div class="pj-grid pj-grid-p"><div class="pj-flat pj-left">${blocks.target}\n${blocks.search}</div><div class="pj-flat">${blocks.prospects}</div></div>`
+        : tab === 'envoi' ? `<p class="ban ban-info pj-ready" data-ready role="status"></p>
+          <div class="pj-grid pj-grid-e"><div class="pj-flat pj-left">${blocks.template}\n${blocks.followuptpl}\n${journalCard(p, journal)}</div><div class="pj-flat">${blocks.send}\n${blocks.followup}\n${blocks.inbox}</div></div>`
+          : `<div class="pj-flat">${(TAB_BLOCKS[tab] || []).map((k) => blocks[k]).join('\n')}</div>`;
   const summary = `<summary><span class="pname">${esc(p.name)}</span><button type="button" class="pcfg badge" data-cfg hidden></button><span class="pstate" data-state></span></summary>`;
   return layout({
     title: `${p.name} · ${label}`, email,
@@ -157,5 +195,6 @@ ${body}
 </details>
 <dialog class="prospect-dialog" id="prospect-dialog" aria-label="Fiche prospect"><div data-dialog-body></div></dialog>
 </div>`,
+    scripts: tab === 'clients' ? ['/static/clients.js'] : tab === 'facturation' ? ['/static/facturation.js'] : [],
   });
 }

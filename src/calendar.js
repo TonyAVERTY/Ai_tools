@@ -85,12 +85,12 @@ export function calendarPage({ email, year, month, byDay, feed, today, agenda = 
   }).join('');
   const feedBox = icalBox(feed.url, '/calendar');
   return layout({
-    title: 'Calendrier', email,
+    title: 'Agenda', email,
     body: `<div class="cal-page">
 <div class="cal-layout">
 <section class="card cal-main" aria-labelledby="h-cal">
-  <div class="row-between"><h1 id="h-cal">Calendrier</h1>
-    <nav class="row" aria-label="Mois"><a class="btn small" href="/calendar?m=${prev[0]}-${pad(prev[1])}">← ${MONTHS[prev[1] - 1]}</a><strong>${MONTHS[month - 1]} ${year}</strong><a class="btn small" href="/calendar?m=${next[0]}-${pad(next[1])}">${MONTHS[next[1] - 1]} →</a></nav></div>
+  <div class="row-between cal-top"><h1 id="h-cal">${MONTHS[month - 1].charAt(0).toUpperCase()}${MONTHS[month - 1].slice(1)} ${year}</h1>
+    <nav class="row cal-nav" aria-label="Mois"><a class="btn small" href="/calendar?m=${prev[0]}-${pad(prev[1])}" aria-label="${MONTHS[prev[1] - 1]}">‹</a><a class="btn small" href="/calendar">Aujourd'hui</a><a class="btn small" href="/calendar?m=${next[0]}-${pad(next[1])}" aria-label="${MONTHS[next[1] - 1]}">›</a><a class="btn primary small" href="#evenements">${ic('plus')}Ajouter un événement</a></nav></div>
   <div class="cal"><div class="cal-head">${DAYS.map((d) => `<span>${d}</span>`).join('')}</div><div class="cal-grid">${grid}</div></div>
   <p class="muted small">Heures de Paris. Les posts LinkedIn se programment depuis le projet (section LinkedIn).</p>
 </section>
@@ -99,8 +99,9 @@ export function calendarPage({ email, year, month, byDay, feed, today, agenda = 
   <div class="card-h"><h2 id="h-agenda">À venir</h2></div>
   ${agenda.length ? `<ul class="agenda">${agendaItems}</ul>` : '<p class="muted">Rien de prévu pour l\'instant. Les rendez-vous, les prochaines actions sur tes prospects et les posts LinkedIn programmés apparaissent ici.</p>'}
 </section>
-<section class="card" id="evenements" aria-labelledby="h-ev">
-  <div class="card-h"><h2 id="h-ev">Ajouter un événement</h2><p>Un rendez-vous, un appel ou un rappel. Quand un prospect te répond avec une date, iaboss te propose de l'ajouter d'un clic (popup et page Mails).</p></div>
+<details class="card ev-fold" id="evenements"${error ? ' open' : ''}>
+  <summary><h2 id="h-ev">Ajouter un événement</h2></summary>
+  <p class="muted">Un rendez-vous, un appel ou un rappel. Quand un prospect te répond avec une date, iaboss te propose de l'ajouter d'un clic (popup et page Mails).</p>
   ${error ? banner('err', error) : ''}
   <form method="post" action="/calendar/events" class="cfg evform">
     <label class="field"><span class="lbl">Titre</span><input name="title" maxlength="200" required placeholder="ex. Appel avec Boulangerie Dupont"></label>
@@ -112,7 +113,7 @@ export function calendarPage({ email, year, month, byDay, feed, today, agenda = 
     <label class="field"><span class="lbl">Notes (facultatif)</span><textarea name="notes" rows="2" maxlength="1000"></textarea></label>
     <div class="row"><button class="btn primary">${ic('plus')}Ajouter à mon calendrier</button></div>
   </form>
-</section>
+</details>
 <section class="card" aria-labelledby="h-ext">
   <div class="card-h"><h2 id="h-ext">Agenda externe</h2></div>
   ${feedBox}

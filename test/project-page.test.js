@@ -101,3 +101,48 @@ test('la barre du haut porte « Rechercher » et la fenêtre de recherche ; « A
   assert.match(h, /<div class="jobs" id="jobs">/, 'plus de hidden au repos');
   assert.match(h, /Aucune tâche en cours\./);
 });
+
+test('onglet Envoi : bandeau, modèles, Journal du projet (compteurs réels vers Mails), Envoyer, Relance et Boîte de réception', async () => {
+  const u = await s.newUser({ email: 'envoi@x.fr' });
+  const a = await addProject(s.db, u.id, { name: 'Courrier', gitUrl: 'https://github.com/u/courrier.git' });
+  const now = Math.floor(Date.now() / 1000);
+  const pr = Number((await s.db.prepare("INSERT INTO prospects(project_id, company, email, status, created_at) VALUES(?, 'Boulangerie', 'b@x.fr', 'replied', ?)").run(a, now)).lastInsertRowid);
+  await s.db.prepare('INSERT INTO mail_log(project_id, prospect_id, email, sent_at, kind) VALUES(?, ?, ?, ?, ?)').run(a, pr, 'b@x.fr', now, 'initial');
+  await s.db.prepare('INSERT INTO mail_log(project_id, prospect_id, email, sent_at, error, kind) VALUES(?, ?, ?, ?, ?, ?)').run(a, null, 'c@x.fr', now, 'refusé', 'initial');
+  const h = await text(u, `/p/${a}/envoi`);
+  assert.match(h, /<p class="ban ban-info pj-ready" data-ready/);
+  for (const id of ['acc-template', 'acc-followuptpl', 'acc-send', 'acc-followup', 'acc-inbox']) assert.match(h, new RegExp(`id="${id}"`), id);
+  assert.match(h, /<h2 id="jr-h">Journal du projet<\/h2>/);
+  assert.match(h, new RegExp(`href="/mails\\?project=${a}"><span class="k-l">Tous</span><span class="k-v">2</span>`));
+  assert.match(h, new RegExp(`filter=sent"><span class="k-l">Envoyé</span><span class="k-v">1</span>`));
+  assert.match(h, new RegExp(`filter=replied"><span class="k-l">Répondu</span><span class="k-v">1</span>`));
+  assert.match(h, new RegExp(`filter=failed"><span class="k-l">Non envoyé</span><span class="k-v">1</span><span class="badge err">`));
+  assert.match(h, /<h2 id="send-h">Envoyer<\/h2>/);
+  assert.match(h, /data-followup-badge>Désactivée</);
+  const other = await s.newUser({ email: 'autre-envoi@x.fr' });
+  assert.equal((await other.get(`/p/${a}/envoi`, { headers: { accept: 'text/html' } })).status, 404, 'le journal d\'un autre compte reste introuvable');
+});
+
+test('fiche contact : dernière réponse, échanges, prochaine action, accroche ; introuvable pour un autre projet ou un autre compte', async () => {
+  const u = await s.newUser({ email: 'contact@x.fr' });
+  const v = await s.newUser({ email: 'autre-contact@x.fr' });
+  const a = await addProject(s.db, u.id, { name: 'Kiné', gitUrl: 'https://github.com/u/kine2.git' });
+  const b = await addProject(s.db, u.id, { name: 'Boulangerie', gitUrl: 'https://github.com/u/boul.git' });
+  const now = Math.floor(Date.now() / 1000);
+  const pid = Number((await s.db.prepare("INSERT INTO prospects(project_id, company, email, city, score, status, hook, source, created_at, replied_at) VALUES(?, 'Cabinet Le Gall', 'contact@legall.fr', 'Quimper', 9, 'replied', 'Votre cabinet accueille des remplaçants.', 'https://legall-kine.fr/contact', ?, ?)").run(a, now - 86400, now)).lastInsertRowid);
+  await s.db.prepare("INSERT INTO replies(project_id, prospect_id, uid, from_email, subject, body, intent, received_at) VALUES(?, ?, 1, 'contact@legall.fr', 'Re', 'Bonjour, ça nous intéresse. Pouvez-vous m''appeler jeudi ?', 'interested', ?)").run(a, pid, now);
+  await s.db.prepare('INSERT INTO mail_log(project_id, prospect_id, email, sent_at, kind, subject, variant) VALUES(?, ?, ?, ?, ?, ?, ?)').run(a, pid, 'contact@legall.fr', now - 3600, 'initial', 'Un agenda partagé', 'A');
+  const h = await text(u, `/p/${a}/contact/${pid}`);
+  assert.match(h, /<h1>Cabinet Le Gall<\/h1>/);
+  assert.match(h, /<nav class="crumb"[^]*?href="\/p\/\d+">Kiné<\/a>/);
+  assert.match(h, /<h2 id="dr-h">Dernière réponse<\/h2><span class="badge ok">Intéressé<\/span>/);
+  assert.match(h, /« Bonjour, ça nous intéresse\. Pouvez-vous m&#39;appeler jeudi \? »/);
+  assert.match(h, /<b>Mail envoyé<\/b> · Objet A « Un agenda partagé »/);
+  assert.match(h, /<b>Prospect trouvé<\/b> · source : legall-kine\.fr\/contact/);
+  assert.match(h, /<mark>Votre cabinet accueille des remplaçants\.<\/mark>/);
+  assert.match(h, /data-contact-form="next"/);
+  assert.match(h, /data-contact-client/, 'un prospect peut passer en client');
+  assert.equal((await u.get(`/p/${b}/contact/${pid}`, { headers: { accept: 'text/html' } })).status, 404, 'le prospect est d\'un autre projet');
+  assert.equal((await v.get(`/p/${a}/contact/${pid}`, { headers: { accept: 'text/html' } })).status, 404, 'le projet est d\'un autre compte');
+  assert.match(await text(u, `/p/${a}/prospection`), /<script/, 'la page Prospection charge ses scripts');
+});

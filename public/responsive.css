@@ -29,7 +29,7 @@ td:has(> select), td:has(> .badge) { min-width: 7.5rem; }
   .row, .row-actions { min-width: 0; }
 
   /* ---- Fenêtres flottantes : jamais plus larges que l'écran ---- */
-  .reply-pops { right: 8px; left: 8px; bottom: 8px; width: auto; }
+  .reply-pops { right: 8px; left: 8px; bottom: calc(68px + env(safe-area-inset-bottom)); width: auto; }
   .reply-pop, .reply-pop > summary, .reply-body { min-width: 0; max-width: 100%; }
   .prospect-dialog { width: calc(100vw - 16px); padding: 16px; }
   .tokenbox { flex-direction: column; align-items: stretch; }

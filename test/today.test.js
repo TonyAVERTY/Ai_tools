@@ -143,7 +143,7 @@ test('argent : factures à encaisser (échues en rouge), encaissé du mois, aucu
   assert.match(home, /2 factures, 1 en retard/);
   assert.match(home, /1\s284,00\s€/, 'total à encaisser');
   assert.match(home, /640,00\s€/, 'encaissé du mois');
-  assert.match(home, new RegExp(`href="/facturation/projet/${pid}">Relancer<`));
+  assert.match(home, new RegExp(`href="/p/${pid}/facturation">Relancer<`));
   assert.doesNotMatch(await text(other, '/'), /Cabinet Morvan|F-2026-0004/);
 });
 

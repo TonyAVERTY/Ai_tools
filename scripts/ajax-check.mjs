@@ -64,8 +64,8 @@ for (const k of Object.keys(after.keys)) if ((after.keys[k] || 0) > (base.keys[k
 
 // 2. précédent / suivant
 await p.goBack(); await p.waitForFunction(() => location.pathname === '/compta' && document.title.startsWith('Comptabilité')); await ready();
-await p.goBack(); await p.waitForFunction(() => location.pathname === '/calendar' && document.title.startsWith('Calendrier')); await ready();
-check(/Calendrier/.test(await p.title()), 'retour arrière : la bonne page revient');
+await p.goBack(); await p.waitForFunction(() => location.pathname === '/calendar' && document.title.startsWith('Agenda')); await ready();
+check(/Agenda/.test(await p.title()), 'retour arrière : la bonne page revient');
 await p.goForward(); await p.waitForFunction(() => location.pathname === '/compta'); await ready();
 check(await p.evaluate(() => window.__marker) === 'vivante' && navs.length === navsAfterLoad, 'précédent / suivant : sans rechargement');
 

@@ -32,6 +32,7 @@ import { registerCalendarRoutes } from './calendar.js';
 import { registerAccountingRoutes } from './accountingroutes.js';
 import { registerBillingRoutes } from './billingroutes.js';
 import { registerClientsRoutes } from './clientsroutes.js';
+import { clientsOverview } from './clientsdata.js';
 import { registerChatRoutes } from './chat.js';
 import { registerEventRoutes } from './events.js';
 import { feedToken, feedUrl } from './services/ical.js';
@@ -43,6 +44,7 @@ import { isRoleJob, roleTaskByJob } from './services/roles.js';
 import { registerProspectRoutes } from './prospectroutes.js';
 import { settingsPage, unsubPage, accountPage, layout } from './views.js';
 import { projectsPage, projectTabPage, tabSlugs } from './projectviews.js';
+import { contactPage } from './contactviews.js';
 import { fmtEur } from './services/accounting.js';
 import { linkPage } from './linkviews.js';
 import { availableProviders } from './services/providers/availability.js';
@@ -195,8 +197,17 @@ export function registerRoutes(router, app) {
     }));
   });
 
+  // Journal du projet (onglet Envoi) : mails de ce projet, par état
+  const journalOf = async (database, projectId) => {
+    const r = await database.prepare(`SELECT COUNT(*) n, SUM(CASE WHEN m.error IS NULL THEN 1 ELSE 0 END) ok, SUM(CASE WHEN m.error IS NOT NULL THEN 1 ELSE 0 END) failed,
+        SUM(CASE WHEN m.error IS NULL AND x.status IN ('replied', 'client') THEN 1 ELSE 0 END) replied
+      FROM mail_log m LEFT JOIN prospects x ON x.id = m.prospect_id WHERE m.project_id = ?`).get(projectId);
+    return { all: Number(r?.n || 0), sent: Number(r?.ok || 0), failed: Number(r?.failed || 0), replied: Number(r?.replied || 0) };
+  };
+
   // Page d'un projet, une adresse par onglet (le sien ou un projet d'équipe) : tout autre numéro ou onglet est « introuvable »
-  const projectTab = async ({ res, params, session }) => {
+  const projectTab = async (ctx) => {
+    const { res, params, session } = ctx;
     const tab = params.tab ?? '';
     if (!tabSlugs().includes(tab)) throw new HttpError(404, 'Page introuvable');
     const userId = session.userId;
@@ -206,8 +217,22 @@ export function registerRoutes(router, app) {
     html(res, projectTabPage({
       email: session.email, entry, tab, stats: (await projectStats(db, [full.id])).get(Number(full.id)),
       checklist: await projectChecklist(app, full), jobs: await latestJobs(db, full.id),
+      billing: tab === 'facturation' ? await app.billingTab(ctx) : null,
+      clientCounts: tab === 'clients' ? (await clientsOverview(db, session.userId, [Number(full.id)])).get(Number(full.id)) : null,
+      journal: tab === 'envoi' ? await journalOf(db, full.id) : null,
+      scheduled: tab === 'communication' ? (await db.prepare("SELECT body, scheduled_at at FROM linkedin_posts WHERE project_id = ? AND status = 'scheduled' ORDER BY scheduled_at LIMIT 5").all(full.id)).map((r) => ({ body: r.body, at: Number(r.at) })) : [],
     }));
   };
+  // Fiche contact : un prospect ou un client du projet (introuvable si le prospect est d'un autre projet ou d'un autre compte)
+  router.get('/p/:id/contact/:cid', async ({ res, params, session }) => {
+    const full = await getProject(app, params.id, { userId: session.userId });
+    const detail = await prospectDetail(db, Number(params.cid));
+    if (!detail || Number(detail.prospect.project_id) !== Number(full.id)) throw new HttpError(404, 'Prospect introuvable');
+    const reply = await db.prepare('SELECT body, subject, intent, received_at FROM replies WHERE prospect_id = ? ORDER BY received_at DESC, id DESC LIMIT 1').get(detail.prospect.id);
+    const job = await db.prepare("SELECT status FROM jobs WHERE project_id = ? AND type = 'hook' AND params_json = ? ORDER BY id DESC LIMIT 1").get(full.id, JSON.stringify({ prospectId: detail.prospect.id }));
+    html(res, contactPage({ email: session.email, project: full, detail, reply: reply ? { ...reply, received_at: Number(reply.received_at) } : null, hookBusy: !!job && ['queued', 'running'].includes(job.status) }));
+  });
+
   router.get('/p/:id', projectTab);
   router.get('/p/:id/:tab', projectTab);
   router.get('/projets/:id', async ({ res, params }) => redirect(res, `/p/${params.id}`));
