@@ -10,13 +10,16 @@ import { checkSense, acceptSenseFix, SenseUnavailable, SENSE_BATCH } from './ser
 import { addUsage, jobContext, liveJobUsage } from './services/jobs.js';
 import { syncRepo } from './services/git.js';
 import { normalizeModel, defaultModelOf, tierEquivalent } from './services/models.js';
-import { analyzePrompt, prospectPrompt, templatePrompt, reviewMailPrompt, fixStylePrompt, followupTemplatePrompt, evolutionPrompt, linkedinPostPrompt, hookPrompt, auditPrompt, promoPrompt, rolePrompt, parseCustomPrompts, LEVELS } from './services/prompts.js';
+import { analyzePrompt, prospectPrompt, templatePrompt, reviewMailPrompt, fixStylePrompt, followupTemplatePrompt, evolutionPrompt, linkedinPostPrompt, instagramPrompt, instagramResearchPrompt, newsletterPrompt, hookPrompt, auditPrompt, promoPrompt, rolePrompt, parseCustomPrompts, LEVELS } from './services/prompts.js';
 import { VOICE_PROVIDERS, parseVoiceParams, extractVoiceScript, prepareVoice, cleanVoice, mixVoice, synthesize, langName } from './services/voiceover.js';
 import { PROMO, FORMATS, SCENE_REFUSED, SceneError, parsePromoParams, extractScene, promoSupported, renderPromo } from './services/promovideo.js';
 import { reviewPromo } from './services/promoqa.js';
 import { createJobStream } from './services/jobstream.js';
 import { reserveVideo, finishVideo, removeVideo, countVideos, keepScene, takeScene, getVoiceKey, getVoiceRegion } from './promo.js';
 import { linkedinAccount, saveDraft, recentDrafts } from './linkedin.js';
+import { saveDraft as saveContent, recentBodies, cleanHashtags, INSTAGRAM_FORMATS, LIMITS as CONTENT } from './contentdrafts.js';
+import { extractVisual, renderStill, stillSupported, TOOLS as STILL_TOOLS } from './services/stillimage.js';
+import { reviewStill, reviewVerdict as stillVerdict } from './services/stillqa.js';
 import { followupCandidates, followupSubject, isBusinessHours } from './services/followup.js';
 import { EMAIL_RE, createTransport, buildProspectMail, allowedToSend, makeMessageId, mailVars, SAMPLE_PERSON } from './services/mailer.js';
 import { unsubToken } from './crypto.js';
@@ -733,6 +736,116 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
       body = body.replace(/\r\n/g, '\n').trim().slice(0, 3000);
       if (body.length < 50) throw new Error('Claude n\'a pas produit de post exploitable : réessaie');
       return { ok: true, postId: await saveDraft(db, project.id, { body, direction }) };
+    },
+
+    // Post Instagram : légende, hashtags, texte alternatif et image. Claude cherche d'abord sur le web ce qui fonctionne dans le secteur du projet (grandes marques,
+    // formats qui performent), lit le dépôt (lecture seule) pour retrouver le vrai design (couleurs, polices, logo, écrans), dessine l'image en HTML/CSS fixe
+    // que Chromium rend en PNG, puis un directeur artistique indépendant juge le PNG. Trois essais au plus : un document refusé au rendu ou une image notée
+    // en dessous du seuil repart avec des corrections précises ; au dernier essai le post est livré avec les constats du contrôle.
+    async instagram_post(ctx) {
+      const userId = ctx.job.user_id;
+      const project = await getProject(app, ctx.job.project_id, { userId });
+      if (!project.profile) throw new Error("Analyse le projet d'abord");
+      const sup = (app.stillSupported || stillSupported)(cfg);
+      if (!sup.ok) throw new Error(sup.reason);
+      const direction = String(ctx.params.direction ?? '').trim().slice(0, CONTENT.direction);
+      const formatKey = INSTAGRAM_FORMATS[ctx.params.format] ? ctx.params.format : 'carre';
+      const format = INSTAGRAM_FORMATS[formatKey];
+      await ctx.progress({ message: 'Mise à jour du repo…', pct: 3 });
+      const dir = repoDir(cfg, userId, project.id);
+      await sync(userId, project.gitUrl, dir);
+      const model = await writeModel(userId, await modelOf(userId, 'analyze_model'));
+      const previous = await recentBodies(db, project.id, 'instagram');
+      const ATTEMPTS = 3;
+      const field = (text, tag) => (String(text ?? '').match(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`, 'i')) || [])[1]?.trim() ?? '';
+      let fix = null;
+      let previousVisual = '';
+      // Phase 1 : le web SEUL (jamais avec le dépôt : une page piégée ne doit pas pouvoir exfiltrer du code). Une recherche en échec ne fait pas échouer le post.
+      let inspiration = '';
+      try {
+        await ctx.progress({ message: 'Recherche d\'inspiration dans ton secteur…', pct: 8 });
+        const rp = instagramResearchPrompt({ projectName: project.name, profile: project.profile, target: project.target || {}, direction, site: project.siteUrl });
+        const rr = await creeping(ctx, 'Recherche d\'inspiration dans ton secteur…', 8, () => claude(userId, { prompt: rp.prompt, system: rp.system, model, maxTurns: 12, tools: STILL_TOOLS.research, signal: ctx.signal }), { to: 22 });
+        addUsage(ctx, rr);
+        inspiration = field(rr.text, 'inspiration').replace(/\n{3,}/g, '\n\n').slice(0, 900);
+      } catch (e) { if (ctx.signal?.aborted) throw e; }
+      // Phase 2 : le dépôt SEUL (lecture) pour le vrai design, puis le dessin
+      for (let attempt = 1; ; attempt++) {
+        const first = attempt === 1;
+        const label = first ? 'Lecture du design du projet et conception du post…' : `Amélioration de l'image (essai ${attempt}/${ATTEMPTS})…`;
+        const from = first ? 25 : 30 + (attempt - 2) * 8;
+        await ctx.progress({ message: label, pct: from });
+        const { prompt, system } = instagramPrompt({
+          projectName: project.name, profile: project.profile, target: project.target || {}, direction, previous, site: project.siteUrl, format,
+          custom: await custom(userId), model, fix, previousVisual, inspiration,
+        });
+        const sink = makeSink();
+        const maxTurns = first ? 20 : 14;
+        const r = await creeping(ctx, label, from, () => claude(userId, {
+          prompt, system, cwd: dir, model, maxTurns, tools: STILL_TOOLS.design, signal: ctx.signal,
+          onTurn: (n) => sink.push(() => ctx.progress({ message: `${label} · étape ${n}`, pct: turnPct(from, 60, n, maxTurns) })),
+        }), { to: 60 });
+        await sink.flush();
+        addUsage(ctx, r);
+        const caption = field(r.text, 'legende').replace(/\r\n/g, '\n').slice(0, CONTENT.caption);
+        if (caption.length < 40) throw new Error(`Claude n'a pas produit de légende exploitable (${r.subtype}) : réessaie`);
+        const html = extractVisual(r.text);
+        const meta = { hashtags: cleanHashtags(field(r.text, 'hashtags')), alt: field(r.text, 'alt').replace(/\s+/g, ' ').slice(0, CONTENT.alt), format: formatKey, width: format.width, height: format.height, inspiration };
+        let png;
+        try {
+          await ctx.progress({ message: 'Rendu de l\'image…', pct: 66 });
+          png = await (app.renderStill || renderStill)({ cfg, html, width: format.width, height: format.height, signal: ctx.signal });
+          if (png.length > CONTENT.image) throw new SceneError(`L'image pèse trop lourd (${png.length} octets) : simplifie les dégradés et les formes.`);
+        } catch (e) {
+          if (!(e instanceof SceneError)) throw e;
+          if (attempt >= ATTEMPTS) throw new Error(`L'image écrite par Claude ne passe pas au rendu : ${e.message}`);
+          fix = e.message;
+          previousVisual = html;
+          continue;
+        }
+        // Le directeur artistique regarde l'image rendue. Un contrôle en panne ne bloque pas la livraison, mais le post le dit.
+        let review = null;
+        let reviewNote = '';
+        try {
+          await ctx.progress({ message: 'Contrôle par un directeur artistique…', pct: 80 });
+          review = await (app.reviewStill || reviewStill)({
+            png, width: format.width, height: format.height, caption, direction, brand: inspiration, model, extraRoot: userChatRoot(cfg, userId), signal: ctx.signal,
+            runAgent: async (options) => { const result = await claude(userId, options); addUsage(ctx, result); return result; },
+          });
+        } catch (e) {
+          if (ctx.signal?.aborted) throw e;
+          reviewNote = 'Le contrôle qualité de l\'image n\'a pas pu être fait : relis-la avec attention avant de publier.';
+        }
+        if (review && !review.approved && attempt < ATTEMPTS) { fix = stillVerdict(review); previousVisual = html; continue; }
+        const notes = review && !review.approved ? review.issues.filter((x) => x.severity !== 'minor').map((x) => x.problem) : [];
+        const id = await saveContent(db, project.id, 'instagram', {
+          direction, body: caption, image: png,
+          extra: { ...meta, ...(review ? { score: review.score } : {}), ...(notes.length ? { toCheck: notes.slice(0, 5) } : {}), ...(reviewNote ? { toCheck: [reviewNote] } : {}), attempts: attempt },
+        });
+        return { ok: true, draftId: id, attempts: attempt, ...(review ? { score: review.score } : {}) };
+      }
+    },
+
+    // Newsletter : objet, texte d'aperçu et corps en Markdown, à relire puis à copier ou télécharger. Rien n'est envoyé ici.
+    async newsletter(ctx) {
+      const userId = ctx.job.user_id;
+      const project = await getProject(app, ctx.job.project_id, { userId });
+      if (!project.profile) throw new Error("Analyse le projet d'abord");
+      const direction = String(ctx.params.direction ?? '').trim().slice(0, CONTENT.direction);
+      const label = direction ? 'Rédaction de la newsletter selon ta direction…' : 'Claude choisit un sujet et rédige la newsletter…';
+      await ctx.progress({ message: label, pct: 40 });
+      const model = await writeModel(userId, await modelOf(userId, 'analyze_model'));
+      const { prompt, system } = newsletterPrompt({
+        projectName: project.name, profile: project.profile, target: project.target || {}, direction, previous: await recentBodies(db, project.id, 'newsletter'),
+        site: project.siteUrl, custom: await custom(userId), model,
+      });
+      const r = await creeping(ctx, label, 40, () => claude(userId, { prompt, system, model, maxTurns: 1, tools: [], signal: ctx.signal }));
+      addUsage(ctx, r);
+      const field = (tag) => (String(r.text ?? '').match(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`, 'i')) || [])[1]?.trim() ?? '';
+      const subject = field('objet').replace(/\s+/g, ' ').slice(0, CONTENT.subject);
+      const body = field('texte').replace(/\r\n/g, '\n').slice(0, CONTENT.newsletter);
+      if (!subject || body.length < 200) throw new Error("Claude n'a pas produit de newsletter exploitable : réessaie");
+      return { ok: true, draftId: await saveContent(db, project.id, 'newsletter', { direction, title: subject, body, extra: { preview: field('apercu').replace(/\s+/g, ' ').slice(0, CONTENT.preview) } }) };
     },
 
     // Vidéo de promotion : Claude écrit une scène animée, Chromium la rend image par image, ffmpeg produit le MP4.

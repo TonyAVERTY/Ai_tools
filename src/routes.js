@@ -38,6 +38,7 @@ import { registerEventRoutes, suggestionFor } from './events.js';
 import { feedToken, feedUrl } from './services/ical.js';
 import { developerMode } from './apitokens.js';
 import { registerLinkedinRoutes } from './linkedinroutes.js';
+import { registerContentRoutes } from './contentroutes.js';
 import { registerPromoRoutes, removeProjectVideos } from './promo.js';
 import { registerPosteRoutes } from './posteroutes.js';
 import { isRoleJob, roleTaskByJob } from './services/roles.js';
@@ -105,6 +106,7 @@ export function registerRoutes(router, app) {
   registerSearchRoutes(router, app);
   registerMailRoutes(router, app);
   registerLinkedinRoutes(router, app, { project, aiOpts });
+  registerContentRoutes(router, app, { project, aiOpts });
   registerPromoRoutes(router, app, { project, aiOpts });
   registerPosteRoutes(router, app, { project, aiOpts });
   registerProspectRoutes(router, app, { project });

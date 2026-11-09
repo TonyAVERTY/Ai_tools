@@ -1982,3 +1982,20 @@ a.pj-card:hover { border-color: var(--primary); }
   .tools-nav .on, .tools-nav [aria-current="true"] { border-color: var(--primary); background: var(--primary); color: var(--on-primary); }
 }
 .ev-fold > summary h2 { font-size: 1.125rem; }
+
+/* Communication : posts Instagram et newsletters */
+.ct-gen, .ct-draft { display: flex; flex-direction: column; gap: 12px; }
+.ct-draft { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--line); }
+.ct-gen .field, .ct-draft .field { margin: 0; }
+.ct-fig { margin: 0; display: flex; flex-direction: column; gap: 8px; align-items: center; }
+.ct-img { display: block; width: 100%; max-width: 420px; height: auto; border-radius: var(--radius-lg); border: 1px solid var(--line); background: var(--bg-sunk); box-shadow: var(--shadow-2, none); }
+.ct-fig figcaption { text-align: center; }
+.ct-format { max-width: 320px; }
+.ct-insp > summary, .ct-history > summary { cursor: pointer; font-weight: 600; min-height: 36px; padding: 6px 0; color: var(--link); }
+.ct-insp > summary:hover, .ct-history > summary:hover { text-decoration: underline; }
+.ct-insp p { margin: 6px 0 0; color: var(--muted); }
+.ct-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.ct-list li { display: flex; align-items: center; gap: 12px; justify-content: space-between; padding: 8px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card-2); }
+.ct-li-t { display: flex; flex-direction: column; min-width: 0; }
+.ct-li-t b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 640px) { .ct-img { max-width: 100%; } .ct-format { max-width: none; } }
