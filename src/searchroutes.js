@@ -18,7 +18,7 @@ export function registerSearchRoutes(router, app) {
     const groups = [];
 
     const hits = projects.filter((p) => p.name.toLowerCase().includes(q.toLowerCase())).slice(0, MAX_PER_GROUP)
-      .map((p) => ({ title: p.name, sub: 'Projet', href: `/projets/${p.id}` }));
+      .map((p) => ({ title: p.name, sub: 'Projet', href: `/p/${p.id}` }));
     if (hits.length) groups.push({ id: 'projects', label: 'Projets', items: hits });
 
     if (ids.length) {
@@ -26,7 +26,7 @@ export function registerSearchRoutes(router, app) {
       const prospects = await db.prepare(`SELECT id, project_id, company, email, status FROM prospects WHERE project_id IN (${marks}) AND (LOWER(company) LIKE ? ESCAPE '!' OR LOWER(email) LIKE ? ESCAPE '!') ORDER BY created_at DESC LIMIT ${MAX_PER_GROUP}`).all(...ids, needle, needle);
       if (prospects.length) {
         groups.push({ id: 'prospects', label: 'Prospects et clients', items: prospects.map((r) => ({
-          title: r.company, sub: `${r.status === 'client' ? 'Client' : 'Prospect'} · ${r.email} · ${names.get(Number(r.project_id)) || ''}`, href: `/projets/${r.project_id}`,
+          title: r.company, sub: `${r.status === 'client' ? 'Client' : 'Prospect'} · ${r.email} · ${names.get(Number(r.project_id)) || ''}`, href: `/p/${r.project_id}/prospection`,
         })) });
       }
       const replies = await db.prepare(`SELECT id, project_id, from_email, subject FROM replies WHERE project_id IN (${marks}) AND (LOWER(from_email) LIKE ? ESCAPE '!' OR LOWER(subject) LIKE ? ESCAPE '!') ORDER BY received_at DESC LIMIT ${MAX_PER_GROUP}`).all(...ids, needle, needle);
