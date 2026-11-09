@@ -64,8 +64,11 @@ export function mailsPage(d) {
         ${suggestBlock(r)}
         <label class="field"><span class="lbl">Réponse suggérée (à relire, puis à envoyer depuis ta messagerie)</span>
           <textarea rows="9" readonly data-draft>${esc(r.draft)}</textarea></label>
-        <div class="row-actions"><button type="button" class="btn small" data-copy-draft>${ic('copy')}Copier la réponse</button>
-          ${r.seen ? '' : `<button type="button" class="btn small" data-reply-seen="${r.id}">${ic('check')}Marquer comme lu</button>`}</div>
+        <div class="row-actions"><a class="btn small primary" href="mailto:${esc(r.from)}?subject=${encodeURIComponent(/^re:/i.test(r.subject) ? r.subject : `Re: ${r.subject}`)}">${ic('reply')}Répondre</a>
+          <button type="button" class="btn small" data-copy-draft>${ic('copy')}Copier la réponse</button>
+          ${r.prospectId ? `<button type="button" class="btn small" data-remind-toggle aria-expanded="false">${ic('clock')}Programmer un rappel</button>` : ''}
+          ${r.seen ? '' : `<button type="button" class="btn small" data-reply-seen="${r.id}">${ic('check')}Marquer traitée</button>`}</div>
+        ${r.prospectId ? `<form class="remind-f" data-remind="${r.prospectId}" hidden><label class="field"><span class="lbl">Me le rappeler le</span><input type="date" name="day" required></label><button class="btn small primary">Programmer</button></form>` : ''}
       </div></details>`).join('')}</div>`;
   } else {
     const solo = d.project || d.projects.length < 2;

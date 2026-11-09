@@ -58,6 +58,7 @@ for (const vp of [{ width: 1280, height: 900 }, { width: 390, height: 844 }]) {
   // 2) Calendrier : « Ajouter un événement » avec une date dans dix ans (le serveur accepte jusqu'à trois ans)
   await p.goto(`${s.base}/calendar`); await p.waitForSelector('html[data-nav="ready"]');
   const F2 = '.evform';
+  await p.evaluate(() => { document.getElementById('evenements').open = true; });
   await p.fill(`${F2} [name=title]`, 'Appel avec Boulangerie Dupont'); await p.fill(`${F2} [name=date]`, '2036-05-12'); await p.fill(`${F2} [name=time]`, '14:30');
   await p.selectOption(`${F2} [name=minutes]`, '60'); await p.fill(`${F2} [name=notes]`, 'Parler du devis');
   await p.evaluate((f) => { document.querySelector(f).__mark = 1; }, F2);
