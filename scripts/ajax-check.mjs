@@ -46,6 +46,8 @@ const check = (ok, what) => { if (!ok) bad.push(what); console.log(`${ok ? 'ok '
 await p.goto(`${s.base}/`);
 await p.waitForTimeout(500);
 await p.evaluate(() => { window.__marker = 'vivante'; });
+// « Visite guidée » (/?tour=1) est une action : sur l'accueil, il ne doit pas être surligné comme page courante
+check(await p.locator('.user-pop a[href="/?tour=1"][aria-current]').count() === 0, 'menu du compte : « Visite guidée » n\'est pas surligné sur l\'accueil');
 const base = await p.evaluate(() => window.__live());
 const navsAfterLoad = navs.length;
 
