@@ -3,6 +3,7 @@
 import { esc } from './http.js';
 import { ic } from './icons.js';
 import { layout } from './views.js';
+import { suggestBlock } from './mailviews.js';
 import { STATUSES } from './services/crm.js';
 import { INTENTS } from './services/replies.js';
 
@@ -56,7 +57,7 @@ ${detail.optOut ? `<p class="ban ban-warn" role="note">${ic('alert')}<span>Sur l
 <div class="pj-grid pj-grid-e">
   <div class="pj-flat pj-left">
     <section class="sheet" aria-labelledby="dr-h"><div class="sheet-h"><h2 id="dr-h">Dernière réponse</h2>${reply ? `<span class="badge ok">${esc(INTENTS[reply.intent] || INTENTS.other)}</span>` : ''}</div>
-      ${reply ? `<blockquote class="pj-quote">« ${esc(String(reply.body || '').replace(/\\s+/g, ' ').trim().slice(0, 400))} »</blockquote><p class="small muted">Reçue ${esc(when(reply.received_at))}${reply.subject ? ` · ${esc(reply.subject)}` : ''}</p>` : '<p class="muted">Pas de réponse pour l\'instant.</p>'}</section>
+      ${reply ? `<blockquote class="pj-quote">« ${esc(String(reply.body || '').replace(/\\s+/g, ' ').trim().slice(0, 400))} »</blockquote><p class="small muted">Reçue ${esc(when(reply.received_at))}${reply.subject ? ` · ${esc(reply.subject)}` : ''}</p>${suggestBlock({ id: reply.id, suggestion: reply.suggestion, event: reply.event })}` : '<p class="muted">Pas de réponse pour l\'instant.</p>'}</section>
     <section class="sheet" aria-labelledby="ex-h"><div class="sheet-h"><h2 id="ex-h">Échanges</h2><button type="button" class="btn small" data-contact-note-toggle aria-expanded="false">${ic('plus')}Ajouter une note</button></div>
       <form data-contact-form="note" class="pj-note" hidden><textarea name="body" rows="3" maxlength="2000" required aria-label="Note" placeholder="Ce qu'il a dit, le contexte, ce qu'il faut retenir…"></textarea><div class="row"><button class="btn primary">Ajouter la note</button></div></form>
       <ol class="pj-timeline">${ev.map((e) => `<li><time>${esc(when(e.at))}</time><span>${e.html}</span></li>`).join('')}</ol></section>

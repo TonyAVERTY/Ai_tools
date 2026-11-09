@@ -7,7 +7,7 @@ html { -webkit-text-size-adjust: 100%; }
 body {
   margin: 0; background: var(--bg); color: var(--text); font-family: var(--font); font-size: 1rem; line-height: 1.55;
   -webkit-font-smoothing: antialiased; min-height: 100vh;
-  --series-1: var(--link); --series-2: var(--warn); --series-3: var(--info); /* paire de courbes : bleu et ambre, lisibles dans les deux thèmes */
+  --series-1: var(--link); --series-2: var(--warn); --series-3: var(--chart-3); /* série 3 : teal clair (jeton --chart-3), lisibles dans les deux thèmes */
 }
 h1, h2, h3, h4, h5, p { margin: 0; }
 .page h1 > .ic, .card h1 > .ic { display: none; } /* un titre de page n'a pas besoin d'icône : le mot suffit */
@@ -1950,3 +1950,15 @@ a.pj-card:hover { border-color: var(--primary); }
 }
 .recap .legend { gap: 8px 14px; }
 .recap > details summary, .recap details.small > summary { display: inline-flex; align-items: center; min-height: 36px; padding: 0 14px; margin-top: 12px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--card); color: var(--text); font-weight: 600; cursor: pointer; }
+
+/* Cible validée (maquette 04) : un résumé en une phrase ; les champs reviennent avec « Modifier » */
+.target .target-sum { display: none; margin: 0 0 12px; font-size: 1rem; line-height: 1.5; }
+.target-locked .target-sum { display: block; }
+.target-locked > label, .target-locked > .grid3, .target-locked > .grid2 { display: none; }
+
+/* Récapitulatif : carte « Revenu du produit » */
+.recap .rev-card h3 { margin: 0 0 6px; font-family: var(--display); font-weight: 600; font-size: 1.125rem; }
+.recap .rev-card p { margin: 6px 0; }
+.recap .rev-card .rev-v strong { font-family: var(--display); font-weight: 600; font-size: 1.5rem; }
+@media (min-width: 900px) { .recap .charts .rev-card { grid-column: 2; } }
+.recap .rev-card { margin: 0; padding: 20px 22px; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--card); min-width: 0; }
