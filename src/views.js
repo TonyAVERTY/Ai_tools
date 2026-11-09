@@ -16,7 +16,7 @@ import { loadingBlock } from './loading.js';
 const fmtDate = (ts) => (ts ? new Date(ts * 1000).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' }) : '—');
 
 // Icônes de la section : noms du sprite (src/icons.js), une seule fois par page
-const SECTION_ICONS = { target: 'target', search: 'search', spark: 'spark', chart: 'chart', mail: 'mail', linkedin: 'pen', send: 'send', repeat: 'repeat', users: 'users', gear: 'gear', git: 'git', computer: 'computer', film: 'film' };
+const SECTION_ICONS = { target: 'target', search: 'search', spark: 'spark', chart: 'chart', mail: 'mail', linkedin: 'pen', send: 'send', repeat: 'repeat', users: 'users', gear: 'gear', git: 'git', computer: 'computer', film: 'film', image: 'image' };
 
 /** Section dépliable. `title` peut contenir du HTML de confiance (badges), jamais de donnée utilisateur brute. */
 function acc(key, icon, title, sub, body, { open = false, cls = '' } = {}) {
@@ -58,6 +58,7 @@ ${iconLinks()}
 <script src="${assetUrl('/static/app-search.js')}" defer></script>
 <script src="${assetUrl('/static/app-promo.js')}" defer></script>
 <script src="${assetUrl('/static/app-linkedin.js')}" defer></script>
+<script src="${assetUrl('/static/app-content.js')}" defer></script>
 <script src="${assetUrl('/static/app-prospects.js')}" defer></script>
 <script src="${assetUrl('/static/app-replies.js')}" defer></script>
 <script src="${assetUrl('/static/app-bdd.js')}" defer></script>
@@ -538,6 +539,12 @@ export function projectBlocks(p, smtp, dbCfg, imap) {
   const linkedin = acc('linkedin', 'linkedin', 'LinkedIn', `Relie un compte, ${aiName()} écrit des posts, tu relis et publies`, `
     <div class="linkedin" data-linkedin>${loadingBlock()}</div>
     <div class="job" data-job="linkedin_post"></div>`, { open: true, cls: 'main' });
+  const instagram = acc('instagram', 'image', 'Instagram', `${aiName()} écrit le post et dessine l'image d'après le vrai design de ton projet`, `
+    <div class="content" data-content="instagram">${loadingBlock()}</div>
+    <div class="job" data-job="instagram_post"></div>`, { open: true, cls: 'main' });
+  const newsletter = acc('newsletter', 'mail', 'Newsletter', `${aiName()} rédige une newsletter prête à copier ou à télécharger`, `
+    <div class="content" data-content="newsletter">${loadingBlock()}</div>
+    <div class="job" data-job="newsletter"></div>`, { open: true, cls: 'main' });
   const promo = acc('promo', 'film', 'Promotion', `${aiName()} conçoit une vidéo de design motion pour présenter ton projet`, `
     <div class="promo" data-promo>${loadingBlock()}</div>
     <div class="job" data-job="promo_video"></div>`, { open: true, cls: 'main' });
@@ -545,7 +552,7 @@ export function projectBlocks(p, smtp, dbCfg, imap) {
     <div class="recap" data-recap>${loadingBlock()}</div>`, { open: true, cls: 'main' }) : '';
   const postes = acc('postes', 'users', 'Postes et tâches IA', 'Les postes d\'une entreprise, chacun avec ses tâches faites par l\'IA', postesBody(p), { open: true, cls: 'main' });
   const config = p.access !== 'member' ? acc('config', 'gear', 'Configuration du projet', 'SMTP, boîte IMAP, base de données', configForms(p, smtp, dbCfg, imap), { open: true, cls: 'config' }) : '';
-  return { setup, header: headerAcc, target, search, template, send, followup, followuptpl, inbox, prospects, evolution, audit, linkedin, promo, recap, postes, config };
+  return { setup, header: headerAcc, target, search, template, send, followup, followuptpl, inbox, prospects, evolution, audit, linkedin, instagram, newsletter, promo, recap, postes, config };
 }
 
 /** Une ligne « serveur Git » : URL et token. `i` : numéro de la ligne (champs git_*_i) ; `fresh` : ligne qui vient d'être ajoutée (gabarit). */

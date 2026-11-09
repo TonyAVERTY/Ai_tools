@@ -2,7 +2,7 @@
 Résumé : comprendre le menu Activité, la file de jobs (en attente, programmé, annulation), la carte « Consommation Claude » (quota Claude, coût IA), les reports automatiques, les jobs de nuit et les alertes.
 
 ## Les jobs
-Toute tâche lourde (analyse, recherche de prospects, envoi, relances, évolutions, audit, post LinkedIn, vidéo de promotion, accroche) est un **job** : il tourne en arrière-plan, même si on ferme la page.
+Toute tâche lourde (analyse, recherche de prospects, envoi, relances, évolutions, audit, post LinkedIn, post Instagram, newsletter, vidéo de promotion, accroche) est un **job** : il tourne en arrière-plan, même si on ferme la page.
 - Un **seul job du même type à la fois par projet**, et un nombre de jobs IA **simultanés par compte qui dépend de l'offre** (le « multi jobs ») : **un seul à la fois avec l'offre gratuite**, plusieurs avec les offres payantes, et plus l'offre est chère plus il y en a (voir « Offres, plafonds et limites », colonne « Jobs IA simultanés »). Les jobs en trop attendent dans « Activité » avec le message « En attente : … » qui dit pourquoi. Les envois de mails (premiers mails et relances) ne se chevauchent jamais. Il n'y a aucune limite globale sur le serveur : le nombre de jobs simultanés d'un compte est celui de son offre (le tourniquet reste équitable entre les comptes quand plusieurs attendent). Seule une charge très élevée du serveur retient provisoirement les nouveaux jobs (message « charge du serveur élevée »).
 - Un job IA exige une **liaison valide de ton IA**.
 - Le plafond mensuel de **jobs IA** de l'offre s'applique (voir « Offres, plafonds et limites ») ; les envois de mails ont leur propre plafond.

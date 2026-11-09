@@ -168,7 +168,7 @@ class Cdp {
 }
 
 /** Lance Chromium (dans le bac à sable si activé) et renvoie { cdp, stop }. */
-async function openBrowser(cfg, { width, height, signal }) {
+export async function openBrowser(cfg, { width, height, signal }) {
   const bin = findChromium(cfg);
   if (!bin) throw new Error("Chromium n'est pas installé sur ce serveur.");
   const sandboxed = !!cfg.sandbox?.enabled;
