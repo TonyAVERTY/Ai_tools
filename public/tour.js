@@ -193,11 +193,13 @@
     document.addEventListener('keydown', onKey, true);
     addEventListener('resize', onMove);
     addEventListener('scroll', onMove, true);
+    const recheck = setInterval(place, 400); // la page peut bouger sans scroll ni redimensionnement (menu Activité qui se remplit, bandeau d'arrivée) : la zone éclairée suit
     live = {
       cleanup() {
         document.removeEventListener('keydown', onKey, true);
         removeEventListener('resize', onMove);
         removeEventListener('scroll', onMove, true);
+        clearInterval(recheck);
         if (opened) opened.open = false;
         document.body.classList.remove('tour-active');
         document.documentElement.style.removeProperty('--tour-pad');
