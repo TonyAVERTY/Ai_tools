@@ -1103,7 +1103,7 @@ form.cfg.link-key > .btn { align-self: flex-end; } /* le bouton se pose en bas d
 .ai-card .badge { margin-top: 8px; }
 a.ai-card:hover { border-color: var(--accent); }
 .ai-card.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
-.ai-card[aria-disabled="true"] { opacity: .6; }
+.ai-card[aria-disabled="true"] { opacity: .78; }
 .ai-pick { max-width: 760px; }
 .ai-panel { display: flex; flex-direction: column; gap: 16px; }
 .ai-panel[hidden] { display: none; }
@@ -1913,10 +1913,11 @@ a.pj-card:hover { border-color: var(--primary); }
 
 /* Barre du bas sur téléphone (maquettes) : les cinq onglets en bas de l'écran, icône au-dessus du mot */
 @media (max-width: 700px) {
-  .pills { position: fixed; left: 0; right: 0; bottom: 0; z-index: 25; order: 0; width: auto; gap: 0; margin: 0; padding: 0 0 env(safe-area-inset-bottom); overflow: visible; background: var(--card); border-top: 1px solid var(--line); }
+  .pills { position: fixed; left: 0; right: 0; bottom: 0; z-index: 25; order: 0; width: auto; gap: 0; margin: 0; padding: 0 0 env(safe-area-inset-bottom); overflow: visible; background: var(--nav-bg); border-top: 1px solid color-mix(in srgb, var(--nav-on) 22%, transparent); }
   .pill { flex: 1 1 0; min-width: 0; flex-direction: column; justify-content: center; gap: 2px; min-height: 60px; padding: 6px 2px; border-bottom: 0; border-top: 2px solid transparent; font-size: .75rem; }
   .pill:hover { border-bottom-color: transparent; }
-  .pill[aria-current="page"] { border-top-color: var(--primary); }
+  .top .pill, .top .pill:hover { border-bottom: 0; border-top: 3px solid transparent; color: var(--nav-on); }
+  .top .pill[aria-current="page"] { border-top-color: var(--accent); }
   .pill .ic { display: inline-block; }
   .pill { position: relative; }
   .pill-n { position: absolute; top: 4px; left: 50%; margin: 0 0 0 8px; }
@@ -1962,3 +1963,18 @@ a.pj-card:hover { border-color: var(--primary); }
 .recap .rev-card .rev-v strong { font-family: var(--display); font-weight: 600; font-size: 1.5rem; }
 @media (min-width: 900px) { .recap .charts .rev-card { grid-column: 2; } }
 .recap .rev-card { margin: 0; padding: 20px 22px; border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--card); min-width: 0; }
+
+/* Finitions responsive : le statut ne se coupe plus, le champ date de Mails garde sa hauteur */
+.pr-table select[data-prospect] { min-width: 10rem; max-width: 100%; text-overflow: clip; }
+.suggest .sg-row .field { flex: 1 1 200px; min-width: 0; }
+.suggest .sg-row .field input { flex: none; width: 100%; min-height: 44px; }
+
+/* Téléphone et tablette : le menu latéral devient des pastilles qui passent à la ligne (le contenu monte, rien ne défile de côté) */
+@media (max-width: 899px) {
+  .tools-nav { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .tools-grp { flex-basis: 100%; margin: 8px 0 0; }
+  .tools-grp:first-child { margin-top: 0; }
+  .tools-nav button, .tools-nav a { width: auto; min-height: 40px; padding: 0 14px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--card); }
+  .tools-nav .on, .tools-nav [aria-current="true"] { border-color: var(--primary); background: var(--primary); color: var(--on-primary); }
+}
+.ev-fold > summary h2 { font-size: 1.125rem; }
