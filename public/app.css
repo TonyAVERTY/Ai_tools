@@ -645,7 +645,8 @@ input.copy { font-family: var(--mono); font-size: .8125rem; }
 .kcol.over { border-color: var(--accent); background: var(--card); }
 .kcol h4 { display: flex; justify-content: space-between; margin: 0 0 8px; font-size: .875rem; }
 .kcol h4 .n { color: var(--muted); font-weight: 500; }
-.kcards { display: flex; flex-direction: column; gap: 8px; }
+.kcards { display: flex; flex-direction: column; gap: 8px; max-height: 44rem; overflow-y: auto; scrollbar-gutter: stable; }
+.kmore { align-self: stretch; justify-content: center; }
 .kcard { background: var(--card); border: 1px solid var(--line-strong); border-radius: 10px; padding: 10px; cursor: grab; display: flex; flex-direction: column; gap: 4px; overflow-wrap: anywhere; }
 .kcard.drag { opacity: .45; }
 .kcard select { margin-top: 4px; width: 100%; font-size: .8125rem; }
