@@ -2049,3 +2049,4 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 7px; text-align: cen
 .ig-schedule .field { flex: 1 1 220px; }
 .ig-conn { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-bottom: 14px; padding: 10px 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg-sunk); }
 .ig-conn .small { margin: 0; }
+.ig-who { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; }
