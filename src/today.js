@@ -21,6 +21,19 @@ export const JOB_LABELS = {
   linkedin: 'Post LinkedIn', evolution: 'Idées d\'évolution', billing_quotes: 'Exemples de devis', billing_docs: 'Devis, acompte, facture et avoir',
   billing_refine: 'Affinage d\'un document', instagram_post: 'Post Instagram', newsletter: 'Newsletter', promo: 'Vidéo de promotion', audit: 'Audit du projet', poste: 'Tâches des postes',
 };
+/** Où vit le résultat de chaque tâche IA : [onglet du projet, section]. `?vu=1` fait grossir la section à l'arrivée. */
+const JOB_PLACE = {
+  analyze: ['', ''], prospect: ['prospection', 'search'], template: ['envoi', 'template'], followup_template: ['envoi', 'followuptpl'],
+  linkedin: ['communication', 'linkedin'], instagram_post: ['communication', 'instagram'], newsletter: ['communication', 'newsletter'], promo: ['communication', 'promo'],
+  evolution: ['outils', 'evolution'], audit: ['outils', 'audit'], poste: ['outils', 'postes'],
+  billing_quotes: ['facturation', ''], billing_docs: ['facturation', ''], billing_refine: ['facturation', ''],
+};
+export function jobHref(type, projectId) {
+  const place = JOB_PLACE[type];
+  if (!projectId || !place) return '/projets';
+  const [tab, acc] = place;
+  return `/p/${Number(projectId)}${tab ? `/${tab}` : ''}${acc ? `?vu=1#acc-${acc}` : ''}`;
+}
 const INTENT = {
   interested: ['Intéressé', 'ok', 'check'], question: ['Question', 'info', 'info'], later: ['Plus tard', 'warn', 'clock'],
   refused: ['Pas intéressé', 'n', 'info'], other: ['Réponse', 'n', 'info'],
@@ -169,7 +182,7 @@ async function toDo(db, userId, ids, names, at, doneKeys) {
     items.push({
       key, kind: 'ia', icon: bad ? 'x' : 'spark', title: label, badge: bad ? 'Échec' : 'Terminé', tone: bad ? 'err' : 'ok', badgeIcon: bad ? 'x' : 'check',
       meta: `${p(r.project_id)} · ${ago(r.finished_at, at)}`.replace(/^ · /, ''), text: bad ? excerpt(r.error, 160) || 'La tâche a échoué.' : 'La tâche est terminée : le résultat t\'attend dans le projet.',
-      action: bad ? 'Réessayer' : 'Voir le projet', primary: !bad, href: '/projets', at: Number(r.finished_at),
+      action: bad ? 'Réessayer' : 'Voir le résultat', primary: !bad, href: jobHref(r.type, r.project_id), at: Number(r.finished_at),
     });
   }
   return items.sort((a, b) => b.at - a.at);
