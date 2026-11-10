@@ -26,7 +26,7 @@ Page du projet → onglet **Communication** : les sections **Instagram** et **Ne
 Si, au troisième essai, l'image n'atteint toujours pas le niveau demandé, elle est quand même livrée avec une bannière **À vérifier avant de publier** qui liste les points faibles relevés : corrige-les (tu peux régénérer) avant de publier. Si le contrôle du directeur artistique est lui-même en panne, la bannière le dit.
 
 ## Newsletter
-1. Dans **Newsletter**, écris si tu veux **De quoi doit parler la newsletter ? (facultatif)**, puis clique **Générer une newsletter**. La tâche « Newsletter » apparaît dans **Activité**.
+1. Dans **Newsletter**, écris si tu veux **De quoi doit parler la newsletter ? (facultatif)**, puis clique **Générer une newsletter**. Comme pour Instagram, l'IA commence par chercher sur le web les newsletters qui performent dans le secteur de ton produit et celles de grandes entreprises du même secteur (« Recherche d'inspiration dans ton secteur… ») ; si cette recherche échoue, la newsletter est écrite quand même. La tâche « Newsletter » apparaît dans **Activité**.
 2. Le brouillon donne un **Objet**, un **Texte d'aperçu** et le **Texte (Markdown, modifiable)** : introduction, deux ou trois sections avec intertitre, un appel à l'action, une formule de politesse. Rien d'inventé : pas de chiffre, de client ni de tarif qui ne figure pas dans la fiche du projet.
 3. Modifie, puis **Enregistrer**, **Copier le texte** (l'objet puis le texte) ou **Télécharger en HTML** (une version prête à coller dans un outil d'envoi ou à ouvrir dans un navigateur, avec des styles en ligne, sans script).
 4. **Régénérer une autre newsletter** change le sujet, l'objet et la structure. **Brouillons précédents** / **Reprendre** : comme pour Instagram.
