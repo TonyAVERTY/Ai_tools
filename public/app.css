@@ -2008,6 +2008,14 @@ a.pj-card:hover { border-color: var(--primary); }
 .offer { margin: 16px 0 4px; padding-top: 16px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 10px; }
 .offer p { margin: 0; }
 .offer form { margin: 0; display: inline; }
+/* Instagram : image à gauche, texte à droite (pleine largeur de la page Communication) ; une colonne sur téléphone */
+.ct-ig-draft { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; }
+.ct-ig-draft > .ct-ig-ban { grid-column: 1 / -1; }
+.ct-ig-form { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.ct-ig-form .field, .ct-ig-form p { margin: 0; }
+.ct-more > .field { margin-top: 8px; }
+.ct-more > p { margin-top: 10px; }
+@media (min-width: 900px) { .ct-ig-draft { grid-template-columns: minmax(240px, 380px) minmax(0, 1fr); gap: 28px; align-items: start; } .ct-ig-draft .ct-img { max-width: 100%; } .ct-ig-fig { position: sticky; top: 16px; } }
 /* Aperçu du mail parti (fiche contact) : le texte exact, replié */
 .cl-mail { margin-top: 6px; }
 .cl-mail > summary { cursor: pointer; font-weight: 600; min-height: 36px; padding: 6px 0; color: var(--link); }
