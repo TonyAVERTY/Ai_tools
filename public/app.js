@@ -1532,10 +1532,14 @@
     const target = m && document.getElementById(m[1]);
     if (!target) return;
     for (let n = target; n; n = n.parentElement) if (n.tagName === 'DETAILS') n.open = true;
+    // Outils IA : la section visée peut être dans le panneau des postes, masqué par défaut
+    if (target.closest('[data-tool-panel="postes"][hidden]')) $('[data-tool]:not([data-tool="evo"])')?.click();
     const calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     target.scrollIntoView({ behavior: calm ? 'auto' : 'smooth', block: 'start' });
-    target.classList.add('flash');
-    setTimeout(() => target.classList.remove('flash'), 1800);
+    // `?vu=1` : on arrive depuis « À traiter », la section grossit puis revient à sa taille ; sinon le simple liseré
+    const cls = new URLSearchParams(location.search).has('vu') ? 'flash-grow' : 'flash';
+    target.classList.add(cls);
+    setTimeout(() => target.classList.remove(cls), 1800);
   })();
 
   // Agenda : le formulaire « Ajouter un événement » est replié ; le bouton du haut (#evenements) le déplie

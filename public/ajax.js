@@ -188,7 +188,10 @@
       if (back.origin === location.origin && back.pathname === location.pathname && back.searchParams.get('e')) { onFail(); toast(back.searchParams.get('e')); return; }
     }
     if (!compatible(doc)) { if (method === 'GET' || res.redirected) location.assign(res.url); else { onFail(); toast('Réponse inattendue : recharge la page.'); } return; }
-    await swap(doc, res.url, { push, keepScroll, y });
+    // `res.url` n'a jamais l'ancre (#acc-…) de l'adresse demandée : on la remet, sinon la page ne défile pas jusqu'à la section visée
+    const landed = new URL(res.url);
+    if (!landed.hash) landed.hash = abs(url).hash;
+    await swap(doc, landed.href, { push, keepScroll, y });
   }
 
   window.AiNav = {

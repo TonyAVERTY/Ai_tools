@@ -578,7 +578,10 @@ input.copy { font-family: var(--mono); font-size: .8125rem; }
   .pcfg.pop { animation: wiz-pop .5s var(--ease) both; }
   /* la ligne qu'on vient d'ajouter (prospect, événement, note), avec le même surlignage que les nouvelles tâches du menu « Activité ». */
   .row-new { animation: fx-flash 1.5s ease-out; }
+  /* la section qu'on vient d'ouvrir depuis « À traiter » (lien `?vu=1#acc-…`) : elle grossit un peu, puis revient à sa taille, avec le liseré de `.flash`. Opacité et transform seulement (une fois). */
+  .flash-grow { animation: grow-back .9s var(--ease) 1, flash-ring 1.8s ease-out 1; transform-origin: center top; }
 }
+@keyframes grow-back { 0%, 100% { transform: none; } 35% { transform: scale(1.02); } }
 @keyframes reveal { from { opacity: 0; } }
 
 /* ---------- Corbeille rouge (suppression marquée, effective à l'enregistrement) ---------- */
