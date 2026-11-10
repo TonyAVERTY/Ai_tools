@@ -100,11 +100,13 @@ test('connexion : vers Meta avec la configuration, retour contrôlé, jeton chif
   assert.equal((await view(owner, p)).instagram.account, null);
   const start = await goto(owner, `/instagram/connect?project=${p}`);
   const loc = new URL(start.headers.get('location'));
-  assert.equal(loc.origin + loc.pathname, 'https://www.facebook.com/v23.0/dialog/oauth');
+  assert.equal(loc.origin + loc.pathname, 'https://www.facebook.com/dialog/oauth');
   assert.equal(loc.searchParams.get('client_id'), IG.appId);
   assert.equal(loc.searchParams.get('redirect_uri'), IG.redirectUri);
   assert.equal(loc.searchParams.get('config_id'), IG.configId, 'les droits viennent de la configuration de connexion');
   assert.equal(loc.searchParams.get('response_type'), 'code');
+  assert.equal(loc.searchParams.get('override_default_response_type'), 'true');
+  assert.equal(loc.searchParams.get('prompt'), 'login');
   assert.equal(loc.searchParams.get('scope'), null);
   assert.match(start.headers.getSetCookie().find((c) => c.startsWith('ig_oauth_b=')), /HttpOnly/);
 

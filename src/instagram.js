@@ -99,8 +99,8 @@ export async function startInstagram(app, userId, projectId, res) {
     .run(state, 'instagram', 'none', `${Number(userId)}:${Number(projectId)}`, hashBind(bind), now());
   setCookie(res, COOKIE, bind, { maxAge: STATE_TTL, path: COOKIE_PATH });
   // Les droits et les éléments (compte Instagram) viennent de la configuration de connexion (config_id), pas d'une liste de scopes
-  const q = new URLSearchParams({ client_id: cfg.instagram.appId, redirect_uri: cfg.instagram.redirectUri, response_type: 'code', config_id: cfg.instagram.configId, override_default_response_type: 'true', state });
-  redirect(res, `${DIALOG}/${cfg.instagram.apiVersion}/dialog/oauth?${q}`);
+  const q = new URLSearchParams({ client_id: cfg.instagram.appId, redirect_uri: cfg.instagram.redirectUri, response_type: 'code', config_id: cfg.instagram.configId, override_default_response_type: 'true', prompt: 'login', state });
+  redirect(res, `${DIALOG}/dialog/oauth?${q}`); // même adresse et mêmes paramètres que l'« URL de connexion » donnée par la console Meta (prompt=login : l'utilisateur choisit son compte)
 }
 
 /**
