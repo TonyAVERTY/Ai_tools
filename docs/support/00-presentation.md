@@ -21,6 +21,7 @@ Tout ce que fait l'IA passe par le accès de la personne à son IA, jamais par u
 - **Liste d'opposition** : adresses qui ne doivent plus être contactées (désinscription, refus, adresse invalide), commune à tous les comptes.
 
 ## La barre du haut (de gauche à droite)
+Sur ordinateur et tablette, la barre reste collée en haut de l'écran mais **se rétracte quand tu descends dans la page** pour laisser toute la place au contenu, et **revient dès que tu remontes**, quand tu es en haut de page, quand un de ses menus est ouvert ou quand tu y navigues au clavier (Tab). Sur téléphone, les onglets sont dans la barre du bas, qui ne bouge pas. Les pages utilisent toute la largeur d'un grand écran (jusqu'à 1480 px) ; les pages de lecture (Réglages, formulaires) restent plus étroites pour rester lisibles.
 - **iaboss** (logo) : retour à la page des projets.
 - **Aujourd'hui** : la page d'accueil de l'application, ce qui demande ton attention maintenant (voir le fichier « La page Aujourd'hui »).
 - **Projets** : la liste de tes projets (adresse `/projets`). 
