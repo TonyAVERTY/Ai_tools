@@ -578,7 +578,10 @@ input.copy { font-family: var(--mono); font-size: .8125rem; }
   .pcfg.pop { animation: wiz-pop .5s var(--ease) both; }
   /* la ligne qu'on vient d'ajouter (prospect, événement, note), avec le même surlignage que les nouvelles tâches du menu « Activité ». */
   .row-new { animation: fx-flash 1.5s ease-out; }
+  /* la section qu'on vient d'ouvrir depuis « À traiter » (lien `?vu=1#acc-…`) : elle grossit un peu, puis revient à sa taille, avec le liseré de `.flash`. Opacité et transform seulement (une fois). */
+  .flash-grow { animation: grow-back .9s var(--ease) 1, flash-ring 1.8s ease-out 1; transform-origin: center top; }
 }
+@keyframes grow-back { 0%, 100% { transform: none; } 35% { transform: scale(1.02); } }
 @keyframes reveal { from { opacity: 0; } }
 
 /* ---------- Corbeille rouge (suppression marquée, effective à l'enregistrement) ---------- */
@@ -645,7 +648,8 @@ input.copy { font-family: var(--mono); font-size: .8125rem; }
 .kcol.over { border-color: var(--accent); background: var(--card); }
 .kcol h4 { display: flex; justify-content: space-between; margin: 0 0 8px; font-size: .875rem; }
 .kcol h4 .n { color: var(--muted); font-weight: 500; }
-.kcards { display: flex; flex-direction: column; gap: 8px; }
+.kcards { display: flex; flex-direction: column; gap: 8px; max-height: 44rem; overflow-y: auto; scrollbar-gutter: stable; }
+.kmore { align-self: stretch; justify-content: center; }
 .kcard { background: var(--card); border: 1px solid var(--line-strong); border-radius: 10px; padding: 10px; cursor: grab; display: flex; flex-direction: column; gap: 4px; overflow-wrap: anywhere; }
 .kcard.drag { opacity: .45; }
 .kcard select { margin-top: 4px; width: 100%; font-size: .8125rem; }
@@ -2004,3 +2008,6 @@ a.pj-card:hover { border-color: var(--primary); }
 .offer { margin: 16px 0 4px; padding-top: 16px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 10px; }
 .offer p { margin: 0; }
 .offer form { margin: 0; display: inline; }
+/* Mise en route : les étapes facultatives sont rangées à part, hors du décompte (cercle en tirets) */
+.pj-opt-h { margin: 18px 0 2px; }
+.pj-opt .n { border-style: dashed; font-weight: 500; }

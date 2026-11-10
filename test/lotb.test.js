@@ -31,6 +31,15 @@ test('Kanban : une colonne par statut, totaux, filtres appliqués, 25 fiches par
   assert.equal(q.columns.find((c) => c.status === 'new').total, 11, 'le filtre texte s\'applique, le filtre statut est ignoré');
   assert.equal(q.columns.find((c) => c.status === 'sent').total, 0);
   assert.equal((await v.get(`/api/projects/${pid}/kanban`)).status, 404, 'projet d\'un autre compte');
+  // « Voir + » : la suite d'une seule colonne, à partir de ce qui est déjà chargé
+  const more = await (await u.get(`/api/projects/${pid}/kanban?col=new&offset=25`)).json();
+  assert.equal(more.columns.length, 1);
+  assert.equal(more.columns[0].status, 'new');
+  assert.equal(more.columns[0].total, 30);
+  assert.equal(more.columns[0].rows.length, 5, 'les 5 dernières');
+  assert.notDeepEqual(more.columns[0].rows.map((x) => x.id), col.new.rows.slice(0, 5).map((x) => x.id), 'ce ne sont pas les premières');
+  assert.equal((await u.get(`/api/projects/${pid}/kanban?col=nimporte`)).status, 400, 'statut inconnu');
+  assert.equal((await v.get(`/api/projects/${pid}/kanban?col=new&offset=25`)).status, 404, 'projet d\'un autre compte');
 });
 
 test('régénérer l\'accroche : mise en file, une seule à la fois, accès et isolation', async () => {
