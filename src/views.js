@@ -10,6 +10,7 @@ import { ROLES, MAX_NOTES, rolesOfSection } from './services/roles.js';
 import { describeKpi } from './services/dbschema.js';
 import { MODE_LABELS } from './claudelink.js';
 import { aiName, forAi } from './services/ainame.js';
+import { goAttr } from './shortcutdata.js';
 import { PLAN_PRICES, PLAN_LABELS, annualPrice } from './limits.js';
 import { banner } from './banner.js';
 import { loadingBlock } from './loading.js';
@@ -57,6 +58,7 @@ ${iconLinks()}
 <script src="${assetUrl('/static/app-today.js')}" defer></script>
 <script src="${assetUrl('/static/app-contact.js')}" defer></script>
 <script src="${assetUrl('/static/app-search.js')}" defer></script>
+<script src="${assetUrl('/static/app-shortcuts.js')}" defer></script>
 <script src="${assetUrl('/static/app-promo.js')}" defer></script>
 <script src="${assetUrl('/static/app-linkedin.js')}" defer></script>
 <script src="${assetUrl('/static/app-content.js')}" defer></script>
@@ -68,7 +70,7 @@ ${iconLinks()}
 <script src="${assetUrl('/static/ajax.js')}" defer></script>
 ${scripts.map((src) => `<script src="${assetUrl(src)}" defer></script>`).join('\n')}
 </head>
-<body class="app" data-ai="${esc(aiName())}">
+<body class="app" data-ai="${esc(aiName())}" data-go="${goAttr()}">
 ${SPRITE}
 <a class="skip" href="#contenu">Aller au contenu</a>
 ${email ? `<header class="top">
@@ -102,6 +104,7 @@ ${email ? `<header class="top">
           <a href="/account">${ic('user')}Mon compte</a>
           <a href="/settings">${ic('gear')}Réglages</a>
           <a href="/?tour=1">${ic('help')}Visite guidée</a>
+          <a href="/raccourcis">${ic('keyboard')}Raccourcis clavier</a>
           <form method="post" action="/logout"><button>${ic('out')}Déconnexion</button></form>
         </div>
       </details>
