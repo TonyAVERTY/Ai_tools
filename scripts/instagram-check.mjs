@@ -36,15 +36,21 @@ for (const vp of [{ width: 1280, height: 900 }, { width: 390, height: 780 }]) {
   await ctx.route('**/*', async (route) => { const r = route.request(); if (r.method() !== 'POST') return route.continue(); await route.fulfill({ response: await route.fetch({ headers: { ...r.headers(), origin: APP_URL }, maxRedirects: 0 }) }); });
   const p = await ctx.newPage(); const errs = [];
   p.on('pageerror', (e) => errs.push(e.message)); p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
+  // Sans aucun brouillon, le bouton « Connecter Instagram » est déjà là
+  await s.db.prepare("UPDATE content_drafts SET kind = 'masque'").run();
   await p.goto(`${s.base}/p/${pid}/communication`);
-  await p.waitForSelector('[data-content="instagram"] [data-ig-pub]');
-  ok(await p.locator('[data-ig-pub] a', { hasText: 'Connecter Instagram' }).getAttribute('href') === `/instagram/connect?project=${pid}`, `${tag} sans compte : « Connecter Instagram » vise la connexion`);
+  await p.waitForSelector('[data-content="instagram"] [data-ig-conn]');
+  ok(await p.locator('[data-ig-conn] a', { hasText: 'Connecter Instagram' }).isVisible() && !(await p.locator('[data-ig-pub]').count()), `${tag} sans brouillon : « Connecter Instagram » est visible en haut de la section`);
+  await s.db.prepare("UPDATE content_drafts SET kind = 'instagram'").run();
+  await p.goto(`${s.base}/p/${pid}/communication`);
+  await p.waitForSelector('[data-content="instagram"] [data-ig-conn]');
+  ok(await p.locator('[data-ig-conn] a', { hasText: 'Connecter Instagram' }).getAttribute('href') === `/instagram/connect?project=${pid}`, `${tag} sans compte : « Connecter Instagram » vise la connexion`);
   ok(!(await p.locator('[data-ig-publish]').count()), `${tag} sans compte : pas de bouton Publier`);
   // Compte relié (la connexion OAuth elle-même est testée côté serveur)
   await s.db.prepare('INSERT INTO instagram_accounts(project_id, ig_user_id, username, account_type, token_enc, expires_at, connected_by, created_at) VALUES(?, ?, ?, ?, ?, ?, ?, ?)')
     .run(pid, '1784140000', 'cafe_bzh', 'BUSINESS', encrypt(s.app.cfg.secretKey, 'tok'), Math.floor(Date.now() / 1000) + 5000000, u.id, Math.floor(Date.now() / 1000));
   await p.reload(); await p.waitForSelector('[data-ig-publish]');
-  ok(/@cafe_bzh/.test(await p.locator('[data-ig-pub]').innerText()), `${tag} le compte relié s'affiche`);
+  ok(/@cafe_bzh/.test(await p.locator('[data-ig-conn]').innerText()), `${tag} le compte relié s'affiche`);
   const g = await p.evaluate(() => ({ o: document.documentElement.scrollWidth > innerWidth + 1 }));
   ok(!g.o, `${tag} aucun débordement horizontal`);
   // Programmer puis annuler

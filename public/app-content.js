@@ -41,6 +41,20 @@
 
   const parisDay = (ts) => new Date(ts * 1000).toLocaleString('fr-FR', { dateStyle: 'full', timeStyle: 'short', timeZone: 'Europe/Paris' });
 
+  // Barre de connexion, toujours visible en haut de la section (même sans brouillon) : relier, reconnecter ou déconnecter le compte Instagram du projet
+  function connectBar(s, id) {
+    const ig = s.instagram;
+    if (!ig?.configured) return '';
+    const acc = ig.account;
+    if (!acc) {
+      return `<div class="ig-conn" data-ig-conn><span class="small"><b>Compte Instagram</b> : non connecté.</span>
+        ${ig.canManage ? `<a class="btn primary" href="/instagram/connect?project=${id}" data-noajax>Connecter Instagram</a>` : '<span class="muted small">Demande à un administrateur du projet de le relier.</span>'}
+        ${ig.canManage ? '<span class="muted small">Compte professionnel (business ou créateur) : tu publies ensuite en post ou en story, tout de suite ou programmé.</span>' : ''}</div>`;
+    }
+    return `<div class="ig-conn" data-ig-conn><span class="small"><span class="badge ${acc.expired ? 'warn' : 'ok'}">${acc.expired ? 'connexion expirée' : 'connecté'}</span> <strong>@${esc(acc.username || 'compte Instagram')}</strong></span>
+      ${ig.canManage ? `${acc.expired ? `<a class="btn small primary" href="/instagram/connect?project=${id}" data-noajax>Reconnecter</a>` : ''}<button type="button" class="btn small danger" data-ig-disconnect>Déconnecter</button>` : ''}</div>`;
+  }
+
   // Publier sur Instagram : relier le compte, puis publier tout de suite ou programmer, en post ou en story (administrateur du projet)
   function publishPanel(s, d, id) {
     const ig = s.instagram;
@@ -50,13 +64,8 @@
     if (d.status === 'published') {
       return `<div class="ig-pub" data-ig-pub><p class="ok small"><b>Publié ${where}</b> le ${esc(parisDay(d.publishedAt))}${acc ? ` sur @${esc(acc.username)}` : ''}${d.permalink ? ` · <a href="${esc(d.permalink)}" target="_blank" rel="noopener noreferrer">Voir sur Instagram</a>` : ''}</p></div>`;
     }
-    if (!acc) {
-      return `<div class="ig-pub" data-ig-pub><p class="small"><b>Publier sur Instagram</b></p>${d.publishError ? `<p class="error small">${esc(d.publishError)}</p>` : ''}
-        ${ig.canManage ? `<p><a class="btn" href="/instagram/connect?project=${id}" data-noajax>Connecter Instagram</a></p><p class="muted small">Il faut un compte Instagram professionnel (business ou créateur). Tu choisis ensuite entre publier tout de suite et programmer, en post ou en story.</p>`
-    : '<p class="muted small">Demande à un administrateur du projet de relier le compte Instagram.</p>'}</div>`;
-    }
-    const head = `<p class="small"><span class="badge ${acc.expired ? 'warn' : 'ok'}">${acc.expired ? 'connexion expirée' : 'connecté'}</span> <strong>@${esc(acc.username || 'compte Instagram')}</strong>
-      ${ig.canManage ? `${acc.expired ? `<a class="btn small primary" href="/instagram/connect?project=${id}" data-noajax>Reconnecter</a> ` : ''}<button type="button" class="btn small danger" data-ig-disconnect>Déconnecter</button>` : ''}</p>`;
+    if (!acc) return `<div class="ig-pub" data-ig-pub><p class="small"><b>Publier sur Instagram</b></p>${d.publishError ? `<p class="error small">${esc(d.publishError)}</p>` : ''}<p class="muted small">Connecte d'abord ton compte Instagram avec le bouton « Connecter Instagram » en haut de cette section.</p></div>`;
+    const head = '';
     if (d.status === 'scheduled') {
       return `<div class="ig-pub" data-ig-pub>${head}<p class="ok small">Programmé ${where} : ${esc(parisDay(d.scheduledAt))} (heure de Paris). Il part tout seul, dans les 15 minutes qui suivent l'heure choisie.</p>
         ${ig.canManage ? '<div class="row-actions"><button type="button" class="btn" data-ig-unschedule>Annuler la programmation</button></div>' : ''}</div>`;
@@ -116,7 +125,7 @@
     if (box.contains(document.activeElement) && document.activeElement.matches('textarea, input')) return;
     const draft = current(s, id, kind);
     box.dataset.kind = kind;
-    box.innerHTML = `${generator(s, kind, draft)}${draft ? (kind === 'instagram' ? instagramDraft(s, draft, id) : newsletterDraft(s, draft, id)) : ''}${history(s, draft, kind)}`;
+    box.innerHTML = `${kind === 'instagram' ? connectBar(s, id) : ''}${generator(s, kind, draft)}${draft ? (kind === 'instagram' ? instagramDraft(s, draft, id) : newsletterDraft(s, draft, id)) : ''}${history(s, draft, kind)}`;
     box._state = s;
   }
 

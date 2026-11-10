@@ -2047,3 +2047,5 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 7px; text-align: cen
 .ig-as { max-width: 340px; }
 .ig-schedule { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; }
 .ig-schedule .field { flex: 1 1 220px; }
+.ig-conn { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin-bottom: 14px; padding: 10px 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg-sunk); }
+.ig-conn .small { margin: 0; }
