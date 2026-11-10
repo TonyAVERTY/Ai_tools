@@ -90,13 +90,19 @@ ${projects.length ? `<div class="pj-cards">${projects.map((x) => card(x, d)).joi
 // ---------- Page d'un projet (03) ----------
 function steps(c, id) {
   if (!c) return '';
-  const cur = c.steps.find((s) => !s.done);
+  const required = c.steps.filter((s) => !s.optional);
+  const optional = c.steps.filter((s) => s.optional);
+  const cur = required.find((s) => !s.done);
   const verb = (s) => (['smtp', 'imap'].includes(s.key) ? 'Régler' : 'Ouvrir');
   const href = (s) => `${tabHref(id, s.key === 'analyze' ? '' : TAB_OF_ACC[s.acc] ?? '')}${s.key === 'analyze' ? '' : `#acc-${s.acc}`}`;
-  return `<ol class="pj-steps">${c.steps.map((s, i) => `<li class="${s.done ? 'done' : s === cur ? 'cur' : ''}">
-    <span class="n" aria-hidden="true">${s.done ? ic('check') : i + 1}</span>
-    <span class="st">${s.done ? esc(s.label) : `<b>${esc(s.label)}</b>`}${s.done ? '' : `<span class="small muted">${esc(s.hint)}${s.optional ? ' · facultatif' : ''}</span>`}</span>
-    ${s.done ? '<span></span>' : `<a class="btn small${s === cur ? '' : ' ghost'}" href="${href(s)}">${verb(s)}</a>`}</li>`).join('')}</ol>`;
+  const row = (s, mark, cls) => `<li class="${cls}">
+    <span class="n" aria-hidden="true">${mark}</span>
+    <span class="st">${s.done ? esc(s.label) : `<b>${esc(s.label)}</b>`}${s.done ? '' : `<span class="small muted">${esc(s.hint)}</span>`}</span>
+    ${s.done ? '<span></span>' : `<a class="btn small${s === cur ? '' : ' ghost'}" href="${href(s)}">${verb(s)}</a>`}</li>`;
+  // Les étapes facultatives sont rangées à part, hors du décompte : on peut tout ignorer sans que la mise en route reste « inachevée »
+  return `<ol class="pj-steps">${required.map((s, i) => row(s, s.done ? ic('check') : i + 1, s.done ? 'done' : s === cur ? 'cur' : '')).join('')}</ol>
+  ${optional.length ? `<p class="pj-opt-h small muted">Pour aller plus loin (facultatif, rien d'obligatoire)</p>
+  <ul class="pj-steps pj-opt">${optional.map((s) => row(s, s.done ? ic('check') : '+', s.done ? 'done' : '')).join('')}</ul>` : ''}`;
 }
 
 function overview(p, c, st, jobs) {

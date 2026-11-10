@@ -53,7 +53,7 @@ test('ajax.js : une erreur de saisie renvoyée par « ?e= » sur la même page g
   assert.match(ajax, /method !== 'GET' && res\.redirected/, 'seulement après un envoi redirigé');
   assert.match(ajax, /back\.pathname === location\.pathname && back\.searchParams\.get\('e'\)/, 'même page, avec un message « e »');
   assert.match(ajax, /back\.searchParams\.get\('e'\)\) \{ onFail\(\); toast\(back\.searchParams\.get\('e'\)\); return; \}/, 'le bouton se réactive et l\'erreur s\'affiche en notification, sans remplacer la page');
-  assert.ok(ajax.indexOf('res.redirected) {') < ajax.indexOf('await swap(doc, res.url'), 'la règle passe avant le remplacement de la page');
+  assert.ok(ajax.indexOf('res.redirected) {') < ajax.indexOf('await swap(doc, landed.href'), 'la règle passe avant le remplacement de la page');
 });
 
 test('ajax.js est servi, chargé sur les pages de l\'application après app.js, et jamais sur le site public ni la connexion', async () => {
