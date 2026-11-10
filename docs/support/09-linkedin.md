@@ -12,7 +12,7 @@ Bouton **Connecter LinkedIn** (réservé aux administrateurs du projet ; un memb
 ## Faire écrire un post
 1. Le projet doit être analysé (sinon : « Analyse le projet d'abord »).
 2. Champ **« De quoi doit parler le post ? »** (facultatif, 500 caractères) : laisse vide et l'IA choisit un angle utile pour le public visé.
-3. Bouton **Générer un post** (ou **Régénérer un autre post** : l'IA change l'angle, l'accroche et la structure par rapport aux brouillons précédents).
+3. Avant d'écrire, l'IA **cherche sur le web** ce qui fait percer les posts LinkedIn du secteur de ton produit et ce que font de grandes entreprises reconnues de ce secteur (la tâche affiche « Recherche d'inspiration dans ton secteur… »). Elle n'en copie rien ; si la recherche échoue, le post est écrit quand même. Bouton **Générer un post** (ou **Régénérer un autre post** : l'IA change l'angle, l'accroche et la structure par rapport aux brouillons précédents).
 Le post suit une structure : accroche seule sur sa ligne, courts paragraphes, question finale, 3 emojis et 3 hashtags au plus, sans inventer de chiffre ni de témoignage. Les consignes se modifient dans **Réglages → Prompts IA** (« Post LinkedIn »).
 
 ## Relire, programmer, publier
