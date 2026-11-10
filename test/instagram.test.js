@@ -76,13 +76,15 @@ test('configuration : les trois variables Meta ensemble, sinon Instagram est dé
   const base = { APP_URL: 'https://x.fr', SECRET_KEY: 'a'.repeat(64), GOOGLE_CLIENT_ID: 'g', GOOGLE_CLIENT_SECRET: 's', DB_DRIVER: 'sqlite' };
   const keep = { ...process.env };
   const withEnv = (extra, fn) => {
-    for (const k of ['META_APP_ID', 'META_APP_SECRET', 'META_LOGIN_CONFIG_ID', 'META_REDIRECT_URI', 'META_API_VERSION']) delete process.env[k];
+    for (const k of ['META_APP_ID', 'META_APP_SECRET', 'META_LOGIN_CONFIG_ID', 'META_REDIRECT_URI', 'META_API_VERSION', 'INSTAGRAM_APP_ID', 'INSTAGRAM_APP_SECRET', 'INSTAGRAM_REDIRECT_URI']) delete process.env[k];
     Object.assign(process.env, base, extra);
     try { return fn(); } finally { for (const k of Object.keys(process.env)) if (!(k in keep)) delete process.env[k]; Object.assign(process.env, keep); }
   };
   const ok = { META_APP_ID: '1805917243982329', META_APP_SECRET: 'b', META_LOGIN_CONFIG_ID: '2203028057765474' };
   assert.equal(withEnv({}, () => loadConfig().instagram), null);
-  assert.deepEqual(withEnv(ok, () => loadConfig().instagram), { appId: '1805917243982329', appSecret: 'b', configId: '2203028057765474', redirectUri: 'https://x.fr/instagram/callback', apiVersion: 'v23.0', publicBase: 'https://x.fr' });
+  assert.deepEqual(withEnv(ok, () => loadConfig().instagram), { mode: 'meta', appId: '1805917243982329', appSecret: 'b', configId: '2203028057765474', redirectUri: 'https://x.fr/instagram/callback', apiVersion: 'v23.0', publicBase: 'https://x.fr' });
+  assert.deepEqual(withEnv({ INSTAGRAM_APP_ID: '12345', INSTAGRAM_APP_SECRET: 'x' }, () => loadConfig().instagram), { mode: 'instagram', appId: '12345', appSecret: 'x', redirectUri: 'https://x.fr/instagram/callback', apiVersion: 'v23.0', publicBase: 'https://x.fr' });
+  assert.throws(() => withEnv({ INSTAGRAM_APP_ID: '12345' }, loadConfig), /INSTAGRAM_APP_ID et INSTAGRAM_APP_SECRET vont ensemble/);
   assert.throws(() => withEnv({ META_APP_ID: '1805917243982329' }, loadConfig), /vont ensemble/);
   assert.throws(() => withEnv({ ...ok, META_LOGIN_CONFIG_ID: '' }, loadConfig), /vont ensemble/);
   assert.throws(() => withEnv({ ...ok, META_APP_ID: 'abc' }, loadConfig), /META_APP_ID/);
@@ -334,4 +336,43 @@ test('connexion par Instagram : jeton Instagram reconnu sur graph.instagram.com,
   calls = [];
   assert.deepEqual(await refreshInstagramTokens(s.app, { at: t }), { refreshed: 1, failed: 0 });
   assert.ok(calls.some((c) => c.url.startsWith('https://graph.instagram.com/refresh_access_token') && c.url.includes('ig_refresh_token')));
+});
+
+test('voie « Instagram login » : connexion directe avec Instagram, droits demandés, compte professionnel exigé', async () => {
+  const ig = await startApp({ cfg: { instagram: { mode: 'instagram', appId: '9988776655', appSecret: 'igs', redirectUri: IG.redirectUri, apiVersion: 'v23.0', publicBase: IG.publicBase } } });
+  try {
+    let acct = { user_id: '1784140000', username: 'cafe_bzh', account_type: 'BUSINESS' };
+    const seen = [];
+    ig.app.fetch = async (url, init = {}) => {
+      const u = String(url); seen.push({ u, body: init.body ? String(init.body) : '' });
+      const r = (json, status = 200) => ({ ok: status < 400, status, headers: { get: () => null }, json: async () => json });
+      if (u === 'https://api.instagram.com/oauth/access_token') return r({ data: [{ access_token: 'IGAA-short', user_id: 1784140000, permissions: 'instagram_business_basic,instagram_business_content_publish' }] });
+      if (u.startsWith('https://graph.instagram.com/access_token?') && u.includes('ig_exchange_token')) return r({ access_token: 'IGAA-long', expires_in: 5183944 });
+      if (/^https:\/\/graph\.instagram\.com\/v23\.0\/me\?/.test(u)) return r(acct);
+      throw new Error(`appel inattendu : ${u}`);
+    };
+    const owner = await ig.newUser({ admin: true });
+    const p = await addProject(ig.db, owner.id, { name: 'Café Bzh' });
+    const get = (path, cookie) => fetch(`${ig.base}${path}`, { redirect: 'manual', headers: { cookie: [owner.cookie, cookie].filter(Boolean).join('; '), accept: 'text/html' } });
+    const run = async () => {
+      const start = await get(`/instagram/connect?project=${p}`);
+      const loc = new URL(start.headers.get('location'));
+      const st = loc.searchParams.get('state');
+      const back = await get(`/instagram/callback?${new URLSearchParams({ code: 'c1#_', state: st })}`, jar(start));
+      return { loc, back: decodeURIComponent(back.headers.get('location').replace(/\+/g, ' ')) };
+    };
+    let { loc, back } = await run();
+    assert.equal(loc.origin + loc.pathname, 'https://www.instagram.com/oauth/authorize');
+    assert.equal(loc.searchParams.get('client_id'), '9988776655');
+    assert.equal(loc.searchParams.get('scope'), 'instagram_business_basic,instagram_business_content_publish');
+    assert.equal(loc.searchParams.get('config_id'), null);
+    assert.equal(back, `/p/${p}/communication?ig=ok`);
+    assert.equal(new URLSearchParams(seen.find((x) => x.u === 'https://api.instagram.com/oauth/access_token').body).get('code'), 'c1', 'le suffixe « #_ » est retiré');
+    const acc = await ig.db.prepare('SELECT account_type, username FROM instagram_accounts WHERE project_id = ?').get(p);
+    assert.deepEqual({ type: acc.account_type, user: acc.username }, { type: 'instagram', user: 'cafe_bzh' });
+    // Un compte personnel est refusé, avec le remède
+    acct = { user_id: '1', username: 'perso', account_type: 'PERSONAL' };
+    ({ back } = await run());
+    assert.match(back, /ig=error&m=Ce compte Instagram est personnel/);
+  } finally { await ig.close(); }
 });
