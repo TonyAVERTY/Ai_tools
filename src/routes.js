@@ -28,6 +28,7 @@ import { registerSearchRoutes } from './searchroutes.js';
 import { registerMailRoutes } from './mailroutes.js';
 import { registerApiV1 } from './apiv1.js';
 import { registerDeveloperRoutes } from './developerroutes.js';
+import { registerShortcutRoutes } from './shortcuts.js';
 import { registerCalendarRoutes } from './calendar.js';
 import { registerAccountingRoutes } from './accountingroutes.js';
 import { registerBillingRoutes } from './billingroutes.js';
@@ -116,6 +117,7 @@ export function registerRoutes(router, app) {
   registerProspectRoutes(router, app, { project });
   registerApiV1(router, app, { aiOpts });
   registerDeveloperRoutes(router, app);
+  registerShortcutRoutes(router);
   registerCalendarRoutes(router, app);
   registerAccountingRoutes(router, app);
   registerBillingRoutes(router, app, { aiOpts });

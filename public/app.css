@@ -2008,6 +2008,12 @@ a.pj-card:hover { border-color: var(--primary); }
 .offer { margin: 16px 0 4px; padding-top: 16px; border-top: 1px solid var(--line); display: flex; flex-direction: column; gap: 10px; }
 .offer p { margin: 0; }
 .offer form { margin: 0; display: inline; }
+/* Raccourcis clavier : touches et tableau */
+kbd { display: inline-block; min-width: 1.6em; padding: 1px 7px; text-align: center; font: 600 .8125rem/1.5 var(--mono, ui-monospace, monospace); color: var(--text); background: var(--card-2); border: 1px solid var(--line-strong); border-bottom-width: 2px; border-radius: 6px; }
+.sc-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+.sc-table th, .sc-table td { text-align: left; padding: 10px 8px; border-top: 1px solid var(--line); }
+.sc-table thead th { border-top: 0; color: var(--muted); font-size: .8125rem; font-weight: 600; }
+.sc-table td:first-child { white-space: nowrap; width: 1%; }
 /* Instagram : image à gauche, texte à droite (pleine largeur de la page Communication) ; une colonne sur téléphone */
 .ct-ig-draft { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; }
 .ct-ig-draft > .ct-ig-ban { grid-column: 1 / -1; }

@@ -436,6 +436,7 @@ export async function lastConsent(db, userId) {
 export function isLinkExempt(method, pathname) {
   if (pathname === '/link' || pathname.startsWith('/link/')) return true;
   if (pathname === '/account' || pathname === '/account/delete') return true;
+  if (pathname === '/raccourcis') return true; // une page d'aide, sans accès à l'IA
   if (pathname === '/abonnement/portail') return true; // on doit toujours pouvoir gérer ou résilier son abonnement, même sans IA reliée
   if (pathname === '/welcome' || pathname === '/welcome/skip') return true; // le profil ne demande pas d'accès Claude
   if (pathname.startsWith('/linkedin/')) return true; // un administrateur d'équipe relie LinkedIn avec l'accès Claude du propriétaire
