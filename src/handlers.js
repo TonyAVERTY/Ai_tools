@@ -10,7 +10,7 @@ import { checkSense, acceptSenseFix, SenseUnavailable, SENSE_BATCH } from './ser
 import { addUsage, jobContext, liveJobUsage } from './services/jobs.js';
 import { syncRepo } from './services/git.js';
 import { normalizeModel, defaultModelOf, tierEquivalent, modelFamily } from './services/models.js';
-import { analyzePrompt, prospectPrompt, templatePrompt, reviewMailPrompt, fixStylePrompt, followupTemplatePrompt, evolutionPrompt, linkedinPostPrompt, instagramPrompt, instagramResearchPrompt, newsletterPrompt, hookPrompt, auditPrompt, promoPrompt, rolePrompt, parseCustomPrompts, LEVELS } from './services/prompts.js';
+import { analyzePrompt, prospectPrompt, templatePrompt, reviewMailPrompt, fixStylePrompt, followupTemplatePrompt, evolutionPrompt, linkedinPostPrompt, instagramPrompt, inspirationPrompt, newsletterPrompt, hookPrompt, auditPrompt, promoPrompt, rolePrompt, parseCustomPrompts, LEVELS } from './services/prompts.js';
 import { VOICE_PROVIDERS, parseVoiceParams, extractVoiceScript, prepareVoice, cleanVoice, mixVoice, synthesize, langName } from './services/voiceover.js';
 import { PROMO, FORMATS, SCENE_REFUSED, SceneError, parsePromoParams, extractScene, promoSupported, renderPromo } from './services/promovideo.js';
 import { reviewPromo } from './services/promoqa.js';
@@ -247,6 +247,19 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
   // Forme d'un modèle tout juste généré : s'il manque l'appel ou la politesse, ou s'il propose des réponses toutes faites, l'IA le corrige UNE fois.
   // La correction n'est retenue que si elle garde les adresses, n'ajoute aucune variable et réduit le nombre de défauts ; sinon le texte reste tel quel
   // (l'aperçu signale les défauts qui restent). Une annulation ou un accès perdu remontent ; toute autre panne est sans effet.
+  // Avant tout contenu public (post, newsletter, vidéo) : l'IA cherche sur le web ce qui fait percer les contenus du secteur du projet et ce que font les grandes entreprises
+  // reconnues de ce secteur. Le web SEUL (jamais avec le dépôt : une page piégée ne doit pas pouvoir exfiltrer du code). Une recherche en échec ne fait pas échouer le contenu.
+  async function researchInspiration(ctx, { userId, project, model, kind, direction = '', from = 8, to = 22 }) {
+    const label = "Recherche d'inspiration dans ton secteur…";
+    try {
+      await ctx.progress({ message: label, pct: from });
+      const rp = inspirationPrompt({ kind, projectName: project.name, profile: project.profile, target: project.target || {}, direction, site: project.siteUrl });
+      const rr = await creeping(ctx, label, from, () => claude(userId, { prompt: rp.prompt, system: rp.system, model, maxTurns: 12, tools: STILL_TOOLS.research, signal: ctx.signal }), { to });
+      addUsage(ctx, rr);
+      return (String(rr.text ?? '').match(/<inspiration>([\s\S]*?)<\/inspiration>/i) || [])[1]?.trim().replace(/\n{3,}/g, '\n\n').slice(0, 900) ?? '';
+    } catch (e) { if (ctx.signal?.aborted) throw e; return ''; }
+  }
+
   async function mendStyle(ctx, userId, model, kind, body) {
     const problems = styleProblems(body);
     if (!problems.length) return { body, fixed: [] };
@@ -724,11 +737,12 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
       const account = await linkedinAccount(db, project.id);
       if (!account) throw new Error("Connecte LinkedIn à ce projet d'abord");
       const direction = String(ctx.params.direction ?? '').trim().slice(0, 500);
-      await ctx.progress({ message: direction ? 'Rédaction du post selon ta direction…' : 'Claude choisit un angle et rédige le post…', pct: 40 });
       const model = await writeModel(userId, await modelOf(userId, 'analyze_model'));
+      const inspiration = await researchInspiration(ctx, { userId, project, model, kind: 'linkedin', direction, from: 5, to: 35 });
       const { prompt, system } = linkedinPostPrompt({
-        profile: project.profile, target: project.target || {}, direction, previous: await recentDrafts(db, project.id), author: account.name, custom: await custom(userId), model,
+        profile: project.profile, target: project.target || {}, direction, previous: await recentDrafts(db, project.id), author: account.name, custom: await custom(userId), model, inspiration,
       });
+      await ctx.progress({ message: direction ? 'Rédaction du post selon ta direction…' : 'Claude choisit un angle et rédige le post…', pct: 40 });
       const r = await creeping(ctx, direction ? 'Rédaction du post selon ta direction…' : 'Claude choisit un angle et rédige le post…', 40, () => claude(userId, { prompt, system, model, maxTurns: 1, tools: [], signal: ctx.signal }));
       addUsage(ctx, r);
       let body = '';
@@ -763,15 +777,8 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
       const field = (text, tag) => (String(text ?? '').match(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`, 'i')) || [])[1]?.trim() ?? '';
       let fix = null;
       let previousVisual = '';
-      // Phase 1 : le web SEUL (jamais avec le dépôt : une page piégée ne doit pas pouvoir exfiltrer du code). Une recherche en échec ne fait pas échouer le post.
-      let inspiration = '';
-      try {
-        await ctx.progress({ message: 'Recherche d\'inspiration dans ton secteur…', pct: 8 });
-        const rp = instagramResearchPrompt({ projectName: project.name, profile: project.profile, target: project.target || {}, direction, site: project.siteUrl });
-        const rr = await creeping(ctx, 'Recherche d\'inspiration dans ton secteur…', 8, () => claude(userId, { prompt: rp.prompt, system: rp.system, model, maxTurns: 12, tools: STILL_TOOLS.research, signal: ctx.signal }), { to: 22 });
-        addUsage(ctx, rr);
-        inspiration = field(rr.text, 'inspiration').replace(/\n{3,}/g, '\n\n').slice(0, 900);
-      } catch (e) { if (ctx.signal?.aborted) throw e; }
+      // Phase 1 : le web SEUL, ce qui marche dans le secteur
+      const inspiration = await researchInspiration(ctx, { userId, project, model, kind: 'instagram', direction });
       // Phase 2 : le dépôt SEUL (lecture) pour le vrai design, puis le dessin
       for (let attempt = 1; ; attempt++) {
         const first = attempt === 1;
@@ -836,11 +843,12 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
       if (!project.profile) throw new Error("Analyse le projet d'abord");
       const direction = String(ctx.params.direction ?? '').trim().slice(0, CONTENT.direction);
       const label = direction ? 'Rédaction de la newsletter selon ta direction…' : 'Claude choisit un sujet et rédige la newsletter…';
-      await ctx.progress({ message: label, pct: 40 });
       const model = await writeModel(userId, await modelOf(userId, 'analyze_model'));
+      const inspiration = await researchInspiration(ctx, { userId, project, model, kind: 'newsletter', direction, from: 5, to: 35 });
+      await ctx.progress({ message: label, pct: 40 });
       const { prompt, system } = newsletterPrompt({
         projectName: project.name, profile: project.profile, target: project.target || {}, direction, previous: await recentBodies(db, project.id, 'newsletter'),
-        site: project.siteUrl, custom: await custom(userId), model,
+        site: project.siteUrl, custom: await custom(userId), model, inspiration,
       });
       const r = await creeping(ctx, label, 40, () => claude(userId, { prompt, system, model, maxTurns: 1, tools: [], signal: ctx.signal }));
       addUsage(ctx, r);
@@ -848,7 +856,7 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
       const subject = field('objet').replace(/\s+/g, ' ').slice(0, CONTENT.subject);
       const body = field('texte').replace(/\r\n/g, '\n').slice(0, CONTENT.newsletter);
       if (!subject || body.length < 200) throw new Error("Claude n'a pas produit de newsletter exploitable : réessaie");
-      return { ok: true, draftId: await saveContent(db, project.id, 'newsletter', { direction, title: subject, body, extra: { preview: field('apercu').replace(/\s+/g, ' ').slice(0, CONTENT.preview) } }) };
+      return { ok: true, draftId: await saveContent(db, project.id, 'newsletter', { direction, title: subject, body, extra: { preview: field('apercu').replace(/\s+/g, ' ').slice(0, CONTENT.preview), inspiration } }) };
     },
 
     // Vidéo de promotion : Claude écrit une scène animée, Chromium la rend image par image, ffmpeg produit le MP4.
@@ -873,11 +881,13 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
         // « Corriger » relance le job avec le verdict du contrôle et la dernière scène refusée
         let fix = String(ctx.params.fix ?? '').slice(0, 6000) || null;
         let previousScene = fix ? takeScene(cfg, userId, ctx.params.fixScene) : '';
+        // Une seule recherche, avant la première conception ; une correction repart de la scène refusée, sans refaire de recherche
+        const inspiration = fix ? '' : await researchInspiration(ctx, { userId, project, model, kind: 'promo', direction: params.subject, from: 3, to: 8 });
         for (let attempt = fix ? 2 : 1; ; attempt++) {
           await ctx.progress({ message: attempt === 1 ? (params.subject ? 'Claude conçoit la vidéo sur ton sujet…' : 'Claude conçoit la vidéo de présentation du projet…') : 'Claude corrige la scène…', pct: attempt === 1 ? 8 : 40 });
           const { prompt, system } = promoPrompt({
             projectName: project.name, profile: project.profile, target: project.target || {}, subject: params.subject, style: params.style, site: project.siteUrl,
-            seconds: params.seconds, fps: params.fps, format: params.format, width: fmt.width, height: fmt.height, custom: await custom(userId), model, fix, previousScene,
+            seconds: params.seconds, fps: params.fps, format: params.format, width: fmt.width, height: fmt.height, custom: await custom(userId), model, fix, previousScene, inspiration,
             voice: voice && { ...voice, langName: langName(voice.lang) },
           });
           const r = await creeping(ctx, attempt === 1 ? (params.subject ? 'Claude conçoit la vidéo sur ton sujet…' : 'Claude conçoit la vidéo de présentation du projet…') : 'Claude corrige la scène…', attempt === 1 ? 8 : 40, () => claude(userId, { prompt, system, model, maxTurns: 1, tools: [], signal: ctx.signal }), { to: 44 });

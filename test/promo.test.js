@@ -30,6 +30,7 @@ before(async () => {
 after(async () => { await s.close(); });
 const supported = promoSupported({ chromiumBin: chromium });
 const renderFixture = (options) => renderPromo({ ...options, quality: 'off' });
+const isResearch = (c) => c.prompt.includes("Recherche d'inspiration (outils WebSearch"); // la recherche web faite avant la conception : un appel de plus, sans scène
 const calls = () => (existsSync(spy) ? readFileSync(spy, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []);
 const PROFILE = JSON.stringify({ resume: 'Cartes de fidélité digitales.', proposition_valeur: 'Fidélisez sans carton.', arguments: ['simple'], ton: 'direct' });
 async function setup(opts = {}) {
@@ -98,7 +99,9 @@ test('vidéo complète : sujet transmis, MP4 H.264 de la bonne taille et durée,
   const job = await runJob(pid);
   assert.equal(job.status, 'done', job.error);
   assert.equal(job.result.attempts, 1);
-  const c = calls().slice(n0);
+  const all = calls().slice(n0);
+  assert.equal(all.filter(isResearch).length, 1, 'une recherche d\'inspiration avant la conception');
+  const c = all.filter((x) => !isResearch(x));
   assert.equal(c.length, 1);
   assert.match(c[0].prompt, /Sujet demandé : « Les cartes de fidélité »/);
   assert.match(c[0].prompt, /3 secondes, à 10 images par seconde, au format carre \(720 × 720 pixels\)/);
@@ -142,7 +145,7 @@ test('sujet vide : Claude présente le projet ; scène fautive renvoyée une foi
   const job = await runJob(pid);
   assert.equal(job.status, 'done', job.error);
   assert.equal(job.result.attempts, 2);
-  const c = calls().slice(n0);
+  const c = calls().slice(n0).filter((x) => !isResearch(x));
   assert.equal(c.length, 2, 'un seul nouvel essai');
   assert.match(c[1].prompt, /Ta version précédente a été refusée au rendu : La scène doit définir window\.renderFrame/);
   assert.doesNotMatch(c[0].prompt, /refusée au rendu/);
@@ -151,7 +154,7 @@ test('sujet vide : Claude présente le projet ; scène fautive renvoyée une foi
   await s.db.prepare("DELETE FROM jobs WHERE project_id = ?").run(pid);
   await gen(u, pid, { fps: 10, seconds: 3 });
   assert.equal((await runJob(pid)).status, 'done');
-  assert.match(calls().slice(n1)[0].prompt, /Aucun sujet précisé : la vidéo présente le projet/);
+  assert.match(calls().slice(n1).find((x) => !isResearch(x)).prompt, /Aucun sujet précisé : la vidéo présente le projet/);
 });
 
 test('scène toujours fautive : job en erreur lisible, aucune ligne ni fichier laissés', { skip: !supported.ok && supported.reason }, async () => {
@@ -198,7 +201,7 @@ test('prompt modifiable dans les Réglages : le texte de l\'utilisateur remplace
     await gen(u, pid, { fps: 12, seconds: 5, format: 'vertical' });
     const job = await runJob(pid);
     assert.equal(job.status, 'done', job.error);
-    const p = calls().slice(n0)[0].prompt;
+    const p = calls().slice(n0).find((c) => c.prompt.includes('Contrat technique')).prompt;
     assert.match(p, /Fais une vidéo TRÈS sobre : fond blanc, un seul mot par plan, 5 s\./);
     assert.doesNotMatch(p, /Direction artistique :\n- Remplis l'image/, 'le texte de l\'utilisateur remplace les règles par défaut');
     assert.match(p, /Direction artistique imposée : « [^»]+ »[\s\S]*Couleurs exactes : fond en dégradé #[0-9a-f]{6} → #[0-9a-f]{6}/, 'la direction artistique choisie reste imposée');
