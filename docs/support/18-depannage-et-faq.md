@@ -275,7 +275,7 @@ Le message précise maintenant la cause : produits manquants dans l'application 
 L'activation arrive par un message signé de Stripe, en général en quelques secondes : recharge « Mon compte ». Au bout de quelques minutes sans changement, écris-nous avec l'email de ton compte. Détails dans « Abonnement et paiement : choisir, changer ou résilier son offre ».
 
 ## Je n'arrive pas à publier ou programmer sur Instagram
-- Le bouton **Connecter Instagram** n'apparaît pas : le service n'a pas activé Instagram (l'administrateur renseigne INSTAGRAM_APP_ID et INSTAGRAM_APP_SECRET), ou tu n'es pas administrateur du projet.
+- Le bouton **Connecter Instagram** n'apparaît pas : le service n'a pas activé Instagram (l'administrateur renseigne META_APP_ID, META_APP_SECRET et META_LOGIN_CONFIG_ID), ou tu n'es pas administrateur du projet.
 - Compte refusé : il doit être **professionnel** (business ou créateur), pas personnel.
 - « Instagram refuse l'adresse de retour » / « refuse l'action » / « a refusé le jeton » / « n'a pas accepté l'image » : voir la rubrique **Problèmes fréquents** de « Instagram et newsletter ». Pour un jeton refusé, clique **Reconnecter**.
 - Un post programmé n'est pas parti : il part dans les 15 minutes qui suivent l'heure choisie ; s'il a échoué, il est revenu en brouillon avec la raison (et tu as une notification).
