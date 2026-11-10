@@ -32,6 +32,8 @@ before(async () => {
     if (u.includes('/oauth/access_token?') && u.includes('fb_exchange_token')) return res(reply.long ?? { json: { access_token: LONG, token_type: 'bearer', expires_in: 5183944 } });
     if (u.includes('/oauth/access_token?')) return res(reply.token ?? { json: { access_token: 'EAAB-short', token_type: 'bearer', expires_in: 3600 } });
     if (u.includes('/debug_token?')) return res(reply.debug ?? { json: GRANTED() });
+    if (u.startsWith('https://graph.instagram.com/') && /\/me\?/.test(u)) return res(reply.igme ?? { status: 400, json: { error: { message: 'Invalid token', code: 190 } } });
+    if (u.startsWith('https://graph.instagram.com/refresh_access_token')) return res(reply.igrefresh ?? { json: { access_token: 'IGAA-refreshed', expires_in: 5183944 } });
     if (/\/me\?/.test(u)) return res(reply.identity ?? { json: { id: '10001' } });
     if (u.includes('/me/accounts?')) return res(reply.accounts ?? { json: { data: [] } });
     if (/\/1784140000\?fields=username/.test(u)) return res(reply.me ?? { json: { username: 'cafe_bzh', id: '1784140000' } });
@@ -310,4 +312,26 @@ test('isolation : un autre compte ne voit ni ne publie le brouillon d\'un projet
   const other = await s.newUser({});
   assert.equal((await other.post(`/api/projects/${p}/instagram/publish`, { draftId: id, confirm: true })).status, 404);
   assert.equal((await other.get(`/api/projects/${p}/content/instagram`)).status, 404);
+});
+
+test('connexion par Instagram : jeton Instagram reconnu sur graph.instagram.com, publication et renouvellement sur ce serveur', async () => {
+  const { owner, p } = await setup();
+  reply.debug = { json: { data: { scopes: ['instagram_basic', 'instagram_content_publish'], granular_scopes: [], expires_at: 0 } } };
+  reply.igme = { json: { user_id: '1784140000', username: 'cafe_bzh', account_type: 'BUSINESS' } };
+  assert.equal(location(await connect(owner, p)), `/p/${p}/communication?ig=ok`);
+  const acc = await row('SELECT account_type, expires_at FROM instagram_accounts WHERE project_id = ?', p);
+  assert.equal(acc.account_type, 'instagram');
+  assert.ok(Number(acc.expires_at) > Date.now() / 1000 + 50 * 86400, 'jeton Instagram : 60 jours par défaut');
+  assert.equal((await view(owner, p)).instagram.account.username, 'cafe_bzh');
+  // Publier : les appels partent sur graph.instagram.com
+  const id = await draft(p);
+  calls = [];
+  assert.equal((await owner.post(`/api/projects/${p}/instagram/publish`, { draftId: id, as: 'post', confirm: true })).status, 200);
+  assert.ok(calls.filter((c) => /\/media$|media_publish$/.test(c.url)).every((c) => c.url.startsWith('https://graph.instagram.com/v23.0/1784140000/')));
+  // Renouveler : refresh_access_token d'Instagram, pas l'échange Facebook
+  const t = Math.floor(Date.now() / 1000);
+  await s.db.prepare('UPDATE instagram_accounts SET expires_at = ?, refreshed_at = ? WHERE project_id = ?').run(t + 5 * 86400, t - 3 * 86400, p);
+  calls = [];
+  assert.deepEqual(await refreshInstagramTokens(s.app, { at: t }), { refreshed: 1, failed: 0 });
+  assert.ok(calls.some((c) => c.url.startsWith('https://graph.instagram.com/refresh_access_token') && c.url.includes('ig_refresh_token')));
 });

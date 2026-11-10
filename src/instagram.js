@@ -13,6 +13,7 @@ import { INSTAGRAM_FORMATS, getDraft, getImage } from './contentdrafts.js';
 
 const DIALOG = 'https://www.facebook.com';
 const GRAPH = 'https://graph.facebook.com';
+const IG_GRAPH = 'https://graph.instagram.com'; // un jeton Instagram (connexion par Instagram) s'interroge ici, pas sur graph.facebook.com
 export const NEEDED = ['instagram_content_publish']; // droit exigé dans la configuration de connexion de l'application Meta
 const STATE_TTL = 600;
 const COOKIE = 'ig_oauth_b';
@@ -183,25 +184,37 @@ export async function finishInstagram(app, userId, params, req, res, checkAccess
       if (m?.username && /^\d{1,30}$/.test(String(m.id ?? ''))) { igId = String(m.id); username = String(m.username).slice(0, 100); }
     } else diag.me = `HTTP ${meRes.status}`;
   }
+  // 4. Jeton Instagram : la connexion par Instagram donne un jeton qui ne s'interroge que sur graph.instagram.com
+  let kind = 'facebook';
+  if (!/^\d{1,30}$/.test(igId)) {
+    const ig = await call(app, `${IG_GRAPH}/${cfg.instagram.apiVersion}/me?${new URLSearchParams({ fields: 'user_id,username,account_type', access_token: token })}`, {}, 'lecture du compte Instagram');
+    diag.igme = ig.ok ? 'ok' : `HTTP ${ig.status}`;
+    if (ig.ok) {
+      const m = await ig.json().catch(() => null);
+      const id = String(m?.user_id ?? m?.id ?? '');
+      diag.igme = `ok (${m?.username ? 'avec' : 'sans'} nom d'utilisateur)`;
+      if (/^\d{1,30}$/.test(id)) { igId = id; username = String(m?.username ?? '').slice(0, 100) || null; kind = 'instagram'; }
+    }
+  }
   if (!/^\d{1,30}$/.test(igId)) {
     // Aucun secret ni identifiant dans cette ligne : seulement ce que Meta a accordé, pour comprendre pourquoi aucun compte n'est visible
-    console.warn(`[instagram] aucun compte Instagram trouvé après la connexion : droits=${diag.scopes.join(',')} ; éléments=${diag.granular.join(',') || 'aucun'} ; pages=${diag.pages ?? 'non lues'} dont avec Instagram=${diag.pagesWithInstagram} ; identité=${diag.me ?? 'non lue'}`);
+    console.warn(`[instagram] aucun compte Instagram trouvé après la connexion : droits=${diag.scopes.join(',')} ; éléments=${diag.granular.join(',') || 'aucun'} ; pages=${diag.pages ?? 'non lues'} dont avec Instagram=${diag.pagesWithInstagram} ; identité=${diag.me ?? 'non lue'} ; jeton Instagram=${diag.igme ?? 'non essayé'}`);
     throw fail(400, "Aucun compte Instagram professionnel n'a été autorisé : recommence et sélectionne ton compte Instagram (professionnel, lié à une Page Facebook) quand Meta le propose. Si ça se répète, l'administrateur trouvera le détail dans les journaux du serveur (« [instagram] aucun compte Instagram trouvé »).");
   }
-  if (!username) {
+  if (!username && kind === 'facebook') {
     const me = await call(app, `${v}/${igId}?${new URLSearchParams({ fields: 'username', access_token: token })}`, {}, 'lecture du profil');
     if (me.ok) username = String((await me.json().catch(() => null))?.username ?? '').slice(0, 100) || null;
   }
 
   await db.prepare('DELETE FROM instagram_accounts WHERE project_id = ?').run(projectId);
   await db.prepare('INSERT INTO instagram_accounts(project_id, ig_user_id, username, account_type, token_enc, expires_at, connected_by, created_at, refreshed_at) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)')
-    .run(projectId, igId, username, null, encrypt(cfg.secretKey, token), expiresAt, Number(userId), now(), now());
+    .run(projectId, igId, username, kind, encrypt(cfg.secretKey, token), kind === 'instagram' && !expiresAt ? now() + 60 * 86400 : expiresAt, Number(userId), now(), now());
   return projectId;
 }
 
 /** Compte relié, jeton déchiffré : les mêmes contrôles avant chaque appel. */
 async function accountToken(app, projectId) {
-  const acc = await app.db.prepare('SELECT ig_user_id, username, token_enc, expires_at FROM instagram_accounts WHERE project_id = ?').get(Number(projectId));
+  const acc = await app.db.prepare('SELECT ig_user_id, username, account_type, token_enc, expires_at FROM instagram_accounts WHERE project_id = ?').get(Number(projectId));
   if (!acc) throw fail(400, "Aucun compte Instagram n'est relié à ce projet");
   if (acc.expires_at && Number(acc.expires_at) <= now()) throw fail(400, 'La connexion Instagram a expiré (elle dure 60 jours) : reconnecte le compte.');
   let token;
@@ -216,13 +229,15 @@ async function accountToken(app, projectId) {
  */
 export async function refreshInstagramTokens(app, { at = now() } = {}) {
   if (!app.cfg.instagram) return { refreshed: 0, failed: 0 };
-  const rows = await app.db.prepare(`SELECT i.project_id, i.token_enc, p.user_id, p.name FROM instagram_accounts i JOIN projects p ON p.id = i.project_id JOIN users u ON u.id = p.user_id
+  const rows = await app.db.prepare(`SELECT i.project_id, i.token_enc, i.account_type, p.user_id, p.name FROM instagram_accounts i JOIN projects p ON p.id = i.project_id JOIN users u ON u.id = p.user_id
     WHERE u.status = 'active' AND i.expires_at > ? AND i.expires_at <= ? AND (i.refreshed_at IS NULL OR i.refreshed_at <= ?) LIMIT 20`).all(at, at + REFRESH_WITHIN, at - REFRESH_AFTER);
   const out = { refreshed: 0, failed: 0 };
   for (const r of rows) {
     try {
       const token = decrypt(app.cfg.secretKey, r.token_enc);
-      const res = await call(app, `${GRAPH}/${app.cfg.instagram.apiVersion}/oauth/access_token?${new URLSearchParams({ grant_type: 'fb_exchange_token', client_id: app.cfg.instagram.appId, client_secret: app.cfg.instagram.appSecret, fb_exchange_token: token })}`, {}, 'renouvellement du jeton');
+      const res = r.account_type === 'instagram'
+        ? await call(app, `${IG_GRAPH}/refresh_access_token?${new URLSearchParams({ grant_type: 'ig_refresh_token', access_token: token })}`, {}, 'renouvellement du jeton')
+        : await call(app, `${GRAPH}/${app.cfg.instagram.apiVersion}/oauth/access_token?${new URLSearchParams({ grant_type: 'fb_exchange_token', client_id: app.cfg.instagram.appId, client_secret: app.cfg.instagram.appSecret, fb_exchange_token: token })}`, {}, 'renouvellement du jeton');
       if (!res.ok) throw await graphError(res, 'renouvellement du jeton');
       const j = await res.json().catch(() => null);
       if (typeof j?.access_token !== 'string') throw fail(502, 'Réponse inattendue au renouvellement du jeton.');
@@ -329,7 +344,7 @@ export async function publishInstagram(app, projectId, draftId, { as = 'post' } 
     const jpg = await (app.toJpeg || pngToJpeg)({ cfg, png, width: draft.extra?.width || fmt.width, height: draft.extra?.height || fmt.height });
     token_ = putMedia(jpg);
     const imageUrl = `${cfg.instagram.publicBase}/ig-media/${token_}.jpg`;
-    const v = `${GRAPH}/${cfg.instagram.apiVersion}`;
+    const v = `${acc.account_type === 'instagram' ? IG_GRAPH : GRAPH}/${cfg.instagram.apiVersion}`;
     const authed = (obj) => new URLSearchParams({ ...obj, access_token: token });
 
     // 1. Le conteneur : Instagram va chercher l'image à imageUrl
