@@ -439,7 +439,6 @@ export function isLinkExempt(method, pathname) {
   if (pathname === '/raccourcis') return true; // une page d'aide, sans accès à l'IA
   if (pathname === '/abonnement/portail') return true; // on doit toujours pouvoir gérer ou résilier son abonnement, même sans IA reliée
   if (pathname === '/welcome' || pathname === '/welcome/skip') return true; // le profil ne demande pas d'accès Claude
-  if (pathname.startsWith('/instagram/')) return true; // relier Instagram ne demande pas d'accès à l'IA
   if (pathname.startsWith('/linkedin/')) return true; // un administrateur d'équipe relie LinkedIn avec l'accès Claude du propriétaire
   if (pathname === '/team' || pathname.startsWith('/team/')) return true; // on peut gérer son équipe ou accepter une invitation sans avoir relié Claude
   if (pathname === '/admin' || pathname.startsWith('/admin/')) return true; // les administrateurs gèrent les comptes même sans liaison
