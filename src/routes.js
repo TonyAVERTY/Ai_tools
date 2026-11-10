@@ -205,6 +205,25 @@ export function registerRoutes(router, app) {
     }));
   });
 
+  // Derniers mails partis d'un projet, avec leur texte et la dernière réponse du prospect : de quoi voir ce qui est parti juste après un envoi.
+  // Le projet est vérifié comme partout (introuvable s'il n'est pas à la personne ou à son équipe).
+  router.get('/api/projects/:id/mails/recent', async (ctx) => {
+    const p = await project(ctx);
+    const rows = await db.prepare(`SELECT m.id, m.prospect_id, m.email, m.subject, m.kind, m.sent_at, m.error, m.read_at, m.body, m.note, x.company, x.status FROM mail_log m
+      LEFT JOIN prospects x ON x.id = m.prospect_id WHERE m.project_id = ? ORDER BY m.sent_at DESC, m.id DESC LIMIT 8`).all(p.id);
+    const mails = [];
+    for (const r of rows) {
+      const reply = r.prospect_id ? await db.prepare('SELECT subject, body, intent, received_at FROM replies WHERE project_id = ? AND prospect_id = ? ORDER BY received_at DESC, id DESC LIMIT 1').get(p.id, r.prospect_id) : null;
+      const state = r.error ? 'failed' : ['replied', 'client'].includes(r.status) ? 'replied' : r.status === 'bounced' ? 'bounced' : r.status === 'refused' ? 'refused' : r.read_at ? 'read' : 'sent';
+      mails.push({
+        id: Number(r.id), to: r.email, company: r.company || '', subject: r.subject || '', kind: r.kind, sentAt: Number(r.sent_at), state,
+        error: r.error || null, note: state === 'bounced' ? r.note || null : null, body: r.body ? String(r.body).slice(0, 6000) : null, prospectId: r.prospect_id ? Number(r.prospect_id) : null,
+        reply: reply ? { subject: reply.subject || '', body: String(reply.body || '').slice(0, 3000), receivedAt: Number(reply.received_at) } : null,
+      });
+    }
+    json(ctx.res, { mails });
+  });
+
   // Journal du projet (onglet Envoi) : mails de ce projet, par état
   const journalOf = async (database, projectId) => {
     const r = await database.prepare(`SELECT COUNT(*) n, SUM(CASE WHEN m.error IS NULL THEN 1 ELSE 0 END) ok, SUM(CASE WHEN m.error IS NOT NULL THEN 1 ELSE 0 END) failed,
@@ -236,6 +255,9 @@ export function registerRoutes(router, app) {
     const full = await getProject(app, params.id, { userId: session.userId });
     const detail = await prospectDetail(db, Number(params.cid));
     if (!detail || Number(detail.prospect.project_id) !== Number(full.id)) throw new HttpError(404, 'Prospect introuvable');
+    // Le texte des mails partis (et la raison d'un rejet) ne sert qu'à cette page : prospectDetail, lui, sert aussi l'API
+    detail.mails = await db.prepare(`SELECT kind, subject, variant, sent_at, error, read_at, body, note, email FROM mail_log
+      WHERE prospect_id = ? AND project_id = ? ORDER BY sent_at, id`).all(detail.prospect.id, full.id);
     const reply = await db.prepare('SELECT id, project_id, body, subject, intent, received_at, from_email FROM replies WHERE prospect_id = ? ORDER BY received_at DESC, id DESC LIMIT 1').get(detail.prospect.id);
     const job = await db.prepare("SELECT status FROM jobs WHERE project_id = ? AND type = 'hook' AND params_json = ? ORDER BY id DESC LIMIT 1").get(full.id, JSON.stringify({ prospectId: detail.prospect.id }));
     html(res, contactPage({ email: session.email, project: full, detail, reply: reply ? { ...reply, received_at: Number(reply.received_at), ...(await suggestionFor(db, session.userId, { id: reply.id, subject: reply.subject, text: reply.body, intent: reply.intent, company: detail.prospect.company, from: reply.from_email, receivedAt: Number(reply.received_at) })) } : null, hookBusy: !!job && ['queued', 'running'].includes(job.status) }));
