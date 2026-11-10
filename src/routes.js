@@ -851,7 +851,11 @@ export function registerRoutes(router, app) {
   router.get('/api/projects/:id/kanban', async (ctx) => {
     const { res, url } = ctx;
     const p = await project(ctx);
-    json(res, { columns: await kanbanColumns(db, p.id, parseFilters(url.searchParams)) });
+    // `col` + `offset` : la suite d'une seule colonne (bouton « Voir + » quand elle a plus de fiches que celles déjà chargées)
+    const col = url.searchParams.get('col');
+    if (col && !Object.hasOwn(PROSPECT_STATUSES, col)) throw new HttpError(400, 'Statut inconnu');
+    const offset = Math.min(100000, Math.max(0, Number.parseInt(url.searchParams.get('offset'), 10) || 0));
+    json(res, { columns: await kanbanColumns(db, p.id, parseFilters(url.searchParams), col ? { only: col, offset } : {}) });
   });
 
   const STATUSES = Object.keys(PROSPECT_STATUSES);

@@ -11,7 +11,7 @@ La clé est fausse, supprimée ou limitée : crée-en une nouvelle sur aistudio.
 Aucun lien : active la connexion par code d'appareil dans les paramètres de sécurité de ton compte ChatGPT, ou utilise « Coller le fichier ». Les tâches qui s'enchaînent sont normales avec un compte ChatGPT : une seule tourne à la fois pour ton compte (avec une clé API, elles tournent ensemble).
 
 ## Une tâche terminée n'affiche plus qu'une ligne (résultat, « Voir », tokens)
-C'est voulu pour alléger la page : sous une recherche, un envoi ou une relance terminés, le résultat, le bouton **Voir** (le détail de la tâche) et le nombre de tokens tiennent sur une même ligne. Rien n'est perdu : **Voir** ouvre le détail complet, et le menu « Activité » garde l'historique.
+C'est voulu pour alléger la page : sous une recherche, un envoi ou une relance terminés, le résultat, le bouton **Voir** (le détail de la tâche) et le nombre de tokens tiennent sur une même ligne. Rien n'est perdu : **Voir** ouvre le détail complet, et le menu « Activité » garde l'historique. Une **analyse** terminée n'affiche plus rien sous les onglets du projet (la fiche projet, juste en dessous, est son résultat) : « Voir » et les tokens n'apparaissent que pendant l'analyse (à côté d'**Annuler**) ou si elle a échoué (à côté de **Réessayer**) ; le détail d'une analyse terminée se retrouve dans « Activité ».
 
 ## « Se connecter avec Google » : le lien ne s'affiche pas, ou « Google a refusé le code »
 - **Je ne vois pas l'option** : elle est désactivée par défaut. L'administrateur doit l'activer sur le serveur (et y installer Antigravity CLI, `agy`).
