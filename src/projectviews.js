@@ -176,7 +176,8 @@ export function projectTabPage({ email, entry, tab, stats = null, checklist = nu
   const body = tab === '' ? overview(p, checklist, stats, jobs)
     : tab === 'clients' ? `<div class="bill-page" data-clients><div class="cl-projects">${clientProjectBlock({ id: Number(p.id), name: p.name, counts: clientCounts || { clients: 0, prospects: 0, pending: 0 } }, Number(p.id))}</div></div>`
     : tab === 'facturation' ? billing || ''
-      : tab === 'communication' ? `<div class="pj-grid pj-grid-c"><div class="pj-flat">${blocks.linkedin}\n${blocks.newsletter}</div><div class="pj-flat">${blocks.instagram}\n${blocks.promo}\n${scheduledCard(p, scheduled)}</div></div>`
+      : tab === 'communication' ? `<div class="pj-flat pj-ig">${blocks.instagram}</div>
+        <div class="pj-grid pj-grid-c"><div class="pj-flat">${blocks.linkedin}\n${blocks.newsletter}</div><div class="pj-flat">${blocks.promo}\n${scheduledCard(p, scheduled)}</div></div>`
       : tab === 'outils' ? toolsLayout(p, blocks)
         : tab === 'reglages' ? settingsLayout(p, blocks)
           : tab === 'prospection' ? `<div class="pj-grid pj-grid-p"><div class="pj-flat pj-left">${blocks.target}\n${blocks.search}</div><div class="pj-flat">${blocks.prospects}</div></div>`
