@@ -2039,3 +2039,9 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 7px; text-align: cen
 /* Mise en route : les étapes facultatives sont rangées à part, hors du décompte (cercle en tirets) */
 .pj-opt-h { margin: 18px 0 2px; }
 .pj-opt .n { border-style: dashed; font-weight: 500; }
+/* Publier ou programmer un post Instagram (connexion Meta) */
+.ig-pub { margin-top: 14px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg-sunk); display: flex; flex-direction: column; gap: 10px; }
+.ig-pub p { margin: 0; }
+.ig-as { max-width: 340px; }
+.ig-schedule { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; }
+.ig-schedule .field { flex: 1 1 220px; }
