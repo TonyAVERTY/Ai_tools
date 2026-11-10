@@ -156,20 +156,38 @@ export async function finishInstagram(app, userId, params, req, res, checkAccess
   // debug_token fait foi : 0 = le jeton n'expire pas (pas de date) ; sinon sa date ; à défaut, la durée donnée par l'échange
   const expiresAt = Number(info.expires_at) === 0 ? null : Number(info.expires_at) > 0 ? Number(info.expires_at) : (expiresIn ? now() + expiresIn : null);
 
-  let igId = '';
-  for (const g of info.granular_scopes ?? []) {
-    if (['instagram_content_publish', 'instagram_basic'].includes(g.scope)) { igId = String((g.target_ids ?? [])[0] ?? ''); if (igId) break; }
-  }
+  // 1. Le compte choisi dans la configuration de connexion (granular_scopes) : d'abord les droits Instagram de publication, puis tout droit « instagram_* »
+  const granular = info.granular_scopes ?? [];
+  const pick = (scopes) => { for (const g of granular) if (scopes(g.scope)) { const id = String((g.target_ids ?? [])[0] ?? ''); if (/^\d{1,30}$/.test(id)) return id; } return ''; };
+  let igId = pick((sc) => sc === 'instagram_content_publish') || pick((sc) => sc === 'instagram_basic') || pick((sc) => /^instagram_/.test(sc));
   let username = null;
-  if (!/^\d{1,30}$/.test(igId)) {
-    // Sans élément choisi dans la configuration : le compte Instagram lié à une Page Facebook de l'utilisateur
-    const pg = await call(app, `${v}/me/accounts?${new URLSearchParams({ fields: 'instagram_business_account{id,username}', limit: '25', access_token: token })}`, {}, 'liste des comptes');
+  const diag = { scopes: scopes.slice(0, 20), granular: granular.map((g) => `${g.scope}:${(g.target_ids ?? []).length}`), pages: null, pagesWithInstagram: 0, me: null };
+  // 2. Le compte Instagram lié à une Page Facebook de l'utilisateur
+  if (!igId) {
+    const pg = await call(app, `${v}/me/accounts?${new URLSearchParams({ fields: 'instagram_business_account{id,username},connected_instagram_account{id,username}', limit: '50', access_token: token })}`, {}, 'liste des comptes');
+    diag.pages = pg.ok ? 'ok' : `HTTP ${pg.status}`;
     if (pg.ok) {
-      const found = ((await pg.json().catch(() => null))?.data ?? []).find((p) => p?.instagram_business_account?.id);
-      if (found) { igId = String(found.instagram_business_account.id); username = found.instagram_business_account.username || null; }
+      const pages = (await pg.json().catch(() => null))?.data ?? [];
+      diag.pages = `${pages.length} page(s)`;
+      const found = pages.map((p) => p?.instagram_business_account ?? p?.connected_instagram_account).find((x) => x?.id);
+      diag.pagesWithInstagram = pages.filter((p) => p?.instagram_business_account?.id || p?.connected_instagram_account?.id).length;
+      if (found) { igId = String(found.id); username = found.username || null; }
     }
   }
-  if (!/^\d{1,30}$/.test(igId)) throw fail(400, "Aucun compte Instagram professionnel n'a été autorisé : recommence et sélectionne ton compte Instagram (professionnel, lié à une Page Facebook) quand Meta le propose.");
+  // 3. Connexion par Instagram : l'identité de la personne est elle-même le compte Instagram
+  if (!/^\d{1,30}$/.test(igId)) {
+    const meRes = await call(app, `${v}/me?${new URLSearchParams({ fields: 'id,username', access_token: token })}`, {}, 'lecture de l\'identité');
+    if (meRes.ok) {
+      const m = await meRes.json().catch(() => null);
+      diag.me = m?.username ? 'compte avec nom d\'utilisateur' : 'sans nom d\'utilisateur';
+      if (m?.username && /^\d{1,30}$/.test(String(m.id ?? ''))) { igId = String(m.id); username = String(m.username).slice(0, 100); }
+    } else diag.me = `HTTP ${meRes.status}`;
+  }
+  if (!/^\d{1,30}$/.test(igId)) {
+    // Aucun secret ni identifiant dans cette ligne : seulement ce que Meta a accordé, pour comprendre pourquoi aucun compte n'est visible
+    console.warn(`[instagram] aucun compte Instagram trouvé après la connexion : droits=${diag.scopes.join(',')} ; éléments=${diag.granular.join(',') || 'aucun'} ; pages=${diag.pages ?? 'non lues'} dont avec Instagram=${diag.pagesWithInstagram} ; identité=${diag.me ?? 'non lue'}`);
+    throw fail(400, "Aucun compte Instagram professionnel n'a été autorisé : recommence et sélectionne ton compte Instagram (professionnel, lié à une Page Facebook) quand Meta le propose. Si ça se répète, l'administrateur trouvera le détail dans les journaux du serveur (« [instagram] aucun compte Instagram trouvé »).");
+  }
   if (!username) {
     const me = await call(app, `${v}/${igId}?${new URLSearchParams({ fields: 'username', access_token: token })}`, {}, 'lecture du profil');
     if (me.ok) username = String((await me.json().catch(() => null))?.username ?? '').slice(0, 100) || null;

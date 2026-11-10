@@ -32,6 +32,7 @@ before(async () => {
     if (u.includes('/oauth/access_token?') && u.includes('fb_exchange_token')) return res(reply.long ?? { json: { access_token: LONG, token_type: 'bearer', expires_in: 5183944 } });
     if (u.includes('/oauth/access_token?')) return res(reply.token ?? { json: { access_token: 'EAAB-short', token_type: 'bearer', expires_in: 3600 } });
     if (u.includes('/debug_token?')) return res(reply.debug ?? { json: GRANTED() });
+    if (/\/me\?/.test(u)) return res(reply.identity ?? { json: { id: '10001' } });
     if (u.includes('/me/accounts?')) return res(reply.accounts ?? { json: { data: [] } });
     if (/\/1784140000\?fields=username/.test(u)) return res(reply.me ?? { json: { username: 'cafe_bzh', id: '1784140000' } });
     if (/\/media$/.test(u)) {
@@ -137,6 +138,11 @@ test('connexion : vers Meta avec la configuration, retour contrôlé, jeton chif
   reply.accounts = { json: { data: [{ id: '1', instagram_business_account: { id: '1784140000', username: 'cafe_bzh' } }] } };
   assert.equal(location(await connect(owner, p)), `/p/${p}/communication?ig=ok`);
   assert.equal((await view(owner, p)).instagram.account.expiresAt, null, 'un jeton qui n\'expire pas (expires_at 0) n\'a pas de date');
+  // Connexion par Instagram : l'identité de la personne est elle-même le compte (id + nom d'utilisateur)
+  reset(); reply.debug = { json: { data: { scopes: ['instagram_content_publish'], granular_scopes: [], expires_at: 0 } } };
+  reply.identity = { json: { id: '1784140000', username: 'cafe_bzh' } };
+  assert.equal(location(await connect(owner, p)), `/p/${p}/communication?ig=ok`);
+  assert.equal((await view(owner, p)).instagram.account.userId, '1784140000');
   // Le droit de publier n'a pas été accordé
   reset(); reply.debug = { json: { data: { scopes: ['instagram_basic'], granular_scopes: [{ scope: 'instagram_basic', target_ids: ['1784140000'] }] } } };
   assert.match(location(await connect(owner, p)), /instagram_content_publish/);
