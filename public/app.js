@@ -71,6 +71,23 @@
   // Outils communs pour les fichiers public/app-*.js (chargés après celui-ci)
   Object.assign(window.AiTools, { $, $$, api, esc, every, formData, go, icon, later, liDay, listen, refreshProject, httpErrorText, networkErrorText, toLogin, confirmBox, loadingHtml, loadFailed, sentence, aiName });
 
+  // Barre du haut : elle se rétracte quand on descend dans la page et revient dès qu'on remonte, en haut de page, ou si un menu y est ouvert / le focus y est / la visite guidée est en cours
+  {
+    const bar = document.querySelector('header.top');
+    if (bar) {
+      let last = window.scrollY;
+      const keepOpen = () => bar.matches(':focus-within') || !!document.querySelector('.tour-card') || !!bar.querySelector('details[open], [aria-expanded="true"]');
+      const sync = () => {
+        const y = window.scrollY, down = y > last + 4, up = y < last - 4;
+        if (y < 80 || up || keepOpen()) bar.classList.remove('top-hidden');
+        else if (down) bar.classList.add('top-hidden');
+        if (down || up) last = y;
+      };
+      listen(window, 'scroll', sync, { passive: true });
+      listen(bar, 'focusin', () => bar.classList.remove('top-hidden'));
+    }
+  }
+
   // Une erreur dit ce qui s'est passé et quoi faire ensuite : jamais « Failed to fetch » ni un code brut. Le message du serveur, quand il y en a un, passe en premier.
   function httpErrorText(status) {
     if (status === 403) return "Tu n'as pas accès à cette action.";
