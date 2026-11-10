@@ -2,7 +2,7 @@
 // La liste vient du serveur (attribut data-go du <body>, voir src/shortcuts.js) : une seule source pour les touches et pour la page /raccourcis.
 // Chargé après app.js (window.AiTools) ; ajax.js relance ce script à chaque navigation : tout passe par listen() et later().
 (() => {
-  const { $, go, later, listen } = window.AiTools;
+  const { $, $$, go, later, listen } = window.AiTools;
   const map = new Map(String(document.body.dataset.go || '').split(';').filter(Boolean).map((p) => { const i = p.indexOf(':'); return [p.slice(0, i), p.slice(i + 1)]; }));
   let armed = null; // minuteur de la touche « g » : la lettre doit suivre dans la seconde
 
@@ -25,6 +25,25 @@
     if (key === 'g' && !e.shiftKey) { armed = later(() => { armed = null; }, 1000); return; }
     if (key === '/') { const b = $('[data-search-open]'); if (b) { e.preventDefault(); b.click(); } return; }
     if (key === 'j' && !e.shiftKey) { const b = $('.jobs-btn'); if (b) { e.preventDefault(); b.click(); } return; }
-    if (key === '?') { e.preventDefault(); if (location.pathname !== '/raccourcis') go('/raccourcis'); }
+    if (key === '?') { e.preventDefault(); if (location.pathname !== '/raccourcis') go('/raccourcis'); return; }
+    // n : nouveau projet (sur Projets, ouvre le formulaire ; ailleurs, va sur Projets où il s'ouvre)
+    if (key === 'n' && !e.shiftKey) {
+      e.preventDefault();
+      const t = $('[data-new-toggle][aria-expanded]');
+      if (t) { if (t.getAttribute('aria-expanded') !== 'true') t.click(); } else go('/projets?nouveau=1');
+      return;
+    }
+    // 1 à 9 : dans un projet, l'onglet de ce rang dans la barre du projet (la barre n'a que les onglets auxquels on a droit)
+    if (/^[1-9]$/.test(key) && !e.shiftKey) {
+      const tab = $$('.ptabs a')[Number(key) - 1];
+      if (tab) { e.preventDefault(); if (tab.getAttribute('aria-current') !== 'page') tab.click(); }
+    }
   });
+
+  // Arrivée par « n » depuis une autre page : le formulaire « Nouveau projet » s'ouvre tout seul, une seule fois
+  if (location.pathname === '/projets' && /[?&]nouveau(=|&|$)/.test(location.search)) {
+    const t = $('[data-new-toggle][aria-expanded]');
+    if (t && t.getAttribute('aria-expanded') !== 'true') t.click();
+    history.replaceState(history.state, '', '/projets');
+  }
 })();

@@ -5,12 +5,15 @@
 export const GO = [
   ['a', '/', "Aujourd'hui"], ['p', '/projets', 'Projets'], ['m', '/mails', 'Mails'], ['c', '/calendar', 'Agenda'], ['o', '/compta', 'Compta'],
   ['f', '/facturation', 'Facturation'], ['l', '/clients', 'Clients'], ['e', '/team', 'Équipe'], ['r', '/settings', 'Réglages'], ['u', '/account', 'Mon compte'],
+  ['i', '/chat', 'Assistant IA'], ['s', '/support', 'Support'],
 ];
 
 /** Les autres raccourcis. [touches (alternatives séparées par « ou »), ce que ça fait]. */
 export const OTHERS = [
   [['/', 'Ctrl K', '⌘ K'], 'Rechercher un projet, un prospect, un client ou un mail'],
+  [['n'], 'Créer un nouveau projet (ouvre « Nouveau projet »)'],
   [['j'], "Ouvrir ou fermer « Activité » (les tâches de l'IA en cours)"],
+  [['1 – 9'], "Dans un projet : ouvrir l'onglet de ce rang dans la barre du projet (1 Vue d'ensemble, 2 Prospection, 3 Envoi…)"],
   [['?'], 'Afficher cette page des raccourcis'],
   [['Échap'], 'Fermer le menu, la recherche ou la fenêtre ouverte'],
 ];
