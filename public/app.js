@@ -1041,6 +1041,13 @@
       else if (st[key] && j) { st[key] = false; window.AiTools.loadContent?.(el, type === 'instagram_post' ? 'instagram' : 'newsletter'); if (j.status === 'done') toast(type === 'instagram_post' ? 'Post Instagram prêt' : 'Newsletter prête'); }
     }
 
+    // Fin d'un envoi ou de relances → les derniers mails partis (texte, rejet, réponse) se rafraîchissent aussitôt
+    for (const [type, key] of [['send', 'sendRunning'], ['followup', 'fuRunning']]) {
+      const j = jobs[type];
+      if (j && ACTIVE.includes(j.status)) st[key] = true;
+      else if (st[key] && j) { st[key] = false; for (const b of $$('[data-recent-mails]')) window.AiTools.loadRecentMails?.(b); }
+    }
+
     // Fin d'une vidéo de promotion → on recharge la liste
     const pv = jobs.promo_video;
     if (pv && ACTIVE.includes(pv.status)) st.promoRunning = true;

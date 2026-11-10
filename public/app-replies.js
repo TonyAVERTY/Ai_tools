@@ -121,6 +121,50 @@
     } catch { /* hors ligne ou session expirée : la prochaine requête le dira */ }
   }
   if ($('.top')) { pollReplies(); every(pollReplies, 45_000); listen(document, 'visibilitychange', () => { if (!document.hidden) pollReplies(); }); }
+  // Onglet Envoi : les derniers mails partis, dépliables (texte exact, rejet, réponse). Chargé à l'arrivée et dès qu'un envoi ou des relances se terminent.
+  // Tout le texte vient de la base et passe par textContent.
+  const STATE_TXT = { sent: ['Envoyé', ''], read: ['Lu', 'info'], replied: ['Répondu', 'ok'], bounced: ['Rejeté', 'err'], refused: ['Refus', 'err'], failed: ['Non envoyé', 'err'] };
+  const when = (ts) => new Date(ts * 1000).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
+  const MISSING = 'Contenu non conservé : ce mail est parti avant que iaboss ne garde le texte des mails envoyés.';
+  async function loadRecentMails(box) {
+    const id = box.dataset.project;
+    if (!id) return;
+    try {
+      const { mails } = await api(`/api/projects/${id}/mails/recent`);
+      const open = new Set([...box.querySelectorAll('details[open]')].map((d) => d.dataset.recent)); // ce que la personne avait déplié reste déplié
+      box.replaceChildren();
+      if (!mails.length) return;
+      const h = document.createElement('h3'); h.className = 'pj-recent-h'; h.textContent = 'Derniers mails partis'; box.append(h);
+      const list = document.createElement('div'); list.className = 'pj-recent-l';
+      for (const m of mails) {
+        const d = document.createElement('details'); d.className = 'cl-mail pj-mail'; d.dataset.recent = String(m.id); d.open = open.has(String(m.id));
+        const s = document.createElement('summary');
+        const [label, tone] = STATE_TXT[m.state] || STATE_TXT.sent;
+        const b = document.createElement('span'); b.className = `badge ${tone}`.trim(); b.textContent = label;
+        const t = document.createElement('span'); t.className = 'pj-mail-t'; t.textContent = `${m.company || m.to} · ${m.subject || '(sans objet)'}`;
+        const w = document.createElement('span'); w.className = 'muted small'; w.textContent = when(m.sentAt);
+        s.append(b, t, w); d.append(s);
+        const add = (cls, text, lead) => { const p = document.createElement('p'); p.className = cls; if (lead) { const x = document.createElement('b'); x.textContent = `${lead} `; p.append(x); } p.append(text); d.append(p); };
+        if (m.error) add('mail-err', m.error, 'Non envoyé :');
+        else if (m.state === 'bounced') add('mail-err', m.note || "Le serveur du destinataire n'a pas donné de raison.", 'Rejeté :');
+        add('muted small', `À ${m.to}${m.subject ? ` · objet : ${m.subject}` : ''}`);
+        if (!m.error) add(m.body ? 'mail-text' : 'muted small', m.body || MISSING);
+        if (m.reply) {
+          const r = document.createElement('div'); r.className = 'pj-mail-reply';
+          const rh = document.createElement('p'); rh.className = 'small'; const rb = document.createElement('b'); rb.textContent = `Réponse du ${when(m.reply.receivedAt)}`; rh.append(rb);
+          if (m.reply.subject) rh.append(` · objet : ${m.reply.subject}`);
+          const rt = document.createElement('div'); rt.className = 'mail-text cl-quote'; rt.textContent = m.reply.body || '(réponse vide)';
+          r.append(rh, rt); d.append(r);
+        }
+        if (m.prospectId) { const a = document.createElement('a'); a.className = 'link small'; a.href = `/p/${id}/contact/${m.prospectId}`; a.textContent = 'Ouvrir la fiche du prospect'; d.append(a); }
+        list.append(d);
+      }
+      box.append(list);
+    } catch { /* hors ligne : la zone reste vide, le journal au-dessus donne déjà les chiffres */ }
+  }
+  window.AiTools.loadRecentMails = loadRecentMails;
+  for (const box of $$('[data-recent-mails]')) loadRecentMails(box);
+
   // Page « Mails » : un clic sur un mail déplie son contenu (ou, s'il est rejeté ou n'est pas parti, la raison), chargé à la première ouverture
   async function toggleMail(btn) {
     const row = document.getElementById(btn.getAttribute('aria-controls'));

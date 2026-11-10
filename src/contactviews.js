@@ -1,6 +1,7 @@
 // Fiche contact (maquette 06, docs/REFONTE-UI.md) : un prospect ou un client, sa dernière réponse, ses échanges, sa prochaine action, son accroche,
 // ses informations. Rendue par le serveur ; public/app-contact.js envoie les formulaires aux routes d'API de la fiche prospect (mêmes que l'ancienne fenêtre).
 import { esc } from './http.js';
+import { mailPreview } from './clientsviews.js';
 import { ic } from './icons.js';
 import { layout } from './views.js';
 import { suggestBlock } from './mailviews.js';
@@ -21,10 +22,14 @@ const BADGE = { replied: 'ok', client: 'ok', sent: 'info', new: '', refused: 'er
 function events(d, reply) {
   const p = d.prospect;
   const list = [];
-  if (reply) list.push({ at: reply.received_at, html: `<b>Réponse reçue</b> · ${esc(INTENTS[reply.intent] || INTENTS.other)}` });
+  if (reply) list.push({ at: reply.received_at, html: `<b>Réponse reçue</b> · ${esc(INTENTS[reply.intent] || INTENTS.other)}${reply.body ? `<details class="cl-mail"><summary>Voir la réponse</summary>${reply.subject ? `<p class="muted small">Objet : ${esc(reply.subject)}</p>` : ''}<div class="mail-text">${esc(String(reply.body).slice(0, 5000))}</div></details>` : ''}` });
   else if (p.replied_at) list.push({ at: p.replied_at, html: `<b>Réponse reçue</b>${p.reply_subject ? ` · ${esc(p.reply_subject)}` : ''}` });
+  // Le dernier mail parti d'un prospect « Rejeté » est celui que le serveur du destinataire a refusé : sa raison s'affiche avec le mail
+  const rejected = p.status === 'bounced' ? [...d.mails].reverse().find((m) => !m.error) : null;
   for (const m of d.mails) {
-    list.push({ at: m.sent_at, html: m.error ? `<b>Mail non envoyé</b> · <span class="err">${esc(m.error)}</span>` : `<b>${m.kind === 'followup' ? 'Relance envoyée' : 'Mail envoyé'}</b>${m.variant ? ` · Objet ${esc(m.variant)}` : ''}${m.subject ? ` « ${esc(m.subject)} »` : ''}` });
+    const preview = m.error || m.body === undefined ? '' : mailPreview({ to: m.email || p.email, subject: m.subject, body: m.body });
+    const bounce = m === rejected ? `<br><span class="err"><b>Rejeté :</b> ${esc(m.note || "le serveur du destinataire n'a pas donné de raison.")}</span>` : '';
+    list.push({ at: m.sent_at, html: m.error ? `<b>Mail non envoyé</b> · <span class="err">${esc(m.error)}</span>` : `<b>${m.kind === 'followup' ? 'Relance envoyée' : 'Mail envoyé'}</b>${m.variant ? ` · Objet ${esc(m.variant)}` : ''}${m.subject ? ` « ${esc(m.subject)} »` : ''}${bounce}${preview}` });
     if (m.read_at) list.push({ at: m.read_at, html: '<b>Lu par le destinataire</b>' });
   }
   for (const n of d.notes) list.push({ at: n.created_at, html: `<b>Note</b> · ${esc(n.body)} <button type="button" class="link small" data-del-note="${n.id}" aria-label="Supprimer cette note">supprimer</button>` });

@@ -2014,6 +2014,20 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 7px; text-align: cen
 .sc-table th, .sc-table td { text-align: left; padding: 10px 8px; border-top: 1px solid var(--line); }
 .sc-table thead th { border-top: 0; color: var(--muted); font-size: .8125rem; font-weight: 600; }
 .sc-table td:first-child { white-space: nowrap; width: 1%; }
+/* Aperçu du mail parti (fiche contact) : le texte exact, replié */
+.cl-mail { margin-top: 6px; }
+.cl-mail > summary { cursor: pointer; font-weight: 600; min-height: 36px; padding: 6px 0; color: var(--link); }
+.cl-mail > summary:hover { text-decoration: underline; }
+.cl-mail .mail-text { margin-top: 6px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card-2); }
+/* Onglet Envoi : derniers mails partis, dépliables */
+.pj-recent { padding: 4px 20px 16px; }
+.pj-recent-h { margin: 12px 0 4px; font-size: .9375rem; }
+.pj-recent-l { display: flex; flex-direction: column; gap: 4px; }
+.pj-mail { border-top: 1px solid var(--line); margin-top: 0; }
+.pj-mail > summary { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.pj-mail-t { flex: 1 1 200px; min-width: 0; overflow-wrap: anywhere; color: var(--text); font-weight: 500; }
+.pj-mail > p { margin: 4px 0; }
+.pj-mail-reply { margin: 10px 0 6px; padding-left: 12px; border-left: 3px solid var(--accent); }
 /* Mise en route : les étapes facultatives sont rangées à part, hors du décompte (cercle en tirets) */
 .pj-opt-h { margin: 18px 0 2px; }
 .pj-opt .n { border-style: dashed; font-weight: 500; }
