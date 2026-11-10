@@ -44,8 +44,11 @@ export function cleanHashtags(list) {
 const view = (r) => ({
   id: Number(r.id), kind: r.kind, direction: r.direction || '', title: r.title || '', body: r.body, extra: parse(r.extra_json),
   hasImage: Number(r.image_size || 0) > 0, createdAt: Number(r.created_at), updatedAt: Number(r.updated_at),
+  // Publication sur Instagram (draft | scheduled | publishing | published)
+  status: r.status || 'draft', publishAs: r.publish_as || null, scheduledAt: r.scheduled_at ? Number(r.scheduled_at) : null,
+  publishedAt: r.published_at ? Number(r.published_at) : null, permalink: r.permalink || null, publishError: r.publish_error || null,
 });
-const COLS = 'id, kind, direction, title, body, extra_json, created_at, updated_at, LENGTH(image) image_size';
+const COLS = 'id, kind, direction, title, body, extra_json, created_at, updated_at, LENGTH(image) image_size, status, publish_as, scheduled_at, published_at, permalink, publish_error';
 
 export async function saveDraft(db, projectId, kind, { direction = '', title = '', body, extra = {}, image = null }) {
   if (!KINDS.includes(kind)) throw fail(400, 'Type de brouillon inconnu');
@@ -55,7 +58,7 @@ export async function saveDraft(db, projectId, kind, { direction = '', title = '
       JSON.stringify(extra), image ? Buffer.from(image) : null, t, t);
   const id = Number(r.lastInsertRowid);
   // Les plus anciens brouillons partent : le dernier reste toujours
-  const old = await db.prepare('SELECT id FROM content_drafts WHERE project_id = ? AND kind = ? ORDER BY id DESC LIMIT 1000 OFFSET ?').all(Number(projectId), kind, LIMITS.perKind);
+  const old = await db.prepare("SELECT id FROM content_drafts WHERE project_id = ? AND kind = ? AND status NOT IN ('scheduled', 'publishing') ORDER BY id DESC LIMIT 1000 OFFSET ?").all(Number(projectId), kind, LIMITS.perKind);
   for (const o of old) await db.prepare('DELETE FROM content_drafts WHERE id = ?').run(Number(o.id));
   return id;
 }
@@ -84,6 +87,7 @@ export async function getImage(db, projectId, id) {
 export async function editDraft(db, projectId, kind, id, { title, body, hashtags, alt, preview }) {
   const cur = await getDraft(db, projectId, kind, id);
   if (!cur) throw fail(404, 'Brouillon introuvable');
+  if (kind === 'instagram' && cur.status !== 'draft') throw fail(409, cur.status === 'published' ? 'Ce post est déjà publié : il ne se modifie plus ici' : 'Ce post est programmé : annule la programmation pour le modifier');
   const extra = { ...cur.extra };
   let text = cur.body;
   let subject = cur.title;
@@ -106,6 +110,8 @@ export async function editDraft(db, projectId, kind, id, { title, body, hashtags
 }
 
 export async function removeDraft(db, projectId, kind, id) {
+  const cur = await db.prepare('SELECT status FROM content_drafts WHERE id = ? AND project_id = ? AND kind = ?').get(Number(id) || 0, Number(projectId), kind);
+  if (cur?.status === 'publishing') throw fail(409, 'Ce post est en cours de publication : attends la fin');
   const r = await db.prepare('DELETE FROM content_drafts WHERE id = ? AND project_id = ? AND kind = ?').run(Number(id) || 0, Number(projectId), kind);
   if (!Number(r.changes ?? r.affectedRows ?? 0)) throw fail(404, 'Brouillon introuvable');
 }

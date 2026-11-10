@@ -39,7 +39,41 @@
       <p class="muted small">${hint}</p></div>`;
   }
 
+  const parisDay = (ts) => new Date(ts * 1000).toLocaleString('fr-FR', { dateStyle: 'full', timeStyle: 'short', timeZone: 'Europe/Paris' });
+
+  // Publier sur Instagram : relier le compte, puis publier tout de suite ou programmer, en post ou en story (administrateur du projet)
+  function publishPanel(s, d, id) {
+    const ig = s.instagram;
+    if (!ig?.configured) return `<p class="muted small">iaboss ne publie pas sur Instagram sur ce service : télécharge l'image, copie la légende et publie depuis l'application Instagram.</p>`;
+    const acc = ig.account;
+    const where = d.publishAs === 'story' ? 'en story' : 'en post';
+    if (d.status === 'published') {
+      return `<div class="ig-pub" data-ig-pub><p class="ok small"><b>Publié ${where}</b> le ${esc(parisDay(d.publishedAt))}${acc ? ` sur @${esc(acc.username)}` : ''}${d.permalink ? ` · <a href="${esc(d.permalink)}" target="_blank" rel="noopener noreferrer">Voir sur Instagram</a>` : ''}</p></div>`;
+    }
+    if (!acc) {
+      return `<div class="ig-pub" data-ig-pub><p class="small"><b>Publier sur Instagram</b></p>${d.publishError ? `<p class="error small">${esc(d.publishError)}</p>` : ''}
+        ${ig.canManage ? `<p><a class="btn" href="/instagram/connect?project=${id}" data-noajax>Connecter Instagram</a></p><p class="muted small">Il faut un compte Instagram professionnel (business ou créateur). Tu choisis ensuite entre publier tout de suite et programmer, en post ou en story.</p>`
+    : '<p class="muted small">Demande à un administrateur du projet de relier le compte Instagram.</p>'}</div>`;
+    }
+    const head = `<p class="small"><span class="badge ${acc.expired ? 'warn' : 'ok'}">${acc.expired ? 'connexion expirée' : 'connecté'}</span> <strong>@${esc(acc.username || 'compte Instagram')}</strong>
+      ${ig.canManage ? `${acc.expired ? `<a class="btn small primary" href="/instagram/connect?project=${id}" data-noajax>Reconnecter</a> ` : ''}<button type="button" class="btn small danger" data-ig-disconnect>Déconnecter</button>` : ''}</p>`;
+    if (d.status === 'scheduled') {
+      return `<div class="ig-pub" data-ig-pub>${head}<p class="ok small">Programmé ${where} : ${esc(parisDay(d.scheduledAt))} (heure de Paris). Il part tout seul, dans les 15 minutes qui suivent l'heure choisie.</p>
+        ${ig.canManage ? '<div class="row-actions"><button type="button" class="btn" data-ig-unschedule>Annuler la programmation</button></div>' : ''}</div>`;
+    }
+    if (!ig.canManage) return `<div class="ig-pub" data-ig-pub>${head}<p class="muted small">Un administrateur du projet publie ou programme le post.</p></div>`;
+    const defAs = (d.extra || {}).format === 'story' ? 'story' : 'post';
+    return `<div class="ig-pub" data-ig-pub>${head}
+      ${d.publishError ? `<p class="error small">La dernière publication a échoué : ${esc(d.publishError)}</p>` : ''}
+      <label class="field ig-as"><span class="lbl">Publier en</span><span class="sel"><select data-ig-as><option value="post"${defAs === 'post' ? ' selected' : ''}>Post (avec la légende)</option><option value="story"${defAs === 'story' ? ' selected' : ''}>Story (l'image seule, sans légende)</option></select></span></label>
+      <div class="row-actions"><button type="button" class="btn primary" data-ig-publish${acc.expired ? ' disabled' : ''}>Publier maintenant</button></div>
+      <div class="ig-schedule"><label class="field"><span class="lbl">Ou programmer la publication</span><input type="datetime-local" data-ig-when></label>
+        <button type="button" class="btn" data-ig-schedule${acc.expired ? ' disabled' : ''}>Programmer</button></div>
+      <p class="muted small">Le post est public sur ton compte. Une programmation est publiée par iaboss à l'heure choisie (heure de ton navigateur), dans les 15 minutes qui suivent.</p></div>`;
+  }
+
   function instagramDraft(s, d, id) {
+    const locked = d.status !== 'draft'; // programmé ou publié : le texte ne se modifie plus
     const x = d.extra || {};
     const tags = (x.hashtags || []).join(' ');
     // Image à gauche, texte à droite (une seule colonne sur téléphone) ; le texte alternatif et l'inspiration sont repliés dans « Détails »
@@ -48,18 +82,18 @@
       ${d.hasImage ? `<figure class="ct-fig ct-ig-fig"><img class="ct-img" src="${base(id, 'instagram')}/${d.id}/image" width="${x.width || 1080}" height="${x.height || 1080}" alt="${esc(x.alt || 'Image du post')}">
         <figcaption class="muted small">${esc(x.format === 'portrait' ? 'Portrait 4:5' : x.format === 'story' ? 'Story 9:16' : 'Carré 1:1')} · ${x.width || 1080} × ${x.height || 1080} px${x.score ? ` · note du directeur artistique : ${x.score}/10` : ''}</figcaption></figure>` : ''}
       <div class="ct-ig-form">
-        <label class="field"><span class="lbl">Légende (modifiable)</span><textarea rows="8" maxlength="${s.limits.caption}" data-ct-body>${esc(d.body)}</textarea></label>
+        <label class="field"><span class="lbl">Légende (modifiable)</span><textarea rows="8" maxlength="${s.limits.caption}" data-ct-body${locked ? ' readonly' : ''}>${esc(d.body)}</textarea></label>
         <p class="muted small"><span data-ct-count>${d.body.length}</span> / ${s.limits.caption} caractères${d.direction ? ` · direction : « ${esc(d.direction)} »` : ` · sujet choisi par ${esc(aiName())}`}</p>
-        <label class="field"><span class="lbl">Hashtags</span><input data-ct-tags value="${esc(tags)}" maxlength="600" placeholder="#exemple #secteur"></label>
+        <label class="field"><span class="lbl">Hashtags</span><input data-ct-tags value="${esc(tags)}" maxlength="600" placeholder="#exemple #secteur"${locked ? ' readonly' : ''}></label>
         <details class="ct-insp ct-more"><summary>Détails : texte alternatif${x.inspiration ? ` et ce que ${esc(aiName())} a retenu de ton secteur` : ''}</summary>
           <label class="field"><span class="lbl">Texte alternatif de l'image <span class="muted small">(lecteurs d'écran)</span></span><input data-ct-alt value="${esc(x.alt || '')}" maxlength="${s.limits.alt}"></label>
           ${x.inspiration ? `<p class="small"><b>Ce que ${esc(aiName())} a retenu de ton secteur</b><br>${esc(x.inspiration).replace(/\n/g, '<br>')}</p>` : ''}</details>
         <div class="row-actions">
           ${d.hasImage ? `<a class="btn primary" href="${base(id, 'instagram')}/${d.id}/image?telecharger=1" data-noajax>Télécharger l'image</a>` : ''}
           <button type="button" class="btn" data-ct-copy="instagram">Copier la légende</button>
-          <button type="button" class="btn" data-ct-save>Enregistrer</button>
+          ${locked ? '' : '<button type="button" class="btn" data-ct-save>Enregistrer</button>'}
           <button type="button" class="btn danger" data-ct-delete>Supprimer</button></div>
-        <p class="muted small">iaboss ne publie pas sur Instagram : télécharge l'image, copie la légende et publie depuis l'application Instagram.</p></div></div>`;
+        ${publishPanel(s, d, id)}</div></div>`;
   }
 
   function newsletterDraft(s, d, id) {
@@ -93,7 +127,7 @@
   };
 
   listen(document, 'click', async (e) => {
-    const t = e.target.closest('[data-ct-generate],[data-ct-save],[data-ct-copy],[data-ct-delete],[data-ct-pick]');
+    const t = e.target.closest('[data-ct-generate],[data-ct-save],[data-ct-copy],[data-ct-delete],[data-ct-pick],[data-ig-publish],[data-ig-schedule],[data-ig-unschedule],[data-ig-disconnect]');
     if (!t) return;
     const box = t.closest('[data-content]');
     const proj = t.closest('.project');
@@ -124,6 +158,33 @@
         picked.delete(`${id}:${kind}`);
         toast('Brouillon supprimé');
         loadContent(proj, kind);
+      } else if (t.matches('[data-ig-publish],[data-ig-schedule]')) {
+        const as = $('[data-ig-as]', box).value;
+        const asText = as === 'story' ? 'en story' : 'en post';
+        let at = 0;
+        if (t.matches('[data-ig-schedule]')) {
+          const when = $('[data-ig-when]', box).value;
+          if (!when) { toast('Choisis la date et l\'heure de publication', 'error'); return; }
+          at = Math.floor(new Date(when).getTime() / 1000); // l'heure saisie est celle de ton navigateur
+          if (!(await confirmBox(`Programmer la publication ${asText} le ${new Date(at * 1000).toLocaleString('fr-FR', { dateStyle: 'full', timeStyle: 'short' })} ?\nLe post sera publié automatiquement et sera visible publiquement par tout le monde.`, { confirm: 'Programmer' }))) return;
+        } else if (!(await confirmBox(`Publier ce post ${asText} sur Instagram ?\nIl sera visible publiquement par tout le monde.`, { confirm: 'Publier' }))) return;
+        t.disabled = true;
+        // Le texte affiché est celui qui part : on l'enregistre d'abord
+        await api(`${base(id, 'instagram')}/edit`, { draftId, body: $('[data-ct-body]', box).value, hashtags: $('[data-ct-tags]', box).value, alt: $('[data-ct-alt]', box).value });
+        if (at) await api(`/api/projects/${id}/instagram/schedule`, { draftId, as, at, confirm: true });
+        else await api(`/api/projects/${id}/instagram/publish`, { draftId, as, confirm: true });
+        toast(at ? 'Publication programmée' : `Post publié sur Instagram`);
+        loadContent(proj, kind);
+      } else if (t.matches('[data-ig-unschedule]')) {
+        t.disabled = true;
+        await api(`/api/projects/${id}/instagram/unschedule`, { draftId });
+        toast('Programmation annulée');
+        loadContent(proj, kind);
+      } else if (t.matches('[data-ig-disconnect]')) {
+        if (!(await confirmBox('Déconnecter le compte Instagram de ce projet ?\nLes brouillons sont conservés ; ce qui était programmé repasse en brouillon.', { danger: true, confirm: 'Déconnecter' }))) return;
+        await api(`/api/projects/${id}/instagram/disconnect`, {});
+        toast('Instagram déconnecté');
+        loadContent(proj, kind);
       } else if (t.matches('[data-ct-pick]')) {
         picked.set(`${id}:${kind}`, Number(t.dataset.ctPick));
         loadContent(proj, kind);
@@ -139,6 +200,15 @@
     d.addEventListener('toggle', () => { if (d.open) loadContent(d.closest('.project'), kind); });
     if (d.open) loadContent(d.closest('.project'), kind);
   }
+
+  // Retour d'Instagram après la connexion : message, puis on nettoie l'adresse
+  (() => {
+    const q = new URLSearchParams(location.search);
+    if (!q.has('ig')) return;
+    history.replaceState(null, '', location.pathname);
+    if (q.get('ig') === 'ok') toast('Compte Instagram relié au projet');
+    else toast(q.get('m') || 'Connexion Instagram impossible', 'error');
+  })();
 
   window.AiTools.loadContent = loadContent;
 })();

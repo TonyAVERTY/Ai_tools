@@ -1264,5 +1264,51 @@ export const MIGRATIONS = [
       ) ${T}`,
     ],
   },
+  {
+    // Instagram : un compte relié par projet (jeton chiffré, valable 60 jours puis renouvelé) ; les brouillons Instagram gardent leur état de publication
+    // (draft | scheduled | publishing | published), le type (post | story), l'heure programmée, l'adresse publique du post et la dernière erreur.
+    name: 'instagram_publish',
+    sqlite: [
+      `CREATE TABLE instagram_accounts (
+        project_id INTEGER PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,
+        ig_user_id TEXT NOT NULL,
+        username TEXT,
+        account_type TEXT,
+        token_enc TEXT NOT NULL,
+        expires_at INTEGER,
+        connected_by INTEGER,
+        created_at INTEGER NOT NULL,
+        refreshed_at INTEGER
+      )`,
+      "ALTER TABLE content_drafts ADD COLUMN status TEXT NOT NULL DEFAULT 'draft'",
+      'ALTER TABLE content_drafts ADD COLUMN publish_as TEXT',
+      'ALTER TABLE content_drafts ADD COLUMN scheduled_at INTEGER',
+      'ALTER TABLE content_drafts ADD COLUMN published_at INTEGER',
+      'ALTER TABLE content_drafts ADD COLUMN remote_id TEXT',
+      'ALTER TABLE content_drafts ADD COLUMN permalink TEXT',
+      'ALTER TABLE content_drafts ADD COLUMN publish_error TEXT',
+    ],
+    mysql: [
+      `CREATE TABLE IF NOT EXISTS instagram_accounts (
+        project_id BIGINT NOT NULL PRIMARY KEY,
+        ig_user_id VARCHAR(40) NOT NULL,
+        username VARCHAR(100) NULL,
+        account_type VARCHAR(40) NULL,
+        token_enc TEXT NOT NULL,
+        expires_at BIGINT NULL,
+        connected_by BIGINT NULL,
+        created_at BIGINT NOT NULL,
+        refreshed_at BIGINT NULL,
+        CONSTRAINT instagram_accounts_project_fk FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+      ) ${T}`,
+      { sql: "ALTER TABLE content_drafts ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT 'draft'", when: colMissing('content_drafts', 'status') },
+      { sql: 'ALTER TABLE content_drafts ADD COLUMN publish_as VARCHAR(10) NULL', when: colMissing('content_drafts', 'publish_as') },
+      { sql: 'ALTER TABLE content_drafts ADD COLUMN scheduled_at BIGINT NULL', when: colMissing('content_drafts', 'scheduled_at') },
+      { sql: 'ALTER TABLE content_drafts ADD COLUMN published_at BIGINT NULL', when: colMissing('content_drafts', 'published_at') },
+      { sql: 'ALTER TABLE content_drafts ADD COLUMN remote_id VARCHAR(100) NULL', when: colMissing('content_drafts', 'remote_id') },
+      { sql: 'ALTER TABLE content_drafts ADD COLUMN permalink VARCHAR(500) NULL', when: colMissing('content_drafts', 'permalink') },
+      { sql: 'ALTER TABLE content_drafts ADD COLUMN publish_error VARCHAR(500) NULL', when: colMissing('content_drafts', 'publish_error') },
+    ],
+  },
 ];
 
