@@ -1265,6 +1265,7 @@ export const MIGRATIONS = [
     ],
   },
   {
+    // (Fonctionnalité retirée : la connexion et la publication Instagram n'existent plus. Cette migration reste, car elle a déjà été appliquée : les tables et colonnes ne sont plus utilisées.)
     // Instagram : un compte relié par projet (jeton chiffré, valable 60 jours puis renouvelé) ; les brouillons Instagram gardent leur état de publication
     // (draft | scheduled | publishing | published), le type (post | story), l'heure programmée, l'adresse publique du post et la dernière erreur.
     name: 'instagram_publish',

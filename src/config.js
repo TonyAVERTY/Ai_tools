@@ -58,34 +58,6 @@ function linkedinConfig(appUrl) {
 }
 
 /**
- * Instagram (publier ou programmer un post ou une story depuis un projet). Facultatif : sans ces trois variables, iaboss reste à « télécharge et publie toi-même ».
- * Deux voies : « Instagram login » (INSTAGRAM_APP_ID + INSTAGRAM_APP_SECRET, la voie simple, sans Facebook ni Page) ou « connexion unifiée » :
- * Application Meta (developers.facebook.com) avec « Facebook Login for Business » : META_APP_ID et META_APP_SECRET (Paramètres de l'application → Général),
- * META_LOGIN_CONFIG_ID (Facebook Login for Business → Configurations : la configuration qui demande instagram_content_publish et un compte Instagram).
- */
-function instagramConfig(appUrl) {
-  // Voie « Instagram login » (l'utilisateur se connecte directement avec Instagram) : INSTAGRAM_APP_ID + INSTAGRAM_APP_SECRET, ceux de l'« API setup with Instagram login »
-  const igId = (env.INSTAGRAM_APP_ID || '').trim();
-  const igSecret = (env.INSTAGRAM_APP_SECRET || '').trim();
-  if (igId || igSecret) {
-    if (!igId || !igSecret) throw new Error('Instagram : INSTAGRAM_APP_ID et INSTAGRAM_APP_SECRET vont ensemble');
-    const apiVersion = (env.META_API_VERSION || 'v23.0').trim();
-    if (!/^v\d{1,2}\.\d$/.test(apiVersion)) throw new Error('Instagram : META_API_VERSION doit ressembler à v23.0');
-    return { mode: 'instagram', appId: igId, appSecret: igSecret, redirectUri: (env.INSTAGRAM_REDIRECT_URI || env.META_REDIRECT_URI || `${appUrl}/instagram/callback`).trim(), apiVersion, publicBase: appUrl };
-  }
-  const appId = (env.META_APP_ID || '').trim();
-  const appSecret = (env.META_APP_SECRET || '').trim();
-  const configId = (env.META_LOGIN_CONFIG_ID || '').trim();
-  if (!appId && !appSecret && !configId) return null;
-  if (!appId || !appSecret || !configId) throw new Error('Instagram : META_APP_ID, META_APP_SECRET et META_LOGIN_CONFIG_ID vont ensemble');
-  if (!/^\d{5,25}$/.test(appId)) throw new Error("Instagram : META_APP_ID doit être l'identifiant numérique de l'application Meta");
-  if (!/^\d{5,25}$/.test(configId)) throw new Error("Instagram : META_LOGIN_CONFIG_ID doit être l'identifiant numérique de la configuration de connexion");
-  const apiVersion = (env.META_API_VERSION || 'v23.0').trim();
-  if (!/^v\d{1,2}\.\d$/.test(apiVersion)) throw new Error('Instagram : META_API_VERSION doit ressembler à v23.0');
-  return { mode: 'meta', appId, appSecret, configId, redirectUri: (env.META_REDIRECT_URI || `${appUrl}/instagram/callback`).trim(), apiVersion, publicBase: appUrl };
-}
-
-/**
  * Paiement des offres (Stripe). Facultatif : sans ces deux variables, les offres restent « Me prévenir à l'ouverture » et un administrateur attribue les plans à la main.
  * STRIPE_SECRET_KEY : clé secrète (sk_test_… pour essayer, sk_live_… en production) ou clé restreinte (rk_…) ; STRIPE_WEBHOOK_SECRET : secret de signature du point
  * d'arrivée des événements (whsec_…). `live` : la clé est-elle une clé de production ?
@@ -184,7 +156,6 @@ export function loadConfig() {
     apple: appleConfig(),
     recaptcha: recaptchaConfig(),
     linkedin: linkedinConfig(required('APP_URL').replace(/\/$/, '')),
-    instagram: instagramConfig(required('APP_URL').replace(/\/$/, '')),
     stripe: stripeConfig(),
     systemSmtp,
     errorSmtp: errorSmtpConfig(systemSmtp),
