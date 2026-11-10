@@ -3,7 +3,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { startApp } from './helpers/server.js';
 import { addProject } from './helpers/users.js';
-import { weekStarts, declarationNote, usageRows, setDone, JOB_LABELS } from '../src/today.js';
+import { weekStarts, declarationNote, usageRows, setDone, JOB_LABELS, jobHref } from '../src/today.js';
 import { now } from '../src/db.js';
 
 let s;
@@ -63,6 +63,7 @@ test('« À traiter » : réponses non lues, actions du jour et tâches IA, chac
   assert.match(home, /Audit du projet/);
   assert.match(home, /Dépôt inaccessible/);
   assert.match(home, /Réessayer/);
+  assert.match(home, new RegExp(`href="/p/${pid}/outils\\?vu=1#acc-audit"`), 'le lien mène à la section du résultat, pas à la liste des projets');
   assert.doesNotMatch(home, /Assistant IA/, 'une conversation n\'est pas une tâche à traiter');
   assert.match(home, /data-today-n="rep">2</);
   assert.match(home, /data-today-n="act">1</);
@@ -128,7 +129,8 @@ test('argent : factures à encaisser (échues en rouge), encaissé du mois, aucu
   const u = await s.newUser({ email: 'argent@x.fr' });
   const other = await s.newUser({ email: 'argent2@x.fr' });
   const pid = await addProject(s.db, u.id, { name: 'Compta', gitUrl: 'https://github.com/u/c.git' });
-  const day = (delta) => new Date(Date.now() + delta * 86400_000).toISOString().slice(0, 10);
+  // Jours en heure de Paris, comme le code testé : en UTC, le décompte « échue depuis N jours » se décalait d'un jour entre minuit à Paris et minuit UTC
+  const day = (delta) => new Date(Date.now() + delta * 86400_000).toLocaleDateString('sv-SE', { timeZone: 'Europe/Paris' });
   const entry = async (kind, pending, cents, date) => Number((await s.db.prepare(`INSERT INTO accounting_entries(user_id, project_id, project_name, kind, entry_date, label, amount_cents, doc_name, doc_mime, doc_size, doc_file, created_at, updated_at, pending)
     VALUES(?, ?, 'Compta', ?, ?, 'x', ?, 'd.pdf', 'application/pdf', 1, 'f', ?, ?, ?)`).run(u.id, pid, kind, date, cents, now(), now(), pending)).lastInsertRowid);
   const inv = async (number, cents, due, entryId) => s.db.prepare(`INSERT INTO billing_invoices(user_id, project_id, project_name, kind, number, issue_date, due_date, client_json, amount_cents, entry_id, pdf_file, pdf_size, created_at)
@@ -196,4 +198,14 @@ test('public/app-today.js ne s\'accroche qu\'à la page Aujourd\'hui : son repè
     assert.doesNotMatch(await text(u, p), /data-today-root/, p);
   }
   assert.match(await text(u, '/'), /data-today-root/);
+});
+
+test('jobHref : chaque tâche mène à la section de son résultat', () => {
+  assert.equal(jobHref('instagram_post', 7), '/p/7/communication?vu=1#acc-instagram');
+  assert.equal(jobHref('newsletter', 7), '/p/7/communication?vu=1#acc-newsletter');
+  assert.equal(jobHref('template', 7), '/p/7/envoi?vu=1#acc-template');
+  assert.equal(jobHref('billing_docs', 7), '/p/7/facturation');
+  assert.equal(jobHref('analyze', 7), '/p/7');
+  assert.equal(jobHref('audit', null), '/projets', 'sans projet : la liste');
+  assert.equal(jobHref('inconnu', 7), '/projets');
 });
