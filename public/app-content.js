@@ -42,21 +42,24 @@
   function instagramDraft(s, d, id) {
     const x = d.extra || {};
     const tags = (x.hashtags || []).join(' ');
-    return `<div class="ct-draft" data-ct-draft="${d.id}">
-      ${d.hasImage ? `<figure class="ct-fig"><img class="ct-img" src="${base(id, 'instagram')}/${d.id}/image" width="${x.width || 1080}" height="${x.height || 1080}" alt="${esc(x.alt || 'Image du post')}">
+    // Image à gauche, texte à droite (une seule colonne sur téléphone) ; le texte alternatif et l'inspiration sont repliés dans « Détails »
+    return `<div class="ct-draft ct-ig-draft" data-ct-draft="${d.id}">
+      ${(x.toCheck || []).length ? `<div class="ban ban-warn ct-ig-ban" role="note"><span><b>À vérifier avant de publier :</b> ${(x.toCheck).map(esc).join(' ; ')}</span></div>` : ''}
+      ${d.hasImage ? `<figure class="ct-fig ct-ig-fig"><img class="ct-img" src="${base(id, 'instagram')}/${d.id}/image" width="${x.width || 1080}" height="${x.height || 1080}" alt="${esc(x.alt || 'Image du post')}">
         <figcaption class="muted small">${esc(x.format === 'portrait' ? 'Portrait 4:5' : x.format === 'story' ? 'Story 9:16' : 'Carré 1:1')} · ${x.width || 1080} × ${x.height || 1080} px${x.score ? ` · note du directeur artistique : ${x.score}/10` : ''}</figcaption></figure>` : ''}
-      ${(x.toCheck || []).length ? `<div class="ban ban-warn" role="note"><span><b>À vérifier avant de publier :</b> ${(x.toCheck).map(esc).join(' ; ')}</span></div>` : ''}
-      <label class="field"><span class="lbl">Légende (modifiable)</span><textarea rows="9" maxlength="${s.limits.caption}" data-ct-body>${esc(d.body)}</textarea></label>
-      <p class="muted small"><span data-ct-count>${d.body.length}</span> / ${s.limits.caption} caractères${d.direction ? ` · direction : « ${esc(d.direction)} »` : ` · sujet choisi par ${esc(aiName())}`}</p>
-      <label class="field"><span class="lbl">Hashtags</span><input data-ct-tags value="${esc(tags)}" maxlength="600" placeholder="#exemple #secteur"></label>
-      <label class="field"><span class="lbl">Texte alternatif de l'image <span class="muted small">(lecteurs d'écran)</span></span><input data-ct-alt value="${esc(x.alt || '')}" maxlength="${s.limits.alt}"></label>
-      ${x.inspiration ? `<details class="ct-insp"><summary>Ce que ${esc(aiName())} a retenu de ton secteur</summary><p class="small">${esc(x.inspiration).replace(/\n/g, '<br>')}</p></details>` : ''}
-      <div class="row-actions">
-        ${d.hasImage ? `<a class="btn primary" href="${base(id, 'instagram')}/${d.id}/image?telecharger=1" data-noajax>Télécharger l'image</a>` : ''}
-        <button type="button" class="btn" data-ct-copy="instagram">Copier la légende</button>
-        <button type="button" class="btn" data-ct-save>Enregistrer</button>
-        <button type="button" class="btn danger" data-ct-delete>Supprimer</button></div>
-      <p class="muted small">iaboss ne publie pas sur Instagram : télécharge l'image, copie la légende et publie depuis l'application Instagram.</p></div>`;
+      <div class="ct-ig-form">
+        <label class="field"><span class="lbl">Légende (modifiable)</span><textarea rows="8" maxlength="${s.limits.caption}" data-ct-body>${esc(d.body)}</textarea></label>
+        <p class="muted small"><span data-ct-count>${d.body.length}</span> / ${s.limits.caption} caractères${d.direction ? ` · direction : « ${esc(d.direction)} »` : ` · sujet choisi par ${esc(aiName())}`}</p>
+        <label class="field"><span class="lbl">Hashtags</span><input data-ct-tags value="${esc(tags)}" maxlength="600" placeholder="#exemple #secteur"></label>
+        <details class="ct-insp ct-more"><summary>Détails : texte alternatif${x.inspiration ? ` et ce que ${esc(aiName())} a retenu de ton secteur` : ''}</summary>
+          <label class="field"><span class="lbl">Texte alternatif de l'image <span class="muted small">(lecteurs d'écran)</span></span><input data-ct-alt value="${esc(x.alt || '')}" maxlength="${s.limits.alt}"></label>
+          ${x.inspiration ? `<p class="small"><b>Ce que ${esc(aiName())} a retenu de ton secteur</b><br>${esc(x.inspiration).replace(/\n/g, '<br>')}</p>` : ''}</details>
+        <div class="row-actions">
+          ${d.hasImage ? `<a class="btn primary" href="${base(id, 'instagram')}/${d.id}/image?telecharger=1" data-noajax>Télécharger l'image</a>` : ''}
+          <button type="button" class="btn" data-ct-copy="instagram">Copier la légende</button>
+          <button type="button" class="btn" data-ct-save>Enregistrer</button>
+          <button type="button" class="btn danger" data-ct-delete>Supprimer</button></div>
+        <p class="muted small">iaboss ne publie pas sur Instagram : télécharge l'image, copie la légende et publie depuis l'application Instagram.</p></div></div>`;
   }
 
   function newsletterDraft(s, d, id) {

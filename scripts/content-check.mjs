@@ -56,6 +56,20 @@ for (const vp of [{ width: 1280, height: 900 }, { width: 390, height: 780 }]) {
   ok(/#fidelite/.test(await p.inputValue('[data-content="instagram"] [data-ct-tags]')), `${tag} les hashtags sont proposés`);
   ok(/Secteur/.test(await p.locator('[data-content="instagram"] .ct-insp').innerText().catch(() => '') + await p.locator('[data-content="instagram"] .ct-insp p').textContent().catch(() => '')), `${tag} ce que l'IA a retenu du secteur est consultable`);
 
+  // Disposition : image à gauche et texte à droite sur grand écran, empilés sur téléphone ; la section Instagram a toute la largeur ; rien ne déborde
+  const g = await p.evaluate(() => {
+    const r = (q) => document.querySelector(q)?.getBoundingClientRect();
+    const f = r('.ct-ig-fig'), t = r('.ct-ig-form'), sec = r('.pj-ig'), grid = r('.pj-grid-c');
+    return { fr: f.right, fy: f.y, tx: t.x, ty: t.y, secW: sec.width, gridW: grid.width, overflow: document.documentElement.scrollWidth > innerWidth + 1 };
+  });
+  if (vp.width >= 900) ok(g.fr <= g.tx + 1 && Math.abs(g.fy - g.ty) < 4, `${tag} l'image est à gauche et le texte à droite, côte à côte`);
+  else ok(g.ty >= g.fy + 100, `${tag} sur téléphone : l'image puis le texte`);
+  ok(Math.abs(g.secW - g.gridW) < 2, `${tag} la section Instagram a toute la largeur de la page`);
+  ok(!g.overflow, `${tag} aucun débordement horizontal`);
+  ok(!(await p.locator('[data-content="instagram"] [data-ct-alt]').isVisible()), `${tag} le texte alternatif est replié dans « Détails »`);
+  await p.locator('[data-content="instagram"] .ct-more > summary').click();
+  ok(await p.locator('[data-content="instagram"] [data-ct-alt]').isVisible(), `${tag} « Détails » déplie le texte alternatif`);
+
   // Modifier, enregistrer, copier
   await p.fill('[data-content="instagram"] [data-ct-body]', 'Ma légende relue, assez longue pour être enregistrée.');
   await p.locator('[data-content="instagram"] [data-ct-save]').click();
