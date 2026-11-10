@@ -58,6 +58,21 @@ function linkedinConfig(appUrl) {
 }
 
 /**
+ * Instagram (publier ou programmer un post ou une story depuis un projet). Facultatif : sans ces deux variables, iaboss reste à « télécharge et publie toi-même ».
+ * Il faut une application sur developers.facebook.com avec le produit « Instagram » (API avec connexion Instagram) ; le compte Instagram relié doit être
+ * professionnel (business ou créateur). INSTAGRAM_APP_ID / INSTAGRAM_APP_SECRET : identifiant et clé secrète de l'application Instagram (pas ceux de l'application Meta).
+ */
+function instagramConfig(appUrl) {
+  const appId = (env.INSTAGRAM_APP_ID || '').trim();
+  const appSecret = (env.INSTAGRAM_APP_SECRET || '').trim();
+  if (!appId && !appSecret) return null;
+  if (!appId || !appSecret) throw new Error('Instagram : INSTAGRAM_APP_ID et INSTAGRAM_APP_SECRET vont ensemble');
+  const apiVersion = (env.INSTAGRAM_API_VERSION || 'v23.0').trim();
+  if (!/^v\d{1,2}\.\d$/.test(apiVersion)) throw new Error('Instagram : INSTAGRAM_API_VERSION doit ressembler à v23.0');
+  return { appId, appSecret, redirectUri: (env.INSTAGRAM_REDIRECT_URI || `${appUrl}/instagram/callback`).trim(), apiVersion, publicBase: appUrl };
+}
+
+/**
  * Paiement des offres (Stripe). Facultatif : sans ces deux variables, les offres restent « Me prévenir à l'ouverture » et un administrateur attribue les plans à la main.
  * STRIPE_SECRET_KEY : clé secrète (sk_test_… pour essayer, sk_live_… en production) ou clé restreinte (rk_…) ; STRIPE_WEBHOOK_SECRET : secret de signature du point
  * d'arrivée des événements (whsec_…). `live` : la clé est-elle une clé de production ?
@@ -156,6 +171,7 @@ export function loadConfig() {
     apple: appleConfig(),
     recaptcha: recaptchaConfig(),
     linkedin: linkedinConfig(required('APP_URL').replace(/\/$/, '')),
+    instagram: instagramConfig(required('APP_URL').replace(/\/$/, '')),
     stripe: stripeConfig(),
     systemSmtp,
     errorSmtp: errorSmtpConfig(systemSmtp),
