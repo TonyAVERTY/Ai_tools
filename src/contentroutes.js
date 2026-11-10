@@ -6,6 +6,7 @@ import { assertCanRunAi } from './claudelink.js';
 import { budgetState } from './services/budget.js';
 import { renderMarkdown } from './services/markdown.js';
 import { stillSupported } from './services/stillimage.js';
+import { instagramAvailable, instagramAccount } from './instagram.js';
 import { KINDS, INSTAGRAM_FORMATS, LIMITS, listDrafts, getDraft, getImage, editDraft, removeDraft } from './contentdrafts.js';
 
 const JOB = { instagram: 'instagram_post', newsletter: 'newsletter' };
@@ -52,6 +53,8 @@ export function registerContentRoutes(router, app, { project, aiOpts }) {
       formats: kind === 'instagram' ? Object.entries(INSTAGRAM_FORMATS).map(([key, f]) => ({ key, label: f.label, width: f.width, height: f.height })) : null,
       limits: { caption: LIMITS.caption, alt: LIMITS.alt, subject: LIMITS.subject, preview: LIMITS.preview, newsletter: LIMITS.newsletter, direction: LIMITS.direction, hashtags: LIMITS.hashtags },
       drafts: await listDrafts(db, p.id, kind),
+      // Publier sur Instagram : activé quand le service a une application Meta ; le compte relié au projet ; qui peut publier (administrateur du projet)
+      instagram: kind === 'instagram' ? { configured: instagramAvailable(cfg), canManage: p.access !== 'member', account: await instagramAccount(db, p.id) } : null,
     });
   });
 

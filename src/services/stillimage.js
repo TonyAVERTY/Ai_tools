@@ -96,3 +96,24 @@ export async function renderStill({ cfg, html, width, height, signal }) {
     return png;
   } finally { await stop(); }
 }
+
+/**
+ * PNG → JPEG (qualité 92, fond blanc). L'API d'Instagram n'accepte que le JPEG pour une image : le PNG dessiné par l'IA est converti au moment de publier.
+ * Chromium charge l'image depuis une adresse data: (aucune requête réseau) et la recapture au format JPEG.
+ */
+export async function pngToJpeg({ cfg, png, width, height, signal }) {
+  const { cdp, stop } = await openBrowser(cfg, { width, height, signal });
+  try {
+    await cdp.send('Page.enable');
+    await cdp.send('Runtime.enable');
+    await cdp.send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false });
+    const { frameTree } = await cdp.send('Page.getFrameTree');
+    const html = `<!doctype html><html><body style="margin:0;background:#fff"><img id="i" src="data:image/png;base64,${Buffer.from(png).toString('base64')}" width="${width}" height="${height}" style="display:block"></body></html>`;
+    await cdp.send('Page.setDocumentContent', { frameId: frameTree.frame.id, html });
+    await cdp.send('Runtime.evaluate', { expression: 'new Promise((r) => { const i = document.getElementById("i"); i.decode().then(r, r); })', awaitPromise: true, returnByValue: true }, STILL.timeoutMs);
+    const s = await cdp.send('Page.captureScreenshot', { format: 'jpeg', quality: 92, fromSurface: true, clip: { x: 0, y: 0, width, height, scale: 1 } }, STILL.timeoutMs);
+    const jpg = Buffer.from(s.data, 'base64');
+    if (jpg.length < 2000) throw new Error("La conversion de l'image en JPEG a échoué");
+    return jpg;
+  } finally { await stop(); }
+}

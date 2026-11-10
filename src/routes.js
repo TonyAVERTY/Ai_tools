@@ -40,6 +40,7 @@ import { feedToken, feedUrl } from './services/ical.js';
 import { developerMode } from './apitokens.js';
 import { registerLinkedinRoutes } from './linkedinroutes.js';
 import { registerContentRoutes } from './contentroutes.js';
+import { registerInstagramRoutes } from './instagramroutes.js';
 import { registerSubscriptionRoutes } from './subscriptionroutes.js';
 import { subscriptionOf, billingView } from './subscriptions.js';
 import { stripeCall } from './services/stripe.js';
@@ -111,6 +112,7 @@ export function registerRoutes(router, app) {
   registerMailRoutes(router, app);
   registerLinkedinRoutes(router, app, { project, aiOpts });
   registerContentRoutes(router, app, { project, aiOpts });
+  registerInstagramRoutes(router, app, { project });
   registerSubscriptionRoutes(router, app);
   registerPromoRoutes(router, app, { project, aiOpts });
   registerPosteRoutes(router, app, { project, aiOpts });
