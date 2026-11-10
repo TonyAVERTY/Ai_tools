@@ -128,7 +128,8 @@ test('argent : factures à encaisser (échues en rouge), encaissé du mois, aucu
   const u = await s.newUser({ email: 'argent@x.fr' });
   const other = await s.newUser({ email: 'argent2@x.fr' });
   const pid = await addProject(s.db, u.id, { name: 'Compta', gitUrl: 'https://github.com/u/c.git' });
-  const day = (delta) => new Date(Date.now() + delta * 86400_000).toISOString().slice(0, 10);
+  // Jours en heure de Paris, comme le code testé : en UTC, le décompte « échue depuis N jours » se décalait d'un jour entre minuit à Paris et minuit UTC
+  const day = (delta) => new Date(Date.now() + delta * 86400_000).toLocaleDateString('sv-SE', { timeZone: 'Europe/Paris' });
   const entry = async (kind, pending, cents, date) => Number((await s.db.prepare(`INSERT INTO accounting_entries(user_id, project_id, project_name, kind, entry_date, label, amount_cents, doc_name, doc_mime, doc_size, doc_file, created_at, updated_at, pending)
     VALUES(?, ?, 'Compta', ?, ?, 'x', ?, 'd.pdf', 'application/pdf', 1, 'f', ?, ?, ?)`).run(u.id, pid, kind, date, cents, now(), now(), pending)).lastInsertRowid);
   const inv = async (number, cents, due, entryId) => s.db.prepare(`INSERT INTO billing_invoices(user_id, project_id, project_name, kind, number, issue_date, due_date, client_json, amount_cents, entry_id, pdf_file, pdf_size, created_at)
