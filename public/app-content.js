@@ -24,7 +24,7 @@
       <button type="button" class="btn small" data-ct-pick="${d.id}">Reprendre</button></li>`).join('')}</ul></details>`;
   }
 
-  function generator(s, kind, draft) {
+  function generator(s, kind, draft, id) {
     if (!s.hasProfile) return `<p class="muted small">Analyse le projet d'abord : ${esc(aiName())} s'appuie sur la fiche projet.</p>`;
     if (!s.supported) return `<p class="warn small">${esc(s.unsupportedReason || 'Cette fonction n\'est pas disponible sur ce serveur.')}</p>`;
     const formats = s.formats ? `<label class="field ct-format"><span class="lbl">Format de l'image</span><span class="sel"><select data-ct-format>${s.formats.map((f) => `<option value="${esc(f.key)}">${esc(f.label)} (${f.width} × ${f.height})</option>`).join('')}</select></span></label>` : '';
@@ -35,11 +35,22 @@
     return `<div class="ct-gen"><label class="field"><span class="lbl">De quoi doit parler ${what} ? <span class="muted small">(facultatif)</span></span>
         <textarea rows="3" maxlength="${s.limits.direction}" data-ct-direction placeholder="Ex. : une nouveauté, un conseil pour mes clients, un cas d'usage… Laisse vide : ${esc(aiName())} choisit un angle."></textarea></label>
       ${formats}
-      <div class="row-actions"><button type="button" class="btn primary" data-ct-generate>${draft ? `Régénérer ${kind === 'instagram' ? 'un autre post' : 'une autre newsletter'}` : `Générer ${kind === 'instagram' ? 'un post' : 'une newsletter'}`}</button></div>
+      <div class="row-actions"><button type="button" class="btn primary" data-ct-generate>${draft ? `Régénérer ${kind === 'instagram' ? 'un autre post' : 'une autre newsletter'}` : `Générer ${kind === 'instagram' ? 'un post' : 'une newsletter'}`}</button>${kind === 'instagram' ? connectInline(s, id) : ''}</div>
+      ${kind === 'instagram' && s.instagram?.configured && !s.instagram.account && s.instagram.canManage ? '<p class="muted small">Compte Instagram professionnel (business ou créateur) : tu publies ensuite en post ou en story, tout de suite ou programmé.</p>' : ''}
       <p class="muted small">${hint}</p></div>`;
   }
 
   const parisDay = (ts) => new Date(ts * 1000).toLocaleString('fr-FR', { dateStyle: 'full', timeStyle: 'short', timeZone: 'Europe/Paris' });
+
+  // Même rangée que « Générer un post » : relier, reconnecter ou déconnecter le compte Instagram du projet
+  function connectInline(s, id) {
+    const ig = s.instagram;
+    if (!ig?.configured) return '';
+    const acc = ig.account;
+    if (!acc) return ig.canManage ? `<a class="btn" href="/instagram/connect?project=${id}" data-noajax data-ig-conn>Connecter Instagram</a>` : '<span class="muted small" data-ig-conn>Demande à un administrateur du projet de relier Instagram.</span>';
+    return `<span class="ig-who small" data-ig-conn><span class="badge ${acc.expired ? 'warn' : 'ok'}">${acc.expired ? 'connexion expirée' : 'connecté'}</span> <strong>@${esc(acc.username || 'compte Instagram')}</strong></span>
+      ${ig.canManage ? `${acc.expired ? `<a class="btn" href="/instagram/connect?project=${id}" data-noajax>Reconnecter</a>` : ''}<button type="button" class="btn danger" data-ig-disconnect>Déconnecter</button>` : ''}`;
+  }
 
   // Barre de connexion, toujours visible en haut de la section (même sans brouillon) : relier, reconnecter ou déconnecter le compte Instagram du projet
   function connectBar(s, id) {
@@ -125,7 +136,7 @@
     if (box.contains(document.activeElement) && document.activeElement.matches('textarea, input')) return;
     const draft = current(s, id, kind);
     box.dataset.kind = kind;
-    box.innerHTML = `${kind === 'instagram' ? connectBar(s, id) : ''}${generator(s, kind, draft)}${draft ? (kind === 'instagram' ? instagramDraft(s, draft, id) : newsletterDraft(s, draft, id)) : ''}${history(s, draft, kind)}`;
+    box.innerHTML = `${kind === 'instagram' && !(s.hasProfile && s.supported) ? connectBar(s, id) : ''}${generator(s, kind, draft, id)}${draft ? (kind === 'instagram' ? instagramDraft(s, draft, id) : newsletterDraft(s, draft, id)) : ''}${history(s, draft, kind)}`;
     box._state = s;
   }
 

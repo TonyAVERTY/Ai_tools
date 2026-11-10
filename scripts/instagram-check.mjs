@@ -12,6 +12,7 @@ const IG = { appId: 'a', appSecret: 'b', redirectUri: 'https://x.fr/instagram/ca
 const s = await startApp({ cfg: { instagram: IG } });
 s.app.toJpeg = async () => Buffer.from('ffd8ffe000104a46494600010100000100010000ffd9', 'hex');
 s.app.instagramPollMs = 0;
+s.app.stillSupported = () => ({ ok: true });
 const sent = [];
 s.app.fetch = async (url, init = {}) => {
   const u = String(url); sent.push(u);
@@ -24,6 +25,7 @@ s.app.fetch = async (url, init = {}) => {
 };
 const u = await s.newUser({ email: 'ig@x.fr' });
 const pid = await addProject(s.db, u.id, { name: 'Cartes Fidèles' });
+await s.db.prepare('UPDATE projects SET profile_json = ? WHERE id = ?').run(JSON.stringify({ resume: 'Cartes de fidélité.', proposition_valeur: 'Sans carton.', arguments: ['simple'] }), pid);
 const draft = () => saveDraft(s.db, pid, 'instagram', { body: 'Ma légende', extra: { hashtags: ['#a'], format: 'carre', width: 1080, height: 1080 }, image: PNG });
 await draft();
 const b = await chromium.launch(process.env.PLAYWRIGHT_CHROMIUM ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM } : {});
@@ -40,11 +42,14 @@ for (const vp of [{ width: 1280, height: 900 }, { width: 390, height: 780 }]) {
   await s.db.prepare("UPDATE content_drafts SET kind = 'masque'").run();
   await p.goto(`${s.base}/p/${pid}/communication`);
   await p.waitForSelector('[data-content="instagram"] [data-ig-conn]');
-  ok(await p.locator('[data-ig-conn] a', { hasText: 'Connecter Instagram' }).isVisible() && !(await p.locator('[data-ig-pub]').count()), `${tag} sans brouillon : « Connecter Instagram » est visible en haut de la section`);
+  ok(await p.locator('[data-ig-conn]', { hasText: 'Connecter Instagram' }).isVisible() && !(await p.locator('[data-ig-pub]').count()), `${tag} sans brouillon : « Connecter Instagram » est visible`);
+  // Même niveau que « Générer un post » : même rangée, même ligne sur grand écran
+  const lv = await p.evaluate(() => { const a = document.querySelector('[data-ct-generate]').getBoundingClientRect(), b = document.querySelector('a[data-ig-conn]').getBoundingClientRect(); return { dy: Math.abs(a.y + a.height / 2 - (b.y + b.height / 2)), dh: Math.abs(a.height - b.height), same: document.querySelector('[data-ct-generate]').parentElement === document.querySelector('a[data-ig-conn]').parentElement }; });
+  ok(lv.same && lv.dh <= 1 && (vp.width < 500 || lv.dy <= 2), `${tag} « Connecter Instagram » est dans la même rangée que « Générer un post », à la même hauteur (écart ${Math.round(lv.dy)} px)`);
   await s.db.prepare("UPDATE content_drafts SET kind = 'instagram'").run();
   await p.goto(`${s.base}/p/${pid}/communication`);
   await p.waitForSelector('[data-content="instagram"] [data-ig-conn]');
-  ok(await p.locator('[data-ig-conn] a', { hasText: 'Connecter Instagram' }).getAttribute('href') === `/instagram/connect?project=${pid}`, `${tag} sans compte : « Connecter Instagram » vise la connexion`);
+  ok(await p.locator('a[data-ig-conn]', { hasText: 'Connecter Instagram' }).getAttribute('href') === `/instagram/connect?project=${pid}`, `${tag} sans compte : « Connecter Instagram » vise la connexion`);
   ok(!(await p.locator('[data-ig-publish]').count()), `${tag} sans compte : pas de bouton Publier`);
   // Compte relié (la connexion OAuth elle-même est testée côté serveur)
   await s.db.prepare('INSERT INTO instagram_accounts(project_id, ig_user_id, username, account_type, token_enc, expires_at, connected_by, created_at) VALUES(?, ?, ?, ?, ?, ?, ?, ?)')
