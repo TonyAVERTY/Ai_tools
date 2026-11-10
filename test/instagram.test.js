@@ -9,14 +9,14 @@ import { decrypt } from '../src/crypto.js';
 import { saveDraft } from '../src/contentdrafts.js';
 import { publishDueInstagram, refreshInstagramTokens } from '../src/instagram.js';
 
-const IG = { appId: 'ig-app', appSecret: 'ig-secret', redirectUri: 'https://ai.tony-averty.dev/instagram/callback', apiVersion: 'v23.0', publicBase: 'https://ai.tony-averty.dev' };
-const LONG = 'IGAA-long-token-0123456789';
+const IG = { appId: '1805917243982329', appSecret: 'ig-secret', configId: '2203028057765474', redirectUri: 'https://ai.tony-averty.dev/instagram/callback', apiVersion: 'v23.0', publicBase: 'https://ai.tony-averty.dev' };
+const LONG = 'EAAB-long-token-0123456789';
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
 const JPG = Buffer.from('ffd8ffe000104a46494600010100000100010000ffd9', 'hex');
 let s, off;
 let calls = [];
 let reply = {};
-let account = { user_id: '1784140000', username: 'cafe_bzh', account_type: 'BUSINESS' };
+const GRANTED = () => ({ data: { scopes: ['instagram_basic', 'instagram_content_publish', 'pages_show_list'], granular_scopes: [{ scope: 'instagram_basic', target_ids: ['1784140000'] }, { scope: 'instagram_content_publish', target_ids: ['1784140000'] }], expires_at: Math.floor(Date.now() / 1000) + 5183944 } });
 let mediaSeen = null;
 
 before(async () => {
@@ -29,10 +29,11 @@ before(async () => {
     const body = init.body ? Object.fromEntries(new URLSearchParams(String(init.body))) : null;
     calls.push({ url: u, body });
     const res = (o) => ({ ok: (o.status ?? 200) < 400, status: o.status ?? 200, headers: { get: () => null }, json: async () => o.json ?? {} });
-    if (u.startsWith('https://api.instagram.com/oauth/access_token')) return res(reply.token ?? { json: { data: [{ access_token: 'IGAA-short', user_id: 1784140000, permissions: 'instagram_business_basic,instagram_business_content_publish' }] } });
-    if (u.includes('/access_token?') && u.includes('ig_exchange_token')) return res(reply.long ?? { json: { access_token: LONG, token_type: 'bearer', expires_in: 5183944 } });
-    if (u.includes('/refresh_access_token')) return res(reply.refresh ?? { json: { access_token: 'IGAA-refreshed', expires_in: 5183944 } });
-    if (/\/v23\.0\/me\?/.test(u)) return res(reply.me ?? { json: account });
+    if (u.includes('/oauth/access_token?') && u.includes('fb_exchange_token')) return res(reply.long ?? { json: { access_token: LONG, token_type: 'bearer', expires_in: 5183944 } });
+    if (u.includes('/oauth/access_token?')) return res(reply.token ?? { json: { access_token: 'EAAB-short', token_type: 'bearer', expires_in: 3600 } });
+    if (u.includes('/debug_token?')) return res(reply.debug ?? { json: GRANTED() });
+    if (u.includes('/me/accounts?')) return res(reply.accounts ?? { json: { data: [] } });
+    if (/\/1784140000\?fields=username/.test(u)) return res(reply.me ?? { json: { username: 'cafe_bzh', id: '1784140000' } });
     if (/\/media$/.test(u)) {
       // Instagram va chercher l'image à l'adresse donnée : elle doit être servie, sans session, en JPEG
       const img = await fetch(body.image_url.replace(IG.publicBase, s.base));
@@ -51,7 +52,7 @@ const jar = (r) => r.headers.getSetCookie().find((c) => c.startsWith('ig_oauth_b
 const goto = (u, path, cookie) => fetch(`${s.base}${path}`, { redirect: 'manual', headers: { cookie: [u.cookie, cookie].filter(Boolean).join('; '), accept: 'text/html' } });
 const location = (r) => decodeURIComponent(r.headers.get('location').replace(/\+/g, ' '));
 const row = (sql, ...a) => s.db.prepare(sql).get(...a);
-const reset = () => { calls = []; reply = {}; mediaSeen = null; account = { user_id: '1784140000', username: 'cafe_bzh', account_type: 'BUSINESS' }; };
+const reset = () => { calls = []; reply = {}; mediaSeen = null; };
 
 async function setup() {
   reset();
@@ -68,18 +69,21 @@ async function connect(u, p, query = {}) {
 const draft = (p, extra = {}, body = 'Une légende pour le café.') => saveDraft(s.db, p, 'instagram', { body, extra: { hashtags: ['#cafe', '#bzh'], format: 'carre', width: 1080, height: 1080, ...extra }, image: PNG });
 const view = async (u, p) => (await (await u.get(`/api/projects/${p}/content/instagram`)).json());
 
-test('configuration : les deux clés ensemble, sinon Instagram est désactivé', async () => {
+test('configuration : les trois variables Meta ensemble, sinon Instagram est désactivé', async () => {
   const base = { APP_URL: 'https://x.fr', SECRET_KEY: 'a'.repeat(64), GOOGLE_CLIENT_ID: 'g', GOOGLE_CLIENT_SECRET: 's', DB_DRIVER: 'sqlite' };
   const keep = { ...process.env };
   const withEnv = (extra, fn) => {
-    for (const k of ['INSTAGRAM_APP_ID', 'INSTAGRAM_APP_SECRET', 'INSTAGRAM_REDIRECT_URI', 'INSTAGRAM_API_VERSION']) delete process.env[k];
+    for (const k of ['META_APP_ID', 'META_APP_SECRET', 'META_LOGIN_CONFIG_ID', 'META_REDIRECT_URI', 'META_API_VERSION']) delete process.env[k];
     Object.assign(process.env, base, extra);
     try { return fn(); } finally { for (const k of Object.keys(process.env)) if (!(k in keep)) delete process.env[k]; Object.assign(process.env, keep); }
   };
+  const ok = { META_APP_ID: '1805917243982329', META_APP_SECRET: 'b', META_LOGIN_CONFIG_ID: '2203028057765474' };
   assert.equal(withEnv({}, () => loadConfig().instagram), null);
-  assert.deepEqual(withEnv({ INSTAGRAM_APP_ID: 'a', INSTAGRAM_APP_SECRET: 'b' }, () => loadConfig().instagram), { appId: 'a', appSecret: 'b', redirectUri: 'https://x.fr/instagram/callback', apiVersion: 'v23.0', publicBase: 'https://x.fr' });
-  assert.throws(() => withEnv({ INSTAGRAM_APP_ID: 'a' }, loadConfig), /vont ensemble/);
-  assert.throws(() => withEnv({ INSTAGRAM_APP_ID: 'a', INSTAGRAM_APP_SECRET: 'b', INSTAGRAM_API_VERSION: 'latest' }, loadConfig), /INSTAGRAM_API_VERSION/);
+  assert.deepEqual(withEnv(ok, () => loadConfig().instagram), { appId: '1805917243982329', appSecret: 'b', configId: '2203028057765474', redirectUri: 'https://x.fr/instagram/callback', apiVersion: 'v23.0', publicBase: 'https://x.fr' });
+  assert.throws(() => withEnv({ META_APP_ID: '1805917243982329' }, loadConfig), /vont ensemble/);
+  assert.throws(() => withEnv({ ...ok, META_LOGIN_CONFIG_ID: '' }, loadConfig), /vont ensemble/);
+  assert.throws(() => withEnv({ ...ok, META_APP_ID: 'abc' }, loadConfig), /META_APP_ID/);
+  assert.throws(() => withEnv({ ...ok, META_API_VERSION: 'latest' }, loadConfig), /META_API_VERSION/);
 });
 
 test('sans clés Instagram : la section le dit, la connexion et la publication sont refusées', async () => {
@@ -91,27 +95,30 @@ test('sans clés Instagram : la section le dit, la connexion et la publication s
   assert.equal((await owner.post(`/api/projects/${p}/instagram/publish`, { draftId: 1, confirm: true })).status, 503);
 });
 
-test('connexion : vers Instagram avec les bons droits, retour contrôlé, jeton chiffré, compte professionnel exigé', async () => {
+test('connexion : vers Meta avec la configuration, retour contrôlé, jeton chiffré, compte et droit exigés', async () => {
   const { owner, p } = await setup();
   assert.equal((await view(owner, p)).instagram.account, null);
   const start = await goto(owner, `/instagram/connect?project=${p}`);
   const loc = new URL(start.headers.get('location'));
-  assert.equal(loc.origin + loc.pathname, 'https://www.instagram.com/oauth/authorize');
+  assert.equal(loc.origin + loc.pathname, 'https://www.facebook.com/v23.0/dialog/oauth');
   assert.equal(loc.searchParams.get('client_id'), IG.appId);
   assert.equal(loc.searchParams.get('redirect_uri'), IG.redirectUri);
-  assert.equal(loc.searchParams.get('scope'), 'instagram_business_basic,instagram_business_content_publish');
+  assert.equal(loc.searchParams.get('config_id'), IG.configId, 'les droits viennent de la configuration de connexion');
+  assert.equal(loc.searchParams.get('response_type'), 'code');
+  assert.equal(loc.searchParams.get('scope'), null);
   assert.match(start.headers.getSetCookie().find((c) => c.startsWith('ig_oauth_b=')), /HttpOnly/);
 
   const st = loc.searchParams.get('state');
-  const ok = await goto(owner, `/instagram/callback?code=c1%23_&state=${st}`, jar(start));
+  const ok = await goto(owner, `/instagram/callback?code=c1&state=${st}`, jar(start));
   assert.equal(location(ok), `/p/${p}/communication?ig=ok`);
   const acc = (await view(owner, p)).instagram.account;
   assert.equal(acc.username, 'cafe_bzh');
   assert.equal(acc.userId, '1784140000');
   assert.equal(acc.expired, false);
-  // Le code a été échangé sans le suffixe « #_ », le jeton de 60 jours demandé avec le secret
-  assert.equal(calls.find((c) => c.url.startsWith('https://api.instagram.com/oauth/access_token')).body.code, 'c1');
-  assert.ok(calls.some((c) => c.url.includes('ig_exchange_token') && c.url.includes('client_secret=ig-secret')));
+  // Le code est échangé, puis le jeton de 60 jours demandé avec le secret, puis les droits et le compte lus chez Meta
+  assert.ok(calls.some((c) => c.url.includes('/oauth/access_token?') && c.url.includes('code=c1') && !c.url.includes('fb_exchange_token')));
+  assert.ok(calls.some((c) => c.url.includes('fb_exchange_token=EAAB-short') && c.url.includes('client_secret=ig-secret')));
+  assert.ok(calls.some((c) => c.url.includes('/debug_token?') && c.url.includes(`access_token=${IG.appId}%7Cig-secret`)));
   // Jeton chiffré en base, jamais renvoyé par l'API
   const enc = (await row('SELECT token_enc FROM instagram_accounts WHERE project_id = ?', p)).token_enc;
   assert.ok(!enc.includes(LONG));
@@ -120,9 +127,17 @@ test('connexion : vers Instagram avec les bons droits, retour contrôlé, jeton 
   // Le state est à usage unique
   assert.match(location(await goto(owner, `/instagram/callback?code=c1&state=${st}`, jar(start))), /ig=error/);
 
-  // Un compte personnel est refusé, avec le remède
-  reset(); account = { user_id: '1', username: 'perso', account_type: 'PERSONAL' };
-  assert.match(location(await connect(owner, p)), /ig=error&m=Ce compte Instagram est personnel/);
+  // Aucun compte Instagram autorisé : refusé, avec le remède
+  reset(); reply.debug = { json: { data: { scopes: ['instagram_content_publish'], granular_scopes: [], expires_at: 0 } } };
+  assert.match(location(await connect(owner, p)), /ig=error&m=Aucun compte Instagram professionnel/);
+  // Le compte retrouvé par la Page Facebook quand la configuration ne désigne aucun élément
+  reset(); reply.debug = { json: { data: { scopes: ['instagram_content_publish'], granular_scopes: [], expires_at: 0 } } };
+  reply.accounts = { json: { data: [{ id: '1', instagram_business_account: { id: '1784140000', username: 'cafe_bzh' } }] } };
+  assert.equal(location(await connect(owner, p)), `/p/${p}/communication?ig=ok`);
+  assert.equal((await view(owner, p)).instagram.account.expiresAt, null, 'un jeton qui n\'expire pas (expires_at 0) n\'a pas de date');
+  // Le droit de publier n'a pas été accordé
+  reset(); reply.debug = { json: { data: { scopes: ['instagram_basic'], granular_scopes: [{ scope: 'instagram_basic', target_ids: ['1784140000'] }] } } };
+  assert.match(location(await connect(owner, p)), /instagram_content_publish/);
 });
 
 test('connexion : autre navigateur, autre compte, refus et annulation sont refusés', async () => {
@@ -268,13 +283,14 @@ test('jeton : renouvelé quand il expire dans moins de 10 jours, pas avant ; un 
   calls = [];
   assert.deepEqual(await refreshInstagramTokens(s.app, { at: t + 86400 * 2 }), { refreshed: 0, failed: 0 }, 'trop tôt : il lui reste ~58 jours');
   await s.db.prepare('UPDATE instagram_accounts SET expires_at = ?, refreshed_at = ? WHERE project_id = ?').run(t + 5 * 86400, t - 3 * 86400, p);
+  reply.long = { json: { access_token: 'EAAB-refreshed', expires_in: 5183944 } };
   assert.deepEqual(await refreshInstagramTokens(s.app, { at: t }), { refreshed: 1, failed: 0 });
   const r = await row('SELECT token_enc, expires_at FROM instagram_accounts WHERE project_id = ?', p);
-  assert.equal(decrypt(s.app.cfg.secretKey, r.token_enc), 'IGAA-refreshed');
+  assert.equal(decrypt(s.app.cfg.secretKey, r.token_enc), 'EAAB-refreshed');
   assert.ok(r.expires_at > t + 50 * 86400);
   // Échec : prévenu, et pas de nouvel essai avant 24 h
   await s.db.prepare('UPDATE instagram_accounts SET expires_at = ?, refreshed_at = ? WHERE project_id = ?').run(t + 5 * 86400, t - 3 * 86400, p);
-  reply.refresh = { status: 400, json: { error: { message: 'token invalide', code: 190 } } };
+  reply.long = { status: 400, json: { error: { message: 'token invalide', code: 190 } } };
   assert.deepEqual(await refreshInstagramTokens(s.app, { at: t }), { refreshed: 0, failed: 1 });
   assert.deepEqual(await refreshInstagramTokens(s.app, { at: t + 3600 }), { refreshed: 0, failed: 0 });
 });

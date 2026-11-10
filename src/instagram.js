@@ -1,5 +1,6 @@
-// Instagram : un compte professionnel relié à un projet (API « Instagram avec connexion Instagram », OAuth 2, jeton chiffré), puis publication ou
-// programmation d'un post ou d'une story à partir d'un brouillon de la section Communication. Rien ne part sans un clic explicite d'un administrateur.
+// Instagram : un compte professionnel relié à un projet par la « connexion unifiée » de Meta (Facebook Login for Business : une configuration choisit les droits
+// et le compte Instagram ; OAuth 2, jeton chiffré), puis publication ou programmation d'un brouillon de la section Communication (post ou story).
+// Rien ne part sans un clic explicite d'un administrateur.
 // Publier se fait en trois temps : créer un « conteneur » média (Instagram va chercher l'image à une adresse publique), attendre qu'il soit prêt, le publier.
 // L'API n'accepte que le JPEG : le PNG du brouillon est converti, puis servi quelques minutes sous une adresse secrète (/ig-media/<jeton>.jpg).
 import { createHash, timingSafeEqual } from 'node:crypto';
@@ -10,10 +11,9 @@ import { notify } from './services/notify.js';
 import { pngToJpeg } from './services/stillimage.js';
 import { INSTAGRAM_FORMATS, getDraft, getImage } from './contentdrafts.js';
 
-const AUTH_URL = 'https://www.instagram.com/oauth/authorize';
-const TOKEN_URL = 'https://api.instagram.com/oauth/access_token';
-const GRAPH = 'https://graph.instagram.com';
-export const SCOPES = ['instagram_business_basic', 'instagram_business_content_publish'];
+const DIALOG = 'https://www.facebook.com';
+const GRAPH = 'https://graph.facebook.com';
+export const NEEDED = ['instagram_content_publish']; // droit exigé dans la configuration de connexion de l'application Meta
 const STATE_TTL = 600;
 const COOKIE = 'ig_oauth_b';
 const COOKIE_PATH = '/instagram';
@@ -22,7 +22,7 @@ const REFRESH_WITHIN = 10 * 86400;  // un jeton (60 jours) est renouvelé quand 
 const REFRESH_AFTER = 86400;        // Instagram ne renouvelle un jeton qu'après 24 h
 export const SCHEDULE_MIN_SECONDS = 5 * 60;
 export const SCHEDULE_MAX_SECONDS = 75 * 86400; // l'API d'Instagram ne garde pas de programmation : c'est iaboss qui publie, au plus ~75 jours plus tard
-export const NOT_CONFIGURED = "Instagram n'est pas activé sur ce service (l'administrateur doit renseigner INSTAGRAM_APP_ID et INSTAGRAM_APP_SECRET).";
+export const NOT_CONFIGURED = "Instagram n'est pas activé sur ce service (l'administrateur doit renseigner META_APP_ID, META_APP_SECRET et META_LOGIN_CONFIG_ID).";
 
 const hashBind = (v) => createHash('sha256').update(String(v)).digest('hex');
 const fail = (status, message) => new HttpError(status, message, { expose: true });
@@ -73,18 +73,18 @@ export async function graphError(r, what) {
   if (r.status === 401 || code === 190) return fail(400, 'Instagram a refusé le jeton (expiré ou révoqué) : reconnecte le compte.');
   if (code === 4 || code === 17 || code === 32 || code === 613 || r.status === 429) return fail(429, 'Instagram limite les appels : réessaie plus tard.');
   if (code === 9 || /limit/i.test(why) && /publish|post/i.test(why)) return fail(400, `Instagram limite le nombre de publications par jour${why ? ` (${why})` : ''} : réessaie demain.`);
-  if (code === 10 || code === 200 || r.status === 403) return fail(400, `Instagram refuse l'action (${what}) : l'application n'a pas le droit de publier (instagram_business_content_publish), ou le compte n'est pas professionnel${why ? ` — ${why}` : ''}.`);
+  if (code === 10 || code === 200 || r.status === 403) return fail(400, `Instagram refuse l'action (${what}) : l'application n'a pas le droit de publier (instagram_content_publish), ou le compte n'est pas professionnel${why ? ` — ${why}` : ''}.`);
   if (code === 9004 || code === 9007 || (code === 100 && Number(e.error_subcode) >= 2207000)) return fail(400, `Instagram n'a pas accepté l'image${why ? ` : ${why}` : ''}. Vérifie son format et que le service est joignable depuis Internet.`);
   return fail(502, `Instagram n'a pas répondu normalement (${what}, HTTP ${r.status}${why ? ` : ${why}` : ''}). Réessaie plus tard.`);
 }
 
-/** Retour d'Instagram refusant la connexion : la cause et le remède. */
+/** Retour de Meta refusant la connexion : la cause et le remède. */
 export function refusalMessage(code, why, redirectUri) {
   if (code === 'access_denied') return 'Connexion Instagram annulée (ou refusée).';
-  if (/redirect/i.test(`${code} ${why}`)) return `Instagram refuse l'adresse de retour. Dans developers.facebook.com → ton application → Instagram → Configuration de l'API avec la connexion Instagram → « Configurer la connexion d'entreprise », ajoute exactement cette adresse dans « URL de redirection OAuth » : ${redirectUri}`;
-  if (/invalid_client|unauthorized_client/i.test(code)) return "Instagram ne reconnaît pas l'application : vérifie INSTAGRAM_APP_ID et INSTAGRAM_APP_SECRET dans le .env du serveur (ceux de l'application Instagram, pas ceux de l'application Meta).";
-  if (/scope/i.test(`${code} ${why}`)) return "Instagram refuse un des droits demandés : ajoute le produit « Instagram » à l'application et les droits instagram_business_basic et instagram_business_content_publish.";
-  return `Instagram a refusé la connexion (${code}${why ? ` : ${why}` : ''}).`;
+  if (/redirect/i.test(`${code} ${why}`)) return `Meta refuse l'adresse de retour. Dans developers.facebook.com → ton application → Facebook Login for Business → Paramètres, ajoute exactement cette adresse dans « URI de redirection OAuth valides » : ${redirectUri}`;
+  if (/config/i.test(`${code} ${why}`)) return "Meta ne reconnaît pas la configuration de connexion : vérifie META_LOGIN_CONFIG_ID (Facebook Login for Business → Configurations) dans le .env du serveur.";
+  if (/invalid_client|unauthorized_client|app/i.test(`${code} ${why}`)) return "Meta ne reconnaît pas l'application : vérifie META_APP_ID et META_APP_SECRET dans le .env du serveur (ceux de l'application Meta, dans Paramètres de l'application → Général).";
+  return `Meta a refusé la connexion (${code}${why ? ` : ${why}` : ''}).`;
 }
 
 // ---------- Connexion OAuth ----------
@@ -98,8 +98,9 @@ export async function startInstagram(app, userId, projectId, res) {
   await db.prepare('INSERT INTO oauth_states(state, provider, verifier, nonce, binding, created_at) VALUES(?, ?, ?, ?, ?, ?)')
     .run(state, 'instagram', 'none', `${Number(userId)}:${Number(projectId)}`, hashBind(bind), now());
   setCookie(res, COOKIE, bind, { maxAge: STATE_TTL, path: COOKIE_PATH });
-  const q = new URLSearchParams({ client_id: cfg.instagram.appId, redirect_uri: cfg.instagram.redirectUri, response_type: 'code', scope: SCOPES.join(','), state });
-  redirect(res, `${AUTH_URL}?${q}`);
+  // Les droits et les éléments (compte Instagram) viennent de la configuration de connexion (config_id), pas d'une liste de scopes
+  const q = new URLSearchParams({ client_id: cfg.instagram.appId, redirect_uri: cfg.instagram.redirectUri, response_type: 'code', config_id: cfg.instagram.configId, override_default_response_type: 'true', state });
+  redirect(res, `${DIALOG}/${cfg.instagram.apiVersion}/dialog/oauth?${q}`);
 }
 
 /**
@@ -130,35 +131,53 @@ export async function finishInstagram(app, userId, params, req, res, checkAccess
   if (!bind || a.length !== b.length || !timingSafeEqual(a, b)) throw fail(400, 'Connexion lancée depuis un autre navigateur : recommence.');
   await checkAccess(projectId);
 
-  // Instagram renvoie parfois « # _ » collé au code
-  const code = String(params.get('code')).replace(/#_$/, '');
-  const tok = await call(app, TOKEN_URL, {
-    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ client_id: cfg.instagram.appId, client_secret: cfg.instagram.appSecret, grant_type: 'authorization_code', redirect_uri: cfg.instagram.redirectUri, code }),
-  }, 'échange du code');
-  if (!tok.ok) throw fail(tok.status >= 500 ? 502 : 400, "Instagram a refusé le code (expiré ou déjà utilisé) ou l'adresse de retour ne correspond pas. Recommence.");
+  const v = `${GRAPH}/${cfg.instagram.apiVersion}`;
+  const code = String(params.get('code')).replace(/#_=_$/, '');
+  const tok = await call(app, `${v}/oauth/access_token?${new URLSearchParams({ client_id: cfg.instagram.appId, client_secret: cfg.instagram.appSecret, redirect_uri: cfg.instagram.redirectUri, code })}`, {}, 'échange du code');
+  if (!tok.ok) throw fail(tok.status >= 500 ? 502 : 400, "Meta a refusé le code (expiré ou déjà utilisé) ou l'adresse de retour ne correspond pas. Recommence.");
   const t0 = await tok.json().catch(() => null);
-  const short = Array.isArray(t0?.data) ? t0.data[0] : t0; // deux formes de réponse selon la version
-  if (typeof short?.access_token !== 'string' || !short.access_token) throw fail(502, "Réponse inattendue d'Instagram : la connexion n'a pas pu être terminée.");
-  const granted = String(short.permissions ?? '').split(/[\s,]+/).filter(Boolean);
-  if (granted.length && !granted.includes('instagram_business_content_publish')) throw fail(400, "Instagram n'a pas accordé le droit de publier : recommence et accepte tous les droits demandés.");
+  if (typeof t0?.access_token !== 'string' || !t0.access_token) throw fail(502, "Réponse inattendue de Meta : la connexion n'a pas pu être terminée.");
 
-  const lt = await call(app, `${GRAPH}/access_token?${new URLSearchParams({ grant_type: 'ig_exchange_token', client_secret: cfg.instagram.appSecret, access_token: short.access_token })}`, {}, 'jeton de 60 jours');
-  if (!lt.ok) throw await graphError(lt, 'jeton de 60 jours');
-  const long = await lt.json().catch(() => null);
-  if (typeof long?.access_token !== 'string') throw fail(502, "Réponse inattendue d'Instagram (jeton de 60 jours).");
+  // Jeton de longue durée (60 jours) ; s'il n'est pas échangeable (jeton déjà durable), on garde celui reçu
+  let token = t0.access_token;
+  let expiresIn = Number(t0.expires_in) > 0 ? Number(t0.expires_in) : null;
+  const lt = await call(app, `${v}/oauth/access_token?${new URLSearchParams({ grant_type: 'fb_exchange_token', client_id: cfg.instagram.appId, client_secret: cfg.instagram.appSecret, fb_exchange_token: token })}`, {}, 'jeton de 60 jours');
+  if (lt.ok) {
+    const long = await lt.json().catch(() => null);
+    if (typeof long?.access_token === 'string' && long.access_token) { token = long.access_token; expiresIn = Number(long.expires_in) > 0 ? Number(long.expires_in) : expiresIn; }
+  }
 
-  const me = await call(app, `${GRAPH}/${cfg.instagram.apiVersion}/me?${new URLSearchParams({ fields: 'user_id,username,account_type', access_token: long.access_token })}`, {}, 'lecture du profil');
-  if (!me.ok) throw await graphError(me, 'lecture du profil');
-  const info = await me.json().catch(() => null);
-  const igId = String(info?.user_id ?? info?.id ?? short.user_id ?? '').replace(/\D/g, '').slice(0, 30);
-  if (!igId) throw fail(502, "Instagram n'a pas donné l'identifiant du compte. Réessaie.");
-  if (info?.account_type && !/BUSINESS|MEDIA_CREATOR/i.test(String(info.account_type))) throw fail(400, 'Ce compte Instagram est personnel : passe-le en compte professionnel (Instagram → Paramètres → Type de compte et outils), puis recommence.');
+  // Ce que Meta a réellement accordé : les droits, et le compte Instagram choisi par l'utilisateur dans la configuration
+  const dbg = await call(app, `${v}/debug_token?${new URLSearchParams({ input_token: token, access_token: `${cfg.instagram.appId}|${cfg.instagram.appSecret}` })}`, {}, 'lecture des droits');
+  if (!dbg.ok) throw await graphError(dbg, 'lecture des droits');
+  const info = (await dbg.json().catch(() => null))?.data ?? {};
+  const scopes = [...(info.scopes ?? []), ...(info.granular_scopes ?? []).map((g) => g.scope)];
+  if (!NEEDED.every((n) => scopes.includes(n))) throw fail(400, "Meta n'a pas accordé le droit de publier sur Instagram (instagram_content_publish) : ajoute-le à la configuration de connexion de l'application, puis recommence en acceptant tout.");
+  // debug_token fait foi : 0 = le jeton n'expire pas (pas de date) ; sinon sa date ; à défaut, la durée donnée par l'échange
+  const expiresAt = Number(info.expires_at) === 0 ? null : Number(info.expires_at) > 0 ? Number(info.expires_at) : (expiresIn ? now() + expiresIn : null);
+
+  let igId = '';
+  for (const g of info.granular_scopes ?? []) {
+    if (['instagram_content_publish', 'instagram_basic'].includes(g.scope)) { igId = String((g.target_ids ?? [])[0] ?? ''); if (igId) break; }
+  }
+  let username = null;
+  if (!/^\d{1,30}$/.test(igId)) {
+    // Sans élément choisi dans la configuration : le compte Instagram lié à une Page Facebook de l'utilisateur
+    const pg = await call(app, `${v}/me/accounts?${new URLSearchParams({ fields: 'instagram_business_account{id,username}', limit: '25', access_token: token })}`, {}, 'liste des comptes');
+    if (pg.ok) {
+      const found = ((await pg.json().catch(() => null))?.data ?? []).find((p) => p?.instagram_business_account?.id);
+      if (found) { igId = String(found.instagram_business_account.id); username = found.instagram_business_account.username || null; }
+    }
+  }
+  if (!/^\d{1,30}$/.test(igId)) throw fail(400, "Aucun compte Instagram professionnel n'a été autorisé : recommence et sélectionne ton compte Instagram (professionnel, lié à une Page Facebook) quand Meta le propose.");
+  if (!username) {
+    const me = await call(app, `${v}/${igId}?${new URLSearchParams({ fields: 'username', access_token: token })}`, {}, 'lecture du profil');
+    if (me.ok) username = String((await me.json().catch(() => null))?.username ?? '').slice(0, 100) || null;
+  }
 
   await db.prepare('DELETE FROM instagram_accounts WHERE project_id = ?').run(projectId);
   await db.prepare('INSERT INTO instagram_accounts(project_id, ig_user_id, username, account_type, token_enc, expires_at, connected_by, created_at, refreshed_at) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)')
-    .run(projectId, igId, String(info?.username ?? '').slice(0, 100) || null, String(info?.account_type ?? '').slice(0, 40) || null, encrypt(cfg.secretKey, long.access_token),
-      Number(long.expires_in) > 0 ? now() + Number(long.expires_in) : now() + 60 * 86400, Number(userId), now(), now());
+    .run(projectId, igId, username, null, encrypt(cfg.secretKey, token), expiresAt, Number(userId), now(), now());
   return projectId;
 }
 
@@ -185,7 +204,7 @@ export async function refreshInstagramTokens(app, { at = now() } = {}) {
   for (const r of rows) {
     try {
       const token = decrypt(app.cfg.secretKey, r.token_enc);
-      const res = await call(app, `${GRAPH}/refresh_access_token?${new URLSearchParams({ grant_type: 'ig_refresh_token', access_token: token })}`, {}, 'renouvellement du jeton');
+      const res = await call(app, `${GRAPH}/${app.cfg.instagram.apiVersion}/oauth/access_token?${new URLSearchParams({ grant_type: 'fb_exchange_token', client_id: app.cfg.instagram.appId, client_secret: app.cfg.instagram.appSecret, fb_exchange_token: token })}`, {}, 'renouvellement du jeton');
       if (!res.ok) throw await graphError(res, 'renouvellement du jeton');
       const j = await res.json().catch(() => null);
       if (typeof j?.access_token !== 'string') throw fail(502, 'Réponse inattendue au renouvellement du jeton.');
