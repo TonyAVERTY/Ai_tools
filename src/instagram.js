@@ -23,7 +23,7 @@ const REFRESH_WITHIN = 10 * 86400;  // un jeton (60 jours) est renouvelé quand 
 const REFRESH_AFTER = 86400;        // Instagram ne renouvelle un jeton qu'après 24 h
 export const SCHEDULE_MIN_SECONDS = 5 * 60;
 export const SCHEDULE_MAX_SECONDS = 75 * 86400; // l'API d'Instagram ne garde pas de programmation : c'est iaboss qui publie, au plus ~75 jours plus tard
-export const NOT_CONFIGURED = "Instagram n'est pas activé sur ce service (l'administrateur doit renseigner META_APP_ID, META_APP_SECRET et META_LOGIN_CONFIG_ID).";
+export const NOT_CONFIGURED = "Instagram n'est pas activé sur ce service (l'administrateur doit renseigner INSTAGRAM_APP_ID et INSTAGRAM_APP_SECRET, ou META_APP_ID, META_APP_SECRET et META_LOGIN_CONFIG_ID).";
 
 const hashBind = (v) => createHash('sha256').update(String(v)).digest('hex');
 const fail = (status, message) => new HttpError(status, message, { expose: true });
@@ -99,41 +99,45 @@ export async function startInstagram(app, userId, projectId, res) {
   await db.prepare('INSERT INTO oauth_states(state, provider, verifier, nonce, binding, created_at) VALUES(?, ?, ?, ?, ?, ?)')
     .run(state, 'instagram', 'none', `${Number(userId)}:${Number(projectId)}`, hashBind(bind), now());
   setCookie(res, COOKIE, bind, { maxAge: STATE_TTL, path: COOKIE_PATH });
+  if (cfg.instagram.mode === 'instagram') {
+    const q = new URLSearchParams({ client_id: cfg.instagram.appId, redirect_uri: cfg.instagram.redirectUri, response_type: 'code', scope: 'instagram_business_basic,instagram_business_content_publish', state });
+    return redirect(res, `https://www.instagram.com/oauth/authorize?${q}`);
+  }
   // Les droits et les éléments (compte Instagram) viennent de la configuration de connexion (config_id), pas d'une liste de scopes
   const q = new URLSearchParams({ client_id: cfg.instagram.appId, redirect_uri: cfg.instagram.redirectUri, response_type: 'code', config_id: cfg.instagram.configId, override_default_response_type: 'true', prompt: 'login', state });
   redirect(res, `${DIALOG}/dialog/oauth?${q}`); // même adresse et mêmes paramètres que l'« URL de connexion » donnée par la console Meta (prompt=login : l'utilisateur choisit son compte)
 }
 
-/**
- * Retour d'Instagram : mêmes contrôles que LinkedIn (state connu, à usage unique, non expiré, émis pour CE compte et CE navigateur), puis échange du code
- * contre un jeton court, du jeton court contre un jeton de 60 jours, et lecture du profil.
- * @returns {Promise<number>} l'identifiant du projet relié
- */
-export async function finishInstagram(app, userId, params, req, res, checkAccess) {
-  const { cfg, db } = app;
-  const state = params.get('state');
-  const row = state ? await db.prepare('SELECT * FROM oauth_states WHERE state = ? AND created_at > ?').get(String(state), now() - STATE_TTL) : null;
-  if (state) await db.prepare('DELETE FROM oauth_states WHERE state = ?').run(String(state));
-  setCookie(res, COOKIE, '', { maxAge: 0, path: COOKIE_PATH });
-  if (!cfg.instagram) throw fail(503, NOT_CONFIGURED);
+/** Voie « Instagram login » (Business Login for Instagram) : l'utilisateur se connecte avec son compte Instagram professionnel, sans Facebook ni Page. */
+async function instagramLoginAccount(app, code) {
+  const { cfg } = app;
+  const tok = await call(app, 'https://api.instagram.com/oauth/access_token', {
+    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ client_id: cfg.instagram.appId, client_secret: cfg.instagram.appSecret, grant_type: 'authorization_code', redirect_uri: cfg.instagram.redirectUri, code }),
+  }, 'échange du code');
+  if (!tok.ok) throw fail(tok.status >= 500 ? 502 : 400, "Instagram a refusé le code (expiré ou déjà utilisé) ou l'adresse de retour ne correspond pas. Recommence.");
+  const t0 = await tok.json().catch(() => null);
+  const short = Array.isArray(t0?.data) ? t0.data[0] : t0; // deux formes de réponse selon la version
+  if (typeof short?.access_token !== 'string' || !short.access_token) throw fail(502, "Réponse inattendue d'Instagram : la connexion n'a pas pu être terminée.");
+  const granted = String(short.permissions ?? '').split(/[\s,]+/).filter(Boolean);
+  if (granted.length && !granted.includes('instagram_business_content_publish')) throw fail(400, "Instagram n'a pas accordé le droit de publier : recommence et accepte tous les droits demandés.");
+  const lt = await call(app, `${IG_GRAPH}/access_token?${new URLSearchParams({ grant_type: 'ig_exchange_token', client_secret: cfg.instagram.appSecret, access_token: short.access_token })}`, {}, 'jeton de 60 jours');
+  if (!lt.ok) throw await graphError(lt, 'jeton de 60 jours');
+  const long = await lt.json().catch(() => null);
+  if (typeof long?.access_token !== 'string') throw fail(502, "Réponse inattendue d'Instagram (jeton de 60 jours).");
+  const me = await call(app, `${IG_GRAPH}/${cfg.instagram.apiVersion}/me?${new URLSearchParams({ fields: 'user_id,username,account_type', access_token: long.access_token })}`, {}, 'lecture du profil');
+  if (!me.ok) throw await graphError(me, 'lecture du profil');
+  const info = await me.json().catch(() => null);
+  const igId = String(info?.user_id ?? info?.id ?? short.user_id ?? '').replace(/\D/g, '').slice(0, 30);
+  if (!igId) throw fail(502, "Instagram n'a pas donné l'identifiant du compte. Réessaie.");
+  if (info?.account_type && !/BUSINESS|MEDIA_CREATOR/i.test(String(info.account_type))) throw fail(400, 'Ce compte Instagram est personnel : passe-le en compte professionnel (Instagram → Paramètres → Type de compte et outils), puis recommence.');
+  return { igId, username: String(info?.username ?? '').slice(0, 100) || null, token: long.access_token, expiresAt: now() + (Number(long.expires_in) > 0 ? Number(long.expires_in) : 60 * 86400), kind: 'instagram' };
+}
 
-  const [ownerId, projectId] = String(row?.nonce ?? '').split(':').map(Number);
-  if (params.get('error')) {
-    const code = String(params.get('error')).slice(0, 80);
-    const why = String(params.get('error_description') ?? params.get('error_reason') ?? '').replace(/[\r\n]+/g, ' ').slice(0, 200);
-    if (code !== 'access_denied') console.warn(`[instagram] connexion refusée par Instagram : ${code}${why ? ` : ${why}` : ''}`);
-    throw fail(400, refusalMessage(code, why, cfg.instagram.redirectUri));
-  }
-  if (!params.get('code') || !state) throw fail(400, "Retour d'Instagram incomplet : recommence.");
-  if (!row || row.provider !== 'instagram' || ownerId !== Number(userId) || !projectId) throw fail(400, 'Connexion expirée ou lancée depuis un autre compte : recommence.');
-  const bind = parseCookies(req)[COOKIE];
-  const a = Buffer.from(hashBind(bind || ''));
-  const b = Buffer.from(String(row.binding));
-  if (!bind || a.length !== b.length || !timingSafeEqual(a, b)) throw fail(400, 'Connexion lancée depuis un autre navigateur : recommence.');
-  await checkAccess(projectId);
-
+/** Voie « connexion unifiée » (Facebook Login for Business) : du code au compte Instagram autorisé. */
+async function metaAccount(app, code) {
+  const { cfg } = app;
   const v = `${GRAPH}/${cfg.instagram.apiVersion}`;
-  const code = String(params.get('code')).replace(/#_=_$/, '');
   const tok = await call(app, `${v}/oauth/access_token?${new URLSearchParams({ client_id: cfg.instagram.appId, client_secret: cfg.instagram.appSecret, redirect_uri: cfg.instagram.redirectUri, code })}`, {}, 'échange du code');
   if (!tok.ok) throw fail(tok.status >= 500 ? 502 : 400, "Meta a refusé le code (expiré ou déjà utilisé) ou l'adresse de retour ne correspond pas. Recommence.");
   const t0 = await tok.json().catch(() => null);
@@ -205,6 +209,40 @@ export async function finishInstagram(app, userId, params, req, res, checkAccess
     const me = await call(app, `${v}/${igId}?${new URLSearchParams({ fields: 'username', access_token: token })}`, {}, 'lecture du profil');
     if (me.ok) username = String((await me.json().catch(() => null))?.username ?? '').slice(0, 100) || null;
   }
+
+  return { igId, username, token, expiresAt, kind };
+}
+
+/**
+ * Retour d'Instagram : mêmes contrôles que LinkedIn (state connu, à usage unique, non expiré, émis pour CE compte et CE navigateur), puis échange du code
+ * contre un jeton court, du jeton court contre un jeton de 60 jours, et lecture du profil.
+ * @returns {Promise<number>} l'identifiant du projet relié
+ */
+export async function finishInstagram(app, userId, params, req, res, checkAccess) {
+  const { cfg, db } = app;
+  const state = params.get('state');
+  const row = state ? await db.prepare('SELECT * FROM oauth_states WHERE state = ? AND created_at > ?').get(String(state), now() - STATE_TTL) : null;
+  if (state) await db.prepare('DELETE FROM oauth_states WHERE state = ?').run(String(state));
+  setCookie(res, COOKIE, '', { maxAge: 0, path: COOKIE_PATH });
+  if (!cfg.instagram) throw fail(503, NOT_CONFIGURED);
+
+  const [ownerId, projectId] = String(row?.nonce ?? '').split(':').map(Number);
+  if (params.get('error')) {
+    const code = String(params.get('error')).slice(0, 80);
+    const why = String(params.get('error_description') ?? params.get('error_reason') ?? '').replace(/[\r\n]+/g, ' ').slice(0, 200);
+    if (code !== 'access_denied') console.warn(`[instagram] connexion refusée par Instagram : ${code}${why ? ` : ${why}` : ''}`);
+    throw fail(400, refusalMessage(code, why, cfg.instagram.redirectUri));
+  }
+  if (!params.get('code') || !state) throw fail(400, "Retour d'Instagram incomplet : recommence.");
+  if (!row || row.provider !== 'instagram' || ownerId !== Number(userId) || !projectId) throw fail(400, 'Connexion expirée ou lancée depuis un autre compte : recommence.');
+  const bind = parseCookies(req)[COOKIE];
+  const a = Buffer.from(hashBind(bind || ''));
+  const b = Buffer.from(String(row.binding));
+  if (!bind || a.length !== b.length || !timingSafeEqual(a, b)) throw fail(400, 'Connexion lancée depuis un autre navigateur : recommence.');
+  await checkAccess(projectId);
+
+  const code = String(params.get('code')).replace(/#_(=_)?$/, '');
+  const { igId, username, token, expiresAt, kind } = cfg.instagram.mode === 'instagram' ? await instagramLoginAccount(app, code) : await metaAccount(app, code);
 
   await db.prepare('DELETE FROM instagram_accounts WHERE project_id = ?').run(projectId);
   await db.prepare('INSERT INTO instagram_accounts(project_id, ig_user_id, username, account_type, token_enc, expires_at, connected_by, created_at, refreshed_at) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)')
