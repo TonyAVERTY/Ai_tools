@@ -10,7 +10,7 @@ export const GO = [
 
 /** Les autres raccourcis. [touches (alternatives séparées par « ou »), ce que ça fait]. */
 export const OTHERS = [
-  [['/', 'Ctrl K', '⌘ K'], 'Rechercher un projet, un prospect, un client ou un mail'],
+  [['/', 'Ctrl K', '⌘ K'], 'Rechercher une page, un projet, un prospect, un client ou un mail'],
   [['n'], 'Créer un nouveau projet (ouvre « Nouveau projet »)'],
   [['j'], "Ouvrir ou fermer « Activité » (les tâches de l'IA en cours)"],
   [['1 – 9'], "Dans un projet : ouvrir l'onglet de ce rang dans la barre du projet (1 Vue d'ensemble, 2 Prospection, 3 Envoi…)"],
