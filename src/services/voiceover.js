@@ -189,16 +189,49 @@ async function azureSynth(text, voice, { key, region, fetchImpl = fetch }) {
   return Buffer.from(await res.arrayBuffer());
 }
 
+// ElevenLabs renvoie toute la bibliothèque du compte (des dizaines de voix) : on n'en montre qu'une sélection, 5 voix françaises et 3 anglaises.
+export const ELEVEN_SHORTLIST = { fr: 5, en: 3 };
+const FRENCH = /fran[cç]|french|paris|belg|qu[eé]b/i;
+const ENGLISH = /americ|brit|austral|irish|scot|canad|english|new zealand|south african/i;
+const CATEGORY_RANK = { professional: 0, premade: 1, generated: 2 };
+
+/** Langue d'une voix ElevenLabs d'après ses étiquettes (langue, accent, description), puis ses langues vérifiées ; vide si rien ne la dit. */
+export function elevenVoiceLang(x) {
+  const l = x?.labels || {};
+  const own = String(l.language || '').slice(0, 2).toLowerCase();
+  if (own === 'fr' || own === 'en') return own;
+  const text = `${x?.name || ''} ${l.accent || ''} ${l.descriptive || ''} ${l.description || ''}`;
+  if (FRENCH.test(text)) return 'fr';
+  if (ENGLISH.test(text)) return 'en';
+  const verified = new Set((Array.isArray(x?.verified_languages) ? x.verified_languages : []).map((e) => String(e?.language || e?.locale || '').slice(0, 2).toLowerCase()));
+  if (verified.has('fr') && !verified.has('en')) return 'fr';
+  if (verified.has('en') && !verified.has('fr')) return 'en';
+  return '';
+}
+
+/** Voix de la bibliothèque → 5 françaises puis 3 anglaises (les plus soignées d'abord, puis par nom) ; les voix dont la langue est inconnue sont écartées. */
+export function pickElevenVoices(voices, limits = ELEVEN_SHORTLIST) {
+  const sex = { female: 'féminine', male: 'masculine' };
+  const rank = (x) => CATEGORY_RANK[x.category] ?? 3;
+  const out = [];
+  for (const lang of ['fr', 'en']) {
+    const group = voices.filter((x) => VOICE_ID.test(String(x?.voice_id)) && elevenVoiceLang(x) === lang)
+      .sort((a, b) => rank(a) - rank(b) || String(a.name).localeCompare(String(b.name), 'fr'))
+      .slice(0, limits[lang]);
+    for (const x of group) {
+      const l = x.labels || {};
+      const tags = [sex[l.gender] || l.gender, l.accent, l.descriptive || l.description].filter(Boolean).join(', ');
+      out.push(v(x.voice_id, `${x.name}${tags ? ` · ${tags}` : ''}`, lang));
+    }
+  }
+  return out;
+}
+
 /** Voix proposées par un fournisseur à clé (c'est aussi le test de la clé : refusée, la liste échoue). */
 export async function listVoices(provider, { key, region = null, fetchImpl = fetch } = {}) {
   if (provider === 'elevenlabs') {
     const res = await keyedFetch(fetchImpl, 'https://api.elevenlabs.io/v1/voices', { headers: { 'xi-api-key': key } }, 'ElevenLabs');
-    const sex = { female: 'féminine', male: 'masculine' };
-    return ((await res.json())?.voices || []).filter((x) => VOICE_ID.test(String(x.voice_id))).map((x) => {
-      const l = x.labels || {};
-      const tags = [sex[l.gender] || l.gender, l.accent, l.descriptive || l.description].filter(Boolean).join(', ');
-      return v(x.voice_id, `${x.name}${tags ? ` · ${tags}` : ''}`, 'fr');
-    }).sort((a, b) => a.label.localeCompare(b.label, 'fr'));
+    return pickElevenVoices((await res.json())?.voices || []);
   }
   if (provider === 'googlecloud') {
     const out = [];
