@@ -280,9 +280,13 @@ export function legalMentions(kind, legal) {
  * Document complet (HTML autonome, styles intégrés) : modèle avec variables entre accolades, mentions légales fixées par le code.
  * Servi seulement dans un cadre isolé (voir billingroutes.js).
  */
-export function renderDocument({ kind, content, legal, layout }) {
+export function renderDocument({ kind, content, legal, layout, brand = null }) {
   const c = content;
   const theme = THEMES[layout] ? layout : 'classique';
+  // Identité du projet (couleurs déjà vérifiées par billingbrand.js) : elle recouvre les couleurs de la mise en page choisie
+  const bt = brand?.theme;
+  const brandCss = bt ? `h1,h2{color:${bt.accent}}.rule{border-top-color:${bt.accent}}th{background:${bt.tint};color:${bt.accent};border-bottom:2px solid ${bt.accent}}.box{border-color:${bt.edge};background:${bt.tint}}${layout === 'moderne' ? `.total{background:${bt.accent};color:#fff}` : `.total{border-top:1px solid ${bt.accent}}`}body{color:${bt.text}}` : '';
+  const logo = brand?.logoUri && !bt?.hideLogo ? `<img src="${brand.logoUri}" alt="" style="display:block;max-height:${Math.round(bt?.logoHeight || 44)}px;max-width:170px;margin:0 0 8px">` : '';
   const rate = rateOf(legal);
   const t = totalsOf(c.lines, rate);
   const vatText = legal.vat_mode === 'assujetti' ? `TVA ${rate / 100} %`.replace('.', ',') : 'TVA non applicable, art. 293 B du CGI';
@@ -321,9 +325,9 @@ export function renderDocument({ kind, content, legal, layout }) {
   const bank = (kind === 'acompte' || kind === 'facture') && legal.iban ? `<p class="small"><b>Règlement par virement :</b> IBAN ${esc(legal.iban.replace(/(.{4})/g, '$1 ').trim())}${legal.bic ? ` — BIC ${esc(legal.bic)}` : ''}</p>` : '';
   const sig = kind === 'devis' ? `<div class="row"><div class="box"><b>Bon pour accord</b> — date et signature du client<div class="sig"></div></div><div></div></div>` : '';
   return `<!doctype html>
-<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(c.title)}</title><style>${BASE_CSS}${THEMES[theme]}</style></head>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(c.title)}</title><style>${BASE_CSS}${THEMES[theme]}${brandCss}</style></head>
 <body><div class="doc">
-<div class="row"><div><h2>${esc(legal.legal_name)}</h2><p>${addr}</p><p class="muted small">${contact}</p></div><div style="text-align:right"><h1>${esc(c.title)}</h1>${meta}</div></div>
+<div class="row"><div>${logo}<h2>${esc(legal.legal_name)}</h2><p>${addr}</p><p class="muted small">${contact}</p></div><div style="text-align:right"><h1>${esc(c.title)}</h1>${meta}</div></div>
 <div class="rule"></div>
 <div class="row"><div></div><div class="box"><b>Client</b><br>${ph('client_nom')}<br>${ph('client_adresse')}<br>SIRET : ${ph('client_siret')}</div></div>
 ${c.intro ? para(c.intro) : ''}
