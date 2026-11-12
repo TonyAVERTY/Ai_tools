@@ -21,7 +21,8 @@
     if (!others.length) return '';
     return `<details class="ct-history"><summary>Brouillons précédents (${others.length})</summary><ul class="ct-list">${others.map((d) => `<li>
       <span class="ct-li-t"><b>${esc(kind === 'instagram' ? (d.body.split('\n')[0] || '').slice(0, 70) : d.title)}</b><span class="muted small">${esc(day(d.createdAt))}</span></span>
-      <button type="button" class="btn small" data-ct-pick="${d.id}">Reprendre</button></li>`).join('')}</ul></details>`;
+      <span class="ct-li-actions"><button type="button" class="btn small" data-ct-pick="${d.id}">Reprendre</button>
+      <button type="button" class="btn small danger" data-ct-delete data-ct-draft-id="${d.id}">Supprimer</button></span></li>`).join('')}</ul></details>`;
   }
 
   function generator(s, kind, draft) {
@@ -101,7 +102,8 @@
     const kind = box.dataset.content;
     const id = proj.dataset.id;
     const draftEl = $('[data-ct-draft]', box);
-    const draftId = draftEl ? Number(draftEl.dataset.ctDraft) : 0;
+    // Un bouton « Supprimer » de la liste des brouillons précédents porte l'id de son brouillon ; sinon c'est celui qui est affiché
+    const draftId = Number(t.dataset.ctDraftId) || (draftEl ? Number(draftEl.dataset.ctDraft) : 0);
     try {
       if (t.matches('[data-ct-generate]')) {
         t.disabled = true;
@@ -121,7 +123,7 @@
       } else if (t.matches('[data-ct-delete]')) {
         if (!(await confirmBox(kind === 'instagram' ? 'Supprimer ce post et son image ?' : 'Supprimer cette newsletter ?'))) return;
         await api(`${base(id, kind)}/delete`, { draftId });
-        picked.delete(`${id}:${kind}`);
+        if (picked.get(`${id}:${kind}`) === draftId || !t.dataset.ctDraftId) picked.delete(`${id}:${kind}`); // supprimer un ancien brouillon ne change pas celui qu'on regarde
         toast('Brouillon supprimé');
         loadContent(proj, kind);
       } else if (t.matches('[data-ct-pick]')) {

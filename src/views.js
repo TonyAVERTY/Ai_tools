@@ -112,7 +112,7 @@ ${email ? `<header class="top">
   </div>
 </header>
 <dialog class="search-dialog" id="search" aria-label="Recherche">
-  <label class="s-in">${ic('search')}<span class="sr-only">Rechercher un projet, un prospect, un client ou un mail</span><input type="text" role="searchbox" data-search-q placeholder="Rechercher un projet, un prospect, un mail…" autocomplete="off" spellcheck="false" aria-controls="search-out"></label>
+  <label class="s-in">${ic('search')}<span class="sr-only">Rechercher une page, un projet, un prospect, un client ou un mail</span><input type="text" role="searchbox" data-search-q placeholder="Rechercher une page, un projet, un prospect, un mail…" autocomplete="off" spellcheck="false" aria-controls="search-out"></label>
   <div class="s-out" id="search-out" data-search-out aria-live="polite"></div>
   <p class="s-hint" aria-hidden="true"><kbd>↑</kbd> <kbd>↓</kbd> pour choisir · <kbd>Entrée</kbd> pour ouvrir · <kbd>Échap</kbd> pour fermer</p>
 </dialog>` : ''}

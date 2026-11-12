@@ -777,6 +777,17 @@
   // Page « Relier Claude » sans accès utilisable : le serveur refuse ces relevés (403). On ne les demande pas, et on réessaie vite (la page change une fois Claude relié).
   const unlinked = () => !!document.querySelector('[data-nolink]');
   window.AiTools.unlinked = unlinked;
+  // Vue d'ensemble d'un projet : la liste « Mise en route » et « En cours » sont calculées au chargement de la page. Quand une tâche cesse d'être
+  // active (terminée, en erreur ou annulée), on recharge la page pour que ses étapes se raient aussitôt, sans toucher à ce que l'utilisateur est en train de saisir.
+  let activeJobIds = null;
+  function overviewOnJobEnd(snapshot) {
+    const now = new Set((snapshot.jobs || []).filter((j) => ACTIVE.includes(j.status)).map((j) => j.id));
+    const ended = activeJobIds && [...activeJobIds].some((id) => !now.has(id));
+    activeJobIds = now;
+    if (!ended || !document.querySelector('.pj-steps') || document.querySelector('dialog[open]')) return;
+    if (document.activeElement?.matches('input, textarea, select')) return;
+    reload();
+  }
   let activityTimerId, activityRequest = null, activityBusy = false;
   function refreshActivity() {
     clearTimeout(activityTimerId);
@@ -792,6 +803,7 @@
         if (disposed) return;
         activityBusy = snapshot.queue > 0;
         renderJobsMenu(snapshot);
+        overviewOnJobEnd(snapshot);
       } catch { /* garder la dernière mesure, puis retenter automatiquement */ }
       finally {
         activityRequest = null;
