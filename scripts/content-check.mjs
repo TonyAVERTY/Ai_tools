@@ -81,8 +81,23 @@ for (const vp of [{ width: 1280, height: 900 }, { width: 390, height: 780 }]) {
   const [dl] = await Promise.all([p.waitForEvent('download', { timeout: 10000 }), p.locator('[data-content="instagram"] a', { hasText: "Télécharger l'image" }).click()]);
   ok(/^instagram-cartes-fideles-\d+\.png$/.test(dl.suggestedFilename()), `${tag} « Télécharger l'image » envoie un PNG nommé d'après le projet`);
 
+  // Brouillons précédents : « Reprendre » et « Supprimer » côte à côte ; supprimer un ancien brouillon laisse celui qu'on regarde
+  await p.fill('[data-content="instagram"] [data-ct-direction]', 'un second post');
+  await p.locator('[data-content="instagram"] [data-ct-generate]').click();
+  await runJob('instagram_post');
+  await p.waitForSelector('[data-content="instagram"] .ct-history', { timeout: 20000 });
+  await p.locator('[data-content="instagram"] .ct-history > summary').click();
+  ok(await p.locator('[data-content="instagram"] .ct-history li [data-ct-pick]').innerText() === 'Reprendre' && await p.locator('[data-content="instagram"] .ct-history li [data-ct-delete]').innerText() === 'Supprimer', `${tag} brouillons précédents : « Reprendre » et « Supprimer » à côté l'un de l'autre`);
+  if (process.env.SHOTS) await p.locator('[data-content="instagram"] .ct-history').screenshot({ path: `${process.env.SHOTS}/ct-history-${vp.width}.png` });
+  const shown = await p.locator('[data-content="instagram"] .ct-draft').getAttribute('data-ct-draft');
+  await p.locator('[data-content="instagram"] .ct-history li [data-ct-delete]').click();
+  await p.locator('dialog.confirm [data-yes]').click();
+  await p.waitForFunction(() => !document.querySelector('[data-content="instagram"] .ct-history'), null, { timeout: 8000 });
+  ok(await p.locator('[data-content="instagram"] .ct-draft').getAttribute('data-ct-draft') === shown, `${tag} supprimer un ancien brouillon laisse le post affiché`);
+  ok(await s.db.prepare("SELECT COUNT(*) n FROM content_drafts WHERE kind = 'instagram'").get().then((r) => Number(r.n) === 1), `${tag} l'ancien brouillon est supprimé en base, l'autre reste`);
+
   // Supprimer
-  await p.locator('[data-content="instagram"] [data-ct-delete]').click();
+  await p.locator('[data-content="instagram"] .ct-draft [data-ct-delete]').click();
   await p.locator('dialog.confirm [data-yes]').click();
   await p.waitForFunction(() => !document.querySelector('[data-content="instagram"] .ct-draft'), null, { timeout: 8000 });
   ok(await s.db.prepare("SELECT COUNT(*) n FROM content_drafts WHERE kind = 'instagram'").get().then((r) => Number(r.n) === 0), `${tag} « Supprimer » retire le post après confirmation`);

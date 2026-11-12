@@ -2003,6 +2003,7 @@ a.pj-card:hover { border-color: var(--primary); }
 .ct-insp p { margin: 6px 0 0; color: var(--muted); }
 .ct-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .ct-list li { display: flex; align-items: center; gap: 12px; justify-content: space-between; padding: 8px 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card-2); }
+.ct-li-actions { display: flex; flex-wrap: wrap; gap: 8px; flex-shrink: 0; justify-content: flex-end; }
 .ct-li-t { display: flex; flex-direction: column; min-width: 0; }
 .ct-li-t b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 640px) { .ct-img { max-width: 100%; } .ct-format { max-width: none; } }
