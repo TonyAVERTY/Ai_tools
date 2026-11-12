@@ -1,4 +1,5 @@
 import { createServer } from 'node:http';
+import { isEntryPoint } from './entrypoint.js';
 import { readFileSync, readdirSync, mkdirSync, accessSync, constants as fsConstants } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
@@ -241,7 +242,7 @@ export async function createApp(cfg, { db, worker = true, createTransport, fetch
   return app;
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (isEntryPoint(import.meta.url)) { // lancé par `node src/server.js` ou par pm2
   const cfg = loadConfig();
   if (!cfg.adminEmails.length) console.warn('ADMIN_EMAILS est vide : aucun administrateur (back-office inaccessible).');
   for (const m of sandboxStartupMessages(cfg.sandbox)) console.warn(m);

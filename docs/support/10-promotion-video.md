@@ -34,7 +34,7 @@ Piper et eSpeak NG s'installent sur le serveur d'iaboss, une fois pour toutes. R
   1. `python3 -m venv ~/piper && ~/piper/bin/pip install piper-tts`
   2. Télécharger des voix (Internet nécessaire une seule fois), par exemple : `~/piper/bin/python -m piper.download_voices fr_FR-siwis-medium --data-dir ~/piper-voices` puis `~/piper/bin/python -m piper.download_voices fr_FR-tom-medium --data-dir ~/piper-voices` (la liste des voix est sur rhasspy.github.io/piper-samples ; une voix = un fichier `.onnx` et son `.onnx.json`).
   3. Dans le fichier `.env` : `PIPER_BIN=/home/<compte>/piper/bin/python` (ou le chemin d'un exécutable `piper`) et `PIPER_VOICES_DIR=/home/<compte>/piper-voices`.
-  4. Recharger le service : `pm2 delete all && pm2 start ecosystem.config.cjs`.
+  4. Recharger le service : `pm2 delete all && pm2 start ecosystem.config.cjs` (modèle du fichier : `deploy/ecosystem.config.cjs` ; mets-le à la racine du projet).
   Ensuite « Piper (voix locale, gratuit) » liste les voix présentes dans le dossier (les langues gérées : français, anglais, espagnol, allemand, italien, portugais). Le test se fait avec « Écouter un extrait ». La disponibilité est revérifiée toutes les minutes : ajouter une voix dans le dossier suffit, sans redémarrage.
 
 ## Comment la voix est fabriquée
