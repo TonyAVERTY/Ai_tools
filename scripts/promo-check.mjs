@@ -16,9 +16,12 @@ s.app.reviewPromo = async () => ({ reviews: [] });
 s.app.renderPromo = (options) => renderPromo({ ...options, quality: 'off' });
 // Extrait d'écoute : un vrai MP3 d'une seconde (le service de voix n'est jamais appelé)
 const sample = spawnSync('ffmpeg', ['-v', 'error', '-f', 'lavfi', '-i', 'sine=frequency=440:duration=1', '-f', 'mp3', '-'], { maxBuffer: 1 << 20 }).stdout;
-s.app.sampleVoice = async () => sample;
+s.app.sampleVoice = async (o) => {
+  if (o.voice === 'zzz999') throw new Error('ElevenLabs : voix premium (👑) non incluse dans ton plan, les voix de la bibliothèque exigent un abonnement payant : choisis une voix sans couronne');
+  return sample;
+};
 s.app.localStatus = () => ({ piper: { ok: false, voices: [] }, espeak: { ok: true, voices: [{ id: 'fr', label: 'Français · voix masculine', lang: 'fr' }, { id: 'fr+f3', label: 'Français · voix féminine', lang: 'fr' }] } });
-s.app.listVoices = async () => [{ id: 'abcDEF123', label: 'Bella · féminine', lang: 'fr' }, { id: 'zzz999', label: 'Adam · masculine', lang: 'fr' }];
+s.app.listVoices = async () => [{ id: 'abcDEF123', label: 'Bella · féminine', lang: 'fr' }, { id: 'zzz999', label: 'Adam · masculine', lang: 'fr' }, { id: 'prem123', label: '👑 Léo · masculine, parisian', lang: 'fr', premium: true }];
 const u = await s.newUser();
 const pid = await addProject(s.db, u.id, { name: 'Fidélio', gitUrl: 'https://github.com/u/fidelio.git' });
 await s.db.prepare('UPDATE projects SET profile_json = ? WHERE id = ?').run(JSON.stringify({ resume: 'Cartes de fidélité digitales.', proposition_valeur: 'Fidélisez sans carton.', arguments: ['simple'], ton: 'direct' }), pid);
@@ -86,9 +89,26 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   ok(await p.locator('input[name="voiceRegion"]').isHidden(), `${tag} clé : pas de région pour ElevenLabs`);
   await p.fill('input[name="voiceKey"]', 'sk_test_1234567890abcdefghij');
   await p.locator('input[name="voiceKey"]').press('Enter');
-  await p.waitForFunction(() => document.querySelectorAll('select[name="voiceName"] option').length === 2, null, { timeout: 5000 });
+  await p.waitForFunction(() => document.querySelectorAll('select[name="voiceName"] option').length === 3, null, { timeout: 5000 });
   ok(/se termine par ghij/.test(await p.locator('[data-promo-key-last4]').textContent()) && await p.locator('[data-promo-key-new]').isHidden(), `${tag} clé : enregistrée, seuls les 4 derniers caractères s'affichent`);
   ok(await p.locator('input[name="voiceKey"]').inputValue() === '', `${tag} clé : champ vidé après l'enregistrement`);
+  // Voix premium : couronne dans la liste, explication dès qu'on la choisit, et message précis quand l'extrait est refusé
+  ok(await p.locator('[data-promo-premium]').isHidden(), `${tag} voix premium : pas d'explication pour une voix ordinaire`);
+  await p.selectOption('select[name="voiceName"]', 'prem123');
+  ok(await p.locator('[data-promo-premium]').isVisible() && /Voix premium/.test(await p.locator('[data-promo-premium]').textContent()), `${tag} voix premium : l'explication s'affiche quand on la choisit`);
+  ok((await p.locator('select[name="voiceName"] option:checked').textContent()).startsWith('👑'), `${tag} voix premium : couronne dans la liste`);
+  await p.selectOption('select[name="voiceName"]', 'zzz999');
+  ok(await p.locator('[data-promo-premium]').isHidden(), `${tag} voix premium : l'explication disparaît pour une voix ordinaire`);
+  await p.locator('[data-promo-sample]').click();
+  await p.waitForFunction(() => document.querySelector('[data-promo-sample-state]').textContent.includes('voix premium'), null, { timeout: 8000 });
+  const st = p.locator('[data-promo-sample-state]');
+  ok((await st.textContent()).startsWith('« Adam » : ElevenLabs : voix premium'), `${tag} extrait refusé : le message nomme la voix et la cause`);
+  ok((await st.getAttribute('class')).includes('error'), `${tag} extrait refusé : affiché comme une erreur`);
+  ok((await p.locator('select[name="voiceName"] option:checked').textContent()).startsWith('👑') && await p.locator('[data-promo-premium]').isVisible(), `${tag} extrait refusé : la voix reçoit la couronne et l'explication apparaît`);
+  await p.selectOption('select[name="voiceName"]', 'abcDEF123');
+  await p.locator('[data-promo-sample]').click();
+  await p.waitForFunction(() => !document.querySelector('[data-promo-sample-state]').classList.contains('error'), null, { timeout: 8000 });
+  ok(true, `${tag} extrait suivant : l'erreur disparaît`);
   ok(!(await p.content()).includes('sk_test_1234567890abcdefghij'), `${tag} clé : jamais réaffichée dans la page`);
   ok(await p.locator('[data-promo-form]').count() === 1 && await p.locator('.pv').count() === 0, `${tag} clé : Entrée n'a pas lancé la vidéo`);
   if (process.env.SHOTS) await p.locator('details[data-acc="promo"]').screenshot({ path: `${process.env.SHOTS}/promo-key-${vp.width}.png` });
@@ -125,7 +145,9 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   await p.locator('dialog.confirm [data-yes]').click();
   await p.waitForFunction(() => !document.querySelector('.pv'), null, { timeout: 8000 });
   ok(true, `${tag} suppression`);
-  ok(errs.length === 0, `${tag} aucune erreur console ${errs.join(' | ')}`);
+  // Le 502 de l'extrait refusé est provoqué exprès plus haut : ce n'est pas une erreur de la page
+  const unexpected = errs.filter((m) => !/status of 502/.test(m));
+  ok(unexpected.length === 0, `${tag} aucune erreur console ${unexpected.join(' | ')}`);
   await ctx.close();
   if (vp.width === 1280) await s.db.prepare('DELETE FROM jobs').run();
 }
