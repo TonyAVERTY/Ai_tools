@@ -12,7 +12,7 @@ const KIND = { initial: 'Premier mail', followup: 'Relance' };
 const when = (ts) => new Date(ts * 1000).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' });
 
 /** Proposition d'ajout à l'agenda (ou événement déjà ajouté) pour une réponse. */
-function suggestBlock(r) {
+export function suggestBlock(r) {
   if (r.event) {
     return `<div class="suggest done" data-suggest="${r.id}"><p class="why"><b>${ic('check')} Ajouté à ton calendrier :</b> ${esc(r.event.title)}</p>
       <div class="sg-row"><a class="btn small" href="${esc(r.event.links.google)}" target="_blank" rel="noopener noreferrer">Google Agenda</a><a class="btn small" href="${esc(r.event.links.ics)}">Fichier .ics</a></div></div>`;
@@ -29,7 +29,7 @@ function suggestBlock(r) {
 
 function link(base, over) {
   const q = new URLSearchParams();
-  const all = { v: base.view === 'replies' ? 'replies' : '', project: base.project || '', filter: base.filter || '', page: '', ...over };
+  const all = { v: base.view === 'sent' ? 'sent' : '', project: base.project || '', filter: base.filter || '', page: '', ...over };
   for (const [k, v] of Object.entries(all)) if (v) q.set(k, v);
   const s = q.toString();
   return `/mails${s ? `?${s}` : ''}`;
@@ -43,7 +43,7 @@ export function mailsPage(d) {
     .map(([k, l, n]) => `<a class="mstat${(d.filter || '') === k ? ' on' : ''}${BAD.has(k) && n ? ' bad' : ''}" href="${esc(link(d, { filter: k }))}"${(d.filter || '') === k ? ' aria-current="true"' : ''}><b>${n.toLocaleString('fr-FR')}</b><span>${esc(l)}</span></a>`).join('');
 
   const projectSelect = d.projects.length > 1 ? `<form class="inline-form" method="get" action="/mails">
-      ${d.view === 'replies' ? '<input type="hidden" name="v" value="replies">' : ''}
+      ${d.view === 'sent' ? '<input type="hidden" name="v" value="sent">' : ''}
       <label class="sr-only" for="mp">Projet</label>
       <select id="mp" name="project" data-autosubmit><option value="">Tous les projets</option>${d.projects.map((p) => `<option value="${p.id}"${Number(p.id) === d.project ? ' selected' : ''}>${esc(p.name)}</option>`).join('')}</select>
       <noscript><button class="btn small">Filtrer</button></noscript></form>` : '';
@@ -54,7 +54,7 @@ export function mailsPage(d) {
     else if (d.view === 'replies') list = `<div class="empty-s"><p><b>Aucune réponse pour l'instant.</b> Elles s'affichent ici dès que la boîte de réception du projet (IMAP) en détecte une.</p><a class="btn small" href="/">Régler la boîte de réception</a></div>`;
     else list = `<div class="empty-s"><p><b>Aucun mail envoyé pour l'instant.</b> Les mails partent depuis un projet, section « Prospecter », après ta confirmation.</p><a class="btn small" href="/">Ouvrir mes projets</a></div>`;
   } else if (d.view === 'replies') {
-    list = d.rows.map((r) => `<details class="reply-row${r.seen ? '' : ' unseen'}">
+    list = `<div class="reply-list">${d.rows.map((r) => `<details class="reply-row${r.seen ? '' : ' unseen'}" open>
       <summary><span class="badge ${INTENT_BADGE[r.intent]}">${esc(r.intentLabel)}</span>
         <span class="r-from">${esc(r.company ? `${r.company} · ` : '')}${esc(r.from)}</span>
         <span class="muted small r-meta">${esc(r.project)} · ${esc(when(r.receivedAt))}</span></summary>
@@ -64,17 +64,21 @@ export function mailsPage(d) {
         ${suggestBlock(r)}
         <label class="field"><span class="lbl">Réponse suggérée (à relire, puis à envoyer depuis ta messagerie)</span>
           <textarea rows="9" readonly data-draft>${esc(r.draft)}</textarea></label>
-        <div class="row-actions"><button type="button" class="btn small" data-copy-draft>${ic('copy')}Copier la réponse</button>
-          ${r.seen ? '' : `<button type="button" class="btn small" data-reply-seen="${r.id}">${ic('check')}Marquer comme lu</button>`}</div>
-      </div></details>`).join('');
+        <div class="row-actions"><a class="btn small primary" href="mailto:${esc(r.from)}?subject=${encodeURIComponent(/^re:/i.test(r.subject) ? r.subject : `Re: ${r.subject}`)}">${ic('reply')}Répondre</a>
+          <button type="button" class="btn small" data-copy-draft>${ic('copy')}Copier la réponse</button>
+          ${r.prospectId ? `<button type="button" class="btn small" data-remind-toggle aria-expanded="false">${ic('clock')}Programmer un rappel</button>` : ''}
+          ${r.seen ? '' : `<button type="button" class="btn small" data-reply-seen="${r.id}">${ic('check')}Marquer traitée</button>`}</div>
+        ${r.prospectId ? `<form class="remind-f" data-remind="${r.prospectId}" hidden><label class="field"><span class="lbl">Me le rappeler le</span><input type="date" name="day" required></label><button class="btn small primary">Programmer</button></form>` : ''}
+      </div></details>`).join('')}</div>`;
   } else {
     const solo = d.project || d.projects.length < 2;
     list = `<div class="table-wrap"><table class="mtable">
       <thead><tr><th>Date</th><th>Destinataire</th><th>Objet</th><th>État</th></tr></thead><tbody>
-      ${d.rows.map((r) => `<tr><td class="nowrap">${esc(when(r.sent_at))}</td>
+      ${d.rows.map((r) => `<tr class="mail-row"><td class="nowrap">${esc(when(r.sent_at))}</td>
         <td>${r.company ? `<b>${esc(r.company)}</b><span class="td-s">${esc(r.email)}</span>` : esc(r.email)}</td>
-        <td>${esc(r.subject || '—')}<span class="td-s">${esc(solo ? KIND[r.kind] || r.kind : `${r.project} · ${KIND[r.kind] || r.kind}`)}</span></td>
-        <td><span class="badge ${STATE_BADGE[r.state]}"${r.error ? ` title="${esc(r.error)}"` : ''}>${esc(STATE_LABELS[r.state])}</span>${r.error ? `<span class="td-s">${esc(String(r.error).slice(0, 80))}</span>` : ''}</td></tr>`).join('')}
+        <td><button type="button" class="mail-toggle" data-mail="${Number(r.id)}" aria-expanded="false" aria-controls="mail-d-${Number(r.id)}">${esc(r.subject || '—')}${ic('down')}</button><span class="td-s">${esc(solo ? KIND[r.kind] || r.kind : `${r.project} · ${KIND[r.kind] || r.kind}`)}</span></td>
+        <td><span class="badge ${STATE_BADGE[r.state]}">${esc(STATE_LABELS[r.state])}</span>${r.error ? `<span class="td-s">${esc(String(r.error).slice(0, 80))}</span>` : ''}</td></tr>
+      <tr class="mail-detail" id="mail-d-${Number(r.id)}" hidden><td colspan="4"></td></tr>`).join('')}
       </tbody></table></div>`;
   }
 
@@ -85,11 +89,12 @@ export function mailsPage(d) {
 
   return layout({
     title: 'Mails', email: d.email,
-    body: `<section class="card">
-  <div class="row-between"><h1>Mails</h1>${projectSelect}</div>
+    body: `<section class="pj-page mails-page">
+  <div class="ph"><div class="t"><h1>Mails</h1><span class="muted small">${esc(d.project ? (d.projects.find((p) => Number(p.id) === d.project)?.name || 'Ce projet') : 'Tous les projets')}</span></div></div>
+  ${projectSelect}
   <nav class="tabs" aria-label="Affichage">
-    <a class="tab${d.view === 'sent' ? ' on' : ''}" href="${esc(link({ ...d, view: 'sent', filter: '' }, {}))}"${d.view === 'sent' ? ' aria-current="page"' : ''}>${ic('send')}Envoyés</a>
     <a class="tab${d.view === 'replies' ? ' on' : ''}" href="${esc(link({ ...d, view: 'replies', filter: '' }, {}))}"${d.view === 'replies' ? ' aria-current="page"' : ''}>${ic('reply')}Réponses</a>
+    <a class="tab${d.view === 'sent' ? ' on' : ''}" href="${esc(link({ ...d, view: 'sent', filter: '' }, {}))}"${d.view === 'sent' ? ' aria-current="page"' : ''}>${ic('send')}Envoyés</a>
   </nav>
   <nav class="mstats" aria-label="${d.view === 'replies' ? 'Filtrer par intention' : 'Filtrer par état'}">${stats}</nav>
   ${list}${pager}

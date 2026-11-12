@@ -19,6 +19,94 @@
     choose(c.dataset.aiCard);
   }));
 
+  // ---------- Connexion guidée Google ----------
+  // 1) le serveur donne le lien de Google, 2) l'utilisateur se connecte et recopie le code que Google affiche : le CLI n'attend que 60 secondes, la page
+  // affiche le compte à rebours, 3) le code est transmis, la connexion est vérifiée (appel minimal) puis rangée : la page se recharge.
+  // Passé le délai, « Nouveau lien » repart de zéro. Fermer la fenêtre annule la connexion en cours.
+  (() => {
+    const first = $('form[data-google-login]');
+    if (!first) return;
+    const dlg = first.closest('dialog');
+    const second = $('form[data-google-step2]', dlg);
+    let id = null;
+    let left = 0;
+    let ticker = null;
+    const stop = () => { if (ticker) clearInterval(ticker); ticker = null; };
+    const showErr = (form, sel, message) => { const p = $(sel, dlg); p.textContent = message; p.hidden = false; };
+    const busy = (btn, on, label) => {
+      if (on) btn.setAttribute('aria-busy', 'true'); else btn.removeAttribute('aria-busy');
+      const l = $('[data-label]', btn); if (l) l.textContent = label;
+      btn.disabled = on;
+    };
+    const reset = () => {
+      stop(); id = null;
+      first.hidden = false; second.hidden = true;
+      second.reset(); $('[data-google-error2]', dlg).hidden = true; $('[data-google-again]', dlg).hidden = true;
+      const go1 = $('button:not([type=button])', first); busy(go1, false, 'Continuer'); go1.disabled = !$('[data-consent]', first).checked;
+    };
+    const render = () => {
+      const t = $('[data-google-timer]', dlg);
+      if (left > 0) { t.textContent = `Il te reste ${left} seconde${left > 1 ? 's' : ''} pour coller le code.`; return; }
+      stop();
+      t.textContent = 'Le délai de Google est passé : clique sur « Nouveau lien ».';
+      $('[data-google-send]', dlg).disabled = true;
+      $('[data-google-again]', dlg).hidden = false;
+    };
+    const tick = () => { left -= 1; render(); };
+    async function begin() {
+      $('[data-google-error]', dlg).hidden = true;
+      const go1 = $('button:not([type=button])', first);
+      busy(go1, true, 'Je prépare ton lien…');
+      $('[data-google-status]', first).textContent = 'Ça prend quelques secondes.';
+      try {
+        const r = await api('/link/google/login', { accept: 'on' });
+        id = r.id;
+        $('[data-google-link]', dlg).href = r.url;
+        first.hidden = true; second.hidden = false;
+        $('[data-google-again]', dlg).hidden = true; $('[data-google-error2]', dlg).hidden = true;
+        busy($('[data-google-send]', dlg), false, 'Valider le code');
+        left = r.expiresIn; render();
+        stop(); ticker = every(tick, 1000);
+        $('input[name=code]', second).focus();
+      } catch (err) { showErr(first, '[data-google-error]', err.message); busy(go1, false, 'Continuer'); }
+      $('[data-google-status]', first).textContent = '';
+    }
+    first.addEventListener('submit', (e) => { e.preventDefault(); begin(); });
+    $('[data-google-again]', dlg).addEventListener('click', async () => {
+      const old = id; stop(); id = null;
+      if (old) api('/link/google/login/cancel', { id: old }).catch(() => {});
+      second.hidden = true; first.hidden = false;
+      await begin();
+    });
+    second.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!id) return;
+      $('[data-google-error2]', dlg).hidden = true;
+      const btn = $('[data-google-send]', dlg);
+      stop();
+      busy(btn, true, 'Je vérifie ton code…');
+      $('[data-google-timer]', dlg).textContent = 'Vérification en cours : ça peut prendre une minute.';
+      try {
+        await api('/link/google/login/code', { id, code: $('input[name=code]', second).value });
+        id = null;
+        go('/');
+      } catch (err) {
+        id = null;
+        showErr(second, '[data-google-error2]', err.message);
+        $('[data-google-timer]', dlg).textContent = '';
+        busy(btn, false, 'Valider le code'); btn.disabled = true;
+        $('[data-google-again]', dlg).hidden = false;
+      }
+    });
+    dlg.addEventListener('close', () => {
+      if (id) api('/link/google/login/cancel', { id }).catch(() => {});
+      reset();
+      first.reset();
+      $('[data-google-error]', dlg).hidden = true;
+      $('button:not([type=button])', first).disabled = true;
+    });
+  })();
+
   // ---------- Connexion guidée ChatGPT ----------
   // 1) le serveur prépare le lien et le code (petit chargement), 2) l'utilisateur valide sur chatgpt.com : le serveur attend et la page
   // interroge son état toutes les 2 secondes, 3) connexion rangée : la page se recharge. Fermer la fenêtre annule la connexion en cours.

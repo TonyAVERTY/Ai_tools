@@ -14,6 +14,7 @@ import { encrypt } from '../src/crypto.js';
 import { importProspects } from '../src/services/csv.js';
 import { startApp } from './helpers/server.js';
 import { withSense } from './helpers/sense.js';
+import { projectsHtml } from './helpers/pages.js';
 
 // Plafonds du plan gratuit appliqués côté serveur : à la limite exacte, sans compteur qui dérive, sans perte de données.
 
@@ -232,14 +233,14 @@ test('Mon compte et tableau de bord : barres d\'usage du mois, plafond atteint s
     assert.match(acc, /Plafond atteint : .*mails ce mois-ci/);
     assert.match(acc, /Projets<\/span><span class="g-v">1 \/ 1/);
     assert.doesNotMatch(acc, /style="/, 'pas de style en ligne (CSP)');
-    // Projets : quatre indicateurs en tête, mêmes chiffres, plafond atteint signalé ; plus de panneau « Usage du mois » en doublon
-    const dash = await (await u.get('/', { headers: { accept: 'text/html' } })).text();
-    assert.equal((dash.match(/class="ukpi-c/g) || []).length, 4);
-    assert.match(dash, /<div class="ukpi-c full"><dt>[^]*?Mails envoyés<\/dt><dd><b>100<\/b><span>ce mois-ci · sur 100 · plafond atteint<\/span>/);
-    assert.match(dash, /<dt>[^]*?Projets<\/dt><dd><b>1<\/b><span>sur 1 · plafond atteint<\/span>/);
-    assert.match(dash, /Plafond atteint : .*mails ce mois-ci/);
-    assert.doesNotMatch(dash, /Usage du mois/, 'les chiffres sont dans les indicateurs, pas dans un second panneau');
-    assert.match(dash, /data-claude-card hidden/, 'la consommation Claude reste dans un panneau secondaire, masqué tant qu\'il est vide');
+    // Aujourd'hui : « Ce mois-ci » reprend les mêmes plafonds (plafond atteint signalé) ; Projets dit combien de projets l'offre permet
+    const home = await (await u.get('/', { headers: { accept: 'text/html' } })).text();
+    assert.match(home, /class="td-usage"/);
+    assert.match(home, /Plafond atteint/);
+    assert.doesNotMatch(home, /style="/, 'pas de style en ligne (CSP)');
+    const dash = await (await u.get('/projets', { headers: { accept: 'text/html' } })).text();
+    assert.match(dash, /1 projet sur 1 avec ton offre/);
+    assert.doesNotMatch(dash, /class="ukpi-c|Usage du mois/, 'plus de bandeau de plafonds sur la liste : ils sont dans Aujourd\'hui et Mon compte');
     assert.doesNotMatch(dash, /style="/, 'pas de style en ligne (CSP)');
     assert.ok(pid);
     const a = await s.newUser({ admin: true });

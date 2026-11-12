@@ -3,7 +3,7 @@
 // individuel Tony AVERTY. Ce sont des modèles sérieux, pas un avis juridique : voir docs/JOURNAL.md pour ce qui reste
 // à compléter (marqueurs visibles) et à faire relire.
 import { siteLayout, ic, CONTACT_EMAIL } from './layout.js';
-import { PLAN_LIMITS, PLAN_PRICES, PLAN_LABELS, ANNUAL_FREE_MONTHS, annualPrice } from '../limits.js';
+import { PLAN_LIMITS, PLAN_PRICES, PLAN_LABELS, ANNUAL_FREE_MONTHS, annualPrice, SUBSCRIPTION } from '../limits.js';
 
 /**
  * Marqueurs visibles tant que l'information n'est pas fournie ou validée. Leur liste est aussi dans docs/JOURNAL.md
@@ -16,7 +16,7 @@ export const ADDRESS = '4 rue Alcide de Gasperi, 35340 Liffré';
 export const HOST = 'ElypseCloud, 29 rue Lebrix Mesmin, 33700 Mérignac';
 const PAGES = [['/mentions-legales', 'Mentions légales'], ['/confidentialite', 'Confidentialité'], ['/cgu', 'CGU']];
 
-export const LEGAL_UPDATED = '5 novembre 2026';
+export const LEGAL_UPDATED = '6 novembre 2026';
 
 /** Gabarit commun (design Claude Design) : onglets des trois pages, titre, date, sommaire numéroté, texte. */
 function legalPage({ appUrl, path, title, description, h1, lead, sections }) {
@@ -102,7 +102,7 @@ export function mentionsPage({ appUrl }) {
 
 // ---------- Politique de confidentialité ----------
 // `captcha` : reCAPTCHA configuré. Les paragraphes qui le concernent n'apparaissent que dans ce cas, comme Apple.
-export function privacyPage({ appUrl, apple = false, captcha = false, inactiveMonths = 24 }) {
+export function privacyPage({ appUrl, apple = false, captcha = false, inactiveMonths = 24, billing = false }) {
   return legalPage({
     appUrl, path: '/confidentialite',
     title: 'Politique de confidentialité · iaboss',
@@ -126,7 +126,7 @@ export function privacyPage({ appUrl, apple = false, captcha = false, inactiveMo
   <tbody>
     <tr><th scope="row">Compte</th><td>Email et nom fournis par ${apple ? 'Google ou Apple' : 'Google'}, fournisseur de connexion et identifiant chez lui, plan, dates de création et de dernière connexion.</td><td>Créer ton compte et te connecter. Exécution du contrat.</td></tr>
     <tr><th scope="row">Session</th><td>Un identifiant de session aléatoire (cookie), un cookie de liaison pendant la connexion.</td><td>Te garder connecté et sécuriser la connexion. Exécution du contrat, intérêt légitime.</td></tr>
-    <tr><th scope="row">Liaison de ton IA (Claude, ChatGPT ou Gemini)</th><td>Ta clé API, ton jeton d'abonnement ou ton fichier de connexion, chiffrés. Les 4 derniers caractères d'une clé API, les dates de liaison et de test, la date et la version du texte d'avertissement accepté pour le mode abonnement.</td><td>Lancer tes jobs avec ton accès, garder la preuve de ton acceptation. Exécution du contrat, intérêt légitime.</td></tr>
+    <tr><th scope="row">Liaison de ton IA (Claude, ChatGPT ou Gemini)</th><td>Ta clé API, ton jeton d'abonnement ou ton fichier de connexion (ChatGPT, Google), chiffrés. Les 4 derniers caractères d'une clé API, les dates de liaison et de test, la date et la version du texte d'avertissement accepté pour le mode abonnement.</td><td>Lancer tes jobs avec ton accès, garder la preuve de ton acceptation. Exécution du contrat, intérêt légitime.</td></tr>
     <tr><th scope="row">Projets</th><td>Nom, adresse du dépôt Git, fiche projet, cible, modèles de mail, copie du dépôt sur le serveur.</td><td>Fournir le service. Exécution du contrat.</td></tr>
     <tr><th scope="row">Configuration</th><td>Identifiants SMTP et IMAP, accès à la base de données de ton projet (récapitulatif), jeton Forgejo, adresse du webhook Discord, plafonds et budgets. Les mots de passe, jetons et adresses de webhook sont chiffrés.</td><td>Envoyer, lire les réponses, notifier. Exécution du contrat.</td></tr>
     <tr><th scope="row">Prospects</th><td>Entreprise, adresse professionnelle, site, ville, secteur, phrase d'accroche, page source, score, statut, notes, prochaine action, historique d'envoi, objet et date d'une réponse.</td><td>Fournir le service pour ton compte (voir « rôles »). La base légale du démarchage est la tienne, en B2B en règle générale l'intérêt légitime.</td></tr>
@@ -156,7 +156,7 @@ export function privacyPage({ appUrl, apple = false, captcha = false, inactiveMo
     <tr><th scope="row">Journal d'administration</th><td>12 mois. Il note les actions des administrateurs (suspension, changement de plan, suppression) et les pauses d'envoi, avec un identifiant et une adresse masquée.</td></tr>
     <tr><th scope="row">Session</th><td>30 jours au plus, effacée à la déconnexion. Les états de connexion durent 10 minutes.</td></tr>
     <tr><th scope="row">Clé API, jeton ou connexion de ton IA</th><td>Jusqu'à ce que tu le délies ou supprimes ton compte.</td></tr>
-    <tr><th scope="row">Prospects, notes et journaux d'envoi</th><td>Jusqu'à la suppression du projet ou du compte. En tant que responsable de traitement, ne garde pas une fiche plus de 3 ans après le dernier contact.</td></tr>
+    <tr><th scope="row">Prospects, notes et journaux d'envoi</th><td>Jusqu'à la suppression du projet ou du compte. Le journal d'envoi garde le texte de chaque mail envoyé (sans le pied de page) et, pour un mail rejeté, la raison donnée par le serveur du destinataire : tu les relis dans la page Mails. En tant que responsable de traitement, ne garde pas une fiche plus de 3 ans après le dernier contact.</td></tr>
     <tr><th scope="row">Comptabilité et justificatifs</th><td>Jusqu'à ce que tu supprimes la ligne ou ton compte. Les documents comptables se conservent en principe 10 ans : exporte-les avant de supprimer.</td></tr>
     <tr><th scope="row">Liste d'opposition</th><td>Conservée après la suppression d'un compte, tant qu'il faut respecter l'opposition de la personne.</td></tr>
     <tr><th scope="row">Sauvegardes</th><td>Environ 14 jours : une donnée effacée disparaît des sauvegardes à leur expiration.</td></tr>
@@ -173,6 +173,7 @@ export function privacyPage({ appUrl, apple = false, captcha = false, inactiveMo
   <li><strong>Ton fournisseur d'IA : Anthropic (Claude), OpenAI (ChatGPT) ou Google (Gemini), un seul à la fois,</strong> par l'intermédiaire de <em>ton</em> accès : le code de ton projet lu par ton IA, la fiche et la cible, les domaines des prospects déjà connus pour éviter les doublons, les messages et les pièces jointes (photos, PDF, textes, images tirées d'une vidéo, code d'un projet joint) que tu envoies sur la page IA, la fiche du projet et le sujet que tu donnes pour une vidéo de promotion (la scène animée écrite par ton IA est ensuite dessinée sur le serveur d'iaboss, sans accès au réseau), et ce que ton IA trouve sur le web transitent par ton compte chez ce fournisseur, selon les conditions que tu as acceptées avec lui. <a href="https://www.anthropic.com/legal/privacy" rel="noopener noreferrer">Politique d'Anthropic</a>, <a href="https://openai.com/policies/privacy-policy" rel="noopener noreferrer">politique d'OpenAI</a>, <a href="https://policies.google.com/privacy" rel="noopener noreferrer">politique de Google</a>. Avec une clé Gemini gratuite, Google peut utiliser les données envoyées pour améliorer ses produits : n'y mets pas de données de prospects, ou active la facturation sur ton projet Google.</li>
   <li><strong>Google, ElevenLabs ou Microsoft (voix des vidéos de promotion, facultatif) :</strong> si tu coches « Ajouter une voix », le texte de la narration, écrit par ton IA à partir de la fiche de ton projet, est envoyé au service de synthèse vocale que tu choisis (Google Traduction, ou, avec ta propre clé API, ElevenLabs, Google Cloud ou Microsoft Azure) pour être transformé en audio. Une clé API que tu enregistres est chiffrée et n'est utilisée que pour ces appels. Aucun autre élément de ton compte n'y est transmis ; sans la case cochée, rien n'est envoyé, et les voix locales (Piper, eSpeak NG) s'exécutent sur le serveur d'iaboss sans rien transmettre à un tiers.</li>
   ${captcha ? `<li><strong>Google reCAPTCHA</strong> (Google Ireland Limited, Google LLC) : protège la connexion contre les envois automatisés. Son script est chargé automatiquement à l'ouverture de la page de connexion, sans action de ta part. Il dépose des cookies et transmet à Google ton adresse IP, des informations sur ton navigateur et sur ton comportement sur la page. Base légale : l'intérêt légitime d'iaboss à protéger la connexion contre les abus. iaboss ne conserve pas le résultat de la vérification. Sans elle, la connexion n'est pas possible. Si cela te pose problème, écris-nous. <a href="https://policies.google.com/privacy" rel="noopener noreferrer">Politique de Google</a>.</li>` : ''}
+  ${billing ? `<li><strong>Stripe</strong> (Stripe Payments Europe, Ltd., Irlande) pour le paiement des offres payantes : la saisie de ta carte se fait sur une page de Stripe, iaboss ne voit et ne conserve jamais ton numéro de carte. Stripe reçoit ton email, le nom de l'offre choisie et les données de paiement, et nous renvoie l'état de ton abonnement (offre, période, paiement réussi ou refusé). Base légale : l'exécution du contrat. <a href="https://stripe.com/fr/privacy" rel="noopener noreferrer">Politique de Stripe</a>.</li>` : ''}
   <li><strong>L'hébergeur</strong> du serveur : ${HOST}</li>
   <li><strong>Tes propres services</strong>, quand tu les configures : serveur SMTP et IMAP de ta messagerie, Forgejo, base de données de ton projet, Discord. iaboss s'y connecte avec tes identifiants.</li>
 </ul>
@@ -238,7 +239,7 @@ ${captcha
 }
 
 // ---------- Conditions générales d'utilisation ----------
-export function termsPage({ appUrl, apple = false }) {
+export function termsPage({ appUrl, apple = false, billing = false }) {
   return legalPage({
     appUrl, path: '/cgu',
     title: "Conditions générales d'utilisation · iaboss",
@@ -264,14 +265,17 @@ export function termsPage({ appUrl, apple = false }) {
         html: `<p>Pour lancer un job, tu relies ton propre accès à une IA : Claude (Anthropic), ChatGPT (OpenAI) ou Gemini (Google). iaboss ne fournit ni crédits ni abonnement.</p>
 <ul>
   <li><strong>Clé API (Anthropic, OpenAI ou Google) :</strong> ton fournisseur te facture directement, selon ses tarifs. Tu es responsable de cette dépense. Les budgets réglables dans iaboss sont des garde-fous, pas une garantie.</li>
-  <li><strong>Abonnement Claude (jeton) ou compte ChatGPT :</strong> les conditions d'Anthropic ou d'OpenAI peuvent ne pas autoriser l'usage d'un abonnement via une application tierce. Si tu choisis ce mode, <strong>ton compte Claude ou ChatGPT peut être limité, suspendu ou fermé</strong> par ton fournisseur. Gemini ne se relie que par clé API. L'éditeur d'iaboss n'a aucun contrôle sur cette décision et n'en est pas responsable, dans la mesure permise par la loi. Avant la liaison, une fenêtre d'avertissement te demande de cocher « J'ai compris et j'accepte ce risque ». Cette acceptation est enregistrée avec sa date et la version du texte. Ce mode peut être désactivé à tout moment.</li>
+  <li><strong>Abonnement Claude (jeton), compte ChatGPT ou abonnement Google AI :</strong> les conditions d'Anthropic, d'OpenAI ou de Google peuvent ne pas autoriser l'usage d'un abonnement via une application tierce. Si tu choisis ce mode, <strong>ton compte Claude, ChatGPT ou Google peut être limité, suspendu ou fermé</strong> par ton fournisseur. Pour Google, cette option n'existe que si l'éditeur l'a activée, et la règle de Google n'est pas tranchée : le texte d'avertissement le dit. Gemini se relie sinon par clé API. L'éditeur d'iaboss n'a aucun contrôle sur cette décision et n'en est pas responsable, dans la mesure permise par la loi. Avant la liaison, une fenêtre d'avertissement te demande de cocher « J'ai compris et j'accepte ce risque ». Cette acceptation est enregistrée avec sa date et la version du texte. Ce mode peut être désactivé à tout moment.</li>
 </ul>
 <p>Tu peux délier ton accès à tout moment depuis Mon compte : le secret est alors effacé et tes jobs IA en attente sont annulés.</p>`,
       },
       {
         id: 'plans', title: 'Plan gratuit et plans payants',
         html: `<p>Le plan gratuit comprend ${PLAN_LIMITS.free.projects} projet, ${PLAN_LIMITS.free.prospects} prospects, ${PLAN_LIMITS.free.mails} mails et ${PLAN_LIMITS.free.aiJobs} jobs IA par mois. Ces limites peuvent évoluer, avec information préalable.</p>
-<p>Des plans payants sont prévus : ${Object.keys(PLAN_PRICES).map((k) => `${PLAN_LABELS[k]} (${PLAN_PRICES[k]} € TTC par mois, ou ${annualPrice(k)} € TTC par an, ${ANNUAL_FREE_MONTHS} mois offerts)`).join(', ')}. Les prix sont TTC ; l'éditeur est en franchise de TVA (art. 293 B du CGI). Ces plans ouvrent prochainement ; seul le plan Gratuit est ouvert aujourd'hui, et rien ne sera facturé sans ton accord exprès.</p>`,
+${billing ? `<p>Les plans payants sont ouverts : ${Object.keys(PLAN_PRICES).map((k) => `${PLAN_LABELS[k]} (${PLAN_PRICES[k]} € TTC par mois, ou ${annualPrice(k)} € TTC par an, ${ANNUAL_FREE_MONTHS} mois offerts)`).join(', ')}. Les prix sont TTC ; l'éditeur est en franchise de TVA (art. 293 B du CGI).</p>
+<p><strong>Paiement.</strong> Il se fait par carte sur une page sécurisée de Stripe ; iaboss ne voit ni ne conserve ton numéro de carte. Tu choisis la périodicité (mensuelle ou annuelle) et le prix affiché au moment du paiement est celui que tu paies.</p>
+<p><strong>Renouvellement et résiliation.</strong> L'abonnement se renouvelle automatiquement à chaque période jusqu'à ta résiliation. Tu peux le résilier à tout moment depuis Mon compte (« Gérer mon abonnement ») : l'offre reste active jusqu'à la fin de la période déjà payée, puis ton compte repasse au plan Gratuit. La période commencée n'est pas remboursée, sauf obligation légale. Tu peux aussi changer d'offre ; la différence est calculée au prorata.</p>
+<p><strong>Paiement refusé.</strong> Si un paiement échoue, tu gardes les droits de ton offre pendant ${SUBSCRIPTION.graceDays} jours pour mettre ta carte à jour ; sans régularisation, ton compte repasse au plan Gratuit. Dans tous les cas, tes projets et tes données sont conservés : seuls les plafonds du plan Gratuit s'appliquent aux nouvelles actions.</p>` : `<p>Des plans payants sont prévus : ${Object.keys(PLAN_PRICES).map((k) => `${PLAN_LABELS[k]} (${PLAN_PRICES[k]} € TTC par mois, ou ${annualPrice(k)} € TTC par an, ${ANNUAL_FREE_MONTHS} mois offerts)`).join(', ')}. Les prix sont TTC ; l'éditeur est en franchise de TVA (art. 293 B du CGI). Ces plans ouvrent prochainement ; seul le plan Gratuit est ouvert aujourd'hui, et rien ne sera facturé sans ton accord exprès.</p>`}`,
       },
       {
         id: 'envois', title: 'Tes envois',

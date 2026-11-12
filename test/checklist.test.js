@@ -6,6 +6,7 @@ import { addProject, testTokenLink } from './helpers/users.js';
 import { buildChecklist } from '../src/checklist.js';
 import { saveTemplate } from '../src/projects.js';
 import { now } from '../src/db.js';
+import { projectsHtml } from './helpers/pages.js';
 
 let s, off;
 const user = (srv) => srv.newUser({ admin: false, link: testTokenLink() });
@@ -22,17 +23,20 @@ test('calcul : un projet vide a tout à faire, l\'ordre conseillé est respecté
   const c = buildChecklist(none);
   assert.deepEqual(keys(c), ['analyze', 'target', 'prospects', 'smtp', 'template', 'send', 'imap', 'followup', 'evolution', 'linkedin', 'post']);
   assert.equal(c.done, 0);
-  assert.equal(c.total, 11);
+  assert.equal(c.steps.length, 11);
+  assert.equal(c.total, 6, 'seules les étapes obligatoires comptent');
   assert.equal(c.ready, false);
   assert.equal(c.complete, false);
 });
 
-test('calcul : « prêt » quand l\'obligatoire est fait, « complet » quand le facultatif aussi', () => {
+test('calcul : la mise en route est terminée dès que l\'obligatoire est fait ; le facultatif ne compte pas et n\'a pas à être fait', () => {
   const core = { ...none, hasProfile: true, targetValidated: true, prospects: 3, hasSmtp: true, templateValidated: true, mailsSent: true };
   const ready = buildChecklist(core);
   assert.equal(ready.ready, true);
-  assert.equal(ready.complete, false);
+  assert.equal(ready.complete, true, 'les étapes facultatives ne laissent pas la liste « inachevée »');
   assert.equal(ready.done, 6);
+  assert.equal(ready.total, 6, '6 sur 6, pas « 6 sur 11 »');
+  assert.equal(ready.steps.filter((x) => x.optional && !x.done).length, 5, 'elles restent proposées');
   const all = buildChecklist({ ...core, hasImap: true, followupEnabled: true, evolutionDone: true, linkedinConnected: true, linkedinPosted: true });
   assert.equal(all.complete, true);
   assert.equal(all.done, all.total);
@@ -80,7 +84,7 @@ test('route : l\'état suit le projet, étape par étape', async () => {
   c = await get();
   assert.ok(step(c, 'send'));
   assert.equal(c.ready, true);
-  assert.equal(c.complete, false);
+  assert.equal(c.complete, true, 'terminée : le facultatif ne compte pas');
 
   // LinkedIn : relié, puis premier post publié
   assert.equal(step(c, 'linkedin'), false);
@@ -97,11 +101,28 @@ test('route : l\'état suit le projet, étape par étape', async () => {
   assert.equal(step(await get(), 'linkedin'), false);
 });
 
+test('idées d\'évolution : la case se raye dès qu\'une évolution est terminée', async () => {
+  const u = await user(s);
+  const pid = await addProject(s.db, u.id);
+  const evo = async () => (await (await u.get(`/api/projects/${pid}/checklist`)).json()).steps.find((x) => x.key === 'evolution').done;
+  const job = (status, at) => s.db.prepare('INSERT INTO jobs(project_id, user_id, type, status, created_at) VALUES(?, ?, ?, ?, ?)').run(pid, u.id, 'evolution', status, at);
+  assert.equal(await evo(), false, 'aucune évolution demandée');
+  await job('running', now());
+  assert.equal(await evo(), false, 'en cours : pas encore');
+  await job('done', now() + 1);
+  assert.equal(await evo(), true, 'terminée : rayée');
+  // une demande plus récente (en erreur, annulée, en cours) ne fait pas retomber l'étape
+  for (const [i, st] of ['error', 'cancelled', 'queued', 'running'].entries()) {
+    await job(st, now() + 10 + i);
+    assert.equal(await evo(), true, `une évolution plus récente « ${st} » : reste rayée`);
+  }
+});
+
 test('/status embarque la liste (le front la rafraîchit avec le reste)', async () => {
   const u = await user(s);
   const pid = await addProject(s.db, u.id);
   const st = await (await u.get(`/api/projects/${pid}/status`)).json();
-  assert.equal(st.checklist.total, 11);
+  assert.equal(st.checklist.steps.length, 11);
   assert.equal(st.checklist.steps[0].key, 'analyze');
 });
 
@@ -117,22 +138,24 @@ test('sans clés LinkedIn : la liste n\'en parle pas', async () => {
   const u = await user(off);
   const pid = await addProject(off.db, u.id);
   const c = await (await u.get(`/api/projects/${pid}/checklist`)).json();
-  assert.equal(c.total, 9);
+  assert.equal(c.steps.length, 9);
   assert.ok(!c.steps.some((x) => x.key === 'linkedin'));
 });
 
-test('page : la liste est une section du projet (badge « config » cliquable), sans panneau flottant ni style en ligne', async () => {
+test('page : la mise en route est la première carte de la vue d\'ensemble (étape en cours en Safran, lignes qui mènent au bon onglet), sans panneau flottant ni style en ligne', async () => {
   const u = await user(s);
-  await addProject(s.db, u.id, { name: 'Mon projet' });
-  const html = await (await u.get('/', { headers: { accept: 'text/html' } })).text();
-  // la section « Mise en route » est la première du projet, avec son contenu rempli par le navigateur
-  assert.match(html, /<details class="acc anim setup-acc" data-acc="setup"[^>]*>\s*<summary>[^]*?Mise en route[^]*?<div class="setup" data-setup>/);
-  assert.ok(html.indexOf('data-acc="setup"') < html.indexOf('data-acc="header"'), 'la première section du projet');
-  // le badge est un vrai bouton (clavier, lecteur d'écran)
+  const id = await addProject(s.db, u.id, { name: 'Mon projet' });
+  const html = await (await u.get(`/p/${id}`, { headers: { accept: 'text/html' } })).text();
+  assert.match(html, /<section class="sheet" aria-labelledby="mr-h"><div class="sheet-h"><h2 id="mr-h">Mise en route<\/h2>/);
+  assert.match(html, /<ol class="pj-steps">/);
+  assert.match(html, /<li class="cur">/, 'la première étape à faire est mise en avant');
+  // chaque ligne ouvre l'onglet qui porte la section (adresse + ancre), pas une section d'accordéon
+  assert.match(html, /href="\/p\/\d+\/prospection#acc-target"/);
+  assert.match(html, /href="\/p\/\d+\/reglages#acc-config"/);
+  // le badge « config » masqué reste un vrai bouton pour public/app.js
   assert.match(html, /<button type="button" class="pcfg badge" data-cfg[^>]*>/);
-  // plus aucun panneau qui flotte, plus de lien pour le récupérer
   assert.doesNotMatch(html, /id="todo"|class="todo"|data-todo-restore|Afficher la mise en route/);
-  assert.doesNotMatch(html.match(/<details class="acc anim setup-acc"[^>]*>/)[0], /style=/);
+  assert.doesNotMatch(html, /style="/);
   const empty = await user(s);
-  assert.doesNotMatch(await (await empty.get('/', { headers: { accept: 'text/html' } })).text(), /data-acc="setup"/, 'pas de projet : pas de liste');
+  assert.doesNotMatch(await (await empty.get('/projets', { headers: { accept: 'text/html' } })).text(), /pj-steps/, 'pas de projet : pas de liste');
 });

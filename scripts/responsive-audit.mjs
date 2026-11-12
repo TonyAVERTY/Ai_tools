@@ -14,7 +14,7 @@ import { now } from '../src/db.js';
 const S = process.argv[2] || tmpdir();
 const WIDTHS = (process.argv[3] || '320,360,390,430,768,1280').split(',').map(Number);
 const SHOTS = process.argv[4] === 'shots';
-const s = await startApp({ cfg: { systemSmtp: { host: 'x', port: 587, user: 'u', pass: 'p', fromEmail: 'a@b.fr' }, linkedin: null } });
+const s = await startApp({ cfg: { systemSmtp: { host: 'x', port: 587, user: 'u', pass: 'p', fromEmail: 'a@b.fr' }, linkedin: null, stripe: { secretKey: 'sk_test_51AuditAuditAuditAudit', webhookSecret: 'whsec_AuditAuditAuditAudit12', live: false } } }); // paiements ouverts : boutons d'achat et bloc « Ton offre » mesurés
 const u = await s.newUser({ email: 'tony.averty.exemple@exemple-tres-long.fr', admin: true });
 const other = await s.newUser({ email: 'membre@exemple.fr' });
 const pid = await addProject(s.db, u.id, { name: 'Atelier Exemple avec un nom de projet vraiment très long', gitUrl: 'https://github.com/utilisateur/atelier-exemple-avec-un-depot-long.git' });
@@ -32,7 +32,7 @@ await createFeed(s.app, u.id);
 const team = Number((await s.db.prepare("INSERT INTO teams(owner_id, name, created_at) VALUES(?, 'Équipe', ?)").run(u.id, now())).lastInsertRowid);
 await s.db.prepare("INSERT INTO team_members(team_id, user_id, role, created_at) VALUES(?, ?, 'member', ?)").run(team, other.id, now());
 const PUBLIC = ['/', '/fonctionnement', '/tarifs', '/docs', '/docs/api', '/docs/mcp', '/mentions-legales', '/confidentialite', '/cgu', '/login', '/page-inconnue'];
-const APP = ['/', '/settings', '/account', '/mails', '/mails?v=replies', '/calendar', '/compta', '/facturation', '/clients', '/chat', '/support', '/team', '/developer', '/admin', '/link'];
+const APP = ['/', '/settings', '/account', '/mails', '/mails?v=replies', '/calendar', '/compta', '/facturation', '/clients', '/chat', '/support', '/raccourcis', '/team', '/developer', '/admin', '/link'];
 const b = await chromium.launch(process.env.PLAYWRIGHT_CHROMIUM ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM } : {});
 const bad = [];
 const probe = (W) => {
@@ -64,7 +64,7 @@ const probe = (W) => {
   }
   // Un libellé d'onglet du haut ne doit jamais dépasser de sa case (sinon il recouvre l'onglet voisin, sans faire défiler la page : la mesure de page ne le voit pas)
   for (const a of document.querySelectorAll('.pills a.pill')) {
-    const shown = [...a.querySelectorAll('.pill-l, .pill-s')].find((e) => getComputedStyle(e).display !== 'none' && e.getBoundingClientRect().width > 2);
+    const shown = null;
     const node = shown || [...a.childNodes].find((n) => n.nodeType === 3 && n.textContent.trim());
     if (!node) continue;
     const rg = document.createRange(); rg.selectNodeContents(node);

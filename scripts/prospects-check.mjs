@@ -25,11 +25,11 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   const errs = [];
   p.on('pageerror', (e) => errs.push(e.message));
   p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
-  await p.goto(`${s.base}/`);
+  await p.goto(`${s.base}/p/${pid}/prospection`);
   await p.waitForSelector('html[data-nav="ready"]');
-  if (!(await p.locator('details.project').evaluate((d) => d.open))) await p.locator('details.project > summary').click();
   for (const k of ['prospect', 'prospects', 'template']) await p.evaluate((x) => { const d = document.querySelector(`details[data-acc="${x}"]`); if (d) d.open = true; }, k);
   const email = `neuf-${vp.width}@boulangerie.fr`;
+  const goTab = async (t) => { await p.evaluate(([id, x]) => window.AiNav.go(`/p/${id}/${x}`), [pid, t]); await p.waitForURL((url) => url.pathname === `/p/${pid}/${t}`); await p.waitForSelector('html[data-nav="ready"]'); await p.waitForTimeout(300); }; // changer d'onglet sans recharger
   // ajout manuel
   await p.locator('[data-pform-toggle]').click();
   ok(await p.locator('form[data-pform]').isVisible(), `${tag} le formulaire d'ajout s'ouvre`);
@@ -40,20 +40,26 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   await p.waitForSelector('[data-prospects] >> text=Boulangerie Neuve');
   if (process.env.DBG) { console.log(await p.evaluate(() => { const b = document.querySelector('[data-open-prospect]'); const r = b.getBoundingClientRect(); const chain = []; for (let e = b; e; e = e.parentElement) { const cs = getComputedStyle(e); if (cs.display === 'none' || cs.visibility === 'hidden' || e.tagName === 'DETAILS') chain.push(e.tagName + '.' + e.className + ' open=' + e.open + ' disp=' + cs.display); } return JSON.stringify({ r, chain }); })); }
   ok(true, `${tag} le prospect ajouté apparaît dans la liste`);
-  // fiche : modification
+  // fiche contact : modification (le nom de l'entreprise de la liste mène à la page du contact)
   await p.locator('[data-prospects] >> text=Boulangerie Neuve').first().click();
-  await p.waitForSelector('dialog[open] form[data-dlg="edit"]');
-  await p.fill('dialog[open] form[data-dlg="edit"] [name=city]', 'Rennes');
-  await p.locator('dialog[open] form[data-dlg="edit"] button.primary, dialog[open] form[data-dlg="edit"] button:not([type=button])').first().click();
-  await p.waitForFunction(() => document.querySelector('[data-prospects]')?.textContent.includes('Rennes'));
-  ok(true, `${tag} la modification (ville) est enregistrée et visible dans la liste`);
-  ok(!(await p.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)), `${tag} pas de défilement horizontal avec la fiche ouverte`);
+  await p.waitForSelector('[data-contact]');
+  ok(/^Boulangerie Neuve$/.test((await p.locator('[data-contact] h1').innerText()).trim()), `${tag} la fiche contact s'ouvre sur ce prospect`);
+  await p.locator('[data-contact-edit-toggle]').click();
+  await p.fill('[data-contact-form="edit"] [name=city]', 'Rennes');
+  await p.locator('[data-contact-form="edit"] button.primary').click();
+  await p.waitForFunction(() => document.querySelector('.pj-info')?.textContent.includes('Rennes'));
+  ok(true, `${tag} la modification (ville) est enregistrée et visible dans la fiche`);
+  ok(!(await p.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)), `${tag} pas de défilement horizontal sur la fiche contact`);
   // suppression
-  await p.locator('dialog[open] [data-del-prospect]').click();
+  await p.locator('[data-contact-delete]').click();
   await p.locator('dialog.confirm [data-yes]').click();
+  await p.waitForURL((url) => url.pathname === `/p/${pid}/prospection`);
+  await p.waitForSelector('html[data-nav="ready"]');
+  await p.evaluate(() => { const d = document.querySelector('details[data-acc="prospects"]'); if (d) d.open = true; });
   await p.waitForFunction(() => !document.querySelector('[data-prospects]')?.textContent.includes('Boulangerie Neuve'));
   ok(true, `${tag} le prospect supprimé disparaît de la liste`);
-  // aperçu
+  // aperçu (le modèle de mail est dans l'onglet Envoi)
+  await goTab('envoi');
   const tpl = 'form[data-action=template][data-kind=initial]';
   await p.fill(`${tpl} [name=subject]`, 'Bonjour {{entreprise}}');
   await p.fill(`${tpl} [name=subjectB]`, 'Une idée pour {{entreprise}}');
@@ -76,20 +82,33 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   ok(((await p.locator('dialog.mailprev [data-pv-sense]').innerText()) || '').includes('Sens vérifié'), `${tag} aperçu : « Sens vérifié » quand le mail a un sens`);
   await p.screenshot({ path: process.env.SHOT_DIR ? `${process.env.SHOT_DIR}/preview-${vp.width}.png` : undefined }).catch(() => {});
   await p.keyboard.press('Escape'); // ferme l'aperçu
-  // Mail sans sens : l'IA l'explique, propose un modèle corrigé, et le modèle ne change qu'au clic sur « Appliquer la correction au modèle »
+  // Mail sans sens : l'IA le relit AVANT de le montrer, le corrige dans le modèle (le champ et l'aperçu disent la même chose), le dit, et « Annuler la correction » remet l'ancien texte
   await p.fill(`${tpl} [name=body]`, 'Bonjour SENSEBAD,\n\n{{accroche}}\n\n{{expediteur}}');
   await p.locator(`${tpl} [data-tpl-preview]`).click();
-  await p.waitForSelector('dialog.mailprev [data-pv-apply]', { timeout: 15000 });
-  const bad = await p.locator('dialog.mailprev [data-pv-sense]').innerText();
-  ok(/Ce mail ne veut pas dire grand-chose/.test(bad) && /Version corrigée proposée/.test(bad), `${tag} aperçu : le problème et la version corrigée sont affichés`);
-  ok((await p.inputValue(`${tpl} [name=body]`)).includes('SENSEBAD'), `${tag} le modèle n'a pas changé tant qu'on n'a pas cliqué`);
-  ok(!(await p.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)), `${tag} pas de défilement horizontal avec la correction proposée`);
-  await p.locator('dialog.mailprev [data-pv-apply]').click();
-  await p.waitForFunction((sel) => !document.querySelector(sel).value.includes('SENSEBAD'), `${tpl} [name=body]`);
-  ok((await p.inputValue(`${tpl} [name=body]`)).startsWith('Bonjour bien,'), `${tag} « Appliquer la correction au modèle » met le texte corrigé dans le modèle`);
-  await p.waitForSelector('dialog.mailprev [data-pv-sense] .badge.ok', { timeout: 15000 }).catch(() => {});
-  ok(((await p.locator('dialog.mailprev [data-pv-sense]').innerText()) || '').includes('Sens vérifié'), `${tag} après correction : « Sens vérifié »`);
+  await p.waitForSelector('dialog.mailprev [data-pv-undo]', { timeout: 15000 });
+  const fixedBox = await p.locator('dialog.mailprev [data-pv-sense]').innerText();
+  ok(/Corrigé/.test(fixedBox) && /avant de te le montrer/.test(fixedBox), `${tag} aperçu : l'IA dit qu'elle a relu et corrigé le mail avant de le montrer`);
+  ok((await p.inputValue(`${tpl} [name=body]`)).startsWith('Bonjour bien,'), `${tag} le texte corrigé est déjà dans le modèle : le champ et l'aperçu disent la même chose`);
+  const pvFrame = await p.locator('dialog.mailprev iframe').elementHandle().then((h) => h.contentFrame());
+  await pvFrame.waitForLoadState();
+  ok((await pvFrame.locator('body').innerText()).includes('Bonjour bien'), `${tag} l'aperçu montre le texte corrigé, jamais le texte brut`);
+  ok(!(await p.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)), `${tag} pas de défilement horizontal avec la correction`);
+  await p.locator('dialog.mailprev [data-pv-undo]').click();
+  await p.waitForFunction((sel) => document.querySelector(sel).value.includes('SENSEBAD'), `${tpl} [name=body]`);
+  await p.waitForSelector('dialog.mailprev [data-pv-sense]:has-text("Correction annulée")', { timeout: 15000 });
+  ok(true, `${tag} « Annuler la correction » remet le texte d'origine, sans que l'IA le corrige de nouveau`);
   await p.keyboard.press('Escape');
+  // Relecture AVANT l'affichage : tant que l'IA n'a pas répondu, aucun texte du mail n'est visible (texte jamais relu, donc pas de résultat en mémoire)
+  await p.route('**/template/sense', async (route) => { await new Promise((r) => setTimeout(r, 1500)); const rq = route.request(); await route.fulfill({ response: await route.fetch({ headers: { ...rq.headers(), origin: APP_URL }, maxRedirects: 0 }) }); });
+  await p.fill(`${tpl} [name=body]`, 'Bonjour {{entreprise}},\n\n{{accroche}}\n\n{{expediteur}} merci');
+  await p.locator(`${tpl} [data-tpl-preview]`).click();
+  await p.waitForSelector('dialog.mailprev[open]');
+  ok(/relit le mail avant de te le montrer/.test(await p.locator('dialog.mailprev').innerText()) && (await p.locator('dialog.mailprev iframe, dialog.mailprev [data-pv-body]').count()) === 0, `${tag} pendant la relecture, l'IA le dit et aucun texte du mail n'est affiché`);
+  await p.waitForSelector('dialog.mailprev iframe', { timeout: 20000 });
+  ok(true, `${tag} le texte n'apparaît qu'une fois relu`);
+  await p.unroute('**/template/sense');
+  await p.keyboard.press('Escape');
+  await p.fill(`${tpl} [name=body]`, 'Bonjour bien,\n\n{{accroche}}\n\n{{expediteur}}');
   // Phrase sélectionnée dans l'aperçu : « Changer | Modifier »
   const SENT = 'Est-ce un sujet chez vous ?';
   const bodyOf = () => p.inputValue(`${tpl} [name=body]`);
@@ -190,6 +209,7 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   await p.locator('dialog.mailprev [data-pv-hand]').click();
   const edit = await p.evaluate((sel) => { const f = document.querySelector(sel); return { active: document.activeElement === f, text: f.value.slice(f.selectionStart, f.selectionEnd), open: !!document.querySelector('dialog.mailprev[open]') }; }, `${tpl} [name=body]`);
   ok(!edit.open && edit.active && edit.text === 'Bien cordialement,', `${tag} Modifier à la main : l'aperçu se ferme et la phrase est sélectionnée dans le champ du modèle (« ${edit.text} »)`);
+  await goTab('prospection');
   // vue tableau : un prospect glissé d'une colonne à l'autre change de statut côté serveur
   const kanbanEmail = `kanban-${vp.width}@atelier.fr`;
   const kanbanName = `Atelier Kanban ${vp.width}`; // un nom par largeur : le prospect du premier passage reste dans la base
@@ -201,23 +221,33 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   let status = '';
   for (let i = 0; i < 40 && status !== 'sent'; i++) { status = (await s.db.prepare('SELECT status FROM prospects WHERE email = ?').get(kanbanEmail)).status; if (status !== 'sent') await new Promise((r) => setTimeout(r, 150)); }
   ok(status === 'sent', `${tag} glisser-déposer : le statut passe de « new » à « ${status} »`);
+  // Un filtre qui ne laisse rien (« Actions à faire » à 0) : le tableau le dit au lieu d'afficher cinq colonnes « Vide », et « Voir tous les prospects » rend la main
+  await p.locator('[data-chip-todo]').click();
+  await p.waitForSelector('.pr-none', { timeout: 10000 });
+  ok((await p.locator('[data-card]').count()) === 0 && /ne correspond/.test(await p.locator('.pr-none').innerText()), `${tag} tableau : un filtre sans résultat est expliqué`);
+  await p.locator('[data-pr-reset]').click();
+  await p.waitForSelector('[data-card]', { timeout: 10000 });
+  ok((await p.locator('[data-card]').count()) > 0 && (await p.locator('[data-chip-todo]').getAttribute('aria-pressed')) !== 'true', `${tag} tableau : « Voir tous les prospects » remet les cartes et retire le filtre`);
   await p.locator('[data-view-mode="list"]').click();
   // navigation sans rechargement, puis retour : les écouteurs du fichier doivent être posés de nouveau
   await p.evaluate(() => { window.__marker = 'vivante'; });
-  await p.locator('.pills a.pill', { hasText: 'Calendrier' }).click();
+  await p.locator('.pills a.pill', { hasText: 'Agenda' }).click();
   await p.waitForURL(/calendar/);
   await p.waitForSelector('html[data-nav="ready"]');
   await p.locator('.pills a.pill', { hasText: 'Projets' }).click();
-  await p.waitForURL((url) => url.pathname === '/');
+  await p.waitForURL((url) => url.pathname === '/projets');
+  await p.waitForSelector('html[data-nav="ready"]');
+  await p.locator('.pj-card').first().click(); // la carte du projet, puis son onglet Prospection (navigation douce)
+  await p.waitForURL((url) => url.pathname === `/p/${pid}`);
+  await p.evaluate((id) => window.AiNav.go(`/p/${id}/prospection`), pid);
+  await p.waitForURL((url) => url.pathname === `/p/${pid}/prospection`);
   await p.waitForSelector('html[data-nav="ready"]');
   ok(await p.evaluate(() => window.__marker) === 'vivante', `${tag} aller-retour sans rechargement de la page`);
-  if (!(await p.locator('details.project').evaluate((d) => d.open))) await p.locator('details.project > summary').click();
   for (const k of ['prospect', 'prospects']) await p.evaluate((x) => { const d = document.querySelector(`details[data-acc="${x}"]`); if (d) d.open = true; }, k);
   await p.waitForSelector(`[data-prospects] >> text=${kanbanName}`, { timeout: 10000 });
   await p.locator(`[data-prospects] >> text=${kanbanName}`).first().click();
-  await p.waitForSelector('dialog[open] form[data-dlg="edit"]', { timeout: 10000 });
-  ok(true, `${tag} après navigation : la liste se recharge et la fiche d'un prospect s'ouvre`);
-  await p.keyboard.press('Escape');
+  await p.waitForSelector('[data-contact]', { timeout: 10000 });
+  ok(true, `${tag} après navigation : la liste se recharge et la fiche contact d'un prospect s'ouvre`);
   ok(errs.length === 0, `${tag} aucune erreur console${errs.length ? ` : ${errs.join(' | ')}` : ''}`);
   await ctx.close();
 }

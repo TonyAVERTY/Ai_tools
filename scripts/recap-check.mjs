@@ -32,12 +32,11 @@ const p = await ctx.newPage();
 const errs = [];
 p.on('pageerror', (e) => errs.push(e.message));
 p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
+const tabOf = async (t) => { if (new URL(p.url()).pathname !== `/p/${pid}/${t}`) { await p.evaluate(([id, x]) => window.AiNav.go(`/p/${id}/${x}`), [pid, t]); await p.waitForURL((u) => u.pathname === `/p/${pid}/${t}`); } await p.waitForSelector('html[data-nav="ready"]'); }; // aller sur l'onglet d'un projet sans recharger
 
 async function openRecap(tag) {
   await p.waitForSelector('html[data-nav="ready"]');
-  const project = p.locator('details.project').first();
-  if (!(await project.evaluate((d) => d.open))) await project.locator('summary').first().click();
-  await p.locator('details[data-acc="recap"] > summary').click();
+  await tabOf('recap');
   await p.waitForSelector('[data-recap] .kpis', { timeout: 15000 });
   ok(await p.locator('[data-recap] .kpi').count() >= 3, `${tag} les indicateurs s'affichent`);
   await p.waitForSelector('[data-charts] .chart svg', { timeout: 15000 });
@@ -47,27 +46,24 @@ async function openRecap(tag) {
 
 async function openPromo(tag) {
   await p.waitForSelector('html[data-nav="ready"]');
-  const project = p.locator('details.project').first();
-  if (!(await project.evaluate((d) => d.open))) await project.locator('summary').first().click();
-  await p.locator('details[data-acc="promo"] > summary').click();
+  await tabOf('communication');
   await p.waitForSelector('[data-promo-form]', { timeout: 15000 });
   ok(await p.locator('[data-promo-form] input[name="fps"]').inputValue() === '30', `${tag} le formulaire de la Promotion s'affiche (30 images/s par défaut)`);
 }
 
 async function openLinkedin(tag) {
   await p.waitForSelector('html[data-nav="ready"]');
-  const project = p.locator('details.project').first();
-  if (!(await project.evaluate((d) => d.open))) await project.locator('summary').first().click();
-  await p.locator('details[data-acc="linkedin"] > summary').click();
+  await tabOf('communication');
   // « Chargement… » est remplacé par le contenu de la section (compte à relier, ou message d'absence de configuration)
   await p.waitForFunction(() => { const b = document.querySelector('[data-linkedin]'); return b && b.textContent.trim().length > 0 && !/^Chargement…$/.test(b.textContent.trim()); }, null, { timeout: 15000 });
   ok(true, `${tag} la section LinkedIn s'est chargée : « ${(await p.locator('[data-linkedin]').innerText()).trim().replace(/\s+/g, ' ').slice(0, 60)}… »`);
 }
 
-await p.goto(`${s.base}/`);
+await p.goto(`${s.base}/projets`);
 await openRecap('1re page :');
 await openPromo('1re page :');
 await openLinkedin('1re page :');
+await tabOf('recap'); // les trois sections sont sur deux onglets : retour sur le Récapitulatif
 // 30 → 90 jours
 await p.locator('[data-days="90"]').click();
 await p.waitForSelector('[data-days="90"][aria-pressed="true"]');
@@ -80,11 +76,11 @@ ok(true, 'Rafraîchir recharge le récapitulatif');
 
 // Navigation sans rechargement vers une autre page, puis retour : le récapitulatif doit marcher avec les scripts relancés
 await p.evaluate(() => { window.__marker = 'vivante'; });
-await p.locator('.pills a.pill', { hasText: 'Calendrier' }).click();
+await p.locator('.pills a.pill', { hasText: 'Agenda' }).click();
 await p.waitForURL(/calendar/);
 await p.waitForSelector('html[data-nav="ready"]');
 await p.locator('.pills a.pill', { hasText: 'Projets' }).click();
-await p.waitForURL((url) => url.pathname === '/');
+await p.waitForURL((url) => url.pathname === '/projets');
 await p.waitForSelector('html[data-nav="ready"]');
 ok(await p.evaluate(() => window.__marker) === 'vivante', 'aller-retour sans rechargement de la page');
 ok(await p.evaluate(() => typeof window.AiTools?.loadRecap) === 'function', 'app-recap.js a été relancé : window.AiTools.loadRecap existe');

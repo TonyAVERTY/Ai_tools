@@ -36,7 +36,7 @@ export const ROLES = [
   },
   {
     id: 'marketing', label: 'Marketing', summary: 'Positionnement, acquisition, référencement et pages qui convertissent.',
-    sections: ['target', 'linkedin', 'promo'],
+    sections: ['target', 'linkedin', 'instagram', 'newsletter', 'promo'],
     tasks: [
       { id: 'positionnement', label: 'Positionnement et messages clés', brief: 'Formule le positionnement du produit et les messages clés par cible, avec preuves à l\'appui.', sections: ['Cible principale', 'Problème et promesse', 'Messages clés', 'Preuves à fournir', 'Ton et mots à utiliser ou éviter'] },
       { id: 'personas', label: 'Personas et parcours client', brief: 'Décris 2 ou 3 personas réalistes et leur parcours, de la prise de conscience à l\'achat.', sections: ['Personas', 'Motivations et freins', 'Parcours par étape', 'Contenus utiles à chaque étape'] },
@@ -47,12 +47,11 @@ export const ROLES = [
   },
   {
     id: 'communication', label: 'Communication', summary: 'Contenus, réseaux sociaux, relations presse et image de marque.',
-    sections: ['linkedin', 'promo'],
+    sections: ['linkedin', 'instagram', 'newsletter', 'promo'],
     tasks: [
       { id: 'idees_contenus', label: 'Idées de contenus sur 4 semaines', brief: 'Propose un programme de contenus pour 4 semaines : sujets, format, plateforme et accroche de chacun.', sections: ['Fil rouge du mois', 'Programme semaine par semaine', 'Accroche de chaque contenu', 'Idées à réutiliser sur plusieurs plateformes'] },
-      { id: 'reseaux', label: 'Posts pour Instagram, X et Facebook', brief: 'Écris un lot de posts adaptés à chaque réseau (longueur, ton, hashtags), à partir des mêmes idées.', sections: ['Posts Instagram', 'Posts X', 'Posts Facebook', 'Visuels à prévoir'] },
+      { id: 'ligne_editoriale', label: 'Ligne éditoriale et ton de marque', brief: 'Définis la ligne éditoriale du produit : la voix de la marque (avec des exemples de phrases à faire et à éviter), les thèmes récurrents, les formats par canal et la fréquence de publication.', sections: ['Voix et ton de la marque', 'Thèmes récurrents', 'Formats par canal', 'Rythme de publication', 'À faire et à éviter'] },
       { id: 'communique', label: 'Communiqué de presse', brief: 'Rédige un communiqué de presse sur un fait réel du produit. Si aucun fait précis n\'est donné, propose le meilleur angle et marque les éléments à confirmer.', sections: ['Titre', 'Chapeau', 'Corps du communiqué', 'Citation (à faire valider)', 'À propos', 'Contact presse (à renseigner)'] },
-      { id: 'newsletter', label: 'Newsletter', brief: 'Rédige une newsletter prête à envoyer : objet, aperçu, contenu et appel à l\'action.', sections: ['Objet et texte d\'aperçu', 'Introduction', 'Contenu principal', 'Appel à l\'action', 'Pied de message'] },
       { id: 'incident_com', label: 'Message en cas d\'incident', brief: 'Prépare les messages à publier en cas de panne ou d\'incident : première annonce, point d\'étape, clôture et excuses.', sections: ['Première annonce', 'Point d\'étape', 'Message de clôture', 'Réponse type aux clients mécontents', 'Qui valide quoi'] },
     ],
   },

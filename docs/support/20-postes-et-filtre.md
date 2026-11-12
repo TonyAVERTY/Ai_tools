@@ -1,19 +1,15 @@
-# Postes et filtre par poste : les tâches IA d'une entreprise
-Résumé : comment filtrer les projets par poste (Commerce, Communication, Finance…), lancer les tâches IA d'un poste depuis « Postes et tâches IA », lire et copier le livrable, droits et limites. La liste complète des postes et tâches est dans postes-et-taches-ia.md.
+# Postes : les tâches IA d'une entreprise
+Résumé : où trouver les postes (Commerce, Communication, Finance…) dans l'onglet Outils IA d'un projet, lancer les tâches IA d'un poste depuis « Postes et tâches IA », lire et copier le livrable, droits et limites. La liste complète des postes et tâches est dans postes-et-taches-ia.md.
 
 ## À quoi ça sert
-Une entreprise est faite de postes : Direction, Commerce, Marketing, Communication, Produit, Développement, Support client, Finance, Juridique et conformité, Ressources humaines, Opérations et qualité. Dans un projet, chaque poste a ses tâches faites par l'IA. Les fonctions qui existaient déjà (Prospecter, LinkedIn, Promotion, Évolution, Audit du projet, Récapitulatif, Cible) sont rattachées à leur poste ; les autres sont dans la section **Postes et tâches IA**.
+Une entreprise est faite de postes : Direction, Commerce, Marketing, Communication, Produit, Développement, Support client, Finance, Juridique et conformité, Ressources humaines, Opérations et qualité. Dans un projet, chaque poste a ses tâches faites par l'IA. Les fonctions qui existaient déjà (Prospection, LinkedIn, Promotion, Évolution, Audit du projet, Récapitulatif, Cible) sont rattachées à leur poste ; les autres sont dans la section **Postes et tâches IA** de l'onglet **Outils IA**.
 
-## Filtrer par poste
-1. Sur la page **Projets**, en haut à droite, à côté de **Nouveau projet**, la liste **Poste** propose : **Tous les postes**, **Direction**, **Commerce**, **Marketing**, **Communication**, **Produit**, **Développement**, **Support client**, **Finance**, **Juridique et conformité**, **Ressources humaines**, **Opérations et qualité**.
-2. Choisis un poste : **tous tes projets** n'affichent plus que les sections de ce poste (par exemple Commerce : Cible et Prospecter), et la section **Postes et tâches IA** s'ouvre sur ce poste seulement.
-3. **Tous les postes** réaffiche tout.
-- Les sections **En-tête** et **Configuration du projet** restent toujours visibles.
-- Le filtre choisi est mémorisé dans ton navigateur ; il ne change rien aux données ni pour les autres membres de l'équipe. La liste n'apparaît que lorsque tu as au moins un projet.
-- Un poste sans section dédiée (Support client, Finance, Juridique et conformité, Ressources humaines, Opérations et qualité) n'affiche que **Postes et tâches IA**.
+## Où sont les postes
+Dans un projet, onglet **Outils IA** (adresse `/p/N/outils`) : la section **Postes et tâches IA** liste les postes **Direction**, **Commerce**, **Marketing**, **Communication**, **Produit**, **Développement**, **Support client**, **Finance**, **Juridique et conformité**, **Ressources humaines** et **Opérations et qualité**, chacun avec ses tâches. Les fonctions déjà présentes ailleurs restent dans leur onglet : Cible et Prospects dans **Prospection**, LinkedIn et Promotion dans **Communication**, Évolution et Audit du projet dans **Outils IA**, Récapitulatif dans **Récapitulatif**.
+Le filtre « Poste » de l'ancienne page Projets n'existe plus : chaque onglet ne montre que ses sections, et tous les postes sont au même endroit.
 
 ## Lancer une tâche
-1. Ouvre la section **Postes et tâches IA** (ou filtre sur un poste), puis le poste voulu.
+1. Ouvre l'onglet **Outils IA** du projet, section **Postes et tâches IA**, puis le poste voulu.
 2. Chaque tâche a un nom, une description et un champ **Précisions** (facultatif, jusqu'à 1000 caractères) : le client visé, le ton, une contrainte, un sujet précis.
 3. Clique **Lancer la tâche**. Elle apparaît dans le menu **Activité** de la barre du haut avec sa progression ; comme les autres tâches IA, elle peut attendre si le quota ou le budget est atteint.
 4. Quand elle est terminée, **Voir le résultat** ouvre le livrable dans une fenêtre ; **Copier le livrable (Markdown)** le copie, **Fermer** referme la fenêtre.

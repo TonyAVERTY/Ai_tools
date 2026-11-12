@@ -38,7 +38,7 @@ for (const [who, u, priced] of [['abonnement', sub, false], ['clé API', api, tr
       ok(/\$/.test(card) && /IA via iaboss/.test(card), `${tag} carte « Consommation Claude » : lignes « IA via iaboss » en $`);
     } else {
       // Abonnement : aucun montant nulle part, et pas de carte vide quand le quota n'est pas mesuré
-      ok(!(await p.locator('.dash').innerText()).includes('$'), `${tag} page Projets : aucun montant en $`);
+      ok(!(await p.locator('#contenu').innerText()).includes('$'), `${tag} page Aujourd'hui : aucun montant en $`);
       await p.waitForSelector('[data-claude-card]:not([hidden]) .g-r');
       const notes = await p.locator('[data-usage-claude] .g-r').allInnerTexts();
       ok(notes.length === 2 && notes.every((n) => /^Remise à zéro (aujourd'hui|demain|[a-zé]+) à \d\d:\d\d$/.test(n)), `${tag} carte « Consommation Claude » : date de remise à zéro sous chaque barre (${notes.join(' | ')})`);

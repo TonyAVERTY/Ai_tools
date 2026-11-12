@@ -12,6 +12,7 @@ import { snapshotAll } from './metrics.js';
 import { runInactiveCleanup } from './inactive.js';
 import { publishDuePosts } from '../linkedin.js';
 import { purgeAudit } from '../audit.js';
+import { expireGrace, purgeEvents } from '../subscriptions.js';
 import { INACTIVITY } from '../limits.js';
 import { now } from '../db.js';
 
@@ -57,6 +58,8 @@ export class Scheduler {
       }
       await this.queueFollowups();
       try { await publishDuePosts(this.app, { at: this.clock() }); } catch (e) { this.log.error('[linkedin programmés]', e.message); }
+      // Offres payantes : délai de grâce écoulé après un paiement refusé → retour au plan gratuit ; vieux événements Stripe oubliés
+      try { await expireGrace(this.app.db, { at: this.clock() }); await purgeEvents(this.app.db, { at: this.clock() }); } catch (e) { this.log.error('[abonnements]', e.message); }
       const users = await this.app.db.prepare(`SELECT s.user_id FROM user_settings s JOIN users u ON u.id = s.user_id
         WHERE s.\`key\` = 'weekly_report' AND s.value = '1' AND u.status = 'active'`).all();
       for (const { user_id: userId } of users) {

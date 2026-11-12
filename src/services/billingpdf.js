@@ -22,19 +22,26 @@ export function filler(values = {}) {
 }
 
 /**
- * @param {{ kind: string, content: object, legal: object, layout?: string, values?: object }} d
+ * @param {{ kind: string, content: object, legal: object, layout?: string, values?: object, brand?: { theme: object, fonts?: object, logo?: object }|null }} d
+ * `brand` : identité du projet (couleurs sûres, police et logo déjà chargés) ; sans elle, la mise en page choisie garde ses couleurs.
  * @returns {Buffer} le PDF
  */
-export function renderDocumentPdf({ kind, content, legal, layout = 'classique', values = {}, facts = {} }) {
-  const th = THEMES[layout] || THEMES.classique;
+export function renderDocumentPdf({ kind, content, legal, layout = 'classique', values = {}, facts = {}, brand = null }) {
+  const base = THEMES[layout] || THEMES.classique;
+  const bt = brand?.theme || null;
+  // Identité du projet : sa couleur remplace celle de la mise en page, la structure (filets, taille du titre) reste celle choisie
+  const th = bt ? { ...base, serif: false, accent: bt.accent, head: bt.accent, tint: bt.tint } : base;
+  const fs = bt?.fontScale || 1;          // échelle du texte courant
+  const rowPad = bt?.rowPad ?? 12;        // espace sous chaque ligne du tableau
+  const ink = bt?.text || '#222222';
   const c = content;
   const f = documentFacts({ kind, content: c, legal, ...facts });
   const v = filler(values);
-  const doc = new Pdf({ serif: th.serif, title: `${c.title}${values.numero ? ` ${values.numero}` : ''}`, author: legal.legal_name });
+  const doc = new Pdf({ serif: th.serif, fonts: brand?.fonts || null, title: `${c.title}${values.numero ? ` ${values.numero}` : ''}`, author: legal.legal_name });
   let y = M;
 
   const ensure = (h) => { if (y + h > BOTTOM) { doc.newPage(); y = M; } };
-  const paragraphs = (str, { size = 10, bold = false, color = '#222222', gap = 6, x = M, w = W } = {}) => {
+  const paragraphs = (str, { size = 10 * fs, bold = false, color = ink, gap = 6, x = M, w = W } = {}) => {
     for (const para of String(str || '').split(/\n{2,}/).map((p) => p.trim()).filter(Boolean)) {
       for (const ln of doc.wrap(para, w, size, bold)) { ensure(size + 3); doc.text(x, y + size, ln, { size, bold, color }); y += size + 3.2; }
       y += gap;
@@ -51,9 +58,15 @@ export function renderDocumentPdf({ kind, content, legal, layout = 'classique', 
     avoir: [`Avoir n° ${v('numero')}`, `Date : ${v('date', frDate)}`, `Sur la facture n° ${v('facture_numero')}`],
   }[kind] || [];
   let ly = y + 12;
+  // Logo du projet à gauche, au-dessus de l'éditeur
+  if (brand?.logo && !bt?.hideLogo) {
+    const lh = bt?.logoHeight || 44, lw = Math.min(170, lh * (brand.logo.width / brand.logo.height)), lh2 = lw / (brand.logo.width / brand.logo.height);
+    doc.image(brand.logo, M, y, lw, lh2);
+    ly += lh2 + 10;
+  }
   left.forEach((ln, i) => { doc.text(M, ly, ln, { size: i === 0 ? 13 : 9.5, bold: i === 0, color: i > 2 ? '#666666' : '#1c1c1c' }); ly += i === 0 ? 17 : 13; });
-  doc.text(M + W, y + th.title, c.title, { size: th.title, bold: layout !== 'epure', color: th.head, align: 'right', spacing: th.spacing });
-  let ry = y + th.title + 20;
+  doc.text(M + W, y + th.title, c.title, { size: th.title * (bt?.titleScale || 1), bold: layout !== 'epure', color: th.head, align: 'right', spacing: th.spacing });
+  let ry = y + th.title * (bt?.titleScale || 1) + 20;
   meta.forEach((ln) => { doc.text(M + W, ry, ln, { size: 9.5, align: 'right' }); ry += 13; });
   y = Math.max(ly, ry) + 8;
   doc.line(M, y, M + W, y, { width: th.rule, color: th.accent });
@@ -64,7 +77,7 @@ export function renderDocumentPdf({ kind, content, legal, layout = 'classique', 
   const clientLines = [v('client_nom'), v('client_adresse'), v('client_siret') === '' ? '' : `SIRET : ${v('client_siret')}`];
   const addrLines = doc.wrap(clientLines[1], boxW - 20, 9.5);
   const boxH = 18 + 14 + addrLines.length * 13 + (clientLines[2] ? 13 : 0) + 8;
-  doc.rect(M + W - boxW, y, boxW, boxH, { fill: th.tint, stroke: layout === 'moderne' ? '#c7d2fe' : '#999999', width: 0.6 });
+  doc.rect(M + W - boxW, y, boxW, boxH, { fill: th.tint, stroke: bt ? bt.edge : layout === 'moderne' ? '#c7d2fe' : '#999999', width: 0.6 });
   doc.text(M + W - boxW + 10, y + 15, 'Client', { size: 9.5, bold: true });
   let cy = y + 29;
   doc.text(M + W - boxW + 10, cy, clientLines[0], { size: 10, bold: true }); cy += 14;
@@ -91,7 +104,7 @@ export function renderDocumentPdf({ kind, content, legal, layout = 'classique', 
   for (const r of f.rows) {
     const lab = doc.wrap(r.label, labelW, 10, true);
     const desc = r.description ? doc.wrap(r.description, labelW, 8.5) : [];
-    const h = lab.length * 13 + desc.length * 11.5 + 12;
+    const h = lab.length * 13 + desc.length * 11.5 + rowPad;
     if (y + h > BOTTOM) { doc.newPage(); y = M; head(); }
     let ty = y + 11;
     for (const ln of lab) { doc.text(M + 6, ty, ln, { size: 10, bold: true }); ty += 13; }

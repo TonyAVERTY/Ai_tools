@@ -14,12 +14,11 @@ service commercial. Le ton de la marque : franc, concret, on se tutoie, on dit c
 Le vocabulaire visuel vient donc de la **correspondance** : une feuille posée sur un bureau, un texte composé comme du courrier, une
 annotation en marge, un fil de conversation. Pas de décor « technologique » (réseau de points, rubans lumineux, bulles).
 
-> Le concept en une phrase : **un bureau bleu-gris sur lequel on pose des feuilles blanches bien composées ; la couleur n'apparaît que
-> là où il y a une action, un état, ou le fil de la conversation.**
+> Le concept en une phrase : **du papier (Lin) sur lequel on écrit à l'encre (Pétrole) ; le Safran n'est que le surligneur, là où il y a une
+> action à ne pas rater.**
 
-L'identité existante est conservée : l'indigo du logo (`#1e296a`) et le bleu-cyan du ruban (`#1288b7` → `#0db8c5`). Ce qui change,
-c'est leur emploi : l'indigo porte l'action principale, le bleu sert aux liens et au focus, le dégradé n'existe plus que dans le
-logo, le fil de la page d'accueil et les barres de progression.
+Charte « Lin, Pétrole, Safran » (trois couleurs : deux dominantes et une touche). Elle remplace l'ancienne identité indigo et bleu-cyan ;
+le logo garde sa forme, son point devient Safran.
 
 ## 2. Ce qu'on évite, et pourquoi (relu contre le plan)
 
@@ -44,47 +43,43 @@ de page).
 
 ## 3. Couleurs
 
-Une seule palette, deux thèmes (clair par défaut, sombre selon le système). Toutes les valeurs sont dans `tokens.css`.
+Trois couleurs, deux thèmes (clair par défaut, sombre selon le système). Toutes les valeurs sont dans `tokens.css` ; `test/tokens.test.js`
+échoue sur toute couleur en dur dans `app.css`, `site.css` ou `responsive.css`.
 
-| Rôle | Jeton | Clair | Usage |
+| Part | Couleur | Échelle | Rôle |
 |---|---|---|---|
-| Bureau | `--bg` | `#f1f3f9` | fond des pages |
-| Creux | `--bg-sunk` | `#e6eaf4` | zones en retrait, champs désactivés, bandeau d'état |
-| Feuille | `--card` | `#ffffff` | panneaux, champs, fenêtres |
-| Encre | `--text` | `#0e1535` | texte |
-| Marge | `--muted` | `#4a5782` | texte secondaire, annotations |
-| Indigo | `--indigo`, `--primary` | `#1e296a` (sombre : `#4356c9`) | action principale, onglet actif, bloc inversé |
-| Bleu | `--accent`, `--link` | `#1288b7`, `#0b6f96` | liens, focus, sélection |
-| Cyan | `--accent-2` | `#0db8c5` | seulement le fil et la fin du dégradé |
-| Filets | `--line`, `--line-strong`, `--control` | `#d5dbeb`, `#b4bed8`, `#6f7ea5` | bordures, séparateurs, contour des champs |
-| États | `--ok` `--warn` `--err` `--info` (+ `-bg`) | vert, ambre, rouge, bleu | toujours avec un mot ou une icône, jamais la couleur seule |
+| ~60 % | **Lin** (papier) | `--lin-50` à `--lin-600` | fonds : bureau `--bg` (`#f6f1e6`), feuille `--card` (`#fffcf6`), creux `--bg-sunk`, filets |
+| ~30 % | **Pétrole** (encre) | `--pet-100` à `--pet-950` | texte `--text`, action `--primary`, barre du haut `--nav-bg`, liens, états ok et info |
+| ≤ 10 % | **Safran** (surligneur) | `--saf-100` à `--saf-700` | une touche : onglet courant, pastille de compte, série « réponses », accroche surlignée `--mark`, attention `--warn` |
 
-Contrastes : chaque couple texte/fond est vérifié à 4,5:1 (clair et sombre) par `test/site.test.js` ; le contour des champs vise 3:1.
+Les échelles brutes (`--pet-700`…) ne s'emploient pas dans les composants : on utilise les jetons sémantiques (`--bg`, `--card`, `--text`,
+`--muted`, `--primary`, `--accent`, `--ok`, `--warn`, `--err`, `--info`, `--line`, `--control`, `--mark`, `--chart-1` à `-3`, `--scrim`, `--doc-bg`).
+
+Exception assumée : **Brique** (`--err`, `--err-bg`) pour les erreurs et les actions destructives seulement. Une information n'est jamais portée
+par la couleur seule : toujours une icône et un mot.
+
+Contrastes : chaque couple texte/fond est vérifié à 4,5:1 (clair et sombre) et le contour des champs à 3:1, par `test/site.test.js`.
 
 ## 4. Typographie
 
-Deux familles, libres (SIL OFL), **servies par l'application** (`public/fonts/`, `font-display: swap`, sous-ensemble latin) :
+Deux familles libres (SIL OFL), **servies par l'application** (`public/fonts/`, `font-display: swap`, licences à côté) :
 
-- **Source Serif 4** (variable, graisses 200 à 900) : **le site public et la marque** (logo, titres du site, prix, lettre d'exemple).
-  Un serif d'édition à fort dessin, qui donne au site son ton de courrier posé, loin des grotesques par défaut.
-- **Hanken Grotesk** (variable, 100 à 900) : **toute l'application** (titres de page, panneaux, indicateurs, tableaux, formulaires) et le
-  texte courant du site. Humaniste, très lisible en petits corps et avec les accents français. Un écran d'exploitation n'a pas le ton
-  d'une page d'accueil : pas de serif dans le tableau de bord, sauf le mot « iaboss » du logo.
+- **Fraunces** (variable, 100 à 900) : titres, chiffres clés, prix et logo (`--display`, alias `--serif`), jamais en dessous de 18 px.
+- **Instrument Sans** (variable, 400 à 700) : toute l'interface et le texte courant (`--font`).
 - Données techniques (adresses, URL, code) : `ui-monospace` du système, aucun fichier de plus.
 
 Échelle (rem ; les titres du site sont fluides) :
 
 | Niveau | Taille | Police | Remarque |
 |---|---|---|---|
-| Titre de page (site) | `clamp(2.5rem, 5.2vw, 3.9rem)` | Source Serif 4, 600 | interligne 1,05, approche -0,02em |
-| Titre de section | `clamp(1.75rem, 3vw, 2.375rem)` | Source Serif 4, 600 | interligne 1,15 |
-| Titre de panneau | 1,25 | Source Serif 4, 600 | |
-| Texte courant | 1 (1,0625 en lecture longue) | Hanken Grotesk, 400 | interligne 1,6, ligne de 66 caractères au plus |
-| Interface | 0,9375 | Hanken Grotesk, 500/600 | boutons, champs, onglets |
-| Annotation | 0,8125 à 0,875 | Hanken Grotesk, 400/500 | casse normale, jamais en capitales |
+| Titre de page | `clamp(2rem, 4vw, 2.75rem)` | Fraunces, 600 | interligne 1,05, approche -0,02em |
+| Titre de section | 1,25 | Fraunces, 600 | |
+| Texte courant | 1 | Instrument Sans, 400 | interligne 1,55, ligne de 66 caractères au plus |
+| Interface | 0,9375 | Instrument Sans, 500/600 | boutons, champs, onglets |
+| Annotation | 0,8125 à 0,875 | Instrument Sans, 400/500 | casse normale, jamais en capitales |
 
 Règles : pas de mot isolé mis en couleur ou en italique dans un titre ; pas de capitales espacées ; chiffres tabulaires pour les prix
-et les compteurs ; texte aligné à gauche partout (aucun bloc marketing centré).
+et les compteurs ; texte aligné à gauche partout.
 
 ## 5. Composition
 
@@ -92,8 +87,8 @@ et les compteurs ; texte aligné à gauche partout (aucun bloc marketing centré
   que des rangées de quatre cartes.
 - **Rythme vertical** : 96 px entre sections sur bureau, 64 px sur tablette, 48 px sur téléphone ; le texte courant respire à l'intérieur
   d'une section (16 à 24 px entre paragraphes).
-- **Alternance de densité** : une section sur trois change de fond (bureau, feuille, bloc indigo) ; un seul bloc inversé par page.
-- **Rayons** : 6 px (champs, boutons), 10 px (panneaux), 999 px uniquement pour une pastille d'état, un avatar et les nœuds du fil. Un panneau n'a pas le même rayon
+- **Alternance de densité** : une section sur trois change de fond (bureau, feuille, bloc Pétrole) ; un seul bloc inversé par page.
+- **Rayons** : 6 px (badges, cases), 10 px (boutons, champs), 16 px (feuilles : panneaux et fenêtres), 999 px uniquement pour une pastille d'état, un avatar et les nœuds du fil. Un panneau n'a pas le même rayon
   qu'un bouton.
 - **Ombres** : aucune sur les panneaux (la bordure suffit) ; une ombre portée uniquement sous les fenêtres flottantes (menus, dialogues,
   notifications).
@@ -104,19 +99,19 @@ et les compteurs ; texte aligné à gauche partout (aucun bloc marketing centré
 
 | Composant | Règle |
 |---|---|
-| Bouton principal | plein indigo, texte blanc, 44 px de haut ; survol : indigo plus clair ; pas de soulèvement, pas de flèche décorative |
-| Bouton secondaire | fond feuille, bordure, texte encre ; survol : bordure indigo |
-| Lien | bleu soulignement décalé de 3 px ; survol : soulignement épaissi |
-| Champ | fond feuille, bordure `--control`, 44 px de haut, focus : anneau bleu de 2 px décalé |
+| Bouton principal | plein Pétrole, texte Lin, 44 px de haut ; survol : Pétrole plus foncé ; pas de soulèvement, pas de flèche décorative |
+| Bouton secondaire | fond feuille, bordure, texte encre ; survol : bordure Pétrole |
+| Lien | Pétrole, soulignement décalé de 3 px ; survol : soulignement épaissi |
+| Champ | fond feuille, bordure `--control`, 44 px de haut, focus : anneau Pétrole de 3 px décalé |
 | Pastille d'état | un mot, couleur de l'état en fond clair ; avec l'avatar et les nœuds du fil, seul élément arrondi à 999 px |
-| Panneau | feuille blanche, bordure fine, rayon 10 px ; titre en Hanken Grotesk 600 dans l'application, en Source Serif 4 sur le site |
+| Panneau | feuille Lin, bordure fine, rayon 16 px ; titre en Fraunces 600 |
 | Indicateur du plan | quatre cellules en tête de la page Projets (libellé, valeur en chiffres tabulaires, plafond) ; mêmes données que `usageView`, jamais d'estimation ; attention à 80 %, erreur à 100 % |
 | Filtre en chiffres (Mails) | une barre de cellules « nombre + état » qui sert aussi de filtre ; les états d'échec passent en rouge dès qu'il y en a |
 | Panneau « À venir » (Calendrier) | liste des prochains éléments réels, regroupés par jour ; vide, il le dit sans rien inventer |
 | Tableau des offres (Tarifs) | une ligne par offre, une colonne par plafond ; chaque ligne devient un bloc libellé sur téléphone |
 | Capture réelle | image de l'application avec ses données d'exemple, signalée dans la légende, clair et sombre (`<picture>`) |
 | Liste de sections (projet) | lignes séparées par un filet : titre, sous-titre en marge, chevron ; coche verte quand tout est fait ; pas d'icône |
-| Onglets de navigation | texte, soulignement indigo de 2 px pour la page courante ; même principe sur le site et dans l'application |
+| Onglets de navigation | texte, soulignement Safran de 3 px pour la page courante ; même principe sur le site et dans l'application |
 | Tableau | en-têtes en casse normale, graisse 600, filets horizontaux seulement |
 | Fenêtres et menus | seuls éléments avec ombre ; apparition courte (120 ms) |
 | États vides | une phrase qui dit quoi faire, un bouton ; pas d'illustration ni de pastille d'icône |
@@ -134,11 +129,18 @@ Principe : le mouvement répond à une action ou signale un changement ; il n'es
 
 ## 8. Responsive
 
-Trois paliers : téléphone (< 640 px), tablette (640 à 899 px), bureau (≥ 900 px).
-- Téléphone : une colonne ; la lettre d'exemple passe sous le titre, pleine largeur ; la chronologie garde son fil à gauche ; les
-  grilles d'offres deviennent des lignes ; la navigation défile horizontalement ; cibles tactiles de 44 px.
-- Tablette : deux colonnes lorsque le contenu s'y prête ; la lettre reste sous le titre jusqu'à 900 px.
+Conteneur du site : 1160 px au plus, 20 px de marge sur téléphone, 24 px dès 640 px. Les grilles de l'accueil ont des points de rupture
+**explicites** (pas de colonnes « auto-fit » qui laissent des cases vides) : 560 px (deux colonnes : chaîne, étapes, confiance), 600 px
+(faits, offres en 2×2), 940 px (accroche et lettre côte à côte, lettre inclinée d'un degré, titre et contenu en deux colonnes),
+1000 px (chaîne en 5 colonnes, étapes en 4), 1060 px (quatre offres sur une ligne). Quand une grille a un nombre impair d'éléments sur
+deux colonnes, le dernier prend toute la largeur.
+- Téléphone : une colonne ; en-tête sur deux lignes (marque et « Créer mon compte » en haut, liens dessous), « Connexion » masqué sous
+  420 px de large ; boutons de l'accroche et de l'appel final pleins ; tailles de titres fluides (`clamp`) ; cibles tactiles de 44 px.
+- Tablette : deux colonnes lorsque le contenu s'y prête ; l'en-tête tient sur une ligne dès 760 px.
 - Bureau : compositions asymétriques, lettre à droite du titre, sommaire collant dans la documentation.
+
+Vérification : `scripts/vitrine-check.mjs` (Chromium) parcourt l'accueil et les pages intérieures de 320 à 1920 px, en clair et en sombre :
+aucun défilement horizontal, aucun élément qui dépasse, cibles de 44 px, en-tête sur une ligne dès 760 px.
 
 ## 9. Ton des textes
 

@@ -1,122 +1,132 @@
-/* Jetons de design d'iaboss. Voir docs/DESIGN.md : un bureau bleu-gris, des feuilles blanches, l'indigo du logo pour l'action.
-   Source unique des couleurs, rayons, ombres, durées et polices : le site public et l'application les lisent via var(--…),
-   rien n'est redéfini ailleurs. Thème sombre = réglage du système (prefers-color-scheme).
-   Le dégradé du logo n'est utilisé que pour le fil des étapes et les barres de progression, jamais pour du texte ni des boutons. */
+/* Jetons de design d'iaboss : charte « Lin, Pétrole, Safran » (docs/DESIGN.md).
+   Deux dominantes (Lin = le papier, Pétrole = l'encre et l'action) et une touche (Safran = le surligneur, 10 % de l'écran au plus).
+   Source unique des couleurs, rayons, ombres, durées et polices : le site public et l'application les lisent via var(--…), rien n'est redéfini ailleurs
+   (test/tokens.test.js échoue sur toute couleur en dur dans app.css et site.css). Thème sombre = réglage du système (prefers-color-scheme).
+   Une information n'est jamais portée par la couleur seule : toujours une icône et un mot. */
 
-/* Polices embarquées (public/fonts, licence OFL) : sous-ensembles latin, graisse variable */
 @font-face {
-  font-family: "Source Serif 4";
-  src: url("/static/fonts/source-serif-4.woff2") format("woff2");
-  font-weight: 200 900;
-  font-style: normal;
-  font-display: swap;
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-@font-face {
-  font-family: "Hanken Grotesk";
-  src: url("/static/fonts/hanken-grotesk.woff2") format("woff2");
+  font-family: "Fraunces";
+  src: url("/static/fonts/fraunces.woff2") format("woff2");
   font-weight: 100 900;
   font-style: normal;
   font-display: swap;
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 @font-face {
-  font-family: "Hanken Grotesk";
-  src: url("/static/fonts/hanken-grotesk-ext.woff2") format("woff2");
-  font-weight: 100 900;
+  font-family: "Instrument Sans";
+  src: url("/static/fonts/instrument-sans.woff2") format("woff2");
+  font-weight: 400 700;
   font-style: normal;
   font-display: swap;
-  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 
 :root {
-  /* rayons : un contrôle (6) n'a pas le même rayon qu'un panneau (10) ; 999 px seulement pour une pastille d'état */
-  --radius-sm: 6px;
-  --radius: 8px;
-  --radius-lg: 10px;
-  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px;
-  --s-5: 24px; --s-6: 32px; --s-7: 48px; --s-8: 64px;
-  --ease: cubic-bezier(.2, .7, .2, 1);
-  --t-fast: 120ms; --t: 180ms; --t-slow: 320ms;
-  /* typographie : Hanken Grotesk pour l'interface, Source Serif 4 pour les titres et les chiffres, monospace du système pour les adresses et le code */
-  --font: "Hanken Grotesk", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --serif: "Source Serif 4", "Iowan Old Style", Georgia, "Times New Roman", serif;
+  /* ——— Échelles brutes (ne s'emploient pas directement dans les composants) ——— */
+  /* Dominante 1 : Pétrole (encre profonde bleu-vert) */
+  --pet-950: #071d22; --pet-900: #0b2b32; --pet-850: #0b3540; --pet-800: #0b3d48; --pet-700: #0f4c59;
+  --pet-600: #0f5c6c; --pet-550: #3f5e65; --pet-400: #5bb0c0; --pet-300: #7cc4d2; --pet-200: #c5dee3; --pet-100: #dcebee;
+  /* Dominante 2 : Lin (papier chaud) */
+  --lin-50: #fffcf6; --lin-100: #f6f1e6; --lin-150: #fbf7ee; --lin-200: #ece4d2; --lin-300: #ddd3bd; --lin-400: #bfb294; --lin-600: #7c7357;
+  /* Accent : Safran (le surligneur) */
+  --saf-700: #7a4f00; --saf-500: #f2b632; --saf-400: #f2c45a; --saf-300: #f7d58a; --saf-100: #fbebc0;
+  /* Exception proposée (états d'erreur seulement) : Brique */
+  --brick-700: #a5301d; --brick-100: #f8e2da;
+
+  /* ——— Surfaces et texte (thème clair) ——— */
+  --bg: var(--lin-100);          /* le bureau */
+  --bg-sunk: var(--lin-200);     /* zones en retrait, champs désactivés */
+  --card: var(--lin-50);         /* la feuille */
+  --card-2: var(--lin-150);      /* feuille légèrement teintée (ligne survolée, bandeau) */
+  --text: var(--pet-900);
+  --muted: var(--pet-550);
+  --link: var(--pet-600);
+  --focus: var(--pet-600);
+  --line: var(--lin-300);
+  --line-strong: var(--lin-400);
+  --control: var(--lin-600);     /* contour des champs : 4,6:1 sur la feuille */
+
+  /* ——— Action principale et navigation (Pétrole) ——— */
+  --primary: var(--pet-700);
+  --primary-hover: var(--pet-800);
+  --primary-active: var(--pet-900);
+  --on-primary: var(--lin-50);
+  --nav-bg: var(--pet-850);
+  --nav-on: var(--lin-100);
+  --logo-ink: var(--pet-900);
+  --on-nav-muted: var(--pet-200);   /* texte secondaire sur un fond Pétrole (barre du haut, offre mise en avant) */
+
+  /* ——— Accent (Safran) : petites touches, jamais seul pour porter une information ——— */
+  --accent: var(--saf-500);
+  --on-accent: var(--pet-900);
+  --accent-text: var(--saf-700);   /* texte et icône safran sur fond clair */
+  --accent-bg: var(--saf-100);
+  --mark: var(--saf-300);          /* surlignage de l'accroche dans un mail */
+  --on-mark: var(--pet-900);
+
+  /* ——— États : une icône et un mot toujours, la couleur ne suffit jamais ——— */
+  --ok: var(--pet-600);    --ok-bg: var(--pet-100);
+  --info: var(--pet-600);  --info-bg: var(--pet-100);
+  --warn: var(--saf-700);  --warn-bg: var(--saf-100);
+  --err: var(--brick-700); --err-bg: var(--brick-100); --on-err: var(--lin-50);
+
+  /* ——— Graphiques : une teinte de la marque + l'accent ; les séries se distinguent aussi par la forme et l'étiquette directe ——— */
+  --chart-1: var(--pet-700);
+  --chart-2: var(--saf-500);
+  --chart-3: var(--pet-400);
+  --chart-grid: var(--line);
+  --chart-label: var(--muted);
+
+  /* ——— Documentation : code (toujours sombre), méthodes HTTP ——— */
+  --code-bg: var(--pet-950); --code-fg: var(--lin-100); --code-muted: #9db4b9; --code-line: #1b3b43; --code-hover: #10303a;
+  --tk-k: var(--pet-300); --tk-s: var(--saf-400); --tk-n: var(--lin-100); --tk-b: var(--pet-400); --tk-c: #7f989d;
+  --m-get: var(--pet-700); --m-post: var(--saf-700); --on-m: var(--lin-50);
+
+  /* ——— Typographie ——— */
+  --display: "Fraunces", "Iowan Old Style", Georgia, "Times New Roman", serif;   /* titres, chiffres clés, logo */
+  --font: "Instrument Sans", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --serif: var(--display);   /* alias : l'ancien nom reste valable pendant la migration */
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
 
-  /* marque */
-  --indigo: #1e296a;
-  --accent: #1288b7;
-  --accent-2: #0db8c5;
-  --grad: linear-gradient(90deg, #1288b7, #0db8c5);
-  --on-grad: #081022;
-  /* action principale : plein indigo (clair) */
-  --primary: #1e296a;
-  --primary-hover: #2a3890;
-  --on-primary: #ffffff;
-
-  /* clair : le bureau, la feuille, l'encre */
-  --bg: #f1f3f9;
-  --bg-sunk: #e6eaf4;
-  --card: #ffffff;
-  --card-2: #f7f8fc;
-  --text: #0e1535;
-  --muted: #4a5782;
-  --link: #0b6f96;
-  --line: #d5dbeb;
-  --line-strong: #b4bed8;
-  --control: #6f7ea5;
-  --logo-ink: #1e296a;
-  --nav-on-bg: #1e296a;
-  --nav-on-text: #e1e9f6;
-  --ok: #0e6b43; --ok-bg: #e2f4ea;
-  --warn: #8a5200; --warn-bg: #fdf0d8;
-  --err: #b4233a; --err-bg: #fde7eb;
-  --info: #0b6f96; --info-bg: #e1f1f8;
-  --on-err: #ffffff;
-  /* surlignage de l'accroche dans la lettre d'exemple */
-  --mark: #fbe9a8;
-  --on-mark: #0e1535;
-  /* documentation : blocs de code (toujours sombres) et méthodes HTTP */
-  --code-bg: #0f1a33; --code-fg: #e6edf9; --code-muted: #9fb0d0; --code-line: #2a3a5e; --code-hover: #1b2b4d;
-  --tk-k: #7cc4ff; --tk-s: #a5e3a1; --tk-n: #ffcb7b; --tk-b: #f59ad4; --tk-c: #8c9bbd;
-  --m-get: #12633b; --m-post: #1a55bd; --on-m: #ffffff;
-  /* pas d'ombre sous les panneaux (la bordure suffit) ; seules les fenêtres flottantes en ont une */
-  --shadow: none;
-  --shadow-2: 0 6px 18px rgba(21, 30, 83, .12), 0 1px 3px rgba(21, 30, 83, .08);
-  --shadow-3: 0 18px 44px rgba(21, 30, 83, .20), 0 2px 6px rgba(21, 30, 83, .08);
+  /* ——— Espacement (grille de 4), rayons, ombres, durées  ——— */
+  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 24px; --s-6: 32px; --s-7: 48px; --s-8: 64px; --s-9: 96px;
+  --radius-sm: 6px;      /* badges, cases */
+  --radius: 10px;        /* boutons, champs */
+  --radius-lg: 16px;     /* feuilles (panneaux, fenêtres) */
+  --radius-pill: 999px;  /* pastille d'état, avatar */
+  --scrim: rgba(7, 29, 34, .62); --scrim-strong: rgba(7, 29, 34, .78);   /* voile derrière une fenêtre et derrière la visite guidée */
+  --doc-bg: #ffffff;   /* fond d'un document aperçu (mail, devis) : toujours blanc, comme sur le papier ou dans la boîte du destinataire */
+  --shadow: 0 1px 0 rgba(11, 43, 50, .06);   /* une feuille posée : un filet d'ombre dessous */
+  --shadow-2: 0 6px 18px rgba(11, 43, 50, .14), 0 1px 3px rgba(11, 43, 50, .08);
+  --shadow-3: 0 18px 44px rgba(11, 43, 50, .22), 0 2px 6px rgba(11, 43, 50, .10);
+  --ease: cubic-bezier(.2, .7, .2, 1);
+  --t-fast: 120ms; --t: 180ms; --t-slow: 320ms;
   color-scheme: light dark;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0b1224;
-    --bg-sunk: #080e1d;
-    --card: #111a33;
-    --card-2: #16213f;
-    --text: #e1e9f6;
-    --muted: #9aa8c7;
-    --link: #5cc4ec;
-    --line: #212e55;
-    --line-strong: #33447a;
-    --control: #5f71a8;
-    --logo-ink: #e1e9f6;
-    --nav-on-bg: #24307b;
-    --nav-on-text: #e1e9f6;
-    --primary: #4356c9;
-    --primary-hover: #5668dd;
-    --on-primary: #ffffff;
-    --ok: #5fd6a0; --ok-bg: #0e2a26;
-    --warn: #f2b84b; --warn-bg: #2b2310;
-    --err: #ff8a9b; --err-bg: #33141f;
-    --info: #5cc4ec; --info-bg: #0e2a40;
-    --on-err: #2a0a14;
-    --mark: #5a4a14;
-    --on-mark: #fdf3cf;
-    --code-bg: #0a1226; --code-line: #26365a; --code-hover: #17274a;
-    --m-get: #5fd6a0; --m-post: #7cb2ff; --on-m: #071022;
-    --shadow-2: 0 6px 16px rgba(0, 0, 0, .45), 0 1px 3px rgba(0, 0, 0, .4);
-    --shadow-3: 0 22px 54px rgba(0, 0, 0, .6), 0 2px 8px rgba(0, 0, 0, .45);
+    --bg: var(--pet-950); --bg-sunk: #05161a; --card: #0d2a31; --card-2: #12333b;
+    --text: #f3ecdc; --muted: #a9bfc3; --link: var(--pet-300); --focus: var(--pet-300);
+    --line: #1b3b43; --line-strong: #2d5560; --control: #6e9199;
+    --primary: var(--pet-400); --primary-hover: var(--pet-300); --primary-active: var(--pet-200); --on-primary: #06191e;
+    --nav-bg: #04141a; --nav-on: #f3ecdc; --logo-ink: #f3ecdc;
+    --accent: var(--saf-500); --on-accent: var(--pet-900); --accent-text: var(--saf-400); --accent-bg: #3a2b08;
+    --mark: #5a4710; --on-mark: #fdf3cf;
+    --ok: var(--pet-300); --ok-bg: #10333b; --info: var(--pet-300); --info-bg: #10333b;
+    --warn: var(--saf-400); --warn-bg: #3a2b08; --err: #ff9b88; --err-bg: #3a1710; --on-err: #2a0a05;
+    --chart-1: var(--pet-400); --chart-2: var(--saf-500); --chart-3: #2f7f8d;
+    --m-get: var(--pet-300); --m-post: var(--saf-400); --on-m: #06191e;
+    --shadow: none; --shadow-2: 0 6px 16px rgba(0, 0, 0, .5), 0 1px 3px rgba(0, 0, 0, .4); --shadow-3: 0 22px 54px rgba(0, 0, 0, .65), 0 2px 8px rgba(0, 0, 0, .5);
   }
+}
+
+/* ——— Compatibilité (PR 1 seulement) : anciens noms encore lus par app.css et site.css. À retirer écran par écran (temps 3). ——— */
+:root {
+  --indigo: var(--primary);
+  --accent-2: var(--pet-400);
+  --grad: var(--primary);          /* plus de dégradé : barre de progression et fil en Pétrole plein */
+  --on-grad: var(--on-primary);
+  --nav-on-bg: var(--nav-bg);
+  --nav-on-text: var(--nav-on);
 }
 
 /* Transitions de page (public/ajax.js) : le contenu arrive par la droite quand on va vers la droite dans la barre du haut, par la gauche vers la gauche,
@@ -140,6 +150,6 @@
 }
 
 :focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 3px solid var(--focus);
   outline-offset: 2px;
 }

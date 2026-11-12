@@ -1,8 +1,8 @@
 # Comptabilité : lignes, justificatifs, déclaration et exports
-Résumé : la page « Comptabilité » (barre du haut) : ta situation, ajouter une ligne (paiement, dépense, remboursement…) avec son justificatif obligatoire, les chiffres par période et par projet, le guide « Faire ma déclaration » (où déclarer, quoi saisir, quand), les exports (justificatifs en archive, journal CSV) et l'aide pour débutants.
+Résumé : la page « Comptabilité » (onglet **Compta** de la barre du haut) : ta situation, ajouter une ligne (paiement, dépense, remboursement…) avec son justificatif obligatoire, les chiffres par période et par projet, le guide « Faire ma déclaration » (où déclarer, quoi saisir, quand), les exports (justificatifs en archive, journal CSV) et l'aide pour débutants.
 
 ## À quoi sert la page
-« Comptabilité » (barre du haut, entre « Calendrier » et « Équipe ») rassemble pour **tous tes projets** ce qui concerne l'argent : les paiements reçus, les dépenses, les remboursements, les cotisations, chacun avec sa **preuve** (facture, reçu). Elle t'aide à ranger tes pièces, à voir tes chiffres et à savoir quoi déclarer. Elle ne remplace pas un expert-comptable.
+« Comptabilité » (onglet **Compta** de la barre du haut, après « Agenda ») rassemble pour **tous tes projets** ce qui concerne l'argent : les paiements reçus, les dépenses, les remboursements, les cotisations, chacun avec sa **preuve** (facture, reçu). Elle t'aide à ranger tes pièces, à voir tes chiffres et à savoir quoi déclarer. Elle ne remplace pas un expert-comptable.
 La comptabilité est **personnelle** : seules tes propres lignes s'affichent, même pour un projet partagé en équipe, et personne d'autre n'ouvre tes justificatifs.
 
 ## 1. Dire où tu en es (une seule fois)

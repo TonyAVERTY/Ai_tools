@@ -196,6 +196,7 @@ test('envoi : Message-ID journalisé et objets A/B alternés équitablement', as
       assert.equal(l.message_id, s.sentMails[i].messageId);
       assert.match(l.message_id, /^<[^@\s]+@codebzh\.fr>$/);
       assert.equal(l.subject, s.sentMails[i].subject);
+      assert.equal(l.body, 'Bonjour', 'le texte envoyé est gardé pour la page Mails');
     }
     assert.equal(new Set(logs.map((l) => l.message_id)).size, 4, 'Message-ID uniques');
     assert.deepEqual((await s.db.prepare('SELECT variant FROM prospects ORDER BY id').all()).map((r) => r.variant), ['A', 'B', 'A', 'B']);
@@ -264,7 +265,7 @@ test('modèle et consignes de sa gamme : le prompt de la gamme du modèle choisi
   const spyFile = join(s.tmp, 'prompts.log');
   s.app.cfg.claudeBin = makeClaudeBin(s.tmp, { fixture: 'spy-claude.js', env: { PROMPT_SPY_FILE: spyFile } });
   // Dernier appel de rédaction (la relecture et la correction de forme, qui suivent un modèle de mail, ont leur propre prompt)
-  const last = () => JSON.parse(readFileSync(spyFile, 'utf8').trim().split('\n').filter((l) => !l.includes('RELECTURE DU MAIL') && !l.includes('CORRECTION DE FORME')).pop());
+  const last = () => JSON.parse(readFileSync(spyFile, 'utf8').trim().split('\n').filter((l) => !l.includes('RELECTURE DU MAIL') && !l.includes('CORRECTION DE FORME') && !l.includes('CONTRÔLE DU SENS')).pop());
   try {
     assert.equal((await run(s, 'analyze')).status, 'done'); // le modèle de mail s'écrit à partir de la fiche du projet
     await setSetting(s.db, s.userId, 'prompts_json', JSON.stringify({ '*': { template: 'email de prospection MARQUE-COMMUNE' }, haiku: { template: 'email de prospection MARQUE-HAIKU' }, opus: { template: 'email de prospection MARQUE-OPUS' } }));

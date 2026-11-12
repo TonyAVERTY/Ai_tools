@@ -13,6 +13,7 @@ import { AI_JOBS } from '../src/services/budget.js';
 import { PROMPT_DEFS, rolePrompt } from '../src/services/prompts.js';
 import { now } from '../src/db.js';
 import { testTokenLink } from './helpers/users.js';
+import { projectsHtml } from './helpers/pages.js';
 
 let s, spy, worker;
 before(async () => {
@@ -31,7 +32,7 @@ async function setup({ profile = true, ...opts } = {}) {
   return { u, pid };
 }
 const run = (u, pid, task, body = {}) => u.post(`/api/projects/${pid}/poste/${task}`, body);
-const page = async (u) => (await u.get('/', { headers: { accept: 'text/html' } })).text();
+const page = async (u) => projectsHtml(u);
 
 test('catalogue : identifiants uniques et courts, chaque tâche a une mission et des rubriques, chaque tâche est un job IA', () => {
   assert.ok(ROLES.length >= 10, 'les postes d\'une entreprise');
@@ -67,11 +68,8 @@ test('sections : celles qui relèvent d\'un poste le déclarent, En-tête et Con
   assert.deepEqual(rolesOfSection('header'), []);
   const { u } = await setup();
   const html = await page(u);
-  assert.match(html, /<div class="hd dash-hd"><h1 id="h-projets">Projets<\/h1><div class="hd-tools"><label class="rolesel">/, 'le filtre est dans l\'en-tête de la page Projets');
-  assert.match(html, /<option value="">Tous les postes<\/option>/);
-  for (const r of ROLES) assert.ok(html.includes(`<option value="${r.id}">${r.label}</option>`), `poste ${r.label}`);
-  assert.equal((html.match(/data-role-select/g) || []).length, 1, 'un seul filtre pour tous les projets');
-  assert.match(html, /data-acc="prospect" data-roles="commerce"/);
+  assert.doesNotMatch(await (await u.get('/projets', { headers: { accept: 'text/html' } })).text(), /data-role-select/, 'plus de filtre par poste sur la liste des projets : les postes ont leur onglet Outils IA');
+  assert.match(html, /data-acc="linkedin" data-roles="marketing communication"/);
   assert.match(html, /data-acc="audit" data-roles="technique"/);
   assert.doesNotMatch(html, /data-acc="header" data-roles/);
   assert.doesNotMatch(html, /data-acc="config" data-roles/);
@@ -150,7 +148,7 @@ test('droits : un simple membre lance les tâches courantes, pas celles qui lise
   const refused = await run(member, pid, 'doc_tech');
   assert.equal(refused.status, 403, 'lit le dépôt : réservé aux administrateurs');
   assert.equal((await run(member, pid, 'faq')).status, 200, 'les autres tâches sont ouvertes aux membres');
-  const html = await (await member.get('/', { headers: { accept: 'text/html' } })).text();
+  const html = await projectsHtml(member);
   assert.match(html, /Réservé aux administrateurs du projet/);
   assert.equal((await run(owner, pid, 'doc_tech')).status, 200, 'le propriétaire peut');
 });

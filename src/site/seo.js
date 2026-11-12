@@ -29,7 +29,8 @@ ${urls}
 
 // Tout vient de l'application elle-même : ni script, ni style, ni police, ni image d'un autre domaine.
 // Pas de style en ligne : les largeurs, couleurs et animations passent par des classes de public/*.css.
-// form-action liste les fournisseurs de connexion (un formulaire ne les vise pas aujourd'hui, la redirection oui).
+// form-action liste les fournisseurs de connexion et de paiement : un formulaire (« Choisir cette offre », « Gérer mon abonnement ») répond par une REDIRECTION vers Stripe,
+// et Chrome applique form-action aux redirections ; sans ces deux adresses, le paiement serait bloqué dans le navigateur.
 const directives = (extra = {}) => [
   "default-src 'self'",
   `script-src 'self'${extra.script ? ` ${extra.script}` : ''}`,
@@ -40,7 +41,7 @@ const directives = (extra = {}) => [
   ...(extra.frame ? [`frame-src ${extra.frame}`] : []),
   "object-src 'none'",
   "base-uri 'self'",
-  "form-action 'self' https://accounts.google.com https://appleid.apple.com",
+  "form-action 'self' https://accounts.google.com https://appleid.apple.com https://checkout.stripe.com https://billing.stripe.com",
   "frame-ancestors 'none'",
 ].join('; ');
 const CSP = directives();

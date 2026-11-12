@@ -1,4 +1,5 @@
 import { createServer } from 'node:http';
+import { isEntryPoint } from './entrypoint.js';
 import { readFileSync, readdirSync, mkdirSync, accessSync, constants as fsConstants } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
@@ -25,7 +26,7 @@ import { reportError } from './services/errormail.js';
 import { installCrashGuards } from './crashguard.js';
 import { purgePendingUploads, sweepRunDirs } from './chatfiles.js';
 import { securityHeaders, robotsHeaderFor, cspFor } from './site/seo.js';
-import { hasUsableLink, isLinkExempt, LINK_REQUIRED_MESSAGE, providerLabelOf } from './claudelink.js';
+import { hasUsableLink, isLinkExempt, LINK_REQUIRED_MESSAGE, providerLabelOf, setGoogleAccountEnabled } from './claudelink.js';
 import { withAiName } from './services/ainame.js';
 import { memberTeamIds, purgeInvites } from './teams.js';
 import { needsWelcome } from './userprofile.js';
@@ -50,9 +51,14 @@ const STATIC = {
   '/static/responsive.js': asset('responsive.js', 'text/javascript; charset=utf-8', 3600),
   '/static/app.js': asset('app.js', 'text/javascript; charset=utf-8', 3600),
   '/static/app-recap.js': asset('app-recap.js', 'text/javascript; charset=utf-8', 3600),
+  '/static/app-today.js': asset('app-today.js', 'text/javascript; charset=utf-8', 3600),
+  '/static/app-contact.js': asset('app-contact.js', 'text/javascript; charset=utf-8', 3600),
+  '/static/app-search.js': asset('app-search.js', 'text/javascript; charset=utf-8', 3600),
+  '/static/app-shortcuts.js': asset('app-shortcuts.js', 'text/javascript; charset=utf-8', 3600),
   '/static/app-link.js': asset('app-link.js', 'text/javascript; charset=utf-8', 3600),
   '/static/app-promo.js': asset('app-promo.js', 'text/javascript; charset=utf-8', 3600),
   '/static/app-linkedin.js': asset('app-linkedin.js', 'text/javascript; charset=utf-8', 3600),
+  '/static/app-content.js': asset('app-content.js', 'text/javascript; charset=utf-8', 3600),
   '/static/app-prospects.js': asset('app-prospects.js', 'text/javascript; charset=utf-8', 3600),
   '/static/app-replies.js': asset('app-replies.js', 'text/javascript; charset=utf-8', 3600),
   '/static/app-bdd.js': asset('app-bdd.js', 'text/javascript; charset=utf-8', 3600),
@@ -67,13 +73,14 @@ const STATIC = {
   // Les navigateurs réclament /favicon.ico d'office
   '/favicon.ico': asset('favicon.ico', 'image/x-icon', 86400),
   '/static/site.js': asset('site.js', 'text/javascript; charset=utf-8', 3600),
-  // Polices embarquées (Source Serif 4, Hanken Grotesk : licence OFL, textes de licence à côté)
+  // Polices embarquées (Fraunces, Instrument Sans : licence OFL, textes de licence à côté)
   ...Object.fromEntries(readdirSync(join(ROOT, 'public', 'fonts')).filter((f) => extname(f) === '.woff2').map((f) => [`/static/fonts/${f}`, asset(`fonts/${f}`, FONT_TYPE['.woff2'], 604800)])),
   ...Object.fromEntries(readdirSync(join(ROOT, 'public', 'img')).map((f) => [`/static/img/${f}`, asset(`img/${f}`, IMG_TYPES[extname(f)] || 'application/octet-stream', 86400)])),
 };
 
 // `fetch`, `validateApiKey`, `validateToken`, `syncRepo`, `limiter` : points d'injection pour les tests (aucun appel réseau réel)
 export async function createApp(cfg, { db, worker = true, createTransport, fetch, validateApiKey, validateToken, syncRepo, limiter, resolveHost, resolveMx } = {}) {
+  setGoogleAccountEnabled(cfg.googleAccountEnabled); // connexion par compte Google (Antigravity CLI) : désactivée par défaut
   db ??= await openDb(cfg.db, { adminEmails: cfg.adminEmails });
   await syncAdmins(db, cfg.adminEmails || []); // ADMIN_EMAILS fait foi pour le rôle admin
   const app = { db, cfg, createTransport, fetch, validateApiKey, validateToken, syncRepo, resolveHost, resolveMx, limiter: limiter || new RateLimiter() };
@@ -139,7 +146,7 @@ export async function createApp(cfg, { db, worker = true, createTransport, fetch
           // Visiteur sur la racine : le site public. Connecté, la même adresse mène au tableau de bord.
           if (isRead && url.pathname === '/') {
             res.setHeader('Vary', 'Cookie');
-            return html(res, homePage({ appUrl: cfg.appUrl, apple: !!cfg.apple }));
+            return html(res, homePage({ appUrl: cfg.appUrl, apple: !!cfg.apple, billing: !!cfg.stripe }));
           }
           if (url.pathname.startsWith('/api/')) throw new HttpError(401, 'Non connecté');
           return redirect(res, '/login');
@@ -223,6 +230,7 @@ export async function createApp(cfg, { db, worker = true, createTransport, fetch
     clearInterval(purge);
     app.claudeLogins?.closeAll();
     app.chatgptLogins?.closeAll();
+    app.googleLogins?.closeAll();
     await new Promise((r) => { server.close(r); server.closeIdleConnections?.(); });
     await w?.stop();
     await scheduler?.stop();
@@ -234,7 +242,7 @@ export async function createApp(cfg, { db, worker = true, createTransport, fetch
   return app;
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (isEntryPoint(import.meta.url)) { // lancé par `node src/server.js` ou par pm2
   const cfg = loadConfig();
   if (!cfg.adminEmails.length) console.warn('ADMIN_EMAILS est vide : aucun administrateur (back-office inaccessible).');
   for (const m of sandboxStartupMessages(cfg.sandbox)) console.warn(m);

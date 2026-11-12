@@ -1,6 +1,9 @@
 // Facturation : lecture et écriture en base (informations légales, exemples de devis, documents définitifs). Tout est filtré par compte.
 import { now } from './db.js';
 import { normalizeLegal, normalizeContent, LEGAL_KEYS, DOC_KINDS } from './services/billing.js';
+import { themeOf, cleanAdjust } from './services/billingbrand.js';
+import { TrueTypeFont } from './services/pdffont.js';
+import { loadImage, trimImage } from './services/pdfimage.js';
 
 const parse = (s, dflt) => { try { return JSON.parse(s); } catch { return dflt; } };
 
@@ -92,4 +95,49 @@ export async function billingOverview(db, userId) {
 export async function otherLegals(db, userId, exceptProjectId) {
   const rows = await db.prepare('SELECT legal_json FROM billing_projects WHERE user_id = ? AND project_id <> ? ORDER BY updated_at DESC, project_id DESC').all(Number(userId), Number(exceptProjectId));
   return rows.map((r) => normalizeLegal(parse(r.legal_json, {})).values);
+}
+
+// ---------- Identité visuelle du projet (voir services/billingbrand.js) ----------
+
+const b64 = (buf) => (buf ? Buffer.from(buf).toString('base64') : '');
+const unb64 = (s) => (s ? Buffer.from(String(s), 'base64') : null);
+
+/** Ligne brute de l'identité du projet (null s'il n'y en a pas). */
+export async function getBrandRow(db, projectId, userId) {
+  const r = await db.prepare('SELECT * FROM billing_brand WHERE project_id = ? AND user_id = ?').get(Number(projectId), Number(userId));
+  if (!r) return null;
+  return { brand: parse(r.brand_json, {}), adjust: cleanAdjust(parse(r.adjust_json, {})), assets: parse(r.assets_json, {}), review: parse(r.review_json, null), updatedAt: Number(r.updated_at) };
+}
+
+/** Enregistre une identité fraîchement lue : les ajustements et le verdict précédents ne valent plus pour elle. */
+export async function saveBrand(db, projectId, userId, { brand, assets, notes = [] }) {
+  const at = now();
+  const a = JSON.stringify({ fontRegular: b64(assets.fontRegular), fontBold: b64(assets.fontBold), logo: b64(assets.logo), logoType: assets.logoType || '' });
+  await db.prepare(`INSERT INTO billing_brand(project_id, user_id, brand_json, adjust_json, assets_json, review_json, updated_at) VALUES(?, ?, ?, '{}', ?, NULL, ?)
+    ON CONFLICT(project_id) DO UPDATE SET brand_json = excluded.brand_json, adjust_json = '{}', assets_json = excluded.assets_json, review_json = NULL, updated_at = excluded.updated_at`)
+    .run(Number(projectId), Number(userId), JSON.stringify({ ...brand, notes: [brand.notes, ...notes].filter(Boolean).slice(0, 6) }), a, at);
+}
+
+/** Ajustements de mise en page et verdict de la relecture (la ligne d'identité doit exister). */
+export async function saveBrandReview(db, projectId, userId, { adjust, review }) {
+  await db.prepare('UPDATE billing_brand SET adjust_json = ?, review_json = ?, updated_at = ? WHERE project_id = ? AND user_id = ?')
+    .run(JSON.stringify(cleanAdjust(adjust)), JSON.stringify(review ?? null), now(), Number(projectId), Number(userId));
+}
+
+/**
+ * Identité prête pour le générateur de PDF : { theme, fonts, logo } ou null (pas d'identité exploitable : mise en page par défaut).
+ * `adjust` remplace les ajustements enregistrés (pendant la relecture, avant de les garder).
+ */
+export function brandForRender(row, adjust = null) {
+  if (!row?.brand?.primary) return null;
+  const theme = themeOf(row.brand, adjust ?? row.adjust);
+  let fonts = null, logo = null;
+  try {
+    const regular = unb64(row.assets.fontRegular);
+    if (regular) { const bold = unb64(row.assets.fontBold); fonts = { regular: new TrueTypeFont(regular), bold: bold ? new TrueTypeFont(bold) : null }; }
+  } catch { fonts = null; }
+  try { const l = unb64(row.assets.logo); if (l) logo = trimImage(loadImage(l)); } catch { logo = null; }
+  // Aperçu HTML : le logo en « data: » (le cadre isolé n'a aucun accès réseau)
+  const raw = row.assets.logo && row.assets.logoType ? `data:image/${row.assets.logoType === 'jpeg' ? 'jpeg' : 'png'};base64,${row.assets.logo}` : '';
+  return { theme, fonts, logo, logoUri: logo ? raw : '' };
 }

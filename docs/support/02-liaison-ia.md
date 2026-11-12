@@ -22,13 +22,25 @@ Dans la carte **ChatGPT** (OpenAI), même présentation que Claude.
 La vérification d'un compte ChatGPT lance un appel minimal : quelques tokens sont décomptés de l'abonnement.
 **Avec un compte ChatGPT, tes tâches passent l'une après l'autre** (une seule à la fois pour ton compte) : si tu en lances plusieurs, elles attendent leur tour au lieu de tourner ensemble. C'est voulu : ChatGPT renouvelle lui-même ta connexion et elle ne supporte pas deux usages en même temps. Elle peut te demander de te reconnecter de temps en temps, rarement.
 
-## Gemini : clé API Google AI Studio
-Dans la carte **Gemini** (Google), un seul mode : la **Clé API Google AI Studio**. Google ne permet plus de se connecter avec un compte pour ce type d'usage, il n'y a donc pas de connexion par compte. Crée une clé sur aistudio.google.com, colle-la dans « Clé API » et clique **Vérifier et relier** (la vérification ne consomme pas de tokens).
+## Gemini : clé API Google AI Studio, ou compte Google (si ton administrateur l'a activé)
+Dans la carte **Gemini** (Google), le mode normal est la **Clé API Google AI Studio**. Crée une clé sur aistudio.google.com, colle-la dans « Clé API » et clique **Vérifier et relier** (la vérification ne consomme pas de tokens).
 - **Une clé gratuite suffit pour essayer** : elle fonctionne avec les modèles Flash (par exemple Gemini 3.5 Flash-Lite), avec des limites quotidiennes fixées par Google. Elle ne donne pas accès aux modèles Pro ni à Gemini 4.
 - **Avec une clé gratuite, Google peut utiliser les données envoyées pour améliorer ses produits, et des personnes peuvent les relire.** N'y mets pas de données de prospects (noms, adresses e-mail, sites). Pour un vrai usage, **active la facturation sur ton projet Google** : tes données ne sont alors plus utilisées pour améliorer ses produits. iaboss ne peut pas savoir si ta clé est gratuite ou payante : l'avertissement s'affiche toujours.
 
+### Avec ton abonnement Google AI (Plus, Pro, Ultra) : « Se connecter avec Google »
+Cette option n'apparaît que si l'administrateur d'iaboss l'a activée sur le serveur (et que l'outil Antigravity CLI y est installé). **Google n'a pas dit clairement si c'est permis depuis une application comme iaboss** (c'est explicitement interdit pour Gemini CLI, et Google a suspendu des comptes) : ton compte Google pourrait être limité ou suspendu. La clé API reste l'option recommandée.
+1. Dans la carte **Gemini**, section « Avec ton abonnement Google AI (Plus, Pro, Ultra) », clique **Se connecter avec Google**.
+2. Lis l'avertissement, coche « J'ai compris et j'accepte ce risque », puis clique **Continuer**. Le bouton est grisé tant que la case n'est pas cochée.
+3. Un lien s'affiche : clique **Ouvrir Google** et connecte-toi avec le compte qui porte ton abonnement. Google affiche un code.
+4. Copie ce code et colle-le dans « Code de Google », puis clique **Valider le code**. **Tu as 60 secondes** (le compte à rebours s'affiche) : prépare-toi avant de cliquer sur Continuer.
+5. Le délai est passé, ou le code est refusé : clique **Nouveau lien** et recommence.
+- iaboss vérifie la connexion par un appel minimal : quelques milliers de tokens sont décomptés de ton abonnement (Antigravity CLI envoie ses consignes à chaque appel).
+- **Fichier de connexion collé** : si la connexion directe ne passe pas, connecte-toi à `agy` sur une machine Linux (ou WSL), puis clique **Coller le fichier** et colle le contenu de `~/.gemini/antigravity-cli/antigravity-oauth-token`, puis **Relier avec mon fichier**. Sous Windows et sur Mac, la connexion n'est pas rangée dans un fichier : utilise la connexion guidée.
+- Tes tâches passent l'une après l'autre. Les trois niveaux de modèle (économe, intermédiaire, plus cher) deviennent Gemini 3.8 Flash en réflexion faible, moyenne et haute. Le coût en dollars n'est pas affiché ; la carte « Consommation Gemini » montre les tokens utilisés via iaboss.
+- L'IA n'a accès qu'à la lecture : toutes ses autres actions (écrire des fichiers, lancer des commandes, naviguer, envoyer des messages) sont refusées.
+
 ## Le risque de l'abonnement
-Utiliser un abonnement Claude (Pro, Max) ou un compte ChatGPT à travers une application tierce peut contrevenir aux conditions d'utilisation d'Anthropic ou d'OpenAI et entraîner la suspension ou la fermeture du compte. iaboss ne peut en être tenu responsable. La clé API reste l'option recommandée. L'acceptation du risque est enregistrée avec sa date et la version du texte.
+Utiliser un abonnement Claude (Pro, Max), un compte ChatGPT ou un abonnement Google AI à travers une application tierce peut contrevenir aux conditions d'utilisation d'Anthropic, d'OpenAI ou de Google et entraîner la suspension ou la fermeture du compte. iaboss ne peut en être tenu responsable. La clé API reste l'option recommandée. L'acceptation du risque est enregistrée avec sa date et la version du texte.
 
 ## Voir, changer, déconnecter (Avatar → Mon compte → « Mon IA »)
 La carte « Mon IA » affiche : l'**IA** reliée (Claude, ChatGPT ou Gemini), le **Mode** (clé API ou abonnement), l'**État** (« Valide » ou « À revalider »), la date de liaison, les 4 derniers caractères d'une clé API, et la date d'acceptation du risque pour un abonnement. Elle contient aussi les **Limites d'utilisation**, le lien **Changer d'IA** (il ouvre la page « Relier mon IA ») et le bouton **Déconnecter**.
@@ -39,6 +51,7 @@ La carte « Mon IA » affiche : l'**IA** reliée (Claude, ChatGPT ou Gemini), le
 Avec un **abonnement** Claude, la carte montre deux barres : **Session de 5 h** et **Semaine de 7 jours**, avec le pourcentage utilisé et l'heure de remise à zéro. Orange à partir de 80 %, rouge à 100 %.
 - « Relevé en direct chez Anthropic » : compte tout l'usage de Claude, y compris hors iaboss (claude.ai, Claude Code).
 - Sinon : « Dernière mesure faite pendant un job iaboss », avec la raison du repli (Anthropic limite les relevés, refuse le relevé avec ce jeton, ne répond pas, etc.).
+- Avec un **compte ChatGPT**, la carte montre les mêmes barres (session de 5 h, semaine), relevées chez OpenAI ; sinon la dernière mesure ou la raison de l'indisponibilité. Avec Gemini, les limites de ton abonnement ne sont pas mesurées par iaboss.
 - Avec une **clé API** : il n'y a pas de limite de session ni de semaine, le fournisseur facture ce qui est consommé.
 - La même mesure s'affiche dans la carte « Consommation Claude » de la page Projets (« Claude session 5 h », « Claude semaine »).
 - Quand le quota est serré (au-delà de 85 %), les jobs non urgents (analyse, évolutions) attendent en file et repartent seuls ; la prospection et les envois continuent. Une alerte part à 80 % puis 95 % si un canal de notification est configuré.

@@ -1,0 +1,166 @@
+// Page d'un projet (/p/:id) à onglets, liste en cartes, recherche et barre du haut : lien depuis la liste, isolation entre comptes, entrées déplacées dans le menu du compte.
+import { test, before, after } from 'node:test';
+import assert from 'node:assert/strict';
+import { startApp } from './helpers/server.js';
+import { addProject } from './helpers/users.js';
+import { NAV, MORE_PAGES } from '../src/views.js';
+
+let s;
+before(async () => { s = await startApp(); });
+after(async () => { await s.close(); });
+const text = async (u, p) => (await u.get(p, { headers: { accept: 'text/html' } })).text();
+
+test('la page d\'un projet : nom, dépôt, fil d\'Ariane, neuf onglets avec une adresse chacun, « Vue d\'ensemble » courant', async () => {
+  const u = await s.newUser({ email: 'page@x.fr' });
+  const a = await addProject(s.db, u.id, { name: 'Agenda Kiné', gitUrl: 'https://github.com/atelier/agenda-kine.git' });
+  const b = await addProject(s.db, u.id, { name: 'Atelier Bois', gitUrl: 'https://github.com/u/bois.git' });
+  const h = await text(u, `/p/${a}`);
+  assert.match(h, /<h1 id="h-projet">Agenda Kiné<\/h1>/);
+  assert.match(h, /<nav class="crumb"[^]*?href="\/projets">Projets<\/a>/);
+  assert.match(h, /github\.com\/atelier\/agenda-kine/);
+  assert.match(h, /<title>Agenda Kiné · Vue d(?:'|&#39;)ensemble · iaboss<\/title>/);
+  const tabs = h.match(/<nav class="ptabs"[^]*?<\/nav>/)[0];
+  const hrefs = [...tabs.matchAll(/href="([^"]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(hrefs, ['', '/prospection', '/envoi', '/clients', '/facturation', '/communication', '/outils', '/recap', '/reglages'].map((x) => `/p/${a}${x}`));
+  assert.match(tabs, /<a href="\/p\/\d+" aria-current="page">Vue d(?:'|&#39;)ensemble/);
+  assert.doesNotMatch(h, new RegExp(`data-id="${b}"`), 'les autres projets ne sont pas sur cette page');
+});
+
+test('la pastille de l\'onglet Prospection compte ce qui attend une action, pas le nombre de prospects', async () => {
+  const u = await s.newUser({ email: 'pastille@x.fr' });
+  const a = await addProject(s.db, u.id, { name: 'Calme', gitUrl: 'https://github.com/u/calme.git' });
+  const t = Math.floor(Date.now() / 1000);
+  for (let i = 0; i < 4; i++) await s.db.prepare("INSERT INTO prospects(project_id, company, email, status, created_at, sent_at) VALUES(?, ?, ?, 'sent', ?, ?)").run(a, `E${i}`, `e${i}@x.fr`, t, t);
+  const tab = (h) => h.match(/<nav class="ptabs"[^]*?<\/nav>/)[0];
+  assert.doesNotMatch(tab(await text(u, `/p/${a}`)), /class="count"/, 'quatre prospects contactés, rien à faire : pas de pastille');
+  await s.db.prepare("UPDATE prospects SET status = 'replied', replied_at = ? WHERE project_id = ? AND email = 'e0@x.fr'").run(t, a);
+  assert.match(tab(await text(u, `/p/${a}`)), /Prospection <span class="count" title="[^"]+">1<\/span>/, 'une réponse à traiter : la pastille affiche 1, pas 4');
+});
+
+test('chaque onglet répond avec son titre ; un onglet inconnu est introuvable ; l\'ancienne adresse /projets/:id redirige', async () => {
+  const u = await s.newUser({ email: 'onglets@x.fr' });
+  const a = await addProject(s.db, u.id, { name: 'Alpha', gitUrl: 'https://github.com/u/alpha.git' });
+  for (const [slug, label] of [['prospection', 'Prospection'], ['envoi', 'Envoi'], ['clients', 'Clients'], ['facturation', 'Facturation'], ['communication', 'Communication'], ['outils', 'Outils IA'], ['recap', 'Récapitulatif'], ['reglages', 'Réglages du projet']]) {
+    const r = await u.get(`/p/${a}/${slug}`, { headers: { accept: 'text/html' } });
+    assert.equal(r.status, 200, slug);
+    assert.match(await r.text(), new RegExp(`<title>Alpha · ${label} · iaboss</title>`), slug);
+  }
+  assert.equal((await u.get(`/p/${a}/nimportequoi`, { headers: { accept: 'text/html' } })).status, 404);
+  const old = await u.get(`/projets/${a}`, { redirect: 'manual' });
+  assert.equal(old.status, 303);
+  assert.equal(old.headers.get('location'), `/p/${a}`);
+});
+
+test('la liste Projets : une carte par projet, avec l\'état, le dépôt et le lien vers la page ; « Nouveau projet » demande aussi le site', async () => {
+  const u = await s.newUser({ email: 'liste@x.fr' });
+  const a = await addProject(s.db, u.id, { name: 'Alpha', gitUrl: 'https://github.com/u/alpha.git' });
+  const h = await text(u, '/projets');
+  assert.match(h, new RegExp(`<a class="sheet pj-card" href="/p/${a}"><div class="sheet-h"><h2>Alpha</h2><span class="badge warn">`));
+  assert.match(h, /github\.com\/u\/alpha/);
+  assert.match(h, /name="site_url"[^>]*placeholder="https:\/\/monproduit\.fr"/);
+  assert.match(h, /1 projet sur 1 avec ton offre|1 projet avec ton offre/);
+});
+
+test('le projet d\'un autre compte, ou un numéro inconnu, est « introuvable » ; un membre d\'équipe n\'a ni Clients, ni Facturation, ni Récapitulatif, ni Réglages', async () => {
+  const u = await s.newUser({ email: 'moi@x.fr' });
+  const v = await s.newUser({ email: 'autre@x.fr' });
+  const theirs = await addProject(s.db, v.id, { name: 'Secret', gitUrl: 'https://github.com/v/secret.git' });
+  for (const slug of ['', '/envoi', '/reglages']) assert.equal((await u.get(`/p/${theirs}${slug}`, { headers: { accept: 'text/html' } })).status, 404, `/p/${theirs}${slug}`);
+  assert.equal((await u.get('/p/999999', { headers: { accept: 'text/html' } })).status, 404);
+  assert.doesNotMatch(await text(u, '/projets'), /Secret/);
+});
+
+test('barre du haut : Aujourd\'hui, Projets, Mails, Agenda, Compta ; Facturation, Clients et Équipe dans le menu du compte', async () => {
+  assert.deepEqual(NAV.map(([, , l]) => l), ["Aujourd'hui", 'Projets', 'Mails', 'Agenda', 'Compta']);
+  assert.deepEqual(MORE_PAGES.map(([h]) => h), ['/facturation', '/clients', '/team']);
+  const u = await s.newUser({ email: 'barre@x.fr' });
+  const h = await text(u, '/');
+  const pills = h.match(/<nav class="pills"[^]*?<\/nav>/)[0];
+  for (const [href] of MORE_PAGES) assert.doesNotMatch(pills, new RegExp(`href="${href}"`), `${href} n'est plus dans la barre`);
+  const pop = h.match(/<div class="user-pop">[^]*?<\/div>/)[0];
+  for (const [href] of MORE_PAGES) assert.match(pop, new RegExp(`href="${href}"`), `${href} est dans le menu du compte`);
+});
+
+test('recherche : projets, prospects et mails du compte seulement, 2 lettres minimum, jokers LIKE neutralisés', async () => {
+  const u = await s.newUser({ email: 'cherche@x.fr' });
+  const v = await s.newUser({ email: 'ailleurs@x.fr' });
+  const a = await addProject(s.db, u.id, { name: 'Agenda Kiné', gitUrl: 'https://github.com/u/kine.git' });
+  const other = await addProject(s.db, v.id, { name: 'Kiné secret', gitUrl: 'https://github.com/v/ksecret.git' });
+  const now = Math.floor(Date.now() / 1000);
+  await s.db.prepare('INSERT INTO prospects(project_id, company, email, status, created_at) VALUES(?, ?, ?, ?, ?)').run(a, 'Cabinet Le Gall', 'a@legall.fr', 'client', now);
+  await s.db.prepare('INSERT INTO prospects(project_id, company, email, status, created_at) VALUES(?, ?, ?, ?, ?)').run(other, 'Cabinet Gall Secret', 'x@secret.fr', 'new', now);
+  await s.db.prepare('INSERT INTO replies(project_id, prospect_id, uid, from_email, subject, body, intent, received_at) VALUES(?, ?, ?, ?, ?, ?, ?, ?)').run(a, null, 1, 'b@armor.fr', 'Devis Doctolib', 'x', 'question', now);
+  const search = async (q) => (await u.get(`/api/search?q=${encodeURIComponent(q)}`, { headers: { accept: 'application/json' } })).json();
+  const names = (d) => d.groups.flatMap((g) => g.items.map((i) => i.title));
+  assert.deepEqual((await search('g')).groups, [], 'une lettre ne cherche rien');
+  const kine = await search('kiné');
+  assert.deepEqual(names(kine), ['Agenda Kiné']);
+  assert.equal(kine.groups[0].items[0].href, `/p/${a}`);
+  const gall = await search('gall');
+  assert.deepEqual(names(gall), ['Cabinet Le Gall'], 'le prospect d\'un autre compte reste invisible');
+  assert.match(gall.groups[0].items[0].sub, /^Client · a@legall\.fr/);
+  const fiche = await s.db.prepare("SELECT id FROM prospects WHERE company = 'Cabinet Le Gall'").get();
+  assert.equal(gall.groups[0].items[0].href, `/p/${a}/contact/${fiche.id}`, 'un client ouvre directement sa fiche, pas la liste du projet');
+  assert.deepEqual(names(await search('doctolib')), ['Devis Doctolib']);
+  const pages = await search('factu');
+  assert.equal(pages.groups[0].id, 'pages', 'les pages arrivent en premier');
+  assert.deepEqual(pages.groups[0].items.map((i) => i.href), ['/facturation', `/p/${a}/facturation`]);
+  assert.deepEqual(names(await search('paramètres')).slice(0, 1), ['Réglages'], 'sans accent ni majuscule, par mot-clé');
+  assert.deepEqual((await search('%%')).groups, [], '« % » n\'est pas un joker');
+  assert.deepEqual((await search('a_')).groups, [], '« _ » n\'est pas un joker');
+});
+
+test('la barre du haut porte « Rechercher » et la fenêtre de recherche ; « Activité » est toujours là', async () => {
+  const u = await s.newUser({ email: 'barre2@x.fr' });
+  const h = await text(u, '/');
+  assert.match(h, /data-search-open[^]*?Rechercher/);
+  assert.match(h, /<dialog class="search-dialog" id="search"/);
+  assert.match(h, /<div class="jobs" id="jobs">/, 'plus de hidden au repos');
+  assert.match(h, /Aucune tâche en cours\./);
+});
+
+test('onglet Envoi : bandeau, modèles, Journal du projet (compteurs réels vers Mails), Envoyer, Relance et Boîte de réception', async () => {
+  const u = await s.newUser({ email: 'envoi@x.fr' });
+  const a = await addProject(s.db, u.id, { name: 'Courrier', gitUrl: 'https://github.com/u/courrier.git' });
+  const now = Math.floor(Date.now() / 1000);
+  const pr = Number((await s.db.prepare("INSERT INTO prospects(project_id, company, email, status, created_at) VALUES(?, 'Boulangerie', 'b@x.fr', 'replied', ?)").run(a, now)).lastInsertRowid);
+  await s.db.prepare('INSERT INTO mail_log(project_id, prospect_id, email, sent_at, kind) VALUES(?, ?, ?, ?, ?)').run(a, pr, 'b@x.fr', now, 'initial');
+  await s.db.prepare('INSERT INTO mail_log(project_id, prospect_id, email, sent_at, error, kind) VALUES(?, ?, ?, ?, ?, ?)').run(a, null, 'c@x.fr', now, 'refusé', 'initial');
+  const h = await text(u, `/p/${a}/envoi`);
+  assert.match(h, /<p class="ban ban-info pj-ready" data-ready/);
+  for (const id of ['acc-template', 'acc-followuptpl', 'acc-send', 'acc-followup', 'acc-inbox']) assert.match(h, new RegExp(`id="${id}"`), id);
+  assert.match(h, /<h2 id="jr-h">Journal du projet<\/h2>/);
+  assert.match(h, new RegExp(`href="/mails\\?project=${a}"><span class="k-l">Tous</span><span class="k-v">2</span>`));
+  assert.match(h, new RegExp(`filter=sent"><span class="k-l">Envoyé</span><span class="k-v">1</span>`));
+  assert.match(h, new RegExp(`filter=replied"><span class="k-l">Répondu</span><span class="k-v">1</span>`));
+  assert.match(h, new RegExp(`filter=failed"><span class="k-l">Non envoyé</span><span class="k-v">1</span><span class="badge err">`));
+  assert.match(h, /<h2 id="send-h">Envoyer<\/h2>/);
+  assert.match(h, /data-followup-badge>Désactivée</);
+  const other = await s.newUser({ email: 'autre-envoi@x.fr' });
+  assert.equal((await other.get(`/p/${a}/envoi`, { headers: { accept: 'text/html' } })).status, 404, 'le journal d\'un autre compte reste introuvable');
+});
+
+test('fiche contact : dernière réponse, échanges, prochaine action, accroche ; introuvable pour un autre projet ou un autre compte', async () => {
+  const u = await s.newUser({ email: 'contact@x.fr' });
+  const v = await s.newUser({ email: 'autre-contact@x.fr' });
+  const a = await addProject(s.db, u.id, { name: 'Kiné', gitUrl: 'https://github.com/u/kine2.git' });
+  const b = await addProject(s.db, u.id, { name: 'Boulangerie', gitUrl: 'https://github.com/u/boul.git' });
+  const now = Math.floor(Date.now() / 1000);
+  const pid = Number((await s.db.prepare("INSERT INTO prospects(project_id, company, email, city, score, status, hook, source, created_at, replied_at) VALUES(?, 'Cabinet Le Gall', 'contact@legall.fr', 'Quimper', 9, 'replied', 'Votre cabinet accueille des remplaçants.', 'https://legall-kine.fr/contact', ?, ?)").run(a, now - 86400, now)).lastInsertRowid);
+  await s.db.prepare("INSERT INTO replies(project_id, prospect_id, uid, from_email, subject, body, intent, received_at) VALUES(?, ?, 1, 'contact@legall.fr', 'Re', 'Bonjour, ça nous intéresse. Pouvez-vous m''appeler jeudi ?', 'interested', ?)").run(a, pid, now);
+  await s.db.prepare('INSERT INTO mail_log(project_id, prospect_id, email, sent_at, kind, subject, variant) VALUES(?, ?, ?, ?, ?, ?, ?)').run(a, pid, 'contact@legall.fr', now - 3600, 'initial', 'Un agenda partagé', 'A');
+  const h = await text(u, `/p/${a}/contact/${pid}`);
+  assert.match(h, /<h1>Cabinet Le Gall<\/h1>/);
+  assert.match(h, /<nav class="crumb"[^]*?href="\/p\/\d+">Kiné<\/a>/);
+  assert.match(h, /<h2 id="dr-h">Dernière réponse<\/h2><span class="badge ok">Intéressé<\/span>/);
+  assert.match(h, /« Bonjour, ça nous intéresse\. Pouvez-vous m&#39;appeler jeudi \? »/);
+  assert.match(h, /<b>Mail envoyé<\/b> · Objet A « Un agenda partagé »/);
+  assert.match(h, /<b>Prospect trouvé<\/b> · source : legall-kine\.fr\/contact/);
+  assert.match(h, /data-ev-add="\d+">[^]*?Ajouter à mon calendrier/, 'la date évoquée (jeudi) est proposée pour l\'agenda');
+  assert.match(h, /<mark>Votre cabinet accueille des remplaçants\.<\/mark>/);
+  assert.match(h, /data-contact-form="next"/);
+  assert.match(h, /data-contact-client/, 'un prospect peut passer en client');
+  assert.equal((await u.get(`/p/${b}/contact/${pid}`, { headers: { accept: 'text/html' } })).status, 404, 'le prospect est d\'un autre projet');
+  assert.equal((await v.get(`/p/${a}/contact/${pid}`, { headers: { accept: 'text/html' } })).status, 404, 'le projet est d\'un autre compte');
+  assert.match(await text(u, `/p/${a}/prospection`), /<script/, 'la page Prospection charge ses scripts');
+});

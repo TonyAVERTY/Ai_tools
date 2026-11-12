@@ -10,7 +10,7 @@ const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright-c
 const s = await startApp();
 s.app.cfg.claudeBin = makeClaudeBin(s.tmp, { fixture: 'fake-claude.js' });
 const u = await s.newUser();
-await addProject(s.db, u.id, { name: 'Atelier', gitUrl: 'https://github.com/u/atelier.git' });
+const pid = await addProject(s.db, u.id, { name: 'Atelier', gitUrl: 'https://github.com/u/atelier.git' });
 const b = await chromium.launch(process.env.PLAYWRIGHT_CHROMIUM ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM } : {});
 const ctx = await b.newContext({ viewport: { width: 1280, height: 700 } });
 const [name, value] = u.cookie.split('=');
@@ -46,11 +46,13 @@ const check = (ok, what) => { if (!ok) bad.push(what); console.log(`${ok ? 'ok '
 await p.goto(`${s.base}/`);
 await p.waitForTimeout(500);
 await p.evaluate(() => { window.__marker = 'vivante'; });
+// « Visite guidée » (/?tour=1) est une action : sur l'accueil, il ne doit pas être surligné comme page courante
+check(await p.locator('.user-pop a[href="/?tour=1"][aria-current]').count() === 0, 'menu du compte : « Visite guidée » n\'est pas surligné sur l\'accueil');
 const base = await p.evaluate(() => window.__live());
 const navsAfterLoad = navs.length;
 
 // 1. liens : Mails, Calendrier, Équipe, puis retour au tableau de bord
-for (const [label, path] of [['Mails', '/mails'], ['Calendrier', '/calendar'], ['Équipe', '/team'], ['Projets', '/']]) {
+for (const [label, path] of [['Mails', '/mails'], ['Agenda', '/calendar'], ['Compta', '/compta'], ['Projets', '/projets']]) {
   await p.locator('.pills a.pill', { hasText: label }).click();
   await p.waitForFunction((x) => location.pathname === x, path);
   await ready();
@@ -63,10 +65,10 @@ check(after.listeners <= base.listeners && after.intervals <= base.intervals, `p
 for (const k of Object.keys(after.keys)) if ((after.keys[k] || 0) > (base.keys[k] || 0)) console.log('   +', base.keys[k] || 0, '→', after.keys[k], k);
 
 // 2. précédent / suivant
-await p.goBack(); await p.waitForFunction(() => location.pathname === '/team' && document.title.startsWith('Équipe')); await ready();
-await p.goBack(); await p.waitForFunction(() => location.pathname === '/calendar' && document.title.startsWith('Calendrier')); await ready();
-check(/Calendrier/.test(await p.title()), 'retour arrière : la bonne page revient');
-await p.goForward(); await p.waitForFunction(() => location.pathname === '/team'); await ready();
+await p.goBack(); await p.waitForFunction(() => location.pathname === '/compta' && document.title.startsWith('Comptabilité')); await ready();
+await p.goBack(); await p.waitForFunction(() => location.pathname === '/calendar' && document.title.startsWith('Agenda')); await ready();
+check(/Agenda/.test(await p.title()), 'retour arrière : la bonne page revient');
+await p.goForward(); await p.waitForFunction(() => location.pathname === '/compta'); await ready();
 check(await p.evaluate(() => window.__marker) === 'vivante' && navs.length === navsAfterLoad, 'précédent / suivant : sans rechargement');
 
 // 3. un seul sondage /api/system après toutes ces navigations (pas de chaînes en double)
@@ -126,9 +128,8 @@ await p.waitForFunction(() => document.querySelectorAll('.chat-msg.bot .msg-acti
 check((await p.locator('.chat-msg.bot .bubble').last().innerText()).includes('Écho : ECHO deuxième visite'), 'page IA : revenir dessus relance bien son script');
 
 // 7. rechargement doux (remplace location.reload d'app.js) : défilement conservé
-await p.goto(`${s.base}/`);
+await p.goto(`${s.base}/p/${pid}/prospection`); // une page de projet assez longue pour défiler
 await p.evaluate(() => { window.__marker = 'vivante'; });
-if (!(await p.locator('details.project').first().evaluate((d) => d.open))) await p.locator('details.project summary').first().click(); // un seul projet : déjà ouvert
 await p.waitForTimeout(400);
 await p.evaluate(() => window.scrollBy(0, 120));
 const y1 = await p.evaluate(() => Math.round(scrollY));
@@ -142,7 +143,7 @@ check(await p.locator('details.project').first().evaluate((d) => d.open), 'recha
 // Une date relative à aujourd'hui : « À venir » ne liste que ce qui n'est pas passé, une date en dur faisait échouer ce contrôle dès qu'elle était dépassée (la CI est tombée le 4 novembre)
 const mk = await u.post('/calendar/events', { title: 'Appel test', date: new Date(Date.now() + 5 * 86_400_000).toISOString().slice(0, 10), time: '09:30', minutes: '30' }, { form: true });
 console.log('   création événement :', mk.status, mk.headers.get('location'), '| page :', p.url());
-await p.locator('.pills a.pill', { hasText: 'Calendrier' }).click();
+await p.locator('.pills a.pill', { hasText: 'Agenda' }).click();
 await p.waitForURL('**/calendar**'); await ready();
 await p.evaluate(() => { window.__marker = 'vivante'; });
 const ics = p.locator('a[href$=".ics"]').first();

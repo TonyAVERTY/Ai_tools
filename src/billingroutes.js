@@ -4,9 +4,9 @@ import { HttpError, html, json, redirect, readBody } from './http.js';
 import { enqueue, latestJobs } from './services/jobs.js';
 import { getProject, repoDir } from './projects.js';
 import { userAccountingSettings } from './accountingroutes.js';
-import { getBilling, saveLegal, listDocs, getDoc, setChosen, validateDoc, resetDocs, billingOverview, otherLegals } from './billingdata.js';
+import { getBilling, saveLegal, listDocs, getDoc, setChosen, validateDoc, resetDocs, billingOverview, otherLegals, getBrandRow, brandForRender } from './billingdata.js';
 import { LEGAL_KEYS, normalizeLegal, legalComplete, legalMissing, billingStage, renderDocument, suggestFromRepo, buildSuggestions } from './services/billing.js';
-import { billingOverviewPage, billingProjectPage } from './billingviews.js';
+import { billingOverviewPage, billingProjectBody } from './billingviews.js';
 import { renderDocumentPdf } from './services/billingpdf.js';
 import { issueDocument, listInvoices, listClients, getInvoice, invoiceDir, IssueError } from './billingissue.js';
 import { DOC_BY_KEY } from './services/billing.js';
@@ -26,7 +26,7 @@ export function registerBillingRoutes(router, app, { aiOpts = {} } = {}) {
     if (p.access !== 'owner') throw new HttpError(404, 'Projet introuvable', { expose: true });
     return p;
   };
-  const back = (id, q = '') => `/facturation/projet/${id}${q}`;
+  const back = (id, q = '') => `/p/${id}/facturation${q}`;
 
   /** Tâches de facturation en cours pour le compte, par projet. */
   const runningByProject = async (userId) => {
@@ -54,8 +54,9 @@ export function registerBillingRoutes(router, app, { aiOpts = {} } = {}) {
   });
 
   // ---------- Un projet : informations légales, devis, documents ----------
-  router.get('/facturation/projet/:id', async (ctx) => {
-    const { res, url, session } = ctx;
+  /** Les arguments de la page de facturation d'un projet (page propre ou onglet « Facturation » de la page projet). */
+  const projectArgs = async (ctx) => {
+    const { url, session } = ctx;
     const userId = session.userId;
     const p = await mine(ctx, true);
     const billing = await getBilling(db, p.id, userId);
@@ -71,11 +72,13 @@ export function registerBillingRoutes(router, app, { aiOpts = {} } = {}) {
     const verify = url.searchParams.has('verif');
     const errors = verify || billing.exists ? normalizeLegal(billing.legal).errors : {};
     const stage = billingStage({ legal: billing.legal, docs, chosen: billing.chosen, jobs });
-    html(res, billingProjectPage({
+    return {
       email: session.email, project: { id: p.id, name: p.name, gitUrl: p.gitUrl }, legal: billing.legal, saved: billing.exists, errors: verify || billing.exists ? errors : {}, suggestions,
-      docs, invoices: await listInvoices(db, userId, p.id), clients: await listClients(db, userId, p.id), selectedKind: url.searchParams.get('type') || '', selectedClientId: Number(url.searchParams.get('client')) || null, chosen: billing.chosen, stage, jobs, flash: { ok: url.searchParams.get('ok'), error: url.searchParams.get('e') },
-    }));
-  });
+      docs, brand: await getBrandRow(db, p.id, userId), invoices: await listInvoices(db, userId, p.id), clients: await listClients(db, userId, p.id), selectedKind: url.searchParams.get('type') || '', selectedClientId: Number(url.searchParams.get('client')) || null, chosen: billing.chosen, stage, jobs, flash: { ok: url.searchParams.get('ok'), error: url.searchParams.get('e') },
+    };
+  };
+  app.billingTab = async (ctx) => billingProjectBody({ ...(await projectArgs(ctx)), inTab: true });
+  router.get('/facturation/projet/:id', async (ctx) => redirect(ctx.res, `/p/${ctx.params.id}/facturation${ctx.url.search}`));
 
   // Enregistre les informations légales (même incomplètes : rien n'est perdu)
   router.post('/facturation/projet/:id/legal', async (ctx) => {
@@ -181,7 +184,7 @@ export function registerBillingRoutes(router, app, { aiOpts = {} } = {}) {
     if (!doc || doc.kind === 'quote_option') throw refuse(404, 'Document introuvable.');
     const billing = await getBilling(db, doc.projectId, session.userId);
     if (!legalComplete(billing.legal)) throw refuse(400, 'Complète les informations légales du projet.');
-    sendPdf(res, renderDocumentPdf({ kind: doc.kind, content: doc.content, legal: billing.legal, layout: doc.layout }), `modele-${slug(DOC_BY_KEY[doc.kind].label)}.pdf`);
+    sendPdf(res, renderDocumentPdf({ kind: doc.kind, content: doc.content, legal: billing.legal, layout: doc.layout, brand: brandForRender(await getBrandRow(db, doc.projectId, session.userId)) }), `modele-${slug(DOC_BY_KEY[doc.kind].label)}.pdf`);
   }, { limit: 'compta' });
 
   // Émet un document validé : numéro, PDF et, pour une facture, ligne « à encaisser » dans la Comptabilité
@@ -226,7 +229,7 @@ export function registerBillingRoutes(router, app, { aiOpts = {} } = {}) {
     if (!doc) throw new HttpError(404, 'Document introuvable', { expose: true });
     const { legal } = await getBilling(db, doc.projectId, session.userId);
     const kind = doc.kind === 'quote_option' ? 'devis' : doc.kind;
-    const body = renderDocument({ kind, content: doc.content, legal, layout: doc.layout });
+    const body = renderDocument({ kind, content: doc.content, legal, layout: doc.layout, brand: brandForRender(await getBrandRow(db, doc.projectId, session.userId)) });
     res.writeHead(200, {
       'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff',
       'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; img-src data:; frame-ancestors 'self'; base-uri 'none'; form-action 'none'",

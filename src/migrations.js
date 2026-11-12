@@ -1146,5 +1146,200 @@ export const MIGRATIONS = [
     sqlite: ['ALTER TABLE jobs ADD COLUMN log_json TEXT'],
     mysql: [{ sql: 'ALTER TABLE jobs ADD COLUMN log_json MEDIUMTEXT NULL', when: colMissing('jobs', 'log_json') }],
   },
+  {
+    // Page Mails : le contenu d'un mail est gardé tel qu'envoyé (sans le pied de page), et la raison d'un rebond (lue dans le message de la boîte de réception).
+    // Les mails partis avant cette migration n'ont ni l'un ni l'autre : la page le dit.
+    name: 'mail_log_content',
+    sqlite: ['ALTER TABLE mail_log ADD COLUMN body TEXT', 'ALTER TABLE mail_log ADD COLUMN note TEXT'],
+    mysql: [
+      { sql: 'ALTER TABLE mail_log ADD COLUMN body TEXT NULL', when: colMissing('mail_log', 'body') },
+      { sql: 'ALTER TABLE mail_log ADD COLUMN note VARCHAR(400) NULL', when: colMissing('mail_log', 'note') },
+    ],
+  },  {
+    // Page « Aujourd'hui » : les lignes de la liste « À traiter » que la personne a marquées traitées (clé de la ligne, jamais son contenu).
+    name: 'today_done',
+    sqlite: [
+      `CREATE TABLE today_done (
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        item_key TEXT NOT NULL,
+        done_at INTEGER NOT NULL,
+        PRIMARY KEY (user_id, item_key)
+      )`,
+    ],
+    mysql: [
+      `CREATE TABLE IF NOT EXISTS today_done (
+        user_id BIGINT NOT NULL,
+        item_key VARCHAR(40) NOT NULL,
+        done_at BIGINT NOT NULL,
+        PRIMARY KEY (user_id, item_key),
+        CONSTRAINT today_done_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      ) ${T}`,
+    ],
+  },
+  {
+    // Communication : brouillons de posts Instagram (texte + image dessinée d'après le design du projet) et de newsletters, par projet.
+    // `kind` : instagram | newsletter. `title` : objet de la newsletter ; `extra_json` : hashtags, texte alternatif, format, aperçu. `image` : PNG de l'Instagram.
+    name: 'content_drafts',
+    sqlite: [
+      `CREATE TABLE content_drafts (
+        id INTEGER PRIMARY KEY,
+        project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        kind TEXT NOT NULL,
+        direction TEXT,
+        title TEXT,
+        body TEXT NOT NULL,
+        extra_json TEXT,
+        image BLOB,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )`,
+      'CREATE INDEX content_drafts_project ON content_drafts(project_id, kind, id)',
+    ],
+    mysql: [
+      `CREATE TABLE IF NOT EXISTS content_drafts (
+        id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        project_id BIGINT NOT NULL,
+        kind VARCHAR(20) NOT NULL,
+        direction VARCHAR(500) NULL,
+        title VARCHAR(300) NULL,
+        body MEDIUMTEXT NOT NULL,
+        extra_json TEXT NULL,
+        image MEDIUMBLOB NULL,
+        created_at BIGINT NOT NULL,
+        updated_at BIGINT NOT NULL,
+        KEY content_drafts_project (project_id, kind, id),
+        CONSTRAINT content_drafts_project_fk FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+      ) ${T}`,
+    ],
+  },
+  {
+    // Offres payantes (Stripe) : l'abonnement d'un compte (un seul), et les événements déjà traités (un événement de Stripe peut arriver plusieurs fois).
+    // `entitled` : le compte a-t-il actuellement les droits de l'offre ? (payée, ou en délai de grâce après un paiement refusé). Aucune donnée de carte n'est gardée.
+    name: 'subscriptions',
+    sqlite: [
+      `CREATE TABLE subscriptions (
+        user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+        customer_id TEXT NOT NULL,
+        subscription_id TEXT,
+        plan TEXT,
+        period TEXT,
+        status TEXT NOT NULL,
+        entitled INTEGER NOT NULL DEFAULT 0,
+        current_period_end INTEGER,
+        cancel_at_period_end INTEGER NOT NULL DEFAULT 0,
+        grace_until INTEGER,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )`,
+      'CREATE INDEX subscriptions_customer ON subscriptions(customer_id)',
+      'CREATE INDEX subscriptions_sub ON subscriptions(subscription_id)',
+      `CREATE TABLE stripe_events (
+        id TEXT PRIMARY KEY,
+        type TEXT NOT NULL,
+        at INTEGER NOT NULL
+      )`,
+    ],
+    mysql: [
+      `CREATE TABLE IF NOT EXISTS subscriptions (
+        user_id BIGINT NOT NULL PRIMARY KEY,
+        customer_id VARCHAR(64) NOT NULL,
+        subscription_id VARCHAR(64) NULL,
+        plan VARCHAR(20) NULL,
+        period VARCHAR(10) NULL,
+        status VARCHAR(30) NOT NULL,
+        entitled TINYINT NOT NULL DEFAULT 0,
+        current_period_end BIGINT NULL,
+        cancel_at_period_end TINYINT NOT NULL DEFAULT 0,
+        grace_until BIGINT NULL,
+        created_at BIGINT NOT NULL,
+        updated_at BIGINT NOT NULL,
+        KEY subscriptions_customer (customer_id),
+        KEY subscriptions_sub (subscription_id),
+        CONSTRAINT subscriptions_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      ) ${T}`,
+      `CREATE TABLE IF NOT EXISTS stripe_events (
+        id VARCHAR(80) NOT NULL PRIMARY KEY,
+        type VARCHAR(80) NOT NULL,
+        at BIGINT NOT NULL
+      ) ${T}`,
+    ],
+  },
+  {
+    // (Fonctionnalité retirée : la connexion et la publication Instagram n'existent plus. Cette migration reste, car elle a déjà été appliquée : les tables et colonnes ne sont plus utilisées.)
+    // Instagram : un compte relié par projet (jeton chiffré, valable 60 jours puis renouvelé) ; les brouillons Instagram gardent leur état de publication
+    // (draft | scheduled | publishing | published), le type (post | story), l'heure programmée, l'adresse publique du post et la dernière erreur.
+    name: 'instagram_publish',
+    sqlite: [
+      `CREATE TABLE instagram_accounts (
+        project_id INTEGER PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,
+        ig_user_id TEXT NOT NULL,
+        username TEXT,
+        account_type TEXT,
+        token_enc TEXT NOT NULL,
+        expires_at INTEGER,
+        connected_by INTEGER,
+        created_at INTEGER NOT NULL,
+        refreshed_at INTEGER
+      )`,
+      "ALTER TABLE content_drafts ADD COLUMN status TEXT NOT NULL DEFAULT 'draft'",
+      'ALTER TABLE content_drafts ADD COLUMN publish_as TEXT',
+      'ALTER TABLE content_drafts ADD COLUMN scheduled_at INTEGER',
+      'ALTER TABLE content_drafts ADD COLUMN published_at INTEGER',
+      'ALTER TABLE content_drafts ADD COLUMN remote_id TEXT',
+      'ALTER TABLE content_drafts ADD COLUMN permalink TEXT',
+      'ALTER TABLE content_drafts ADD COLUMN publish_error TEXT',
+    ],
+    mysql: [
+      `CREATE TABLE IF NOT EXISTS instagram_accounts (
+        project_id BIGINT NOT NULL PRIMARY KEY,
+        ig_user_id VARCHAR(40) NOT NULL,
+        username VARCHAR(100) NULL,
+        account_type VARCHAR(40) NULL,
+        token_enc TEXT NOT NULL,
+        expires_at BIGINT NULL,
+        connected_by BIGINT NULL,
+        created_at BIGINT NOT NULL,
+        refreshed_at BIGINT NULL,
+        CONSTRAINT instagram_accounts_project_fk FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+      ) ${T}`,
+      { sql: "ALTER TABLE content_drafts ADD COLUMN status VARCHAR(20) NOT NULL DEFAULT 'draft'", when: colMissing('content_drafts', 'status') },
+      { sql: 'ALTER TABLE content_drafts ADD COLUMN publish_as VARCHAR(10) NULL', when: colMissing('content_drafts', 'publish_as') },
+      { sql: 'ALTER TABLE content_drafts ADD COLUMN scheduled_at BIGINT NULL', when: colMissing('content_drafts', 'scheduled_at') },
+      { sql: 'ALTER TABLE content_drafts ADD COLUMN published_at BIGINT NULL', when: colMissing('content_drafts', 'published_at') },
+      { sql: 'ALTER TABLE content_drafts ADD COLUMN remote_id VARCHAR(100) NULL', when: colMissing('content_drafts', 'remote_id') },
+      { sql: 'ALTER TABLE content_drafts ADD COLUMN permalink VARCHAR(500) NULL', when: colMissing('content_drafts', 'permalink') },
+      { sql: 'ALTER TABLE content_drafts ADD COLUMN publish_error VARCHAR(500) NULL', when: colMissing('content_drafts', 'publish_error') },
+    ],
+  },
+  {
+    // Promotion : plateforme cible choisie pour la vidéo (vide : aucune). Ajoutée à la fin de la liste, jamais au milieu.
+    name: 'promo_videos_platform',
+    sqlite: ["ALTER TABLE promo_videos ADD COLUMN platform TEXT NOT NULL DEFAULT ''"],
+    mysql: [
+      { sql: "ALTER TABLE promo_videos ADD COLUMN platform VARCHAR(20) NOT NULL DEFAULT ''", when: colMissing('promo_videos', 'platform') },
+    ],
+  },
+  {
+    // Facturation : identité visuelle du projet pour les documents (couleurs, police, logo lus dans le dépôt git), ajustements de mise en page
+    // et verdict de la dernière relecture. Les fichiers (police, logo) sont gardés en base en base64 : ils partent avec le projet.
+    name: 'billing_brand',
+    sqlite: [
+      `CREATE TABLE billing_brand (
+        project_id INTEGER PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        brand_json TEXT NOT NULL, adjust_json TEXT, assets_json TEXT, review_json TEXT,
+        updated_at INTEGER NOT NULL
+      )`,
+    ],
+    mysql: [
+      `CREATE TABLE IF NOT EXISTS billing_brand (
+        project_id BIGINT NOT NULL PRIMARY KEY,
+        user_id BIGINT NOT NULL,
+        brand_json TEXT NOT NULL, adjust_json TEXT NULL, assets_json LONGTEXT NULL, review_json TEXT NULL,
+        updated_at BIGINT NOT NULL,
+        CONSTRAINT billing_brand_project_fk FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+        CONSTRAINT billing_brand_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      ) ${T}`,
+    ],
+  },
 ];
-

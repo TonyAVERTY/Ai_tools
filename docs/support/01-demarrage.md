@@ -17,7 +17,7 @@ Les questions s'affichent **une à la fois** (7 au total) :
 5. La page ne revient plus d'elle-même. Tu peux la rouvrir et la modifier à tout moment : avatar → Mon compte → **Modifier mon profil** (toutes les questions s'affichent alors sur une seule page, avec **Enregistrer mon profil** et **Annuler**).
 Pourquoi : l'IA adapte son vocabulaire, ses exemples et son niveau de détail à ton métier. Les réponses restent dans ton compte.
 
-À la fin du questionnaire, un écran « Merci, ton espace est prêt » apparaît en fondu, puis le tableau de bord prend la place sans coupure. Une **visite guidée** démarre alors toute seule (voir le fichier « Visite guidée du tableau de bord ») : la page s'assombrit et chaque élément important est éclairé et expliqué l'un après l'autre. **Passer la visite** l'arrête ; avatar → **Visite guidée** la relance à tout moment.
+À la fin du questionnaire, un écran « Merci, ton espace est prêt » apparaît en fondu, puis la page « Aujourd'hui » (l'accueil de l'application) prend la place sans coupure. Une **visite guidée** démarre alors toute seule (voir le fichier « Visite guidée du tableau de bord ») : la page s'assombrit et chaque élément important est éclairé et expliqué l'un après l'autre. **Passer la visite** l'arrête ; avatar → **Visite guidée** la relance à tout moment.
 
 ## 3. Créer le premier projet
 1. Page **Projets** → bouton **Nouveau projet**.
@@ -26,28 +26,28 @@ Pourquoi : l'IA adapte son vocabulaire, ses exemples et son niveau de détail à
 4. Dépôt privé ou autre serveur Git : ajoute d'abord un token dans **Réglages → Dépôts Git**.
 
 ## 4. Valider la cible
-Quand l'analyse est finie, la section **Cible** s'ouvre avec le badge « à valider ». Relis la description, la zone, la taille, le décideur, les secteurs et les requêtes de recherche, corrige si besoin, puis clique **Valider la cible**. Le badge « à valider » disparaît et la coche verte apparaît sur la section.
+Quand l'analyse est finie, la section **Cible** s'ouvre avec le badge « à valider ». Relis la description, la zone, la taille, le décideur, les secteurs et les requêtes de recherche, corrige si besoin, puis clique **Valider la cible**. Le badge « à valider » disparaît et la coche verte apparaît sur la section. Une fois validée, la cible est **grisée et en lecture seule** : pour la changer, clique **Modifier**, corrige, puis **Mettre à jour** (ou **Annuler** pour remettre ce qui était validé).
 
 ## 5. Chercher des prospects
-Dans **Prospecter → Recherche de prospects** : choisis « Prospects à chercher » (de 1 à 50), « Quand » (Maintenant ou Cette nuit, 1h-6h), puis **Lancer la recherche**.
+Dans l'onglet **Prospection → Recherche de prospects** : choisis « Prospects à chercher » (de 1 à 50), « Quand » (Maintenant ou Cette nuit, 1h-6h), puis **Lancer la recherche**.
 
 ## 6. Régler l'adresse d'envoi (SMTP)
 Dans **Configuration du projet**, renseigne le SMTP de l'adresse qui enverra les mails (hôte, port, utilisateur, mot de passe, email et nom expéditeur) puis **Enregistrer SMTP**. Sans SMTP, rien ne peut partir.
 
 ## 7. Le modèle de mail
-Dans **Prospecter → Modèle de mail** : clique **Générer avec l'IA** (ou écris-le), relis l'objet et le corps, **Enregistrer** puis **Valider le modèle**. Le mail part en texte simple ; coche **Envoyer en mail HTML** avant de valider si tu veux un mail mis en forme. Seul un modèle validé peut être envoyé.
+Dans l'onglet **Envoi → Modèle de mail** : clique **Générer avec l'IA** (ou écris-le), relis l'objet et le corps, **Enregistrer** puis **Valider le modèle**. Le mail part en texte simple ; coche **Envoyer en mail HTML** avant de valider si tu veux un mail mis en forme. Seul un modèle validé peut être envoyé.
 
 ## 8. Le premier envoi
-Dans **Prospecter → Envoi** : indique « Mails à envoyer » puis **Envoyer** et confirme. Voir le fichier sur les mails pour les garde-fous.
+Dans l'onglet **Envoi → Envoi** : indique « Mails à envoyer » puis **Envoyer** et confirme. Voir le fichier sur les mails pour les garde-fous.
 
 ## La liste de mise en route
-Dès qu'un projet existe, sa section **Mise en route** (la première du projet) guide la configuration : analyser le projet, valider la cible, chercher des prospects, SMTP, modèle de mail, premier envoi, puis le facultatif (boîte IMAP, relance automatique, idées d'évolution, compte LinkedIn relié, premier post publié).
-- Le projet porte un badge « config 4/11 » (par exemple) sur sa ligne : **clique dessus pour ouvrir la liste** (il t'amène à la section **Mise en route** du projet). Il est orange tant que le projet n'est pas prêt à prospecter, vert avec une coche « config ✓ » une fois tout fait. La section affiche « 4 étapes sur 11 », et son titre devient **Prêt à prospecter** quand le nécessaire est fait. Si la liste ne peut pas se charger, la section affiche un message et un bouton **Réessayer** (voir « Une section ou une liste n'a pas pu se charger : Réessayer » dans le dépannage).
-- Chaque ligne ouvre la bonne section du projet et y fait défiler la page.
-- Les étapes terminées reçoivent une coche (et sont barrées dans la liste) ; les étapes facultatives sont marquées « facultatif ».
+Dès qu'un projet existe, sa **Vue d'ensemble** (première page du projet, adresse `/p/N`) commence par la carte **Mise en route**, qui guide la configuration : analyser le projet, valider la cible, chercher des prospects, SMTP, modèle de mail, premier envoi. Les étapes facultatives (boîte IMAP, relance automatique, idées d'évolution, compte LinkedIn relié, premier post publié) sont rangées à part, sous « Pour aller plus loin (facultatif, rien d'obligatoire) » : elles ne comptent pas dans l'avancement et rien ne t'oblige à les faire.
+- La carte dit « 4 étapes sur 6 » avec une barre d'avancement : seules les 6 étapes obligatoires comptent. Son titre devient **Mise en route terminée** (« 6 étapes sur 6 ») dès que le nécessaire est fait ; les étapes facultatives, elles, ne la laissent jamais « inachevée ». Sur la carte du projet (page Projets), l'état est « Prêt à prospecter » (vert) ou « Mise en route 4 sur 6 » (orange).
+- Les étapes faites sont **barrées**, avec une coche. La prochaine étape à faire a son numéro en jaune et un bouton : **Régler** pour le SMTP et l'IMAP, **Ouvrir** pour les autres. Les étapes suivantes ont un bouton **Ouvrir** plus discret. Les étapes facultatives sont dans le bloc « Pour aller plus loin », avec un cercle en tirets et un « + ».
+- Chaque bouton ouvre le bon onglet du projet, fait défiler la page jusqu'à la section concernée et la fait clignoter un instant.
 - La liste se calcule à chaque affichage d'après l'état réel du projet : une étape défaite (par exemple un jeton LinkedIn expiré) redevient « à faire ».
-- Il n'y a plus de panneau qui flotte au-dessus de la page : la liste est une section comme les autres, repliée par défaut. Quand tout est fait, la section disparaît toute seule et le badge devient « config ✓ ». Quand tu termines une étape alors que la liste est ouverte, sa coche apparaît d'un petit saut ; quand la dernière est faite, le badge « config ✓ » apparaît de la même façon.
+- « Demander des idées d'évolution » est barrée dès qu'une demande d'évolution a abouti (idées reçues par mail) : une demande plus récente en cours, annulée ou en erreur ne la remet pas à faire. Sur la Vue d'ensemble, la page se recharge d'elle-même quand une tâche se termine (en erreur ou annulée aussi), pour que les étapes se raient tout de suite ; elle ne se recharge pas tant que tu écris dans un champ ou qu'une fenêtre est ouverte.
 - Un membre d'équipe ne voit pas les étapes SMTP et IMAP (il ne peut pas les régler).
 
-## Projet unique ou plusieurs projets
-Avec **un seul projet**, il est déjà ouvert quand on arrive sur la page. Avec **plusieurs projets**, ils sont tous fermés : clique sur le nom du projet pour l'ouvrir.
+## Ouvrir un projet
+La page **Projets** montre une carte par projet, quel qu'en soit le nombre : clique la carte du projet pour ouvrir sa page et ses onglets.

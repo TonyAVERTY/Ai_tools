@@ -25,7 +25,7 @@ export function billingOverviewPage({ email, rows }) {
       <div class="bill-proj-h"><div><h2 id="bp-${r.id}">${esc(r.name)}</h2><p class="muted small">${esc(host(r.gitUrl))}</p></div><span class="badge ${tone}">${esc(label)}</span></div>
       ${r.resume ? `<p class="bill-resume">${esc(r.resume.length > 190 ? `${r.resume.slice(0, 190)}…` : r.resume)}</p>` : ''}
       ${stepper(r.stage.steps, stageStep[r.stage.stage])}
-      <div class="row-actions"><a class="btn ${r.stage.stage === 'ready' ? '' : 'primary'}" href="/facturation/projet/${r.id}">${esc(CTA[r.stage.stage])}</a>
+      <div class="row-actions"><a class="btn ${r.stage.stage === 'ready' ? '' : 'primary'}" href="/p/${r.id}/facturation">${esc(CTA[r.stage.stage])}</a>
         ${r.stage.busy ? `<span class="muted small bill-busy"><span class="spin-inline" aria-hidden="true"></span>Claude travaille…</span>` : ''}</div></article>`;
   }).join('') : `<div class="empty-s"><p><b>Aucun projet pour l'instant.</b> La facturation se prépare projet par projet : crée d'abord un projet.</p><a class="btn primary small" href="/">Ouvrir mes projets</a></div>`;
   const body = `<div data-bill class="bill-page">
@@ -74,7 +74,7 @@ function legalForm(p, legal, errors, suggestions, open) {
 }
 
 const frame = (d) => `<iframe class="bill-frame" sandbox title="Aperçu : ${esc(d.content.title)}" loading="lazy" src="/facturation/documents/${d.id}/apercu"></iframe>`;
-const refineForm = (p, d, label, open = false) => `<details class="bill-refine"${open ? ' open' : ''}><summary>${ic('pen')}Affiner avec Claude</summary>
+const refineForm = (p, d, label, open = false, summary = 'Affiner avec Claude') => `<details class="bill-refine"${open ? ' open' : ''}><summary>${ic('pen')}${summary}</summary>
     <form method="post" action="/facturation/projet/${p.id}/affiner"><input type="hidden" name="doc" value="${d.id}">
       <label class="field"><span class="lbl">Ce que tu veux changer</span><textarea name="request" rows="3" maxlength="800" required placeholder="Ex. : un ton plus chaleureux, ajouter une ligne « formation de 2 heures », réduire l'acompte à 20 %…"></textarea></label>
       <div class="row-actions"><button class="btn">${label}</button></div></form></details>`;
@@ -184,7 +184,27 @@ function invoicesSection(invoices) {
       <td><a class="btn small" href="/facturation/factures/${i.id}/pdf" data-noajax>${ic('file')}PDF</a>${i.entryId ? ` <a class="btn small" href="/compta/entries/${i.entryId}/file" target="_blank" rel="noopener noreferrer" data-noajax>Comptabilité</a>` : ''}</td></tr>`).join('')}</tbody></table></div></section>`;
 }
 
-function docsSection(p, docs, stage, busy, validatedCount) {
+/** Style repris du dépôt du projet et verdict de la relecture de l'IA : ce qui a été trouvé, ce qui reste à vérifier. */
+function brandNote(row) {
+  if (!row) return '';
+  const b = row.brand || {};
+  const dot = b.primary ? `<svg class="bb-dot" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><circle cx="6" cy="6" r="5.5" fill="${esc(b.primary)}" stroke="#888" stroke-width=".6"/></svg>` : '';
+  const style = b.primary
+    ? `${dot} Couleur <code>${esc(b.primary)}</code> · Police ${b.fontName ? esc(b.fontName) : 'standard'} · ${b.hasLogo ? 'Logo repris du dépôt' : 'Pas de logo trouvé'}`
+    : 'Aucun style trouvé dans le dépôt : mise en page standard.';
+  const notes = (b.notes || []).map((n) => `<li>${esc(n)}</li>`).join('');
+  const docs = row.review?.docs || [];
+  const line = (d) => {
+    const label = esc(DOC_BY_KEY[d.kind]?.label || d.kind);
+    if (d.skipped) return `<li><span class="badge warn">Non relu</span> ${label} : ${esc(d.skipped)}</li>`;
+    if (d.approved) return `<li><span class="badge ok">Relu</span> ${label} : accepté${d.rounds > 1 ? ` après ${d.rounds - 1} correction${d.rounds > 2 ? 's' : ''}` : ''}</li>`;
+    return `<li><span class="badge warn">À vérifier</span> ${label} : ${d.issues.map((i) => esc(i.problem)).join(' ; ') || 'refusé'}</li>`;
+  };
+  return `<div class="bill-brand" role="note"><h3>Style des documents</h3><p class="small">${style}</p>${notes ? `<ul class="muted small">${notes}</ul>` : ''}
+    ${docs.length ? `<h3>Relecture par l'IA</h3><ul class="small bill-review">${docs.map(line).join('')}</ul>${docs.some((d) => !d.approved && !d.skipped) ? '<p class="muted small">Après trois essais de correction, un document encore refusé est tout de même livré : relis-le avant de le valider.</p>' : ''}` : ''}</div>`;
+}
+
+function docsSection(p, docs, stage, busy, validatedCount, brand = null) {
   const finals = DOC_KINDS.map(({ key }) => docs.find((d) => d.kind === key)).filter(Boolean);
   let inner;
   if (!finals.length) {
@@ -193,22 +213,24 @@ function docsSection(p, docs, stage, busy, validatedCount) {
   } else {
     inner = `<p class="muted">Relis chaque document, affine-le si besoin, puis valide-le. <b>${validatedCount} sur ${DOC_KINDS.length}</b> validés.</p>
       <div class="bar" role="progressbar" aria-label="Documents validés" aria-valuemin="0" aria-valuemax="4" aria-valuenow="${validatedCount}"><span class="w-${validatedCount * 25}"></span></div>
-      <div class="bill-docs">${finals.map((d) => `<article class="bill-doc${d.status === 'validated' ? ' ok' : ''}" aria-labelledby="bd-${d.id}">
+      ${brandNote(brand)}
+      <div class="bill-docs">${finals.map((d) => `<article class="bill-doc${d.status === 'validated' ? ' ok locked' : ''}" aria-labelledby="bd-${d.id}">
         <div class="bill-opt-h"><h3 id="bd-${d.id}">${esc(DOC_BY_KEY[d.kind].label)}</h3><span class="badge ${d.status === 'validated' ? 'ok' : 'warn'}">${d.status === 'validated' ? 'Validé' : 'À valider'}</span></div>
         <p class="muted small">${esc(DOC_BY_KEY[d.kind].help)}</p>
-        ${frame(d)}
-        <p class="muted small bill-vars">Rempli à l'émission : ${DOC_VARIABLES[d.kind].map((v) => `<code>{{${v}}}</code>`).join(' ')}</p>
+        ${d.status === 'validated' ? '' : `${frame(d)}
+        <p class="muted small bill-vars">Rempli à l'émission : ${DOC_VARIABLES[d.kind].map((v) => `<code>{{${v}}}</code>`).join(' ')}</p>`}
         <div class="row-actions">${d.status === 'validated' ? '' : `<form method="post" action="/facturation/projet/${p.id}/valider"><input type="hidden" name="doc" value="${d.id}"><button class="btn primary small"${busy ? ' disabled' : ''}>${ic('check')}Valider ce document</button></form>`}
           <a class="btn small" href="/facturation/documents/${d.id}/apercu" target="_blank" rel="noopener noreferrer" data-noajax>Voir en grand</a>
           <a class="btn small" href="/facturation/documents/${d.id}/pdf" data-noajax>${ic('file')}Modèle en PDF</a>
           ${d.status === 'validated' ? `<a class="btn small primary" href="?type=${d.kind}#generer">${ic('file')}Émettre ce document</a>` : ''}</div>
-        ${refineForm(p, d, 'Affiner ce document')}
+        ${d.status === 'validated' ? refineForm(p, d, 'Modifier ce document', false, 'Modifier') : refineForm(p, d, 'Affiner ce document')}
       </article>`).join('')}</div>`;
   }
   return `<section class="card bill-sec" id="documents" aria-labelledby="t-docs"><h2 id="t-docs">3. Valide tes documents</h2>${inner}</section>`;
 }
 
-export function billingProjectPage({ email, project: p, legal, errors, suggestions, docs, invoices = [], clients = [], selectedKind = '', selectedClientId = null, chosen, stage, jobs, flash }) {
+/** Le contenu de la facturation d'un projet ; `inTab` : affiché dans l'onglet Facturation de la page projet (pas de lien « Tous les projets », pas de titre propre). */
+export function billingProjectBody({ email, project: p, legal, errors, suggestions, docs, brand = null, invoices = [], clients = [], selectedKind = '', selectedClientId = null, chosen, stage, jobs, flash, inTab = false }) {
   const running = Object.values(jobs).find((j) => ['queued', 'running'].includes(j.status));
   const lastDoc = docs.reduce((m, d) => Math.max(m, d.updatedAt), 0);
   const failed = !running ? Object.values(jobs).filter((j) => j.status === 'error' && Number(j.finishedAt || 0) >= lastDoc).sort((a, b) => b.finishedAt - a.finishedAt)[0] : null;
@@ -228,7 +250,7 @@ export function billingProjectPage({ email, project: p, legal, errors, suggestio
     else {
       const q = docs.find((d) => d.kind === 'quote_option' && d.status === 'validated');
       if (q) sections.push(`<section class="card bill-sec" id="devis" aria-labelledby="t-devis"><h2 id="t-devis">2. Ton devis est validé</h2><p class="muted">Exemple ${q.variant} (${esc(LAYOUTS.find(([k]) => k === q.layout)?.[1] || '')}). Les documents suivants reprennent son style et ses lignes.</p></section>`);
-      sections.push(docsSection(p, docs, stage, stage.busy, finalsCount));
+      sections.push(docsSection(p, docs, stage, stage.busy, finalsCount, brand));
       if (!ready) sections.push(issueSection(p, docs, clients, invoices, selectedKind, selectedClientId), invoicesSection(invoices));
     }
   }
@@ -236,8 +258,8 @@ export function billingProjectPage({ email, project: p, legal, errors, suggestio
     <p class="muted">Le devis, l'acompte, la facture finale et l'avoir de « ${esc(p.name)} » sont validés : ils peuvent être utilisés dans iaboss. Les mentions légales se mettent à jour d'après tes informations légales.</p></div></section>` : '';
   const reset = docs.length ? `<form method="post" action="/facturation/projet/${p.id}/recommencer" data-confirm="Effacer les exemples et les documents de ce projet et repartir du début ? Tes informations légales sont conservées."><button class="btn small danger">${ic('trash')}Recommencer depuis le début</button></form>` : '';
   const body = `<div class="bill-page" data-bill data-bill-project="${p.id}" data-busy="${stage.busy ? '1' : '0'}">
-  <section class="card"><p><a class="link" href="/facturation">${ic('back')} Tous les projets</a></p>
-    <div class="row-between"><div><h1>Facturation : ${esc(p.name)}</h1><p class="muted small">${esc(host(p.gitUrl))}</p></div></div>
+  <section class="card">${inTab ? '' : `<p><a class="link" href="/facturation">${ic('back')} Tous les projets</a></p>`}
+    <div class="row-between"><div>${inTab ? '<h2>Facturation</h2>' : `<h1>Facturation : ${esc(p.name)}</h1>`}<p class="muted small">${esc(host(p.gitUrl))}</p></div></div>
     ${stepper(stage.steps, stageStep[stage.stage])}${statusBar}</section>
   ${done}
   ${ready ? [issueSection(p, docs, clients, invoices, selectedKind, selectedClientId), invoicesSection(invoices)].join('\n  ') : ''}
@@ -245,5 +267,9 @@ export function billingProjectPage({ email, project: p, legal, errors, suggestio
   ${reset ? `<div class="bill-foot">${reset}</div>` : ''}
   <p class="muted small bill-disc">Les documents suivent les usages entre professionnels en France. Les mentions légales sont rédigées par iaboss d'après tes informations, jamais par Claude : fais-les vérifier par un expert-comptable avant un usage particulier (client particulier, TVA sur les encaissements, marché public).</p>
 </div>`;
-  return layout({ title: `Facturation · ${p.name}`, email, body, scripts: ['/static/facturation.js'], named: true });
+  return body;
+}
+
+export function billingProjectPage(a) {
+  return layout({ title: `Facturation · ${a.project.name}`, email: a.email, body: billingProjectBody(a), scripts: ['/static/facturation.js'], named: true });
 }

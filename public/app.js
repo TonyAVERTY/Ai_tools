@@ -69,7 +69,24 @@
   }
 
   // Outils communs pour les fichiers public/app-*.js (chargés après celui-ci)
-  Object.assign(window.AiTools, { $, $$, api, esc, every, formData, go, icon, liDay, listen, refreshProject, httpErrorText, networkErrorText, toLogin, confirmBox, loadingHtml, loadFailed, sentence, aiName });
+  Object.assign(window.AiTools, { $, $$, api, esc, every, formData, go, icon, later, liDay, listen, refreshProject, httpErrorText, networkErrorText, toLogin, confirmBox, loadingHtml, loadFailed, sentence, aiName });
+
+  // Barre du haut : elle se rétracte quand on descend dans la page et revient dès qu'on remonte, en haut de page, ou si un menu y est ouvert / le focus y est / la visite guidée est en cours
+  {
+    const bar = document.querySelector('header.top');
+    if (bar) {
+      let last = window.scrollY;
+      const keepOpen = () => bar.matches(':focus-within') || !!document.querySelector('.tour-card') || !!bar.querySelector('details[open], [aria-expanded="true"]');
+      const sync = () => {
+        const y = window.scrollY, down = y > last + 4, up = y < last - 4;
+        if (y < 80 || up || keepOpen()) bar.classList.remove('top-hidden');
+        else if (down) bar.classList.add('top-hidden');
+        if (down || up) last = y;
+      };
+      listen(window, 'scroll', sync, { passive: true });
+      listen(bar, 'focusin', () => bar.classList.remove('top-hidden'));
+    }
+  }
 
   // Une erreur dit ce qui s'est passé et quoi faire ensuite : jamais « Failed to fetch » ni un code brut. Le message du serveur, quand il y en a un, passe en premier.
   function httpErrorText(status) {
@@ -265,7 +282,7 @@
   const ACTIVE = ['queued', 'running'];
   const LABELS = {
     analyze: 'Analyse', prospect: 'Recherche', template: 'Modèle', send: 'Envoi', evolution: 'Évolutions',
-    followup_template: 'Modèle de relance', followup: 'Relances', linkedin_post: 'Post LinkedIn', promo_video: 'Vidéo de promotion', audit: 'Audit', hook: 'Accroche',
+    followup_template: 'Modèle de relance', followup: 'Relances', linkedin_post: 'Post LinkedIn', instagram_post: 'Post Instagram', newsletter: 'Newsletter', promo_video: 'Vidéo de promotion', audit: 'Audit', hook: 'Accroche',
     billing_quotes: 'Facturation : exemples de devis', billing_refine: 'Facturation : affinage', billing_docs: 'Facturation : documents',
   };
 
@@ -274,6 +291,7 @@
 
   // ---------- Barre du haut : page courante en surbrillance ----------
   $$('.pills a.pill, .user-pop a, .ia-link').forEach((a) => {
+    if (a.search) return; // un lien avec paramètres (« Visite guidée » : /?tour=1) est une action, pas une page : il ne devient pas « courant » sur l'accueil
     const here = a.pathname === '/' ? location.pathname === '/' : location.pathname === a.pathname || location.pathname.startsWith(`${a.pathname}/`);
     if (here) a.setAttribute('aria-current', 'page');
   });
@@ -622,8 +640,18 @@
     if (jobsSeen) for (const id of ids) if (!jobsSeen.has(id)) jobsFresh.set(id, Date.now() + 3500);
     const fresh = new Set(ids.filter((id) => (jobsFresh.get(id) ?? 0) > Date.now()));
     jobsSeen = new Set([...(jobsSeen || []), ...ids]);
-    jobsBox.hidden = !list.length;
-    if (!list.length) { if (jobsOpen()) toggleJobs(false); return; }
+    jobsBox.classList.toggle('is-busy', !!s.queue);
+    jobsBox.classList.toggle('has-jobs', list.length > 0);
+    if (!list.length) {
+      // Toujours là, même au repos : le point s'éteint et la liste dit qu'il n'y a rien
+      $('.spin-inline', jobsBtn).hidden = true;
+      $('[data-jobs-count]', jobsBtn).textContent = '';
+      $('[data-jobs-sub]', jobsPop).textContent = '';
+      const empty = '<p class="jobs-none">Aucune tâche en cours.</p>';
+      const box0 = $('[data-jobs-list]', jobsPop);
+      if (box0._html !== empty) { box0._html = empty; box0.innerHTML = empty; }
+      return;
+    }
     $('.spin-inline', jobsBtn).hidden = !s.queue;
     const failed = list.filter((j) => j.status === 'error').length;
     $('[data-jobs-count]', jobsBtn).textContent = s.queue
@@ -655,14 +683,21 @@
   // Barre du haut hors de l'écran (page défilée) : le bouton « Activité » reste épinglé en haut à droite, avec son menu et la destination de l'agent
   const topBar = $('.top');
   if (jobsBox && topBar && 'IntersectionObserver' in window) {
-    new IntersectionObserver(([en]) => document.body.classList.toggle('hdr-off', !en.isIntersecting)).observe(topBar);
+    new IntersectionObserver(([en]) => {
+      // Le bouton quitte la barre en s'épinglant : on garde sa place (mesurée avant) pour que la barre ne rétrécisse pas et que le contenu ne saute pas
+      if (!en.isIntersecting && !document.body.classList.contains('hdr-off')) {
+        const r = jobsBox.getBoundingClientRect();
+        document.body.style.setProperty('--jobs-w', `${Math.round(r.width)}px`);
+      }
+      document.body.classList.toggle('hdr-off', !en.isIntersecting);
+    }).observe(topBar);
   }
   listen(document, 'click', (e) => {
     if (jobsOpen() && !e.target.closest('#jobs')) toggleJobs(false);
     const link = e.target.closest('[data-goto]');
     if (!link) return;
     const d = $(`details.project[data-id="${link.dataset.goto}"]`);
-    if (!d) { sessionStorageSet('reopenProject', link.dataset.goto); go('/'); return; } // pas sur la page Projets : elle ouvrira ce projet à l'arrivée
+    if (!d) { sessionStorageSet('reopenProject', link.dataset.goto); go('/projets'); return; } // pas sur la page Projets : elle ouvrira ce projet à l'arrivée
     toggleJobs(false);
     d.open = true;
     d.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -683,7 +718,36 @@
     const w = ratio == null ? '' : `<div class="bar usage${ratio >= 1 ? ' full' : ''}" role="progressbar" aria-label="${esc(label)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.min(100, Math.round(ratio * 100))}"><span class="w-${Math.min(100, Math.round(ratio * 20) * 5)}"></span></div>`;
     return `<li class="g"><div class="g-h" title="${esc(tip)}"><span>${esc(label)}</span><span class="g-v ${cls}">${value}</span></div>${w}${note ? `<p class="g-r">${esc(note)}</p>` : ''}</li>`;
   }
+  // Compte ChatGPT : limites relevées chez OpenAI (fenêtres 5 h et semaine) ; avec tout abonnement non Claude, les tokens que les jobs d'iaboss ont consommés
+  const CHATGPT_WHY = {
+    expired: 'ton accès ChatGPT sera renouvelé au prochain job iaboss',
+    denied: "OpenAI refuse le relevé en direct (relie-toi avec « Se connecter avec ChatGPT »)",
+    rate: 'OpenAI limite les relevés : nouvel essai dans quelques minutes',
+    network: 'OpenAI ne répond pas',
+    unavailable: 'le relevé en direct est indisponible chez OpenAI',
+    format: 'réponse inattendue du relevé en direct',
+  };
+  const tokensOf = (x) => `${((x?.tin || 0) + (x?.tout || 0)).toLocaleString('fr-FR')} tokens`;
+  function usageOtherAi(s) {
+    const rows = [];
+    const ai = aiName();
+    const cl = s.chatgptLimits;
+    if (s.linkMode === 'chatgpt_account') {
+      for (const w of cl?.windows || []) {
+        const live = cl.source === 'live' && !cl.error;
+        const tip = `${live ? 'Relevé en direct chez OpenAI, tout ton usage ChatGPT compris (y compris hors iaboss).' : `Dernière mesure ${ago(cl.at)}.`}${w.resetsAt ? ` Réinitialisation ${resetLabel(w.resetsAt)}.` : ''}`;
+        const label = `${ai} ${w.label}`;
+        rows.push(w.expired ? usageRow(label, '– (remise à zéro)', { tip, cls: 'muted' })
+          : usageRow(label, pct(w.utilization), { ratio: w.utilization, tip, note: resetNote(w.resetsAt), cls: w.utilization >= 1 ? 'error' : w.utilization >= 0.8 ? 'warn' : '' }));
+      }
+      if (!cl?.windows?.length) rows.push(usageRow(`Limites ${ai}`, 'indisponible', { tip: cl?.error ? (CHATGPT_WHY[cl.error] || 'relevé indisponible') : 'pas encore mesuré', cls: 'muted' }));
+    }
+    const tip = `Tokens (entrée + sortie) des jobs lancés par iaboss uniquement. Ce que tu fais ailleurs avec ${ai} n'est pas compté ici.`;
+    rows.push(usageRow(`${ai} via iaboss 24 h`, tokensOf(s.usage?.day), { tip }), usageRow(`${ai} via iaboss 30 j`, tokensOf(s.usage?.month), { tip }));
+    return rows.join('');
+  }
   function usageClaude(s) {
+    if (s.provider && s.provider !== 'claude' && s.linkMode !== 'api_key') return usageOtherAi(s);
     const rows = [];
     const rl = s.claudeRateLimit;
     if (s.linkMode !== 'api_key') {
@@ -713,6 +777,17 @@
   // Page « Relier Claude » sans accès utilisable : le serveur refuse ces relevés (403). On ne les demande pas, et on réessaie vite (la page change une fois Claude relié).
   const unlinked = () => !!document.querySelector('[data-nolink]');
   window.AiTools.unlinked = unlinked;
+  // Vue d'ensemble d'un projet : la liste « Mise en route » et « En cours » sont calculées au chargement de la page. Quand une tâche cesse d'être
+  // active (terminée, en erreur ou annulée), on recharge la page pour que ses étapes se raient aussitôt, sans toucher à ce que l'utilisateur est en train de saisir.
+  let activeJobIds = null;
+  function overviewOnJobEnd(snapshot) {
+    const now = new Set((snapshot.jobs || []).filter((j) => ACTIVE.includes(j.status)).map((j) => j.id));
+    const ended = activeJobIds && [...activeJobIds].some((id) => !now.has(id));
+    activeJobIds = now;
+    if (!ended || !document.querySelector('.pj-steps') || document.querySelector('dialog[open]')) return;
+    if (document.activeElement?.matches('input, textarea, select')) return;
+    reload();
+  }
   let activityTimerId, activityRequest = null, activityBusy = false;
   function refreshActivity() {
     clearTimeout(activityTimerId);
@@ -728,6 +803,7 @@
         if (disposed) return;
         activityBusy = snapshot.queue > 0;
         renderJobsMenu(snapshot);
+        overviewOnJobEnd(snapshot);
       } catch { /* garder la dernière mesure, puis retenter automatiquement */ }
       finally {
         activityRequest = null;
@@ -751,12 +827,13 @@
     sysTimer = later(refreshSys, jobsOpen() ? 3000 : busy ? 6000 : 30_000);
   }
   refreshSys();
+  listen(document, 'visibilitychange', () => { if (!document.hidden) refreshSys(); }); // retour sur l'onglet : la carte se remet à jour tout de suite
 
   // Une tâche vient d'être mise en file : le menu « Activité » se met à jour, l'agent y arrive avec sa brouette, puis le menu s'ouvre
   // quelques secondes sur la liste des tâches en cours et à venir (comme la bulle de téléchargement de Chrome).
   let activityTimer;
   function showActivity() {
-    if (!jobsBox || jobsBox.hidden) return;
+    if (!jobsBox) return;
     toggleJobs(true);
     clearTimeout(activityTimer);
     activityTimer = setTimeout(() => { if (jobsOpen() && !jobsPop.matches(':hover') && !jobsPop.contains(document.activeElement)) toggleJobs(false); }, 7500);
@@ -837,8 +914,14 @@
   }
 
   // ---------- Rendu d'un job ----------
+  // Un modèle de mail ou de relance rédigé, ou une analyse : le résultat est affiché juste au-dessus (le texte du modèle, la fiche projet), donc ni « Voir » ni tokens
+  // en pleine largeur sous les onglets ; la tâche reste visible dans « Activité ». « Voir » reste à côté d'un bouton d'action : tâche en cours (Annuler), échec (Réessayer).
+  const QUIET_WHEN_DONE = ['template', 'followup_template', 'analyze'];
   function renderJob(box, job, type) {
+    if (box && job && job.status === 'done' && QUIET_WHEN_DONE.includes(type)) { box.innerHTML = ''; box._sig = ''; return; }
     renderJobContent(box, job, type);
+    // Résultat d'une seule phrase : « Voir » et les tokens se rangent sur la même ligne au lieu de deux blocs pleine largeur (.job-compact)
+    box?.classList.toggle('job-compact', !!job && job.status === 'done' && !!box.firstElementChild?.matches('p.ok') && !box.querySelector('ul, .evo-done, pre, .row'));
     if (box && job && job.canViewLogs !== false && !box.querySelector(`a[href="/jobs/${job.id}"]`)) {
       const link = document.createElement('a');
       link.className = 'btn small'; link.href = `/jobs/${job.id}`; link.textContent = 'Voir';
@@ -937,6 +1020,17 @@
     }
   }
 
+  // ---------- Modèle validé : grisé et en lecture seule, jusqu'à « Modifier » ----------
+  // Verrouillé : un résumé (titre, badge, texte grisé, Modifier, Aperçu) ; l'aide, « Générer avec l'IA », « Enregistrer » et « Valider le modèle » sont masqués (styles .tpl-locked).
+  function setTplLocked(form, locked) {
+    form.classList.toggle('tpl-locked', locked);
+    for (const f of [form.subject, form.subjectB, form.body]) if (f) f.readOnly = locked;
+    form.html.disabled = locked;
+    for (const b of $$('button[name="mode"]', form)) b.disabled = locked;
+    $('[data-tpl-unlock]', form).hidden = !locked;
+    $('[data-tpl-cancel]', form).hidden = locked || !form.dataset.editing;
+  }
+
   // ---------- État d'un projet ----------
   const state = new Map(); // id -> { timer, tplStamp, analyzing }
 
@@ -949,7 +1043,7 @@
     }
     const st = state.get(id) || {};
     const jobs = s.jobs;
-    for (const type of ['analyze', 'prospect', 'template', 'send', 'evolution', 'audit', 'followup_template', 'followup', 'linkedin_post', 'promo_video']) renderJob($(`[data-job="${type}"]`, el), jobs[type], type);
+    for (const type of ['analyze', 'prospect', 'template', 'send', 'evolution', 'audit', 'followup_template', 'followup', 'linkedin_post', 'instagram_post', 'newsletter', 'promo_video']) renderJob($(`[data-job="${type}"]`, el), jobs[type], type);
     for (const box of $$('[data-job^="poste_"]', el)) renderJob(box, jobs[box.dataset.job], box.dataset.job);
     // « En-tête » est replié une fois le projet analysé : une analyse qui échoue y affiche son erreur, on l'ouvre (une fois par échec, pour ne pas rouvrir ce qu'on vient de fermer)
     const analyzeJob = jobs.analyze;
@@ -968,6 +1062,20 @@
     const li = jobs.linkedin_post;
     if (li && ACTIVE.includes(li.status)) st.liRunning = true;
     else if (st.liRunning && li) { st.liRunning = false; window.AiTools.loadLinkedin?.(el); }
+
+    // Fin d'un post Instagram ou d'une newsletter → on recharge la zone pour afficher le brouillon
+    for (const [type, key] of [['instagram_post', 'igRunning'], ['newsletter', 'nlRunning']]) {
+      const j = jobs[type];
+      if (j && ACTIVE.includes(j.status)) st[key] = true;
+      else if (st[key] && j) { st[key] = false; window.AiTools.loadContent?.(el, type === 'instagram_post' ? 'instagram' : 'newsletter'); if (j.status === 'done') toast(type === 'instagram_post' ? 'Post Instagram prêt' : 'Newsletter prête'); }
+    }
+
+    // Fin d'un envoi ou de relances → les derniers mails partis (texte, rejet, réponse) se rafraîchissent aussitôt
+    for (const [type, key] of [['send', 'sendRunning'], ['followup', 'fuRunning']]) {
+      const j = jobs[type];
+      if (j && ACTIVE.includes(j.status)) st[key] = true;
+      else if (st[key] && j) { st[key] = false; for (const b of $$('[data-recent-mails]')) window.AiTools.loadRecentMails?.(b); }
+    }
 
     // Fin d'une vidéo de promotion → on recharge la liste
     const pv = jobs.promo_video;
@@ -988,20 +1096,26 @@
     for (const kind of ['initial', 'followup']) {
       const t = s.templates[kind];
       const form = $(`form[data-action="template"][data-kind="${kind}"]`, el);
+      if (!form) continue; // la section n'est pas sur cet onglet
       if (t && st.tplStamp[kind] !== t.updated_at) {
         st.tplStamp[kind] = t.updated_at;
         form.subject.value = t.subject;
         if (form.subjectB) form.subjectB.value = t.subjectB || '';
         form.body.value = t.body;
         form.html.checked = !!t.html;
+        form._orig = { subject: t.subject, subjectB: t.subjectB || '', body: t.body, html: !!t.html }; // ce que « Annuler » remet
       }
       $('[data-tpl-state]', form).innerHTML = t
         ? (t.status === 'validated' ? '<span class="badge ok">validé</span>' : '<span class="badge warn">brouillon</span>') : '';
+      setTplLocked(form, t?.status === 'validated' && !form.dataset.editing);
     }
 
     // Relance automatique : ce qui est prévu, ou ce qui bloque
     const f = s.followup;
-    $('[data-followup-info]', el).innerHTML = !f.enabled
+    const followBadge = $('[data-followup-badge]', el);
+    if (followBadge) { followBadge.textContent = f.enabled ? 'Activée' : 'Désactivée'; followBadge.classList.toggle('ok', !!f.enabled); }
+    const followInfo = $('[data-followup-info]', el);
+    if (followInfo) followInfo.innerHTML = !f.enabled
       ? 'Désactivée.'
       : f.blockers.length
         ? `<span class="warn">En attente : ${esc(f.blockers.join(', '))}.</span> ${f.due} relance(s) due(s).`
@@ -1019,24 +1133,35 @@
     if (s.templates.initial?.status !== 'validated') blockers.push('modèle à valider');
     if (!s.hasSmtp) blockers.push('SMTP à configurer');
     if (!s.sendMax) blockers.push(s.stats.new ? 'plafond du jour atteint' : 'aucun prospect à contacter');
-    $('button', sendForm).disabled = blockers.length > 0;
-    sendForm.count.max = s.sendMax || 1;
-    sendForm.dataset.warmup = JSON.stringify(s.warmup || {});
-    if (Number(sendForm.count.value) > s.sendMax && s.sendMax) sendForm.count.value = s.sendMax;
-    $('[data-send-info]', sendForm).textContent = blockers.length
-      ? `Bloqué : ${blockers.join(', ')}`
-      : `${s.stats.new} prospect(s) en attente · max ${s.sendMax} maintenant${warmupLine(s.warmup)}`;
-    $('[data-count]', el).textContent = `(${s.stats.total || 0})`;
+    if (sendForm) {
+      $('button', sendForm).disabled = blockers.length > 0;
+      sendForm.count.max = s.sendMax || 1;
+      sendForm.dataset.warmup = JSON.stringify(s.warmup || {});
+      if (Number(sendForm.count.value) > s.sendMax && s.sendMax) sendForm.count.value = s.sendMax;
+      $('[data-send-info]', sendForm).textContent = blockers.length
+        ? `Bloqué : ${blockers.join(', ')}`
+        : `${s.stats.new} prospect(s) en attente · max ${s.sendMax} maintenant${warmupLine(s.warmup)}`;
+    }
+    const ready = $('[data-ready]', el);
+    if (ready) {
+      ready.classList.toggle('ban-warn', blockers.length > 0);
+      ready.textContent = blockers.length
+        ? `À régler avant d'envoyer : ${blockers.join(', ')}.`
+        : `Prêt à envoyer : ${s.hasSmtp ? 'SMTP réglé, ' : ''}modèle validé, ${s.stats.new} prospect${s.stats.new > 1 ? 's' : ''} à contacter, ${s.sendMax} mail${s.sendMax > 1 ? 's' : ''} possible${s.sendMax > 1 ? 's' : ''} maintenant.`;
+    }
+    const countBox = $('[data-count]', el);
+    if (countBox) countBox.textContent = `(${s.stats.total || 0})`;
 
     // Boîte de réception + test A/B
     const ib = $('[data-inbox]', el);
-    const ab = s.ab.length > 1
-      ? `<br>Test A/B : ${s.ab.map((v) => `<strong>${v.variant}</strong> ${v.replied}/${v.sent} réponses (${pct(v.rate)})`).join(' · ')}` : '';
-    if (!s.hasImap) {
+    const abBox = $('[data-ab]', el);
+    if (abBox) abBox.textContent = s.ab.length > 1 ? `Test A/B : ${s.ab.map((v) => `Objet ${v.variant} : ${pct(v.rate)} de réponses`).join(' · ')}` : '';
+    const ab = '';
+    if (!ib) { /* la boîte de réception est sur l'onglet Envoi */ } else if (!s.hasImap) {
       ib.innerHTML = `<span class="muted">Boîte non connectée : configure l'IMAP (Configuration du projet) pour détecter les réponses.</span>${ab}`;
     } else {
       const i = s.inbox || {};
-      const head = i.lastError ? `<span class="error">Boîte en erreur : ${esc(i.lastError)}</span>` : `Boîte vérifiée ${ago(i.lastOk)}`;
+      const head = i.lastError ? `<span class="error">Boîte en erreur : ${esc(i.lastError)}</span>` : `Lue ${ago(i.lastOk)} · <span class="badge ok">${icon('check')}Reliée</span>`;
       ib.innerHTML = `${head} · ${i.replies || 0} réponse(s) · ${i.bounces || 0} adresse(s) invalide(s)
         <button class="btn small" data-inbox-check="${id}">Vérifier maintenant</button>${ab}`;
     }
@@ -1109,9 +1234,19 @@
     const sub = $('.acc-sub', acc);
     if (sub) sub.textContent = `${c.done} étape${c.done > 1 ? 's' : ''} sur ${c.total}`;
     const body = $('[data-setup]', acc);
-    const html = `<ul>${c.steps.map((s) => `<li class="${s.done ? 'done' : ''}">${s.done ? TICK : DOT}<div>
+    const item = (s) => `<li class="${s.done ? 'done' : ''}">${s.done ? TICK : DOT}<div>
       <button type="button" class="setup-go" data-setup-go="${esc(s.key)}">${esc(s.label)}</button>${s.optional ? '<span class="setup-opt">facultatif</span>' : ''}
-      ${s.done ? '' : `<span class="muted small">${esc(s.hint)}</span>`}</div></li>`).join('')}</ul>`;
+      ${s.done ? '' : `<span class="muted small">${esc(s.hint)}</span>`}</div></li>`;
+    // Les étapes faites se replient en une ligne (« 3 étapes faites ») : il ne reste à l'écran que ce qu'il y a encore à faire
+    // Une étape qui vient d'être faite reste visible jusqu'au prochain chargement de la page : sa coche garde son petit saut (voir plus bas)
+    const doneNow = new Set(c.steps.filter((s) => s.done).map((s) => s.key));
+    const stay = (body._stay ||= new Set());
+    if (body._done) for (const k of doneNow) if (!body._done.has(k)) stay.add(k);
+    const todo = c.steps.filter((s) => !s.done || stay.has(s.key));
+    const finished = c.steps.filter((s) => s.done && !stay.has(s.key));
+    const wasOpen = $('details.setup-done', body)?.open ? ' open' : '';
+    const html = `${todo.length ? `<ul>${todo.map(item).join('')}</ul>` : ''}${finished.length
+      ? `<details class="setup-done"${wasOpen}><summary>${finished.length} étape${finished.length > 1 ? 's' : ''} faite${finished.length > 1 ? 's' : ''}</summary><ul>${finished.map(item).join('')}</ul></details>` : ''}`;
     // Les étapes faites depuis le dernier affichage : leur coche apparaît d'un petit saut (jamais au premier affichage, ni pour ce qui l'était déjà)
     const done = new Set(c.steps.filter((s) => s.done).map((s) => s.key));
     const fresh = body._done ? [...done].filter((k) => !body._done.has(k)) : [];
@@ -1413,7 +1548,41 @@
   });
 
   // Le récap se charge à l'ouverture de sa section
-  $$('details[data-acc="recap"]').forEach((d) => d.addEventListener('toggle', () => { if (d.open) window.AiTools.loadRecap?.(d.closest('.project')); }));
+  $$('details[data-acc="recap"]').forEach((d) => { d.addEventListener('toggle', () => { if (d.open) window.AiTools.loadRecap?.(d.closest('.project')); }); if (d.open) window.AiTools.loadRecap?.(d.closest('.project')); });
+
+  // Outils IA : le menu des postes (à gauche) choisit ce qu'affiche la colonne de droite : « Évolution et audit », ou les tâches d'un poste
+  listen(document, 'click', (e) => {
+    const b = e.target.closest?.('[data-tool]');
+    if (!b) return;
+    const root = b.closest('.pj-tools');
+    for (const o of $$('[data-tool]', root)) { const on = o === b; o.classList.toggle('on', on); o.setAttribute('aria-pressed', String(on)); }
+    const evo = b.dataset.tool === 'evo';
+    $('[data-tool-panel="evo"]', root).hidden = !evo;
+    $('[data-tool-panel="postes"]', root).hidden = evo;
+    if (!evo) for (const d of $$('details.role', root)) { d.hidden = d.dataset.role !== b.dataset.tool; d.open = true; }
+  });
+
+  // Page d'un projet : le sélecteur « Section » (téléphone) change d'onglet ; #acc-… (ligne de « Mise en route ») ouvre la section visée et la fait clignoter
+  listen(document, 'change', (e) => { const sel = e.target.closest?.('[data-psel]'); if (sel && sel.value) go(sel.value); });
+  (() => {
+    const m = location.hash.match(/^#(acc-[a-z-]+)$/);
+    const target = m && document.getElementById(m[1]);
+    if (!target) return;
+    for (let n = target; n; n = n.parentElement) if (n.tagName === 'DETAILS') n.open = true;
+    // Outils IA : la section visée peut être dans le panneau des postes, masqué par défaut
+    if (target.closest('[data-tool-panel="postes"][hidden]')) $('[data-tool]:not([data-tool="evo"])')?.click();
+    const calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    target.scrollIntoView({ behavior: calm ? 'auto' : 'smooth', block: 'start' });
+    // `?vu=1` : on arrive depuis « À traiter », la section grossit puis revient à sa taille ; sinon le simple liseré
+    const cls = new URLSearchParams(location.search).has('vu') ? 'flash-grow' : 'flash';
+    target.classList.add(cls);
+    setTimeout(() => target.classList.remove(cls), 1800);
+  })();
+
+  // Agenda : le formulaire « Ajouter un événement » est replié ; le bouton du haut (#evenements) le déplie
+  const openEvents = () => { const d = document.getElementById('evenements'); if (d?.tagName === 'DETAILS') { d.open = true; d.scrollIntoView({ block: 'start' }); $('input', d)?.focus({ preventScroll: true }); } };
+  if (location.hash === '#evenements') openEvents();
+  listen(document, 'click', (e) => { if (e.target.closest('a[href="#evenements"]')) { e.preventDefault(); openEvents(); } });
 
   listen(document, 'click', async (e) => {
     const retry = e.target.closest('[data-retry]');
@@ -1438,6 +1607,40 @@
     if (copy) {
       const md = copy.closest('.job')?._markdown || '';
       try { await navigator.clipboard.writeText(md); toast('Markdown copié'); } catch { toast('Copie impossible dans ce navigateur', 'error'); }
+      return;
+    }
+
+    // Modèle validé : « Modifier » le déverrouille ; « Annuler » remet le texte validé et le reverrouille
+    // Cible validée : « Modifier » rend les champs modifiables ; « Annuler » remet les valeurs validées et reverrouille
+    const tUnlock = e.target.closest('[data-target-unlock]');
+    const tCancel = e.target.closest('[data-target-cancel]');
+    if (tUnlock || tCancel) {
+      const form = (tUnlock || tCancel).closest('form.target');
+      const fields = $$('input, textarea', form);
+      if (tUnlock) form._orig = fields.map((f) => f.value);
+      else fields.forEach((f, i) => { f.value = form._orig?.[i] ?? f.value; });
+      form.classList.toggle('target-locked', !tUnlock);
+      fields.forEach((f) => { f.readOnly = !tUnlock; });
+      $('[data-target-save]', form).disabled = !tUnlock;
+      $('[data-target-unlock]', form).hidden = !!tUnlock;
+      $('[data-target-cancel]', form).hidden = !tUnlock;
+      if (tUnlock) fields[0].focus();
+      return;
+    }
+    const unlock = e.target.closest('[data-tpl-unlock]');
+    if (unlock) {
+      const form = unlock.closest('form.tpl');
+      form.dataset.editing = '1';
+      setTplLocked(form, false);
+      form.body.focus();
+      return;
+    }
+    if (e.target.closest('[data-tpl-cancel]')) {
+      const form = e.target.closest('form.tpl');
+      const o = form._orig;
+      if (o) { form.subject.value = o.subject; if (form.subjectB) form.subjectB.value = o.subjectB; form.body.value = o.body; form.html.checked = o.html; }
+      delete form.dataset.editing;
+      setTplLocked(form, true);
       return;
     }
 
@@ -1584,6 +1787,7 @@
     const form = e.target.closest('form[data-action]');
     if (!form) return;
     e.preventDefault();
+    if (form.classList.contains('tpl-locked') || form.classList.contains('target-locked')) return; // un modèle validé ne s'envoie pas (Entrée dans un champ) tant qu'on n'a pas cliqué sur « Modifier »
     const { action, id, confirm: question } = form.dataset;
     if (question && !(await confirmBox(question, { confirm: form.dataset.confirmLabel }))) return;
     const data = formData(form);
@@ -1628,6 +1832,9 @@
         case 'template': {
           data.kind = form.dataset.kind;
           const r = await api(`/api/projects/${id}/template/save`, data);
+          delete form.dataset.editing;
+          form._orig = { subject: form.subject.value, subjectB: form.subjectB?.value || '', body: form.body.value, html: form.html.checked };
+          form.classList.toggle('tpl-locked', r.status === 'validated'); // validé : verrouillé tout de suite (le rafraîchissement suivant le confirme)
           toast(`${r.status === 'validated' ? 'Modèle validé' : 'Brouillon enregistré'}${r.warnings?.length ? ` · À vérifier : ${r.warnings.slice(0, 2).join(' ')}` : ''}`, r.warnings?.length ? 'error' : 'ok');
           break;
         }
@@ -1662,6 +1869,7 @@
       toast(err.message, 'error');
     } finally {
       btns.forEach((b) => { b.disabled = false; });
+      if (action === 'template') setTplLocked(form, form.classList.contains('tpl-locked')); // les boutons d'un modèle verrouillé restent inactifs
       if (proj && action !== 'send') refreshProject(proj);
     }
   });

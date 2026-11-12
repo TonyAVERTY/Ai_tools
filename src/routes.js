@@ -9,7 +9,7 @@ import { startLogin, finishLogin, destroySession, getSession, checkOrigin } from
 import { verifyCaptcha } from './captcha.js';
 import { deleteUser, normalizeEmail, getUser } from './users.js';
 import {
-  assertCanRunAi, getLinkState, linkChatgptAccount, assertLoginConsent, linkLoginToken, validateSubscriptionToken, linkApiKey, linkSubscriptionToken, unlink, testLink, lastConsent,
+  assertCanRunAi, getLinkState, linkChatgptAccount, linkGoogleAccount, assertGoogleConsent, googleAccountEnabled, assertLoginConsent, linkLoginToken, validateSubscriptionToken, linkApiKey, linkSubscriptionToken, unlink, testLink, lastConsent,
   MODES,
   isPriced, userProvider, aiSwitchOf,
 } from './claudelink.js';
@@ -18,27 +18,39 @@ import { registerSiteRoutes } from './site/routes.js';
 import { registerAdminRoutes } from './adminroutes.js';
 import { loginsOf } from './claudelogin.js';
 import { chatgptLoginsOf } from './chatgptlogin.js';
+import { googleLoginsOf } from './googlelogin.js';
 import { accessOn, memberTeamIds, needAccess } from './teams.js';
 import { registerTeamRoutes } from './teamroutes.js';
 import { registerProfileRoutes, getProfile, isEmpty } from './userprofile.js';
-import { registerTourRoutes, needsTour } from './tour.js';
+import { registerTourRoutes } from './tour.js';
+import { registerTodayRoutes } from './todayroutes.js';
+import { registerSearchRoutes } from './searchroutes.js';
 import { registerMailRoutes } from './mailroutes.js';
 import { registerApiV1 } from './apiv1.js';
 import { registerDeveloperRoutes } from './developerroutes.js';
+import { registerShortcutRoutes } from './shortcuts.js';
 import { registerCalendarRoutes } from './calendar.js';
 import { registerAccountingRoutes } from './accountingroutes.js';
 import { registerBillingRoutes } from './billingroutes.js';
 import { registerClientsRoutes } from './clientsroutes.js';
+import { clientsOverview } from './clientsdata.js';
 import { registerChatRoutes } from './chat.js';
-import { registerEventRoutes } from './events.js';
+import { registerEventRoutes, suggestionFor } from './events.js';
 import { feedToken, feedUrl } from './services/ical.js';
 import { developerMode } from './apitokens.js';
 import { registerLinkedinRoutes } from './linkedinroutes.js';
+import { registerContentRoutes } from './contentroutes.js';
+import { registerSubscriptionRoutes } from './subscriptionroutes.js';
+import { subscriptionOf, billingView } from './subscriptions.js';
+import { stripeCall } from './services/stripe.js';
 import { registerPromoRoutes, removeProjectVideos } from './promo.js';
 import { registerPosteRoutes } from './posteroutes.js';
 import { isRoleJob, roleTaskByJob } from './services/roles.js';
 import { registerProspectRoutes } from './prospectroutes.js';
-import { dashboardPage, settingsPage, unsubPage, accountPage, layout } from './views.js';
+import { settingsPage, unsubPage, accountPage, layout } from './views.js';
+import { projectsPage, projectTabPage, tabSlugs } from './projectviews.js';
+import { contactPage } from './contactviews.js';
+import { fmtEur } from './services/accounting.js';
 import { linkPage } from './linkviews.js';
 import { availableProviders } from './services/providers/availability.js';
 import { getProvider } from './services/providers/index.js';
@@ -62,6 +74,7 @@ import { notify, notifyConfig, saveDiscordHooks, publicHooks, EVENTS, MAX_HOOKS 
 import { listChannels, saveChannels, publicChannels, notifyChannels, CHANNEL_TYPES } from './services/channels.js';
 import { budgetState, AI_JOBS } from './services/budget.js';
 import { currentClaudeQuota } from './services/usagelive.js';
+import { currentChatgptLimits } from './services/usagechatgpt.js';
 import { sendWeeklyReport } from './services/report.js';
 import { exportProspects, importProspects } from './services/csv.js';
 import { quotaFor, planLimitError, withUserLock, assertRoom, usageView } from './services/plans.js';
@@ -93,13 +106,18 @@ export function registerRoutes(router, app) {
   registerTeamRoutes(router, app);
   registerProfileRoutes(router, app);
   registerTourRoutes(router, app);
+  registerTodayRoutes(router, app);
+  registerSearchRoutes(router, app);
   registerMailRoutes(router, app);
   registerLinkedinRoutes(router, app, { project, aiOpts });
+  registerContentRoutes(router, app, { project, aiOpts });
+  registerSubscriptionRoutes(router, app);
   registerPromoRoutes(router, app, { project, aiOpts });
   registerPosteRoutes(router, app, { project, aiOpts });
   registerProspectRoutes(router, app, { project });
   registerApiV1(router, app, { aiOpts });
   registerDeveloperRoutes(router, app);
+  registerShortcutRoutes(router);
   registerCalendarRoutes(router, app);
   registerAccountingRoutes(router, app);
   registerBillingRoutes(router, app, { aiOpts });
@@ -164,7 +182,7 @@ export function registerRoutes(router, app) {
   // ---------- Privé ----------
   router.post('/logout', async ({ req, res }) => { await destroySession(db, req, res); redirect(res, '/login'); });
 
-  router.get('/', async ({ res, session, url }) => {
+  router.get('/projets', async ({ res, session }) => {
     const userId = session.userId;
     const projects = [];
     for (const p of await listProjects(app, userId)) {
@@ -172,13 +190,82 @@ export function registerRoutes(router, app) {
       projects.push({ project: p, smtp: publicConfig(full.smtp, 'pass'), dbCfg: publicConfig(full.dbCfg, 'password'), imap: publicConfig(full.imapCfg, 'pass') });
     }
     const stats = await projectStats(db, projects.map((x) => x.project.id));
-    html(res, dashboardPage({
-      email: session.email, projects, stats, gitHosts: (await listGitServers(db, userId)).map((x) => x.host), usage: await usageView(db, await getUser(db, userId)),
+    // État de mise en route et argent à encaisser de chaque projet, pour les cartes
+    const checks = new Map();
+    for (const x of projects) {
+      const full = await getProject(app, x.project.id, { userId, secrets: true });
+      checks.set(Number(x.project.id), await projectChecklist(app, full));
+    }
+    const cash = new Map();
+    for (const r of await db.prepare(`SELECT i.project_id, SUM(i.amount_cents) cents FROM billing_invoices i JOIN accounting_entries e ON e.id = i.entry_id
+        WHERE i.user_id = ? AND e.pending = 1 AND i.kind <> 'avoir' AND i.project_id IS NOT NULL GROUP BY i.project_id`).all(Number(userId))) cash.set(Number(r.project_id), Number(r.cents || 0));
+    html(res, projectsPage({
+      email: session.email, projects, stats, checks, cash, fmtEur, gitHosts: (await listGitServers(db, userId)).map((x) => x.host), usage: await usageView(db, await getUser(db, userId)),
       pauseMessage: await sendPause(db, userId).then((p) => (p ? pauseMessageOf(p) : null)),
-      // Visite guidée : relancée à la demande (?tour=1), ou toute seule une fois après les questions de bienvenue
-      tour: url.searchParams.get('tour') === '1' ? 'replay' : (await needsTour(db, userId)) ? 'auto' : null,
     }));
   });
+
+  // Derniers mails partis d'un projet, avec leur texte et la dernière réponse du prospect : de quoi voir ce qui est parti juste après un envoi.
+  // Le projet est vérifié comme partout (introuvable s'il n'est pas à la personne ou à son équipe).
+  router.get('/api/projects/:id/mails/recent', async (ctx) => {
+    const p = await project(ctx);
+    const rows = await db.prepare(`SELECT m.id, m.prospect_id, m.email, m.subject, m.kind, m.sent_at, m.error, m.read_at, m.body, m.note, x.company, x.status FROM mail_log m
+      LEFT JOIN prospects x ON x.id = m.prospect_id WHERE m.project_id = ? ORDER BY m.sent_at DESC, m.id DESC LIMIT 8`).all(p.id);
+    const mails = [];
+    for (const r of rows) {
+      const reply = r.prospect_id ? await db.prepare('SELECT subject, body, intent, received_at FROM replies WHERE project_id = ? AND prospect_id = ? ORDER BY received_at DESC, id DESC LIMIT 1').get(p.id, r.prospect_id) : null;
+      const state = r.error ? 'failed' : ['replied', 'client'].includes(r.status) ? 'replied' : r.status === 'bounced' ? 'bounced' : r.status === 'refused' ? 'refused' : r.read_at ? 'read' : 'sent';
+      mails.push({
+        id: Number(r.id), to: r.email, company: r.company || '', subject: r.subject || '', kind: r.kind, sentAt: Number(r.sent_at), state,
+        error: r.error || null, note: state === 'bounced' ? r.note || null : null, body: r.body ? String(r.body).slice(0, 6000) : null, prospectId: r.prospect_id ? Number(r.prospect_id) : null,
+        reply: reply ? { subject: reply.subject || '', body: String(reply.body || '').slice(0, 3000), receivedAt: Number(reply.received_at) } : null,
+      });
+    }
+    json(ctx.res, { mails });
+  });
+
+  // Journal du projet (onglet Envoi) : mails de ce projet, par état
+  const journalOf = async (database, projectId) => {
+    const r = await database.prepare(`SELECT COUNT(*) n, SUM(CASE WHEN m.error IS NULL THEN 1 ELSE 0 END) ok, SUM(CASE WHEN m.error IS NOT NULL THEN 1 ELSE 0 END) failed,
+        SUM(CASE WHEN m.error IS NULL AND x.status IN ('replied', 'client') THEN 1 ELSE 0 END) replied
+      FROM mail_log m LEFT JOIN prospects x ON x.id = m.prospect_id WHERE m.project_id = ?`).get(projectId);
+    return { all: Number(r?.n || 0), sent: Number(r?.ok || 0), failed: Number(r?.failed || 0), replied: Number(r?.replied || 0) };
+  };
+
+  // Page d'un projet, une adresse par onglet (le sien ou un projet d'équipe) : tout autre numéro ou onglet est « introuvable »
+  const projectTab = async (ctx) => {
+    const { res, params, session } = ctx;
+    const tab = params.tab ?? '';
+    if (!tabSlugs().includes(tab)) throw new HttpError(404, 'Page introuvable');
+    const userId = session.userId;
+    const full = await getProject(app, params.id, { userId, secrets: true });
+    if (full.access === 'member' && ['clients', 'facturation', 'recap', 'reglages'].includes(tab)) throw new HttpError(404, 'Page introuvable');
+    const entry = { project: full, smtp: publicConfig(full.smtp, 'pass'), dbCfg: publicConfig(full.dbCfg, 'password'), imap: publicConfig(full.imapCfg, 'pass') };
+    html(res, projectTabPage({
+      email: session.email, entry, tab, stats: (await projectStats(db, [full.id])).get(Number(full.id)),
+      checklist: await projectChecklist(app, full), jobs: await latestJobs(db, full.id),
+      billing: tab === 'facturation' ? await app.billingTab(ctx) : null,
+      clientCounts: tab === 'clients' ? (await clientsOverview(db, session.userId, [Number(full.id)])).get(Number(full.id)) : null,
+      journal: tab === 'envoi' ? await journalOf(db, full.id) : null,
+      scheduled: tab === 'communication' ? (await db.prepare("SELECT body, scheduled_at at FROM linkedin_posts WHERE project_id = ? AND status = 'scheduled' ORDER BY scheduled_at LIMIT 5").all(full.id)).map((r) => ({ body: r.body, at: Number(r.at) })) : [],
+    }));
+  };
+  // Fiche contact : un prospect ou un client du projet (introuvable si le prospect est d'un autre projet ou d'un autre compte)
+  router.get('/p/:id/contact/:cid', async ({ res, params, session }) => {
+    const full = await getProject(app, params.id, { userId: session.userId });
+    const detail = await prospectDetail(db, Number(params.cid));
+    if (!detail || Number(detail.prospect.project_id) !== Number(full.id)) throw new HttpError(404, 'Prospect introuvable');
+    // Le texte des mails partis (et la raison d'un rejet) ne sert qu'à cette page : prospectDetail, lui, sert aussi l'API
+    detail.mails = await db.prepare(`SELECT kind, subject, variant, sent_at, error, read_at, body, note, email FROM mail_log
+      WHERE prospect_id = ? AND project_id = ? ORDER BY sent_at, id`).all(detail.prospect.id, full.id);
+    const reply = await db.prepare('SELECT id, project_id, body, subject, intent, received_at, from_email FROM replies WHERE prospect_id = ? ORDER BY received_at DESC, id DESC LIMIT 1').get(detail.prospect.id);
+    const job = await db.prepare("SELECT status FROM jobs WHERE project_id = ? AND type = 'hook' AND params_json = ? ORDER BY id DESC LIMIT 1").get(full.id, JSON.stringify({ prospectId: detail.prospect.id }));
+    html(res, contactPage({ email: session.email, project: full, detail, reply: reply ? { ...reply, received_at: Number(reply.received_at), ...(await suggestionFor(db, session.userId, { id: reply.id, subject: reply.subject, text: reply.body, intent: reply.intent, company: detail.prospect.company, from: reply.from_email, receivedAt: Number(reply.received_at) })) } : null, hookBusy: !!job && ['queued', 'running'].includes(job.status) }));
+  });
+
+  router.get('/p/:id', projectTab);
+  router.get('/p/:id/:tab', projectTab);
+  router.get('/projets/:id', async ({ res, params }) => redirect(res, `/p/${params.id}`));
 
   router.get('/settings', async ({ res, session, url }) => {
     const userId = session.userId;
@@ -279,9 +366,10 @@ export function registerRoutes(router, app) {
   // Page d'onboarding (bloquante tant qu'aucune liaison valide n'existe). Les secrets arrivent par POST, ne sont jamais
   // relus ni réaffichés ; les erreurs ne contiennent que des messages fixes.
   router.get('/link', async ({ res, session, url }) => {
+    const available = availableProviders(cfg, { googleEnabled: googleAccountEnabled() });
     html(res, linkPage({
-      user: session.user, link: await getLinkState(db, session.userId), cliModeEnabled, error: url.searchParams.get('e'),
-      start: url.searchParams.get('start') === 'claude', selected: url.searchParams.get('ia'), available: availableProviders(cfg),
+      user: session.user, link: await getLinkState(db, session.userId), cliModeEnabled, googleEnabled: available.googleAccount, error: url.searchParams.get('e'),
+      start: url.searchParams.get('start') === 'claude', selected: url.searchParams.get('ia'), available,
     }));
   });
 
@@ -358,6 +446,24 @@ export function registerRoutes(router, app) {
     chatgptLoginsOf(app).cancel(session.userId, (await readBody(req)).id);
     json(res, { ok: true });
   }, LINK_LIMIT);
+  // Compte Google (abonnement Google AI, Antigravity CLI) : désactivé par défaut. Fichier de connexion collé (secours) ou connexion guidée (src/googlelogin.js) :
+  // le serveur donne le lien de Google, l'utilisateur recopie le code (60 secondes), la connexion est vérifiée par un appel minimal puis rangée (chiffrée).
+  router.post('/link/google/auth', linkAction((b, s) => linkGoogleAccount(app, s.userId, { authFile: b.authFile, accept: b.accept, via: 'paste' }), '/', 'gemini'), LINK_LIMIT);
+  router.post('/link/google/login', async ({ req, res, session }) => {
+    const b = await readBody(req);
+    assertGoogleConsent(cfg, b.accept); // case cochée et mode activé, avant tout lancement
+    json(res, await googleLoginsOf(app).start(session.userId));
+  }, LINK_LIMIT);
+  router.post('/link/google/login/code', async ({ req, res, session }) => {
+    const b = await readBody(req);
+    const authFile = await googleLoginsOf(app).finish(session.userId, b.id, b.code);
+    await linkGoogleAccount(app, session.userId, { authFile, accept: true, via: 'login' });
+    json(res, { ok: true });
+  }, LINK_LIMIT);
+  router.post('/link/google/login/cancel', async ({ req, res, session }) => {
+    googleLoginsOf(app).cancel(session.userId, (await readBody(req)).id);
+    json(res, { ok: true });
+  }, LINK_LIMIT);
   router.post('/link/test', async ({ req, res, session }) => {
     const r = await testLink(app, session.userId);
     if (wantsJson(req)) return json(res, r);
@@ -374,12 +480,13 @@ export function registerRoutes(router, app) {
     const t = url.searchParams.get('t');
     const link = await getLinkState(db, session.userId);
     // Le relevé des limites ne doit jamais empêcher d'afficher la page (Anthropic injoignable, réponse inattendue…)
-    const quota = link && link.mode !== MODES.api_key ? await currentClaudeQuota(app, session.userId).catch(() => null) : null;
+    const quota = link?.mode === MODES.chatgpt_account ? await currentChatgptLimits(app, session.userId).catch(() => null)
+      : link && link.mode !== MODES.api_key && link.provider === 'claude' ? await currentClaudeQuota(app, session.userId).catch(() => null) : null;
     const account = { link, quota };
     html(res, accountPage({
       user: session.user, error: url.searchParams.get('e'), link: account.link, quota: account.quota, developer: await developerMode(db, session.userId), appUrl: cfg.appUrl,
       ical: await (async () => { const t = await feedToken(app, session.userId); return t ? feedUrl(cfg, t) : null; })(),
-      consent: await lastConsent(db, session.userId), profileSet: !isEmpty(await getProfile(db, session.userId)), cliModeEnabled, usage: await usageView(db, await getUser(db, session.userId)),
+      consent: await lastConsent(db, session.userId), profileSet: !isEmpty(await getProfile(db, session.userId)), cliModeEnabled, usage: { ...(await usageView(db, await getUser(db, session.userId))), billing: await billingView(app, session.userId), flash: url.searchParams.get('abonnement') },
       notice: t === 'unlinked' ? { ok: true, text: 'Liaison supprimée : le secret a été effacé et tes jobs IA en attente ont été annulés.' }
         : t === 'ok' || t === 'ko' ? { ok: t === 'ok', text: String(url.searchParams.get('m') || '').slice(0, 300) } : null,
     }));
@@ -390,6 +497,12 @@ export function registerRoutes(router, app) {
     const b = await readBody(req);
     if (normalizeEmail(b.confirm) !== normalizeEmail(session.user.email)) {
       return redirect(res, `/account?e=${encodeURIComponent("L'email saisi ne correspond pas à celui du compte")}`);
+    }
+    // Un abonnement payant est résilié chez Stripe AVANT l'effacement : sinon la personne continuerait d'être facturée sans compte. Si Stripe ne répond pas, on ne supprime rien.
+    const sub = await subscriptionOf(db, session.userId);
+    if (cfg.stripe && sub?.subscription_id && !['canceled', 'incomplete_expired'].includes(sub.status)) {
+      try { await stripeCall(app, 'DELETE', `/subscriptions/${encodeURIComponent(sub.subscription_id)}`); }
+      catch (e) { return redirect(res, `/account?e=${encodeURIComponent("Ton abonnement n'a pas pu être résilié chez Stripe : rien n'a été supprimé. Réessaie dans un instant, ou résilie-le d'abord dans « Gérer mon abonnement ».")}`); }
     }
     app.worker?.abortUser(session.userId); // un job en cours pour ce compte s'arrête avant l'effacement
     await deleteUser(app, session.userId);
@@ -432,11 +545,13 @@ export function registerRoutes(router, app) {
     const link = await getLinkState(db, userId);
     // Le quota d'abonnement n'existe qu'en mode abonnement : relevé en direct chez Anthropic (il compte aussi ce que la personne
     // fait avec son Claude en dehors d'iaboss), à défaut la dernière mesure d'un job. Jamais de barre en mode clé API.
-    const quota = link?.mode === MODES.api_key ? null : await currentClaudeQuota(app, userId);
+    const quota = link?.mode === MODES.api_key || (link && link.provider !== 'claude') ? null : await currentClaudeQuota(app, userId);
+    // Compte ChatGPT : ses limites (fenêtre de 5 h, semaine), relevées en direct chez OpenAI sinon dernière mesure
+    const chatgptLimits = link?.mode === MODES.chatgpt_account ? await currentChatgptLimits(app, userId).catch(() => null) : null;
     // Détail pour le menu « jobs » de la barre du haut : en cours d'abord, puis la file, puis les programmés
     json(res, {
       temp: session.user.isAdmin ? cpuTemp() : null, queue, scheduled, jobs, usage: await usageSummary(db, userId), budget: await budgetState(db, userId),
-      claudeRateLimit: quota, linkMode: link?.mode ?? null, linkValid: link ? !!link.valid : null,
+      claudeRateLimit: quota, chatgptLimits, provider: link?.provider ?? null, linkMode: link?.mode ?? null, linkValid: link ? !!link.valid : null,
     });
   });
 
@@ -760,7 +875,11 @@ export function registerRoutes(router, app) {
   router.get('/api/projects/:id/kanban', async (ctx) => {
     const { res, url } = ctx;
     const p = await project(ctx);
-    json(res, { columns: await kanbanColumns(db, p.id, parseFilters(url.searchParams)) });
+    // `col` + `offset` : la suite d'une seule colonne (bouton « Voir + » quand elle a plus de fiches que celles déjà chargées)
+    const col = url.searchParams.get('col');
+    if (col && !Object.hasOwn(PROSPECT_STATUSES, col)) throw new HttpError(400, 'Statut inconnu');
+    const offset = Math.min(100000, Math.max(0, Number.parseInt(url.searchParams.get('offset'), 10) || 0));
+    json(res, { columns: await kanbanColumns(db, p.id, parseFilters(url.searchParams), col ? { only: col, offset } : {}) });
   });
 
   const STATUSES = Object.keys(PROSPECT_STATUSES);

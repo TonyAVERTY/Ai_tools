@@ -17,6 +17,7 @@ import { prepareLaunch } from '../sandbox.js';
 import { estimateCost } from '../pricing.js';
 import { HttpError } from '../../http.js';
 import { SECRET_ENV } from './secretenv.js';
+import { runAgy, validateAccount, isAuthRefusal as isAgyRefusal } from './agy.js';
 
 const MODELS_URL = 'https://generativelanguage.googleapis.com/v1beta/models?pageSize=1';
 
@@ -162,10 +163,16 @@ export const geminiProvider = {
   id: 'gemini',
   label: 'Gemini',
   company: 'Google',
-  modes: { api_key: { env: SECRET_ENV.gemini.api_key, label: 'Clé API Google AI Studio' } },
+  modes: {
+    api_key: { env: SECRET_ENV.gemini.api_key, label: 'Clé API Google AI Studio' },
+    // Pas de variable d'environnement : le secret est le fichier de connexion d'Antigravity CLI (`file`), un abonnement Google (`subscription`)
+    google_account: { file: true, subscription: true, label: 'Compte Google' },
+  },
   apiKey: { pattern: /^[A-Za-z0-9_.-]{20,200}$/, invalidFormat: 'Clé API invalide : copie-la en entier depuis Google AI Studio', validate: validateApiKey },
-  bin: (cfg) => cfg.geminiBin,
-  run: runGemini,
+  bin: (cfg, mode) => (mode === 'google_account' ? cfg.agyBin : cfg.geminiBin),
+  // Avec un compte Google (fichier de connexion), c'est Antigravity CLI ; avec une clé API, Gemini CLI
+  run: (o) => (o.authFile ? runAgy(o) : runGemini(o)),
+  validateAccount,
   rateLimitWindows: () => null,
-  isAuthRefusal,
+  isAuthRefusal: (text) => isAuthRefusal(text) || isAgyRefusal(text),
 };

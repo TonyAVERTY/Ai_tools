@@ -138,18 +138,20 @@
   // ---------- Aperçu du mail ----------
   // Le serveur construit le mail avec le même code que l'envoi réel (rien n'est envoyé) ; le HTML s'affiche dans un cadre isolé (sans script ni réseau).
   let pvDlg = null;
-  const pv = { form: null, prospectId: '', variant: 'A', tab: 'html', prospects: null, seq: 0, fixBody: null, vars: {}, pick: null, mode: 'idle', rseq: 0, avoid: [], hold: false, proposal: null, instruction: '' };
+  const pv = { form: null, prospectId: '', variant: 'A', tab: 'html', prospects: null, seq: 0, verdict: null, undo: null, vars: {}, pick: null, mode: 'idle', rseq: 0, avoid: [], hold: false, proposal: null, instruction: '' };
 
   async function renderPreview() {
     hideSel();
     const form = pv.form;
     const id = form.closest('.project').dataset.id;
+    // L'IA relit D'ABORD : le texte n'est montré qu'une fois relu, et corrigé dans le modèle s'il ne voulait rien dire (voir reviewFirst)
+    if (!(await reviewFirst(id, form))) return;
     let r;
     try {
       r = await api(`/api/projects/${id}/template/preview`, {
         kind: form.dataset.kind, subject: form.subject.value, subjectB: form.subjectB?.value || '', body: form.body.value, html: form.html.checked ? 'on' : '', variant: pv.variant, prospectId: pv.prospectId,
       });
-    } catch (err) { toast(err.message, 'error'); return; }
+    } catch (err) { toast(err.message, 'error'); if (pvDlg.open && !$('[data-pv-body], .pv-frame', pvDlg)) pvDlg.close(); return; }
     if (!pv.prospects) {
       try { pv.prospects = (await api(`/api/projects/${id}/prospects`)).rows || []; } catch { pv.prospects = []; }
     }
@@ -167,7 +169,7 @@
       </div>
       ${r.note ? `<p class="muted small">${esc(r.note)}</p>` : ''}
       <dl class="pv-head"><dt>De</dt><dd>${esc(r.from)}</dd><dt>À</dt><dd>${esc(r.to)}</dd><dt>Objet</dt><dd><strong>${esc(r.subject) || '<span class="error">(vide)</span>'}</strong></dd></dl>
-      <div class="pv-sense" data-pv-sense aria-live="polite">${loadingHtml("L'IA relit le sens du mail…", { small: true })}</div>
+      <div class="pv-sense" data-pv-sense aria-live="polite">${senseHtml(pv.verdict)}</div>
       ${r.warnings.length ? `<ul class="pv-warn" role="status">${r.warnings.map((w) => `<li>${icon('alert')}<span>${esc(w)}</span></li>`).join('')}</ul>` : ''}
       ${r.html ? `<div class="seg" role="group" aria-label="Version du mail">
         <button type="button" class="btn small" data-pv-tab="html" aria-pressed="${pv.tab === 'html'}">Mail</button>
@@ -177,7 +179,6 @@
     : `<pre class="pv-text" data-pv-body>${esc(r.text)}</pre>`}
       <p class="muted small">${r.footer ? `Le lien « Ne plus recevoir de messages » ${r.sample ? 'est un lien d\'exemple' : 'est le vrai lien de ce prospect'} ; il est ajouté automatiquement à chaque mail, avec l'origine de l'adresse.` : 'Le pied de page est retiré dans Réglages → Garde-fous : le mail part tel quel, sans lien de désinscription visible.'}</p>`;
     if (!pvDlg.open) pvDlg.showModal();
-    senseCheck(id, form);
   }
 
   // ---------- Phrase sélectionnée dans l'aperçu : « Changer » (l'IA propose une autre phrase) ou « Modifier » (à la main) ----------
@@ -293,29 +294,60 @@
   listen(document, 'selectionchange', onSelection);
   listen(document, 'scroll', () => { if (pvDlg?.open && pv.pick) showSel(); }, true); // capture : la fenêtre et le cadre du texte défilent chacun
 
-  // L'IA de la personne relit le mail rempli : a-t-il un sens ? Sinon elle propose une version corrigée du modèle, appliquée seulement au clic.
-  // `seq` : un résultat arrivé après un changement de prospect ou d'objet est ignoré.
-  async function senseCheck(id, form) {
+  // L'IA de la personne relit le mail rempli AVANT qu'on le lui montre : a-t-il un sens ? Sinon elle le corrige dans le MODÈLE (sauf s'il est validé et grisé :
+  // alors elle propose, et la personne clique « Modifier »), pour que le champ et l'aperçu disent la même chose ; « Annuler la correction » remet l'ancien texte.
+  // Le résultat est gardé pour le même texte et le même prospect : changer d'onglet ou d'objet ne relance pas l'IA. `seq` : une réponse arrivée après une
+  // autre demande, ou après la fermeture de la fenêtre, est ignorée. Renvoie false si la page doit s'arrêter là.
+  const senseKey = (form) => JSON.stringify([form.dataset.kind, form.subject.value, form.body.value, pv.prospectId]);
+  function showReviewing() {
+    hideSel();
+    $('[data-dialog-body]', pvDlg).innerHTML = `
+      <div class="row dlg-head"><div><h3>${icon('eye')} Aperçu du ${pv.form.dataset.kind === 'followup' ? 'mail de relance' : 'premier mail'}</h3>
+        <p class="muted small">Voilà ce que le prospect reçoit. Rien n'est envoyé.</p></div><button type="button" class="btn small" data-close>Fermer</button></div>
+      <div class="pv-sense" aria-live="polite">${loadingHtml(`${aiName()} relit le mail avant de te le montrer…`)}</div>`;
+    if (!pvDlg.open) pvDlg.showModal();
+  }
+  async function reviewFirst(id, form) {
+    const key = senseKey(form);
+    if (pv.verdict?.key === key) return true;
     const mine = ++pv.seq;
-    pv.fixBody = null;
+    showReviewing();
     let r;
     try {
       r = await api(`/api/projects/${id}/template/sense`, { kind: form.dataset.kind, subject: form.subject.value, body: form.body.value, prospectId: pv.prospectId });
     } catch (err) { r = { unavailable: true, reason: err.message }; }
-    const box = $('[data-pv-sense]', pvDlg);
-    if (mine !== pv.seq || !box) return;
+    if (mine !== pv.seq || !pvDlg.open) return false;
+    const locked = form.classList.contains('tpl-locked');
     if (r.unavailable) {
-      box.innerHTML = `<ul class="pv-warn" role="status"><li>${icon('alert')}<span>${esc(aiName())} n'a pas pu relire le sens de ce mail : ${esc(String(r.reason || 'réponse indisponible').replace(/[.\s]+$/, ''))}. L'envoi attend cette relecture.</span></li></ul>`;
+      pv.verdict = { key: null, kind: 'down', reason: r.reason }; // pas gardé : on réessaie à la prochaine ouverture
     } else if (r.sense) {
-      box.innerHTML = `<p class="small"><span class="badge ok">${icon('check')}Sens vérifié</span> ${esc(aiName())} a relu ce mail.</p>`;
+      pv.verdict = { key, kind: 'ok' };
+    } else if (r.fixBody && !locked) {
+      pv.undo = form.body.value;
+      form.body.value = r.fixBody;
+      form.body.dispatchEvent(new Event('input', { bubbles: true }));
+      pv.verdict = { key: senseKey(form), kind: 'fixed', problem: r.problem };
     } else {
-      pv.fixBody = r.fixBody || null;
-      box.innerHTML = `<ul class="pv-warn" role="status"><li>${icon('alert')}<span><strong>Ce mail ne veut pas dire grand-chose.</strong> ${esc(r.problem || '')}</span></li></ul>
-        ${r.fixBody ? `<p class="small">Version corrigée proposée par ${esc(aiName())} :</p><pre class="pv-text">${esc(r.fixedText || r.fixBody)}</pre>
-        <p><button type="button" class="btn small primary" data-pv-apply>Appliquer la correction au modèle</button></p>
-        <p class="muted small">Le modèle ne change pas tant que tu n'as pas cliqué. Tu pourras ensuite le retoucher avant de l'enregistrer et de le valider.</p>`
-    : `<p class="muted small">Aucune correction sûre n'a pu être proposée : retouche le texte du modèle, puis rouvre l'aperçu.</p>`}`;
+      pv.verdict = { key, kind: 'bad', problem: r.problem, proposal: r.fixedText || r.fixBody || null, locked };
     }
+    return true;
+  }
+  function senseHtml(v) {
+    const ai = esc(aiName());
+    if (!v) return '';
+    if (v.kind === 'down') {
+      return `<ul class="pv-warn" role="status"><li>${icon('alert')}<span>${ai} n'a pas pu relire le sens de ce mail : ${esc(String(v.reason || 'réponse indisponible').replace(/[.\s]+$/, ''))}. L'envoi attend cette relecture.</span></li></ul>`;
+    }
+    if (v.kind === 'ok') return `<p class="small"><span class="badge ok">${icon('check')}Sens vérifié</span> ${ai} a relu ce mail.</p>`;
+    if (v.kind === 'fixed') {
+      return `<p class="small"><span class="badge ok">${icon('check')}Corrigé</span> ${ai} a relu ce mail avant de te le montrer et l'a corrigé : ${esc(v.problem || '')}</p>
+        <p class="muted small">La correction est dans le modèle (champ du mail), pas encore enregistrée. <button type="button" class="btn small" data-pv-undo>Annuler la correction</button></p>`;
+    }
+    if (v.kind === 'declined') return '<p class="muted small">Correction annulée : ton texte d\'origine est gardé. L\'envoi relira le sens du mail de toute façon.</p>';
+    return `<ul class="pv-warn" role="status"><li>${icon('alert')}<span><strong>Ce mail ne veut pas dire grand-chose.</strong> ${esc(v.problem || '')}</span></li></ul>
+      ${v.proposal ? `<p class="small">Version corrigée proposée par ${ai} :</p><pre class="pv-text">${esc(v.proposal)}</pre>
+      <p class="muted small">Le modèle est validé, donc grisé : clique « Modifier » sur le modèle, puis rouvre l'aperçu, et ${ai} le corrigera avant de te le montrer.</p>`
+    : '<p class="muted small">Aucune correction sûre n\'a pu être proposée : retouche le texte du modèle, puis rouvre l\'aperçu.</p>'}`;
   }
 
   listen(document, 'click', async (e) => {
@@ -336,11 +368,12 @@
           if (ev.target.closest('[data-pv-use]') && pv.proposal) { usePick(); return; }
           if (ev.target.closest('[data-pv-more]') && pv.pick) { if (pv.proposal) pv.avoid.push(pv.proposal); pv.proposal = null; changePick(); return; }
           if (ev.target.closest('[data-pv-cancel]')) { hideSel(); return; }
-          if (ev.target.closest('[data-pv-apply]') && pv.fixBody) {
-            pv.form.body.value = pv.fixBody;
+          if (ev.target.closest('[data-pv-undo]') && pv.undo !== null) {
+            pv.form.body.value = pv.undo;
             pv.form.body.dispatchEvent(new Event('input', { bubbles: true }));
-            pv.fixBody = null;
-            toast('Correction appliquée');
+            pv.undo = null;
+            pv.verdict = { key: senseKey(pv.form), kind: 'declined' }; // le texte d'origine est gardé : l'IA ne le re-corrige pas à l'affichage
+            toast('Correction annulée');
             renderPreview();
             return;
           }
@@ -356,7 +389,7 @@
         pvDlg.addEventListener('close', hideSel);
         pvDlg.addEventListener('change', (ev) => { if (ev.target.matches('[data-pv-prospect]')) { pv.prospectId = ev.target.value; renderPreview(); } });
       }
-      Object.assign(pv, { form: open.closest('form'), prospectId: '', variant: 'A', tab: 'html', prospects: null });
+      Object.assign(pv, { form: open.closest('form'), prospectId: '', variant: 'A', tab: 'html', prospects: null, undo: null });
       open.disabled = true;
       await renderPreview();
       open.disabled = false;
@@ -433,18 +466,21 @@
     try {
       const r = await api(`/api/projects/${proj.dataset.id}/prospects?${qs}`);
       d.dataset.page = r.page;
-      box.innerHTML = r.rows.length ? `<div class="table-wrap"><table><thead><tr><th>Entreprise</th><th>Email</th><th>Ville</th><th>Score</th><th>Contacté</th><th>Statut</th></tr></thead><tbody>
-        ${r.rows.map((x) => `<tr data-row="${x.id}"><td><button type="button" class="link" data-open-prospect="${x.id}">${esc(x.company)}</button>
-            ${x.next_action ? `<div class="small ${x.next_action_at * 1000 <= Date.now() ? 'warn' : 'muted'}">→ ${esc(x.next_action)} (${fmtDay(x.next_action_at)})</div>` : ''}</td>
-          <td>${esc(x.email)}</td><td>${esc(x.city)}</td><td>${x.score ?? ''}</td>
-          <td>${fmtDay(x.sent_at)}${x.followup_at ? ' <span class="muted small">+ relance</span>' : ''}</td>
-          <td><select data-prospect="${x.id}" class="st-${x.status}">${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${k === x.status ? 'selected' : ''}>${v}</option>`).join('')}</select></td></tr>`).join('')}
-      </tbody></table></div>` : '<p class="muted small">Aucun prospect ne correspond.</p>';
+      const due = (x) => x.next_action && x.next_action_at * 1000 <= Date.now();
+      box.innerHTML = r.rows.length ? `<div class="table-wrap"><table class="pr-table"><thead><tr><th>Entreprise</th><th class="sm-hide">Ville</th><th class="r">Score</th><th>Statut</th><th class="sm-hide">Prochaine action</th></tr></thead><tbody>
+        ${r.rows.map((x) => `<tr data-row="${x.id}"><td><a class="link" href="/p/${proj.dataset.id}/contact/${x.id}"><b>${esc(x.company)}</b></a><br><span class="mono muted">${esc(x.email)}</span></td>
+          <td class="sm-hide">${esc(x.city)}</td><td class="r">${x.score != null ? `<span class="sc${x.score >= 9 ? ' hi' : ''}">${x.score}</span>` : ''}</td>
+          <td><select data-prospect="${x.id}" class="st-${x.status}" aria-label="Statut de ${esc(x.company)}">${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${k === x.status ? 'selected' : ''}>${v}</option>`).join('')}</select>
+            ${x.sent_at ? `<div class="small muted">contacté le ${fmtDay(x.sent_at)}${x.followup_at ? ' + relance' : ''}</div>` : ''}</td>
+          <td class="sm-hide">${x.next_action ? `${due(x) ? '<span class="badge warn">À faire</span> ' : ''}${esc(x.next_action)}<div class="small muted">${fmtDay(x.next_action_at)}</div>` : '—'}</td></tr>`).join('')}
+      </tbody></table></div>` : '<p class="muted small pr-none">Aucun prospect ne correspond.</p>';
+      // Compteurs des puces : tout le projet, quels que soient les filtres
+      for (const n of $$('[data-chip-n]', d)) n.textContent = String(r.counts?.[n.dataset.chipN] ?? '');
       $('[data-pager]', d).innerHTML = r.pages > 1
         ? `<button type="button" class="btn small" data-page="${r.page - 1}" ${r.page <= 1 ? 'disabled' : ''}>←</button>
            <span class="small muted">Page ${r.page} / ${r.pages} · ${r.total} prospect(s)</span>
            <button type="button" class="btn small" data-page="${r.page + 1}" ${r.page >= r.pages ? 'disabled' : ''}>→</button>`
-        : `<span class="small muted">${r.total} prospect(s)</span>`;
+        : `<span class="small muted">${r.total ? `1 à ${r.rows.length} sur ${r.total}` : '0 prospect'}</span>`;
       const row = fresh ? $(`tr[data-row="${fresh}"]`, box) : null;
       if (row) {
         row.classList.add('row-new');
@@ -460,19 +496,59 @@
       const { status: _ignored, ...f } = filters; // les colonnes sont les statuts
       const r = await api(`/api/projects/${proj.dataset.id}/kanban?${new URLSearchParams(f)}`);
       const card = (x) => `<article class="kcard" draggable="true" data-card="${x.id}">
-        <button type="button" class="link" data-open-prospect="${x.id}">${esc(x.company)}</button>
+        <a class="link" href="/p/${proj.dataset.id}/contact/${x.id}">${esc(x.company)}</a>
         <div class="small muted">${esc(x.email)}${x.city ? ` · ${esc(x.city)}` : ''}${x.score ? ` · ${x.score}/10` : ''}</div>
         ${x.next_action ? `<div class="small ${x.next_action_at * 1000 <= Date.now() ? 'warn' : 'muted'}">→ ${esc(x.next_action)} (${fmtDay(x.next_action_at)})</div>` : ''}
         <select data-prospect="${x.id}" class="st-${x.status}" aria-label="Statut de ${esc(x.company)}">${Object.entries(STATUS).map(([k, v]) => `<option value="${k}" ${k === x.status ? 'selected' : ''}>${v}</option>`).join('')}</select>
       </article>`;
+      // Un filtre qui ne laisse aucun prospect : on le dit (sinon le tableau affiche cinq colonnes « Vide » sans explication) et on propose de tout réafficher
+      if (r.columns.every((c) => !c.total) && Object.values(f).some((v) => v)) {
+        box.innerHTML = '<p class="muted small pr-none">Aucun prospect ne correspond à ces filtres.</p><p><button type="button" class="btn small" data-pr-reset>Voir tous les prospects</button></p>';
+        $('[data-pager]', d).innerHTML = '';
+        return;
+      }
+      // 3 fiches par colonne au départ ; « Voir + » en montre 3 de plus (en allant chercher la suite sur le serveur quand elles ne sont pas encore chargées). La colonne défile.
+      // Les compteurs survivent à un rechargement du tableau (changement de statut) tant que les filtres ne changent pas.
+      const key = JSON.stringify(f);
+      if (box._kkey !== key) { box._kkey = key; box._kshown = new Map(); }
+      box._kctx = { id: proj.dataset.id, f, key, card };
+      box._kcols = new Map(r.columns.map((c) => [c.status, c]));
       box.innerHTML = `<div class="kanban">${r.columns.map((c) => `<section class="kcol${c.total ? '' : ' empty'}" data-col="${c.status}" aria-label="${esc(c.label)}">
         <h4>${esc(c.label)} <span class="n">${c.total}</span></h4>
-        <div class="kcards" data-drop="${c.status}">${c.rows.map(card).join('') || '<p class="muted small">Vide</p>'}
-          ${c.total > c.rows.length ? `<p class="muted small">+ ${c.total - c.rows.length} autre(s) : affine avec les filtres ou passe en liste.</p>` : ''}</div>
+        <div class="kcards" data-drop="${c.status}">${kcards(box, c)}</div>
       </section>`).join('')}</div>`;
       $('[data-pager]', d).innerHTML = '';
     } catch (err) { box.innerHTML = `<p class="error small">${esc(err.message)}</p>`; }
   }
+  const K_STEP = 3;
+  // Le contenu d'une colonne : les fiches visibles, puis « Voir + » s'il en reste
+  function kcards(box, c) {
+    const shown = Math.min(box._kshown.get(c.status) || K_STEP, c.total);
+    const rest = c.total - shown;
+    return `${c.rows.slice(0, shown).map(box._kctx.card).join('') || '<p class="muted small">Vide</p>'}${rest > 0
+      ? `<button type="button" class="btn small kmore" data-kmore="${c.status}">Voir + <span class="muted">(${rest} autre${rest > 1 ? 's' : ''})</span></button>` : ''}`;
+  }
+  listen(document, 'click', async (e) => {
+    const b = e.target.closest?.('[data-kmore]');
+    const box = b?.closest('.kanban')?.parentElement;
+    if (!b || !box?._kcols) return;
+    const c = box._kcols.get(b.dataset.kmore);
+    if (!c || b.disabled) return;
+    const want = (box._kshown.get(c.status) || K_STEP) + K_STEP;
+    b.disabled = true;
+    try {
+      // Les fiches déjà chargées ne suffisent pas : la suite de cette colonne vient du serveur
+      if (want > c.rows.length && c.total > c.rows.length) {
+        const q = new URLSearchParams({ ...box._kctx.f, col: c.status, offset: String(c.rows.length) });
+        const more = (await api(`/api/projects/${box._kctx.id}/kanban?${q}`)).columns[0];
+        if (box._kctx.key !== box._kkey) return; // les filtres ont changé entre-temps
+        if (more?.rows.length) c.rows.push(...more.rows);
+      }
+      box._kshown.set(c.status, want);
+      const zone = $(`.kcards[data-drop="${c.status}"]`, box);
+      if (zone) zone.innerHTML = kcards(box, c);
+    } catch (err) { b.disabled = false; toast(err.message, 'error'); }
+  });
   const moveProspect = async (d, id, status) => {
     if (status === 'refused' && !(await confirmBox('Marquer ce prospect en refus ?\nSon adresse est ajoutée à la liste d\'opposition.', { confirm: 'Marquer en refus' }))) return;
     try { await api(`/api/prospects/${id}/status`, { status }); toast('Statut mis à jour'); } catch (err) { toast(err.message, 'error'); }
@@ -503,14 +579,36 @@
     if (card && card.closest('.kcol') !== col) moveProspect(col.closest('details.prospects'), id, col.dataset.col);
   });
 
+  // Puces de statut : elles règlent le champ « statut » du formulaire de filtres (ou la case « Actions à faire »), puis la liste se recharge
+  const syncChips = (d) => {
+    const f = $('[data-filters]', d);
+    const todo = f.elements.todo?.checked;
+    for (const c of $$('[data-chip]', d)) { const on = !todo && c.dataset.chip === f.elements.status.value; c.classList.toggle('on', on); c.setAttribute('aria-pressed', String(on)); }
+    const t = $('[data-chip-todo]', d);
+    if (t) { t.classList.toggle('on', !!todo); t.setAttribute('aria-pressed', String(!!todo)); }
+  };
+  listen(document, 'click', (e) => {
+    const reset = e.target.closest?.('[data-pr-reset]');
+    if (reset) { const d = reset.closest('details.prospects'); $('[data-filters]', d).reset(); syncChips(d); loadProspects(d); return; }
+    const chip = e.target.closest?.('[data-chip], [data-chip-todo]');
+    if (!chip) return;
+    const d = chip.closest('details.prospects');
+    const f = $('[data-filters]', d);
+    if (chip.matches('[data-chip-todo]')) { f.elements.todo.checked = !f.elements.todo.checked; if (f.elements.todo.checked) f.elements.status.value = ''; } else { f.elements.status.value = chip.dataset.chip; f.elements.todo.checked = false; }
+    syncChips(d);
+    loadProspects(d);
+  });
+
   $$('details.prospects').forEach((d) => {
     d.dataset.view = 'list';
+    $('[data-filters]', d).addEventListener('change', () => syncChips(d));
     for (const b of $$('[data-view-mode]', d)) b.addEventListener('click', () => {
       d.dataset.view = b.dataset.viewMode;
       for (const o of $$('[data-view-mode]', d)) { o.classList.toggle('on', o === b); o.setAttribute('aria-pressed', String(o === b)); }
       loadProspects(d);
     });
     d.addEventListener('toggle', () => { if (d.open) loadProspects(d); });
+    if (d.open) loadProspects(d); // onglet Prospection : la liste est ouverte d'office, elle se charge tout de suite
     const form = $('[data-filters]', d);
     let t;
     form.addEventListener('input', (e) => { if (e.target.name === 'q') { clearTimeout(t); t = setTimeout(() => loadProspects(d), 300); } });

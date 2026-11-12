@@ -51,7 +51,7 @@ export async function history(db, projectId, { days = 30, at = now() } = {}) {
   const weeks = [];
   let cursor = new Date(at * 1000);
   for (let i = 0; i < nWeeks; i++) {
-    weeks.unshift({ start: weekStart(cursor), sent: 0, replies: 0 });
+    weeks.unshift({ start: weekStart(cursor), sent: 0, replies: 0, followups: 0 });
     cursor = new Date(cursor.getTime() - 7 * 86_400_000);
   }
   const first = weeks[0].start.split('-').map(Number);
@@ -59,6 +59,9 @@ export async function history(db, projectId, { days = 30, at = now() } = {}) {
   const bucket = (ts) => weeks.find((w) => w.start === weekStart(new Date(ts * 1000)));
   for (const r of await db.prepare("SELECT sent_at FROM mail_log WHERE project_id = ? AND kind = 'initial' AND error IS NULL AND sent_at >= ?").all(projectId, since)) {
     const w = bucket(r.sent_at); if (w) w.sent++;
+  }
+  for (const r of await db.prepare("SELECT sent_at FROM mail_log WHERE project_id = ? AND kind = 'followup' AND error IS NULL AND sent_at >= ?").all(projectId, since)) {
+    const w = bucket(r.sent_at); if (w) w.followups++;
   }
   for (const r of await db.prepare('SELECT replied_at FROM prospects WHERE project_id = ? AND replied_at >= ?').all(projectId, since)) {
     const w = bucket(r.replied_at); if (w) w.replies++;

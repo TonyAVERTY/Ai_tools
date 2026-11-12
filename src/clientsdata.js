@@ -193,8 +193,16 @@ export async function clientExchanges(db, client) {
   const items = [];
   if (pid || email) {
     const mailArgs = [client.projectId, pid ?? -1, email || '\u0000'];
-    for (const m of await db.prepare('SELECT kind, subject, sent_at, error, read_at FROM mail_log WHERE project_id = ? AND (prospect_id = ? OR LOWER(email) = ?) ORDER BY sent_at DESC LIMIT 200').all(...mailArgs)) {
-      items.push({ type: 'sent', at: Number(m.sent_at), subject: m.subject || '', kind: m.kind, error: m.error || '', read: m.read_at != null });
+    // Un prospect dont l'adresse a rejeté le mail : le dernier mail parti est celui qui a été rejeté (la raison est dans `note` quand le serveur du destinataire l'a donnée)
+    const bouncing = pid ? (await db.prepare('SELECT status FROM prospects WHERE id = ? AND project_id = ?').get(pid, client.projectId))?.status === 'bounced' : false;
+    let lastSent = true;
+    for (const m of await db.prepare('SELECT kind, subject, sent_at, error, read_at, body, note, email FROM mail_log WHERE project_id = ? AND (prospect_id = ? OR LOWER(email) = ?) ORDER BY sent_at DESC LIMIT 200').all(...mailArgs)) {
+      const bounced = bouncing && lastSent && !m.error;
+      if (!m.error) lastSent = false;
+      items.push({
+        type: 'sent', at: Number(m.sent_at), subject: m.subject || '', kind: m.kind, error: m.error || '', read: m.read_at != null,
+        to: m.email || '', body: String(m.body || '').slice(0, 20000), bounced, note: bounced ? String(m.note || '') : '',
+      });
     }
     for (const r of await db.prepare('SELECT subject, body, intent, received_at FROM replies WHERE project_id = ? AND (prospect_id = ? OR LOWER(from_email) = ?) ORDER BY received_at DESC LIMIT 200').all(...mailArgs)) {
       items.push({ type: 'reply', at: Number(r.received_at), subject: r.subject || '', body: String(r.body || '').slice(0, 1500), intent: r.intent });

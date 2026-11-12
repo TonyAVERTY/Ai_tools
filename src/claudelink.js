@@ -10,19 +10,29 @@ import { AI_JOBS } from './services/budget.js';
 import { withUserLock } from './services/userlock.js';
 import { getProvider, hasProvider, DEFAULT_PROVIDER } from './services/providers/index.js';
 import { isAuthRefusal, validateApiKey } from './services/providers/claude.js';
+import { tokenSecrets } from './services/providers/agy.js';
 export { isAuthRefusal, validateApiKey };
 
-export const MODES = { api_key: 'api_key', subscription_token: 'subscription_token', chatgpt_account: 'chatgpt_account' };
+export const MODES = { api_key: 'api_key', subscription_token: 'subscription_token', chatgpt_account: 'chatgpt_account', google_account: 'google_account' };
 export const MODE_LABELS = {
   api_key: 'Clé API Anthropic',
   subscription_token: 'Abonnement Claude (jeton)',
   chatgpt_account: 'Compte ChatGPT',
+  google_account: 'Compte Google',
 };
 /** Tout mode qui n'est pas une clé API est un abonnement : même avertissement, même interrupteur (CLAUDE_CLI_MODE_ENABLED). */
-export const isSubscriptionMode = (mode) => mode === MODES.subscription_token || mode === MODES.chatgpt_account;
+export const isSubscriptionMode = (mode) => mode === MODES.subscription_token || mode === MODES.chatgpt_account || mode === MODES.google_account;
 export const LINK_REQUIRED_MESSAGE = 'Relie ton accès Claude pour utiliser cette fonction';
 export const LINK_INVALID_MESSAGE = "Ta liaison Claude n'est plus valide : teste-la ou relie-la de nouveau (Mon compte)";
 export const CLI_DISABLED_MESSAGE = "Le mode abonnement est désactivé sur ce service : relie une clé API";
+export const GOOGLE_DISABLED_MESSAGE = "La connexion par compte Google est désactivée sur ce service : relie une clé API Google AI Studio";
+
+// Connexion par compte Google (Antigravity CLI) : désactivée tant que l'administrateur ne l'a pas activée (GOOGLE_ACCOUNT_ENABLED), car la règle de
+// Google sur l'usage depuis un autre logiciel n'est pas tranchée. Fixée au démarrage du serveur (createApp) ; un drapeau de module plutôt qu'une
+// option de plus à faire passer par chaque appelant de aiRefusal.
+let googleEnabled = false;
+export const setGoogleAccountEnabled = (on) => { googleEnabled = !!on; };
+export const googleAccountEnabled = () => googleEnabled;
 
 // Texte de l'avertissement affiché avant le mode abonnement. Toute modification change la version : l'acceptation
 // enregistrée en base indique à quelle version du texte l'utilisateur a consenti.
@@ -41,6 +51,15 @@ export const OPENAI_CONSENT_TEXT = [
   "iaboss ne peut en être tenu responsable. Tu utilises ton abonnement à tes propres risques. OpenAI recommande une clé API pour ce type d'usage, et réserve la connexion de compte aux environnements privés de confiance.",
   "Tes tâches passent l'une après l'autre : un seul exécutable utilise ta connexion à la fois. Elle peut te demander de te reconnecter de temps en temps.",
   "La clé API OpenAI reste l'option recommandée : elle est prévue pour cet usage.",
+];
+
+// Même avertissement pour le compte Google (abonnement Google AI), avec sa propre version. Ici la règle de Google n'est PAS tranchée : le texte le dit.
+export const GOOGLE_CONSENT_VERSION = '2026-11-06.1';
+export const GOOGLE_CONSENT_TEXT = [
+  "Utiliser ton abonnement Google AI (Plus, Pro, Ultra) à travers une application tierce n'est pas clairement autorisé par Google. Pour Gemini CLI, Google l'interdit explicitement et a suspendu des comptes ; pour Antigravity CLI, il n'a pas répondu clairement. Ton compte Google pourrait être limité ou suspendu.",
+  "iaboss ne peut en être tenu responsable. Tu utilises ton abonnement à tes propres risques. Une clé API Google AI Studio est prévue pour cet usage et reste l'option recommandée.",
+  "Tes tâches passent l'une après l'autre : un seul exécutable utilise ta connexion à la fois. Elle peut te demander de te reconnecter de temps en temps.",
+  "Chaque tâche envoie les consignes d'Antigravity CLI avant ta demande : quelques milliers de tokens de plus par appel sont décomptés de ton abonnement.",
 ];
 
 const TOKEN_RE = /^[A-Za-z0-9_.-]{20,800}$/;
@@ -113,6 +132,7 @@ export async function aiRefusal(db, userId, { cliModeEnabled = true } = {}) {
   if (!link?.mode || !MODES[link.mode]) return LINK_REQUIRED_MESSAGE;
   if (!link.valid) return LINK_INVALID_MESSAGE;
   if (isSubscriptionMode(link.mode) && !cliModeEnabled) return CLI_DISABLED_MESSAGE;
+  if (link.mode === MODES.google_account && !googleEnabled) return GOOGLE_DISABLED_MESSAGE;
   return null;
 }
 
@@ -147,7 +167,7 @@ export async function resolveCredentials(app, userId) {
   const provider = getProvider(link.provider);
   const mode = provider.modes[link.mode];
   if (!mode) throw new HttpError(403, LINK_REQUIRED_MESSAGE);
-  if (mode.file) return { provider: provider.id, mode: link.mode, secretEnv: {}, authFile: secret, secrets: authSecrets(secret), linkedAt: link.linked_at ?? null };
+  if (mode.file) return { provider: provider.id, mode: link.mode, secretEnv: {}, authFile: secret, secrets: link.mode === MODES.google_account ? tokenSecrets(secret) : authSecrets(secret), linkedAt: link.linked_at ?? null };
   return { provider: provider.id, mode: link.mode, secretEnv: { [mode.env]: secret } };
 }
 
@@ -179,18 +199,49 @@ export function parseAuthJson(text) {
  * Codex a renouvelé ses jetons pendant un job : le fichier mis à jour remplace celui de la base, sauf si l'utilisateur a refait sa liaison
  * entre-temps (date de liaison différente) ou l'a supprimée. Jamais d'erreur vers l'appelant : un job réussi ne doit pas échouer ici.
  */
+/** Fichier de connexion d'un compte Google (Antigravity CLI) : opaque, il suffit qu'il ne soit pas vide ni démesuré. */
+export function checkOpaqueAuth(text) {
+  const raw = String(text ?? '').trim();
+  if (raw.length < 8 || raw.length > 100_000) throw new HttpError(400, "Ce n'est pas un fichier de connexion Google valable");
+  return raw;
+}
+
 export async function saveRefreshedAuth(app, userId, linkedAt, authJson) {
   try {
     const link = await readLink(app.db, userId);
-    if (!link || link.mode !== MODES.chatgpt_account || (link.linked_at ?? null) !== linkedAt) return false;
-    const compact = parseAuthJson(authJson);
+    if (!link || ![MODES.chatgpt_account, MODES.google_account].includes(link.mode) || (link.linked_at ?? null) !== linkedAt) return false;
+    // Compte ChatGPT : fichier JSON vérifié ; compte Google : fichier opaque, seulement non vide et de taille raisonnable
+    const compact = link.mode === MODES.google_account ? checkOpaqueAuth(authJson) : parseAuthJson(authJson);
     if (decrypt(app.cfg.secretKey, link.secret_enc) === compact) return false;
     await writeLink(app.db, userId, { ...link, secret_enc: encrypt(app.cfg.secretKey, compact), refreshed_at: now() });
     return true;
   } catch (e) {
-    console.warn(`[chatgpt] connexion renouvelée mais non enregistrée (utilisateur ${Number(userId)}) : ${String(e.message).slice(0, 120)}`);
+    console.warn(`[liaison] connexion renouvelée mais non enregistrée (utilisateur ${Number(userId)}) : ${String(e.message).slice(0, 120)}`);
     return false;
   }
+}
+
+/**
+ * Compte Google (abonnement Google AI) : fichier de connexion d'Antigravity CLI, collé par l'utilisateur ou produit par la connexion guidée
+ * (src/googlelogin.js). Désactivé tant que l'administrateur n'a pas mis GOOGLE_ACCOUNT_ENABLED. Le consentement est vérifié AVANT tout, la connexion
+ * par un appel minimal à agy (quelques milliers de tokens décomptés de l'abonnement).
+ */
+export async function linkGoogleAccount(app, userId, { authFile, accept, via = 'paste' }) {
+  assertGoogleConsent(app.cfg, accept);
+  const provider = getProvider('gemini');
+  const compact = checkOpaqueAuth(authFile);
+  const checked = await (app.validateGoogleAccount || provider.validateAccount)(app, compact);
+  const stored = checked?.authFile ? checkOpaqueAuth(checked.authFile) : compact; // le test a pu renouveler le fichier : on garde le plus récent
+  const consent = { at: now(), version: GOOGLE_CONSENT_VERSION };
+  await saveLink(app, userId, { provider: 'gemini', mode: MODES.google_account, secret_enc: encrypt(app.cfg.secretKey, stored), consent, via });
+  await setSetting(app.db, userId, 'google_consent_json', JSON.stringify(consent));
+}
+
+/** Consentement obligatoire avant tout lancement d'une connexion Google (guidée ou collée), et mode activé par l'administrateur. */
+export function assertGoogleConsent(cfg, accept) {
+  if (cfg.cliModeEnabled === false) throw new HttpError(403, CLI_DISABLED_MESSAGE);
+  if (!googleEnabled) throw new HttpError(403, GOOGLE_DISABLED_MESSAGE);
+  if (!truthy(accept)) throw new HttpError(400, `Tu dois cocher « ${CONSENT_CHECKBOX} » pour utiliser ton abonnement Google`);
 }
 
 /**
@@ -351,8 +402,9 @@ export async function testLink(app, userId) {
     try { secret = decrypt(app.cfg.secretKey, link.secret_enc); } catch { secret = null; }
     if (!secret) { await mark(false); return { ok: false, message: 'Secret illisible : relie de nouveau ton accès Claude' }; }
     if (link.mode === MODES.api_key) await (app.validateApiKey || getProvider(link.provider).apiKey.validate)(secret, app.fetch || fetch);
-    else if (link.mode === MODES.chatgpt_account) {
+    else if (link.mode === MODES.chatgpt_account || link.mode === MODES.google_account) {
       if (app.cfg.cliModeEnabled === false) return { ok: false, message: CLI_DISABLED_MESSAGE };
+      if (link.mode === MODES.google_account && !googleEnabled) return { ok: false, message: GOOGLE_DISABLED_MESSAGE };
       // File d'attente du compte : un test ne passe jamais en même temps qu'un job (le jeton de rafraîchissement est à usage unique)
       await withUserLock(userId, async () => {
         const fresh = await readLink(app.db, userId);
@@ -384,6 +436,8 @@ export async function lastConsent(db, userId) {
 export function isLinkExempt(method, pathname) {
   if (pathname === '/link' || pathname.startsWith('/link/')) return true;
   if (pathname === '/account' || pathname === '/account/delete') return true;
+  if (pathname === '/raccourcis') return true; // une page d'aide, sans accès à l'IA
+  if (pathname === '/abonnement/portail') return true; // on doit toujours pouvoir gérer ou résilier son abonnement, même sans IA reliée
   if (pathname === '/welcome' || pathname === '/welcome/skip') return true; // le profil ne demande pas d'accès Claude
   if (pathname.startsWith('/linkedin/')) return true; // un administrateur d'équipe relie LinkedIn avec l'accès Claude du propriétaire
   if (pathname === '/team' || pathname.startsWith('/team/')) return true; // on peut gérer son équipe ou accepter une invitation sans avoir relié Claude
