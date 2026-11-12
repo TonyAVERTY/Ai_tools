@@ -153,12 +153,24 @@ async function googleSynth(text, lang, { fetchImpl = fetch } = {}) {
 }
 
 // Fournisseurs à clé : appels REST officiels. La clé voyage dans un en-tête, jamais dans l'adresse ; les erreurs ne la citent jamais.
+// Message du fournisseur dans le corps d'une erreur (ElevenLabs : { detail: { status, message } }, Google : { error: { message } }), court et sur une ligne
+const providerDetail = async (res) => {
+  try {
+    const j = await res.json();
+    const d = j?.detail ?? j?.error ?? j;
+    const text = typeof d === 'string' ? d : d?.message || d?.status || '';
+    return String(text).replace(/\s+/g, ' ').trim().slice(0, 140);
+  } catch { return ''; }
+};
+
 const keyedFetch = async (fetchImpl, url, init, label) => {
   let res;
   try { res = await fetchImpl(url, init); } catch { throw new Error(`${label} ne répond pas`); }
   if (res.status === 401 || res.status === 403) throw new Error(`${label} a refusé la clé API (vérifie-la, ou son quota)`);
   if (res.status === 429) throw new Error(`${label} : quota ou débit dépassé`);
-  if (!res.ok) throw new Error(`${label} a refusé la requête (${res.status})`);
+  // 402 : un abonnement payant est exigé. Chez ElevenLabs, c'est le cas des voix de la bibliothèque partagée avec le plan gratuit (seules les voix de base passent)
+  if (res.status === 402) throw new Error(label === 'ElevenLabs' ? 'ElevenLabs exige un abonnement payant pour cette voix (les voix de la bibliothèque ne sont pas utilisables avec le plan gratuit) : choisis une voix de base' : `${label} exige un abonnement payant pour cette demande`);
+  if (!res.ok) { const d = await providerDetail(res); throw new Error(`${label} a refusé la requête (${res.status}${d ? ` : ${d}` : ''})`); }
   return res;
 };
 
