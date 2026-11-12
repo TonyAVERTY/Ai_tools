@@ -18,14 +18,6 @@ export const PLATFORMS = {
     label: 'YouTube Shorts', format: 'vertical', fps: 30, seconds: 30,
     brief: "YouTube Shorts, au format vertical. Le titre, les boutons et le bas de l'application recouvrent l'image : garde libres environ 15 % en haut, 25 % en bas et 12 % à droite. L'accroche et le produit apparaissent dès les deux premières secondes. La vidéo se comprend sans le son. Un seul appel à l'action, au dernier plan.",
   },
-  youtube: {
-    label: 'YouTube', format: 'paysage', fps: 30, seconds: 30,
-    brief: "YouTube, au format paysage 16:9. La barre de lecture recouvre le bas de l'image : garde libres environ 10 % en bas. Le produit apparaît dans les premières secondes, sans plan d'introduction à rallonge. Textes lisibles même sur un petit écran. Un seul appel à l'action, au dernier plan.",
-  },
-  facebook: {
-    label: 'Facebook', format: 'carre', fps: 30, seconds: 15,
-    brief: "Facebook, au format carré, vu dans le fil d'actualité et souvent sans le son : le texte à l'écran porte le message. Le produit et l'accroche apparaissent dès les deux premières secondes. Garde environ 8 % de marge tout autour. Un seul appel à l'action, au dernier plan.",
-  },
   linkedin: {
     label: 'LinkedIn', format: 'carre', fps: 30, seconds: 20,
     brief: "LinkedIn, au format carré, vu dans le fil d'actualité et souvent sans le son : le texte à l'écran porte le message, dans un ton sobre et professionnel. Le bénéfice principal apparaît dès les premières secondes. Garde environ 8 % de marge tout autour. Un seul appel à l'action, au dernier plan.",

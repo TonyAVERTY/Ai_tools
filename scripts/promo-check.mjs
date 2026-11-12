@@ -44,18 +44,18 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   ok(await p.locator('[data-promo-go]').isDisabled() && /Trop d'images/.test(await p.locator('[data-promo-count]').textContent()), `${tag} trop d'images : bouton bloqué et message`);
   // Plateforme cible : une seule case à la fois, le préréglage remplit les champs, ils restent modifiables, la limite d'images reste contrôlée
   const plat = '[data-promo-form] input[data-promo-platform]';
-  ok(await p.locator(plat).count() === 6 && await p.locator(`${plat}:checked`).count() === 0, `${tag} plateformes : six cases, aucune cochée au départ`);
+  ok(await p.locator(plat).count() === 4 && await p.locator(`${plat}:checked`).count() === 0, `${tag} plateformes : quatre cases, aucune cochée au départ`);
   await p.fill('[data-promo-form] input[name="fps"]', '30'); await p.fill('[data-promo-form] input[name="seconds"]', '15');
   await p.check(`${plat}[value="tiktok"]`);
   ok(await p.locator('[data-promo-form] select[name="format"]').inputValue() === 'vertical' && await p.locator('[data-promo-form] input[name="seconds"]').inputValue() === '15' && await p.locator('[data-promo-form] input[name="fps"]').inputValue() === '30', `${tag} TikTok : vertical, 30 images/s, 15 s`);
   ok(/^TikTok : vertical.*30 images\/s, 15 s/.test(await p.locator('[data-promo-platform-hint]').textContent()), `${tag} plateforme : la phrase sous les cases donne le préréglage`);
-  await p.check(`${plat}[value="youtube"]`);
+  await p.check(`${plat}[value="linkedin"]`);
   ok(await p.locator(`${plat}:checked`).count() === 1 && await p.locator(`${plat}[value="tiktok"]`).isChecked() === false, `${tag} plateformes : une seule case à la fois`);
-  ok(await p.locator('[data-promo-form] select[name="format"]').inputValue() === 'paysage' && await p.locator('[data-promo-form] input[name="seconds"]').inputValue() === '30', `${tag} YouTube : paysage, 30 s`);
-  ok((await p.locator('[data-promo-count]').textContent()).includes('900 images'), `${tag} plateforme : le nombre d'images suit le préréglage`);
+  ok(await p.locator('[data-promo-form] select[name="format"]').inputValue() === 'carre' && await p.locator('[data-promo-form] input[name="seconds"]').inputValue() === '20', `${tag} LinkedIn : carré, 20 s`);
+  ok((await p.locator('[data-promo-count]').textContent()).includes('600 images'), `${tag} plateforme : le nombre d'images suit le préréglage`);
   await p.fill('[data-promo-form] input[name="seconds"]', '60');
-  ok(await p.locator(`${plat}[value="youtube"]`).isChecked() && await p.locator('[data-promo-go]').isDisabled() === false, `${tag} plateforme : champs modifiables, la case reste cochée`);
-  await p.uncheck(`${plat}[value="youtube"]`);
+  ok(await p.locator(`${plat}[value="linkedin"]`).isChecked() && await p.locator('[data-promo-go]').isDisabled() === false, `${tag} plateforme : champs modifiables, la case reste cochée`);
+  await p.uncheck(`${plat}[value="linkedin"]`);
   ok(await p.locator('[data-promo-form] input[name="seconds"]').inputValue() === '60' && /Coche une plateforme/.test(await p.locator('[data-promo-platform-hint]').textContent()), `${tag} plateforme : décocher garde les champs et rend la phrase d'aide`);
   await p.fill('[data-promo-form] input[name="fps"]', '30'); await p.fill('[data-promo-form] input[name="seconds"]', '15');
   await p.selectOption('[data-promo-form] select[name="format"]', 'paysage');
