@@ -25,7 +25,7 @@ export function sampleValues(kind, today = new Date()) {
 }
 
 /** Pages d'un PDF → fichiers PNG dans `dir`. Renvoie la liste, ou null si pdftoppm n'est pas installé (la relecture visuelle est alors impossible). */
-export function rasterizePdf(buffer, dir, { dpi = 90, bin = 'pdftoppm', run = spawnSync } = {}) {
+export function rasterizePdf(buffer, dir, { dpi = 90, bin = process.env.PDFTOPPM_BIN || 'pdftoppm', run = spawnSync } = {}) {
   mkdirSync(dir, { recursive: true });
   const src = join(dir, 'doc.pdf');
   writeFileSync(src, buffer); // pdftoppm lit un fichier : on le dépose dans le dossier temporaire de la relecture
