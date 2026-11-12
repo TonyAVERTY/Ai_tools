@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>MonEspacePro — pub verticale</title>
+<style>
+@font-face{font-family:Figtree;font-weight:600;src:url(../assets/fonts/figtree-600.ttf)}
+@font-face{font-family:Figtree;font-weight:700;src:url(../assets/fonts/figtree-700.ttf)}
+@font-face{font-family:Figtree;font-weight:800;src:url(../assets/fonts/figtree-800.ttf)}
+:root{--green:#0E7A66;--green-l:#EAF6F2;--yellow:#F2B544;--bg:#F6F6F3;--ink:#1C1C19;--grey:#5F5E56;--brick:#A64B17;--red:#D6392B}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1080px;height:1920px;overflow:hidden;background:#000;font-family:Figtree,system-ui,sans-serif}
+#cv{position:absolute;left:0;top:0;width:1080px;height:1920px;overflow:hidden;transform-origin:0 0}
+.sc{position:absolute;inset:0;display:none;overflow:hidden}
+.sc.on{display:block}
+.tx{position:absolute;text-align:center;font-weight:800;letter-spacing:-.02em;line-height:1.02;font-size:132px;color:var(--ink)}
+.tx.light{color:#fff}
+.tx .w{display:inline-block;opacity:0;white-space:pre}
+.tx .y{color:var(--green)}
+.tx.light .y{color:var(--yellow)}
+.tx .r{color:var(--red)}
+.im{position:absolute;left:0;top:0;transform-origin:50% 50%;will-change:transform}
+.chip{position:absolute;left:0;top:0;padding:18px 34px;border-radius:999px;font-weight:800;font-size:54px;white-space:nowrap;background:var(--yellow);color:var(--ink);box-shadow:0 14px 40px rgba(0,0,0,.25)}
+.chip.g{background:var(--green);color:#fff}
+.chip.w{background:#fff;color:var(--ink)}
+.im.rd{border-radius:44px;box-shadow:0 24px 60px rgba(0,0,0,.28)}
+.flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:50}
+.beam{position:absolute;height:14px;border-radius:7px;background:var(--green);box-shadow:0 0 30px 6px rgba(14,122,102,.55);opacity:0}
+.big{position:absolute;font-weight:800;letter-spacing:-.03em;line-height:1;white-space:nowrap}
+.strike{position:absolute;height:16px;background:var(--red);border-radius:8px;transform-origin:0 50%}
+.dot{position:absolute;border-radius:50%;background:var(--yellow)}
+.ring{position:absolute;border-radius:50%;border:10px solid var(--yellow);opacity:0}
+.frame{position:absolute;overflow:hidden;background:var(--bg);border-radius:70px;border:16px solid #0B1514;box-shadow:0 30px 80px rgba(0,0,0,.35)}
+.frame img{position:absolute;left:0;top:0;width:100%}
+.guide{position:absolute;border:3px dashed rgba(255,0,255,.8);z-index:99;pointer-events:none}
+</style>
+</head>
+<body>
+<div id="cv">
+  <!-- 1. Accroche : le résultat tout de suite -->
+  <section class="sc" id="s1">
+    <div class="tx light" id="s1t"></div>
+    <img class="im" id="s1card" src="../assets/capture/wk-7.png">
+    <img class="im" id="s1card2" src="../assets/capture/wk-8.png">
+    <div class="chip" id="s1plus">+1 tampon</div>
+  </section>
+  <!-- 2. Le problème -->
+  <section class="sc" id="s2">
+    <div class="tx" id="s2t"></div>
+    <img class="im" id="s2card" src="../assets/capture/kraft-0.png">
+    <div class="big" id="s2big"></div>
+    <div class="strike" id="s2strike"></div>
+  </section>
+  <!-- 3. Le client scanne -->
+  <section class="sc" id="s3">
+    <div class="tx" id="s3a"></div>
+    <div class="tx" id="s3b"></div>
+    <img class="im" id="s3poster" src="../assets/capture/poster.png">
+    <div class="beam" id="s3beam"></div>
+    <div class="chip g" id="s3chip">✓ Sans application</div>
+  </section>
+  <!-- 4. La carte arrive dans le Wallet -->
+  <section class="sc" id="s4">
+    <div class="tx" id="s4t"></div>
+    <img class="im rd" id="s4art" src="../assets/capture/art-1.png">
+    <img class="im" id="s4phone" src="../assets/capture/hero-phone.png">
+  </section>
+  <!-- 5. Le commerçant crédite -->
+  <section class="sc" id="s5">
+    <div class="tx" id="s5a"></div>
+    <div class="tx" id="s5b"></div>
+    <div class="tx" id="s5c"></div>
+    <img class="im" id="s5p1" src="../assets/capture/iph-1.png">
+    <div class="beam" id="s5beam"></div>
+    <img class="im" id="s5p2" src="../assets/capture/iph-2.png">
+    <img class="im rd" id="s5ok" src="../assets/capture/art-2.png">
+    <div class="ring" id="s5ring"></div>
+  </section>
+  <!-- 6. La récompense -->
+  <section class="sc" id="s6">
+    <div class="tx light" id="s6a"></div>
+    <div class="tx light" id="s6b"></div>
+    <img class="im" id="s6c7" src="../assets/capture/wk-7.png">
+    <img class="im" id="s6c8" src="../assets/capture/wk-8.png">
+    <img class="im" id="s6c9" src="../assets/capture/wk-9.png">
+    <img class="im" id="s6c10" src="../assets/capture/wk-10.png">
+    <div class="ring" id="s6ring"></div>
+  </section>
+  <!-- 7. Les statistiques (vraie capture de l'app Pro, données de démonstration) -->
+  <section class="sc" id="s7">
+    <div class="tx" id="s7t"></div>
+    <div class="frame" id="s7f"><img id="s7img" src="../assets/capture/stats-app-crop.jpg"></div>
+    <div class="chip w" id="s7demo" style="font-size:34px;padding:10px 24px">Données de démonstration</div>
+  </section>
+  <!-- 8. CTA -->
+  <section class="sc" id="s8">
+    <img class="im" id="s8logo" src="../assets/symbole-blanc.svg">
+    <div class="tx light" id="s8name" style="font-size:96px"></div>
+    <div class="tx light" id="s8price" style="font-size:190px"></div>
+    <div class="tx light" id="s8sub" style="font-size:62px;font-weight:700"></div>
+    <div class="chip w" id="s8cta" style="font-size:70px;padding:26px 56px;color:var(--green)">monespacepro.eu</div>
+  </section>
+  <div class="flash" id="flash"></div>
+</div>
+<script src="timeline.js"></script>
+</body>
+</html>
