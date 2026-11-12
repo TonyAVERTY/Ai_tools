@@ -1319,4 +1319,27 @@ export const MIGRATIONS = [
       { sql: "ALTER TABLE promo_videos ADD COLUMN platform VARCHAR(20) NOT NULL DEFAULT ''", when: colMissing('promo_videos', 'platform') },
     ],
   },
+  {
+    // Facturation : identité visuelle du projet pour les documents (couleurs, police, logo lus dans le dépôt git), ajustements de mise en page
+    // et verdict de la dernière relecture. Les fichiers (police, logo) sont gardés en base en base64 : ils partent avec le projet.
+    name: 'billing_brand',
+    sqlite: [
+      `CREATE TABLE billing_brand (
+        project_id INTEGER PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        brand_json TEXT NOT NULL, adjust_json TEXT, assets_json TEXT, review_json TEXT,
+        updated_at INTEGER NOT NULL
+      )`,
+    ],
+    mysql: [
+      `CREATE TABLE IF NOT EXISTS billing_brand (
+        project_id BIGINT NOT NULL PRIMARY KEY,
+        user_id BIGINT NOT NULL,
+        brand_json TEXT NOT NULL, adjust_json TEXT NULL, assets_json LONGTEXT NULL, review_json TEXT NULL,
+        updated_at BIGINT NOT NULL,
+        CONSTRAINT billing_brand_project_fk FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+        CONSTRAINT billing_brand_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      ) ${T}`,
+    ],
+  },
 ];
