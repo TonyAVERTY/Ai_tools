@@ -13,6 +13,7 @@ import { setSetting, now } from '../src/db.js';
 import { userPromoRoot, deleteUser } from '../src/users.js';
 import { PROMO, promoSupported, renderPromo, SceneError } from '../src/services/promovideo.js';
 import { PROMPT_DEFS } from '../src/services/prompts.js';
+import { PLATFORMS, PLATFORM_IDS } from '../src/services/promoplatforms.js';
 import { reserveVideo, finishVideo, removeVideo, keepScene, takeScene } from '../src/promo.js';
 import { projectsHtml } from './helpers/pages.js';
 
@@ -57,6 +58,8 @@ test('état de l\'onglet : limites, formats, aucune vidéo ; section présente d
   assert.deepEqual(st.videos, []);
   assert.deepEqual(st.limits.fps, PROMO.fps);
   assert.deepEqual(st.formats.map((f) => f.id), ['paysage', 'vertical', 'carre']);
+  assert.deepEqual(st.platforms.map((p) => p.id), PLATFORM_IDS);
+  assert.deepEqual(st.platforms.find((p) => p.id === 'tiktok'), { id: 'tiktok', label: PLATFORMS.tiktok.label, format: PLATFORMS.tiktok.format, fps: PLATFORMS.tiktok.fps, seconds: PLATFORMS.tiktok.seconds });
   const page = await projectsHtml(u);
   assert.match(page, /data-acc="promo"[\s\S]*Promotion[\s\S]*data-promo[\s\S]*data-job="promo_video"/);
   const settings = await (await u.get('/settings', { headers: { accept: 'text/html' } })).text();
@@ -66,6 +69,25 @@ test('état de l\'onglet : limites, formats, aucune vidéo ; section présente d
   assert.equal((await s.anon.get(`/api/projects/${pid}/promo`)).status, 401);
   const other = await s.newUser();
   assert.equal((await other.get(`/api/projects/${pid}/promo`)).status, 404, 'projet d\'un autre compte');
+});
+
+test('plateforme cible : transmise au job, ignorée si inconnue, retenue sur la vidéo produite', async () => {
+  const { u, pid } = await setup();
+  const jobParams = async () => JSON.parse((await s.db.prepare('SELECT params_json FROM jobs WHERE project_id = ? ORDER BY id DESC').get(pid)).params_json);
+  assert.equal((await gen(u, pid, { fps: 30, seconds: 15, format: 'vertical', platform: 'tiktok' })).status, 200);
+  assert.equal((await jobParams()).platform, 'tiktok');
+  await s.db.prepare('DELETE FROM jobs WHERE project_id = ?').run(pid);
+  assert.equal((await gen(u, pid, { fps: 30, seconds: 15, platform: 'snapchat' })).status, 200);
+  assert.equal((await jobParams()).platform, '', 'plateforme inconnue : aucune');
+  await s.db.prepare('DELETE FROM jobs WHERE project_id = ?').run(pid);
+  const withP = await reserveVideo(s.app, { userId: u.id, projectId: pid, subject: 'A', fps: 30, seconds: 15, format: 'vertical', width: 720, height: 1280, platform: 'tiktok' });
+  const without = await reserveVideo(s.app, { userId: u.id, projectId: pid, subject: 'B', fps: 10, seconds: 3, format: 'carre', width: 720, height: 720 });
+  try {
+    for (const v of [withP, without]) { writeFileSync(v.path, Buffer.from('MP4')); await finishVideo(s.db, v.id, 3); }
+    const videos = (await (await u.get(`/api/projects/${pid}/promo`)).json()).videos;
+    assert.equal(videos.find((v) => v.id === withP.id).platform, 'tiktok');
+    assert.equal(videos.find((v) => v.id === without.id).platform, '', 'vidéo sans plateforme (ou ancienne) : vide');
+  } finally { for (const v of [withP, without]) await removeVideo(s.app, { id: v.id, user_id: u.id }); }
 });
 
 test('lancement : images par seconde, durée et nombre d\'images contrôlés ; projet non analysé et outils absents refusés', async () => {

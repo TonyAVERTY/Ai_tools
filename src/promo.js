@@ -11,6 +11,7 @@ import { assertCanRunAi } from './claudelink.js';
 import { budgetState } from './services/budget.js';
 import { userPromoRoot } from './users.js';
 import { PROMO, FORMATS, parsePromoParams, promoSupported } from './services/promovideo.js';
+import { PLATFORMS } from './services/promoplatforms.js';
 import { PROMO_STYLES } from './services/promokit.js';
 import { voiceCatalog, parseVoiceParams, sampleFor, listVoices, VOICE_PROVIDERS, VOICE_LANGS, REGION, localStatus, audioType } from './services/voiceover.js';
 
@@ -54,7 +55,7 @@ export function takeScene(cfg, userId, jobId) {
 }
 
 const view = (r) => ({
-  id: Number(r.id), subject: r.subject, fps: r.fps, seconds: r.seconds, format: r.format, width: r.width, height: r.height,
+  id: Number(r.id), subject: r.subject, fps: r.fps, seconds: r.seconds, format: r.format, width: r.width, height: r.height, platform: r.platform || '',
   size: Number(r.size), createdAt: Number(r.created_at),
 });
 
@@ -66,9 +67,9 @@ export async function listVideos(db, projectId) {
 export const countVideos = async (db, userId) => Number((await db.prepare('SELECT COUNT(*) n FROM promo_videos WHERE user_id = ?').get(userId)).n);
 
 /** Réserve la ligne d'une vidéo à produire et renvoie son id et le chemin du fichier (le dossier est créé). */
-export async function reserveVideo(app, { userId, projectId, subject, fps, seconds, format, width, height }) {
-  const r = await app.db.prepare(`INSERT INTO promo_videos(user_id, project_id, subject, fps, seconds, format, width, height, size, file, created_at)
-    VALUES(?, ?, ?, ?, ?, ?, ?, ?, 0, '', ?)`).run(userId, projectId, subject, fps, seconds, format, width, height, now());
+export async function reserveVideo(app, { userId, projectId, subject, fps, seconds, format, width, height, platform = '' }) {
+  const r = await app.db.prepare(`INSERT INTO promo_videos(user_id, project_id, subject, fps, seconds, format, width, height, platform, size, file, created_at)
+    VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, 0, '', ?)`).run(userId, projectId, subject, fps, seconds, format, width, height, platform, now());
   const id = Number(r.lastInsertRowid);
   mkdirSync(userPromoRoot(app.cfg, userId), { recursive: true });
   return { id, path: promoFile(app.cfg, userId, id) };
@@ -101,6 +102,7 @@ export function registerPromoRoutes(router, app, { project, aiOpts }) {
       supported: sup.ok, reason: sup.ok ? null : sup.reason, hasProfile: !!p.profile, canDelete: p.access !== 'member',
       limits: { fps: PROMO.fps, seconds: PROMO.seconds, maxFrames: PROMO.maxFrames, maxSubject: PROMO.maxSubject, maxVideos: PROMO.maxVideos },
       formats: Object.entries(FORMATS).map(([id, f]) => ({ id, label: f.label })),
+      platforms: Object.entries(PLATFORMS).map(([id, pf]) => ({ id, label: pf.label, format: pf.format, fps: pf.fps, seconds: pf.seconds })),
       styles: [{ id: 'auto', label: 'Automatique' }, ...Object.entries(PROMO_STYLES).map(([id, st]) => ({ id, label: st.label }))],
       voices: voiceCatalog(...Object.values(await voiceKeyHints(app, p.userId)), (app.localStatus || localStatus)(cfg)),
       voiceLangs: VOICE_LANGS,

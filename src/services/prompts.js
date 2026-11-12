@@ -9,6 +9,7 @@
 import { modelFamily, modelLabel, PROMPT_SCOPES, FAMILY_LABELS, scopesOf } from './models.js';
 import { withSkills, skillsBlock } from './skills.js';
 import { pickStyle, styleBrief, exampleFor } from './promokit.js';
+import { PLATFORMS } from './promoplatforms.js';
 import { STILL } from './stillimage.js';
 
 const PROMO_HTML_MAX = 60000;
@@ -890,7 +891,7 @@ function voiceContract(voice, seconds) {
 `;
 }
 
-export function promoPrompt({ projectName, profile, target, subject = '', style = 'auto', site = '', seconds, fps, format, width, height, custom, model = null, fix = null, previousScene = '', voice = null, inspiration = '' }) {
+export function promoPrompt({ projectName, profile, target, subject = '', style = 'auto', site = '', seconds, fps, format, width, height, custom, model = null, fix = null, previousScene = '', voice = null, inspiration = '', platform = '' }) {
   const st = pickStyle(style, `${projectName}|${subject}`);
   const subjectLine = subject
     ? `Sujet demandé : « ${subject} ». La vidéo parle de ce sujet, en lien avec le produit.`
@@ -904,7 +905,7 @@ Arguments : ${(profile.arguments || []).join(' ; ')}
 Public visé : ${target?.description || 'professionnels susceptibles d\'en avoir besoin'}
 
 ${subjectLine}
-
+${platform && PLATFORMS[platform] ? `\nPlateforme de diffusion : ${PLATFORMS[platform].brief}\n` : ''}
 ${inspirationBlock(inspiration)}${instructions('promo', custom, { duree: seconds, fps, format: `${format} (${width} × ${height} pixels)`, ton: profile.ton || 'direct et chaleureux' }, model)}
 
 ${styleBrief(st)}

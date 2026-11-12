@@ -11,6 +11,7 @@ import { PLAN_LIMITS, PLAN_LABELS, PLAN_PRICES, ANNUAL_FREE_MONTHS } from '../li
 import { CATALOGS, modelLabel } from './models.js';
 import { PROMPT_DEFS } from './prompts.js';
 import { PROMO, FORMATS } from './promovideo.js';
+import { PLATFORMS } from './promoplatforms.js';
 import { ROLES, MAX_NOTES } from './roles.js';
 import { loadSkills, SKILLS_MAX_CHARS } from './skills.js';
 import { TOUR_STEPS } from '../tour.js';
@@ -68,6 +69,7 @@ Les offres se voient aussi sur la page publique « Tarifs ». Un administrateur 
 - Images par seconde : de ${PROMO.fps.min} à ${PROMO.fps.max} (${PROMO.fps.def} par défaut). Durée : de ${PROMO.seconds.min} à ${PROMO.seconds.max} secondes (${PROMO.seconds.def} par défaut).
 - Nombre d'images au plus : ${PROMO.maxFrames} (images par seconde × durée). Au-delà, le formulaire bloque le bouton et l'explique.
 - Formats : ${Object.values(FORMATS).map((f) => f.label).join(' ; ')}.
+- Plateformes cibles (cases « Plateforme cible ») et ce que chacune règle : ${Object.values(PLATFORMS).map((p) => `${p.label} : ${FORMATS[p.format].label.toLowerCase()}, ${p.fps} images par seconde, ${p.seconds} secondes`).join(' ; ')}.
 - ${PROMO.maxVideos} vidéos au plus par compte : supprime-en une pour en produire une nouvelle.
 `,
   });
