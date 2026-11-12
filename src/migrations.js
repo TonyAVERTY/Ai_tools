@@ -1311,5 +1311,12 @@ export const MIGRATIONS = [
       { sql: 'ALTER TABLE content_drafts ADD COLUMN publish_error VARCHAR(500) NULL', when: colMissing('content_drafts', 'publish_error') },
     ],
   },
+  {
+    // Promotion : plateforme cible choisie pour la vidéo (vide : aucune). Ajoutée à la fin de la liste, jamais au milieu.
+    name: 'promo_videos_platform',
+    sqlite: ["ALTER TABLE promo_videos ADD COLUMN platform TEXT NOT NULL DEFAULT ''"],
+    mysql: [
+      { sql: "ALTER TABLE promo_videos ADD COLUMN platform VARCHAR(20) NOT NULL DEFAULT ''", when: colMissing('promo_videos', 'platform') },
+    ],
+  },
 ];
-
