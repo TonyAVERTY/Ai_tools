@@ -952,6 +952,7 @@ html.nav-busy { cursor: progress; }
 
 /* ---------- Promotion : formulaire et vidéos produites ---------- */
 .promo-form { display: flex; flex-direction: column; gap: var(--s-3); margin-bottom: var(--s-3); }
+.promo-platforms { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); margin: var(--s-1) 0; }
 .promo-voice { display: flex; flex-direction: column; gap: var(--s-3); padding: var(--s-3); border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--card); }
 .promo-voice[hidden], .promo-key[hidden], .promo-voice [hidden] { display: none; }
 .promo-key { display: flex; flex-direction: column; gap: var(--s-2); }
