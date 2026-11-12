@@ -28,8 +28,8 @@ export const stateOf = (row) => (row.error ? 'failed'
 export async function accessibleProjects(db, userId) {
   const teams = await memberTeamIds(db, userId);
   return teams.length
-    ? db.prepare(`SELECT id, name FROM projects WHERE user_id = ? OR team_id IN (${teams.map(() => '?').join(',')}) ORDER BY LOWER(name)`).all(Number(userId), ...teams)
-    : db.prepare('SELECT id, name FROM projects WHERE user_id = ? ORDER BY LOWER(name)').all(Number(userId));
+    ? db.prepare(`SELECT id, name, user_id FROM projects WHERE user_id = ? OR team_id IN (${teams.map(() => '?').join(',')}) ORDER BY LOWER(name)`).all(Number(userId), ...teams)
+    : db.prepare('SELECT id, name, user_id FROM projects WHERE user_id = ? ORDER BY LOWER(name)').all(Number(userId));
 }
 
 export function registerMailRoutes(router, app) {

@@ -99,7 +99,13 @@ test('recherche : projets, prospects et mails du compte seulement, 2 lettres min
   const gall = await search('gall');
   assert.deepEqual(names(gall), ['Cabinet Le Gall'], 'le prospect d\'un autre compte reste invisible');
   assert.match(gall.groups[0].items[0].sub, /^Client · a@legall\.fr/);
+  const fiche = await s.db.prepare("SELECT id FROM prospects WHERE company = 'Cabinet Le Gall'").get();
+  assert.equal(gall.groups[0].items[0].href, `/p/${a}/contact/${fiche.id}`, 'un client ouvre directement sa fiche, pas la liste du projet');
   assert.deepEqual(names(await search('doctolib')), ['Devis Doctolib']);
+  const pages = await search('factu');
+  assert.equal(pages.groups[0].id, 'pages', 'les pages arrivent en premier');
+  assert.deepEqual(pages.groups[0].items.map((i) => i.href), ['/facturation', `/p/${a}/facturation`]);
+  assert.deepEqual(names(await search('paramètres')).slice(0, 1), ['Réglages'], 'sans accent ni majuscule, par mot-clé');
   assert.deepEqual((await search('%%')).groups, [], '« % » n\'est pas un joker');
   assert.deepEqual((await search('a_')).groups, [], '« _ » n\'est pas un joker');
 });

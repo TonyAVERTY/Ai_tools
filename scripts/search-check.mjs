@@ -44,6 +44,25 @@ for (const [vp, scheme] of [[{ width: 1280, height: 800 }, 'light'], [{ width: 1
   await p.keyboard.press('Escape');
   ok(!(await p.locator('#search').evaluate((d) => d.open)), `${tag} Échap ferme la recherche`);
 
+  // Un client ouvre directement sa fiche (et non la liste du projet)
+  await p.keyboard.press('Control+k');
+  await p.locator('[data-search-q]').fill('gall');
+  await p.waitForFunction(() => document.querySelector('a.s-row b')?.textContent === 'Cabinet Le Gall');
+  await p.locator('a.s-row').first().click();
+  await p.waitForFunction(() => /^\/p\/\d+\/contact\/\d+$/.test(location.pathname));
+  ok((await p.locator('h1').first().innerText()).includes('Cabinet Le Gall'), `${tag} un client ouvre directement sa fiche`);
+  await p.goto(`${s.base}/`);
+  await p.waitForSelector('html[data-nav="ready"]');
+  // Les pages se cherchent aussi : « réglages » (sans accent : « reglages ») ouvre la page Réglages
+  await p.keyboard.press('Control+k');
+  await p.locator('[data-search-q]').fill('reglages');
+  await p.waitForFunction(() => document.querySelector('.s-grp h3')?.textContent === 'Pages' && document.querySelector('a.s-row b')?.textContent === 'Réglages');
+  await p.keyboard.press('Enter');
+  await p.waitForFunction(() => location.pathname === '/settings');
+  ok(true, `${tag} une page se trouve et s'ouvre (Réglages)`);
+  await p.goto(`${s.base}/`);
+  await p.waitForSelector('html[data-nav="ready"]');
+
   // Raccourci, flèches, Entrée : ouvre la page du projet sans recharger
   await p.keyboard.press('Control+k');
   ok(await p.locator('#search').evaluate((d) => d.open), `${tag} Ctrl+K ouvre la recherche`);
