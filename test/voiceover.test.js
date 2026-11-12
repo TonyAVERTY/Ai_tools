@@ -11,7 +11,7 @@ import { addProject } from './helpers/users.js';
 import { Worker, latestJobs } from '../src/services/jobs.js';
 import { makeHandlers } from '../src/handlers.js';
 import { SceneError } from '../src/services/promovideo.js';
-import { VOICE_PROVIDERS, ELEVEN_SHORTLIST, pickElevenVoices, elevenVoiceLang, listVoices, piperVoices, localStatus, localConfig, resetLocalStatus, audioType, parseVoiceParams, extractVoiceScript, planVoice, googleChunks, synthesize, audioDuration, mixVoice, voiceCatalog } from '../src/services/voiceover.js';
+import { VOICE_PROVIDERS, ELEVEN_SHORTLIST, PREMIUM_MARK, elevenIsPremium, pickElevenVoices, elevenVoiceLang, listVoices, piperVoices, localStatus, localConfig, resetLocalStatus, audioType, parseVoiceParams, extractVoiceScript, planVoice, googleChunks, synthesize, audioDuration, mixVoice, voiceCatalog } from '../src/services/voiceover.js';
 
 const hasFfmpeg = spawnSync('ffmpeg', ['-version']).status === 0;
 const skipFf = !hasFfmpeg && "ffmpeg n'est pas installé";
@@ -254,7 +254,7 @@ test('ElevenLabs : clé dans l\'en-tête (jamais dans l\'adresse), modèle multi
   await assert.rejects(synthesize({ provider: 'elevenlabs', voice: 'abc', text: 'x y z', key: KEY }, { fetchImpl: async () => jsonRes({}, 401) }), (e) => /ElevenLabs a refusé la clé API/.test(e.message) && !e.message.includes(KEY));
   await assert.rejects(synthesize({ provider: 'elevenlabs', voice: 'abc', text: 'x y z', key: KEY }, { fetchImpl: async () => jsonRes({}, 429) }), /quota ou débit/);
   // 402 : voix de la bibliothèque avec le plan gratuit ; autre refus : le message du fournisseur est repris, sans la clé
-  await assert.rejects(synthesize({ provider: 'elevenlabs', voice: 'abc', text: 'x y z', key: KEY }, { fetchImpl: async () => jsonRes({ detail: { status: 'paid_plan_required', message: 'Free users cannot use library voices via the API' } }, 402) }), (e) => /abonnement payant pour cette voix/.test(e.message) && /voix de base/.test(e.message) && !e.message.includes(KEY));
+  await assert.rejects(synthesize({ provider: 'elevenlabs', voice: 'abc', text: 'x y z', key: KEY }, { fetchImpl: async () => jsonRes({ detail: { status: 'paid_plan_required', message: 'Free users cannot use library voices via the API' } }, 402) }), (e) => /voix premium/.test(e.message) && /sans couronne/.test(e.message) && /abonnement payant/.test(e.message) && !e.message.includes(KEY));
   await assert.rejects(synthesize({ provider: 'elevenlabs', voice: 'abc', text: 'x y z', key: KEY }, { fetchImpl: async () => jsonRes({ detail: { status: 'voice_not_found', message: 'A voice with the voice_id abc was not found.' } }, 404) }), /refusé la requête \(404 : A voice with the voice_id abc was not found\.\)/);
   await assert.rejects(synthesize({ provider: 'elevenlabs', voice: 'abc', text: 'x y z', key: KEY }, { fetchImpl: async () => ({ ok: false, status: 500, json: async () => { throw new Error('pas du JSON'); } }) }), (e) => /refusé la requête \(500\)$/.test(e.message));
   await assert.rejects(synthesize({ provider: 'elevenlabs', voice: 'abc', text: 'x y z', key: KEY }, { fetchImpl: async () => { throw new Error(`boom ${KEY}`); } }), (e) => /ElevenLabs ne répond pas/.test(e.message) && !e.message.includes(KEY));
@@ -529,4 +529,19 @@ test('langue d\'une voix ElevenLabs : étiquette de langue, accent, nom, puis la
   assert.equal(elevenVoiceLang({ name: 'X', labels: {}, verified_languages: [{ language: 'fr' }] }), 'fr');
   assert.equal(elevenVoiceLang({ name: 'X', labels: {}, verified_languages: [{ language: 'fr' }, { language: 'en' }] }), '', 'deux langues sans accent : on ne devine pas');
   assert.equal(elevenVoiceLang({ name: 'X', labels: { accent: 'standard' } }), '');
+});
+
+test('voix premium ElevenLabs : couronne dans la liste pour les voix de la bibliothèque, aucune pour les voix de base', () => {
+  assert.equal(PREMIUM_MARK, '👑');
+  for (const x of [{ category: 'professional' }, { category: 'famous' }, { category: 'premade', sharing: { original_voice_id: 'abc' } }, { category: 'generated', sharing: { status: 'copied' } }]) assert.equal(elevenIsPremium(x), true, JSON.stringify(x));
+  for (const x of [{ category: 'premade' }, { category: 'cloned' }, { category: 'generated', sharing: { status: 'enabled' } }, {}, null]) assert.equal(elevenIsPremium(x), false, JSON.stringify(x));
+  const picked = pickElevenVoices([
+    { voice_id: 'lib', name: 'Léo', category: 'professional', labels: { accent: 'parisian', gender: 'male' } },
+    { voice_id: 'base', name: 'Adam', category: 'premade', labels: { accent: 'american' } },
+  ]);
+  const lib = picked.find((x) => x.id === 'lib'), base = picked.find((x) => x.id === 'base');
+  assert.equal(lib.premium, true);
+  assert.ok(lib.label.startsWith('👑 Léo'), lib.label);
+  assert.equal(base.premium, undefined);
+  assert.equal(base.label.includes('👑'), false);
 });

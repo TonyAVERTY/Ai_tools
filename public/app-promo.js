@@ -57,6 +57,7 @@
             <label class="field"><span class="lbl">Fournisseur</span><span class="sel"><select name="voiceProvider">${s.voices.map((p) => `<option value="${esc(p.id)}">${esc(p.label)}</option>`).join('')}</select>${icon('down')}</span></label>
             <label class="field"><span class="lbl">Voix</span><span class="sel"><select name="voiceName">${voiceOptions(s.voices[0])}</select>${icon('down')}</span></label>
           </div>
+          <p class="muted small" data-promo-premium hidden role="status">👑 Voix premium : elle demande un plan payant chez ElevenLabs. Avec le plan gratuit, l'extrait et la vidéo seront refusés : choisis une voix sans couronne.</p>
           <p class="muted small" data-promo-local hidden role="status"></p>
           <label class="field" data-promo-lang hidden><span class="lbl">Langue</span><span class="sel"><select name="voiceLang">${s.voiceLangs.map((l) => `<option value="${esc(l.id)}">${esc(l.label)}</option>`).join('')}</select>${icon('down')}</span></label>
           <div class="promo-key" data-promo-key hidden data-can="${s.canManageKeys ? '1' : ''}">
@@ -82,7 +83,9 @@
   }
 
   // Nombre d'images à produire, et message clair si la limite est dépassée (le serveur la contrôle aussi)
-  const voiceOptions = (p) => (p?.voices ? p.voices.map((v) => `<option value="${esc(v.id)}">${esc(v.label)}</option>`).join('') : '<option value="">—</option>');
+  const voiceOptions = (p) => (p?.voices ? p.voices.map((v) => `<option value="${esc(v.id)}"${v.premium ? ' data-premium="1"' : ''}>${esc(v.label)}</option>`).join('') : '<option value="">—</option>');
+  // Voix premium (couronne) : elle demande un plan payant chez le fournisseur ; le dire avant l'extrait et la vidéo plutôt qu'après un refus
+  const premiumHint = (f) => { const h = $('[data-promo-premium]', f); if (h) h.hidden = !f.voiceName.selectedOptions[0]?.dataset.premium; };
   function promoCount(box) {
     const f = $('[data-promo-form]', box);
     if (!f) return;
@@ -132,6 +135,7 @@
       $('[data-promo-key-remove]', f).hidden = !key.dataset.can;
     }
     f.voiceName.innerHTML = voiceOptions(p);
+    premiumHint(f);
     $('[data-promo-sample]', f).disabled = !f.voiceName.value;
   }
   async function voiceLoad(f) {
@@ -149,6 +153,7 @@
     if (e.target.matches('[data-promo-voice-toggle]')) $('[data-promo-voice]', f).hidden = !e.target.checked;
     if (e.target.matches('[data-promo-platform]')) platformPick(f, e.target);
     if (e.target.name === 'voiceProvider') voiceLoad(f);
+    if (e.target.name === 'voiceName') premiumHint(f);
   });
   async function saveVoiceKey(f) {
     const p = voiceProvider(f);
@@ -183,6 +188,7 @@
     const state = $('[data-promo-sample-state]', f);
     const url = `/api/promo/voice-sample?provider=${encodeURIComponent(f.voiceProvider.value)}&voice=${encodeURIComponent(f.voiceName.value)}&lang=${encodeURIComponent(f.voiceLang.value)}`;
     b.disabled = true;
+    state.classList.remove('error');
     state.innerHTML = loadingHtml('Chargement de l\'extrait…', { small: true });
     try {
       const r = await fetch(url, { credentials: 'same-origin' });
@@ -192,7 +198,15 @@
       await audio.play();
       state.textContent = 'Lecture…';
       audio.onended = () => { state.textContent = ''; };
-    } catch (err) { state.textContent = err.message; } finally { b.disabled = false; }
+    } catch (err) {
+      // Dire de QUELLE voix il s'agit et pourquoi ; une voix refusée pour son prix est marquée dans la liste pour qu'on ne la reprenne pas
+      const option = f.voiceName.selectedOptions[0];
+      const name = (option?.textContent || '').split(' · ')[0].trim();
+      state.textContent = name ? `« ${name} » : ${err.message}` : err.message;
+      state.classList.add('error');
+      if (option && /voix premium/.test(err.message) && !option.dataset.premium) { option.dataset.premium = '1'; option.textContent = `👑 ${option.textContent}`; }
+      premiumHint(f);
+    } finally { b.disabled = false; }
   });
   listen(document, 'input', (e) => { const b = e.target.closest('[data-promo-form]'); if (b) promoCount(b.closest('[data-promo]')); });
   listen(document, 'submit', async (e) => {
