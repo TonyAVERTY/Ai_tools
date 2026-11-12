@@ -272,7 +272,7 @@ test('Google Cloud : clé dans l\'en-tête, langue déduite de la voix, audio d�
 
 test('listes de voix : ElevenLabs (étiquettes lisibles) et Google Cloud (voix naturelles seulement, Chirp en premier)', async () => {
   const el = await listVoices('elevenlabs', { key: KEY, fetchImpl: async () => jsonRes({ voices: [{ voice_id: 'b1', name: 'Bella', labels: { gender: 'female', accent: 'american' } }, { voice_id: '../x', name: 'Piège' }, { voice_id: 'a1', name: 'Adam', labels: { gender: 'male', accent: 'british' } }] }) });
-  assert.deepEqual(el.map((x) => [x.id, x.label]), [['a1', 'Adam · masculine, british'], ['b1', 'Bella · féminine, american']]);
+  assert.deepEqual(el.map((x) => [x.id, x.label]), [['b1', 'Bella · féminine, american'], ['a1', 'Adam · masculine, british']]);
   const gc = await listVoices('googlecloud', { key: KEY, fetchImpl: async (url) => jsonRes({ voices: url.includes('fr-FR') ? [
     { name: 'fr-FR-Standard-A', ssmlGender: 'FEMALE' }, { name: 'fr-FR-Neural2-B', ssmlGender: 'MALE' }, { name: 'fr-FR-Chirp3-HD-Aoede', ssmlGender: 'FEMALE' }] : [] }) });
   assert.deepEqual(gc.map((x) => [x.id, x.lang]), [['fr-FR-Chirp3-HD-Aoede', 'fr'], ['fr-FR-Neural2-B', 'fr']]);
@@ -498,28 +498,37 @@ test('voix locales : l\'état de l\'onglet les indique, l\'extrait est servi en 
   } finally { delete s.app.localStatus; delete s.app.sampleVoice; }
 });
 
-test('voix ElevenLabs : 5 françaises puis 3 anglaises, les mieux soignées d\'abord, langue inconnue écartée', () => {
-  assert.deepEqual(ELEVEN_SHORTLIST, { fr: 5, en: 3 });
+test('voix ElevenLabs : 3 françaises gratuites, 2 françaises premium, 2 anglaises gratuites, 1 anglaise premium', () => {
+  assert.deepEqual(ELEVEN_SHORTLIST, { fr: { free: 3, premium: 2 }, en: { free: 2, premium: 1 } });
   const mk = (id, name, labels = {}, extra = {}) => ({ voice_id: id, name, labels, ...extra });
+  // Un compte comme celui de l'utilisateur : voix de base anglo-saxonnes (gratuites) et voix françaises de la bibliothèque (premium)
   const library = [
-    ...['Zoé', 'Yann', 'Xavier', 'Wendy', 'Victor', 'Ugo'].map((n, i) => mk(`fr${i}`, n, { accent: 'parisian', gender: 'male' })), // six voix françaises : une de trop
-    mk('frpro', 'Zélie', { accent: 'parisian' }, { category: 'professional' }),
-    mk('fr-name', 'Adolescente française - Chicadi'),
-    mk('fr-lang', 'Camille', { language: 'fr' }),
-    ...['Adam', 'Alice', 'Bella', 'Bill', 'Brian'].map((n, i) => mk(`en${i}`, n, { accent: i % 2 ? 'british' : 'american' })),
-    mk('none', 'Audrey', { accent: 'standard' }),   // aucune langue lisible : écartée
-    mk('bad', 'Piège', { accent: 'parisian' }),
+    ...['Adam', 'Bill', 'Brian', 'Charlie'].map((n, i) => mk(`m${i}`, n, { gender: 'male', accent: i % 2 ? 'british' : 'american' }, { category: 'premade' })),
+    ...['Alice', 'Bella', 'Jessica', 'Laura'].map((n, i) => mk(`f${i}`, n, { gender: 'female', accent: 'american' }, { category: 'premade' })),
+    ...['Antoine', 'Hugo from Paris', 'Léo'].map((n, i) => mk(`p${i}`, n, { gender: 'male', accent: 'parisian' }, { category: 'professional' })),
+    mk('pf', 'Adolescente française - Chicadi', { gender: 'female', accent: 'standard' }, { category: 'professional' }),
+    mk('pen', 'Rachel Premium', { gender: 'female', accent: 'american' }, { category: 'professional' }),
+    mk('pen2', 'Sam Premium', { gender: 'male', accent: 'british' }, { category: 'professional' }),
+    mk('none', 'Audrey', { accent: 'standard' }, { category: 'professional' }),   // premium sans langue lisible : écartée
+    mk('bad', 'Piège', { accent: 'parisian' }, { category: 'professional' }),
   ];
   library.find((x) => x.voice_id === 'bad').voice_id = '../x';
   const picked = pickElevenVoices(library);
-  const fr = picked.filter((x) => x.lang === 'fr'), en = picked.filter((x) => x.lang === 'en');
-  assert.equal(fr.length, 5);
-  assert.equal(en.length, 3);
-  assert.deepEqual(picked.map((x) => x.lang), ['fr', 'fr', 'fr', 'fr', 'fr', 'en', 'en', 'en'], 'françaises d\'abord');
-  assert.equal(fr[0].id, 'frpro', 'une voix professionnelle passe avant les voix de base');
-  assert.deepEqual(en.map((x) => x.label.split(' · ')[0]), ['Adam', 'Alice', 'Bella']);
+  const groups = picked.map((x) => x.group);
+  assert.deepEqual(groups, ['Français · gratuites', 'Français · gratuites', 'Français · gratuites', 'Français · premium 👑', 'Français · premium 👑', 'Anglais · gratuites', 'Anglais · gratuites', 'Anglais · premium 👑'], 'ordre : gratuites puis premium, français puis anglais');
+  assert.equal(picked.length, 8);
+  const inGroup = (g) => picked.filter((x) => x.group === g);
+  assert.ok(inGroup('Français · gratuites').every((x) => !x.premium && x.lang === 'fr'), 'les voix de base servent aussi au français');
+  assert.ok(inGroup('Français · premium 👑').every((x) => x.premium && x.label.startsWith('👑 ')));
+  assert.equal(inGroup('Anglais · premium 👑')[0].premium, true);
+  assert.equal(new Set(picked.map((x) => x.id)).size, 8, 'aucune voix en double');
   assert.ok(!picked.some((x) => ['none', '../x'].includes(x.id)), 'langue inconnue et identifiant piégé écartés');
-  assert.deepEqual(pickElevenVoices([mk('a', 'A', { accent: 'british' })]).map((x) => x.lang), ['en'], 'moins de voix que prévu : on montre ce qu\'il y a');
+  // féminines et masculines alternées (féminine d\'abord) dans les voix gratuites
+  assert.deepEqual(inGroup('Français · gratuites').map((x) => x.id), ['f0', 'm0', 'f1']);
+  assert.deepEqual(inGroup('Anglais · gratuites').map((x) => x.id), ['f2', 'm1']);
+  // moins de voix que prévu : on montre ce qu\'il y a, sans erreur
+  assert.deepEqual(pickElevenVoices([mk('a', 'A', { accent: 'british' }, { category: 'premade' })]).map((x) => x.group), ['Français · gratuites']);
+  assert.deepEqual(pickElevenVoices([]), []);
 });
 
 test('langue d\'une voix ElevenLabs : étiquette de langue, accent, nom, puis langues vérifiées', () => {
