@@ -101,6 +101,23 @@ test('route : l\'état suit le projet, étape par étape', async () => {
   assert.equal(step(await get(), 'linkedin'), false);
 });
 
+test('idées d\'évolution : la case se raye dès qu\'une évolution est terminée', async () => {
+  const u = await user(s);
+  const pid = await addProject(s.db, u.id);
+  const evo = async () => (await (await u.get(`/api/projects/${pid}/checklist`)).json()).steps.find((x) => x.key === 'evolution').done;
+  const job = (status, at) => s.db.prepare('INSERT INTO jobs(project_id, user_id, type, status, created_at) VALUES(?, ?, ?, ?, ?)').run(pid, u.id, 'evolution', status, at);
+  assert.equal(await evo(), false, 'aucune évolution demandée');
+  await job('running', now());
+  assert.equal(await evo(), false, 'en cours : pas encore');
+  await job('done', now() + 1);
+  assert.equal(await evo(), true, 'terminée : rayée');
+  // une demande plus récente (en erreur, annulée, en cours) ne fait pas retomber l'étape
+  for (const [i, st] of ['error', 'cancelled', 'queued', 'running'].entries()) {
+    await job(st, now() + 10 + i);
+    assert.equal(await evo(), true, `une évolution plus récente « ${st} » : reste rayée`);
+  }
+});
+
 test('/status embarque la liste (le front la rafraîchit avec le reste)', async () => {
   const u = await user(s);
   const pid = await addProject(s.db, u.id);
