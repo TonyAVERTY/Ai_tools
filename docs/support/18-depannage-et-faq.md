@@ -155,6 +155,9 @@ Ils dépendent du rôle dans le projet : Configuration du projet, Audit, Récapi
 ## LinkedIn : « connexion expirée » ou Publier grisé
 Cliquer **Reconnecter**. Publier grisé : aucune page choisie alors que le compte ne peut pas publier sur le profil (**Choisir une page**). Voir le fichier sur LinkedIn.
 
+## Les cases « Plateforme cible » changent mes réglages
+Cocher une plateforme (Instagram Reels, TikTok, YouTube Shorts, YouTube, Facebook ou LinkedIn) règle le format, les images par seconde et la durée de l'onglet Promotion : c'est voulu. Une seule case reste cochée à la fois. Pour garder tes propres valeurs, **modifie les champs après avoir coché** (la case reste cochée et l'IA adapte toujours la vidéo à la plateforme), ou ne coche rien. Décocher ne rend pas les valeurs d'avant : retape-les. Si le bouton **Générer la vidéo** se bloque avec « Trop d'images », c'est que tu as monté les images par seconde ou la durée au-delà du maximum après avoir coché : redescends l'un des deux.
+
 ## La vidéo de promotion échoue
 Avec « Ajouter une voix » : si le message nomme le fournisseur de voix (« Google Traduction », « ElevenLabs », « Google Cloud » ou « Microsoft Azure »), c'est lui qui ne répond pas ou qui refuse la clé : essayer un autre fournisseur, vérifier la clé (« Retirer la clé » puis « Enregistrer la clé »), ou décocher la voix. Pour des voix plus naturelles : ElevenLabs, ou Piper (locale, sans clé) si l'administrateur l'a installée. Les extraits (« Écouter un extrait ») permettent de tester un fournisseur sans lancer de vidéo.
 Lire le message du job : outils manquants sur le serveur (Chromium, ffmpeg), plafond de 20 vidéos, scène refusée après correction (relancer ou changer de modèle). Si le message parle d'un « Trop de vide », d'une « Image figée » ou de « Titres trop petits », c'est le contrôle qualité automatique : relancer, choisir un « Style » précis dans l'onglet Promotion, ou passer sur Opus ou Fable. Voir le fichier sur la Promotion.
