@@ -72,7 +72,7 @@ Les offres se voient aussi sur la page publique « Tarifs ». Un administrateur 
 - Formats : ${Object.values(FORMATS).map((f) => f.label).join(' ; ')}.
 - Plateformes cibles (cases « Plateforme cible ») et ce que chacune règle : ${Object.values(PLATFORMS).map((p) => `${p.label} : ${FORMATS[p.format].label.toLowerCase()}, ${p.fps} images par seconde, ${p.seconds} secondes`).join(' ; ')}.
 - ${PROMO.maxVideos} vidéos au plus par compte : supprime-en une pour en produire une nouvelle.
-- Voix ElevenLabs affichées : ${ELEVEN_SHORTLIST.fr} françaises et ${ELEVEN_SHORTLIST.en} anglaises (une sélection de ta bibliothèque, pas toute la liste).
+- Voix ElevenLabs affichées (une sélection de ta bibliothèque, pas toute la liste) : ${ELEVEN_SHORTLIST.fr.free} françaises gratuites, ${ELEVEN_SHORTLIST.fr.premium} françaises premium, ${ELEVEN_SHORTLIST.en.free} anglaises gratuites et ${ELEVEN_SHORTLIST.en.premium} anglaise premium.
 `,
   });
 

@@ -83,7 +83,15 @@
   }
 
   // Nombre d'images à produire, et message clair si la limite est dépassée (le serveur la contrôle aussi)
-  const voiceOptions = (p) => (p?.voices ? p.voices.map((v) => `<option value="${esc(v.id)}"${v.premium ? ' data-premium="1"' : ''}>${esc(v.label)}</option>`).join('') : '<option value="">—</option>');
+  // Les voix d'un fournisseur peuvent venir rangées par groupe (ElevenLabs : « Français · gratuites », « Français · premium 👑»…) : un <optgroup> par groupe
+  const voiceOptions = (p) => {
+    if (!p?.voices) return '<option value="">—</option>';
+    const opt = (v) => `<option value="${esc(v.id)}"${v.premium ? ' data-premium="1"' : ''}>${esc(v.label)}</option>`;
+    if (!p.voices.some((v) => v.group)) return p.voices.map(opt).join('');
+    const groups = [];
+    for (const v of p.voices) { let g = groups.find((x) => x.name === (v.group || '')); if (!g) groups.push(g = { name: v.group || '', items: [] }); g.items.push(v); }
+    return groups.map((g) => (g.name ? `<optgroup label="${esc(g.name)}">${g.items.map(opt).join('')}</optgroup>` : g.items.map(opt).join(''))).join('');
+  };
   // Voix premium (couronne) : elle demande un plan payant chez le fournisseur ; le dire avant l'extrait et la vidéo plutôt qu'après un refus
   const premiumHint = (f) => { const h = $('[data-promo-premium]', f); if (h) h.hidden = !f.voiceName.selectedOptions[0]?.dataset.premium; };
   function promoCount(box) {
