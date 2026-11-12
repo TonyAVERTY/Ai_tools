@@ -201,8 +201,10 @@ async function azureSynth(text, voice, { key, region, fetchImpl = fetch }) {
   return Buffer.from(await res.arrayBuffer());
 }
 
-// ElevenLabs renvoie toute la bibliothèque du compte (des dizaines de voix) : on n'en montre qu'une sélection, 5 voix françaises et 3 anglaises.
-export const ELEVEN_SHORTLIST = { fr: 5, en: 3 };
+// ElevenLabs renvoie toute la bibliothèque du compte (des dizaines de voix) : on n'en montre qu'une sélection, rangée par langue puis par gratuité
+// (3 françaises gratuites, 2 françaises premium, 2 anglaises gratuites, 1 anglaise premium).
+export const ELEVEN_SHORTLIST = { fr: { free: 3, premium: 2 }, en: { free: 2, premium: 1 } };
+const GROUPS = { frFree: 'Français · gratuites', frPremium: 'Français · premium 👑', enFree: 'Anglais · gratuites', enPremium: 'Anglais · premium 👑' };
 export const PREMIUM_MARK = '👑';
 /** Voix « premium » : celles de la bibliothèque partagée (voix professionnelles, célèbres, ajoutées depuis la bibliothèque), que l'API réserve aux plans payants. */
 export function elevenIsPremium(x) {
@@ -232,18 +234,43 @@ export function elevenVoiceLang(x) {
 export function pickElevenVoices(voices, limits = ELEVEN_SHORTLIST) {
   const sex = { female: 'féminine', male: 'masculine' };
   const rank = (x) => CATEGORY_RANK[x.category] ?? 3;
+  const byName = (a, b) => rank(a) - rank(b) || String(a.name).localeCompare(String(b.name), 'fr');
+  const usable = voices.filter((x) => x && VOICE_ID.test(String(x.voice_id)));
+  const used = new Set();
+  // Alterne voix féminines et masculines (les féminines d'abord) pour que la sélection ne soit pas faite que d'hommes ou que de femmes
+  const spread = (pool, n) => {
+    const left = { female: pool.filter((x) => x.labels?.gender === 'female'), other: pool.filter((x) => x.labels?.gender !== 'female') };
+    const out = [];
+    for (let i = 0; out.length < n && (left.female.length || left.other.length); i++) {
+      const next = (i % 2 === 0 ? left.female : left.other).shift() || left.female.shift() || left.other.shift();
+      if (next) out.push(next);
+    }
+    return out;
+  };
+  const take = (group, n) => { const got = group.filter((x) => !used.has(x.voice_id)).slice(0, n); got.forEach((x) => used.add(x.voice_id)); return got; };
+  const free = usable.filter((x) => !elevenIsPremium(x)).sort(byName);
+  const premium = usable.filter(elevenIsPremium).sort(byName);
   const out = [];
-  for (const lang of ['fr', 'en']) {
-    const group = voices.filter((x) => VOICE_ID.test(String(x?.voice_id)) && elevenVoiceLang(x) === lang)
-      .sort((a, b) => rank(a) - rank(b) || String(a.name).localeCompare(String(b.name), 'fr'))
-      .slice(0, limits[lang]);
-    for (const x of group) {
+  const add = (group, lang, name, list) => {
+    for (const x of list) {
       const l = x.labels || {};
       const tags = [sex[l.gender] || l.gender, l.accent, l.descriptive || l.description].filter(Boolean).join(', ');
-      const premium = elevenIsPremium(x);
-      out.push({ ...v(x.voice_id, `${premium ? `${PREMIUM_MARK} ` : ''}${x.name}${tags ? ` · ${tags}` : ''}`, lang), ...(premium ? { premium: true } : {}) });
+      const isPremium = elevenIsPremium(x);
+      out.push({ ...v(x.voice_id, `${isPremium ? `${PREMIUM_MARK} ` : ''}${x.name}${tags ? ` · ${tags}` : ''}`, lang), group: name, ...(isPremium ? { premium: true } : {}) });
     }
-  }
+  };
+  // Gratuites d'abord (elles marchent avec tous les plans), puis premium. Une voix de base parle français avec le modèle multilingue :
+  // pour le français, on prend d'abord celles dont l'étiquette dit « français », puis les autres voix gratuites.
+  const freeFr = spread([...free.filter((x) => elevenVoiceLang(x) === 'fr'), ...free.filter((x) => elevenVoiceLang(x) !== 'fr')], limits.fr.free);
+  take(freeFr, limits.fr.free);
+  const premiumFr = take(premium.filter((x) => elevenVoiceLang(x) === 'fr'), limits.fr.premium);
+  const freeEn = spread([...free.filter((x) => elevenVoiceLang(x) === 'en'), ...free.filter((x) => elevenVoiceLang(x) !== 'en')].filter((x) => !used.has(x.voice_id)), limits.en.free);
+  take(freeEn, limits.en.free);
+  const premiumEn = take(premium.filter((x) => elevenVoiceLang(x) === 'en'), limits.en.premium);
+  add('fr', 'fr', GROUPS.frFree, freeFr);
+  add('fr', 'fr', GROUPS.frPremium, premiumFr);
+  add('en', 'en', GROUPS.enFree, freeEn);
+  add('en', 'en', GROUPS.enPremium, premiumEn);
   return out;
 }
 
