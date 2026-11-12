@@ -46,6 +46,7 @@ Dès qu'un projet existe, sa **Vue d'ensemble** (première page du projet, adres
 - Les étapes faites sont **barrées**, avec une coche. La prochaine étape à faire a son numéro en jaune et un bouton : **Régler** pour le SMTP et l'IMAP, **Ouvrir** pour les autres. Les étapes suivantes ont un bouton **Ouvrir** plus discret. Les étapes facultatives sont dans le bloc « Pour aller plus loin », avec un cercle en tirets et un « + ».
 - Chaque bouton ouvre le bon onglet du projet, fait défiler la page jusqu'à la section concernée et la fait clignoter un instant.
 - La liste se calcule à chaque affichage d'après l'état réel du projet : une étape défaite (par exemple un jeton LinkedIn expiré) redevient « à faire ».
+- « Demander des idées d'évolution » est barrée dès qu'une demande d'évolution a abouti (idées reçues par mail) : une demande plus récente en cours, annulée ou en erreur ne la remet pas à faire. Sur la Vue d'ensemble, la page se recharge d'elle-même quand une tâche se termine (en erreur ou annulée aussi), pour que les étapes se raient tout de suite ; elle ne se recharge pas tant que tu écris dans un champ ou qu'une fenêtre est ouverte.
 - Un membre d'équipe ne voit pas les étapes SMTP et IMAP (il ne peut pas les régler).
 
 ## Ouvrir un projet
