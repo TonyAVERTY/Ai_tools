@@ -160,7 +160,7 @@ Cocher une plateforme (Instagram Reels, TikTok, YouTube Shorts ou LinkedIn) règ
 
 ## « Écouter un extrait » échoue avec une voix ElevenLabs (502)
 Le message affiché dit la cause :
-- **« ElevenLabs exige un abonnement payant pour cette voix »** : les voix de la **bibliothèque partagée** d'ElevenLabs (la plupart des voix françaises de la liste) ne sont pas utilisables par l'API avec le **plan gratuit**. Choisis une **voix de base** (par exemple Adam, Alice, Bella ou Bill, qui parlent aussi français avec la langue « Français ») ou passe à un plan payant chez ElevenLabs.
+- **« ElevenLabs : voix premium (👑) non incluse dans ton plan… »** : les voix avec une **couronne 👑** viennent de la **bibliothèque partagée** d'ElevenLabs (la plupart des voix françaises de la liste) ; l'API ne les accorde qu'aux **plans payants**. Le message nomme la voix, et la voix garde sa couronne dans la liste. Choisis une **voix sans couronne** (par exemple Adam, Alice, Bella ou Bill, qui parlent aussi français avec la langue « Français ») ou passe à un plan payant chez ElevenLabs.
 - **« a refusé la clé API »** : la clé est fausse, révoquée ou son quota du mois est épuisé (voir « Retirer la clé » puis « Enregistrer la clé »).
 - **« quota ou débit dépassé »** : trop de demandes d'un coup, ou quota épuisé.
 - **« ne répond pas »** : le serveur n'atteint pas `api.elevenlabs.io` (l'administrateur doit autoriser cette sortie).

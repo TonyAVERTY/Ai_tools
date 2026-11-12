@@ -169,7 +169,7 @@ const keyedFetch = async (fetchImpl, url, init, label) => {
   if (res.status === 401 || res.status === 403) throw new Error(`${label} a refusé la clé API (vérifie-la, ou son quota)`);
   if (res.status === 429) throw new Error(`${label} : quota ou débit dépassé`);
   // 402 : un abonnement payant est exigé. Chez ElevenLabs, c'est le cas des voix de la bibliothèque partagée avec le plan gratuit (seules les voix de base passent)
-  if (res.status === 402) throw new Error(label === 'ElevenLabs' ? 'ElevenLabs exige un abonnement payant pour cette voix (les voix de la bibliothèque ne sont pas utilisables avec le plan gratuit) : choisis une voix de base' : `${label} exige un abonnement payant pour cette demande`);
+  if (res.status === 402) throw new Error(label === 'ElevenLabs' ? `ElevenLabs : voix premium (${PREMIUM_MARK}) non incluse dans ton plan, les voix de la bibliothèque exigent un abonnement payant : choisis une voix sans couronne` : `${label} exige un abonnement payant pour cette demande`);
   if (!res.ok) { const d = await providerDetail(res); throw new Error(`${label} a refusé la requête (${res.status}${d ? ` : ${d}` : ''})`); }
   return res;
 };
@@ -203,6 +203,13 @@ async function azureSynth(text, voice, { key, region, fetchImpl = fetch }) {
 
 // ElevenLabs renvoie toute la bibliothèque du compte (des dizaines de voix) : on n'en montre qu'une sélection, 5 voix françaises et 3 anglaises.
 export const ELEVEN_SHORTLIST = { fr: 5, en: 3 };
+export const PREMIUM_MARK = '👑';
+/** Voix « premium » : celles de la bibliothèque partagée (voix professionnelles, célèbres, ajoutées depuis la bibliothèque), que l'API réserve aux plans payants. */
+export function elevenIsPremium(x) {
+  if (['professional', 'famous', 'high_quality'].includes(x?.category)) return true;
+  const sh = x?.sharing;
+  return !!(sh && (sh.public_owner_id || sh.original_voice_id || ['copied', 'copied_disabled'].includes(sh.status)));
+}
 const FRENCH = /fran[cç]|french|paris|belg|qu[eé]b/i;
 const ENGLISH = /americ|brit|austral|irish|scot|canad|english|new zealand|south african/i;
 const CATEGORY_RANK = { professional: 0, premade: 1, generated: 2 };
@@ -233,7 +240,8 @@ export function pickElevenVoices(voices, limits = ELEVEN_SHORTLIST) {
     for (const x of group) {
       const l = x.labels || {};
       const tags = [sex[l.gender] || l.gender, l.accent, l.descriptive || l.description].filter(Boolean).join(', ');
-      out.push(v(x.voice_id, `${x.name}${tags ? ` · ${tags}` : ''}`, lang));
+      const premium = elevenIsPremium(x);
+      out.push({ ...v(x.voice_id, `${premium ? `${PREMIUM_MARK} ` : ''}${x.name}${tags ? ` · ${tags}` : ''}`, lang), ...(premium ? { premium: true } : {}) });
     }
   }
   return out;
