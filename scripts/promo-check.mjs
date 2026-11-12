@@ -21,7 +21,7 @@ s.app.sampleVoice = async (o) => {
   return sample;
 };
 s.app.localStatus = () => ({ piper: { ok: false, voices: [] }, espeak: { ok: true, voices: [{ id: 'fr', label: 'Français · voix masculine', lang: 'fr' }, { id: 'fr+f3', label: 'Français · voix féminine', lang: 'fr' }] } });
-s.app.listVoices = async () => [{ id: 'abcDEF123', label: 'Bella · féminine', lang: 'fr' }, { id: 'zzz999', label: 'Adam · masculine', lang: 'fr' }, { id: 'prem123', label: '👑 Léo · masculine, parisian', lang: 'fr', premium: true }];
+s.app.listVoices = async () => [{ id: 'abcDEF123', label: 'Bella · féminine', lang: 'fr', group: 'Français · gratuites' }, { id: 'zzz999', label: 'Adam · masculine', lang: 'fr', group: 'Français · gratuites' }, { id: 'prem123', label: '👑 Léo · masculine, parisian', lang: 'fr', premium: true, group: 'Français · premium 👑' }];
 const u = await s.newUser();
 const pid = await addProject(s.db, u.id, { name: 'Fidélio', gitUrl: 'https://github.com/u/fidelio.git' });
 await s.db.prepare('UPDATE projects SET profile_json = ? WHERE id = ?').run(JSON.stringify({ resume: 'Cartes de fidélité digitales.', proposition_valeur: 'Fidélisez sans carton.', arguments: ['simple'], ton: 'direct' }), pid);
@@ -92,6 +92,8 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   await p.waitForFunction(() => document.querySelectorAll('select[name="voiceName"] option').length === 3, null, { timeout: 5000 });
   ok(/se termine par ghij/.test(await p.locator('[data-promo-key-last4]').textContent()) && await p.locator('[data-promo-key-new]').isHidden(), `${tag} clé : enregistrée, seuls les 4 derniers caractères s'affichent`);
   ok(await p.locator('input[name="voiceKey"]').inputValue() === '', `${tag} clé : champ vidé après l'enregistrement`);
+  // Les voix sont rangées par groupe : gratuites d'abord, premium ensuite
+  ok((await p.locator('select[name="voiceName"] optgroup').evaluateAll((g) => g.map((x) => x.label))).join('|') === 'Français · gratuites|Français · premium 👑', `${tag} voix rangées en groupes : gratuites puis premium`);
   // Voix premium : couronne dans la liste, explication dès qu'on la choisit, et message précis quand l'extrait est refusé
   ok(await p.locator('[data-promo-premium]').isHidden(), `${tag} voix premium : pas d'explication pour une voix ordinaire`);
   await p.selectOption('select[name="voiceName"]', 'prem123');
