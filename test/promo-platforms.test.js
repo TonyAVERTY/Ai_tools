@@ -6,7 +6,7 @@ import { PROMO, FORMATS, parsePromoParams } from '../src/services/promovideo.js'
 import { promoPrompt } from '../src/services/prompts.js';
 
 test('chaque préréglage reste dans les bornes du formulaire et vise un format qui existe', () => {
-  assert.ok(PLATFORM_IDS.length >= 5);
+  assert.deepEqual(PLATFORM_IDS, ['instagram', 'tiktok', 'youtube_shorts', 'linkedin']);
   for (const [id, p] of Object.entries(PLATFORMS)) {
     assert.ok(p.label && p.brief, id);
     assert.ok(FORMATS[p.format], `${id} : format inconnu`);
@@ -32,5 +32,5 @@ test('prompt : la consigne de la plateforme apparaît seulement quand elle est c
   const p = promoPrompt({ ...base, platform: 'tiktok' }).prompt;
   assert.match(p, /Plateforme de diffusion : TikTok, au format vertical/);
   assert.match(p, /zones? masquée|recouvre/i);
-  assert.match(promoPrompt({ ...base, platform: 'youtube', format: 'paysage' }).prompt, /Plateforme de diffusion : YouTube, au format paysage/);
+  assert.match(promoPrompt({ ...base, platform: 'linkedin', format: 'carre' }).prompt, /Plateforme de diffusion : LinkedIn, au format carré/);
 });
