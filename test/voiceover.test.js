@@ -253,6 +253,10 @@ test('ElevenLabs : clé dans l\'en-tête (jamais dans l\'adresse), modèle multi
   assert.equal(JSON.parse(seen[0].init.body).model_id, 'eleven_multilingual_v2');
   await assert.rejects(synthesize({ provider: 'elevenlabs', voice: 'abc', text: 'x y z', key: KEY }, { fetchImpl: async () => jsonRes({}, 401) }), (e) => /ElevenLabs a refusé la clé API/.test(e.message) && !e.message.includes(KEY));
   await assert.rejects(synthesize({ provider: 'elevenlabs', voice: 'abc', text: 'x y z', key: KEY }, { fetchImpl: async () => jsonRes({}, 429) }), /quota ou débit/);
+  // 402 : voix de la bibliothèque avec le plan gratuit ; autre refus : le message du fournisseur est repris, sans la clé
+  await assert.rejects(synthesize({ provider: 'elevenlabs', voice: 'abc', text: 'x y z', key: KEY }, { fetchImpl: async () => jsonRes({ detail: { status: 'paid_plan_required', message: 'Free users cannot use library voices via the API' } }, 402) }), (e) => /abonnement payant pour cette voix/.test(e.message) && /voix de base/.test(e.message) && !e.message.includes(KEY));
+  await assert.rejects(synthesize({ provider: 'elevenlabs', voice: 'abc', text: 'x y z', key: KEY }, { fetchImpl: async () => jsonRes({ detail: { status: 'voice_not_found', message: 'A voice with the voice_id abc was not found.' } }, 404) }), /refusé la requête \(404 : A voice with the voice_id abc was not found\.\)/);
+  await assert.rejects(synthesize({ provider: 'elevenlabs', voice: 'abc', text: 'x y z', key: KEY }, { fetchImpl: async () => ({ ok: false, status: 500, json: async () => { throw new Error('pas du JSON'); } }) }), (e) => /refusé la requête \(500\)$/.test(e.message));
   await assert.rejects(synthesize({ provider: 'elevenlabs', voice: 'abc', text: 'x y z', key: KEY }, { fetchImpl: async () => { throw new Error(`boom ${KEY}`); } }), (e) => /ElevenLabs ne répond pas/.test(e.message) && !e.message.includes(KEY));
   await assert.rejects(synthesize({ provider: 'elevenlabs', voice: 'abc', text: 'x y z' }), /Aucune clé API ElevenLabs/);
 });

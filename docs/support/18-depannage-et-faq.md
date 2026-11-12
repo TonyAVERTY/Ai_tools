@@ -158,6 +158,14 @@ Cliquer **Reconnecter**. Publier grisé : aucune page choisie alors que le compt
 ## Les cases « Plateforme cible » changent mes réglages
 Cocher une plateforme (Instagram Reels, TikTok, YouTube Shorts ou LinkedIn) règle le format, les images par seconde et la durée de l'onglet Promotion : c'est voulu. Une seule case reste cochée à la fois. Pour garder tes propres valeurs, **modifie les champs après avoir coché** (la case reste cochée et l'IA adapte toujours la vidéo à la plateforme), ou ne coche rien. Décocher ne rend pas les valeurs d'avant : retape-les. Si le bouton **Générer la vidéo** se bloque avec « Trop d'images », c'est que tu as monté les images par seconde ou la durée au-delà du maximum après avoir coché : redescends l'un des deux.
 
+## « Écouter un extrait » échoue avec une voix ElevenLabs (502)
+Le message affiché dit la cause :
+- **« ElevenLabs exige un abonnement payant pour cette voix »** : les voix de la **bibliothèque partagée** d'ElevenLabs (la plupart des voix françaises de la liste) ne sont pas utilisables par l'API avec le **plan gratuit**. Choisis une **voix de base** (par exemple Adam, Alice, Bella ou Bill, qui parlent aussi français avec la langue « Français ») ou passe à un plan payant chez ElevenLabs.
+- **« a refusé la clé API »** : la clé est fausse, révoquée ou son quota du mois est épuisé (voir « Retirer la clé » puis « Enregistrer la clé »).
+- **« quota ou débit dépassé »** : trop de demandes d'un coup, ou quota épuisé.
+- **« ne répond pas »** : le serveur n'atteint pas `api.elevenlabs.io` (l'administrateur doit autoriser cette sortie).
+- **« a refusé la requête (404 : … voice … not found) »** : cette voix n'existe plus dans ton compte ; recharge la page pour rafraîchir la liste.
+
 ## Il manque une voix ElevenLabs dans la liste
 La liste n'affiche que 5 voix françaises et 3 voix anglaises de ta bibliothèque ElevenLabs. Une voix n'y figure pas si la langue ne se lit pas dans ses étiquettes ou son nom (accent « standard » seul, par exemple) ou si 5 voix françaises (3 anglaises) plus soignées passent avant elle. Dans ElevenLabs, ajoute-lui une étiquette de langue ou un accent (« french », « parisian », « american »…) ; elle apparaît au prochain chargement de la liste.
 
