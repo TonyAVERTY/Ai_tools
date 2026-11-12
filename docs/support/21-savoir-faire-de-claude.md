@@ -12,7 +12,7 @@ La liste exacte des fiches et des tâches auxquelles elles s'appliquent est dans
 
 ## Comment en profiter
 1. Remplis bien la fiche du projet (bouton « Analyser le projet ») : plus elle est précise, plus l'IA s'en sert.
-2. Lance les tâches depuis le projet (Prospecter, Mails, LinkedIn, Audit, Postes…) : les fiches s'appliquent toutes seules, il n'y a rien à activer.
+2. Lance les tâches depuis le projet (Prospection, Envoi, Communication, Outils IA…) : les fiches s'appliquent toutes seules, il n'y a rien à activer.
 3. Dans « Assistant » (page IA, entrée de ton IA dans le menu Assistant), demande un conseil de prospection : l'IA diagnostique d'abord (cible, message, délivrabilité, rythme), puis propose une amélioration à tester.
 4. Pour changer le style d'une tâche, modifie la consigne dans « Réglages → Prompts IA » : elle l'emporte sur la fiche de méthode en cas de contradiction.
 

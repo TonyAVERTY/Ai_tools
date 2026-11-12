@@ -25,18 +25,18 @@ const STEPS = [
 
 /**
  * Fonction pure : des faits sur le projet vers la liste.
- * `ready` : tout ce qui est obligatoire est fait (le projet peut prospecter). `complete` : tout est fait, facultatif compris.
+ * `done` / `total` ne comptent que les étapes obligatoires. `ready` : tout ce qui est obligatoire est fait (le projet peut prospecter) ; `complete` : idem,
+ * la mise en route est terminée (les étapes facultatives restent proposées, sans compter).
  */
 export function buildChecklist(f) {
   const steps = STEPS
     .filter((s) => (f.canConfigure || !s.needsConfig) && (f.linkedinAvailable || !s.needsLinkedin))
     .map((s) => ({ key: s.key, label: s.label, hint: forAi(s.hint, aiName()), acc: s.acc ?? null, sel: s.sel ?? null, optional: !!s.optional, done: !!s.done(f) }));
-  const done = steps.filter((s) => s.done).length;
-  return {
-    steps, done, total: steps.length,
-    ready: steps.filter((s) => !s.optional).every((s) => s.done),
-    complete: done === steps.length,
-  };
+  // Seules les étapes obligatoires comptent : une étape facultative ne se « termine » pas forcément et ne doit pas laisser croire qu'il reste quelque chose à faire
+  const required = steps.filter((s) => !s.optional);
+  const done = required.filter((s) => s.done).length;
+  const ready = done === required.length;
+  return { steps, done, total: required.length, ready, complete: ready };
 }
 
 /** Rassemble les faits d'un projet (déjà chargé par getProject) et construit sa liste. */
@@ -45,6 +45,8 @@ export async function projectChecklist(app, p) {
   const stats = await prospectStats(db, p.id);
   const jobs = await latestJobs(db, p.id);
   const sent = await db.prepare('SELECT 1 AS x FROM mail_log WHERE project_id = ? AND error IS NULL LIMIT 1').get(p.id);
+  // Une évolution qui a abouti une fois suffit : une demande plus récente (en cours, annulée, en erreur) ne doit pas faire retomber l'étape
+  const evolved = await db.prepare("SELECT 1 AS x FROM jobs WHERE project_id = ? AND type = 'evolution' AND status = 'done' LIMIT 1").get(p.id);
   const li = linkedinAvailable(app.cfg) ? await linkedinAccount(db, p.id) : null;
   const posted = li ? await db.prepare("SELECT 1 AS x FROM linkedin_posts WHERE project_id = ? AND status = 'published' LIMIT 1").get(p.id) : null;
   return buildChecklist({
@@ -52,7 +54,7 @@ export async function projectChecklist(app, p) {
     hasProfile: !!p.profile, targetValidated: p.targetValidated, prospects: stats.total || 0,
     hasSmtp: p.hasSmtp, templateValidated: (await getTemplate(db, p.id, 'initial', { validatedOnly: true })) != null,
     mailsSent: !!sent, hasImap: p.hasImap, followupEnabled: p.followupEnabled,
-    evolutionDone: jobs.evolution?.status === 'done',
+    evolutionDone: !!evolved,
     linkedinAvailable: linkedinAvailable(app.cfg), linkedinConnected: !!li && !li.expired, linkedinPosted: !!posted,
   });
 }

@@ -19,11 +19,11 @@ export function assetUrl(path) {
 }
 
 /**
- * Logo de marque (monogramme « AI ») : version claire par défaut, version sombre quand le navigateur est en thème sombre.
+ * Logo de marque (un « i » : tige et point Safran) en SVG : les couleurs viennent des jetons (barre du haut Pétrole, site sur Lin), donc thème clair et sombre sans second fichier.
  * Décoratif (le nom « iaboss » est écrit à côté), d'où l'alt vide.
  */
 export function brandMark(cls = '') {
-  return `<picture class="brand-mark${cls ? ` ${cls}` : ''}" aria-hidden="true"><source srcset="${assetUrl('/static/img/logo-mark-dark.png')}" media="(prefers-color-scheme: dark)"><img src="${assetUrl('/static/img/logo-mark.png')}" alt="" width="30" height="24"></picture>`;
+  return `<svg class="brand-mark${cls ? ` ${cls}` : ''}" viewBox="0 0 48 48" width="28" height="28" aria-hidden="true" focusable="false"><rect class="lg-bg" width="48" height="48" rx="13"/><circle class="lg-dot" cx="24" cy="14.5" r="4.8"/><rect class="lg-stem" x="19.2" y="23" width="9.6" height="16" rx="4.8"/></svg>`;
 }
 
 /** Liens d'icônes du <head> (onglet du navigateur, écran d'accueil iOS). */

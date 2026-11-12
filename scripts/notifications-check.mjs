@@ -54,7 +54,7 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 844 }]) {
 
   // 3) navigation sans rechargement : les notifications restent
   await p.evaluate(() => { window.__marker = 'vivante'; });
-  await p.locator('.pills a.pill', { hasText: 'Calendrier' }).click();
+  await p.locator('.pills a.pill', { hasText: 'Agenda' }).click();
   await p.waitForURL(/calendar/); await p.waitForSelector('html[data-nav="ready"]');
   ok(await p.evaluate(() => window.__marker) === 'vivante' && await p.locator('.toasts .toast').count() === 3, `${tag} les notifications survivent à une navigation sans rechargement`);
   ok(await p.locator('.toasts').count() === 1, `${tag} un seul conteneur de notifications`);

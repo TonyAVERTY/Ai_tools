@@ -5,6 +5,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { loadingBlock } from '../src/loading.js';
 import { startApp } from './helpers/server.js';
 import { addProject } from './helpers/users.js';
+import { projectsHtml } from './helpers/pages.js';
 
 test('loadingBlock : l\'anneau (grand ou petit) puis le texte, annoncé en « status », texte échappé', () => {
   assert.equal(loadingBlock(), '<span class="loading" role="status"><span class="spinner" aria-hidden="true"></span><span>Chargement…</span></span>');
@@ -44,7 +45,7 @@ test('les blocs du projet qui se chargent après coup affichent l\'anneau dès l
     const u = await s.newUser();
     const id = Number(await addProject(s.db, u.id, { name: 'Atelier' }));
     await s.db.prepare('UPDATE projects SET profile_json = ?, target_json = ?, target_validated = 1 WHERE id = ?').run(JSON.stringify({ resume: 'x', proposition_valeur: 'y', arguments: ['a'], stack: 'node' }), JSON.stringify({ description: 'TPE', secteurs: ['a'], zone: 'z', requetes: ['q'] }), id);
-    const html = await (await u.get('/', { headers: { accept: 'text/html' } })).text();
+    const html = await projectsHtml(u);
     for (const k of ['linkedin', 'promo', 'recap']) assert.match(html, new RegExp(`data-${k}>\\s*<span class="loading" role="status"><span class="spinner" aria-hidden="true"></span><span>Chargement…</span></span>`), `data-${k} : anneau + texte`);
     const chat = await (await u.get('/chat', { headers: { accept: 'text/html' } })).text();
     assert.match(chat, /data-chat-projlist[^>]*>\s*<span class="loading small"/, 'liste des projets du chat');

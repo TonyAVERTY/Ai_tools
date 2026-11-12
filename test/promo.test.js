@@ -13,7 +13,9 @@ import { setSetting, now } from '../src/db.js';
 import { userPromoRoot, deleteUser } from '../src/users.js';
 import { PROMO, promoSupported, renderPromo, SceneError } from '../src/services/promovideo.js';
 import { PROMPT_DEFS } from '../src/services/prompts.js';
+import { PLATFORMS, PLATFORM_IDS } from '../src/services/promoplatforms.js';
 import { reserveVideo, finishVideo, removeVideo, keepScene, takeScene } from '../src/promo.js';
+import { projectsHtml } from './helpers/pages.js';
 
 const chromium = process.env.CHROMIUM_BIN || spawnSync('sh', ['-c', 'ls /opt/pw-browsers/chromium-*/chrome-linux/chrome 2>/dev/null | head -1']).stdout.toString().trim() || undefined;
 let s, spy, worker;
@@ -29,6 +31,7 @@ before(async () => {
 after(async () => { await s.close(); });
 const supported = promoSupported({ chromiumBin: chromium });
 const renderFixture = (options) => renderPromo({ ...options, quality: 'off' });
+const isResearch = (c) => c.prompt.includes("Recherche d'inspiration (outils WebSearch"); // la recherche web faite avant la conception : un appel de plus, sans scène
 const calls = () => (existsSync(spy) ? readFileSync(spy, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : []);
 const PROFILE = JSON.stringify({ resume: 'Cartes de fidélité digitales.', proposition_valeur: 'Fidélisez sans carton.', arguments: ['simple'], ton: 'direct' });
 async function setup(opts = {}) {
@@ -55,7 +58,9 @@ test('état de l\'onglet : limites, formats, aucune vidéo ; section présente d
   assert.deepEqual(st.videos, []);
   assert.deepEqual(st.limits.fps, PROMO.fps);
   assert.deepEqual(st.formats.map((f) => f.id), ['paysage', 'vertical', 'carre']);
-  const page = await (await u.get('/', { headers: { accept: 'text/html' } })).text();
+  assert.deepEqual(st.platforms.map((p) => p.id), PLATFORM_IDS);
+  assert.deepEqual(st.platforms.find((p) => p.id === 'tiktok'), { id: 'tiktok', label: PLATFORMS.tiktok.label, format: PLATFORMS.tiktok.format, fps: PLATFORMS.tiktok.fps, seconds: PLATFORMS.tiktok.seconds });
+  const page = await projectsHtml(u);
   assert.match(page, /data-acc="promo"[\s\S]*Promotion[\s\S]*data-promo[\s\S]*data-job="promo_video"/);
   const settings = await (await u.get('/settings', { headers: { accept: 'text/html' } })).text();
   assert.match(settings, /Vidéo de promotion \(design motion\)/);
@@ -64,6 +69,25 @@ test('état de l\'onglet : limites, formats, aucune vidéo ; section présente d
   assert.equal((await s.anon.get(`/api/projects/${pid}/promo`)).status, 401);
   const other = await s.newUser();
   assert.equal((await other.get(`/api/projects/${pid}/promo`)).status, 404, 'projet d\'un autre compte');
+});
+
+test('plateforme cible : transmise au job, ignorée si inconnue, retenue sur la vidéo produite', async () => {
+  const { u, pid } = await setup();
+  const jobParams = async () => JSON.parse((await s.db.prepare('SELECT params_json FROM jobs WHERE project_id = ? ORDER BY id DESC').get(pid)).params_json);
+  assert.equal((await gen(u, pid, { fps: 30, seconds: 15, format: 'vertical', platform: 'tiktok' })).status, 200);
+  assert.equal((await jobParams()).platform, 'tiktok');
+  await s.db.prepare('DELETE FROM jobs WHERE project_id = ?').run(pid);
+  assert.equal((await gen(u, pid, { fps: 30, seconds: 15, platform: 'snapchat' })).status, 200);
+  assert.equal((await jobParams()).platform, '', 'plateforme inconnue : aucune');
+  await s.db.prepare('DELETE FROM jobs WHERE project_id = ?').run(pid);
+  const withP = await reserveVideo(s.app, { userId: u.id, projectId: pid, subject: 'A', fps: 30, seconds: 15, format: 'vertical', width: 720, height: 1280, platform: 'tiktok' });
+  const without = await reserveVideo(s.app, { userId: u.id, projectId: pid, subject: 'B', fps: 10, seconds: 3, format: 'carre', width: 720, height: 720 });
+  try {
+    for (const v of [withP, without]) { writeFileSync(v.path, Buffer.from('MP4')); await finishVideo(s.db, v.id, 3); }
+    const videos = (await (await u.get(`/api/projects/${pid}/promo`)).json()).videos;
+    assert.equal(videos.find((v) => v.id === withP.id).platform, 'tiktok');
+    assert.equal(videos.find((v) => v.id === without.id).platform, '', 'vidéo sans plateforme (ou ancienne) : vide');
+  } finally { for (const v of [withP, without]) await removeVideo(s.app, { id: v.id, user_id: u.id }); }
 });
 
 test('lancement : images par seconde, durée et nombre d\'images contrôlés ; projet non analysé et outils absents refusés', async () => {
@@ -97,7 +121,9 @@ test('vidéo complète : sujet transmis, MP4 H.264 de la bonne taille et durée,
   const job = await runJob(pid);
   assert.equal(job.status, 'done', job.error);
   assert.equal(job.result.attempts, 1);
-  const c = calls().slice(n0);
+  const all = calls().slice(n0);
+  assert.equal(all.filter(isResearch).length, 1, 'une recherche d\'inspiration avant la conception');
+  const c = all.filter((x) => !isResearch(x));
   assert.equal(c.length, 1);
   assert.match(c[0].prompt, /Sujet demandé : « Les cartes de fidélité »/);
   assert.match(c[0].prompt, /3 secondes, à 10 images par seconde, au format carre \(720 × 720 pixels\)/);
@@ -141,7 +167,7 @@ test('sujet vide : Claude présente le projet ; scène fautive renvoyée une foi
   const job = await runJob(pid);
   assert.equal(job.status, 'done', job.error);
   assert.equal(job.result.attempts, 2);
-  const c = calls().slice(n0);
+  const c = calls().slice(n0).filter((x) => !isResearch(x));
   assert.equal(c.length, 2, 'un seul nouvel essai');
   assert.match(c[1].prompt, /Ta version précédente a été refusée au rendu : La scène doit définir window\.renderFrame/);
   assert.doesNotMatch(c[0].prompt, /refusée au rendu/);
@@ -150,7 +176,7 @@ test('sujet vide : Claude présente le projet ; scène fautive renvoyée une foi
   await s.db.prepare("DELETE FROM jobs WHERE project_id = ?").run(pid);
   await gen(u, pid, { fps: 10, seconds: 3 });
   assert.equal((await runJob(pid)).status, 'done');
-  assert.match(calls().slice(n1)[0].prompt, /Aucun sujet précisé : la vidéo présente le projet/);
+  assert.match(calls().slice(n1).find((x) => !isResearch(x)).prompt, /Aucun sujet précisé : la vidéo présente le projet/);
 });
 
 test('scène toujours fautive : job en erreur lisible, aucune ligne ni fichier laissés', { skip: !supported.ok && supported.reason }, async () => {
@@ -197,7 +223,7 @@ test('prompt modifiable dans les Réglages : le texte de l\'utilisateur remplace
     await gen(u, pid, { fps: 12, seconds: 5, format: 'vertical' });
     const job = await runJob(pid);
     assert.equal(job.status, 'done', job.error);
-    const p = calls().slice(n0)[0].prompt;
+    const p = calls().slice(n0).find((c) => c.prompt.includes('Contrat technique')).prompt;
     assert.match(p, /Fais une vidéo TRÈS sobre : fond blanc, un seul mot par plan, 5 s\./);
     assert.doesNotMatch(p, /Direction artistique :\n- Remplis l'image/, 'le texte de l\'utilisateur remplace les règles par défaut');
     assert.match(p, /Direction artistique imposée : « [^»]+ »[\s\S]*Couleurs exactes : fond en dégradé #[0-9a-f]{6} → #[0-9a-f]{6}/, 'la direction artistique choisie reste imposée');

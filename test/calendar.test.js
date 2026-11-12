@@ -81,11 +81,11 @@ test('page Calendrier : mois, actions et posts, navigation, échappement, isolat
   await s.db.prepare("INSERT INTO prospects(project_id, company, email, status, next_action, next_action_at, created_at) VALUES(?, '<b>Atelier</b>', 'a@x.fr', 'sent', 'Rappeler', ?, ?)").run(pa, at, now());
   await s.db.prepare("INSERT INTO linkedin_posts(project_id, body, status, scheduled_at, created_at) VALUES(?, 'Post du mercredi', 'scheduled', ?, ?)").run(pa, Math.floor(parisTime(2026, 11, 18, 14, 30).getTime() / 1000), now());
   const page = await (await html(a, '/calendar?m=2026-11')).text();
-  assert.match(page, /novembre 2026/);
+  assert.match(page, /Novembre 2026/);
   assert.match(page, /09:00<\/span> Rappeler : &lt;b&gt;Atelier&lt;\/b&gt;/);
   assert.doesNotMatch(page, /<b>Atelier<\/b>/);
   assert.match(page, /14:30<\/span> Post du mercredi/);
-  assert.match(page, /href="\/calendar\?m=2026-10"[^>]*>← octobre/);
+  assert.match(page, /href="\/calendar\?m=2026-10" aria-label="octobre">‹/);
   assert.match(page, /href="\/calendar\?m=2026-12"/);
   // Décembre : rien dans la grille (le panneau « À venir » dépend de l'heure réelle, il n'est pas comparé ici)
   assert.doesNotMatch(await (await html(a, '/calendar?m=2026-12')).text(), /class="cal-ev[^"]*"[^>]*><span class="cal-t">[^<]*<\/span> (Rappeler|Post du mercredi)/);

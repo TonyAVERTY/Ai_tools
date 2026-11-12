@@ -44,10 +44,10 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   ok(r?.move === 'right' && r.name === 'page-from-right', `${tag} Projets → Mails (vers la droite) : le contenu arrive par la droite`);
   ok(r && r.opacity < 1 && r.x > 0, `${tag} l'animation démarre bien décalée et transparente (opacité ${r?.opacity?.toFixed(2)}, x ${r?.x?.toFixed(0)} px)`);
   ok(r && r.overflowX === false, `${tag} pas de défilement horizontal pendant la transition`);
-  r = await go(p, pill('Calendrier'), '/calendar');
-  ok(r?.move === 'right', `${tag} Mails → Calendrier : par la droite`);
-  r = await go(p, pill('Projets'), '/');
-  ok(r?.move === 'left' && r.name === 'page-from-left' && r.x < 0, `${tag} Calendrier → Projets (vers la gauche) : le contenu arrive par la gauche`);
+  r = await go(p, pill('Agenda'), '/calendar');
+  ok(r?.move === 'right', `${tag} Mails → Agenda : par la droite`);
+  r = await go(p, pill('Projets'), '/projets');
+  ok(r?.move === 'left' && r.name === 'page-from-left' && r.x < 0, `${tag} Agenda → Projets (vers la gauche) : le contenu arrive par la gauche`);
   ok(await p.locator('#contenu > .page').evaluate((e) => !e.dataset.move) && await p.locator('#contenu').evaluate((e) => !e.classList.contains('pt-run')), `${tag} nettoyage après la transition`);
   // Hors onglets : fondu vers le haut
   r = await go(p, async () => { await p.locator('details.user > summary').click(); await p.locator('.user-pop a', { hasText: 'Réglages' }).click(); }, '/settings');

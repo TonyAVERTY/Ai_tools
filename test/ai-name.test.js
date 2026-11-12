@@ -6,6 +6,7 @@ import { Worker } from '../src/services/jobs.js';
 import { aiName, withAiName, forAi, DEFAULT_AI_NAME } from '../src/services/ainame.js';
 import { saveLink } from '../src/claudelink.js';
 import { startApp } from './helpers/server.js';
+import { projectsHtml } from './helpers/pages.js';
 
 // Le nom de l'IA de l'utilisateur (Claude, ChatGPT, Gemini) dans les pages, les réglages et les messages de tâches.
 let s;
@@ -39,7 +40,7 @@ test('tableau de bord : le nom de l\'IA de l\'utilisateur, dans le menu, les sec
   const g = await s.newUser({ admin: false, link: linked('gemini') });
   const c = await s.newUser({ admin: false, link: linked('claude') });
   const gp = await html(g, '/');
-  assert.match(gp, /<body class="app" data-ai="Gemini">/);
+  assert.match(gp, /<body class="app" data-ai="Gemini"[ >]/);
   assert.match(gp, /<span class="pop-t">Gemini<small>Discute avec ton Gemini<\/small><\/span>/, 'menu Assistant');
   assert.match(gp, /aria-label="Assistant : discuter avec Gemini ou demander de l'aide sur iaboss"/);
   assert.match(gp, /Consommation Gemini/);
@@ -54,7 +55,7 @@ test('tableau de bord : le nom de l\'IA de l\'utilisateur, dans le menu, les sec
 test('sections d\'un projet : « Gemini cherche des entreprises… », « Gemini écrit des posts », « Gemini conçoit une vidéo »', async () => {
   const g = await s.newUser({ admin: false, link: linked('gemini') });
   await s.db.prepare(`INSERT INTO projects(user_id, name, git_url, profile_json, target_json, target_validated, created_at) VALUES(?, 'P', 'https://git.test/p.git', '{}', '{}', 1, 1)`).run(g.id);
-  const page = await html(g, '/');
+  const page = await projectsHtml(g);
   assert.match(page, /Gemini cherche des entreprises qui collent à la cible/);
   assert.match(page, /Relie un compte, Gemini écrit des posts, tu relis et publies/);
   assert.match(page, /Gemini conçoit une vidéo de design motion/);
@@ -73,7 +74,10 @@ test('Mon compte : « Mon IA », l\'IA, son fournisseur, les limites propres à 
   assert.doesNotMatch(a, /sk-ant-|Session de 5 h|Semaine de 7 jours|Anthropic/, 'rien de propre à Claude');
   assert.match(a, /Avec une clé API, Google facture ce que tu consommes, à l'usage\./);
   const cg = await s.newUser({ admin: false, link: linked('openai', 'chatgpt_account') });
-  assert.match((await html(cg, '/account')).replace(/&#39;/g, "'"), /Avec ton compte ChatGPT, les limites de ton abonnement s'appliquent\. iaboss ne les mesure pas\./);
+  const cgPage = (await html(cg, '/account')).replace(/&#39;/g, "'");
+  assert.match(cgPage, /Limites d'utilisation<\/h3><p class="hint">Réponse inattendue du relevé en direct\./, 'compte ChatGPT : ses limites sont relevées chez OpenAI (accès factice : réponse inexploitable, dite honnêtement)');
+  assert.doesNotMatch(cgPage, /Anthropic|Session de 5 h/, 'rien de propre à Claude');
+  assert.match((await html(await s.newUser({ admin: false, link: linked('gemini', 'subscription_token') }), '/account')).replace(/&#39;/g, "'"), /Avec ton compte Gemini, les limites de ton abonnement s'appliquent\. iaboss ne les mesure pas\./, 'Gemini : non mesurées');
   const c = (await html(await s.newUser({ admin: false, link: linked('claude') }), '/account')).replace(/&#39;/g, "'");
   assert.match(c, /Ton accès à Claude est facturé à part, par Anthropic\./);
   assert.match(c, /<dd>sk-ant-…WXYZ<\/dd>/);

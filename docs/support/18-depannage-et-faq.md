@@ -10,8 +10,32 @@ La clé est fausse, supprimée ou limitée : crée-en une nouvelle sur aistudio.
 ## ChatGPT : aucun lien ne s'affiche, ou mes tâches attendent chacune leur tour
 Aucun lien : active la connexion par code d'appareil dans les paramètres de sécurité de ton compte ChatGPT, ou utilise « Coller le fichier ». Les tâches qui s'enchaînent sont normales avec un compte ChatGPT : une seule tourne à la fois pour ton compte (avec une clé API, elles tournent ensemble).
 
+## Une tâche terminée n'affiche plus qu'une ligne (résultat, « Voir », tokens)
+C'est voulu pour alléger la page : sous une recherche, un envoi ou une relance terminés, le résultat, le bouton **Voir** (le détail de la tâche) et le nombre de tokens tiennent sur une même ligne. Rien n'est perdu : **Voir** ouvre le détail complet, et le menu « Activité » garde l'historique. Une **analyse** terminée n'affiche plus rien sous les onglets du projet (la fiche projet, juste en dessous, est son résultat) : « Voir » et les tokens n'apparaissent que pendant l'analyse (à côté d'**Annuler**) ou si elle a échoué (à côté de **Réessayer**) ; le détail d'une analyse terminée se retrouve dans « Activité ».
+
+## « Se connecter avec Google » : le lien ne s'affiche pas, ou « Google a refusé le code »
+- **Je ne vois pas l'option** : elle est désactivée par défaut. L'administrateur doit l'activer sur le serveur (et y installer Antigravity CLI, `agy`).
+- **« Google n'a pas donné de lien de connexion »** : `agy` n'est pas installé ou pas joignable sur le serveur. Préviens l'administrateur.
+- **« Google a refusé le code »** ou **« Le délai de Google est passé »** : Antigravity CLI n'attend le code que 60 secondes. Clique **Nouveau lien**, et recopie le code dès que Google l'affiche (en entier, sans espace).
+- **« Connexion refusée par Google (expirée ou révoquée) »** pendant une tâche : reconnecte-toi avec **Se connecter avec Google**.
+- **Mon compte Google est limité** : Google n'a pas tranché la règle sur l'usage depuis une autre application. Repasse à la clé API Google AI Studio.
+
+## Avec ChatGPT, la carte « Consommation ChatGPT » dit « indisponible » ou ne montre pas mes limites
+- **« ton accès ChatGPT sera renouvelé au prochain job iaboss »** : l'accès enregistré a expiré. iaboss ne le renouvelle pas tout seul (le renouvellement appartient à Codex) : lance une tâche IA, la carte revient ensuite.
+- **« OpenAI refuse le relevé en direct »** : relie-toi de nouveau avec « Se connecter avec ChatGPT ».
+- **« le relevé en direct est indisponible » / « réponse inattendue »** : la lecture des limites passe par une adresse interne d'OpenAI qui peut changer. Les tokens « via iaboss » restent exacts ; tes vraies limites se lisent aussi dans ChatGPT ou avec « /status » dans Codex.
+
 ## Avec ChatGPT ou Gemini, je ne vois pas les tokens pendant la tâche
 C'est normal : ChatGPT et Gemini ne communiquent leurs tokens qu'**à la fin** de la tâche, contrairement à Claude qui les envoie au fil de l'eau. Pendant la tâche, la ligne dit « Tokens comptés à la fin de la tâche » (dans « Activité » et dans « Voir »). Le total apparaît dès que la tâche est terminée, et reste affiché même si elle échoue. Si le total reste à 0 après la fin d'une tâche réussie, signale-le à l'administrateur : l'IA n'a pas renvoyé sa mesure.
+
+## Un document de facturation validé n'a plus d'aperçu ni de bouton « Valider »
+C'est voulu : un document validé est grisé et réduit à un résumé pour qu'on ne le change pas par erreur. « Voir en grand » ouvre l'aperçu complet. Pour le changer, clique **Modifier** sur le document : il repassera à « À valider » après ta demande.
+
+## Je ne peux plus écrire dans la cible de mon projet
+Elle est **validée** : une cible validée est grisée et en lecture seule pour qu'on ne la change pas par erreur. Clique **Modifier** (section **Cible** du projet), change les champs, puis **Mettre à jour** ; **Annuler** remet la cible validée. Les prospects déjà trouvés ne changent pas : la nouvelle cible sert aux prochaines recherches.
+
+## Je ne peux plus écrire dans mon modèle de mail ou de relance
+Il est **validé** : un modèle validé est verrouillé (grisé, en lecture seule) pour qu'on ne le change pas par erreur. Clique **Modifier** pour le déverrouiller, change le texte, puis **Valider le modèle** (ou **Enregistrer** pour le garder en brouillon, ou **Annuler** pour revenir au texte validé). **Générer avec l'IA** réapparaît aussi avec **Modifier**.
 
 ## La barre « Changer | Modifier » n'apparaît pas quand je sélectionne une phrase
 Elle n'existe que dans l'**Aperçu**, sur l'onglet **Version texte** (pas dans l'onglet « Mail » mis en forme), et seulement pour une phrase **du modèle** : ni l'en-tête (De, À, Objet), ni le pied de page, ni une phrase qui apparaît deux fois dans le modèle, ni une sélection coupée au milieu d'un nom d'entreprise. Sélectionne une phrase entière du corps du mail. Si « Changer » répond que ton IA n'a pas pu proposer une autre phrase, la raison est écrite (budget IA atteint, IA déconnectée, proposition inutilisable) : clique **Réessayer** ou **Fermer**, ou utilise **Modifier**, puis **Modifier à la main**, pour retoucher la phrase toi-même.
@@ -23,16 +47,23 @@ Une personne écrit sa réponse avec ses mots, elle ne choisit pas dans une list
 L'aperçu l'écrit : « Le mail ne commence pas par une formule d'appel » ou « Aucune formule de politesse avant la signature ». Si le mail commence par « Bonjour » suivi du nom de l'entreprise (« Bonjour Une Bonne Bouteille, »), il l'écrit aussi : on salue une personne, pas une entreprise, donc « Bonjour, » tout court. Ajoute « Bonjour, » seul sur la première ligne et « Bien cordialement, » avant ta signature, ou clique de nouveau sur **Générer avec l'IA** : les consignes par défaut demandent maintenant l'appel, la politesse et la signature pour le premier mail comme pour la relance. Si tu as personnalisé la consigne du mail ou de la relance (Réglages → Prompts IA), c'est ton texte qui s'applique : ajoutes-y ces trois éléments ou clique **Revenir au texte par défaut**.
 
 ## « Aucun mail n'est parti : ton IA juge que le texte n'a pas de sens »
-Avant l'envoi, ton IA relit chaque mail rempli avec les vraies valeurs, par lots de 10. Elle a jugé qu'une phrase ne veut rien dire (souvent un nom d'entreprise collé dans une tournure qui ne le porte pas) : le mail ne part pas, rien n'est perdu et les prospects restent « à contacter ». Ouvre **Aperçu** sur le modèle : l'IA y explique le problème et propose une version corrigée ; clique **Appliquer la correction au modèle**, relis, **Enregistrer**, **Valider le modèle**, puis relance l'envoi. Si seuls certains prospects sont refusés, le journal des mails (« Non envoyé : le texte n'a pas de sens (…) ») dit lesquels : la cause est alors leur accroche ou leur nom, à corriger dans leur fiche.
+Avant l'envoi, ton IA relit chaque mail rempli avec les vraies valeurs, par lots de 10. Elle a jugé qu'une phrase ne veut rien dire (souvent un nom d'entreprise collé dans une tournure qui ne le porte pas) : le mail ne part pas, rien n'est perdu et les prospects restent « à contacter ». Ouvre **Aperçu** sur le modèle : l'IA relit le mail avant de te le montrer, le corrige dans le modèle et explique pourquoi (si le modèle est validé et grisé, clique d'abord **Modifier**) ; relis, **Enregistrer**, **Valider le modèle**, puis relance l'envoi. Si seuls certains prospects sont refusés, le journal des mails (« Non envoyé : le texte n'a pas de sens (…) ») dit lesquels : la cause est alors leur accroche ou leur nom, à corriger dans leur fiche.
 
 ## « Relecture par l'IA impossible » : l'envoi ne part pas
 L'envoi vérifie le sens de chaque mail avec ton IA : quand elle ne peut pas répondre (budget IA atteint, IA déconnectée, réponse illisible), **rien ne part** plutôt que d'envoyer un texte non relu. Le message donne la raison. Reconnecte ton IA (voir « Je ne peux rien lancer »), attends que le budget se libère (Réglages → Budget IA) ou relance un peu plus tard : les prospects restent « à contacter ».
+
+## La page « Aujourd'hui » : une ligne manque, ou la liste est vide
+- **Une réponse de prospect n'y est pas** : seules les réponses **non lues** y figurent, et seulement si la boîte de réception (IMAP) du projet est connectée. Vérifie « Connecter ta boîte de réception » dans la liste de mise en route du projet.
+- **Une ligne a disparu après « Marquer traité »** : c'est voulu, elle disparaît au rechargement. Clique sur **Annuler** avant de quitter la page pour la garder.
+- **Une tâche IA en échec n'est plus là** : la liste ne montre que les 48 dernières heures ; l'historique complet est dans le menu « Activité ».
+- **Le message « Ligne non mise à jour »** : le serveur n'a pas pu enregistrer ; la ligne est revenue à son état d'avant, réessaie.
+- **Pas de rendez-vous dans l'agenda du jour** : seul le calendrier d'iaboss est lu, pas un agenda externe.
 
 ## Mon job reste « En attente »
 Lire le message « En attente : … » dans le menu **Activité**. Raisons possibles : budget IA atteint (clé API) ; quota Claude serré (au-delà de 85 %) ; charge élevée du serveur ; job programmé « Cette nuit » ; déjà un job IA en cours pour le compte. Il repart seul. On peut l'**Annuler** depuis Activité.
 
 ## Une section ou une liste n'a pas pu se charger : « Réessayer »
-Quand une partie de la page se charge après coup (la section **Mise en route**, **LinkedIn**, **Promotion** ou **Récapitulatif** d'un projet, la liste de la page **Clients**, le menu **Joindre un projet iaboss** de la page IA), un petit cercle accompagne « Chargement… ». Si la requête échoue, le cercle laisse la place à **un message et un bouton « Réessayer »** : le cercle ne tourne jamais pour toujours.
+Quand une partie de la page se charge après coup (la section **LinkedIn**, **Promotion** ou **Récapitulatif** d'un projet, la liste de la page **Clients**, le menu **Joindre un projet iaboss** de la page IA), un petit cercle accompagne « Chargement… ». Si la requête échoue, le cercle laisse la place à **un message et un bouton « Réessayer »** : le cercle ne tourne jamais pour toujours.
 1. Lis le message : « **Connexion impossible : réessaie dans un instant.** » (réseau coupé), « **Erreur interne : réessaie dans un instant.** » (problème du serveur), « **Tu n'as pas accès à cette action.** » (ton rôle sur le projet ne le permet pas) ou « **Introuvable : recharge la page.** ».
 2. Clique sur **Réessayer** : le cercle revient et la demande repart. Si elle échoue encore, le message revient et tu peux recliquer.
 3. Si le message persiste après plusieurs essais, recharge la page ; s'il revient, signale-le avec l'heure et le nom de la section.
@@ -74,8 +105,8 @@ Vérifier dans l'ordre : 1) SMTP enregistré (« Configuration du projet ») ; 2
 ## Mes mails arrivent en spam
 Configurer SPF, DKIM et DMARC pour le domaine d'envoi ; envoyer de petits lots au début et augmenter progressivement ; garder des délais entre les mails ; éviter les liens et pièces jointes dans le premier mail ; soigner l'accroche. iaboss ajoute déjà un lien de désinscription dans le pied de page des mails.
 
-## Le filtre par poste cache une section que je cherche
-Choisis **Tous les postes** dans la liste **Poste**, en haut de la page Projets : le filtre choisi est mémorisé dans ton navigateur et s'applique à tous tes projets. Un poste ne montre que ses sections (Commerce : Cible et Prospecter ; Communication : LinkedIn et Promotion ; Produit : Évolution ; Développement : Audit du projet ; Direction : Récapitulatif) plus **Postes et tâches IA**. Voir « Postes et filtre par poste : les tâches IA d'une entreprise ».
+## Où est passé le filtre par poste, ou une section que je cherche ?
+Le filtre « Poste » de la page Projets n'existe plus. Un projet a maintenant des onglets (**Vue d'ensemble**, **Prospection**, **Envoi**, **Clients**, **Facturation**, **Communication**, **Outils IA**, **Récapitulatif**, **Réglages du projet**), chacun avec ses sections déjà ouvertes : Cible, Recherche de prospects et Prospects dans Prospection ; Modèle de mail, Envoi et Relance automatique dans Envoi ; LinkedIn et Promotion dans Communication ; Évolution, Audit du projet et Postes et tâches IA dans Outils IA ; SMTP, IMAP, base de données et suppression dans Réglages du projet. Voir « Les projets : cartes, pages à onglets, création, suppression ».
 
 ## Une tâche d'un poste ne démarre pas, échoue ou n'a pas de résultat
 - « Analyse le projet d'abord » : lance l'analyse du projet (la fiche sert de contexte à toutes les tâches).
@@ -98,6 +129,11 @@ Elle est verrouillée dès que le prospect a été contacté (statut autre que �
 - « Aperçu expiré » : relance l'aperçu (il se garde 15 minutes).
 - Les alertes jaunes (variable inconnue, accroche vide, nom d'expéditeur ou adresse d'envoi non réglés) montrent ce que le prospect verrait en moins bien : corrige le modèle ou la configuration du projet. Le lien de désinscription d'un exemple fictif est un lien d'exemple, il ne fonctionne pas.
 
+## Dans « Mails », un mail déplié dit « Contenu non conservé » ou ne donne pas la raison du rejet
+- **Contenu non conservé** : ce mail est parti avant que la page Mails garde les textes. Les nouveaux envois sont tous consultables.
+- **« Le serveur du destinataire n'a pas donné de raison. »** sur un mail **Rejeté** : le rapport de rejet reçu ne contenait pas de motif lisible. Vérifie aussi que la boîte de réception du projet est reliée (Réglages du projet → boîte de réception, IMAP) : sans elle, les rejets ne sont pas détectés et le mail reste « Envoyé ».
+- **« Détail indisponible »** : la connexion a coupé ou ta session a expiré ; replie puis déplie le mail, ou recharge la page.
+
 ## Les réponses n'apparaissent pas
 Configurer la **Boîte de réception (IMAP)** (« Enregistrer et tester ») et cliquer **Vérifier maintenant** dans la section Envoi (lecture automatique toutes les 15 minutes). Sans IMAP, les réponses ne sont pas détectées et les relances automatiques ne partent pas.
 
@@ -119,6 +155,12 @@ Ils dépendent du rôle dans le projet : Configuration du projet, Audit, Récapi
 ## LinkedIn : « connexion expirée » ou Publier grisé
 Cliquer **Reconnecter**. Publier grisé : aucune page choisie alors que le compte ne peut pas publier sur le profil (**Choisir une page**). Voir le fichier sur LinkedIn.
 
+## Les cases « Plateforme cible » changent mes réglages
+Cocher une plateforme (Instagram Reels, TikTok, YouTube Shorts ou LinkedIn) règle le format, les images par seconde et la durée de l'onglet Promotion : c'est voulu. Une seule case reste cochée à la fois. Pour garder tes propres valeurs, **modifie les champs après avoir coché** (la case reste cochée et l'IA adapte toujours la vidéo à la plateforme), ou ne coche rien. Décocher ne rend pas les valeurs d'avant : retape-les. Si le bouton **Générer la vidéo** se bloque avec « Trop d'images », c'est que tu as monté les images par seconde ou la durée au-delà du maximum après avoir coché : redescends l'un des deux.
+
+## Il manque une voix ElevenLabs dans la liste
+La liste n'affiche que 5 voix françaises et 3 voix anglaises de ta bibliothèque ElevenLabs. Une voix n'y figure pas si la langue ne se lit pas dans ses étiquettes ou son nom (accent « standard » seul, par exemple) ou si 5 voix françaises (3 anglaises) plus soignées passent avant elle. Dans ElevenLabs, ajoute-lui une étiquette de langue ou un accent (« french », « parisian », « american »…) ; elle apparaît au prochain chargement de la liste.
+
 ## La vidéo de promotion échoue
 Avec « Ajouter une voix » : si le message nomme le fournisseur de voix (« Google Traduction », « ElevenLabs », « Google Cloud » ou « Microsoft Azure »), c'est lui qui ne répond pas ou qui refuse la clé : essayer un autre fournisseur, vérifier la clé (« Retirer la clé » puis « Enregistrer la clé »), ou décocher la voix. Pour des voix plus naturelles : ElevenLabs, ou Piper (locale, sans clé) si l'administrateur l'a installée. Les extraits (« Écouter un extrait ») permettent de tester un fournisseur sans lancer de vidéo.
 Lire le message du job : outils manquants sur le serveur (Chromium, ffmpeg), plafond de 20 vidéos, scène refusée après correction (relancer ou changer de modèle). Si le message parle d'un « Trop de vide », d'une « Image figée » ou de « Titres trop petits », c'est le contrôle qualité automatique : relancer, choisir un « Style » précis dans l'onglet Promotion, ou passer sur Opus ou Fable. Voir le fichier sur la Promotion.
@@ -130,14 +172,14 @@ Les agendas se rafraîchissent tout seuls mais lentement (Google : 12 à 24 heur
 Pour rédiger un mail, trouver des idées de posts, réfléchir à une stratégie commerciale : menu **Assistant** (l'entrée de ton IA).
 
 ## FAQ rapide
-- **Qui paie l'IA ?** La personne, directement chez son fournisseur d'IA : Anthropic, OpenAI ou Google (clé API : à l'usage ; abonnement ou compte : son abonnement Claude ou ChatGPT). iaboss facture seulement son offre.
+- **Qui paie l'IA ?** La personne, directement chez son fournisseur d'IA : Anthropic, OpenAI ou Google (clé API : à l'usage ; abonnement ou compte : son abonnement Claude, ChatGPT ou Google AI, ce dernier seulement si le service l'a activé). iaboss facture seulement son offre.
 - **iaboss modifie-t-il mon code ?** Non : le dépôt est cloné et lu en lecture seule.
 - **Puis-je changer le dépôt d'un projet ?** Non : créer un nouveau projet.
 - **Combien de temps dure une recherche ou une vidéo ?** Quelques minutes ; l'avancement est dans Activité.
 - **Où voir ce que j'ai consommé ?** « Mon compte → Usage du mois », la carte « Consommation » de la page Projets (suivie du nom de ton IA : « Consommation Gemini », par exemple) et « Mon compte → Mon IA → Limites d'utilisation ».
 - **Comment arrêter les notifications ?** Réglages → Notifications : décocher les événements ou retirer le canal.
 - **Comment supprimer mes données ?** « Mon compte → Zone de danger → Supprimer mon compte et mes données ».
-- **Y a-t-il une application mobile ?** Non : le site s'adapte aux téléphones. Sur un écran étroit, les onglets de la barre du haut tiennent tous sur une ligne et « Comptabilité » s'affiche « Compta » (c'est le même onglet).
+- **Y a-t-il une application mobile ?** Non : le site s'adapte aux téléphones. Sur un écran étroit, les cinq onglets de la barre du haut (Aujourd'hui, Projets, Mails, Agenda, Compta) tiennent sur une ligne. Facturation, Clients et Équipe sont dans le menu de l'avatar.
 - **Qui contacter si la documentation ne répond pas ?** L'administrateur du service d'iaboss.
 
 ## L'IA ignore la méthode attendue ou la réponse sort du cadre
@@ -162,6 +204,8 @@ Les fiches de méthode (voir « Savoir-faire de l'IA dans iaboss ») sont des re
 - **« La dernière demande à Claude a échoué »** (le nom suit ton IA) : la réponse de l'IA était inutilisable ou ton IA n'est pas reliée (voir « Relier, tester et déconnecter son IA (Claude, ChatGPT ou Gemini) »). Rien n'a été modifié : clique de nouveau sur **Générer un modèle de document** (ou sur **Relancer la préparation** après la validation du devis).
 - **Les prix des exemples sont faux** : sans « Tes tarifs habituels », ce sont des prix d'exemple. Renseigne tes tarifs, puis **Recommencer depuis le début**, ou utilise « Affiner avec Claude » (le nom suit ton IA) pour les corriger.
 - **« Tes documents sont prêts » a disparu** : tu as affiné un document, il repasse à « À valider ». Valide-le de nouveau.
+- **Les documents n'ont pas les couleurs, la police ou le logo de mon projet** : regarde l'encadré **Style des documents**. « Aucun style trouvé dans le dépôt » : l'IA n'a pas trouvé de couleur ; une note dit pourquoi une police ou un logo est ignoré (police WOFF2 ou illisible, logo SVG sans Chromium sur le serveur, fichier trop lourd). Mets un logo PNG ou JPEG et une police `.ttf` dans le dépôt, puis **Recommencer depuis le début** pour relire le style.
+- **« À vérifier » ou « Non relu » dans « Relecture par l'IA »** : « À vérifier » = l'IA refusait encore le document au troisième essai, il est livré tel quel : relis-le. « Non relu » = la relecture n'a pas pu avoir lieu (« pdftoppm n'est pas installé sur ce serveur », quota de l'IA atteint…) ; les documents restent utilisables.
 - **Un projet n'apparaît pas** : la page n'affiche que les projets de ton compte.
 - **Rien n'est prérempli** : l'IA n'a rien trouvé d'écrit dans le dépôt (pas de mentions légales, de contact ou de tarifs) ou l'analyse date d'avant cette fonction. Clique **Réanalyser** dans la « Fiche projet », ou remplis à la main : la première fois suffit, les autres projets reprennent ton identité (« Repris d'un autre de tes projets »).
 - **Une valeur préremplie est fausse** : corrige-la avant **Enregistrer les informations** ; l'IA peut se tromper de société si le dépôt en cite plusieurs.
@@ -229,3 +273,11 @@ L'IA n'a le droit de proposer que ce que la fiche projet dit exister, et l'**Ape
 ## « LinkedIn a refusé la connexion »
 Le message précise maintenant la cause : produits manquants dans l'application LinkedIn (« onglet Produits »), adresse de retour non déclarée (« onglet Auth → URL de redirection autorisées »), identifiants de l'application faux, ou compte sans droit sur la page. Suis le remède indiqué dans le message, puis recommence la connexion depuis le projet. Les détails sont dans « LinkedIn » (Problèmes fréquents).
 
+## L'image d'un post Instagram est vide, banale ou refusée
+- Message **« Chromium n'est pas installé sur ce serveur »** : l'image est rendue par Chromium sur le serveur ; l'administrateur doit l'installer (variable CHROMIUM_BIN). La newsletter n'en a pas besoin.
+- Message **« L'image écrite par Claude ne passe pas au rendu »** : trois essais d'image ont été refusés au contrôle (script, adresse externe, texte qui déborde, image vide). Réessaie avec un sujet plus précis.
+- Bannière **« À vérifier avant de publier »** : le directeur artistique (second contrôle) a relevé des défauts que les essais n'ont pas corrigés. Lis-les, puis **Régénérer un autre post**.
+- Couleurs ou polices qui ne ressemblent pas à ton produit : l'IA les lit dans le dépôt ; sans interface dans le dépôt elle reste sobre. Détails dans « Instagram et newsletter : posts, images et lettres d'information ».
+
+## Je viens de payer une offre et mon plan n'a pas changé
+L'activation arrive par un message signé de Stripe, en général en quelques secondes : recharge « Mon compte ». Au bout de quelques minutes sans changement, écris-nous avec l'email de ton compte. Détails dans « Abonnement et paiement : choisir, changer ou résilier son offre ».

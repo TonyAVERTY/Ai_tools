@@ -48,18 +48,17 @@ const p = await ctx.newPage();
 const errs = [];
 p.on('pageerror', (e) => errs.push(e.message));
 p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
+const tabOf = async (t) => { if (new URL(p.url()).pathname !== `/p/${pid}/${t}`) { await p.evaluate(([id, x]) => window.AiNav.go(`/p/${id}/${x}`), [pid, t]); await p.waitForURL((u) => u.pathname === `/p/${pid}/${t}`); } await p.waitForSelector('html[data-nav="ready"]'); }; // aller sur l'onglet d'un projet sans recharger
 
 async function openLinkedin(tag, expected) {
   await p.waitForSelector('html[data-nav="ready"]');
-  const project = p.locator('details.project').first();
-  if (!(await project.evaluate((d) => d.open))) await project.locator('summary').first().click();
-  await p.locator('details[data-acc="linkedin"] > summary').click();
+  await tabOf('communication');
   await p.waitForSelector('[data-li-body]', { timeout: 15000 });
   ok((await p.locator('[data-linkedin]').innerText()).includes('Tony Averty'), `${tag} le compte relié est affiché`);
   ok((await p.locator('[data-li-body]').inputValue()) === expected, `${tag} le brouillon s'affiche : « ${expected} »`);
 }
 
-await p.goto(`${s.base}/`);
+await p.goto(`${s.base}/projets`);
 await openLinkedin('1re page :', 'Un premier brouillon de post.');
 // Édition : le compteur suit la frappe, l'enregistrement est gardé côté serveur
 await p.locator('[data-li-body]').fill('Brouillon modifié à la main.');
@@ -88,11 +87,11 @@ const shown = await p.locator('[data-li-body]').inputValue();
 
 // Navigation sans rechargement, puis retour : la section marche avec les scripts relancés
 await p.evaluate(() => { window.__marker = 'vivante'; });
-await p.locator('.pills a.pill', { hasText: 'Calendrier' }).click();
+await p.locator('.pills a.pill', { hasText: 'Agenda' }).click();
 await p.waitForURL(/calendar/);
 await p.waitForSelector('html[data-nav="ready"]');
 await p.locator('.pills a.pill', { hasText: 'Projets' }).click();
-await p.waitForURL((url) => url.pathname === '/');
+await p.waitForURL((url) => url.pathname === '/projets');
 await p.waitForSelector('html[data-nav="ready"]');
 ok(await p.evaluate(() => window.__marker) === 'vivante', 'aller-retour sans rechargement de la page');
 ok(await p.evaluate(() => typeof window.AiTools?.loadLinkedin) === 'function', 'app-linkedin.js a été relancé : window.AiTools.loadLinkedin existe');

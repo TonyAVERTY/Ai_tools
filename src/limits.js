@@ -19,6 +19,8 @@ export const RATE_LIMITS = {
   chat: { user: { max: 40, windowMs: 10 * MIN } },
   chat_upload: { user: { max: 60, windowMs: 10 * MIN } },
   // Ajout, modification et suppression de prospects ; aperçu d'un mail (rendu sans envoi)
+  // Recherche (⌘K) : une requête par frappe ralentie côté navigateur
+  search: { user: { max: 300, windowMs: 10 * MIN } },
   prospect_write: { user: { max: 120, windowMs: 10 * MIN } },
   preview: { user: { max: 120, windowMs: 10 * MIN } },
   // Contrôle du sens d'un mail dans l'aperçu : chacun coûte un appel à l'IA de la personne
@@ -39,6 +41,10 @@ export const RATE_LIMITS = {
   auth_callback: { ip: { max: 40, windowMs: 10 * MIN } },
   // Désinscription (page publique, lien reçu par mail) : large pour un lecteur légitime, étroit pour un robot qui devine
   unsub: { ip: { max: 60, windowMs: 10 * MIN } },
+  // Abonnement : ouverture du paiement ou du portail (chacun crée une session chez Stripe)
+  billing: { user: { max: 20, windowMs: 10 * MIN } },
+  // Événements de Stripe (webhook public, signé) : large, Stripe peut en envoyer des rafales
+  stripe_webhook: { ip: { max: 600, windowMs: MIN } },
   // Liaison Claude : chaque essai de clé ou de jeton coûte un appel réseau chez Anthropic
   link: { user: { max: 10, windowMs: 10 * MIN }, ip: { max: 30, windowMs: 10 * MIN } },
   // Connexion guidée ChatGPT : la page demande où en est la connexion toutes les 2 s pendant 15 minutes au plus (lecture seule, aucun appel réseau
@@ -98,6 +104,8 @@ export const PLAN_LABELS = {
 export const PLAN_PRICES = { starter: 10, growth: 25, business: 50, intensive: 100 };
 export const ANNUAL_FREE_MONTHS = 2;
 export const annualPrice = (plan) => PLAN_PRICES[plan] * (12 - ANNUAL_FREE_MONTHS);
+/** Abonnement payant : après un paiement refusé, les droits de l'offre sont gardés ce nombre de jours (le temps de mettre la carte à jour), puis retour au plan gratuit. Aucune donnée n'est supprimée. */
+export const SUBSCRIPTION = { graceDays: 7 };
 export const PAID_PLANS = ['free', ...Object.keys(PLAN_PRICES), 'pro']; // plans qu'un administrateur peut attribuer depuis le back-office
 
 /** Détection d'abus à l'envoi : pause du compte quand trop de mails sont rejetés. */

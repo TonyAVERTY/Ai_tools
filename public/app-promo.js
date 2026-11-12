@@ -14,13 +14,19 @@
     catch (e) { loadFailed(box, e.message, () => loadPromo(proj)); }
   }
 
+  // « TikTok · » devant la ligne de détails d'une vidéo produite pour une plateforme
+  const promoPlatformLabel = (v, s) => {
+    const p = v.platform && s.platforms?.find((x) => x.id === v.platform);
+    return p ? `${esc(p.label)} · ` : '';
+  };
+
   function promoVideoCard(v, s, id) {
     const dim = v.width === v.height ? 'carré' : v.width > v.height ? 'paysage' : 'vertical';
     return `<article class="pv" data-pv="${v.id}">
       <video class="pv-video pv-${dim}" controls preload="metadata" playsinline src="/api/promo/${v.id}/file" aria-label="Vidéo de promotion"></video>
       <div class="pv-meta">
         <p class="pv-title">${v.subject ? esc(v.subject) : '<span class="muted">Présentation du projet</span>'}</p>
-        <p class="muted small">${v.seconds} s · ${v.fps} images/s · ${dim} · ${mo(v.size)} · ${esc(liDay(v.createdAt))}</p>
+        <p class="muted small">${promoPlatformLabel(v, s)}${v.seconds} s · ${v.fps} images/s · ${dim} · ${mo(v.size)} · ${esc(liDay(v.createdAt))}</p>
         <p class="row"><a class="btn small" href="/api/promo/${v.id}/file?download=1" download data-noajax>Télécharger</a>
         ${s.canDelete ? `<button type="button" class="btn small danger" data-pv-delete="${v.id}" data-id="${id}">Supprimer</button>` : ''}</p>
       </div></article>`;
@@ -34,6 +40,11 @@
     const form = s.hasProfile ? `<form class="promo-form" data-promo-form data-max-frames="${L.maxFrames}">
         <label class="field"><span class="lbl">Sujet <span class="muted small">(facultatif)</span></span>
           <input name="subject" maxlength="${L.maxSubject}" placeholder="Laisse vide : ${esc(aiName())} présente le projet" autocomplete="off"></label>
+        <div class="field" role="group" aria-labelledby="promo-platform-lbl">
+          <span class="lbl" id="promo-platform-lbl">Plateforme cible <span class="muted small">(facultatif)</span></span>
+          <div class="promo-platforms">${s.platforms.map((p) => `<label class="check"><input type="checkbox" name="platform" value="${esc(p.id)}" data-promo-platform><span>${esc(p.label)}</span></label>`).join('')}</div>
+          <p class="muted small" data-promo-platform-hint role="status">Coche une plateforme : le format, les images par seconde et la durée se règlent pour elle, et ${esc(aiName())} adapte la vidéo (zones masquées par l'application, accroche). Tu peux ensuite les modifier.</p>
+        </div>
         <div class="grid3">
           <label class="field"><span class="lbl">Images par seconde</span><input name="fps" type="number" inputmode="numeric" min="${L.fps.min}" max="${L.fps.max}" value="${L.fps.def}" required></label>
           <label class="field"><span class="lbl">Durée (secondes)</span><input name="seconds" type="number" inputmode="numeric" min="${L.seconds.min}" max="${L.seconds.max}" value="${L.seconds.def}" required></label>
@@ -63,6 +74,7 @@
       <p class="muted small">${esc(aiName())} écrit la scène, elle est ensuite dessinée image par image sur le serveur : compte quelques minutes selon la durée et le nombre d'images par seconde. Les consignes se modifient dans les Réglages (« Vidéo de promotion »).</p>`
       : `<p class="muted">Analyse d'abord le projet : ${esc(aiName())} s'appuie sur sa fiche pour concevoir la vidéo.</p>`;
     voiceCatalogs.set(box, s.voices);
+    platformCatalogs.set(box, s.platforms);
     box.innerHTML = `${form}${s.videos.length ? `<div class="pv-list">${s.videos.map((v) => promoVideoCard(v, s, id)).join('')}</div>` : (s.hasProfile ? '<p class="muted small">Aucune vidéo pour l\'instant.</p>' : '')}`;
     promoCount(box);
     const pf = $('[data-promo-form]', box);
@@ -80,6 +92,22 @@
     out.textContent = bad ? `Trop d'images (${n || 0}) : le maximum est ${max} (images par seconde × durée). Réduis la durée ou le nombre d'images par seconde.` : `${n} images à produire.`;
     out.classList.toggle('error', bad);
     $('[data-promo-go]', f).disabled = bad;
+  }
+
+  // Plateforme cible : une seule case à la fois ; cocher applique le préréglage (format, images par seconde, durée), les champs restent modifiables
+  const platformCatalogs = new WeakMap();
+  function platformPick(f, box) {
+    const hint = $('[data-promo-platform-hint]', f);
+    $$('[data-promo-platform]', f).forEach((c) => { if (c !== box) c.checked = false; });
+    const p = platformCatalogs.get(f.closest('[data-promo]'))?.find((x) => x.id === box.value);
+    hint.dataset.default ||= hint.textContent;
+    if (!box.checked || !p) { hint.textContent = hint.dataset.default; return; }
+    f.fps.value = p.fps;
+    f.seconds.value = p.seconds;
+    f.format.value = p.format;
+    const fmt = f.format.selectedOptions[0]?.textContent || p.format;
+    hint.textContent = `${p.label} : ${fmt.toLowerCase()}, ${p.fps} images/s, ${p.seconds} s.`;
+    promoCount(f.closest('[data-promo]'));
   }
 
   // Voix : la case montre les choix ; le fournisseur change la liste des voix (et demande une clé pour ElevenLabs et Google Cloud) ; l'extrait se lit depuis le serveur
@@ -119,6 +147,7 @@
     const f = e.target.closest('[data-promo-form]');
     if (!f) return;
     if (e.target.matches('[data-promo-voice-toggle]')) $('[data-promo-voice]', f).hidden = !e.target.checked;
+    if (e.target.matches('[data-promo-platform]')) platformPick(f, e.target);
     if (e.target.name === 'voiceProvider') voiceLoad(f);
   });
   async function saveVoiceKey(f) {
@@ -180,7 +209,7 @@
     }
     btn.disabled = true;
     try {
-      const r = await api(`/api/projects/${proj.dataset.id}/promo/generate`, { subject: f.subject.value, fps: Number(f.fps.value), seconds: Number(f.seconds.value), format: f.format.value, style: f.style.value, voice: f.voice.checked, voiceProvider: f.voiceProvider.value, voiceName: f.voiceName.value, voiceLang: f.voiceLang.value });
+      const r = await api(`/api/projects/${proj.dataset.id}/promo/generate`, { subject: f.subject.value, fps: Number(f.fps.value), seconds: Number(f.seconds.value), format: f.format.value, platform: $('[data-promo-platform]:checked', f)?.value || '', style: f.style.value, voice: f.voice.checked, voiceProvider: f.voiceProvider.value, voiceName: f.voiceName.value, voiceLang: f.voiceLang.value });
       toast(r.budgetBlocked ? `En file, mais ${r.budgetBlocked}` : r.existing ? 'Une vidéo est déjà en cours de production' : `${aiName()} conçoit la vidéo…`, r.budgetBlocked ? 'error' : 'ok');
       refreshProject(proj);
     } catch (err) { toast(err.message, 'error'); }
@@ -195,7 +224,7 @@
       loadPromo(t.closest('.project'));
     } catch (err) { toast(err.message, 'error'); }
   });
-  $$('details[data-acc="promo"]').forEach((d) => d.addEventListener('toggle', () => { if (d.open) loadPromo(d.closest('.project')); }));
+  $$('details[data-acc="promo"]').forEach((d) => { d.addEventListener('toggle', () => { if (d.open) loadPromo(d.closest('.project')); }); if (d.open) loadPromo(d.closest('.project')); });
 
   // Retour de LinkedIn : message, puis on rouvre le projet concerné
   (() => {

@@ -2,7 +2,7 @@
 // « Mails ». Chargé après app.js, qui expose ses outils communs dans window.AiTools ; ajax.js relance ce script à chaque navigation,
 // comme app.js. Aucune fonction n'est appelée de l'extérieur : tout passe par des écouteurs et par la consultation périodique.
 (() => {
-  const { $, $$, api, every, listen, toast, unlinked } = window.AiTools;
+  const { $, $$, api, every, listen, toast, unlinked, loadingHtml, loadFailed } = window.AiTools;
 
   // ---------- Réponses des prospects : popup d'arrivée, page « Mails » ----------
   // La popup ne s'affiche que pour les réponses non lues ; tout le texte vient de la base et passe par textContent.
@@ -121,9 +121,98 @@
     } catch { /* hors ligne ou session expirée : la prochaine requête le dira */ }
   }
   if ($('.top')) { pollReplies(); every(pollReplies, 45_000); listen(document, 'visibilitychange', () => { if (!document.hidden) pollReplies(); }); }
+  // Onglet Envoi : les derniers mails partis, dépliables (texte exact, rejet, réponse). Chargé à l'arrivée et dès qu'un envoi ou des relances se terminent.
+  // Tout le texte vient de la base et passe par textContent.
+  const STATE_TXT = { sent: ['Envoyé', ''], read: ['Lu', 'info'], replied: ['Répondu', 'ok'], bounced: ['Rejeté', 'err'], refused: ['Refus', 'err'], failed: ['Non envoyé', 'err'] };
+  const when = (ts) => new Date(ts * 1000).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
+  const MISSING = 'Contenu non conservé : ce mail est parti avant que iaboss ne garde le texte des mails envoyés.';
+  async function loadRecentMails(box) {
+    const id = box.dataset.project;
+    if (!id) return;
+    try {
+      const { mails } = await api(`/api/projects/${id}/mails/recent`);
+      const open = new Set([...box.querySelectorAll('details[open]')].map((d) => d.dataset.recent)); // ce que la personne avait déplié reste déplié
+      box.replaceChildren();
+      if (!mails.length) return;
+      const h = document.createElement('h3'); h.className = 'pj-recent-h'; h.textContent = 'Derniers mails partis'; box.append(h);
+      const list = document.createElement('div'); list.className = 'pj-recent-l';
+      for (const m of mails) {
+        const d = document.createElement('details'); d.className = 'cl-mail pj-mail'; d.dataset.recent = String(m.id); d.open = open.has(String(m.id));
+        const s = document.createElement('summary');
+        const [label, tone] = STATE_TXT[m.state] || STATE_TXT.sent;
+        const b = document.createElement('span'); b.className = `badge ${tone}`.trim(); b.textContent = label;
+        const t = document.createElement('span'); t.className = 'pj-mail-t'; t.textContent = `${m.company || m.to} · ${m.subject || '(sans objet)'}`;
+        const w = document.createElement('span'); w.className = 'muted small'; w.textContent = when(m.sentAt);
+        s.append(b, t, w); d.append(s);
+        const add = (cls, text, lead) => { const p = document.createElement('p'); p.className = cls; if (lead) { const x = document.createElement('b'); x.textContent = `${lead} `; p.append(x); } p.append(text); d.append(p); };
+        if (m.error) add('mail-err', m.error, 'Non envoyé :');
+        else if (m.state === 'bounced') add('mail-err', m.note || "Le serveur du destinataire n'a pas donné de raison.", 'Rejeté :');
+        add('muted small', `À ${m.to}${m.subject ? ` · objet : ${m.subject}` : ''}`);
+        if (!m.error) add(m.body ? 'mail-text' : 'muted small', m.body || MISSING);
+        if (m.reply) {
+          const r = document.createElement('div'); r.className = 'pj-mail-reply';
+          const rh = document.createElement('p'); rh.className = 'small'; const rb = document.createElement('b'); rb.textContent = `Réponse du ${when(m.reply.receivedAt)}`; rh.append(rb);
+          if (m.reply.subject) rh.append(` · objet : ${m.reply.subject}`);
+          const rt = document.createElement('div'); rt.className = 'mail-text cl-quote'; rt.textContent = m.reply.body || '(réponse vide)';
+          r.append(rh, rt); d.append(r);
+        }
+        if (m.prospectId) { const a = document.createElement('a'); a.className = 'link small'; a.href = `/p/${id}/contact/${m.prospectId}`; a.textContent = 'Ouvrir la fiche du prospect'; d.append(a); }
+        list.append(d);
+      }
+      box.append(list);
+    } catch { /* hors ligne : la zone reste vide, le journal au-dessus donne déjà les chiffres */ }
+  }
+  window.AiTools.loadRecentMails = loadRecentMails;
+  for (const box of $$('[data-recent-mails]')) loadRecentMails(box);
+
+  // Page « Mails » : un clic sur un mail déplie son contenu (ou, s'il est rejeté ou n'est pas parti, la raison), chargé à la première ouverture
+  async function toggleMail(btn) {
+    const row = document.getElementById(btn.getAttribute('aria-controls'));
+    const open = btn.getAttribute('aria-expanded') !== 'true';
+    btn.setAttribute('aria-expanded', String(open));
+    row.hidden = !open;
+    if (!open || row.dataset.loaded) return;
+    const cell = row.firstElementChild;
+    cell.innerHTML = loadingHtml('Chargement…', { small: true });
+    try {
+      const m = await api(`/api/mails/${btn.dataset.mail}`);
+      const box = document.createElement('div');
+      box.className = 'mail-box';
+      const add = (cls, text, label) => {
+        const p = document.createElement('p');
+        p.className = cls;
+        if (label) { const b = document.createElement('b'); b.textContent = `${label} `; p.append(b); }
+        p.append(text);
+        box.append(p);
+      };
+      if (m.error) add('mail-err', m.error, 'Non envoyé :');
+      else if (m.state === 'bounced') add('mail-err', m.note || "Le serveur du destinataire n'a pas donné de raison.", 'Rejeté :');
+      add('muted small', m.subject ? `À ${m.to} · objet : ${m.subject}` : `À ${m.to}`);
+      if (m.body) add('mail-text', m.body);
+      else add('muted', 'Contenu non conservé : ce mail est parti avant que la page Mails ne garde les textes.');
+      cell.replaceChildren(box);
+      row.dataset.loaded = '1';
+    } catch (err) {
+      loadFailed(cell, err.message || 'Détail indisponible : réessaie dans un instant', () => { row.dataset.loaded = ''; btn.setAttribute('aria-expanded', 'false'); toggleMail(btn); }, { small: true });
+    }
+  }
+  listen(document, 'submit', async (e) => {
+    const f = e.target.closest('form[data-remind]');
+    if (!f) return;
+    e.preventDefault();
+    try {
+      await api(`/api/prospects/${f.dataset.remind}/next`, { action: 'Relancer', day: f.elements.day.value });
+      toast('Rappel programmé');
+      f.hidden = true;
+    } catch (err) { toast(err.message, 'error'); }
+  });
   listen(document, 'click', async (e) => {
+    const mt = e.target.closest('[data-mail]');
+    if (mt) { toggleMail(mt); return; }
     const c = e.target.closest('[data-copy-draft]');
     if (c) { copyText($('[data-draft]', c.closest('.reply-body')).value, c); return; }
+    const rt = e.target.closest('[data-remind-toggle]');
+    if (rt) { const f = $('[data-remind]', rt.closest('.reply-body')); f.hidden = !f.hidden; rt.setAttribute('aria-expanded', String(!f.hidden)); if (!f.hidden) $('input', f).focus(); return; }
     const s = e.target.closest('[data-reply-seen]');
     if (s) { await markSeen(s.dataset.replySeen); s.closest('.reply-row')?.classList.remove('unseen'); s.remove(); pollReplies(); }
   });

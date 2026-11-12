@@ -57,9 +57,8 @@ export function clientListsHtml({ projectId, q, limit, clients, prospects }) {
 
 // ---------- Page Clients ----------
 
-export function clientsPage({ email, rows, openId, flash }) {
-  const total = rows.reduce((a, r) => ({ clients: a.clients + r.counts.clients, prospects: a.prospects + r.counts.prospects, pending: a.pending + r.counts.pending }), { clients: 0, prospects: 0, pending: 0 });
-  const items = rows.map((r) => `<details class="cl-proj" data-cl-project="${r.id}"${r.id === openId ? ' open' : ''}>
+/** Le déroulant d'un projet (recherche, ajout, export, listes chargées à l'ouverture) ; réutilisé par la page Clients et par l'onglet Clients du projet. */
+export const clientProjectBlock = (r, openId) => `<details class="cl-proj" data-cl-project="${r.id}"${r.id === openId ? ' open' : ''}>
     <summary><span class="pname">${esc(r.name)}</span>
       <span class="cl-sum"><span class="badge">${r.counts.clients} client${r.counts.clients > 1 ? 's' : ''}</span><span class="badge">${r.counts.prospects} prospect${r.counts.prospects > 1 ? 's' : ''}</span>${r.counts.pending ? `<span class="badge warn">À encaisser ${esc(money(r.counts.pending))}</span>` : ''}</span></summary>
     <div class="cl-body">
@@ -82,7 +81,11 @@ export function clientsPage({ email, rows, openId, flash }) {
         <a class="btn small" href="/clients/projet/${r.id}/export.csv" data-noajax>${ic('file')}Exporter les clients (CSV)</a>
       </div>
       <div class="cl-lists" data-cl-lists aria-live="polite">${loadingBlock()}</div>
-    </div></details>`).join('');
+    </div></details>`;
+
+export function clientsPage({ email, rows, openId, flash }) {
+  const total = rows.reduce((a, r) => ({ clients: a.clients + r.counts.clients, prospects: a.prospects + r.counts.prospects, pending: a.pending + r.counts.pending }), { clients: 0, prospects: 0, pending: 0 });
+  const items = rows.map((r) => clientProjectBlock(r, openId)).join('');
   const body = `<div class="bill-page" data-clients>
   <section class="card"><div class="row-between"><div><h1>Clients</h1>
     <p class="muted">Pour chaque projet : tes clients et tes prospects, leurs coordonnées, les documents que tu leur as générés et vos échanges.</p></div></div>
@@ -96,6 +99,13 @@ export function clientsPage({ email, rows, openId, flash }) {
 
 // ---------- Fiche d'un échange (client ou prospect) ----------
 
+/** Ce qui est parti : le texte exact du mail, replié (« Voir le mail »). Les mails partis avant que le texte soit gardé le disent. */
+export function mailPreview(x) {
+  return `<details class="cl-mail"><summary>Voir le mail envoyé</summary>
+    <div class="muted small">À ${esc(x.to)}${x.subject ? ` · objet : ${esc(x.subject)}` : ''}</div>
+    ${x.body ? `<div class="mail-text">${esc(x.body)}</div>` : '<p class="muted small">Contenu non conservé : ce mail est parti avant que iaboss ne garde le texte des mails envoyés.</p>'}</details>`;
+}
+
 /** `freshNote` : on vient d'ajouter une note, la plus récente (la première du fil) est surlignée un instant. */
 function timeline(items, { freshNote = false } = {}) {
   if (!items.length) return '<p class="muted">Aucun échange pour l\'instant : les mails envoyés, les réponses et les notes de ce contact apparaîtront ici.</p>';
@@ -103,7 +113,8 @@ function timeline(items, { freshNote = false } = {}) {
   return `<ol class="cl-tl">${items.map((x, i) => {
     if (x.type === 'sent') {
       return `<li class="cl-tl-i out"><span class="cl-tl-ic">${ic('send')}</span><div><div class="cl-tl-h"><b>${x.kind === 'initial' ? 'Mail envoyé' : 'Relance envoyée'}</b><span class="muted small">${esc(dayTime(x.at))}</span></div>
-        <p>${esc(x.subject || '(sans objet)')}</p>${x.error ? `<p class="small err">Échec de l'envoi : ${esc(x.error)}</p>` : x.read ? '<p class="muted small">Lu par le destinataire</p>' : ''}</div></li>`;
+        <p>${esc(x.subject || '(sans objet)')}</p>${x.error ? `<p class="small err">Échec de l'envoi : ${esc(x.error)}</p>` : x.read ? '<p class="muted small">Lu par le destinataire</p>' : ''}
+        ${x.bounced ? `<p class="small err"><b>Rejeté :</b> ${esc(x.note || "le serveur du destinataire n'a pas donné de raison.")}</p>` : ''}${x.error ? '' : mailPreview(x)}</div></li>`;
     }
     if (x.type === 'reply') {
       const [label, tone] = INTENTS[x.intent] || INTENTS.other;
@@ -125,7 +136,7 @@ export function clientSheetPage({ email, project: p, client: c, documents, total
   const body = `<div class="bill-page" data-client-sheet>
   <section class="card"><p><a class="link" href="/clients?projet=${p.id}">${ic('back')} Tous les clients</a></p>
     <div class="row-between"><div><h1>${esc(c.name)}</h1><p class="muted small">Client de « ${esc(p.name)} » · ${esc(host(p.gitUrl))}</p></div>
-      <div class="row-actions"><a class="btn primary" href="/facturation/projet/${p.id}?client=${c.id}&type=facture#generer">${ic('receipt')}Générer un document</a>
+      <div class="row-actions"><a class="btn primary" href="/p/${p.id}/facturation?client=${c.id}&type=facture#generer">${ic('receipt')}Générer un document</a>
         <form method="post" action="/clients/c/${c.id}/supprimer" data-confirm="Retirer ce client de la liste ? Les documents déjà émis restent dans « Facturation » et dans la Comptabilité."><button class="btn danger">${ic('trash')}Retirer ce client</button></form></div></div>
     ${flashOf(flash)}
     <dl class="cl-kpis"><div><dt>Facturé TTC</dt><dd>${esc(money(totals.billed))}</dd></div><div><dt>Encaissé</dt><dd>${esc(money(totals.paid))}</dd></div><div><dt>À encaisser</dt><dd>${esc(money(totals.pending))}</dd></div><div><dt>Documents</dt><dd>${totals.docs}</dd></div></dl>

@@ -1,8 +1,8 @@
 # Clients : liste par projet, fiches, documents et échanges
-Résumé : la page « Clients » (barre du haut) : les projets en déroulants avec leurs clients et leurs prospects, la recherche, l'ajout et la modification d'un client, la fiche client (documents générés, chiffres, échanges), le passage d'un prospect en client et l'export CSV.
+Résumé : la page « Clients » (menu de l'avatar) : les projets en déroulants avec leurs clients et leurs prospects, la recherche, l'ajout et la modification d'un client, la fiche client (documents générés, chiffres, échanges), le passage d'un prospect en client et l'export CSV.
 
 ## À quoi sert la page
-« Clients » (barre du haut, après « Facturation ») rassemble, **projet par projet**, les personnes et entreprises avec qui tu travailles : tes **clients** et tes **prospects**. Elle est **personnelle** : tu ne vois que tes propres projets, et la fiche d'un autre compte répond « introuvable ».
+« Clients » (menu de l'avatar → Clients) rassemble, **projet par projet**, les personnes et entreprises avec qui tu travailles : tes **clients** et tes **prospects**. Elle est **personnelle** : tu ne vois que tes propres projets, et la fiche d'un autre compte répond « introuvable ».
 En haut, trois chiffres résument tous tes projets : « Clients », « Prospects » et « À encaisser » (le total des factures émises et pas encore payées, voir « Comptabilité »).
 
 ## 1. La liste des projets
@@ -19,7 +19,7 @@ Ouvre un client pour voir :
 - en haut : « Facturé TTC », « Encaissé », « À encaisser » et « Documents » (les devis ne comptent pas dans les montants ; un avoir se déduit ; une facture non jointe à la Comptabilité n'est ni encaissée ni à encaisser) ;
 - **Informations** : « Nom du client », « Contact », « E-mail », « Téléphone », « Adresse », « SIRET » et « Notes » (ce qu'il faut savoir sur ce client). Modifie ce que tu veux puis clique **Enregistrer** (« Les informations du client sont enregistrées. »). L'adresse e-mail doit être valide, le SIRET compte 14 chiffres. Ces informations préremplissent les documents que tu génères pour lui ;
 - **Documents générés** : les devis, acomptes, factures finales et avoirs générés pour ce client, avec leur numéro, leur date, leur montant TTC, leur état (« À encaisser », « Payée », « Devis », « Non jointe à la comptabilité ») et le bouton **PDF** ;
-- **Échanges** : tous les échanges avec lui, du plus récent au plus ancien : les mails envoyés (« Mail envoyé », « Relance envoyée », « Lu par le destinataire »), les réponses reçues (« Réponse reçue » avec l'intention détectée : « Intéressé », « Question », « Plus tard », « Refus ») et les notes. Ils sont retrouvés grâce au prospect dont le client vient, ou à l'**adresse e-mail** du client : renseigne-la pour retrouver ses mails. Seuls les échanges **de ce projet** apparaissent.
+- **Échanges** : tous les échanges avec lui, du plus récent au plus ancien : les mails envoyés (« Mail envoyé », « Relance envoyée », « Lu par le destinataire »), les réponses reçues (« Réponse reçue » avec l'intention détectée : « Intéressé », « Question », « Plus tard », « Refus ») et les notes. Sous chaque mail envoyé, **Voir le mail envoyé** déplie son texte exact ; si l'adresse du prospect a rejeté le mail (statut « Rejeté »), la raison donnée par le serveur du destinataire s'affiche (« Rejeté : … »). Ils sont retrouvés grâce au prospect dont le client vient, ou à l'**adresse e-mail** du client : renseigne-la pour retrouver ses mails. Seuls les échanges **de ce projet** apparaissent.
 - **Générer un document** ouvre « Facturation » avec ce client déjà choisi.
 - **Retirer ce client** (avec confirmation) l'enlève de la liste. Les documents déjà générés restent dans « Facturation » et dans la Comptabilité.
 

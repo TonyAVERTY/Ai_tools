@@ -21,21 +21,26 @@ Tout ce que fait l'IA passe par le accès de la personne à son IA, jamais par u
 - **Liste d'opposition** : adresses qui ne doivent plus être contactées (désinscription, refus, adresse invalide), commune à tous les comptes.
 
 ## La barre du haut (de gauche à droite)
+Sur ordinateur et tablette, la barre reste collée en haut de l'écran mais **se rétracte quand tu descends dans la page** pour laisser toute la place au contenu, et **revient dès que tu remontes**, quand tu es en haut de page, quand un de ses menus est ouvert ou quand tu y navigues au clavier (Tab). Sur téléphone, les onglets sont dans la barre du bas, qui ne bouge pas. Les pages utilisent toute la largeur d'un grand écran (jusqu'à 1480 px) ; les pages de lecture (Réglages, formulaires) restent plus étroites pour rester lisibles.
 - **iaboss** (logo) : retour à la page des projets.
-- **Projets** : la page d'accueil de l'application (liste des projets). 
+- **Aujourd'hui** : la page d'accueil de l'application, ce qui demande ton attention maintenant (voir le fichier « La page Aujourd'hui »).
+- **Projets** : la liste de tes projets (adresse `/projets`). 
 - **Mails** : tous les mails envoyés et les réponses reçues.
-- **Calendrier** : le mois, les événements et l'agenda externe.
-- **Comptabilité** : tes paiements, dépenses et remboursements avec leurs justificatifs, tes chiffres, le guide « Faire ma déclaration » et les exports (voir « Comptabilité : lignes, justificatifs, déclaration et exports »).
-- **Facturation** : pour chaque projet, tes informations légales puis un devis, un acompte, une facture finale et un avoir écrits avec l'IA, validés un par un, puis émis en PDF (les factures émises arrivent toutes seules dans la Comptabilité, à encaisser) (voir « Facturation : modèles de devis, d'acompte, de facture finale et d'avoir »).
-- **Clients** : pour chaque projet, tes clients et tes prospects (recherche, ajout, modification), la fiche client avec ses documents générés et ses échanges, le passage d'un prospect en client et l'export CSV (voir « Clients : liste par projet, fiches, documents et échanges »).
-- **Équipe** : partager des projets avec des collègues.
-- **Activité** (apparaît quand une tâche tourne) : la liste des jobs en cours, en attente ou programmés, avec leur avancement.
+- **Agenda** : le mois, les événements et l'agenda externe (la page s'appelle « Calendrier »).
+- **Compta** : tes paiements, dépenses et remboursements avec leurs justificatifs, tes chiffres, le guide « Faire ma déclaration » et les exports (voir « Comptabilité : lignes, justificatifs, déclaration et exports »).
+- **Rechercher** (ou **⌘K** sur Mac, **Ctrl+K** sous Windows et Linux) : ouvre la recherche (voir « Rechercher partout »).
+- **Activité** (toujours visible, avec un point Safran quand une tâche tourne) : la liste des jobs en cours, en attente ou programmés, avec leur avancement ; au repos, elle dit « Aucune tâche en cours. ».
 - **Site internet** : ouvre le site public d'iaboss (page d'accueil du site). Sur téléphone, seule l'icône (un globe) s'affiche.
 - **Assistant** : un menu qui s'ouvre au survol (ou au clic sur téléphone) avec deux choix : le nom de ton IA, **Claude**, **ChatGPT** ou **Gemini** (l'assistant classique, pour discuter, rédiger, réfléchir) et **Support** (pose une question sur iaboss).
-- **Avatar** (la première lettre de l'email) : un menu au survol avec **Mon compte**, **Réglages** et **Déconnexion**.
+- **Sur téléphone**, les cinq onglets (Aujourd'hui, Projets, Mails, Agenda, Compta) passent dans une barre fixe en bas de l'écran, l'icône au-dessus du mot ; le nombre de réponses non lues s'affiche sur « Mails ».
+- **Avatar** (la première lettre de l'email) : un menu au survol avec **Facturation**, **Clients**, **Équipe**, **Mon compte**, **Réglages**, **Visite guidée** et **Déconnexion**. Ces trois pages ne sont plus dans la barre du haut :
+  - **Facturation** : pour chaque projet, tes informations légales puis un devis, un acompte, une facture finale et un avoir écrits avec l'IA, validés un par un, puis émis en PDF (les factures émises arrivent toutes seules dans la Comptabilité, à encaisser) (voir « Facturation : modèles de devis, d'acompte, de facture finale et d'avoir »).
+  - **Clients** : pour chaque projet, tes clients et tes prospects (recherche, ajout, modification), la fiche client avec ses documents générés et ses échanges, le passage d'un prospect en client et l'export CSV (voir « Clients : liste par projet, fiches, documents et échanges »).
+  - **Équipe** : partager des projets avec des collègues.
+
 - Le **quota Claude** (session de 5 h et semaine) et, avec une clé API seulement, la consommation « IA via iaboss » en $ sur 24 h et 30 jours se lisent dans la carte « Consommation Claude » de la page Projets (le nom suit ton IA : « Consommation Gemini »…) (avec un abonnement Claude, aucun montant en dollars n'est affiché).
 - Pour un administrateur du service, la page « Administration » est accessible depuis « Mon compte ».
-- **Transitions de page** : en passant d'un onglet de la barre du haut à un autre (Projets, Mails, Calendrier, Équipe), le contenu arrive en fondu par la droite quand tu vas vers la droite, et par la gauche quand tu vas vers la gauche ; pour les autres pages (Réglages, Mon compte, IA…) il monte en fondu. Recliquer sur la page déjà ouverte ou enregistrer un formulaire n'anime rien. Si ton système demande moins d'animations (« Réduire les animations »), il n'y a aucune transition.
+- **Transitions de page** : en passant d'un onglet de la barre du haut à un autre (Aujourd'hui, Projets, Mails, Agenda, Compta), le contenu arrive en fondu par la droite quand tu vas vers la droite, et par la gauche quand tu vas vers la gauche ; pour les autres pages (Réglages, Mon compte, IA…) il monte en fondu. Recliquer sur la page déjà ouverte ou enregistrer un formulaire n'anime rien. Si ton système demande moins d'animations (« Réduire les animations »), il n'y a aucune transition.
 
 ## Où trouver quoi
 | Je veux… | Où aller |
@@ -43,8 +48,8 @@ Tout ce que fait l'IA passe par le accès de la personne à son IA, jamais par u
 | Relier, changer ou déconnecter son IA | Avatar → **Mon compte** → « Mon IA » |
 | Créer un projet | **Projets** → « Nouveau projet » |
 | Configurer l'adresse d'envoi (SMTP) | Dans le projet → « Configuration du projet » |
-| Chercher des prospects | Dans le projet → « Prospecter » → « Recherche de prospects » |
-| Envoyer des mails | Dans le projet → « Prospecter » → « Envoi » |
+| Chercher des prospects | Dans le projet → onglet « Prospection » → « Recherche de prospects » |
+| Envoyer des mails | Dans le projet → onglet « Envoi » → « Envoi » |
 | Voir les réponses | **Mails** → « Réponses » |
 | Régler les notifications, plafonds, modèles, prompts | Avatar → **Réglages** |
 | Partager un projet | **Équipe** |

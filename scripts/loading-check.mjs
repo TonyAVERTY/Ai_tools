@@ -38,19 +38,20 @@ for (const [mode, reduced] of [['normal', 'no-preference'], ['mouvement réduit'
     p.on('pageerror', (e) => errs.push(e.message));
     const ring = (sel) => p.evaluate((q) => { const el = document.querySelector(q); if (!el) return null; const sp = el.querySelector('.spinner, .spin-inline'); if (!sp) return { ring: false, text: el.textContent.trim() }; const c = getComputedStyle(sp); const r = sp.getBoundingClientRect(); return { ring: true, anim: c.animationName, w: Math.round(r.width), visible: r.width > 0 && r.height > 0, text: el.textContent.trim() }; }, sel);
 
-    // 1) les blocs du projet : on ouvre la section, la réponse est retenue
-    await p.goto(`${s.base}/`); await p.waitForSelector('html[data-nav="ready"]');
-    await p.evaluate(() => { for (const k of ['linkedin', 'promo', 'recap']) { const d = document.querySelector(`details[data-acc="${k}"]`); if (d) d.open = true; } });
-    for (const k of ['linkedin', 'promo', 'recap']) {
-      await p.locator(`[data-${k}]`).first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
-      const r = await ring(`[data-${k}] .loading`);
-      ok(r?.ring && r.visible && /^Chargement…/.test(r.text), `${tag} ${k} : cercle devant « Chargement… » (${JSON.stringify(r)})`);
-      ok(reduced === 'reduce' ? r?.anim === 'none' : r?.anim === 'spin', `${tag} ${k} : ${reduced === 'reduce' ? 'cercle immobile' : 'le cercle tourne'} (animation « ${r?.anim} »)`);
+    // 1) les blocs du projet, onglet par onglet (LinkedIn et Promotion, puis Récapitulatif) : la réponse est retenue
+    for (const [tab, zones] of [['communication', ['linkedin', 'promo']], ['recap', ['recap']]]) {
+      hold = true;
+      await p.goto(`${s.base}/p/${id}/${tab}`); await p.waitForSelector('html[data-nav="ready"]');
+      for (const k of zones) {
+        await p.locator(`[data-${k}]`).first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+        const r = await ring(`[data-${k}] .loading`);
+        ok(r?.ring && r.visible && /^Chargement…/.test(r.text), `${tag} ${k} : cercle devant « Chargement… » (${JSON.stringify(r)})`);
+        ok(reduced === 'reduce' ? r?.anim === 'none' : r?.anim === 'spin', `${tag} ${k} : ${reduced === 'reduce' ? 'cercle immobile' : 'le cercle tourne'} (animation « ${r?.anim} »)`);
+      }
+      ok(!(await p.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)), `${tag} ${tab} : pas de défilement horizontal pendant le chargement`);
+      hold = false; // les réponses arrivent
+      ok(await waitFor(async () => { for (const k of zones) if ((await p.locator(`[data-${k}] .loading`).count()) !== 0) return false; return true; }), `${tag} le cercle disparaît quand le contenu arrive (${zones.join(', ')})`);
     }
-    ok(!(await p.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)), `${tag} pas de défilement horizontal pendant le chargement`);
-    hold = false; // les réponses arrivent
-    ok(await waitFor(async () => (await p.locator('[data-recap] .loading').count()) === 0), `${tag} le cercle disparaît quand le contenu arrive (Récapitulatif)`);
-    ok(await waitFor(async () => (await p.locator('[data-promo] .loading').count()) === 0 && (await p.locator('[data-linkedin] .loading').count()) === 0), `${tag} idem pour Promotion et LinkedIn`);
 
     // 2) liste des clients
     hold = true;

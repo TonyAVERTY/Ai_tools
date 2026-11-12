@@ -6,7 +6,7 @@ import { now, getSetting } from './db.js';
 import { accessOn } from './teams.js';
 import { getProject, getTemplate } from './projects.js';
 import { getUser } from './users.js';
-import { EMAIL_RE, buildProspectMail, fillTemplate, mailVars } from './services/mailer.js';
+import { EMAIL_RE, buildProspectMail, fillTemplate, mailVars, SAMPLE_PERSON } from './services/mailer.js';
 import { reviewMail, fillBody, fillSubject } from './services/mailcheck.js';
 import { checkSense, proposeSentence, SenseUnavailable } from './services/mailsense.js';
 import { makeClaude } from './handlers.js';
@@ -64,8 +64,6 @@ export function cleanProspect(b = {}, { partial = false } = {}) {
   return { fields: out };
 }
 
-// Exemple fictif de l'aperçu quand aucun prospect n'est choisi
-const SAMPLE_PERSON = { company: 'Boulangerie Le Fournil', email: 'contact@lefournil.exemple', city: 'Rennes', hook: 'Vos fournées au levain naturel ont de quoi séduire les gourmands du centre-ville.', source: 'https://lefournil.exemple/contact' };
 
 export function registerProspectRoutes(router, app, { project }) {
   const { db, cfg } = app;

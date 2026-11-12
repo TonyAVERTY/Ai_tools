@@ -53,7 +53,12 @@ export async function listProspects(db, projectId, f, { limit = 100 } = {}) {
   const rows = await db.prepare(`SELECT id, company, email, website, city, sector, score, status, sent_at, followup_at, replied_at,
     next_action, next_action_at
     FROM prospects WHERE ${sql} ORDER BY ${order} LIMIT ? OFFSET ?`).all(...args, limit, (page - 1) * limit);
-  return { total, page, pages, rows };
+  // Compteurs des puces (« Tous », « À contacter »…) : tout le projet, quels que soient les filtres
+  const by = await db.prepare('SELECT status, COUNT(*) n FROM prospects WHERE project_id = ? GROUP BY status').all(projectId);
+  const counts = { all: 0, new: 0, sent: 0, replied: 0, todo: 0 };
+  for (const r of by) { counts.all += Number(r.n); if (r.status in counts) counts[r.status] = Number(r.n); }
+  counts.todo = Number((await db.prepare('SELECT COUNT(*) n FROM prospects WHERE project_id = ? AND next_action_at IS NOT NULL AND next_action_at <= ?').get(projectId, f.at ?? now())).n);
+  return { total, page, pages, rows, counts };
 }
 
 // ---------- Fiche prospect ----------
@@ -62,7 +67,7 @@ export async function listProspects(db, projectId, f, { limit = 100 } = {}) {
 export async function prospectDetail(db, id) {
   const p = await db.prepare('SELECT * FROM prospects WHERE id = ?').get(id);
   if (!p) return null;
-  const mails = await db.prepare(`SELECT kind, subject, variant, sent_at, error FROM mail_log
+  const mails = await db.prepare(`SELECT kind, subject, variant, sent_at, error, read_at FROM mail_log
     WHERE prospect_id = ? ORDER BY sent_at, id`).all(id);
   const notes = await db.prepare('SELECT id, body, created_at FROM prospect_notes WHERE prospect_id = ? ORDER BY created_at DESC, id DESC').all(id);
   // La liste d'opposition est commune à tous les comptes : on n'en révèle que le strict nécessaire. Le motif d'un
@@ -105,13 +110,14 @@ export async function setNextAction(db, prospectId, action, day) {
  * Vue Kanban : une colonne par statut, avec le total et les premières fiches (mêmes filtres que la liste).
  * Le filtre « statut » de la liste ne s'applique pas ici : les colonnes sont justement les statuts.
  */
-export async function kanbanColumns(db, projectId, f, { per = 25 } = {}) {
+export async function kanbanColumns(db, projectId, f, { per = 25, only = null, offset = 0 } = {}) {
   const cols = [];
   for (const [status, label] of Object.entries(STATUSES)) {
+    if (only && status !== only) continue; // « Voir + » : seule la colonne demandée, à partir de `offset`
     const { sql, args, order } = filterWhere(projectId, { ...f, status });
     const total = Number((await db.prepare(`SELECT COUNT(*) n FROM prospects WHERE ${sql}`).get(...args)).n);
     const rows = total ? await db.prepare(`SELECT id, company, email, city, score, status, sent_at, replied_at, next_action, next_action_at
-      FROM prospects WHERE ${sql} ORDER BY ${order} LIMIT ?`).all(...args, per) : [];
+      FROM prospects WHERE ${sql} ORDER BY ${order} LIMIT ? OFFSET ?`).all(...args, per, offset) : [];
     cols.push({ status, label, total, rows });
   }
   return cols;

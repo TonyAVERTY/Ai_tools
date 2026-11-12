@@ -5,6 +5,7 @@ import { esc } from '../http.js';
 import { brandMark, assetUrl } from '../assets.js';
 import { siteLayout, ic, guest, CONTACT_EMAIL } from './layout.js';
 import { PLAN_LIMITS, PLAN_PRICES, PLAN_LABELS, ANNUAL_FREE_MONTHS, annualPrice } from '../limits.js';
+import { PERIODS } from '../services/stripe.js';
 
 const FREE = PLAN_LIMITS.free;
 /** Montant en euros à la française (« 8,33 € ») ; entier sans décimales. */
@@ -109,130 +110,180 @@ const badge = (cls, icon, text) => `<span class="badge${cls ? ` ${cls}` : ''}">$
 
 // La lettre d'exemple : le produit réel (un mail préparé pour un prospect, l'accroche tirée de son site, la validation avant l'envoi).
 // Entreprise, adresse et contenu sont fictifs et signalés comme tels.
-const LETTER = `<figure class="letter" aria-labelledby="lt-cap">
-  <figcaption class="letter-cap" id="lt-cap">Exemple fictif : un mail préparé pour un cabinet de kinésithérapie.</figcaption>
-  <dl class="letter-head">
+const LETTER = `<figure class="v-letter" aria-labelledby="lt-cap">
+  <figcaption class="v-letter-cap" id="lt-cap">Exemple fictif : un mail préparé pour un cabinet de kinésithérapie.</figcaption>
+  <dl class="v-letter-head">
     <dt>À</dt><dd class="mono">accueil@cabinet-exemple.fr</dd>
     <dt>Objet</dt><dd>Vos patients qui appellent pour décaler un rendez-vous</dd>
   </dl>
-  <div class="letter-body">
+  <div class="v-letter-body">
     <p>Bonjour,</p>
     <p><mark>Sur votre site, vous demandez de téléphoner pour déplacer un rendez-vous.</mark> Agenda Kiné laisse vos patients le faire seuls, et leur envoie le rappel à votre place.</p>
     <p>Je peux vous montrer ça en dix minutes ?</p>
-    <p class="letter-sign">Tony</p>
+    <p>Tony</p>
   </div>
-  <p class="margin-note"><b>Accroche tirée de leur site.</b> L'IA cite une phrase de la page « Contact » du cabinet pour que le mail ne ressemble pas à un envoi en masse.</p>
-  <div class="letter-foot">${badge('b-warn', 'clock', 'À valider')}<span>Rien ne part tant que tu n'as pas relu et confirmé.</span></div>
+  <p class="v-note"><b>Accroche tirée de leur site.</b> L'IA cite une phrase de la page « Contact » du cabinet pour que le mail ne ressemble pas à un envoi en masse.</p>
+  <div class="v-letter-foot"><span class="v-flag">${ic('clock')}À valider</span><span>Rien ne part tant que tu n'as pas relu et confirmé.</span></div>
 </figure>`;
 
 const FACTS = [
-  ['Il cherche des entreprises', "À partir de ton dépôt, il repère celles qui pourraient avoir besoin de ton projet, ne garde que des adresses professionnelles publiées au grand jour, et note la page d'où vient chacune pour que tu puisses la vérifier."],
+  ['Il cherche des entreprises', "À partir de ton dépôt, il repère celles qui pourraient avoir besoin de ton projet, ne garde que des adresses professionnelles publiées au grand jour, et note la page d'où vient chacune."],
   ['Il écrit chaque mail', "Un mail court par entreprise, avec une accroche tirée de son site. Tu relis, tu corriges, tu valides."],
   ['Il relance une fois', "Pas de réponse ? Si tu l'as activée, une seule relance part dans la même conversation."],
   ['Il suit les réponses', "Tu vois qui a répondu, qui attend et qui reste à contacter, sans ouvrir ta boîte pour le savoir."],
   ['Il écrit tes posts LinkedIn', "Il rédige, tu relis et tu publies quand ça te va."],
+  ['Il prépare tes devis', "Quand un prospect dit oui, le devis, l'acompte et la facture se font depuis le même projet."],
+];
+// Du premier mail à la facture : la suite logique, dans l'application
+const CHAIN = [
+  ['01', 'Prospecter', 'La cible, les contacts et les mails, relus par toi.'],
+  ['02', 'Suivre', 'Les réponses et les rendez-vous, sans ouvrir ta boîte.'],
+  ['03', 'Facturer', 'Devis, acompte, facture et avoir, rattachés au projet.'],
+  ['04', 'Encaisser', 'Ce qui reste à encaisser, marqué payé en un clic.'],
+  ['05', 'Déclarer', 'Le montant à saisir sur ta déclaration URSSAF.'],
 ];
 const STEPS = [
-  ['Relie ton IA', "Tu choisis Claude, ChatGPT ou Gemini et tu connectes ta propre clé ou ton compte. C'est ton accès qui travaille, pas celui d'iaboss."],
+  ['Relie ton IA', "Tu choisis Claude, ChatGPT ou Gemini et tu connectes ta propre clé ou ton compte."],
   ['Ajoute ton dépôt Git', 'GitHub ou ton propre serveur : ton IA lit ton projet pour comprendre ce que tu proposes.'],
   ['Valide la cible', "Il te dit à qui il pense parler. Tu corriges, puis tu valides."],
   ['Lance la recherche', "Il trouve les contacts et écrit les mails. Tu les relis et tu confirmes l'envoi."],
 ];
 const TRUST = (apple) => [
-  ['Rien ne part sans ton accord', "Le premier envoi attend ta confirmation, chaque post attend ton clic. La relance, c'est toi qui l'actives."],
-  ['Tes données restent cloisonnées', "Personne d'autre ne voit tes prospects ni tes brouillons. Un clic dans Mon compte et tout est effacé."],
+  ['Rien ne part sans ton accord', "Le premier envoi attend ta confirmation, chaque post attend ton clic."],
+  ['Tes données restent cloisonnées', "Personne d'autre ne voit tes prospects ni tes brouillons."],
   ['Tes secrets sont chiffrés', 'Tes accès sont stockés chiffrés, jamais affichés en clair.'],
-  ['Une connexion en un clic', `Tu te connectes avec ${providersText(apple)}.`],
+  ['Une connexion en un clic', `Tu te connectes avec ${providersText(apple)}, sans mot de passe à retenir.`],
 ];
 
-export function homePage({ appUrl, apple = false }) {
+const planLimits = (l) => LIMIT_COLS.map(([label, f]) => [label, f(l)]);
+// Une carte par offre payante : prix selon la période (public/site.js bascule data-billing), plafonds, prévenir à l'ouverture
+/** Les deux formulaires d'achat d'une offre (un par période : public/site.js montre celui de la période choisie). Un visiteur non connecté est envoyé se connecter. */
+const buyForms = (k, label = 'Choisir cette offre') => PERIODS.map((p) => `<form method="post" action="/abonnement/choisir" class="plan-buy when-${p}" data-noajax><input type="hidden" name="plan" value="${k}"><input type="hidden" name="period" value="${p}"><button class="btn btn-primary">${label}</button></form>`).join('');
+const planCard = (billing) => (k) => `<article class="v-plan${k === 'growth' ? ' v-plan-hi' : ''}" aria-labelledby="pc-${k}">
+        <div class="v-plan-h"><h3 id="pc-${k}">${PLAN_LABELS[k]}</h3>${billing ? '' : '<span class="v-flag v-flag-n">Bientôt</span>'}</div>
+        <p class="v-plan-p"><span class="when-month">${euros(PLAN_PRICES[k])}<small>par mois, TTC</small></span><span class="when-year">${euros(annualPrice(k))}<small>par an, TTC (${12 - ANNUAL_FREE_MONTHS} mois payés)</small></span></p>
+        <p class="v-plan-t">${PLAN_BLURBS[k]}</p>
+        <dl class="v-plim">${planLimits(PLAN_LIMITS[k]).map(([lab, v]) => `<div><dt>${lab}</dt><dd>${v}</dd></div>`).join('')}</dl>
+        ${billing ? buyForms(k) : `<a class="btn btn-secondary" href="mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(`Me prévenir : offre ${PLAN_LABELS[k]}`)}">Me prévenir à l'ouverture</a>`}
+      </article>`;
+const HOME_FAQ = [
+  ['Faut-il une carte bancaire ?', "Non. Le plan Gratuit s'ouvre sans carte bancaire et sans limite de durée."],
+  ['Dois-je fournir mon propre accès à une IA ?', "Oui, Claude, ChatGPT ou Gemini au choix. Ton accès est facturé par son fournisseur, directement à toi : c'est ce qui explique les prix bas."],
+  ['Mon projet doit-il avoir un dépôt Git ?', "Oui. Ton IA lit ton dépôt (GitHub ou ton propre serveur) pour comprendre ce que tu proposes, sans rien y modifier."],
+  ['Les mails partent-ils tout seuls ?', "Non. Chaque lot attend ta confirmation, et les mails partent de ta propre boîte, avec un lien de désinscription. Tu n'écris qu'à des professionnels."],
+  ['Puis-je facturer mes clients avec iaboss ?', "Oui : devis, acompte, facture et avoir, rattachés au projet, puis le suivi des encaissements et le montant à déclarer à l'URSSAF."],
+  ["Que se passe-t-il quand j'atteins un plafond ?", "La nouvelle action est refusée, mais rien n'est supprimé. Les plafonds repartent de zéro le 1er du mois, à l'heure de Paris."],
+];
+
+export function homePage({ appUrl, apple = false, billing = false }) {
   return siteLayout({
     appUrl, path: '/',
     title: 'iaboss : trouve des clients par mail avec ta propre IA',
     description: 'iaboss lit ton projet, trouve des entreprises qui pourraient avoir besoin de toi, écrit et envoie tes mails, relance et suit les réponses. Gratuit pour commencer.',
     jsonLd: HOME_JSON_LD(appUrl),
-    body: `<section class="hero" aria-labelledby="h1">
-  <div class="wrap hero-in">
-    <div>
-      <h1 class="h1" id="h1">Ton IA écrit tes mails de prospection. Toi, tu les relis et tu les signes.</h1>
-      <p class="lead">Pour les développeurs et les indépendants. iaboss part de ton dépôt Git, cherche des entreprises qui pourraient avoir besoin de ton projet et prépare un mail pour chacune. Les mails partent de ta propre boîte, et jamais sans ton accord.</p>
-      <div class="hero-btns">
+    body: `<section class="v-hero" aria-labelledby="h1">
+  <div class="wrap v-hero-g">
+    <div class="v-hero-t">
+      <h1 class="v-h1" id="h1">Ton IA écrit tes mails de prospection. Toi, tu les relis et tu les signes.</h1>
+      <p class="v-lead-xl">Pour les indépendants qui vendent un projet. iaboss part de ton dépôt Git, cherche des entreprises qui pourraient avoir besoin de ton projet et prépare un mail pour chacune. Les mails partent de ta propre boîte, et jamais sans ton accord.</p>
+      <div class="v-btns">
         ${guest('big', btn('btn-primary btn-lg', '/login', 'Créer mon compte'))}
-        <a class="btn btn-secondary btn-lg" href="/fonctionnement">Voir comment ça marche</a>
+        <a class="btn btn-secondary btn-lg" href="#etapes">Voir comment ça marche</a>
       </div>
-      <p class="hero-note">Gratuit pour commencer, sans carte bancaire. Connexion avec ${providersText(apple)}.</p>
+      <p class="v-fine">Gratuit pour commencer, sans carte bancaire. Connexion avec ${providersText(apple)}.</p>
     </div>
     ${LETTER}
   </div>
 </section>
 
-<section class="sec sec-edge" aria-labelledby="h-b">
-  <div class="wrap split">
-    <div class="split-h">
-      <h2 class="h2" id="h-b">Ce que ton IA fait pour toi</h2>
-      <p class="sec-lead">Elle travaille avec ton propre accès, Claude, ChatGPT ou Gemini, pendant que tu fais autre chose.</p>
+<section class="v-sec v-paper" aria-labelledby="h-b">
+  <div class="wrap v-split">
+    <div class="v-split-h">
+      <h2 class="v-h2" id="h-b">Ce que ton IA fait pour toi</h2>
+      <p class="v-lead v-narrow">Elle travaille avec ton propre accès, Claude, ChatGPT ou Gemini, pendant que tu fais autre chose.</p>
     </div>
-    <dl class="facts">
+    <dl class="v-facts">
       ${FACTS.map(([t, p]) => `<div><dt>${esc(t)}</dt><dd>${esc(p)}</dd></div>`).join('\n      ')}
     </dl>
   </div>
 </section>
 
-<section class="sec sec-edge" aria-labelledby="h-s">
-  <div class="wrap split">
-    <div class="split-h">
-      <h2 class="h2" id="h-s">Le suivi des envois</h2>
-      <p class="sec-lead">Chaque mail a un état : envoyé, lu, répondu, rejeté ou non envoyé, avec la cause quand l'envoi échoue. Un clic sur un chiffre filtre la liste.</p>
-    </div>
-    <figure class="real">
-      <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="${assetUrl('/static/img/capture-mails-sombre.png')}">
-        <img src="${assetUrl('/static/img/capture-mails-clair.png')}" width="1132" height="710" loading="lazy" alt="Page Mails de l'application : une barre de chiffres par état (Tous 5, Envoyé 2, Répondu 2, Non envoyé 1) et un tableau avec la date, le destinataire, l'objet et l'état de chaque mail ; le mail non envoyé indique « SMTP : connexion refusée ».">
-      </picture>
-      <figcaption>Capture de la page Mails. Le projet et les contacts sont des exemples.</figcaption>
-    </figure>
-  </div>
-</section>
-
-<section class="sec sec-edge" id="etapes" aria-labelledby="h-e">
-  <div class="wrap">
-    <h2 class="h2" id="h-e">Comment ça marche</h2>
-    <p class="sec-lead">Quatre étapes, et la main reste chez toi du début à la fin.</p>
-    <ol class="fil">
-      ${STEPS.map(([t, p], i) => `<li><span class="num" aria-hidden="true">${i + 1}</span><h3>${esc(t)}</h3><p>${esc(p)}</p></li>`).join('\n      ')}
+<section class="v-sec" id="suite" aria-labelledby="h-x">
+  <div class="wrap v-stack">
+    <h2 class="v-h2" id="h-x">Du premier mail à la facture</h2>
+    <p class="v-lead">Quand un prospect dit oui, tu continues au même endroit : devis, facture, encaissement et déclaration.</p>
+    <ol class="v-chain">
+      ${CHAIN.map(([n, t, p]) => `<li><span class="v-n">${n}</span><h3>${esc(t)}</h3><p>${esc(p)}</p></li>`).join('\n      ')}
     </ol>
-    <a class="lnk" href="/fonctionnement">Voir chaque étape en détail</a>
   </div>
 </section>
 
-<section class="inv" aria-labelledby="h-c">
-  <div class="wrap">
-    <h2 class="h2" id="h-c">Tu gardes la main</h2>
-    <p class="sec-lead">Une IA peut se tromper : relis les fiches avant d'envoyer, et n'écris qu'à des professionnels.</p>
-    <div class="inv-g">
+<section class="v-sec v-edge" id="etapes" aria-labelledby="h-e">
+  <div class="wrap v-stack">
+    <h2 class="v-h2" id="h-e">Comment ça marche</h2>
+    <p class="v-lead">Quatre étapes, et la main reste chez toi du début à la fin.</p>
+    <ol class="v-steps">
+      ${STEPS.map(([t, p], i) => `<li><span class="v-step-n">${i + 1}</span><h3>${esc(t)}</h3><p>${esc(p)}</p></li>`).join('\n      ')}
+    </ol>
+    <a class="v-link" href="/fonctionnement">Voir chaque étape en détail</a>
+  </div>
+</section>
+
+<section class="v-sec v-ink" aria-labelledby="h-c">
+  <div class="wrap v-stack">
+    <h2 class="v-h2" id="h-c">Tu gardes la main</h2>
+    <p class="v-lead">Une IA peut se tromper : relis les fiches avant d'envoyer, et n'écris qu'à des professionnels.</p>
+    <div class="v-trust">
       ${TRUST(apple).map(([t, p]) => `<div><h3>${esc(t)}</h3><p>${esc(p)}</p></div>`).join('\n      ')}
     </div>
-    <a class="lnk" href="/fonctionnement#envois">Voir comment les envois sont encadrés</a>
+    <a class="v-link" href="/fonctionnement#envois">Voir comment les envois sont encadrés</a>
   </div>
 </section>
 
-<section class="sec" id="tarifs" aria-labelledby="h-t">
-  <div class="wrap">
-    <h2 class="h2" id="h-t">Des tarifs simples</h2>
-    <p class="sec-lead">Tu commences gratuitement, tu passes à un plan payant quand ça te rapporte.</p>
-    <div class="rates">
-      <div><div class="ph"><h3>Gratuit</h3>${badge('b-ok', 'check', 'Disponible')}</div><p class="price">0 €</p>
-        <ul class="list"><li>${ic('check')}${FREE.projects} projet, ${fr(FREE.prospects)} contacts, ${fr(FREE.mails)} mails et ${FREE.aiJobs} tâches IA par mois</li><li>${ic('check')}Sans carte bancaire, sans limite de durée</li></ul></div>
-      <div><div class="ph"><h3>Plans payants</h3>${badge('', 'clock', 'Bientôt')}</div><p class="price">${PLAN_PRICES.starter} à ${PLAN_PRICES.intensive} € <small>TTC par mois</small></p>
-        <ul class="list"><li>${ic('check')}${['Un', 'Deux', 'Trois', 'Quatre', 'Cinq', 'Six'][PAID.length - 1] ?? PAID.length} plans, de ${PLAN_LABELS[PAID[0]]} à ${PLAN_LABELS[PAID.at(-1)]}</li><li>${ic('check')}En annuel, ${ANNUAL_FREE_MONTHS} mois offerts</li></ul></div>
+<section class="v-sec" id="tarifs" aria-labelledby="h-t">
+  <div class="wrap v-stack v-stack-l">
+    <div class="v-row">
+      <div class="v-stack">
+        <h2 class="v-h2" id="h-t">Des tarifs simples</h2>
+        <p class="v-lead">${billing ? `Le plan Gratuit pour commencer, puis ${['', 'un', 'deux', 'trois', 'quatre', 'cinq', 'six'][PAID.length] || PAID.length} offres payantes, résiliables à tout moment.` : `Seul le plan Gratuit est ouvert aujourd'hui. Les ${['', 'un', 'deux', 'trois', 'quatre', 'cinq', 'six'][PAID.length] || PAID.length} plans payants ouvrent prochainement.`}</p>
+      </div>
+      <div class="v-bill" data-bill hidden>
+        <div class="v-seg" role="group" aria-label="Période de facturation">
+          <button class="seg-b" type="button" data-period="month" aria-pressed="true">Au mois</button>
+          <button class="seg-b" type="button" data-period="year" aria-pressed="false">À l'année</button>
+        </div>
+        <span class="v-flag v-flag-ok">${ic('check')}${ANNUAL_FREE_MONTHS} mois offerts à l'année</span>
+      </div>
     </div>
-    <p class="price-n">Ton accès à l'IA est facturé par son fournisseur (Anthropic, OpenAI ou Google), directement à toi.</p>
-    <a class="lnk" href="/tarifs">Voir tous les tarifs</a>
+    <div class="v-plans" data-billing="month">
+      <article class="v-free" aria-labelledby="pc-free">
+        <div class="v-free-t">
+          <div class="v-plan-h"><h3 id="pc-free">Gratuit</h3><span class="v-flag v-flag-ok">${ic('check')}Disponible</span></div>
+          <p class="v-free-p"><b>0 €</b> · sans limite de durée, sans carte bancaire</p>
+        </div>
+        <ul class="v-free-l">${planLimits(FREE).map(([k, v]) => `<li><b>${v}</b><span>${k}</span></li>`).join('')}</ul>
+        ${guest('plan', '<a class="btn btn-primary" href="/login">Créer mon compte</a>')}
+      </article>
+      <div class="v-plan-g">
+        ${PAID.map(planCard(billing)).join('\n        ')}
+      </div>
+    </div>
+    <p class="v-small">Prix TTC : l'éditeur est en franchise de TVA (art. 293 B du CGI). Ton accès à l'IA est facturé par son fournisseur (Anthropic, OpenAI ou Google), directement à toi. Un compte n'envoie jamais plus de 300 mails par 24 heures, quelle que soit l'offre.</p>
+    <a class="v-link" href="/tarifs">Voir tous les tarifs</a>
   </div>
 </section>
 
-<div class="wrap">
-  <section class="end" aria-labelledby="h-f">
+<section class="v-sec v-edge" aria-labelledby="faq-h">
+  <div class="wrap v-faq-g">
+    <h2 class="v-h2" id="faq-h">Questions fréquentes</h2>
+    <div class="v-faq">
+      ${HOME_FAQ.map(([q, a], i) => `<details${i === 0 ? ' open' : ''}><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join('\n      ')}
+    </div>
+  </div>
+</section>
+
+<div class="wrap v-end-w">
+  <section class="v-end" aria-labelledby="h-f">
     <div><h2 id="h-f">Essaie sur un de tes projets</h2><p>Crée ton compte avec ${providersText(apple)}, ajoute un dépôt et regarde ce que ton IA prépare. Rien ne part sans ta validation.</p></div>
     ${guest('big', btn('btn-primary btn-lg', '/login', 'Créer mon compte'))}
   </section>
@@ -334,14 +385,19 @@ const FAQ = [
   ['Puis-je supprimer mon compte ?', 'Oui, quand tu veux, depuis Mon compte. Ça efface tes projets, tes contacts, tes modèles, tes réglages et la copie de ton code. Seule la liste d\'opposition, qui protège les personnes désinscrites, est gardée.'],
 ];
 
-export function pricingPage({ appUrl }) {
+export function pricingPage({ appUrl, billing = false }) {
+  // Paiements ouverts : la réponse sur l'ouverture des plans payants change, et on explique la résiliation
+  const faq = billing ? FAQ.flatMap(([q, a]) => (q.startsWith('Quand puis-je passer') ? [
+    [q, "Dès maintenant : le plan Gratuit te permet de tout tester, puis tu choisis une offre payante sur cette page. Elle s'active dès le paiement, et tu peux changer d'offre ou résilier à tout moment depuis Mon compte."],
+    ['Comment résilier un abonnement ?', "Depuis Mon compte, « Gérer mon abonnement » : ton offre reste active jusqu'à la fin de la période payée, puis ton compte repasse au plan Gratuit, sans rien perdre. Si un paiement échoue, tu gardes ton offre 7 jours le temps de mettre ta carte à jour."],
+  ] : [[q, a]])) : FAQ;
   // Une ligne par offre, une colonne par plafond : on compare d'un coup d'œil. Sur téléphone, chaque ligne devient un bloc libellé par plafond.
   const paidRow = (k) => `<tr class="plan-row" aria-labelledby="plan-${k}">
-        <th scope="row"><h2 id="plan-${k}">${PLAN_LABELS[k]}</h2>${badge('b-info', 'clock', 'Bientôt')}<p class="tag">${PLAN_BLURBS[k]}</p></th>
+        <th scope="row"><h2 id="plan-${k}">${PLAN_LABELS[k]}</h2>${billing ? '' : badge('b-info', 'clock', 'Bientôt')}<p class="tag">${PLAN_BLURBS[k]}</p></th>
         <td data-label="Prix"><span class="price when-month">${euros(PLAN_PRICES[k])} <small>par mois, TTC</small></span><span class="price when-year">${euros(annualPrice(k))} <small>par an, TTC</small></span>
           <small class="sub when-month">ou ${euros(annualPrice(k))} par an, ${ANNUAL_FREE_MONTHS} mois offerts</small><small class="sub when-year">soit ${euros(annualPrice(k) / 12)} par mois, ${ANNUAL_FREE_MONTHS} mois offerts</small></td>
         ${limitCells(PLAN_LIMITS[k])}
-        <td class="plan-act"><a class="btn btn-secondary" href="mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(`Me prévenir : offre ${PLAN_LABELS[k]}`)}">Me prévenir à l'ouverture</a></td>
+        <td class="plan-act">${billing ? buyForms(k) : `<a class="btn btn-secondary" href="mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(`Me prévenir : offre ${PLAN_LABELS[k]}`)}">Me prévenir à l'ouverture</a>`}</td>
       </tr>`;
   return siteLayout({
     appUrl, path: '/tarifs',
@@ -350,7 +406,7 @@ export function pricingPage({ appUrl }) {
     body: `<div class="page">
 <div class="wrap">
   <h1 class="h1">Des tarifs simples, sans surprise</h1>
-  <p class="lead">Seul le plan Gratuit est ouvert aujourd'hui, sans carte bancaire. Les plans payants, de ${euros(PLAN_PRICES.starter)} à ${euros(PLAN_PRICES.intensive)} TTC par mois, ouvrent prochainement.</p>
+  <p class="lead">${billing ? `Le plan Gratuit s'ouvre sans carte bancaire. Les offres payantes, de ${euros(PLAN_PRICES.starter)} à ${euros(PLAN_PRICES.intensive)} TTC par mois, se paient par carte sur une page sécurisée de Stripe et se résilient à tout moment depuis Mon compte.` : `Seul le plan Gratuit est ouvert aujourd'hui, sans carte bancaire. Les plans payants, de ${euros(PLAN_PRICES.starter)} à ${euros(PLAN_PRICES.intensive)} TTC par mois, ouvrent prochainement.`}</p>
 
   <div class="claude-n" role="note">
     ${ic('info')}
@@ -382,7 +438,7 @@ export function pricingPage({ appUrl }) {
   </div>
 
   <div class="mentions">
-    <p>Prix TTC. L'éditeur est en franchise de TVA (art. 293 B du CGI) : le prix affiché est le prix payé. En annuel, tu paies ${12 - ANNUAL_FREE_MONTHS} mois et tu en profites 12. Les offres payantes ouvrent prochainement : tu seras prévenu avant toute facturation.</p>
+    <p>Prix TTC. L'éditeur est en franchise de TVA (art. 293 B du CGI) : le prix affiché est le prix payé. En annuel, tu paies ${12 - ANNUAL_FREE_MONTHS} mois et tu en profites 12. ${billing ? 'Le paiement est sécurisé par Stripe : iaboss ne voit jamais ton numéro de carte. Tu peux résilier à tout moment ; l\'offre reste active jusqu\'à la fin de la période payée, puis tu repasses au plan Gratuit sans rien perdre.' : 'Les offres payantes ouvrent prochainement : tu seras prévenu avant toute facturation.'}</p>
     <p>Ces plafonds sont appliqués par le serveur. Les mails et les tâches IA se comptent par mois (heure de Paris) et repartent de zéro le 1er. Quand un plafond est atteint, la nouvelle action est refusée, mais rien n'est supprimé. Un compte ne peut pas envoyer plus de 300 mails par 24 heures, quelle que soit l'offre : c'est une protection pour la réputation de ton adresse.</p>
   </div>
 
@@ -395,9 +451,9 @@ export function pricingPage({ appUrl }) {
         <p>Avec Gemini, une clé gratuite suffit pour essayer, mais Google peut alors utiliser les données envoyées pour améliorer ses produits : n'y mets pas de données de prospects, et active la facturation sur ton projet Google pour un vrai usage.</p>
       </article>
       <article class="card">
-        <h3>Ton abonnement Claude ou ChatGPT, avec un risque</h3>
-        <p>Avec Claude (Pro, Max) ou ChatGPT (Plus, Pro, Business), tu te connectes à ton compte et iaboss récupère l'accès tout seul. Pas de facture en plus, mais les règles d'Anthropic et d'OpenAI peuvent ne pas autoriser d'utiliser un abonnement à travers une application comme iaboss. Ton compte pourrait être limité, suspendu ou fermé. Gemini n'a pas ce mode : il se relie par clé API seulement.</p>
-        <p>iaboss ne peut pas l'empêcher et n'en est pas responsable. Une fenêtre d'avertissement et une case à cocher te le rappellent avant toute connexion, et ton accord est enregistré avec sa date. Lis les <a href="https://www.anthropic.com/legal/consumer-terms" rel="noopener noreferrer">conditions d'Anthropic</a> ou celles d'OpenAI avant de choisir. Ce mode peut aussi être désactivé sur le service.</p>
+        <h3>Ton abonnement Claude, ChatGPT ou Google AI, avec un risque</h3>
+        <p>Avec Claude (Pro, Max), ChatGPT (Plus, Pro, Business) ou Google AI (Plus, Pro, Ultra, par Antigravity, l'outil de Google), tu te connectes à ton compte et iaboss récupère l'accès tout seul. Pas de facture en plus, mais les règles d'Anthropic, d'OpenAI et de Google peuvent ne pas autoriser d'utiliser un abonnement à travers une application comme iaboss, et Google n'a pas dit clairement si c'est permis. Ton compte pourrait être limité, suspendu ou fermé. Pour Gemini, la connexion par abonnement n'est proposée que si le service l'a activée ; la clé API reste toujours possible.</p>
+        <p>iaboss ne peut pas l'empêcher et n'en est pas responsable. Une fenêtre d'avertissement et une case à cocher te le rappellent avant toute connexion, et ton accord est enregistré avec sa date. Lis les <a href="https://www.anthropic.com/legal/consumer-terms" rel="noopener noreferrer">conditions d'Anthropic</a>, celles d'OpenAI ou celles de Google avant de choisir. Ce mode peut aussi être désactivé sur le service.</p>
         <a class="btn btn-secondary" href="/link?start=claude">Choisir mon IA</a>
         <p class="fine">Pas encore de compte iaboss ? Le bouton te demande d'abord de te connecter, puis te ramène ici.</p>
       </article>
@@ -426,7 +482,7 @@ export function pricingPage({ appUrl }) {
   <section class="faq" aria-labelledby="faq-h">
     <h2 class="h2" id="faq-h">Questions fréquentes</h2>
     <div class="acc">
-      ${FAQ.map(([q, a], i) => `<details${i === 0 ? ' open' : ''}><summary>${esc(q)}${ic('chev')}</summary><p class="acc-b">${a}</p></details>`).join('\n      ')}
+      ${faq.map(([q, a], i) => `<details${i === 0 ? ' open' : ''}><summary>${esc(q)}${ic('chev')}</summary><p class="acc-b">${a}</p></details>`).join('\n      ')}
     </div>
   </section>
 </div>

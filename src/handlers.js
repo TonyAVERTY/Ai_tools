@@ -9,16 +9,19 @@ import { tidyTemplateText, acceptReview, fillBody, fillSubject, styleProblems } 
 import { checkSense, acceptSenseFix, SenseUnavailable, SENSE_BATCH } from './services/mailsense.js';
 import { addUsage, jobContext, liveJobUsage } from './services/jobs.js';
 import { syncRepo } from './services/git.js';
-import { normalizeModel, defaultModelOf, tierEquivalent } from './services/models.js';
-import { analyzePrompt, prospectPrompt, templatePrompt, reviewMailPrompt, fixStylePrompt, followupTemplatePrompt, evolutionPrompt, linkedinPostPrompt, hookPrompt, auditPrompt, promoPrompt, rolePrompt, parseCustomPrompts, LEVELS } from './services/prompts.js';
+import { normalizeModel, defaultModelOf, tierEquivalent, modelFamily } from './services/models.js';
+import { analyzePrompt, prospectPrompt, templatePrompt, reviewMailPrompt, fixStylePrompt, followupTemplatePrompt, evolutionPrompt, linkedinPostPrompt, instagramPrompt, inspirationPrompt, newsletterPrompt, hookPrompt, auditPrompt, promoPrompt, rolePrompt, parseCustomPrompts, LEVELS } from './services/prompts.js';
 import { VOICE_PROVIDERS, parseVoiceParams, extractVoiceScript, prepareVoice, cleanVoice, mixVoice, synthesize, langName } from './services/voiceover.js';
 import { PROMO, FORMATS, SCENE_REFUSED, SceneError, parsePromoParams, extractScene, promoSupported, renderPromo } from './services/promovideo.js';
 import { reviewPromo } from './services/promoqa.js';
 import { createJobStream } from './services/jobstream.js';
 import { reserveVideo, finishVideo, removeVideo, countVideos, keepScene, takeScene, getVoiceKey, getVoiceRegion } from './promo.js';
 import { linkedinAccount, saveDraft, recentDrafts } from './linkedin.js';
+import { saveDraft as saveContent, recentBodies, cleanHashtags, INSTAGRAM_FORMATS, LIMITS as CONTENT } from './contentdrafts.js';
+import { extractVisual, renderStill, stillSupported, TOOLS as STILL_TOOLS } from './services/stillimage.js';
+import { reviewStill, reviewVerdict as stillVerdict } from './services/stillqa.js';
 import { followupCandidates, followupSubject, isBusinessHours } from './services/followup.js';
-import { EMAIL_RE, createTransport, buildProspectMail, allowedToSend, makeMessageId, mailVars } from './services/mailer.js';
+import { EMAIL_RE, createTransport, buildProspectMail, allowedToSend, makeMessageId, mailVars, SAMPLE_PERSON } from './services/mailer.js';
 import { unsubToken } from './crypto.js';
 import { resolveCredentials, markLinkInvalid, userProvider, saveRefreshedAuth } from './claudelink.js';
 import { userRepoRoot, userChatRoot } from './users.js';
@@ -36,7 +39,11 @@ import { getProject, repoDir, sentSince, getTemplate, saveTemplate, pickVariant 
 import { getProfile, profileBlock } from './userprofile.js';
 import { repoProfile, renderRepoProfile } from './services/repoprofile.js';
 import { billingQuotesPrompt, billingRefinePrompt, billingDocsPrompt } from './services/prompts.js';
-import { getBilling, listDocs, getDoc, replaceOptions, updateDocContent, replaceFinals } from './billingdata.js';
+import { getBilling, listDocs, getDoc, replaceOptions, updateDocContent, replaceFinals, getBrandRow, saveBrand, saveBrandReview, brandForRender } from './billingdata.js';
+import { brandPrompt, parseBrand, resolveBrand } from './services/billingbrand.js';
+import { fetchGoogleFont, rasterSvg } from './services/brandassets.js';
+import { reviewDocument, sampleValues } from './services/billingreview.js';
+import { renderDocumentPdf } from './services/billingpdf.js';
 import { legalComplete, normalizeContent, DOC_KINDS, LAYOUTS } from './services/billing.js';
 
 // Constats du dépôt cloné (profil établi par le code, mis en cache par commit) ; vide si le dossier est illisible : un job ne doit jamais échouer pour ça
@@ -153,7 +160,7 @@ export function makeClaude(app) {
     jc?.log?.('model', `Modèle : ${o.model || 'haiku'}`);
     try {
       r = await provider.run({
-        bin: provider.bin(cfg), ...o, system,
+        bin: provider.bin(cfg, cred.mode), ...o, system,
         onUsage: (u) => { pendingUsage = u; if (!usageTimer) usageTimer = setTimeout(flushUsage, 500); o.onUsage?.(u); },
         onDelta: stream ? (text) => { hasOutput = true; stream.delta(text); o.onDelta?.(text); } : o.onDelta,
         onActivity: jc ? (text) => { jc.log?.('activity', text); o.onActivity?.(text); } : o.onActivity,
@@ -233,6 +240,62 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
   const { db, cfg } = app;
   // Dépôts Git (GitHub ou serveur perso) : l'hôte est revérifié à chaque synchronisation, git se connecte à l'adresse vérifiée
   const sync = makeSync(app);
+  // Identité du projet pour ses documents (couleurs, police, logo) : Claude lit le dépôt, le code vérifie et garde ce qui est valide.
+  // Jamais bloquant : sans dépôt lisible ou en cas d'échec, les documents gardent leur mise en page standard.
+  const ensureBrand = async (ctx, { userId, project, model, refresh = false }) => {
+    const existing = await getBrandRow(db, project.id, userId);
+    if (existing && !refresh) return existing;
+    try {
+      await ctx.progress({ message: 'Claude lit le dépôt pour retrouver le style du projet…', pct: 6 });
+      const full = await getProject(app, project.id, { userId, secrets: true });
+      const dir = repoDir(cfg, userId, project.id);
+      await sync(userId, full.gitUrl, dir);
+      const { prompt, system } = brandPrompt({ projectName: project.name, profile: project.profile, siteUrl: project.siteUrl });
+      const r = await claude(userId, { prompt, system, cwd: dir, model, maxTurns: 14, tools: ['Read', 'Glob', 'Grep'], signal: ctx.signal });
+      addUsage(ctx, r);
+      if (!r.ok) throw new Error(`lecture du dépôt impossible (${r.subtype})`);
+      const resolved = await resolveBrand(parseBrand(extractJson(r.text)), dir, {
+        fetchFont: app.fetchFont || ((family, weight) => fetchGoogleFont(family, weight)),
+        rasterSvg: (svg) => (app.rasterSvg || rasterSvg)(svg, cfg),
+      });
+      await saveBrand(db, project.id, userId, resolved);
+    } catch (e) {
+      if (ctx.signal?.aborted) throw e;
+      // Une ancienne identité reste valable ; sinon on enregistre « aucune » pour ne pas relancer la lecture à chaque génération
+      if (!existing) await saveBrand(db, project.id, userId, { brand: { source: 'default', primary: '', notes: `Style du projet non lu : ${String(e.message).slice(0, 120)}` }, assets: {} });
+    }
+    return getBrandRow(db, project.id, userId);
+  };
+
+  // Relecture des documents définitifs : l'IA regarde le rendu PDF de chacun, demande des corrections, les relit (trois essais au plus) ;
+  // au dernier essai le document est livré avec les défauts restants. Un échec de la relecture ne bloque jamais la génération.
+  const reviewBillingDocs = async (ctx, { userId, project, legal, model }) => {
+    let row = await getBrandRow(db, project.id, userId);
+    if (!row) { await saveBrand(db, project.id, userId, { brand: { source: 'default', primary: '' }, assets: {} }); row = await getBrandRow(db, project.id, userId); }
+    const docs = (await listDocs(db, project.id, userId)).filter((d) => d.kind !== 'quote_option');
+    let adjust = row.adjust || {};
+    const report = [];
+    for (const [i, doc] of docs.entries()) {
+      const base = 91 + Math.round((i / docs.length) * 8);
+      try {
+        const res = await (app.reviewBillingDoc || reviewDocument)({
+          kind: doc.kind, content: doc.content, legal, brand: row.brand, adjust,
+          render: (content, adj) => renderDocumentPdf({ kind: doc.kind, content, legal, layout: doc.layout, values: sampleValues(doc.kind), brand: brandForRender(row, adj) }),
+          runAgent: async (options) => { const result = await claude(userId, options); addUsage(ctx, result); return result; },
+          extraRoot: userChatRoot(cfg, userId), model, signal: ctx.signal,
+          onProgress: (p) => ctx.progress({ message: p.message, pct: base }),
+        });
+        adjust = res.adjust;
+        if (JSON.stringify(res.content) !== JSON.stringify(doc.content)) await updateDocContent(db, doc.id, userId, { ...res.content, layout: doc.layout }, doc.refinement);
+        report.push({ kind: doc.kind, approved: res.approved, rounds: res.rounds, skipped: res.skipped, issues: res.issues });
+      } catch (e) {
+        if (ctx.signal?.aborted) throw e;
+        report.push({ kind: doc.kind, approved: false, rounds: 0, skipped: `Relecture impossible : ${String(e.message).slice(0, 160)}`, issues: [] });
+      }
+    }
+    await saveBrandReview(db, project.id, userId, { adjust, review: { at: Math.floor(Date.now() / 1000), docs: report } });
+    return report;
+  };
   // Consignes modifiées par l'utilisateur (Réglages) : celles du compte qui lance le job
   const custom = async (userId) => parseCustomPrompts(await getSetting(db, userId, 'prompts_json'));
   // Modèles choisis dans les Réglages (liste de services/models.js ; toute autre valeur retombe sur Haiku)
@@ -244,6 +307,19 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
   // Forme d'un modèle tout juste généré : s'il manque l'appel ou la politesse, ou s'il propose des réponses toutes faites, l'IA le corrige UNE fois.
   // La correction n'est retenue que si elle garde les adresses, n'ajoute aucune variable et réduit le nombre de défauts ; sinon le texte reste tel quel
   // (l'aperçu signale les défauts qui restent). Une annulation ou un accès perdu remontent ; toute autre panne est sans effet.
+  // Avant tout contenu public (post, newsletter, vidéo) : l'IA cherche sur le web ce qui fait percer les contenus du secteur du projet et ce que font les grandes entreprises
+  // reconnues de ce secteur. Le web SEUL (jamais avec le dépôt : une page piégée ne doit pas pouvoir exfiltrer du code). Une recherche en échec ne fait pas échouer le contenu.
+  async function researchInspiration(ctx, { userId, project, model, kind, direction = '', from = 8, to = 22 }) {
+    const label = "Recherche d'inspiration dans ton secteur…";
+    try {
+      await ctx.progress({ message: label, pct: from });
+      const rp = inspirationPrompt({ kind, projectName: project.name, profile: project.profile, target: project.target || {}, direction, site: project.siteUrl });
+      const rr = await creeping(ctx, label, from, () => claude(userId, { prompt: rp.prompt, system: rp.system, model, maxTurns: 12, tools: STILL_TOOLS.research, signal: ctx.signal }), { to });
+      addUsage(ctx, rr);
+      return (String(rr.text ?? '').match(/<inspiration>([\s\S]*?)<\/inspiration>/i) || [])[1]?.trim().replace(/\n{3,}/g, '\n\n').slice(0, 900) ?? '';
+    } catch (e) { if (ctx.signal?.aborted) throw e; return ''; }
+  }
+
   async function mendStyle(ctx, userId, model, kind, body) {
     const problems = styleProblems(body);
     if (!problems.length) return { body, fixed: [] };
@@ -258,6 +334,53 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
       if (ctx.signal?.aborted || e.status === 403) throw e;
     }
     return { body, fixed: [] };
+  }
+
+  /**
+   * Relecture de la forme par l'IA (langue, ponctuation, signature) : facultative, retenue seulement si elle ne change ni variables ni adresses.
+   * Même relecture pour le premier mail et pour la relance : la personne ne voit jamais un texte que l'IA n'a pas relu.
+   */
+  async function reviewTemplate(ctx, userId, model, mail, label) {
+    let corrections = [];
+    let reviewed = false;
+    await ctx.progress({ message: `Relecture ${label} par l'IA…`, pct: 80 });
+    try {
+      const rp = reviewMailPrompt(mail);
+      const rr = await creeping(ctx, `Relecture ${label} par l'IA…`, 80, () => claude(userId, { prompt: rp.prompt, system: rp.system, model, maxTurns: 1, tools: [], signal: ctx.signal }), { to: 98, ms: 20_000 });
+      addUsage(ctx, rr);
+      const fixed = extractJson(rr.text);
+      if (acceptReview(mail, fixed)) {
+        mail = { subject: fixed.subject.trim(), subjectB: mail.subjectB ? String(fixed.subject_b).replace(/\s+/g, ' ').trim() : '', body: tidyTemplateText(fixed.body) };
+        corrections = (Array.isArray(fixed.corrections) ? fixed.corrections : []).map((c) => String(c).trim().slice(0, 100)).filter(Boolean).slice(0, 6);
+        reviewed = true;
+      }
+    } catch (e) {
+      if (ctx.signal?.aborted || e.status === 403) throw e; // annulation, ou accès à l'IA perdu : on ne l'avale pas
+    }
+    return { mail, corrections, reviewed };
+  }
+
+  /**
+   * Contrôle du sens d'un modèle tout juste écrit, rempli avec l'exemple fictif de l'aperçu : « Pour {entreprise_nom} » ne veut rien dire.
+   * Une correction sûre (mêmes variables, texte proche) remplace le corps avant l'enregistrement. IA indisponible : le modèle est gardé,
+   * l'aperçu et l'envoi le contrôleront de toute façon.
+   * @returns {Promise<{mail: object, checked: boolean, problem: string|null, fixed: boolean}>}
+   */
+  async function senseGate(ctx, userId, model, kind, mail, project) {
+    const vars = mailVars(SAMPLE_PERSON, { fromName: project.smtp?.fromName || '' }, project.siteUrl);
+    const item = { id: 1, subject: kind === 'initial' ? fillSubject(mail.subject, vars) : '', body: fillBody(mail.body, vars).replace(/\n{3,}/g, '\n\n').trim() };
+    await ctx.progress({ message: "L'IA vérifie que le texte veut dire quelque chose…", pct: 96 });
+    try {
+      const { verdicts, run } = await checkSense({ claude, userId, model, signal: ctx.signal, kind, template: mail.body, items: [item] });
+      addUsage(ctx, run);
+      const v = verdicts.get(1);
+      if (v.ok) return { mail, checked: true, problem: null, fixed: false };
+      if (v.fixBody) return { mail: { ...mail, body: tidyTemplateText(v.fixBody) }, checked: true, problem: v.problem, fixed: true };
+      return { mail, checked: true, problem: v.problem, fixed: false };
+    } catch (e) {
+      if (ctx.signal?.aborted || !(e instanceof SenseUnavailable)) throw e;
+      return { mail, checked: false, problem: null, fixed: false };
+    }
   }
 
   // Premier mail ou relance : mêmes plafonds, mêmes délais, même journal
@@ -303,8 +426,10 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
     await transport.verify();
     const minDelay = Number(await getSetting(db, userId, 'send_delay_min', '20')) * 1000;
     const maxDelay = Number(await getSetting(db, userId, 'send_delay_max', '60')) * 1000;
-    const log = db.prepare(`INSERT INTO mail_log(project_id, prospect_id, email, sent_at, error, kind, variant, subject, message_id)
-      VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    const log = db.prepare(`INSERT INTO mail_log(project_id, prospect_id, email, sent_at, error, kind, variant, subject, message_id, body)
+      VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    // Le texte du mail tel qu'il est rempli pour ce prospect (sans le pied de page) : gardé dans le journal pour la page Mails
+    const bodyFor = (c) => fillBody(template.body, mailVars(c, project.smtp, project.siteUrl)).replace(/\n{3,}/g, '\n\n').trim().slice(0, 10_000);
     const markInitial = db.prepare('UPDATE prospects SET status = ?, sent_at = ?, variant = ? WHERE id = ?');
     const markFollowup = db.prepare('UPDATE prospects SET followup_at = ? WHERE id = ?');
     const markBounced = db.prepare("UPDATE prospects SET status = 'bounced' WHERE id = ?");
@@ -333,7 +458,7 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
         const v = await verifyAddress(p.email, { resolveMx: app.resolveMx || defaultMx, cache: mxCache });
         if (!v.ok) {
           await markInvalid.run(p.id);
-          await log.run(project.id, p.id, p.email, now(), `Adresse non envoyée : ${v.reason}`, kind, null, null, null);
+          await log.run(project.id, p.id, p.email, now(), `Adresse non envoyée : ${v.reason}`, kind, null, null, null, null);
           invalid++;
           continue;
         }
@@ -357,7 +482,7 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
       }
       const verdict = sense.get(p.id);
       if (!verdict.ok) {
-        await log.run(project.id, p.id, p.email, now(), `Non envoyé : le texte n'a pas de sens (${verdict.problem})`, kind, null, null, null);
+        await log.run(project.id, p.id, p.email, now(), `Non envoyé : le texte n'a pas de sens (${verdict.problem})`, kind, null, null, null, bodyFor(p));
         firstProblem ??= verdict.problem;
         unclear++;
         if (++unclearRow >= SENSE_BATCH) break; // un lot entier refusé : c'est le modèle lui-même qui est en cause
@@ -380,13 +505,13 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
       });
       try {
         await transport.sendMail(mail);
-        await log.run(project.id, p.id, p.email, now(), null, kind, variant, mail.subject, mail.messageId);
+        await log.run(project.id, p.id, p.email, now(), null, kind, variant, mail.subject, mail.messageId, bodyFor(p));
         await recordUsage(db, userId, 'mail');
         if (kind === 'initial') await markInitial.run('sent', now(), variant, p.id);
         else await markFollowup.run(now(), p.id);
         sent++;
       } catch (e) {
-        await log.run(project.id, p.id, p.email, now(), String(e.message).slice(0, 500), kind, variant, mail.subject, mail.messageId);
+        await log.run(project.id, p.id, p.email, now(), String(e.message).slice(0, 500), kind, variant, mail.subject, mail.messageId, bodyFor(p));
         if (/^5\d\d/.test(String(e.responseCode))) await markBounced.run(p.id);
         failed++;
       }
@@ -555,27 +680,16 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
       const sb = String(t.subject_b ?? '').replace(/\s+/g, ' ').trim();
       const subjectB = sb && sb.length <= 120 && sb.toLowerCase() !== String(t.subject).trim().toLowerCase() ? sb : '';
       let mail = { subject: String(t.subject).trim(), subjectB, body: tidyTemplateText(t.body) };
-      // Relecture par Claude (langue, ponctuation, signature) : facultative, retenue seulement si elle ne change ni variables ni adresses
-      let corrections = [];
-      let reviewed = false;
-      await ctx.progress({ message: 'Relecture du mail par Claude…', pct: 80 });
-      try {
-        const rp = reviewMailPrompt(mail);
-        const rr = await creeping(ctx, 'Relecture du mail par Claude…', 80, () => claude(userId, { prompt: rp.prompt, system: rp.system, model, maxTurns: 1, tools: [], signal: ctx.signal }), { to: 98, ms: 20_000 });
-        addUsage(ctx, rr);
-        const fixed = extractJson(rr.text);
-        if (acceptReview(mail, fixed)) {
-          mail = { subject: fixed.subject.trim(), subjectB: mail.subjectB ? String(fixed.subject_b).replace(/\s+/g, ' ').trim() : '', body: tidyTemplateText(fixed.body) };
-          corrections = (Array.isArray(fixed.corrections) ? fixed.corrections : []).map((c) => String(c).trim().slice(0, 100)).filter(Boolean).slice(0, 6);
-          reviewed = true;
-        }
-      } catch (e) {
-        if (ctx.signal?.aborted || e.status === 403) throw e; // annulation, ou accès Claude perdu : on ne l'avale pas
-      }
+      // Relecture par l'IA (langue, ponctuation, signature), puis contrôle du sens : le modèle n'est enregistré, donc montré, qu'après
+      const rv = await reviewTemplate(ctx, userId, model, mail, 'du mail');
+      const { corrections, reviewed } = rv;
+      mail = rv.mail;
       const mended = await mendStyle(ctx, userId, model, 'initial', mail.body);
       mail = { ...mail, body: mended.body };
+      const gate = await senseGate(ctx, userId, model, 'initial', mail, project);
+      mail = gate.mail;
       await saveTemplate(db, project.id, 'initial', mail);
-      return { ok: true, reviewed, corrections, ...(mended.fixed.length ? { styleFixed: mended.fixed } : {}) };
+      return { ok: true, reviewed, corrections, senseChecked: gate.checked, ...(gate.fixed ? { senseFixed: gate.problem } : {}), ...(mended.fixed.length ? { styleFixed: mended.fixed } : {}) };
     },
 
     async followup_template(ctx) {
@@ -589,9 +703,13 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
       addUsage(ctx, r);
       const t = extractJson(r.text);
       if (!t.body) throw new Error('Modèle de relance invalide');
-      const mended = await mendStyle(ctx, userId, model, 'followup', tidyTemplateText(t.body));
-      await saveTemplate(db, project.id, 'followup', { subject: '', body: mended.body });
-      return { ok: true, ...(mended.fixed.length ? { styleFixed: mended.fixed } : {}) };
+      // Comme le premier mail : relecture de la forme, correction de style, contrôle du sens, PUIS enregistrement
+      // La relance n'a pas d'objet à elle (« Re: » + celui du premier mail) : la relecture en demande un, on lui en donne un d'attente qui est ignoré ensuite
+      const rv = await reviewTemplate(ctx, userId, model, { subject: 'Relance', subjectB: '', body: tidyTemplateText(t.body) }, 'de la relance');
+      const mended = await mendStyle(ctx, userId, model, 'followup', rv.mail.body);
+      const gate = await senseGate(ctx, userId, model, 'followup', { subject: '', subjectB: '', body: mended.body }, project);
+      await saveTemplate(db, project.id, 'followup', { subject: '', body: gate.mail.body });
+      return { ok: true, reviewed: rv.reviewed, corrections: rv.corrections, senseChecked: gate.checked, ...(gate.fixed ? { senseFixed: gate.problem } : {}), ...(mended.fixed.length ? { styleFixed: mended.fixed } : {}) };
     },
 
     // Facturation : trois exemples de devis. Claude écrit le texte et propose les lignes ; les mentions légales et les totaux viennent du code.
@@ -601,10 +719,11 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
       const { legal } = await getBilling(db, project.id, userId);
       if (!legalComplete(legal)) throw new Error("Complète d'abord les informations légales du projet");
       if ((await listDocs(db, project.id, userId)).some((d) => d.kind === 'quote_option' && d.status === 'validated')) throw new Error('Un devis est déjà validé : recommence depuis le début pour en générer de nouveaux');
-      await ctx.progress({ message: 'Claude rédige trois exemples de devis…', pct: 8 });
       const model = await writeModel(userId, 'sonnet');
+      await ensureBrand(ctx, { userId, project, model, refresh: true });
+      await ctx.progress({ message: 'Claude rédige trois exemples de devis…', pct: 12 });
       const { prompt, system } = billingQuotesPrompt({ projectName: project.name, profile: project.profile, legal, custom: await custom(userId), model });
-      const r = await creeping(ctx, 'Claude rédige trois exemples de devis…', 8, () => claude(userId, { prompt, system, model, maxTurns: 1, tools: [], signal: ctx.signal }));
+      const r = await creeping(ctx, 'Claude rédige trois exemples de devis…', 12, () => claude(userId, { prompt, system, model, maxTurns: 1, tools: [], signal: ctx.signal }));
       addUsage(ctx, r);
       const raw = extractJson(r.text);
       const options = (Array.isArray(raw.options) ? raw.options : []).map((o) => normalizeContent(o, 'devis')).filter(Boolean).slice(0, 3);
@@ -650,8 +769,9 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
       const quote = (await listDocs(db, project.id, userId)).find((d) => d.kind === 'quote_option' && d.status === 'validated');
       if (!quote) throw new Error("Valide d'abord un devis");
       const { legal } = await getBilling(db, project.id, userId);
-      await ctx.progress({ message: 'Claude prépare le devis, l\'acompte, la facture finale et l\'avoir…', pct: 8 });
       const model = await writeModel(userId, 'sonnet');
+      await ensureBrand(ctx, { userId, project, model }); // l'identité du projet, lue une fois puis réutilisée
+      await ctx.progress({ message: 'Claude prépare le devis, l\'acompte, la facture finale et l\'avoir…', pct: 10 });
       const { prompt, system } = billingDocsPrompt({ projectName: project.name, profile: project.profile, legal, quote: quote.content, custom: await custom(userId), model });
       const r = await creeping(ctx, 'Claude prépare le devis, l\'acompte, la facture finale et l\'avoir…', 8, () => claude(userId, { prompt, system, model, maxTurns: 1, tools: [], signal: ctx.signal }));
       addUsage(ctx, r);
@@ -668,7 +788,8 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
       }
       out.facture.deposit_percent = out.acompte.deposit_percent;
       await replaceFinals(db, project.id, userId, out);
-      return { ok: true };
+      const review = await reviewBillingDocs(ctx, { userId, project, legal, model });
+      return { ok: true, review };
     },
 
     // Brouillon de post LinkedIn : direction facultative ; sans elle Claude choisit l'angle. Rien n'est publié ici.
@@ -679,11 +800,12 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
       const account = await linkedinAccount(db, project.id);
       if (!account) throw new Error("Connecte LinkedIn à ce projet d'abord");
       const direction = String(ctx.params.direction ?? '').trim().slice(0, 500);
-      await ctx.progress({ message: direction ? 'Rédaction du post selon ta direction…' : 'Claude choisit un angle et rédige le post…', pct: 40 });
       const model = await writeModel(userId, await modelOf(userId, 'analyze_model'));
+      const inspiration = await researchInspiration(ctx, { userId, project, model, kind: 'linkedin', direction, from: 5, to: 35 });
       const { prompt, system } = linkedinPostPrompt({
-        profile: project.profile, target: project.target || {}, direction, previous: await recentDrafts(db, project.id), author: account.name, custom: await custom(userId), model,
+        profile: project.profile, target: project.target || {}, direction, previous: await recentDrafts(db, project.id), author: account.name, custom: await custom(userId), model, inspiration,
       });
+      await ctx.progress({ message: direction ? 'Rédaction du post selon ta direction…' : 'Claude choisit un angle et rédige le post…', pct: 40 });
       const r = await creeping(ctx, direction ? 'Rédaction du post selon ta direction…' : 'Claude choisit un angle et rédige le post…', 40, () => claude(userId, { prompt, system, model, maxTurns: 1, tools: [], signal: ctx.signal }));
       addUsage(ctx, r);
       let body = '';
@@ -691,6 +813,113 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
       body = body.replace(/\r\n/g, '\n').trim().slice(0, 3000);
       if (body.length < 50) throw new Error('Claude n\'a pas produit de post exploitable : réessaie');
       return { ok: true, postId: await saveDraft(db, project.id, { body, direction }) };
+    },
+
+    // Post Instagram : légende, hashtags, texte alternatif et image. Claude cherche d'abord sur le web ce qui fonctionne dans le secteur du projet (grandes marques,
+    // formats qui performent), lit le dépôt (lecture seule) pour retrouver le vrai design (couleurs, polices, logo, écrans), dessine l'image en HTML/CSS fixe
+    // que Chromium rend en PNG, puis un directeur artistique indépendant juge le PNG. Trois essais au plus : un document refusé au rendu ou une image notée
+    // en dessous du seuil repart avec des corrections précises ; au dernier essai le post est livré avec les constats du contrôle.
+    async instagram_post(ctx) {
+      const userId = ctx.job.user_id;
+      const project = await getProject(app, ctx.job.project_id, { userId });
+      if (!project.profile) throw new Error("Analyse le projet d'abord");
+      const sup = (app.stillSupported || stillSupported)(cfg);
+      if (!sup.ok) throw new Error(sup.reason);
+      const direction = String(ctx.params.direction ?? '').trim().slice(0, CONTENT.direction);
+      const formatKey = INSTAGRAM_FORMATS[ctx.params.format] ? ctx.params.format : 'carre';
+      const format = INSTAGRAM_FORMATS[formatKey];
+      await ctx.progress({ message: 'Mise à jour du repo…', pct: 3 });
+      const dir = repoDir(cfg, userId, project.id);
+      await sync(userId, project.gitUrl, dir);
+      // Dessiner une image de designer demande au moins un modèle de milieu de gamme : un petit modèle (Haiku) produit des mises en page qui débordent et sans finition
+      const provider = await userProvider(db, userId);
+      const chosen = await writeModel(userId, await modelOf(userId, 'analyze_model'));
+      const model = provider === 'claude' && modelFamily(chosen) === 'haiku' ? tierEquivalent('sonnet', provider) : chosen;
+      const previous = await recentBodies(db, project.id, 'instagram');
+      const ATTEMPTS = 3;
+      const field = (text, tag) => (String(text ?? '').match(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`, 'i')) || [])[1]?.trim() ?? '';
+      let fix = null;
+      let previousVisual = '';
+      // Phase 1 : le web SEUL, ce qui marche dans le secteur
+      const inspiration = await researchInspiration(ctx, { userId, project, model, kind: 'instagram', direction });
+      // Phase 2 : le dépôt SEUL (lecture) pour le vrai design, puis le dessin
+      for (let attempt = 1; ; attempt++) {
+        const first = attempt === 1;
+        const label = first ? 'Lecture du design du projet et conception du post…' : `Amélioration de l'image (essai ${attempt}/${ATTEMPTS})…`;
+        const from = first ? 25 : 30 + (attempt - 2) * 8;
+        await ctx.progress({ message: label, pct: from });
+        const { prompt, system } = instagramPrompt({
+          projectName: project.name, profile: project.profile, target: project.target || {}, direction, previous, site: project.siteUrl, format,
+          custom: await custom(userId), model, fix, previousVisual, inspiration,
+        });
+        const sink = makeSink();
+        const maxTurns = first ? 20 : 14;
+        const r = await creeping(ctx, label, from, () => claude(userId, {
+          prompt, system, cwd: dir, model, maxTurns, tools: STILL_TOOLS.design, signal: ctx.signal,
+          onTurn: (n) => sink.push(() => ctx.progress({ message: `${label} · étape ${n}`, pct: turnPct(from, 60, n, maxTurns) })),
+        }), { to: 60 });
+        await sink.flush();
+        addUsage(ctx, r);
+        const caption = field(r.text, 'legende').replace(/\r\n/g, '\n').slice(0, CONTENT.caption);
+        if (caption.length < 40) throw new Error(`Claude n'a pas produit de légende exploitable (${r.subtype}) : réessaie`);
+        const html = extractVisual(r.text);
+        const meta = { hashtags: cleanHashtags(field(r.text, 'hashtags')), alt: field(r.text, 'alt').replace(/\s+/g, ' ').slice(0, CONTENT.alt), format: formatKey, width: format.width, height: format.height, inspiration };
+        let png;
+        try {
+          await ctx.progress({ message: 'Rendu de l\'image…', pct: 66 });
+          png = await (app.renderStill || renderStill)({ cfg, html, width: format.width, height: format.height, signal: ctx.signal });
+          if (png.length > CONTENT.image) throw new SceneError(`L'image pèse trop lourd (${png.length} octets) : simplifie les dégradés et les formes.`);
+        } catch (e) {
+          if (!(e instanceof SceneError)) throw e;
+          if (attempt >= ATTEMPTS) throw new Error(`L'image écrite par Claude ne passe pas au rendu : ${e.message}`);
+          fix = e.message;
+          previousVisual = html;
+          continue;
+        }
+        // Le directeur artistique regarde l'image rendue. Un contrôle en panne ne bloque pas la livraison, mais le post le dit.
+        let review = null;
+        let reviewNote = '';
+        try {
+          await ctx.progress({ message: 'Contrôle par un directeur artistique…', pct: 80 });
+          review = await (app.reviewStill || reviewStill)({
+            png, width: format.width, height: format.height, caption, direction, brand: inspiration, model, extraRoot: userChatRoot(cfg, userId), signal: ctx.signal,
+            runAgent: async (options) => { const result = await claude(userId, options); addUsage(ctx, result); return result; },
+          });
+        } catch (e) {
+          if (ctx.signal?.aborted) throw e;
+          reviewNote = 'Le contrôle qualité de l\'image n\'a pas pu être fait : relis-la avec attention avant de publier.';
+        }
+        if (review && !review.approved && attempt < ATTEMPTS) { fix = stillVerdict(review); previousVisual = html; continue; }
+        const notes = review && !review.approved ? review.issues.filter((x) => x.severity !== 'minor').map((x) => x.problem) : [];
+        const id = await saveContent(db, project.id, 'instagram', {
+          direction, body: caption, image: png,
+          extra: { ...meta, ...(review ? { score: review.score } : {}), ...(notes.length ? { toCheck: notes.slice(0, 5) } : {}), ...(reviewNote ? { toCheck: [reviewNote] } : {}), attempts: attempt },
+        });
+        return { ok: true, draftId: id, attempts: attempt, ...(review ? { score: review.score } : {}) };
+      }
+    },
+
+    // Newsletter : objet, texte d'aperçu et corps en Markdown, à relire puis à copier ou télécharger. Rien n'est envoyé ici.
+    async newsletter(ctx) {
+      const userId = ctx.job.user_id;
+      const project = await getProject(app, ctx.job.project_id, { userId });
+      if (!project.profile) throw new Error("Analyse le projet d'abord");
+      const direction = String(ctx.params.direction ?? '').trim().slice(0, CONTENT.direction);
+      const label = direction ? 'Rédaction de la newsletter selon ta direction…' : 'Claude choisit un sujet et rédige la newsletter…';
+      const model = await writeModel(userId, await modelOf(userId, 'analyze_model'));
+      const inspiration = await researchInspiration(ctx, { userId, project, model, kind: 'newsletter', direction, from: 5, to: 35 });
+      await ctx.progress({ message: label, pct: 40 });
+      const { prompt, system } = newsletterPrompt({
+        projectName: project.name, profile: project.profile, target: project.target || {}, direction, previous: await recentBodies(db, project.id, 'newsletter'),
+        site: project.siteUrl, custom: await custom(userId), model, inspiration,
+      });
+      const r = await creeping(ctx, label, 40, () => claude(userId, { prompt, system, model, maxTurns: 1, tools: [], signal: ctx.signal }));
+      addUsage(ctx, r);
+      const field = (tag) => (String(r.text ?? '').match(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`, 'i')) || [])[1]?.trim() ?? '';
+      const subject = field('objet').replace(/\s+/g, ' ').slice(0, CONTENT.subject);
+      const body = field('texte').replace(/\r\n/g, '\n').slice(0, CONTENT.newsletter);
+      if (!subject || body.length < 200) throw new Error("Claude n'a pas produit de newsletter exploitable : réessaie");
+      return { ok: true, draftId: await saveContent(db, project.id, 'newsletter', { direction, title: subject, body, extra: { preview: field('apercu').replace(/\s+/g, ' ').slice(0, CONTENT.preview), inspiration } }) };
     },
 
     // Vidéo de promotion : Claude écrit une scène animée, Chromium la rend image par image, ffmpeg produit le MP4.
@@ -709,17 +938,19 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
       if ((await countVideos(db, userId)) >= PROMO.maxVideos) throw new Error(`Tu as déjà ${PROMO.maxVideos} vidéos : supprime-en une avant d'en produire une autre.`);
       const fmt = FORMATS[params.format];
       const model = await writeModel(userId, await modelOf(userId, 'analyze_model'));
-      const video = await reserveVideo(app, { userId, projectId: project.id, subject: params.subject, fps: params.fps, seconds: params.seconds, format: params.format, width: fmt.width, height: fmt.height });
+      const video = await reserveVideo(app, { userId, projectId: project.id, subject: params.subject, fps: params.fps, seconds: params.seconds, format: params.format, width: fmt.width, height: fmt.height, platform: params.platform });
       const sink = makeSink();
       try {
         // « Corriger » relance le job avec le verdict du contrôle et la dernière scène refusée
         let fix = String(ctx.params.fix ?? '').slice(0, 6000) || null;
         let previousScene = fix ? takeScene(cfg, userId, ctx.params.fixScene) : '';
+        // Une seule recherche, avant la première conception ; une correction repart de la scène refusée, sans refaire de recherche
+        const inspiration = fix ? '' : await researchInspiration(ctx, { userId, project, model, kind: 'promo', direction: params.subject, from: 3, to: 8 });
         for (let attempt = fix ? 2 : 1; ; attempt++) {
           await ctx.progress({ message: attempt === 1 ? (params.subject ? 'Claude conçoit la vidéo sur ton sujet…' : 'Claude conçoit la vidéo de présentation du projet…') : 'Claude corrige la scène…', pct: attempt === 1 ? 8 : 40 });
           const { prompt, system } = promoPrompt({
             projectName: project.name, profile: project.profile, target: project.target || {}, subject: params.subject, style: params.style, site: project.siteUrl,
-            seconds: params.seconds, fps: params.fps, format: params.format, width: fmt.width, height: fmt.height, custom: await custom(userId), model, fix, previousScene,
+            seconds: params.seconds, fps: params.fps, format: params.format, width: fmt.width, height: fmt.height, custom: await custom(userId), model, fix, previousScene, inspiration, platform: params.platform,
             voice: voice && { ...voice, langName: langName(voice.lang) },
           });
           const r = await creeping(ctx, attempt === 1 ? (params.subject ? 'Claude conçoit la vidéo sur ton sujet…' : 'Claude conçoit la vidéo de présentation du projet…') : 'Claude corrige la scène…', attempt === 1 ? 8 : 40, () => claude(userId, { prompt, system, model, maxTurns: 1, tools: [], signal: ctx.signal }), { to: 44 });

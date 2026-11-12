@@ -1,6 +1,6 @@
 // Vérifie dans un vrai navigateur (public/app-replies.js) les réponses des prospects : popups d'arrivée (deux au plus, le reste résumé), pastille de
 // l'onglet « Mails », texte affiché sans exécuter de HTML, fermeture qui marque la réponse comme lue, ajout au calendrier depuis la proposition,
-// bouton « Marquer comme lu » de la page « Mails », et le même fonctionnement après une navigation sans rechargement.
+// bouton « Marquer traitée » de la page « Mails », et le même fonctionnement après une navigation sans rechargement.
 // Nécessite Playwright (PLAYWRIGHT_MODULE, PLAYWRIGHT_CHROMIUM). Sortie « TOUT EST BON » attendue.
 import { startApp, APP_URL } from '../test/helpers/server.js';
 import { addProject } from '../test/helpers/users.js';
@@ -36,7 +36,7 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   const errs = [];
   p.on('pageerror', (e) => errs.push(e.message));
   p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
-  await p.goto(`${s.base}/`);
+  await p.goto(`${s.base}/projets`);
   await p.waitForSelector('html[data-nav="ready"]');
 
   // arrivée : deux popups au plus, le reste en une ligne, pastille sur l'onglet Mails
@@ -73,19 +73,19 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   const rows = await p.locator('.reply-row.unseen').count();
   if (rows > 0) {
     const before2 = await unseen();
-    await p.locator('.reply-row.unseen > summary').first().click(); // la ligne est repliée : on l'ouvre comme l'utilisateur
+    // les lignes de réponse sont dépliées d’emblée (maquette 13) : pas de clic pour les ouvrir
     await p.locator('.reply-row.unseen [data-reply-seen]').first().click();
-    ok(await waitFor(async () => (await unseen()) === before2 - 1), `${tag} « Marquer comme lu » de la page Mails met à jour la base`);
+    ok(await waitFor(async () => (await unseen()) === before2 - 1), `${tag} « Marquer traitée » de la page Mails met à jour la base`);
   } else ok(false, `${tag} la page Mails liste des réponses non lues`);
 
   // navigation sans rechargement : une réponse arrivée entre-temps doit apparaître, et les écouteurs doivent être posés de nouveau
   await p.evaluate(() => { window.__marker = 'vivante'; });
-  await p.locator('.pills a.pill', { hasText: 'Calendrier' }).click();
+  await p.locator('.pills a.pill', { hasText: 'Agenda' }).click();
   await p.waitForURL(/calendar/);
   await p.waitForSelector('html[data-nav="ready"]');
   const fresh = await addReply('Re: nouvelle', `Réponse tardive ${vp.width}`);
   await p.locator('.pills a.pill', { hasText: 'Projets' }).click();
-  await p.waitForURL((url) => url.pathname === '/');
+  await p.waitForURL((url) => url.pathname === '/projets');
   await p.waitForSelector('html[data-nav="ready"]');
   ok(await p.evaluate(() => window.__marker) === 'vivante', `${tag} aller-retour sans rechargement de la page`);
   ok(await waitFor(async () => (await p.locator('.reply-pop, .reply-more').count()) > 0), `${tag} après navigation : les popups des réponses non lues reviennent`);

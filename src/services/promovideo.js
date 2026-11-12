@@ -11,6 +11,7 @@ import { tmpdir } from 'node:os';
 import { join, delimiter } from 'node:path';
 import { prepareLaunch } from './sandbox.js';
 import { PROMO_STYLE_IDS } from './promokit.js';
+import { PLATFORMS } from './promoplatforms.js';
 
 export const PROMO = {
   fps: { min: 10, max: 60, def: 30 },
@@ -49,7 +50,9 @@ export function parsePromoParams(b = {}) {
   const format = FORMATS[b.format] ? b.format : 'paysage';
   const subject = String(b.subject ?? '').replace(/\s+/g, ' ').trim().slice(0, PROMO.maxSubject);
   const style = PROMO_STYLE_IDS.includes(b.style) ? b.style : 'auto';
-  return { fps, seconds, format, subject, style };
+  // Plateforme cible (facultative) : le formulaire a déjà appliqué son préréglage ; ici elle sert à guider l'IA et à étiqueter la vidéo
+  const platform = Object.hasOwn(PLATFORMS, b.platform) ? b.platform : '';
+  return { fps, seconds, format, subject, style, platform };
 }
 
 // ---------- La scène ----------
@@ -168,7 +171,7 @@ class Cdp {
 }
 
 /** Lance Chromium (dans le bac à sable si activé) et renvoie { cdp, stop }. */
-async function openBrowser(cfg, { width, height, signal }) {
+export async function openBrowser(cfg, { width, height, signal }) {
   const bin = findChromium(cfg);
   if (!bin) throw new Error("Chromium n'est pas installé sur ce serveur.");
   const sandboxed = !!cfg.sandbox?.enabled;

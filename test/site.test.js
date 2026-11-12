@@ -80,7 +80,8 @@ test('pages d\'application : toujours protégées, la racine dépend de la sessi
   // Connecté sans liaison Claude : la racine ne montre plus le site, l'onboarding reprend la main
   const linked = await s.newUser({ email: 'lie@x.fr' });
   const dash = await (await linked.get('/', { headers: { accept: 'text/html' } })).text();
-  assert.match(dash, /<h1[^>]*>Projets<\/h1>/, 'compte relié : le tableau de bord');
+  assert.match(dash, /<h1[^>]*>Bonjour /, 'compte relié : la page « Aujourd\'hui » est l\'accueil de l\'application');
+  assert.match(await (await linked.get('/projets', { headers: { accept: 'text/html' } })).text(), /<h1[^>]*>Projets<\/h1>/, 'compte relié : la page Projets');
   assert.doesNotMatch(dash, /Un panel pour prospecter/);
   const u = await s.newUser({ email: 'site@x.fr', admin: false });
   let r = await u.get('/', { headers: { accept: 'text/html' } });
@@ -265,13 +266,18 @@ const lum = (hex) => {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 };
 const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
-const tokens = (block) => Object.fromEntries([...block.matchAll(/--([\w-]+):\s*(#[0-9a-fA-F]{3,6})\b/g)].map((m) => [m[1], m[2]]));
+// Lit les déclarations « --nom: valeur; » et résout les var(--autre) : les jetons de la charte s'appuient sur des échelles (--pet-700…)
+const declsOf = (css) => Object.fromEntries([...css.matchAll(/--([\w-]+):\s*([^;]+);/g)].map((m) => [m[1], m[2].trim()]));
+const resolved = (map) => {
+  const val = (v, depth = 0) => { const r = /^var\(--([\w-]+)\)$/.exec(v || ''); return r && depth < 8 ? val(map[r[1]], depth + 1) : v; };
+  return Object.fromEntries(Object.entries(map).map(([k, v]) => [k, val(v)]));
+};
 
 test('couleurs : site.css lit les jetons de tokens.css, sans valeur en dur ni seconde palette', () => {
   const site = read('public/site.css');
   const code = site.replace(/\/\*[\s\S]*?\*\//g, ''); // les commentaires peuvent citer ce qu'on évite
   const tk = read('public/tokens.css');
-  for (const t of ['bg', 'card', 'text', 'muted', 'line', 'accent', 'grad', 'on-grad', 'nav-on-bg']) {
+  for (const t of ['bg', 'card', 'text', 'muted', 'line', 'accent', 'primary', 'on-primary', 'on-accent', 'nav-bg', 'nav-on']) {
     assert.match(site, new RegExp(`var\\(--${t}\\)`), `--${t} utilisé par le site`);
     assert.match(tk, new RegExp(`--${t}:`), `--${t} défini dans tokens.css`);
     assert.doesNotMatch(site, new RegExp(`--${t}\\s*:`), `--${t} ne doit pas être redéfini`);
@@ -285,23 +291,30 @@ test('couleurs : site.css lit les jetons de tokens.css, sans valeur en dur ni se
   assert.match(layout, /\/static\/tokens\.css[\s\S]*\/static\/site\.css/, 'site.css chargé après tokens.css');
 });
 
-test('contrastes AA (4,5:1) des couples texte/fond du design, thèmes clair et sombre', () => {
+test('contrastes AA (4,5:1) des couples texte/fond de la charte, thèmes clair et sombre', () => {
   const tk = read('public/tokens.css');
-  const light = tokens(tk.match(/:root\s*\{([^}]*)\}/)[1]);
-  const dark = tokens(tk.match(/prefers-color-scheme: dark\)\s*\{\s*:root\s*\{([^}]*)\}/)[1]);
-  const themes = { clair: light, sombre: { ...light, ...dark } };
+  const dm = tk.match(/@media \(prefers-color-scheme: dark\) \{\s*:root \{([\s\S]*?)\n  \}\n\}/);
+  assert.ok(dm, 'bloc du thème sombre');
+  const lightRaw = declsOf(tk.replace(dm[0], ''));
+  const themes = { clair: resolved(lightRaw), sombre: resolved({ ...lightRaw, ...declsOf(dm[1]) }) };
   for (const [name, t] of Object.entries(themes)) {
     const pairs = [
-      ['text/bg', t.text, t.bg], ['text/card', t.text, t.card], ['text/bg-sunk', t.text, t['bg-sunk']],
+      ['text/bg', t.text, t.bg], ['text/card', t.text, t.card], ['text/bg-sunk', t.text, t['bg-sunk']], ['text/card-2', t.text, t['card-2']],
       ['muted/bg', t.muted, t.bg], ['muted/card', t.muted, t.card], ['muted/bg-sunk', t.muted, t['bg-sunk']],
-      ['link/bg', t.link, t.bg], ['link/card', t.link, t.card],
-      ['texte sur le début du dégradé (barres)', t['on-grad'], t.accent], ['texte sur la fin du dégradé (barres)', t['on-grad'], t['accent-2']],
+      ['link/bg', t.link, t.bg], ['link/card', t.link, t.card], ['lien sur le fond du bureau creux', t.link, t['bg-sunk']],
       ['ok', t.ok, t['ok-bg']], ['warn', t.warn, t['warn-bg']], ['err', t.err, t['err-bg']], ['info', t.info, t['info-bg']],
-      ['bouton principal (indigo)', t['on-primary'], t.primary], ['bouton principal au survol', t['on-primary'], t['primary-hover']],
-      ['accroche surlignée', t['on-mark'], t.mark], ['lien sur le fond du bureau creux', t.link, t['bg-sunk']],
-      ['barre active', t['nav-on-text'], t['nav-on-bg']],
+      ['bouton principal', t['on-primary'], t.primary], ['bouton principal au survol', t['on-primary'], t['primary-hover']],
+      ['texte sur le Safran', t['on-accent'], t.accent], ['texte safran sur la feuille', t['accent-text'], t.card], ['texte safran sur son fond', t['accent-text'], t['accent-bg']],
+      ['accroche surlignée', t['on-mark'], t.mark], ['barre du haut', t['nav-on'], t['nav-bg']], ["bouton d'erreur", t['on-err'], t.err],
+      ['méthode GET', t['on-m'], t['m-get']], ['méthode POST', t['on-m'], t['m-post']], ['code', t['code-fg'], t['code-bg']],
     ];
-    for (const [label, fg, bg] of pairs) assert.ok(ratio(fg, bg) >= 4.5, `${name} : ${label} = ${ratio(fg, bg).toFixed(2)}`);
+    for (const [label, fg, bg] of pairs) {
+      assert.match(fg || '', /^#[0-9a-fA-F]{3,6}$/, `${name} : ${label} : premier plan introuvable`);
+      assert.match(bg || '', /^#[0-9a-fA-F]{3,6}$/, `${name} : ${label} : fond introuvable`);
+      assert.ok(ratio(fg, bg) >= 4.5, `${name} : ${label} = ${ratio(fg, bg).toFixed(2)}`);
+    }
+    // Le contour des champs doit se voir (3:1) sur la feuille
+    assert.ok(ratio(t.control, t.card) >= 3, `${name} : contour des champs = ${ratio(t.control, t.card).toFixed(2)}`);
   }
 });
 
@@ -333,13 +346,13 @@ test('liens entre pages : chaque lien et chaque image du site mène quelque part
   assert.match(tarifs, /href="\/link\?start=claude"/);
   assert.doesNotMatch(tarifs, /setup-token/);
   // Le design : la lettre d'exemple (signalée comme fictive) sur l'accueil, quatre étapes détaillées sur Fonctionnement
-  assert.match(html['/'], /<figure class="letter"/);
+  assert.match(html['/'], /<figure class="v-letter"/);
   assert.match(html['/'], /Exemple fictif/);
   assert.match(html['/'], /<mark>/, "l'accroche est surlignée");
   assert.equal((html['/fonctionnement'].match(/<section class="stp/g) || []).length, 4);
-  assert.match(html['/'], /<picture class="brand-mark/, 'le vrai logo, pas un espace réservé');
+  assert.match(html['/'], /<svg class="brand-mark[^>]*>.*?lg-dot/s, 'le vrai logo (SVG aux couleurs de la charte), pas un espace réservé');
   // Le logo (monogramme) est décoratif : son nom est écrit à côté, donc alt vide et aria-hidden
-  assert.doesNotMatch(html['/'].replace(/<picture class="brand-mark[^>]*>.*?<\/picture>/g, ''), /<img(?![^>]*\salt="[^"]+")/, 'toutes les images ont un texte alternatif');
+  assert.doesNotMatch(html['/'], /<img(?![^>]*\salt="[^"]+")/, 'toutes les images ont un texte alternatif');
 });
 
 test('offres : prix de 10 à 100 € TTC, annuel = 2 mois offerts, plafonds tenables par le serveur et croissants', async () => {
@@ -435,7 +448,7 @@ test('un seul moment animé hors action : l\'accroche de la lettre ; pages de do
     const js = readFileSync(new URL('../public/site.js', import.meta.url), 'utf8');
     assert.doesNotMatch(js, /requestAnimationFrame|IntersectionObserver\(\(entries\) => \{\s*for \(const e of entries\) if \(e\.isIntersecting\) \{\s*const el/, 'plus de bulles ni d\'apparition au défilement');
     const css = readFileSync(new URL('../public/site.css', import.meta.url), 'utf8');
-    assert.match(css, /@media \(prefers-reduced-motion: no-preference\) \{\s*\.letter-body mark \{ animation: hook/, 'l\'accroche ne s\'anime que si le système l\'autorise');
+    assert.match(css, /@media \(prefers-reduced-motion: no-preference\) \{\s*\.v-letter-body mark \{ animation: hook/, 'l\'accroche ne s\'anime que si le système l\'autorise');
     assert.doesNotMatch(css, /translateY|\.reveal|float|\.rb-b/, 'aucun soulèvement, aucune apparition au défilement, aucune bulle');
     assert.match(css, /\.toc \{[^}]*position: sticky/, 'le sommaire légal reste visible');
   } finally { await s.close(); }
@@ -460,21 +473,23 @@ test('confidentialité : les vidéos de promotion sont déclarées (données, du
 test('site public : l\'IA est « ton IA » (Claude, ChatGPT ou Gemini), les trois fournisseurs sont cités, le risque d\'abonnement couvre ChatGPT', async () => {
   const page = async (p) => (await s.anon.get(p, { headers: { accept: 'text/html' } })).text();
   const home = await page('/');
-  assert.match(home, /<h1 class="h1" id="h1">Ton IA écrit tes mails de prospection/);
+  assert.match(home, /<h1 class="v-h1" id="h1">Ton IA écrit tes mails de prospection/);
   assert.match(home, /avec ta propre IA<\/title>/);
   assert.match(home, /pilotés par ton IA/);
   assert.doesNotMatch(home.replace(/<script[^]*?<\/script>/g, ''), /Claude écrit|ton propre Claude|facturé par Anthropic, directement/);
   const tarifs = await page('/tarifs');
   assert.match(tarifs, /id="acces-ia"/);
   assert.doesNotMatch(tarifs, /id="acces-claude"/);
-  assert.match(tarifs, /Ton abonnement Claude ou ChatGPT, avec un risque/);
-  assert.match(tarifs, /Gemini n'a pas ce mode : il se relie par clé API seulement/);
+  assert.match(tarifs, /Ton abonnement Claude, ChatGPT ou Google AI, avec un risque/);
+  assert.match(tarifs, /Google AI \(Plus, Pro, Ultra, par Antigravity/, 'l\'abonnement Google AI, relié par Antigravity, est cité avec Claude et ChatGPT');
+  assert.match(tarifs, /Pour Gemini, la connexion par abonnement n'est proposée que si le service l'a activée ; la clé API reste toujours possible/);
+  assert.match(tarifs, /Google n'a pas dit clairement si c'est permis/, 'la réserve sur les conditions de Google reste dite');
   assert.match(tarifs, /Google peut alors utiliser les données envoyées pour améliorer ses produits/, 'la clé Gemini gratuite est signalée');
   const how = await page('/fonctionnement');
   assert.match(how, /href="\/tarifs#acces-ia"/);
   const confid = await page('/confidentialite');
   for (const f of ['Anthropic (Claude), OpenAI (ChatGPT) ou Google (Gemini)', 'Google, Anthropic et OpenAI peuvent traiter des données aux États-Unis']) assert.ok(confid.replace(/&#39;/g, "'").includes(f), f);
   const cgu = (await page('/cgu')).replace(/&#39;/g, "'");
-  assert.match(cgu, /ton compte Claude ou ChatGPT peut être limité, suspendu ou fermé/);
-  assert.match(cgu, /Gemini ne se relie que par clé API/);
+  assert.match(cgu, /ton compte Claude, ChatGPT ou Google peut être limité, suspendu ou fermé/);
+  assert.match(cgu, /Gemini se relie sinon par clé API/);
 });

@@ -57,6 +57,21 @@ function linkedinConfig(appUrl) {
   };
 }
 
+/**
+ * Paiement des offres (Stripe). Facultatif : sans ces deux variables, les offres restent « Me prévenir à l'ouverture » et un administrateur attribue les plans à la main.
+ * STRIPE_SECRET_KEY : clé secrète (sk_test_… pour essayer, sk_live_… en production) ou clé restreinte (rk_…) ; STRIPE_WEBHOOK_SECRET : secret de signature du point
+ * d'arrivée des événements (whsec_…). `live` : la clé est-elle une clé de production ?
+ */
+function stripeConfig() {
+  const secretKey = (env.STRIPE_SECRET_KEY || '').trim();
+  const webhookSecret = (env.STRIPE_WEBHOOK_SECRET || '').trim();
+  if (!secretKey && !webhookSecret) return null;
+  if (!secretKey || !webhookSecret) throw new Error('Stripe : STRIPE_SECRET_KEY et STRIPE_WEBHOOK_SECRET vont ensemble');
+  if (!/^(sk|rk)_(test|live)_[A-Za-z0-9]{10,}$/.test(secretKey)) throw new Error('Stripe : STRIPE_SECRET_KEY doit être une clé secrète (sk_test_… ou sk_live_…) ou restreinte (rk_…)');
+  if (!/^whsec_[A-Za-z0-9+/=_-]{10,}$/.test(webhookSecret)) throw new Error('Stripe : STRIPE_WEBHOOK_SECRET doit commencer par whsec_ (secret de signature du point d\'arrivée Stripe)');
+  return { secretKey, webhookSecret, live: /^(sk|rk)_live_/.test(secretKey) };
+}
+
 function recaptchaConfig() {
   const siteKey = (env.RECAPTCHA_SITE_KEY || '').trim();
   const secret = (env.RECAPTCHA_SECRET || '').trim();
@@ -141,6 +156,7 @@ export function loadConfig() {
     apple: appleConfig(),
     recaptcha: recaptchaConfig(),
     linkedin: linkedinConfig(required('APP_URL').replace(/\/$/, '')),
+    stripe: stripeConfig(),
     systemSmtp,
     errorSmtp: errorSmtpConfig(systemSmtp),
     inactiveMonths: inactiveMonths(),
@@ -156,6 +172,9 @@ export function loadConfig() {
     dataDir: resolve(env.DATA_DIR || './data'),
     claudeBin: env.CLAUDE_BIN || 'claude',
     geminiBin: env.GEMINI_BIN || 'gemini',
+    agyBin: env.AGY_BIN || 'agy',
+    // Connexion par compte Google (Antigravity CLI) : désactivée par défaut, la règle de Google sur l'usage depuis un autre logiciel n'est pas tranchée
+    googleAccountEnabled: /^(1|true|yes|on)$/i.test(String(env.GOOGLE_ACCOUNT_ENABLED || '')),
     codexBin: env.CODEX_BIN || 'codex',
     // Mode « abonnement » (jeton claude setup-token) : désactivable globalement
     cliModeEnabled: flag(env.CLAUDE_CLI_MODE_ENABLED, true),

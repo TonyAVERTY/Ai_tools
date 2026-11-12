@@ -156,11 +156,12 @@ export function prepareLaunch(o, deps = {}) {
 
   if (!sb.enabled) {
     // Développement uniquement (SANDBOX=off). HOME jetable : la configuration du CLI de la machine n'est jamais lue.
-    const home = mkdtempSync(join(tmpdir(), 'aitools-home-'));
+    // `homeDir` : dossier maison jetable fourni par l'appelant (Antigravity CLI y range sa connexion de compte) ; il le supprime lui-même
+    const home = o.homeDir ? resolve(o.homeDir) : mkdtempSync(join(tmpdir(), 'aitools-home-'));
     return {
       command: nice[0], args: [...nice.slice(1), o.bin, ...o.args], cwd: cwd || undefined, sandboxed: false,
       env: buildChildEnv(parentEnv, { secretEnv: o.secretEnv, extraEnv: o.extraEnv, home }),
-      cleanup: () => { rmSync(home, { recursive: true, force: true }); },
+      cleanup: () => { if (!o.homeDir) rmSync(home, { recursive: true, force: true }); },
     };
   }
 
@@ -176,7 +177,8 @@ export function prepareLaunch(o, deps = {}) {
   return {
     command: nice[0], args: [...nice.slice(1), sb.bwrapBin, ...bwrap], cwd: tmpdir(), sandboxed: true,
     // Le secret n'est jamais dans argv : bwrap transmet son propre environnement au processus du bac à sable
-    env: buildChildEnv(parentEnv, { secretEnv: o.secretEnv, extraEnv: o.extraEnv, home: SANDBOX_HOME }),
+    // `homeDir` : le dossier jetable (monté en écriture avec `rwDirs`) devient le HOME du CLI ; sans lui, le HOME vide du bac à sable
+    env: buildChildEnv(parentEnv, { secretEnv: o.secretEnv, extraEnv: o.extraEnv, home: o.homeDir ? resolve(o.homeDir) : SANDBOX_HOME }),
     cleanup: () => {},
   };
 }

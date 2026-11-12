@@ -16,8 +16,8 @@ td:has(> select), td:has(> .badge) { min-width: 7.5rem; }
   .table-wrap, .art .tw { overflow-x: visible !important; }
   .tw td, .tw th { padding-left: 10px; padding-right: 10px; } /* la maquette de l'accueil tient dans 320 px */
   /* ---- Menu du haut : tout tient sur la largeur, sans défilement, avec des icônes au-dessus des mots ---- */
-  .pills { overflow: visible; justify-content: stretch; gap: 0; padding-bottom: 0; }
-  .pill { flex: 1 1 auto; min-width: 0; flex-direction: column; justify-content: center; gap: 2px; min-height: 52px; padding: 6px 2px; border-radius: 0; font-size: .6875rem; line-height: 1.15; text-align: center; }
+  .pills { overflow: visible; justify-content: stretch; gap: 0; }
+  .pill { flex: 1 1 auto; min-width: 0; flex-direction: column; justify-content: center; gap: 2px; min-height: 56px; padding: 6px 2px; border-radius: 0; font-size: .6875rem; line-height: 1.15; text-align: center; }
   .pill .ic { width: 22px; height: 22px; }
   .top-in { gap: 6px 12px; padding: 8px 12px 6px; }
 
@@ -29,19 +29,14 @@ td:has(> select), td:has(> .badge) { min-width: 7.5rem; }
   .row, .row-actions { min-width: 0; }
 
   /* ---- Fenêtres flottantes : jamais plus larges que l'écran ---- */
-  .reply-pops { right: 8px; left: 8px; bottom: 8px; width: auto; }
+  .reply-pops { right: 8px; left: 8px; bottom: calc(86px + env(safe-area-inset-bottom)); width: auto; }
   .reply-pop, .reply-pop > summary, .reply-body { min-width: 0; max-width: 100%; }
   .prospect-dialog { width: calc(100vw - 16px); padding: 16px; }
   .tokenbox { flex-direction: column; align-items: stretch; }
   .tokenbox code { flex-basis: auto; }
   .row-between { align-items: stretch; }
 }
-/* Libellé court (« Compta ») sous 450 px : le nom complet reste dans la page pour les lecteurs d'écran */
-@media (max-width: 450px) {
-  .pill-s { display: inline; }
-  .pill-l { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-}
-/* Très petit écran (320 px) : sept libellés ne tiennent qu'en retirant les marges des cases */
+/* Très petit écran (320 px) : cinq libellés ne tiennent qu'en retirant les marges des cases */
 @media (max-width: 340px) {
   .pill { padding-left: 0; padding-right: 0; }
 }

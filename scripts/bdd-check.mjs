@@ -43,7 +43,7 @@ try {
     const errs = [];
     p.on('pageerror', (e) => errs.push(e.message));
     p.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource|status of (4|5)\d\d/.test(m.text())) errs.push(m.text()); });
-    await p.goto(`${s.base}/`); await p.waitForSelector('html[data-nav="ready"]');
+    await p.goto(`${s.base}/p/${id}/reglages`); await p.waitForSelector('html[data-nav="ready"]');
     await p.evaluate(() => { const d = document.querySelector('details[data-acc="config"]'); if (d) d.open = true; });
     const f = 'form[data-action="db"]';
     ok(await p.locator(`${f} input[name^="sql_"]`).count() === 0 && !/SELECT/.test(await p.locator(f).innerText()), `${tag} aucun champ où écrire du SQL`);

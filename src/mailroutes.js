@@ -28,8 +28,8 @@ export const stateOf = (row) => (row.error ? 'failed'
 export async function accessibleProjects(db, userId) {
   const teams = await memberTeamIds(db, userId);
   return teams.length
-    ? db.prepare(`SELECT id, name FROM projects WHERE user_id = ? OR team_id IN (${teams.map(() => '?').join(',')}) ORDER BY LOWER(name)`).all(Number(userId), ...teams)
-    : db.prepare('SELECT id, name FROM projects WHERE user_id = ? ORDER BY LOWER(name)').all(Number(userId));
+    ? db.prepare(`SELECT id, name, user_id FROM projects WHERE user_id = ? OR team_id IN (${teams.map(() => '?').join(',')}) ORDER BY LOWER(name)`).all(Number(userId), ...teams)
+    : db.prepare('SELECT id, name, user_id FROM projects WHERE user_id = ? ORDER BY LOWER(name)').all(Number(userId));
 }
 
 export function registerMailRoutes(router, app) {
@@ -50,7 +50,7 @@ export function registerMailRoutes(router, app) {
 
   const shapeReply = async (r, userId) => {
     const out = {
-      id: Number(r.id), projectId: Number(r.project_id), project: r.project, from: r.from_email, company: r.company || null,
+      id: Number(r.id), prospectId: r.prospect_id ? Number(r.prospect_id) : null, projectId: Number(r.project_id), project: r.project, from: r.from_email, company: r.company || null,
       subject: r.subject || '', text: r.body || '', intent: r.intent, intentLabel: INTENTS[r.intent] || INTENTS.other,
       draft: draftReply(r.intent, { company: r.company, senderName: await senderName(r.project_id, userId) }),
       receivedAt: Number(r.received_at), seen: !!r.seen_at,
@@ -60,6 +60,19 @@ export function registerMailRoutes(router, app) {
   };
   const REPLY_SELECT = `SELECT r.*, p.name project, x.company FROM replies r JOIN projects p ON p.id = r.project_id
     LEFT JOIN prospects x ON x.id = r.prospect_id`;
+
+  // Détail d'un mail envoyé (liste déroulante de la page Mails) : contenu gardé à l'envoi, erreur d'envoi ou raison du rejet.
+  // Un mail d'un projet auquel la personne n'a pas accès est « introuvable ».
+  router.get('/api/mails/:id', async ({ res, params, session }) => {
+    const ids = (await myProjects(session.userId)).map((p) => Number(p.id));
+    const id = Number(params.id);
+    const r = ids.length && Number.isInteger(id)
+      ? await db.prepare(`SELECT m.id, m.email, m.subject, m.error, m.read_at, m.body, m.note, x.status FROM mail_log m
+          LEFT JOIN prospects x ON x.id = m.prospect_id WHERE m.id = ? AND m.project_id IN (${inList(ids)})`).get(id, ...ids)
+      : null;
+    if (!r) throw new HttpError(404, 'Mail introuvable');
+    json(res, { id: Number(r.id), to: r.email, subject: r.subject || '', body: r.body || null, error: r.error || null, note: r.note || null, state: stateOf(r) });
+  });
 
   // Réponses : les nouvelles (popup) ou la liste complète
   router.get('/api/replies', async ({ res, url, session }) => {
@@ -92,7 +105,7 @@ export function registerMailRoutes(router, app) {
     const projects = await myProjects(session.userId);
     const ids = projects.map((p) => Number(p.id));
     const sp = url.searchParams;
-    const view = sp.get('v') === 'replies' ? 'replies' : 'sent';
+    const view = sp.get('v') === 'sent' ? 'sent' : 'replies'; // Réponses d'abord (maquette 13) ; « Envoyés » avec v=sent
     const project = ids.includes(Number(sp.get('project'))) ? Number(sp.get('project')) : null;
     const scope = project ? [project] : ids;
     const page = Math.min(100_000, Math.max(1, Math.floor(Number(sp.get('page'))) || 1));

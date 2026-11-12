@@ -7,33 +7,34 @@ import { assetUrl, brandMark, iconLinks } from './assets.js';
 import { SPRITE, ic } from './icons.js';
 import { GIT_SERVER_TYPES, MAX_GIT_SERVERS } from './gitservers.js';
 import { ROLES, MAX_NOTES, rolesOfSection } from './services/roles.js';
-import { tourJson } from './tour.js';
 import { describeKpi } from './services/dbschema.js';
 import { MODE_LABELS } from './claudelink.js';
 import { aiName, forAi } from './services/ainame.js';
+import { goAttr } from './shortcutdata.js';
+import { PLAN_PRICES, PLAN_LABELS, annualPrice } from './limits.js';
 import { banner } from './banner.js';
 import { loadingBlock } from './loading.js';
 
 const fmtDate = (ts) => (ts ? new Date(ts * 1000).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' }) : '—');
 
 // Icônes de la section : noms du sprite (src/icons.js), une seule fois par page
-const SECTION_ICONS = { target: 'target', search: 'search', spark: 'spark', chart: 'chart', mail: 'mail', linkedin: 'pen', send: 'send', repeat: 'repeat', users: 'users', gear: 'gear', git: 'git', computer: 'computer', film: 'film' };
+const SECTION_ICONS = { target: 'target', search: 'search', spark: 'spark', chart: 'chart', mail: 'mail', linkedin: 'pen', send: 'send', repeat: 'repeat', users: 'users', gear: 'gear', git: 'git', computer: 'computer', film: 'film', image: 'image' };
 
 /** Section dépliable. `title` peut contenir du HTML de confiance (badges), jamais de donnée utilisateur brute. */
 function acc(key, icon, title, sub, body, { open = false, cls = '' } = {}) {
   const roles = rolesOfSection(key); // postes auxquels la section se rattache : le filtre par poste du projet la garde ou la cache
-  return `<details class="acc anim ${cls}" data-acc="${key}"${roles.length ? ` data-roles="${roles.join(' ')}"` : ''}${open ? ' open' : ''}>
+  return `<details class="acc anim ${cls}" id="acc-${key}" data-acc="${key}"${roles.length ? ` data-roles="${roles.join(' ')}"` : ''}${open ? ' open' : ''}>
   <summary><span class="acc-ico">${ic(SECTION_ICONS[icon])}</span><span class="acc-txt"><span class="acc-title">${title}</span>${sub ? `<span class="acc-sub">${sub}</span>` : ''}</span><span class="chev" aria-hidden="true"></span></summary>
   <div class="acc-body">${body}</div>
 </details>`;
 }
 
 /** Entrées de la barre du haut : chacune doit avoir son étape dans la visite guidée (test/tour.test.js). */
-export const NAV = [['/', 'folder', 'Projets'], ['/mails', 'mail', 'Mails'], ['/calendar', 'clock', 'Calendrier'], ['/compta', 'wallet', 'Comptabilité'], ['/facturation', 'receipt', 'Facturation'], ['/clients', 'user', 'Clients'], ['/team', 'users', 'Équipe']];
+export const NAV = [['/', 'check', "Aujourd'hui"], ['/projets', 'folder', 'Projets'], ['/mails', 'mail', 'Mails'], ['/calendar', 'clock', 'Agenda'], ['/compta', 'wallet', 'Compta']];
 
-/** Libellé court d'un onglet sur écran étroit (< 450 px) : « Comptabilité » ne tient pas dans sa case. Le nom complet reste dans le HTML pour les lecteurs d'écran. */
-const NAV_SHORT = { '/compta': 'Compta' };
-const pillLabel = (href, label) => (NAV_SHORT[href] ? `<span class="pill-l">${label}</span><span class="pill-s" aria-hidden="true">${NAV_SHORT[href]}</span>` : label);
+/** Pages qui ne sont plus dans la barre du haut mais restent à un clic : menu du compte (avatar). */
+export const MORE_PAGES = [['/facturation', 'receipt', 'Facturation'], ['/clients', 'user', 'Clients'], ['/team', 'users', 'Équipe']];
+
 
 // `named` : « Claude » dans ce corps de page veut dire « l'IA de la personne » : il est remplacé par son nom (Gemini, ChatGPT…).
 // À ne pas mettre sur une page qui parle de Claude comme fournisseur (liaison, abonnement, quota de session).
@@ -54,8 +55,13 @@ ${iconLinks()}
 <script src="${assetUrl('/static/tour.js')}" defer></script>
 <script src="${assetUrl('/static/app.js')}" defer></script>
 <script src="${assetUrl('/static/app-recap.js')}" defer></script>
+<script src="${assetUrl('/static/app-today.js')}" defer></script>
+<script src="${assetUrl('/static/app-contact.js')}" defer></script>
+<script src="${assetUrl('/static/app-search.js')}" defer></script>
+<script src="${assetUrl('/static/app-shortcuts.js')}" defer></script>
 <script src="${assetUrl('/static/app-promo.js')}" defer></script>
 <script src="${assetUrl('/static/app-linkedin.js')}" defer></script>
+<script src="${assetUrl('/static/app-content.js')}" defer></script>
 <script src="${assetUrl('/static/app-prospects.js')}" defer></script>
 <script src="${assetUrl('/static/app-replies.js')}" defer></script>
 <script src="${assetUrl('/static/app-bdd.js')}" defer></script>
@@ -64,21 +70,22 @@ ${iconLinks()}
 <script src="${assetUrl('/static/ajax.js')}" defer></script>
 ${scripts.map((src) => `<script src="${assetUrl(src)}" defer></script>`).join('\n')}
 </head>
-<body class="app" data-ai="${esc(aiName())}">
+<body class="app" data-ai="${esc(aiName())}" data-go="${goAttr()}">
 ${SPRITE}
 <a class="skip" href="#contenu">Aller au contenu</a>
 ${email ? `<header class="top">
   <div class="top-in">
-    <a class="lockup" href="/" aria-label="iaboss, projets">${brandMark()}<span class="wordmark">iaboss</span></a>
+    <a class="lockup" href="/" aria-label="iaboss, accueil">${brandMark()}<span class="wordmark">iaboss</span></a>
     <nav class="pills" aria-label="Navigation de l'application">
-      ${NAV.map(([href, icon, label]) => `<a class="pill" href="${href}">${ic(icon)}${pillLabel(href, label)}</a>`).join('\n      ')}
+      ${NAV.map(([href, icon, label]) => `<a class="pill" href="${href}">${ic(icon)}${label}</a>`).join('\n      ')}
     </nav>
     <div class="top-r">
-      <div class="jobs" id="jobs" hidden>
-        <button type="button" class="jobs-btn" aria-expanded="false" aria-controls="jobs-pop"><span class="spin-inline"></span><span data-jobs-count></span><span class="chev" aria-hidden="true"></span></button>
+      <button type="button" class="search-btn" data-search-open aria-haspopup="dialog" aria-keyshortcuts="Control+K Meta+K">${ic('search')}<span class="search-l">Rechercher</span><kbd aria-hidden="true">⌘K</kbd></button>
+      <div class="jobs" id="jobs">
+        <button type="button" class="jobs-btn" aria-label="Activité" aria-expanded="false" aria-controls="jobs-pop"><span class="jobs-dot" aria-hidden="true"></span><span class="spin-inline" hidden></span><span class="jobs-l">Activité</span><span class="jobs-n" data-jobs-count></span><span class="chev" aria-hidden="true"></span></button>
         <div class="jobs-pop" id="jobs-pop" role="region" aria-label="Jobs en cours" hidden>
           <div class="jobs-head"><strong>Activité</strong><span class="muted small" data-jobs-sub></span></div>
-          <div data-jobs-list></div>
+          <div data-jobs-list><p class="jobs-none">Aucune tâche en cours.</p></div>
         </div>
       </div>
       <a class="ia-link site-link" href="/accueil" data-noajax aria-label="Accès au site internet" title="Accès au site internet">${ic('globe')}<span>Site internet</span></a>
@@ -93,15 +100,22 @@ ${email ? `<header class="top">
         <summary aria-label="Menu du compte : ${esc(email)}"><span class="avatar" aria-hidden="true">${esc(String(email).trim().charAt(0).toUpperCase())}</span></summary>
         <div class="user-pop">
           <p class="user-mail">${esc(email)}</p>
+          ${MORE_PAGES.map(([href, icon, label]) => `<a href="${href}">${ic(icon)}${label}</a>`).join('\n          ')}
           <a href="/account">${ic('user')}Mon compte</a>
           <a href="/settings">${ic('gear')}Réglages</a>
           <a href="/?tour=1">${ic('help')}Visite guidée</a>
+          <a href="/raccourcis">${ic('keyboard')}Raccourcis clavier</a>
           <form method="post" action="/logout"><button>${ic('out')}Déconnexion</button></form>
         </div>
       </details>
     </div>
   </div>
-</header>` : ''}
+</header>
+<dialog class="search-dialog" id="search" aria-label="Recherche">
+  <label class="s-in">${ic('search')}<span class="sr-only">Rechercher une page, un projet, un prospect, un client ou un mail</span><input type="text" role="searchbox" data-search-q placeholder="Rechercher une page, un projet, un prospect, un mail…" autocomplete="off" spellcheck="false" aria-controls="search-out"></label>
+  <div class="s-out" id="search-out" data-search-out aria-live="polite"></div>
+  <p class="s-hint" aria-hidden="true"><kbd>↑</kbd> <kbd>↓</kbd> pour choisir · <kbd>Entrée</kbd> pour ouvrir · <kbd>Échap</kbd> pour fermer</p>
+</dialog>` : ''}
 <main id="contenu" tabindex="-1"><div class="page">${body}</div></main>
 </body>
 </html>`;
@@ -137,6 +151,31 @@ export function claudePanel() {
 }
 
 // Usage du mois : une barre par plafond du plan (largeurs par classes w-N, la CSP interdit le style en ligne)
+const frDay = (ts) => new Date(ts * 1000).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Paris' });
+
+/** Bloc « Ton offre » de Mon compte : abonnement en cours, fin, paiement à régulariser, ou invitation à passer à une offre payante. Rien si les paiements ne sont pas ouverts. */
+export function offerBlock(bl) {
+  if (!bl?.enabled && !bl?.sub) return '';
+  const sub = bl.sub;
+  const flash = bl.flash === 'ok' ? `<p class="ban ban-info" role="status">${ic('check')}<span>Paiement reçu : ton offre est activée dans quelques secondes. Si le plan affiché n'a pas changé, recharge la page.</span></p>` : '';
+  const test = bl.enabled && !bl.live ? '<p class="muted small">Mode test : aucun paiement réel n\'est fait avec cette configuration.</p>' : '';
+  const portal = (label, cls = 'btn') => `<form method="post" action="/abonnement/portail" data-noajax><button class="${cls}">${esc(label)}</button></form>`;
+  let body;
+  if (sub?.entitled) {
+    const price = sub.plan && PLAN_PRICES[sub.plan] ? (sub.period === 'year' ? `${annualPrice(sub.plan)} € TTC par an` : `${PLAN_PRICES[sub.plan]} € TTC par mois`) : '';
+    const end = sub.periodEnd ? (sub.cancelAtEnd ? `Se termine le ${frDay(sub.periodEnd)} : tu repasseras ensuite au plan gratuit, tes données sont gardées.` : `Prochain paiement le ${frDay(sub.periodEnd)}.`) : '';
+    const late = sub.status === 'past_due' ? `<p class="cap" role="alert">${ic('alert')}<span>Ton dernier paiement a échoué. Mets ta carte à jour${sub.graceUntil ? ` avant le ${frDay(sub.graceUntil)}` : ''} pour garder ton offre.</span></p>` : '';
+    body = `<p><b>Ton offre : ${esc(PLAN_LABELS[sub.plan] || 'payante')}</b>${price ? ` · ${esc(price)}` : ''}</p>${end ? `<p class="muted">${esc(end)}</p>` : ''}${late}
+      <div class="row-actions">${portal('Gérer mon abonnement', sub.status === 'past_due' ? 'btn primary' : 'btn')}<a class="btn" href="/tarifs">Changer d'offre</a></div>`;
+  } else if (sub) {
+    body = `<p class="muted">Ton abonnement est terminé : tu es revenu au plan gratuit. Tes projets et tes données sont gardés ; seuls les plafonds du plan gratuit s'appliquent aux nouvelles actions.</p>
+      <div class="row-actions"><a class="btn primary" href="/tarifs">Voir les offres</a>${sub.hasCustomer ? portal('Mes factures') : ''}</div>`;
+  } else {
+    body = `<p class="muted">Tu es sur le plan gratuit. Une offre payante relève les plafonds (projets, prospects, mails, jobs IA).</p><div class="row-actions"><a class="btn primary" href="/tarifs">Passer à une offre payante</a></div>`;
+  }
+  return `<div class="offer" id="offre">${flash}${body}${test}</div>`;
+}
+
 export function usagePanel(u) {
   if (!u) return '';
   const rows = u.items.map((i) => `<li class="g"><div class="g-h"><span>${esc(i.label)}</span><span class="g-v">${i.used}${i.limit == null ? '' : ` / ${i.limit}`}</span></div>${i.limit == null ? '' : `<div class="bar usage${i.full ? ' full' : ''}" role="progressbar" aria-label="${esc(i.label)}" aria-valuemin="0" aria-valuemax="${i.limit}" aria-valuenow="${i.used}"><span class="w-${Math.round(i.pct / 5) * 5}"></span></div>`}</li>`).join('');
@@ -144,6 +183,7 @@ export function usagePanel(u) {
   return `<section class="panel usage-card" aria-labelledby="h-usage">
   <div class="panel-h"><h2 id="h-usage">Usage du mois</h2><span class="badge">plan ${esc(u.planLabel)}</span></div>
   <ul class="usage-list">${rows}</ul>
+  ${offerBlock(u.billing ? { ...u.billing, flash: u.flash } : null)}
   <div data-claude-card hidden><ul class="usage-list usage-claude" data-usage-claude aria-label="Usage de ${esc(aiName())}"></ul></div>
   ${full.length ? `<p class="cap" role="alert">${ic('alert')}<span>Plafond atteint : ${full.map((i) => esc(i.label.toLowerCase())).join(', ')}. Rien n'est perdu. <a href="/tarifs">Voir les tarifs</a></span></p>` : u.plan === 'free' ? '<p class="foot-n">Les plafonds se renouvellent le 1er du mois (heure de Paris). <a href="/tarifs">Voir les tarifs</a></p>' : ''}
 </section>`;
@@ -160,6 +200,14 @@ const QUOTA_WHY = {
   unavailable: 'Le relevé en direct est indisponible chez Anthropic.',
   format: 'Réponse inattendue du relevé en direct.',
 };
+const CHATGPT_WHY = {
+  expired: 'Ton accès ChatGPT sera renouvelé au prochain job iaboss, puis le relevé reviendra.',
+  denied: 'OpenAI refuse le relevé en direct avec cet accès (relie-toi avec « Se connecter avec ChatGPT »).',
+  rate: 'OpenAI limite les relevés : nouvel essai dans quelques minutes.',
+  network: "OpenAI ne répond pas.",
+  unavailable: 'Le relevé en direct est indisponible chez OpenAI.',
+  format: 'Réponse inattendue du relevé en direct.',
+};
 const fmtReset = (ts) => new Date(ts * 1000).toLocaleString('fr-FR', { weekday: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
 
 // Limites d'utilisation du compte Claude : session glissante de 5 h et semaine de 7 j (abonnement seulement ; une clé API n'a pas ces limites).
@@ -167,8 +215,9 @@ function claudeLimits(quota, link) {
   const { mode } = link;
   const head = '<h3 class="sub-h">Limites d\'utilisation</h3>';
   if (mode === 'api_key') return `${head}<p class="hint">Avec une clé API, ${esc(link.providerCompany)} facture ce que tu consommes, à l'usage.</p>`;
-  // Seul Claude remonte une session de 5 h et une semaine : pour un compte ChatGPT, les limites sont celles de l'abonnement, non mesurées par iaboss
-  if (link.provider !== 'claude') return `${head}<p class="hint">Avec ton compte ${esc(link.providerLabel)}, les limites de ton abonnement s'appliquent. iaboss ne les mesure pas.</p>`;
+  // Compte ChatGPT : fenêtres relevées chez OpenAI (src/services/usagechatgpt.js), sinon dernière mesure. Les autres fournisseurs : limites de l'abonnement, non mesurées
+  const chatgpt = link.mode === 'chatgpt_account';
+  if (link.provider !== 'claude' && !chatgpt) return `${head}<p class="hint">Avec ton compte ${esc(link.providerLabel)}, les limites de ton abonnement s'appliquent. iaboss ne les mesure pas.</p>`;
   const row = (label, w) => {
     if (!w) return '';
     if (w.expired) return `<li class="g"><div class="g-h"><span>${label}</span><span class="g-v muted">remise à zéro</span></div></li>`;
@@ -178,11 +227,12 @@ function claudeLimits(quota, link) {
       <div class="bar usage${cls}" role="progressbar" aria-label="${label}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><span class="w-${Math.round(Math.min(100, pct) / 5) * 5}"></span></div>
       ${w.resetsAt ? `<p class="hint">Remise à zéro ${esc(fmtReset(w.resetsAt))}</p>` : ''}</li>`;
   };
-  const rows = quota ? row('Session de 5 h', quota.fiveHour) + row('Semaine de 7 jours', quota.sevenDay) : '';
-  if (!rows) return `${head}<p class="hint">${quota?.error ? esc(QUOTA_WHY[quota.error] || 'Relevé indisponible.') : 'Pas encore mesuré.'}</p>`;
+  const rows = !quota ? '' : chatgpt ? (quota.windows || []).map((w) => row(w.label.charAt(0).toUpperCase() + w.label.slice(1), w)).join('')
+    : row('Session de 5 h', quota.fiveHour) + row('Semaine de 7 jours', quota.sevenDay);
+  if (!rows) return `${head}<p class="hint">${quota?.error ? esc((chatgpt ? CHATGPT_WHY : QUOTA_WHY)[quota.error] || 'Relevé indisponible.') : 'Pas encore mesuré.'}</p>`;
   const live = quota.source === 'live' && !quota.error;
   return `${head}<ul class="usage-list">${rows}</ul>
-  <p class="hint">${live ? 'Relevé en direct chez Anthropic : il compte tout ton usage de Claude, y compris hors iaboss.' : `Dernière mesure faite pendant un job iaboss${quota.error ? ` (${esc((QUOTA_WHY[quota.error] || 'relevé en direct indisponible').replace(/\.$/, ''))})` : ''}.`}</p>`;
+  <p class="hint">${live ? `Relevé en direct chez ${chatgpt ? 'OpenAI' : 'Anthropic'} : il compte tout ton usage de ${chatgpt ? 'ChatGPT' : 'Claude'}, y compris hors iaboss.` : `Dernière mesure faite pendant un job iaboss${quota.error ? ` (${esc((QUOTA_WHY[quota.error] || 'relevé en direct indisponible').replace(/\.$/, ''))})` : ''}.`}</p>`;
 }
 
 function linkSection(link, consent, quota = null) {
@@ -218,31 +268,36 @@ export const pctBlock = (label) => `<div class="dl-pct" data-pct hidden><div cla
 export function accountPage({ user, error, link = null, consent = null, notice = null, usage = null, developer = false, ical = null, appUrl = '', quota = null, profileSet = false }) {
   return layout({
     title: 'Mon compte', email: user.email,
-    body: `<div class="narrow">
-<h1 class="h1">Mon compte</h1>
-<section class="card">
+    body: `<div class="pj-page acct">
+<div class="ph"><div class="t"><h1>Mon compte</h1><span class="muted small">${esc(user.email)} · connecté avec ${esc(PROVIDER_NAMES[user.provider] || '—')}</span></div></div>
+<div class="pj-tools"><nav class="tools-nav" aria-label="Mon compte">
+  <p class="tools-grp">Moi</p><a href="#mon-ia" aria-current="true">Mon IA</a><a href="#usage">Usage et offre</a><a href="#profil">Mon profil</a><a href="#agenda-ext">Agenda externe</a>
+  <p class="tools-grp">Réglages</p><a href="/settings#notif">Notifications</a><a href="/settings#git">Dépôts Git</a><a href="/settings#garde">Garde-fous</a><a href="/settings#garde">Liste d'opposition</a><a href="/settings#budget">Budget et modèles IA</a><a href="/settings#prompts">Prompts IA</a>
+  <p class="tools-grp">Équipe et avancé</p><a href="/team">Équipe</a><a href="/developer">Mode développeur</a><a href="/?tour=1">Visite guidée</a><a href="#danger">Zone de danger</a></nav>
+<div class="pj-flat tools-main">
+${notice ? banner(notice.ok ? 'ok' : 'err', notice.text) : ''}
+<div id="mon-ia">${linkSection(link, consent, quota)}</div>
+<div id="usage">${usagePanel(usage)}</div>
+<section class="card" id="profil">
+  <div class="card-h"><h2>Mon profil</h2><span class="badge ${profileSet ? 'ok' : ''}">${profileSet ? `${ic('check')}Renseigné` : 'Non renseigné'}</span><p>Ta fonction, ton niveau technique, le niveau de détail et le tutoiement que tu préfères : Claude s'en sert pour te répondre. Valable pour tous tes projets, rien n'est partagé avec un autre compte.</p></div>
+  <div class="row"><a class="btn small" href="/welcome?edit=1">${ic('user')}${profileSet ? 'Modifier mon profil' : 'Renseigner mon profil'}</a></div>
+</section>
+<section class="card" id="agenda-ext">
+  <div class="card-h"><h2>Agenda</h2><a class="btn small" href="/calendar">${ic('clock')}Voir le calendrier</a></div>
+  ${icalBox(ical, '/account')}
+</section>
+<section class="card" id="connexion">
   <div class="card-h"><h2>Connexion</h2></div>
   <div class="ident"><span class="avatar" aria-hidden="true">${esc(String(user.email).trim().charAt(0).toUpperCase())}</span>
     <span class="sp"><b>${esc(user.email)}</b><span class="hint">Connecté avec ${esc(PROVIDER_NAMES[user.provider] || '—')}, sans mot de passe</span></span></div>
   ${user.isAdmin ? '<div class="row"><a class="btn small" href="/admin">Administration</a></div>' : ''}
 </section>
-${notice ? banner(notice.ok ? 'ok' : 'err', notice.text) : ''}
-${usagePanel(usage)}
-${linkSection(link, consent, quota)}
-<section class="card">
-  <div class="card-h"><h2>Mon profil</h2><span class="badge ${profileSet ? 'ok' : ''}">${profileSet ? `${ic('check')}Renseigné` : 'Non renseigné'}</span><p>Ta fonction, ton niveau technique, le niveau de détail et le tutoiement que tu préfères : Claude s'en sert pour te répondre. Valable pour tous tes projets, rien n'est partagé avec un autre compte.</p></div>
-  <div class="row"><a class="btn small" href="/welcome?edit=1">${ic('user')}${profileSet ? 'Modifier mon profil' : 'Renseigner mon profil'}</a></div>
-</section>
-<section class="card">
-  <div class="card-h"><h2>Agenda</h2><a class="btn small" href="/calendar">${ic('clock')}Voir le calendrier</a></div>
-  ${icalBox(ical, '/account')}
-</section>
-<section class="card">
+<section class="card" id="developpeur">
   <div class="card-h"><h2>Mode développeur</h2><p>L'API d'iaboss et le serveur MCP (relier Claude à ton panel) ne sont disponibles que si tu actives ce mode.</p></div>
   <div class="row"><span class="badge ${developer ? 'ok' : ''}">${developer ? 'Activé' : 'Désactivé'}</span><a class="btn small" href="/developer">${ic('key')}${developer ? 'Jetons et documentation' : 'Activer'}</a></div>
   ${developer ? devLinks(appUrl) : `<p class="muted small">Une fois le mode activé, les adresses de l'API et du serveur MCP, leurs documentations et tes jetons s'affichent ici et sur la page Développeur.</p>`}
 </section>
-<section class="card danger">
+<section class="card danger" id="danger">
   <div class="card-h"><h2>Zone de danger</h2></div>
   <p class="card-d">Supprimer ton compte efface définitivement ton compte et toutes tes données : projets, prospects, notes, modèles de mail, journaux d'envoi, lignes de comptabilité et leurs justificatifs, jobs, réglages et clones du code. Les adresses qui ont demandé à ne plus être contactées restent dans la liste d'opposition commune. Cette action est irréversible.</p>
   ${error ? banner('err', error) : ''}
@@ -251,25 +306,29 @@ ${linkSection(link, consent, quota)}
     <div class="row"><button class="btn danger-fill">${ic('trash')}Supprimer mon compte et mes données</button></div>
   </form>
 </section>
-</div>`,
+</div></div></div>`,
   });
 }
 
 function targetForm(p) {
   const t = p.target || {};
   const list = (a) => esc((a || []).join('\n'));
-  return `<form class="target cfg" data-action="target" data-id="${p.id}">
-  <label>Description<input name="description" value="${esc(t.description)}"></label>
+  const lock = p.targetValidated ? ' readonly' : ''; // cible validée : grisée et en lecture seule jusqu'à « Modifier » (public/app.js)
+  return `<form class="target cfg${p.targetValidated ? ' target-locked' : ''}" data-action="target" data-id="${p.id}">
+  ${p.targetValidated ? `<p class="target-sum">${esc([t.description, t.taille, t.zone].filter(Boolean).join(', '))}${t.decideur ? `, décideur : ${esc(t.decideur)}` : ''}${t.description || t.taille || t.zone || t.decideur ? '.' : ''}</p>` : ''}
+  <label>Description<input name="description" value="${esc(t.description)}"${lock}></label>
   <div class="grid3">
-    <label>Zone<input name="zone" value="${esc(t.zone)}"></label>
-    <label>Taille<input name="taille" value="${esc(t.taille)}"></label>
-    <label>Décideur<input name="decideur" value="${esc(t.decideur)}"></label>
+    <label>Zone<input name="zone" value="${esc(t.zone)}"${lock}></label>
+    <label>Taille<input name="taille" value="${esc(t.taille)}"${lock}></label>
+    <label>Décideur<input name="decideur" value="${esc(t.decideur)}"${lock}></label>
   </div>
   <div class="grid2">
-    <label>Secteurs (1 par ligne)<textarea name="secteurs" rows="4">${list(t.secteurs)}</textarea></label>
-    <label>Requêtes de recherche (1 par ligne)<textarea name="requetes" rows="4">${list(t.requetes)}</textarea></label>
+    <label>Secteurs (1 par ligne)<textarea name="secteurs" rows="4"${lock}>${list(t.secteurs)}</textarea></label>
+    <label>Requêtes de recherche (1 par ligne)<textarea name="requetes" rows="4"${lock}>${list(t.requetes)}</textarea></label>
   </div>
-  <div class="row"><button class="btn${p.targetValidated ? '' : ' primary'}">${p.targetValidated ? 'Mettre à jour' : `${ic('check')}Valider la cible`}</button></div>
+  <div class="row">${p.targetValidated ? `<button type="button" class="btn small" data-target-unlock>${ic('pen')}Modifier</button>` : ''}
+    <button class="btn${p.targetValidated ? '' : ' primary'}" data-target-save${p.targetValidated ? ' disabled' : ''}>${p.targetValidated ? 'Mettre à jour' : `${ic('check')}Valider la cible`}</button>
+    ${p.targetValidated ? '<button type="button" class="btn" data-target-cancel hidden>Annuler</button>' : ''}</div>
 </form>`;
 }
 
@@ -297,8 +356,8 @@ function bddTables(dbCfg) {
 
 function configForms(p, smtp, dbCfg, imap) {
   const source = { project: 'Ce projet envoie depuis son adresse (SMTP ci-dessous).', null: "Aucun SMTP : renseigne celui de l'adresse d'envoi de ce projet, sinon rien ne peut partir." }[p.smtpSource ?? 'null'];
-  return `<form data-action="smtp" data-id="${p.id}" class="cfg">
-  <h4>SMTP d'envoi de ce projet (adresse du projet)</h4>
+  return `<form data-action="smtp" data-id="${p.id}" class="cfg" id="set-smtp">
+  <h4>Adresse d'envoi (SMTP)</h4>
   <p class="muted small" data-smtp-source>${source} Les mails de prospection et les relances de ce projet partent de cette adresse (une boîte par projet). Les mails d'iaboss (rapport, évolutions, invitations) partent, eux, du serveur.</p>
   <div class="grid3">
     <label>Hôte<input name="host" value="${esc(smtp.host)}" placeholder="smtp.exemple.fr"></label>
@@ -311,7 +370,7 @@ function configForms(p, smtp, dbCfg, imap) {
   <label>Plafond mails / 24 h (max 200)<input name="dailyCap" type="number" min="1" max="200" value="${p.dailyMailCap}"></label>
   <button class="btn">Enregistrer SMTP</button>
 </form>
-<form data-action="imap" data-id="${p.id}" class="cfg">
+<form data-action="imap" data-id="${p.id}" class="cfg" id="set-imap">
   <h4>Boîte de réception (IMAP)</h4>
   <p class="muted small">Sert à détecter les réponses et les adresses invalides. Utilisateur vide = mêmes identifiants que le SMTP. Hôte vide = désactivé.</p>
   <div class="grid3">
@@ -322,7 +381,7 @@ function configForms(p, smtp, dbCfg, imap) {
   </div>
   <button class="btn">Enregistrer et tester</button>
 </form>
-<form data-action="db" data-id="${p.id}" class="cfg">
+<form data-action="db" data-id="${p.id}" class="cfg" id="set-db">
   <h4>Base de données (récapitulatif)</h4>
   <p class="muted small">Utilise un compte en lecture seule. iaboss lit la structure de ta base, te propose les bonnes tables et affiche un aperçu des chiffres : tu n'écris aucune requête.</p>
   <div class="grid3">
@@ -337,9 +396,9 @@ function configForms(p, smtp, dbCfg, imap) {
   ${bddTables(dbCfg)}
   <div class="row"><button type="button" class="btn" data-bdd-analyze>Se connecter et analyser</button><button class="btn">Enregistrer BDD</button></div>
 </form>
-${p.access === 'owner' ? `<form data-action="delete" data-id="${p.id}" data-confirm="Supprimer ${esc(p.name)} et tous ses prospects ?" data-confirm-label="Supprimer le projet" class="cfg">
+${p.access === 'owner' ? `<section class="cfg danger-card" id="set-danger" aria-labelledby="danger-h"><h4 id="danger-h">Zone de danger</h4><p class="muted small">Efface le projet, ses prospects, ses modèles, ses vidéos et le clone du code. Les adresses en liste d'opposition restent.</p><form data-action="delete" data-id="${p.id}" data-confirm="Supprimer ${esc(p.name)} et tous ses prospects ?" data-confirm-label="Supprimer le projet" class="cfg">
   <button class="btn danger">${ic('trash')}Supprimer le projet</button>
-</form>` : ''}`;
+</form></section>` : ''}`;
 }
 
 function templateForm(p, kind) {
@@ -347,26 +406,22 @@ function templateForm(p, kind) {
   const job = initial ? 'template' : 'followup_template';
   return `<form data-action="template" data-kind="${kind}" data-id="${p.id}" class="tpl">
       <div class="row"><h4>${initial ? 'Modèle de mail' : 'Modèle de relance'} <span data-tpl-state></span></h4>
-        <button type="button" class="btn small" data-run="${job}" data-id="${p.id}">Générer avec l'IA</button></div>
-      <p class="muted small">Variables : {{entreprise}} {{ville}}${initial ? ' {{accroche}}' : ''} {{expediteur}} {{site}}. Le lien de désinscription est ajouté automatiquement.</p>
-      <label>Objet${initial ? '' : ' <span class="muted small">(vide = « Re: » + objet du premier mail, dans le même fil)</span>'}<input name="subject"></label>
-      ${initial ? '<label>Objet B <span class="muted small">(optionnel : test A/B, les envois alternent entre les deux objets)</span><input name="subjectB"></label>' : ''}
+        <span class="row"><button type="button" class="btn small" data-tpl-unlock hidden>${ic('pen')}Modifier</button>
+        <button type="button" class="btn small" data-run="${job}" data-id="${p.id}">Générer avec l'IA</button></span></div>
+      <p class="muted small" data-tpl-help>Variables : {{entreprise}} {{ville}}${initial ? ' {{accroche}}' : ''} {{expediteur}} {{site}}. Le lien de désinscription est ajouté automatiquement.</p>
+      <label>Objet${initial ? '' : ' <span class="muted small" data-tpl-help>(vide = « Re: » + objet du premier mail, dans le même fil)</span>'}<input name="subject"></label>
+      ${initial ? '<label>Objet B <span class="muted small" data-tpl-help>(optionnel : test A/B, les envois alternent entre les deux objets)</span><input name="subjectB"></label>' : ''}
       <label>Corps<textarea name="body" rows="${initial ? 9 : 5}"></textarea></label>
       <label class="opt"><input type="checkbox" name="html"><span class="box">${ic('check')}</span><span>Envoyer en mail HTML<small class="muted"> Sans cette case, le mail part en texte simple, comme un mail écrit à la main.</small></span></label>
       <div class="row">
         <button type="button" class="btn" data-tpl-preview>${ic('eye')}Aperçu</button>
         <button class="btn" name="mode" value="save">Enregistrer</button>
         <button class="btn primary" name="mode" value="validate">Valider le modèle</button>
+        <button type="button" class="btn" data-tpl-cancel hidden>Annuler</button>
       </div>
     </form>
     <div class="job" data-job="${job}"></div>`;
 }
-
-/** Filtre par poste, dans l'en-tête de la page Projets : il s'applique à tous les projets. */
-const ROLE_SELECT = `<label class="rolesel"><span class="lbl">Poste</span><span class="sel"><select data-role-select aria-label="Filtrer les projets par poste">
-    <option value="">Tous les postes</option>
-    ${ROLES.map((r) => `<option value="${r.id}">${esc(r.label)}</option>`).join('\n    ')}
-  </select>${ic('down')}</span></label>`;
 
 /** Section « Postes et tâches IA » : chaque poste avec ses tâches. Les tâches qui lisent le dépôt sont réservées aux administrateurs. */
 function postesBody(p) {
@@ -390,22 +445,10 @@ function postesBody(p) {
   </div>`;
 }
 
-const shortDay = (ts) => new Date(ts * 1000).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', timeZone: 'Europe/Paris' });
-/** Chiffres réels d'un projet dans sa ligne repliée (voir projectStats) : seuls les compteurs non nuls s'ajoutent à « prospects ». */
-function projectFacts(st) {
-  if (!st) return '';
-  if (!st.prospects) return '<span class="pfacts"><span class="muted">aucun prospect</span></span>';
-  const parts = [`<span><b>${st.prospects.toLocaleString('fr-FR')}</b> prospect${st.prospects > 1 ? 's' : ''}</span>`];
-  if (st.toContact) parts.push(`<span><b>${st.toContact.toLocaleString('fr-FR')}</b> à contacter</span>`);
-  if (st.replies) parts.push(`<span class="ok"><b>${st.replies.toLocaleString('fr-FR')}</b> réponse${st.replies > 1 ? 's' : ''}</span>`);
-  if (st.lastSentAt) parts.push(`<span>dernier envoi le ${esc(shortDay(st.lastSentAt))}</span>`);
-  return `<span class="pfacts">${parts.join('')}</span>`;
-}
-
-function projectItem(p, smtp, dbCfg, imap, { open = false, stats = null } = {}) {
+export function projectBlocks(p, smtp, dbCfg, imap) {
   const profile = p.profile;
   // « En-tête » (dépôt, site, fiche, sortie de l'analyse) : en haut et ouvert tant que le projet n'est pas analysé, puis replié en bas, juste avant « Configuration ».
-  const headerAcc = acc('header', 'git', 'En-tête', 'Dépôt Git et fiche projet', `
+  const headerAcc = acc('header', 'git', 'Dépôt et site', 'Dépôt Git, site du produit et fiche projet', `
   <div class="field"><span class="lbl">Dépôt Git</span><div class="ro">${ic('lock', 'ic-s')}<span>${esc(p.gitUrl)}</span><span class="badge">lecture seule</span></div></div>
   ${p.access !== 'member' ? `<form data-action="site" data-id="${p.id}" class="site-form">
     <label class="field"><span class="lbl">Site du produit</span><input name="site_url" maxlength="300" inputmode="url" autocomplete="off" placeholder="https://monproduit.fr" value="${esc(p.siteUrl || '')}"></label>
@@ -416,68 +459,67 @@ function projectItem(p, smtp, dbCfg, imap, { open = false, stats = null } = {}) 
     <div class="fiche-h"><b>Fiche projet</b></div>
     <p>${esc(profile.resume)}</p><p class="meta"><span>Analysé le ${fmtDate(p.profileAt)}</span><span>Commit <code>${esc((p.profileCommit || '').slice(0, 8))}</code></span><span>${esc(profile.stack || '')}</span></p>
   </section>` : ''}
-  <div class="job" data-job="analyze"></div>`, { open: !profile });
-  return `<details class="project anim" data-id="${p.id}"${open ? ' open' : ''}>
-<summary><span class="pname">${esc(p.name)}</span>${p.access !== 'owner' ? `<span class="badge" title="Projet partagé par ${esc(p.ownerEmail || '')}">équipe de ${esc(p.ownerEmail || '')}</span>` : p.teamId ? '<span class="badge ok">partagé</span>' : ''}<button type="button" class="pcfg badge" data-cfg title="Voir la liste « Mise en route »" hidden></button><button type="button" class="btn small secondary prean" data-run="analyze" data-id="${p.id}"${profile ? ' data-reanalyze' : ''} title="${profile ? "Relancer l'analyse du dépôt" : "Lancer l'analyse du dépôt"}" aria-label="${profile ? 'Réanalyser' : 'Analyser'} le projet">${ic(profile ? 'repeat' : 'spark')}<span>${profile ? 'Réanalyser' : 'Analyser'}</span></button><span class="pstate" data-state></span>${projectFacts(stats)}</summary>
-<div class="pbody"><div class="pcard">
-  ${acc('setup', 'target', 'Mise en route', 'Ce qu\'il reste à faire avant ton premier envoi', `<div class="setup" data-setup>${loadingBlock()}</div>`, { cls: 'setup-acc' })}
-  ${profile ? '' : headerAcc}
-
-  ${profile ? acc('target', 'target',
-    `Cible${p.targetValidated ? '' : ' <span class="badge warn">à valider</span>'}`, // une cible validée est signalée par la coche verte de la section
-    esc((p.target?.description || '').slice(0, 120)), targetForm(p), { open: !p.targetValidated, cls: 'target-acc' }) : ''}
-
-  <div class="accs">
-  ${acc('prospect', 'search', 'Prospecter', 'Recherche, modèle de mail, envoi, relances et CRM', `
-    ${acc('search', 'search', 'Recherche de prospects', `${aiName()} cherche des entreprises qui collent à la cible`, `
+  <div class="job" data-job="analyze"></div>`, { open: true });
+  const setup = acc('setup', 'target', 'Mise en route', 'Ce qu\'il reste à faire avant ton premier envoi', `<div class="setup" data-setup>${loadingBlock()}</div>`, { cls: 'setup-acc' });
+  const target = profile ? acc('target', 'target',
+    `${p.targetValidated ? ic('lock', 'ic-s') : ''}Cible ${p.targetValidated ? `<span class="badge ok">${ic('check')}Validée</span>` : '<span class="badge warn">à valider</span>'}`,
+    esc((p.target?.description || '').slice(0, 120)), targetForm(p), { open: true, cls: 'target-acc' }) : '';
+  const search = acc('search', 'search', 'Recherche de prospects', `${aiName()} cherche des entreprises qui collent à la cible`, `
     <form data-action="prospect" data-id="${p.id}" class="inline">
       <label>Prospects à chercher<input name="count" type="number" min="1" max="50" value="10"></label>
       <label>Quand<select name="when"><option value="now">Maintenant</option><option value="night">Cette nuit (1h-6h)</option></select></label>
       <button class="btn primary">Lancer la recherche</button>
     </form>
-    <div class="job" data-job="prospect"></div>`, { open: true, cls: 'sub' })}
-
-    ${acc('template', 'mail', 'Modèle de mail', 'Objet, test A/B et corps du premier mail', templateForm(p, 'initial'), { cls: 'sub' })}
-
-    ${acc('send', 'send', 'Envoi', 'Envoi par lots, boîte de réception et test A/B', `
-    <form data-action="send" data-id="${p.id}" class="inline send">
-      <label>Mails à envoyer<input name="count" type="number" min="1" value="10"></label>
-      <button class="btn primary" disabled>Envoyer</button>
+    <div class="job" data-job="prospect"></div>`, { open: true, cls: 'main' });
+  const template = acc('template', 'mail', 'Modèle de mail', 'Objet, test A/B et corps du premier mail', templateForm(p, 'initial'), { open: true, cls: 'main' });
+  const send = `<section class="sheet pj-send" id="acc-send" data-acc="send" aria-labelledby="send-h"><h2 id="send-h">Envoyer</h2>
+    <form data-action="send" data-id="${p.id}" class="send">
+      <label class="field"><span class="lbl">Mails à envoyer</span><input name="count" type="number" min="1" value="10"></label>
+      <p class="muted small">Un lot fait 100 mails au plus. Chaque mail est relu par ${esc(aiName())} avant de partir.</p>
+      <button class="btn primary" disabled>${ic('send')}Envoyer</button>
       <span class="muted small" data-send-info></span>
     </form>
     <div class="job" data-job="send"></div>
-    <p class="inbox small" data-inbox></p>`, { cls: 'sub' })}
-
-    ${acc('followup', 'repeat', 'Relance automatique', 'Une relance dans le même fil après quelques jours', `
-    <section class="followup">
-      <form data-action="followup" data-id="${p.id}" class="inline">
-        <label class="check"><input type="checkbox" name="enabled" ${p.followupEnabled ? 'checked' : ''}> Relancer une fois les prospects sans réponse</label>
-        <label>Après (jours)<input name="days" type="number" min="2" max="30" value="${p.followupDays}"></label>
-        <button class="btn">Enregistrer</button>
-      </form>
-      <p class="muted small" data-followup-info></p>
-      ${templateForm(p, 'followup')}
-      <div class="job" data-job="followup"></div>
-    </section>`, { cls: 'sub' })}
-
-    ${acc('prospects', 'users', 'Prospects <span data-count></span>', 'Recherche, filtres, fiches, import et export CSV', `
-      <div class="viewtoggle" role="group" aria-label="Affichage des prospects">
-        <button type="button" class="btn small on" data-view-mode="list" aria-pressed="true">Liste</button>
-        <button type="button" class="btn small" data-view-mode="board" aria-pressed="false">Kanban</button>
+    <p class="muted small" data-ab></p></section>`;
+  const followup = `<section class="sheet pj-follow" id="acc-followup" data-acc="followup" aria-labelledby="follow-h"><div class="sheet-h"><h2 id="follow-h">Relance automatique</h2><span class="badge" data-followup-badge>Désactivée</span></div>
+    <form data-action="followup" data-id="${p.id}" class="followup">
+      <label class="check"><input type="checkbox" name="enabled" ${p.followupEnabled ? 'checked' : ''}> Relancer une fois les prospects sans réponse</label>
+      <label class="field"><span class="lbl">Après (jours)</span><input name="days" type="number" min="2" max="30" value="${p.followupDays}"></label>
+      <button class="btn">Enregistrer</button>
+    </form>
+    <p class="muted small" data-followup-info></p>
+    <div class="job" data-job="followup"></div></section>`;
+  const followuptpl = acc('followuptpl', 'repeat', 'Modèle de relance', 'Le texte envoyé dans le même fil, après quelques jours', templateForm(p, 'followup'), { open: true, cls: 'main' });
+  const inbox = `<section class="sheet pj-inbox" id="acc-inbox" aria-labelledby="inbox-h"><h2 id="inbox-h">Boîte de réception</h2><p class="small" data-inbox></p></section>`;
+  const prospects = acc('prospects', 'users', 'Prospects <span data-count></span>', 'Recherche, filtres, fiches, import et export CSV', `
+      <div class="pr-head">
+        <h2>Prospects</h2>
+        <div class="seg" role="group" aria-label="Affichage des prospects">
+          <button type="button" class="on" data-view-mode="list" aria-pressed="true">Liste</button>
+          <button type="button" data-view-mode="board" aria-pressed="false">Kanban</button>
+        </div>
+        <button type="button" class="btn secondary small" data-pform-toggle aria-expanded="false">${ic('plus')}Ajouter un prospect</button>
       </div>
       <form class="pfilters" data-filters>
-        <input type="search" name="q" placeholder="Rechercher : entreprise, email, ville, secteur" aria-label="Rechercher">
-        <select name="status" aria-label="Statut"><option value="">Tous les statuts</option>${Object.entries(STATUSES).map(([k, l]) => `<option value="${k}">${l}</option>`).join('')}</select>
-        <select name="minScore" aria-label="Score minimum"><option value="0">Tous les scores</option><option value="5">Score ≥ 5</option><option value="7">Score ≥ 7</option><option value="9">Score ≥ 9</option></select>
-        <label class="opt"><input type="checkbox" name="todo" value="1"><span class="box">${ic('check')}</span><span>Actions à faire</span></label>
-        <select name="sort" aria-label="Tri"><option value="score">Tri : score</option><option value="recent">Plus récents</option><option value="contacted">Dernier contact</option><option value="company">Entreprise A → Z</option></select>
+        <div class="pr-bar">
+          <div class="chips" role="group" aria-label="Filtrer par statut">
+            <button type="button" class="chip on" data-chip="" aria-pressed="true">Tous <span data-chip-n="all"></span></button>
+            <button type="button" class="chip" data-chip="new" aria-pressed="false">À contacter <span data-chip-n="new"></span></button>
+            <button type="button" class="chip" data-chip="sent" aria-pressed="false">Contacté <span data-chip-n="sent"></span></button>
+            <button type="button" class="chip" data-chip="replied" aria-pressed="false">A répondu <span data-chip-n="replied"></span></button>
+            <button type="button" class="chip" data-chip-todo aria-pressed="false">Actions à faire <span data-chip-n="todo"></span></button>
+          </div>
+          <label class="pr-search">${ic('search', 'ic-s')}<input type="search" name="q" placeholder="Rechercher" aria-label="Rechercher : entreprise, email, ville, secteur"></label>
+        </div>
+        <details class="pr-more"><summary>Plus de filtres</summary>
+          <div class="pr-more-b">
+            <select name="status" aria-label="Statut"><option value="">Tous les statuts</option>${Object.entries(STATUSES).map(([k, l]) => `<option value="${k}">${l}</option>`).join('')}</select>
+            <select name="minScore" aria-label="Score minimum"><option value="0">Tous les scores</option><option value="5">Score ≥ 5</option><option value="7">Score ≥ 7</option><option value="9">Score ≥ 9</option></select>
+            <label class="opt"><input type="checkbox" name="todo" value="1"><span class="box">${ic('check')}</span><span>Actions à faire</span></label>
+            <select name="sort" aria-label="Tri"><option value="score">Tri : score</option><option value="recent">Plus récents</option><option value="contacted">Dernier contact</option><option value="company">Entreprise A → Z</option></select>
+          </div>
+        </details>
       </form>
-      <div class="row csv">
-        <button type="button" class="btn small primary" data-pform-toggle aria-expanded="false">${ic('plus')}Ajouter un prospect</button>
-        <a class="btn small" data-export href="/api/projects/${p.id}/prospects.csv" download>Exporter (CSV)</a>
-        <label class="btn small file">Importer un CSV<input type="file" accept=".csv,text/csv" data-import="${p.id}" hidden></label>
-        <span class="muted small">Colonnes reconnues : entreprise, email, site, ville, secteur, score, source, accroche.</span>
-      </div>
       <form class="pform panel" data-pform data-id="${p.id}" hidden>
         <div class="panel-h"><h4>Ajouter un prospect</h4></div>
         <p class="muted small">Pour un contact que tu as déjà : le prospect est ajouté avec le statut « À contacter ». Il est écarté s'il existe déjà dans ce projet ou s'il ne doit pas être contacté.</p>
@@ -495,10 +537,12 @@ function projectItem(p, smtp, dbCfg, imap, { open = false, stats = null } = {}) 
       </form>
       <div data-import-report></div>
       <div data-prospects></div>
-      <div class="pager" data-pager></div>`, { cls: 'sub prospects' })}
-  `, { cls: 'main', open: !!profile && !!p.targetValidated })}
-
-  ${acc('evolution', 'spark', 'Évolution', 'Idées de fonctionnalités tirées du code, envoyées par mail', `
+      <div class="pr-foot">
+        <div class="pager" data-pager></div>
+        <span class="acts"><a data-export href="/api/projects/${p.id}/prospects.csv" download>Exporter (CSV)</a><label class="file">Importer un CSV<input type="file" accept=".csv,text/csv" data-import="${p.id}" hidden></label></span>
+      </div>
+      <p class="muted small pr-hint">Colonnes reconnues à l'import : entreprise, email, site, ville, secteur, score, source, accroche.</p>`, { open: true, cls: 'main prospects' });
+  const evolution = acc('evolution', 'spark', 'Évolution', 'Idées de fonctionnalités tirées du code, envoyées par mail', `
     <form data-action="evolution" data-id="${p.id}" class="inline">
       <label>Nombre d'évolutions<input name="count" type="number" min="1" max="20" value="5"></label>
       <label>Raisonnement<select name="level">
@@ -509,9 +553,8 @@ function projectItem(p, smtp, dbCfg, imap, { open = false, stats = null } = {}) 
       <label>Quand<select name="when"><option value="now">Maintenant</option><option value="night">Cette nuit (1h-6h)</option></select></label>
       <button class="btn primary">Chercher et envoyer par mail</button>
     </form>
-    <div class="job" data-job="evolution"></div>`, { cls: 'main' })}
-
-  ${p.access !== 'member' ? acc('audit', 'computer', 'Audit du projet', 'Rapport qualité et sécurité du code, en lecture seule', `
+    <div class="job" data-job="evolution"></div>`, { open: true, cls: 'main' });
+  const audit = p.access !== 'member' ? acc('audit', 'computer', 'Audit du projet', 'Rapport qualité et sécurité du code, en lecture seule', `
     <form data-action="audit" data-id="${p.id}" class="inline">
       <label>Raisonnement<select name="level">
         <option value="rapide" selected>Rapide (Haiku, économe)</option>
@@ -522,59 +565,24 @@ function projectItem(p, smtp, dbCfg, imap, { open = false, stats = null } = {}) 
       <button class="btn primary">${ic('shield')}Lancer l'audit</button>
     </form>
     <p class="muted small">${esc(aiName())} lit le dépôt (sans rien modifier) et signale les défauts de code, de sécurité, de tests et de dépendances, avec le fichier concerné.</p>
-    <div class="job" data-job="audit"></div>`, { cls: 'main' }) : ''}
-
-  ${acc('linkedin', 'linkedin', 'LinkedIn', `Relie un compte, ${aiName()} écrit des posts, tu relis et publies`, `
+    <div class="job" data-job="audit"></div>`, { open: true, cls: 'main' }) : '';
+  const linkedin = acc('linkedin', 'linkedin', 'LinkedIn', `Relie un compte, ${aiName()} écrit des posts, tu relis et publies`, `
     <div class="linkedin" data-linkedin>${loadingBlock()}</div>
-    <div class="job" data-job="linkedin_post"></div>`, { cls: 'main' })}
-
-  ${acc('promo', 'film', 'Promotion', `${aiName()} conçoit une vidéo de design motion pour présenter ton projet`, `
+    <div class="job" data-job="linkedin_post"></div>`, { open: true, cls: 'main' });
+  const instagram = acc('instagram', 'image', 'Instagram', `${aiName()} écrit le post et dessine l'image d'après le vrai design de ton projet`, `
+    <div class="content" data-content="instagram">${loadingBlock()}</div>
+    <div class="job" data-job="instagram_post"></div>`, { open: true, cls: 'main' });
+  const newsletter = acc('newsletter', 'mail', 'Newsletter', `${aiName()} rédige une newsletter prête à copier ou à télécharger`, `
+    <div class="content" data-content="newsletter">${loadingBlock()}</div>
+    <div class="job" data-job="newsletter"></div>`, { open: true, cls: 'main' });
+  const promo = acc('promo', 'film', 'Promotion', `${aiName()} conçoit une vidéo de design motion pour présenter ton projet`, `
     <div class="promo" data-promo>${loadingBlock()}</div>
-    <div class="job" data-job="promo_video"></div>`, { cls: 'main' })}
-
-  ${p.access !== 'member' ? acc('recap', 'chart', 'Récapitulatif', 'Chiffres business, prospection et courbes', `
-    <div class="recap" data-recap>${loadingBlock()}</div>`, { cls: 'main' }) : ''}
-
-  ${acc('postes', 'users', 'Postes et tâches IA', 'Les postes d\'une entreprise, chacun avec ses tâches faites par l\'IA', postesBody(p), { cls: 'main' })}
-  </div>
-
-  ${profile ? headerAcc : ''}
-
-  ${p.access !== 'member' ? acc('config', 'gear', 'Configuration du projet', 'SMTP, boîte IMAP, base de données', configForms(p, smtp, dbCfg, imap), { cls: 'config' }) : ''}
-</div></div>
-</details>`;
-}
-
-export function dashboardPage({ email, projects, stats = new Map(), gitHosts = [], usage = null, pauseMessage = null, tour = null }) {
-  return layout({
-    title: 'Projets', email,
-    body: `<div class="dash">
-<div class="hd dash-hd"><h1 id="h-projets">Projets</h1><div class="hd-tools">${projects.length ? ROLE_SELECT : ''}<button type="button" class="btn primary" data-new-toggle aria-expanded="false" aria-controls="new-project">${ic('plus')}Nouveau projet</button></div></div>
-${usageKpis(usage)}
-<section class="col-p" aria-label="Liste des projets">
-  ${pauseMessage ? `<p class="ban ban-err" role="alert">${ic('alert')}<span class="ban-t"><b>${esc(pauseMessage)}</b></span></p>` : ''}
-  <form data-action="create" class="panel cfg" id="new-project" aria-labelledby="h-new" hidden>
-    <div class="panel-h"><h2 id="h-new">Nouveau projet</h2></div>
-    <div class="form">
-      <label class="field"><span class="lbl">Nom</span><input name="name" required maxlength="80" placeholder="Ex. Atelier Exemple"></label>
-      <label class="field"><span class="lbl">Dépôt Git</span><input name="gitUrl" required placeholder="https://github.com/utilisateur/projet.git">
-        <span class="hint">${gitHosts.length ? `GitHub et ${gitHosts.map(esc).join(', ')} sont acceptés.` : 'GitHub est accepté.'} Dépôt privé ou autre serveur Git : ajoute un token dans <a href="/settings">Réglages</a>. Le lien ne pourra plus être modifié. Le projet est cloné et analysé une fois (Sonnet).</span></label>
-    </div>
-    <div class="form-b"><button class="btn primary">Créer et analyser</button><button type="button" class="btn" data-new-toggle>Annuler</button></div>
-  </form>
-  <dialog class="prospect-dialog" id="prospect-dialog" aria-label="Fiche prospect"><div data-dialog-body></div></dialog>
-  <div class="projects">
-  ${projects.length ? projects.map((x) => projectItem(x.project, x.smtp, x.dbCfg, x.imap, { open: projects.length === 1, stats: stats.get(Number(x.project.id)) })).join('\n') : `<div class="empty">
-    <span class="empty-i">${ic('folder')}</span>
-    <h3>Aucun projet pour l'instant</h3>
-    <p>Crée ton premier projet : donne-lui un nom et l'adresse de son dépôt Git, ${esc(aiName())} s'occupe de l'analyser.</p>
-  </div>`}
-  </div>
-</section>
-<aside class="col-s">${claudePanel()}</aside>
-</div>
-${tour ? `<script type="application/json" id="tour-data" data-mode="${esc(tour)}">${tourJson()}</script>` : ''}`,
-  });
+    <div class="job" data-job="promo_video"></div>`, { open: true, cls: 'main' });
+  const recap = p.access !== 'member' ? acc('recap', 'chart', 'Récapitulatif', 'Chiffres business, prospection et courbes', `
+    <div class="recap" data-recap>${loadingBlock()}</div>`, { open: true, cls: 'main' }) : '';
+  const postes = acc('postes', 'users', 'Postes et tâches IA', 'Les postes d\'une entreprise, chacun avec ses tâches faites par l\'IA', postesBody(p), { open: true, cls: 'main' });
+  const config = p.access !== 'member' ? acc('config', 'gear', 'Configuration du projet', 'SMTP, boîte IMAP, base de données', configForms(p, smtp, dbCfg, imap), { open: true, cls: 'config' }) : '';
+  return { setup, header: headerAcc, target, search, template, send, followup, followuptpl, inbox, prospects, evolution, audit, linkedin, instagram, newsletter, promo, recap, postes, config };
 }
 
 /** Une ligne « serveur Git » : URL et token. `i` : numéro de la ligne (champs git_*_i) ; `fresh` : ligne qui vient d'être ajoutée (gabarit). */

@@ -10,8 +10,8 @@ import { PROMO, FORMATS, SceneError, parsePromoParams, extractScene, prepareScen
 const SCENE = `<!doctype html><html><head><style>body{margin:0;background:#0b1020;overflow:hidden}#t{position:absolute;top:40%;left:50%;font:700 60px sans-serif;color:#fff}</style></head><body><div id="t">iaboss</div><script>window.renderFrame=function(t){var e=document.getElementById('t');e.style.opacity=Math.min(1,t);e.style.left=(30+t*10)+'%';};</script></body></html>`;
 
 test('paramètres : valeurs par défaut, bornes, nombre d\'images maximal, format et sujet nettoyés', () => {
-  assert.deepEqual(parsePromoParams({}), { fps: PROMO.fps.def, seconds: PROMO.seconds.def, format: 'paysage', subject: '', style: 'auto' });
-  assert.deepEqual(parsePromoParams({ fps: '24', seconds: '10', format: 'vertical', subject: '  Le  \n nouveau   devis  ' }), { fps: 24, seconds: 10, format: 'vertical', subject: 'Le nouveau devis', style: 'auto' });
+  assert.deepEqual(parsePromoParams({}), { fps: PROMO.fps.def, seconds: PROMO.seconds.def, format: 'paysage', subject: '', style: 'auto', platform: '' });
+  assert.deepEqual(parsePromoParams({ fps: '24', seconds: '10', format: 'vertical', subject: '  Le  \n nouveau   devis  ' }), { fps: 24, seconds: 10, format: 'vertical', subject: 'Le nouveau devis', style: 'auto', platform: '' });
   assert.equal(parsePromoParams({ format: 'imax' }).format, 'paysage', 'format inconnu : paysage');
   for (const b of [{ fps: 9 }, { fps: 61 }, { fps: 'abc' }, { seconds: 2 }, { seconds: 61 }]) assert.match(parsePromoParams(b).error, /entre \d+ et \d+/, JSON.stringify(b));
   assert.match(parsePromoParams({ fps: 60, seconds: 60 }).error, /Trop d'images à produire \(3600\)/);
