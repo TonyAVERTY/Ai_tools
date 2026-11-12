@@ -171,6 +171,8 @@ const base = (pid) => `/facturation/projet/${pid}`;
 const page = (pid) => `/p/${pid}/facturation`; // l'onglet Facturation de la page projet
 const saveLegal = (u, pid, over = {}) => post(u, `${base(pid)}/legal`, { ...LEGAL, ...over });
 const jobOf = async (pid, type) => { await worker.tick(); return (await latestJobs(s.db, pid))[type]; };
+// Un job en file d'un autre compte (laissé par un test précédent) passe d'abord : on relance le worker jusqu'à ce que celui-ci ait tourné
+const jobDone = async (pid, type) => { let j; for (let i = 0; i < 8; i++) { j = await jobOf(pid, type); if (j && j.status !== 'queued') break; } return j; };
 const docsOf = async (pid) => (await s.db.prepare('SELECT * FROM billing_docs WHERE project_id = ? ORDER BY kind, variant').all(pid));
 
 test('recap : mes projets seulement, avec leur état ; la page d\'un projet est fermée aux autres comptes', async () => {
@@ -380,6 +382,69 @@ test('plan : la facturation compte comme des jobs IA (plafond mensuel du plan)',
   await post(u, `${base(pid)}/generer`);
   const after = Number((await s.db.prepare("SELECT COUNT(*) n FROM usage_events WHERE user_id = ? AND kind = 'ai_job'").get(u.id).catch(() => ({ n: 1 }))).n);
   assert.ok(after >= before, 'usage enregistré');
+});
+
+test('identité du projet : relecture à la génération des documents, ajustements gardés, PDF aux couleurs du projet', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { saveBrand, getBrandRow } = await import('../src/billingdata.js');
+  const { u, pid } = await setup();
+  await saveLegal(u, pid);
+  // Identité déjà lue dans le dépôt (la lecture elle-même est testée dans billing-brand.test.js) : couleur, police et logo
+  const font = readFileSync(new URL('../promo-video/assets/fonts/figtree-600.ttf', import.meta.url));
+  await saveBrand(s.db, pid, u.id, { brand: { source: 'repo', primary: '#0e7a66', fontFamily: 'Figtree', fontName: 'Figtree', hasLogo: false }, assets: { fontRegular: font, fontBold: null, logo: null, logoType: '' }, notes: [] });
+  const seen = [];
+  s.app.reviewBillingDoc = async (o) => {
+    seen.push(o.kind);
+    const pdf = o.render(o.content, { ...o.adjust, fontScale: 0.95 });
+    assert.ok(pdf.toString('latin1').includes('/Type0'), 'le rendu relu porte la police du projet');
+    return { approved: o.kind !== 'avoir', skipped: null, rounds: o.kind === 'avoir' ? 3 : 1, issues: o.kind === 'avoir' ? [{ page: 1, severity: 'blocker', problem: 'Marge trop serrée' }] : [], adjust: { ...o.adjust, fontScale: 0.95 }, content: o.content };
+  };
+  try {
+    await post(u, `${base(pid)}/generer`); const qj = await jobDone(pid, 'billing_quotes'); assert.equal(qj.status, 'done', qj.error);
+    await post(u, `${base(pid)}/choisir`, { variant: 1 });
+    const o1 = (await docsOf(pid))[0];
+    await post(u, `${base(pid)}/valider`, { doc: o1.id });
+    const dj = await jobDone(pid, 'billing_docs');
+    assert.equal(dj.status, 'done', dj.error);
+    assert.deepEqual([...seen].sort(), ['acompte', 'avoir', 'devis', 'facture'], 'les quatre documents sont relus');
+    assert.deepEqual(dj.result.review.map((r) => r.kind).sort(), ['acompte', 'avoir', 'devis', 'facture']);
+    const row = await getBrandRow(s.db, pid, u.id);
+    assert.equal(row.adjust.fontScale, 0.95, 'les ajustements acceptés sont gardés pour tous les documents du projet');
+    assert.equal(row.review.docs.find((d) => d.kind === 'avoir').approved, false, 'le refus final est conservé avec ses défauts');
+    assert.equal(row.review.docs.find((d) => d.kind === 'avoir').issues[0].problem, 'Marge trop serrée');
+    // La page dit ce qui a été trouvé et le verdict de chaque document
+    const pageHtml = await html(u, page(pid));
+    assert.match(pageHtml, /Style des documents/);
+    assert.match(pageHtml, /Couleur <code>#0e7a66<\/code> · Police Figtree · Pas de logo trouvé/);
+    assert.match(pageHtml, /Relecture par l'IA/);
+    assert.match(pageHtml, /<span class="badge ok">Relu<\/span> Devis : accepté/);
+    assert.match(pageHtml, /<span class="badge warn">À vérifier<\/span> Avoir : Marge trop serrée/);
+    assert.match(pageHtml, /Après trois essais de correction/);
+    // L'aperçu HTML reprend la couleur du projet
+    const preview = await (await u.get(`/facturation/documents/${(await docsOf(pid)).find((d) => d.kind === 'devis').id}/apercu`)).text();
+    assert.match(preview, /h1,h2\{color:#0e7a66\}/);
+    // Le PDF téléchargé reprend l'identité
+    const doc = (await docsOf(pid)).find((d) => d.kind === 'devis');
+    await post(u, `${base(pid)}/valider`, { doc: doc.id });
+    const pdf = await u.get(`/facturation/documents/${doc.id}/pdf`);
+    assert.equal(pdf.status, 200);
+    assert.ok(Buffer.from(await pdf.arrayBuffer()).toString('latin1').includes('/Type0'), 'police du projet dans le PDF téléchargé');
+  } finally { delete s.app.reviewBillingDoc; }
+});
+
+test('relecture en échec : la génération des documents n\'est jamais bloquée', async () => {
+  const { u, pid } = await setup();
+  await saveLegal(u, pid);
+  s.app.reviewBillingDoc = async () => { throw new Error('quota atteint'); };
+  try {
+    await post(u, `${base(pid)}/generer`); await jobDone(pid, 'billing_quotes');
+    await post(u, `${base(pid)}/choisir`, { variant: 1 });
+    await post(u, `${base(pid)}/valider`, { doc: (await docsOf(pid))[0].id });
+    const dj = await jobDone(pid, 'billing_docs');
+    assert.equal(dj.status, 'done', dj.error);
+    assert.ok(dj.result.review.every((r) => !r.approved && /Relecture impossible : quota atteint/.test(r.skipped)));
+    assert.equal((await docsOf(pid)).filter((d) => d.kind !== 'quote_option').length, 4, 'les quatre documents existent quand même');
+  } finally { delete s.app.reviewBillingDoc; }
 });
 
 test('pourcentage : un appel Claude d\'un seul tour fait avancer la barre sans jamais dépasser le plafond, puis s\'arrête', async () => {

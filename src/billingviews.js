@@ -184,7 +184,27 @@ function invoicesSection(invoices) {
       <td><a class="btn small" href="/facturation/factures/${i.id}/pdf" data-noajax>${ic('file')}PDF</a>${i.entryId ? ` <a class="btn small" href="/compta/entries/${i.entryId}/file" target="_blank" rel="noopener noreferrer" data-noajax>Comptabilité</a>` : ''}</td></tr>`).join('')}</tbody></table></div></section>`;
 }
 
-function docsSection(p, docs, stage, busy, validatedCount) {
+/** Style repris du dépôt du projet et verdict de la relecture de l'IA : ce qui a été trouvé, ce qui reste à vérifier. */
+function brandNote(row) {
+  if (!row) return '';
+  const b = row.brand || {};
+  const dot = b.primary ? `<svg class="bb-dot" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><circle cx="6" cy="6" r="5.5" fill="${esc(b.primary)}" stroke="#888" stroke-width=".6"/></svg>` : '';
+  const style = b.primary
+    ? `${dot} Couleur <code>${esc(b.primary)}</code> · Police ${b.fontName ? esc(b.fontName) : 'standard'} · ${b.hasLogo ? 'Logo repris du dépôt' : 'Pas de logo trouvé'}`
+    : 'Aucun style trouvé dans le dépôt : mise en page standard.';
+  const notes = (b.notes || []).map((n) => `<li>${esc(n)}</li>`).join('');
+  const docs = row.review?.docs || [];
+  const line = (d) => {
+    const label = esc(DOC_BY_KEY[d.kind]?.label || d.kind);
+    if (d.skipped) return `<li><span class="badge warn">Non relu</span> ${label} : ${esc(d.skipped)}</li>`;
+    if (d.approved) return `<li><span class="badge ok">Relu</span> ${label} : accepté${d.rounds > 1 ? ` après ${d.rounds - 1} correction${d.rounds > 2 ? 's' : ''}` : ''}</li>`;
+    return `<li><span class="badge warn">À vérifier</span> ${label} : ${d.issues.map((i) => esc(i.problem)).join(' ; ') || 'refusé'}</li>`;
+  };
+  return `<div class="bill-brand" role="note"><h3>Style des documents</h3><p class="small">${style}</p>${notes ? `<ul class="muted small">${notes}</ul>` : ''}
+    ${docs.length ? `<h3>Relecture par l'IA</h3><ul class="small bill-review">${docs.map(line).join('')}</ul>${docs.some((d) => !d.approved && !d.skipped) ? '<p class="muted small">Après trois essais de correction, un document encore refusé est tout de même livré : relis-le avant de le valider.</p>' : ''}` : ''}</div>`;
+}
+
+function docsSection(p, docs, stage, busy, validatedCount, brand = null) {
   const finals = DOC_KINDS.map(({ key }) => docs.find((d) => d.kind === key)).filter(Boolean);
   let inner;
   if (!finals.length) {
@@ -193,6 +213,7 @@ function docsSection(p, docs, stage, busy, validatedCount) {
   } else {
     inner = `<p class="muted">Relis chaque document, affine-le si besoin, puis valide-le. <b>${validatedCount} sur ${DOC_KINDS.length}</b> validés.</p>
       <div class="bar" role="progressbar" aria-label="Documents validés" aria-valuemin="0" aria-valuemax="4" aria-valuenow="${validatedCount}"><span class="w-${validatedCount * 25}"></span></div>
+      ${brandNote(brand)}
       <div class="bill-docs">${finals.map((d) => `<article class="bill-doc${d.status === 'validated' ? ' ok locked' : ''}" aria-labelledby="bd-${d.id}">
         <div class="bill-opt-h"><h3 id="bd-${d.id}">${esc(DOC_BY_KEY[d.kind].label)}</h3><span class="badge ${d.status === 'validated' ? 'ok' : 'warn'}">${d.status === 'validated' ? 'Validé' : 'À valider'}</span></div>
         <p class="muted small">${esc(DOC_BY_KEY[d.kind].help)}</p>
@@ -209,7 +230,7 @@ function docsSection(p, docs, stage, busy, validatedCount) {
 }
 
 /** Le contenu de la facturation d'un projet ; `inTab` : affiché dans l'onglet Facturation de la page projet (pas de lien « Tous les projets », pas de titre propre). */
-export function billingProjectBody({ email, project: p, legal, errors, suggestions, docs, invoices = [], clients = [], selectedKind = '', selectedClientId = null, chosen, stage, jobs, flash, inTab = false }) {
+export function billingProjectBody({ email, project: p, legal, errors, suggestions, docs, brand = null, invoices = [], clients = [], selectedKind = '', selectedClientId = null, chosen, stage, jobs, flash, inTab = false }) {
   const running = Object.values(jobs).find((j) => ['queued', 'running'].includes(j.status));
   const lastDoc = docs.reduce((m, d) => Math.max(m, d.updatedAt), 0);
   const failed = !running ? Object.values(jobs).filter((j) => j.status === 'error' && Number(j.finishedAt || 0) >= lastDoc).sort((a, b) => b.finishedAt - a.finishedAt)[0] : null;
@@ -229,7 +250,7 @@ export function billingProjectBody({ email, project: p, legal, errors, suggestio
     else {
       const q = docs.find((d) => d.kind === 'quote_option' && d.status === 'validated');
       if (q) sections.push(`<section class="card bill-sec" id="devis" aria-labelledby="t-devis"><h2 id="t-devis">2. Ton devis est validé</h2><p class="muted">Exemple ${q.variant} (${esc(LAYOUTS.find(([k]) => k === q.layout)?.[1] || '')}). Les documents suivants reprennent son style et ses lignes.</p></section>`);
-      sections.push(docsSection(p, docs, stage, stage.busy, finalsCount));
+      sections.push(docsSection(p, docs, stage, stage.busy, finalsCount, brand));
       if (!ready) sections.push(issueSection(p, docs, clients, invoices, selectedKind, selectedClientId), invoicesSection(invoices));
     }
   }
