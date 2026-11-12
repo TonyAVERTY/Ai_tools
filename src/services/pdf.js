@@ -3,6 +3,7 @@
 // et le symbole € passent, tout autre caractère devient « ? ».
 import { deflateSync } from 'node:zlib';
 import { WIDTHS } from './pdffonts.js';
+import { embedImage } from './pdfimage.js';
 
 export const A4 = { w: 595.28, h: 841.89 };
 
@@ -35,9 +36,14 @@ const rgb = (c) => {
 };
 
 export class Pdf {
-  /** @param {{ serif?: boolean, title?: string, author?: string }} opts  serif : Times au lieu d'Helvetica */
-  constructor({ serif = false, title = '', author = '' } = {}) {
+  /**
+   * @param {{ serif?: boolean, title?: string, author?: string, fonts?: { regular: import('./pdffont.js').TrueTypeFont, bold?: import('./pdffont.js').TrueTypeFont|null }|null }} opts
+   *   serif : Times au lieu d'Helvetica ; fonts : police du projet embarquée (sans gras : le gras est simulé par un contour)
+   */
+  constructor({ serif = false, title = '', author = '', fonts = null } = {}) {
     this.serif = serif;
+    this.fonts = fonts;
+    this.images = []; // { img, name }
     this.title = title;
     this.author = author;
     this.pages = [];
@@ -55,6 +61,7 @@ export class Pdf {
 
   /** Largeur d'un texte en points. */
   width(str, size, bold = false) {
+    if (this.fonts) return (bold && this.fonts.bold ? this.fonts.bold : this.fonts.regular).width(str, size) + (bold && !this.fonts.bold ? String(str ?? '').length * size * 0.012 : 0);
     const w = WIDTHS[this.fontKey(bold)];
     let sum = 0;
     for (const b of toWinAnsi(str)) sum += w[b - 32] ?? 556;
@@ -93,7 +100,21 @@ export class Pdf {
     let w = this.width(s, size, bold);
     if (spacing) w += spacing * s.length;
     const px = align === 'right' ? x - w : align === 'center' ? x - w / 2 : x;
+    if (this.fonts) {
+      const f = bold && this.fonts.bold ? this.fonts.bold : this.fonts.regular;
+      const key = f === this.fonts.bold ? 'CB' : 'CR';
+      const fake = bold && !this.fonts.bold; // pas de police grasse : le contour épaissit légèrement les lettres
+      this._add(`BT ${rgb(color)} rg ${fake ? `${rgb(color)} RG ${num(size * 0.02)} w 2 Tr ` : ''}/${key} ${num(size)} Tf ${spacing ? `${num(spacing)} Tc ` : ''}${num(px)} ${num(A4.h - y)} Td ${f.encode(s)} Tj ET`, page);
+      return;
+    }
     this._add(`BT ${rgb(color)} rg /${this.fontKey(bold)} ${num(size)} Tf ${spacing ? `${num(spacing)} Tc ` : ''}${num(px)} ${num(A4.h - y)} Td ${hex(toWinAnsi(s))} Tj ET`, page);
+  }
+
+  /** Image (PNG/JPEG décodée par loadImage) dans le rectangle dont (x, y) est le coin haut-gauche. */
+  image(img, x, y, w, h) {
+    let entry = this.images.find((i) => i.img === img);
+    if (!entry) { entry = { img, name: `Im${this.images.length + 1}` }; this.images.push(entry); }
+    this._add(`q ${num(w)} 0 0 ${num(h)} ${num(x)} ${num(A4.h - y - h)} cm /${entry.name} Do Q`);
   }
 
   line(x1, y1, x2, y2, { width = 0.5, color = '#000000' } = {}) {
@@ -115,12 +136,16 @@ export class Pdf {
     const catalog = add(''); // 1 : renseigné plus bas
     const pagesRoot = add(''); // 2
     const fontIds = Object.fromEntries(FONT_KEYS.map((k) => [k, add(`<< /Type /Font /Subtype /Type1 /BaseFont /${FONT_NAMES[k]} /Encoding /WinAnsiEncoding >>`)]));
-    const fontRes = FONT_KEYS.map((k) => `/${k} ${fontIds[k]} 0 R`).join(' ');
+    const custom = {};
+    // Les pages sont écrites avant les objets de police : tous les glyphes utilisés sont connus ici
+    if (this.fonts) { custom.CR = this.fonts.regular.embed(add); if (this.fonts.bold) custom.CB = this.fonts.bold.embed(add); }
+    const xobjects = this.images.map((i) => `/${i.name} ${embedImage(i.img, add)} 0 R`).join(' ');
+    const fontRes = [...FONT_KEYS.map((k) => `/${k} ${fontIds[k]} 0 R`), ...Object.entries(custom).map(([k, id]) => `/${k} ${id} 0 R`)].join(' ');
     const kids = [];
     for (const ops of this.pages) {
       const data = deflateSync(Buffer.from(ops.join('\n'), 'latin1'));
       const contentId = add(Buffer.concat([Buffer.from(`<< /Length ${data.length} /Filter /FlateDecode >>\nstream\n`, 'latin1'), data, Buffer.from('\nendstream', 'latin1')]));
-      kids.push(add(`<< /Type /Page /Parent ${pagesRoot} 0 R /MediaBox [0 0 ${A4.w} ${A4.h}] /Resources << /Font << ${fontRes} >> >> /Contents ${contentId} 0 R >>`));
+      kids.push(add(`<< /Type /Page /Parent ${pagesRoot} 0 R /MediaBox [0 0 ${A4.w} ${A4.h}] /Resources << /Font << ${fontRes} >>${xobjects ? ` /XObject << ${xobjects} >>` : ''} >> /Contents ${contentId} 0 R >>`));
     }
     const pdfDate = (() => { const d = new Date(); const p = (n) => String(n).padStart(2, '0'); return `D:${d.getUTCFullYear()}${p(d.getUTCMonth() + 1)}${p(d.getUTCDate())}${p(d.getUTCHours())}${p(d.getUTCMinutes())}${p(d.getUTCSeconds())}Z`; })();
     const info = add(`<< /Title ${hex(toWinAnsi(this.title))} /Author ${hex(toWinAnsi(this.author))} /Producer ${hex(toWinAnsi('iaboss'))} /CreationDate (${pdfDate}) >>`);

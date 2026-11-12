@@ -6,6 +6,7 @@ import { now } from './db.js';
 import { userAccountingRoot } from './users.js';
 import { DOC_BY_KEY, documentFacts, legalComplete, normalizeLine } from './services/billing.js';
 import { renderDocumentPdf } from './services/billingpdf.js';
+import { getBrandRow, brandForRender } from './billingdata.js';
 import { LIMITS, todayIso, validDate, vatOf, slug, defaultCategory, fmtEur } from './services/accounting.js';
 
 export class IssueError extends Error {}
@@ -145,11 +146,12 @@ export async function issueDocument(app, { userId, project, doc, legal, raw }) {
   let id = null;
   let number = '';
   let pdf = null;
+  const brand = brandForRender(await getBrandRow(db, doc.projectId, userId)); // identité du projet : couleurs, police et logo
   const at = now();
   for (let attempt = 0; attempt < 4 && id === null; attempt++) {
     number = await nextNumber(db, userId, kind, values.date.slice(0, 4));
     values.numero = number;
-    pdf = renderDocumentPdf({ kind, content: doc.content, legal, layout: doc.layout, values, facts: opts });
+    pdf = renderDocumentPdf({ kind, content: doc.content, legal, layout: doc.layout, values, facts: opts, brand });
     const fileName = `${slug(DOC_BY_KEY[kind].label)}-${number}.pdf`;
     try {
       id = Number((await db.prepare(`INSERT INTO billing_invoices(user_id, project_id, project_name, kind, number, issue_date, due_date, client_json, amount_cents, pdf_file, pdf_size, devis_id, ref_id, lines_json, meta_json, created_at)

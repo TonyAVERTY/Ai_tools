@@ -39,7 +39,11 @@ import { getProject, repoDir, sentSince, getTemplate, saveTemplate, pickVariant 
 import { getProfile, profileBlock } from './userprofile.js';
 import { repoProfile, renderRepoProfile } from './services/repoprofile.js';
 import { billingQuotesPrompt, billingRefinePrompt, billingDocsPrompt } from './services/prompts.js';
-import { getBilling, listDocs, getDoc, replaceOptions, updateDocContent, replaceFinals } from './billingdata.js';
+import { getBilling, listDocs, getDoc, replaceOptions, updateDocContent, replaceFinals, getBrandRow, saveBrand, saveBrandReview, brandForRender } from './billingdata.js';
+import { brandPrompt, parseBrand, resolveBrand } from './services/billingbrand.js';
+import { fetchGoogleFont, rasterSvg } from './services/brandassets.js';
+import { reviewDocument, sampleValues } from './services/billingreview.js';
+import { renderDocumentPdf } from './services/billingpdf.js';
 import { legalComplete, normalizeContent, DOC_KINDS, LAYOUTS } from './services/billing.js';
 
 // Constats du dépôt cloné (profil établi par le code, mis en cache par commit) ; vide si le dossier est illisible : un job ne doit jamais échouer pour ça
@@ -236,6 +240,62 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
   const { db, cfg } = app;
   // Dépôts Git (GitHub ou serveur perso) : l'hôte est revérifié à chaque synchronisation, git se connecte à l'adresse vérifiée
   const sync = makeSync(app);
+  // Identité du projet pour ses documents (couleurs, police, logo) : Claude lit le dépôt, le code vérifie et garde ce qui est valide.
+  // Jamais bloquant : sans dépôt lisible ou en cas d'échec, les documents gardent leur mise en page standard.
+  const ensureBrand = async (ctx, { userId, project, model, refresh = false }) => {
+    const existing = await getBrandRow(db, project.id, userId);
+    if (existing && !refresh) return existing;
+    try {
+      await ctx.progress({ message: 'Claude lit le dépôt pour retrouver le style du projet…', pct: 6 });
+      const full = await getProject(app, project.id, { userId, secrets: true });
+      const dir = repoDir(cfg, userId, project.id);
+      await sync(userId, full.gitUrl, dir);
+      const { prompt, system } = brandPrompt({ projectName: project.name, profile: project.profile, siteUrl: project.siteUrl });
+      const r = await claude(userId, { prompt, system, cwd: dir, model, maxTurns: 14, tools: ['Read', 'Glob', 'Grep'], signal: ctx.signal });
+      addUsage(ctx, r);
+      if (!r.ok) throw new Error(`lecture du dépôt impossible (${r.subtype})`);
+      const resolved = await resolveBrand(parseBrand(extractJson(r.text)), dir, {
+        fetchFont: app.fetchFont || ((family, weight) => fetchGoogleFont(family, weight)),
+        rasterSvg: (svg) => (app.rasterSvg || rasterSvg)(svg, cfg),
+      });
+      await saveBrand(db, project.id, userId, resolved);
+    } catch (e) {
+      if (ctx.signal?.aborted) throw e;
+      // Une ancienne identité reste valable ; sinon on enregistre « aucune » pour ne pas relancer la lecture à chaque génération
+      if (!existing) await saveBrand(db, project.id, userId, { brand: { source: 'default', primary: '', notes: `Style du projet non lu : ${String(e.message).slice(0, 120)}` }, assets: {} });
+    }
+    return getBrandRow(db, project.id, userId);
+  };
+
+  // Relecture des documents définitifs : l'IA regarde le rendu PDF de chacun, demande des corrections, les relit (trois essais au plus) ;
+  // au dernier essai le document est livré avec les défauts restants. Un échec de la relecture ne bloque jamais la génération.
+  const reviewBillingDocs = async (ctx, { userId, project, legal, model }) => {
+    let row = await getBrandRow(db, project.id, userId);
+    if (!row) { await saveBrand(db, project.id, userId, { brand: { source: 'default', primary: '' }, assets: {} }); row = await getBrandRow(db, project.id, userId); }
+    const docs = (await listDocs(db, project.id, userId)).filter((d) => d.kind !== 'quote_option');
+    let adjust = row.adjust || {};
+    const report = [];
+    for (const [i, doc] of docs.entries()) {
+      const base = 91 + Math.round((i / docs.length) * 8);
+      try {
+        const res = await (app.reviewBillingDoc || reviewDocument)({
+          kind: doc.kind, content: doc.content, legal, brand: row.brand, adjust,
+          render: (content, adj) => renderDocumentPdf({ kind: doc.kind, content, legal, layout: doc.layout, values: sampleValues(doc.kind), brand: brandForRender(row, adj) }),
+          runAgent: async (options) => { const result = await claude(userId, options); addUsage(ctx, result); return result; },
+          extraRoot: userChatRoot(cfg, userId), model, signal: ctx.signal,
+          onProgress: (p) => ctx.progress({ message: p.message, pct: base }),
+        });
+        adjust = res.adjust;
+        if (JSON.stringify(res.content) !== JSON.stringify(doc.content)) await updateDocContent(db, doc.id, userId, { ...res.content, layout: doc.layout }, doc.refinement);
+        report.push({ kind: doc.kind, approved: res.approved, rounds: res.rounds, skipped: res.skipped, issues: res.issues });
+      } catch (e) {
+        if (ctx.signal?.aborted) throw e;
+        report.push({ kind: doc.kind, approved: false, rounds: 0, skipped: `Relecture impossible : ${String(e.message).slice(0, 160)}`, issues: [] });
+      }
+    }
+    await saveBrandReview(db, project.id, userId, { adjust, review: { at: Math.floor(Date.now() / 1000), docs: report } });
+    return report;
+  };
   // Consignes modifiées par l'utilisateur (Réglages) : celles du compte qui lance le job
   const custom = async (userId) => parseCustomPrompts(await getSetting(db, userId, 'prompts_json'));
   // Modèles choisis dans les Réglages (liste de services/models.js ; toute autre valeur retombe sur Haiku)
@@ -659,10 +719,11 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
       const { legal } = await getBilling(db, project.id, userId);
       if (!legalComplete(legal)) throw new Error("Complète d'abord les informations légales du projet");
       if ((await listDocs(db, project.id, userId)).some((d) => d.kind === 'quote_option' && d.status === 'validated')) throw new Error('Un devis est déjà validé : recommence depuis le début pour en générer de nouveaux');
-      await ctx.progress({ message: 'Claude rédige trois exemples de devis…', pct: 8 });
       const model = await writeModel(userId, 'sonnet');
+      await ensureBrand(ctx, { userId, project, model, refresh: true });
+      await ctx.progress({ message: 'Claude rédige trois exemples de devis…', pct: 12 });
       const { prompt, system } = billingQuotesPrompt({ projectName: project.name, profile: project.profile, legal, custom: await custom(userId), model });
-      const r = await creeping(ctx, 'Claude rédige trois exemples de devis…', 8, () => claude(userId, { prompt, system, model, maxTurns: 1, tools: [], signal: ctx.signal }));
+      const r = await creeping(ctx, 'Claude rédige trois exemples de devis…', 12, () => claude(userId, { prompt, system, model, maxTurns: 1, tools: [], signal: ctx.signal }));
       addUsage(ctx, r);
       const raw = extractJson(r.text);
       const options = (Array.isArray(raw.options) ? raw.options : []).map((o) => normalizeContent(o, 'devis')).filter(Boolean).slice(0, 3);
@@ -708,8 +769,9 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
       const quote = (await listDocs(db, project.id, userId)).find((d) => d.kind === 'quote_option' && d.status === 'validated');
       if (!quote) throw new Error("Valide d'abord un devis");
       const { legal } = await getBilling(db, project.id, userId);
-      await ctx.progress({ message: 'Claude prépare le devis, l\'acompte, la facture finale et l\'avoir…', pct: 8 });
       const model = await writeModel(userId, 'sonnet');
+      await ensureBrand(ctx, { userId, project, model }); // l'identité du projet, lue une fois puis réutilisée
+      await ctx.progress({ message: 'Claude prépare le devis, l\'acompte, la facture finale et l\'avoir…', pct: 10 });
       const { prompt, system } = billingDocsPrompt({ projectName: project.name, profile: project.profile, legal, quote: quote.content, custom: await custom(userId), model });
       const r = await creeping(ctx, 'Claude prépare le devis, l\'acompte, la facture finale et l\'avoir…', 8, () => claude(userId, { prompt, system, model, maxTurns: 1, tools: [], signal: ctx.signal }));
       addUsage(ctx, r);
@@ -726,7 +788,8 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
       }
       out.facture.deposit_percent = out.acompte.deposit_percent;
       await replaceFinals(db, project.id, userId, out);
-      return { ok: true };
+      const review = await reviewBillingDocs(ctx, { userId, project, legal, model });
+      return { ok: true, review };
     },
 
     // Brouillon de post LinkedIn : direction facultative ; sans elle Claude choisit l'angle. Rien n'est publié ici.
