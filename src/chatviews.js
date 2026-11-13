@@ -32,7 +32,10 @@ export const attachmentHtml = (a) => {
   return `<a class="att att-chip" href="/api/chat/files/${a.id}" target="_blank" rel="noopener" data-noajax>${ic(ICON[a.kind] || 'file')}<span>${esc(a.name)}</span><small>${mo(a.size)}</small></a>`;
 };
 
-const bubble = (m) => (m.role === 'user'
+/** Repère laissé dans le fil par la commande /compacter : le résumé qui remplace les messages plus anciens pour l'IA. public/chat.js construit le même. */
+export const summaryHtml = (m) => `<details class="chat-summary" data-id="${m.id}"><summary>${ic('spark')}<span>Conversation compactée</span></summary><div class="bubble md">${m.html}</div></details>`;
+
+const bubble = (m) => (m.role === 'summary' ? summaryHtml(m) : m.role === 'user'
   ? `<article class="chat-msg user" data-id="${m.id}">${m.attachments?.length ? `<div class="atts">${m.attachments.map(attachmentHtml).join('')}</div>` : ''}<div class="bubble">${esc(m.content)}</div></article>`
   : `<article class="chat-msg bot" data-id="${m.id}"><div class="bubble md">${m.html}</div>
       <div class="msg-actions"><button type="button" class="link small" data-chat-copy data-md="${esc(m.content)}">${ic('copy')}Copier</button></div></article>`);
@@ -76,6 +79,7 @@ export function chatPage({ email, mode = 'claude', priced = false, conversations
     </div>
     <p class="chat-err" role="alert" data-chat-error hidden></p>
     <form class="chat-form" data-chat-form>
+      <ul class="chat-cmds" data-chat-cmds role="listbox" aria-label="Commandes" hidden></ul>
       <div class="chat-tray" data-chat-tray hidden></div>
       <div class="chat-row">
         <input type="file" data-chat-file multiple hidden accept="image/png,image/jpeg,image/gif,image/webp,application/pdf,video/mp4,video/quicktime,video/webm,.txt,.md,.csv,.json,.log,.xml,.yml,.yaml,.html,.css,.js,.ts,.php,.py,.sql">
@@ -85,7 +89,7 @@ export function chatPage({ email, mode = 'claude', priced = false, conversations
           <div class="chat-projlist" data-chat-projlist role="menu" aria-label="Projets iaboss">${loadingBlock('Chargement…', { small: true })}</div>
         </details>`}
         <label class="sr-only" for="chat-input">Ton message</label>
-        <textarea id="chat-input" name="message" rows="1" maxlength="${max}" placeholder="${support ? 'Pose ta question sur iaboss…' : `Écris à ${esc(aiName())}…`}  (Entrée pour envoyer, Maj+Entrée pour un retour à la ligne)" data-chat-input></textarea>
+        <textarea id="chat-input" name="message" rows="1" maxlength="${max}" placeholder="${support ? 'Pose ta question sur iaboss…' : `Écris à ${esc(aiName())}…`}  (Entrée pour envoyer, Maj+Entrée pour un retour à la ligne, / pour les commandes)" data-chat-input></textarea>
         <button class="btn primary" data-chat-send>${ic('send')}<span>Envoyer</span></button>
         <button type="button" class="btn" data-chat-stop hidden>${ic('stop')}<span>Arrêter</span></button>
       </div>

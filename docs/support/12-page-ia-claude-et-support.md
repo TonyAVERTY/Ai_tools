@@ -24,6 +24,17 @@ Pour poser une question sur l'application : où cliquer, comment configurer, pou
 - **Modèle** : la liste déroulante en haut change le modèle de la conversation (recommandés avec la gamme, économe, intermédiaire ou plus cher, et le symbole $ seulement avec une clé API ; puis les autres modèles). Le choix devient le modèle par défaut de la page.
 - Les conversations sont **privées** : propres à chaque compte, supprimées avec lui.
 
+## Les commandes « / » (assistant et Support)
+Dans la zone de saisie, tape **/** : la liste des commandes s'ouvre. Continue à taper pour filtrer, **↑ ↓** pour choisir, **Tab** pour compléter, **Entrée** pour lancer, **Échap** pour fermer. Une commande n'est pas envoyée à l'IA et ne consomme rien, sauf **/compacter**. Elles marchent aussi dans le Support.
+- **/aide** : affiche la liste des commandes.
+- **/nouveau** (ou **/clear**) : ouvre une nouvelle conversation.
+- **/compacter** (ou **/compact**) : l'IA résume la conversation, et seul ce résumé (avec les messages écrits ensuite) lui est renvoyé à chaque message, au lieu de tout l'historique. Utile pour une longue conversation : elle consomme moins de quota. Le fil reste affiché en entier, avec un repère « Conversation compactée » qui se déplie pour lire le résumé. Il faut au moins 4 messages ; le résumé est fait avec le modèle économe et compte dans le budget IA. On peut compacter plusieurs fois.
+- **/modele** (ou **/model**) : montre le modèle actuel et la liste ; **/modele opus** (une partie du nom suffit) change le modèle de la conversation.
+- **/renommer** *titre* (ou **/rename**) : renomme la conversation en cours.
+- **/supprimer** (ou **/delete**) : supprime la conversation en cours, après confirmation.
+- **/copier** (ou **/copy**) : copie la dernière réponse de l'IA.
+Un message qui commence par un chemin (par exemple « /etc/hosts, à quoi sert ce fichier ? ») part normalement. Seul un « /mot » tout seul qui n'existe pas affiche « Commande inconnue ».
+
 ## Pièces jointes (assistant et Support)
 Bouton **trombone** (« Joindre une photo, une vidéo ou un fichier »), glisser-déposer sur la page, ou coller une image depuis le presse-papiers.
 - Types acceptés : **images** (PNG, JPEG, GIF, WebP), **PDF**, **fichiers texte ou de code** (txt, md, csv, json, log, xml, yml, html, css, js, ts, php, py, sql…) et **vidéos** (MP4, MOV, WebM : quelques images en sont tirées, sans le son). Le type est reconnu d'après le contenu du fichier, pas son nom. SVG, exécutables et archives sont refusés.

@@ -289,3 +289,8 @@ Le message précise maintenant la cause : produits manquants dans l'application 
 
 ## Je viens de payer une offre et mon plan n'a pas changé
 L'activation arrive par un message signé de Stripe, en général en quelques secondes : recharge « Mon compte ». Au bout de quelques minutes sans changement, écris-nous avec l'email de ton compte. Détails dans « Abonnement et paiement : choisir, changer ou résilier son offre ».
+
+## Mon quota part trop vite dans la page IA
+Chaque message renvoie à l'IA le début de la conversation. Pour une longue conversation, tape **/compacter** dans la zone de saisie : elle est résumée et le quota baisse. Ou ouvre une **nouvelle conversation** (**/nouveau**). Voir « Les commandes / » dans « La page IA : Claude et Support ».
+- « Rien à compacter : la conversation est encore courte » : il faut au moins 4 messages.
+- « Pas de conversation en cours » : écris d'abord un message.

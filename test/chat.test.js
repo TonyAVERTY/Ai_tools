@@ -207,3 +207,27 @@ test('conversations supprimées avec le compte', async () => {
   assert.equal(Number((await s.db.prepare('SELECT COUNT(*) n FROM chat_conversations WHERE user_id = ?').get(u.id)).n), 0);
   void setSetting;
 });
+
+test('commande /compacter : un résumé remplace les anciens messages dans le prompt, la conversation reste affichée', async () => {
+  const u = await s.newUser();
+  const first = await events(await send(u, { message: 'ECHO un' }));
+  const id = first[0].conversationId;
+  assert.equal((await u.post(`/api/chat/conversations/${id}/compact`, {})).status, 400, 'trop courte pour être compactée');
+  await events(await send(u, { message: 'ECHO deux', conversationId: id }));
+  const r = await u.post(`/api/chat/conversations/${id}/compact`, {});
+  assert.equal(r.status, 200);
+  const d = await r.json();
+  assert.equal(d.message.role, 'summary');
+  assert.equal(d.compacted, 4);
+  assert.equal(calls().at(-1).args[calls().at(-1).args.indexOf('--max-turns') + 1], '1');
+  await events(await send(u, { message: 'ECHO trois', conversationId: id }));
+  const prompt = calls().at(-1).prompt;
+  assert.match(prompt, /Résumé de la conversation avant les messages ci-dessous/);
+  assert.doesNotMatch(prompt, /Utilisateur : ECHO un/, 'les anciens messages ne repartent plus');
+  assert.match(prompt, /Utilisateur : ECHO trois$/);
+  const page = await (await html(u, `/chat/${id}`)).text();
+  assert.match(page, /Conversation compactée/);
+  assert.match(page, /ECHO un/, 'le fil garde tout');
+  const other = await s.newUser();
+  assert.equal((await other.post(`/api/chat/conversations/${id}/compact`, {})).status, 404, 'conversation d\'un autre compte');
+});
