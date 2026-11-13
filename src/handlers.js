@@ -160,7 +160,7 @@ export function makeClaude(app) {
     jc?.log?.('model', `Modèle : ${o.model || 'haiku'}`);
     try {
       r = await provider.run({
-        bin: provider.bin(cfg, cred.mode), ...o, system,
+        bin: provider.bin(cfg, cred.mode), ...o, system, excludeDynamic: !!cfg.claudeFlags?.excludeDynamic,
         onUsage: (u) => { pendingUsage = u; if (!usageTimer) usageTimer = setTimeout(flushUsage, 500); o.onUsage?.(u); },
         onDelta: stream ? (text) => { hasOutput = true; stream.delta(text); o.onDelta?.(text); } : o.onDelta,
         onActivity: jc ? (text) => { jc.log?.('activity', text); o.onActivity?.(text); } : o.onActivity,

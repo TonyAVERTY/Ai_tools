@@ -31,6 +31,7 @@ import { withAiName } from './services/ainame.js';
 import { memberTeamIds, purgeInvites } from './teams.js';
 import { needsWelcome } from './userprofile.js';
 import { sandboxStartupMessages } from './services/sandbox.js';
+import { probeClaudeFlags } from './services/claude.js';
 import { gitVersionNotes } from './services/git.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -246,6 +247,7 @@ if (isEntryPoint(import.meta.url)) { // lancé par `node src/server.js` ou par p
   const cfg = loadConfig();
   if (!cfg.adminEmails.length) console.warn('ADMIN_EMAILS est vide : aucun administrateur (back-office inaccessible).');
   for (const m of sandboxStartupMessages(cfg.sandbox)) console.warn(m);
+  cfg.claudeFlags = probeClaudeFlags(cfg.claudeBin);
   try { for (const m of gitVersionNotes(execFileSync('git', ['--version'], { encoding: 'utf8', timeout: 5000 }))) console.warn(m); } catch { console.warn('git est introuvable ou ne répond pas : aucun dépôt ne pourra être cloné.'); }
   if (cfg.production && cfg.allowPrivateHosts) console.warn('ALLOW_PRIVATE_HOSTS est actif en production : seuls les administrateurs peuvent viser des hôtes privés.');
   if (cfg.production && !cfg.trustProxy) console.warn("TRUST_PROXY est désactivé : derrière Nginx, tous les visiteurs partagent la même adresse pour la limitation de débit. Pose TRUST_PROXY=true.");
