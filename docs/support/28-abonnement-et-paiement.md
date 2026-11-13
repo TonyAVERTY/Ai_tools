@@ -2,7 +2,7 @@
 Résumé : passer à une offre payante (Démarrage, Croissance, Business, Intensif) par carte sur une page sécurisée de Stripe, voir et gérer son abonnement dans Mon compte, changer d'offre, résilier, ce qui se passe en cas de paiement refusé.
 
 ## Les offres
-Le plan **Gratuit** est sans carte bancaire et sans limite de durée. Les offres payantes relèvent les plafonds (projets, prospects, mails, jobs IA, jobs en parallèle, places d'équipe). Les prix et les plafonds exacts sont dans « Plans et limites » et sur la page **Tarifs** ; ils sont TTC (l'éditeur est en franchise de TVA, article 293 B du CGI : le prix affiché est le prix payé). **À l'année**, tu paies 10 mois et tu en profites 12.
+Le plan **Gratuit** est sans carte bancaire et sans limite de durée. Les offres payantes relèvent les plafonds (projets, prospects, mails, jobs IA, jobs en parallèle, places d'équipe) et ouvrent des fonctionnalités réservées (posts et devis par l'IA, postes, export de la comptabilité, mode développeur, vidéos de promotion) : le tableau « Fonctionnalités par offre » de la page **Tarifs** dit laquelle commence où. Les prix et les plafonds exacts sont dans « Plans et limites » et sur la page **Tarifs** ; ils sont TTC (l'éditeur est en franchise de TVA, article 293 B du CGI : le prix affiché est le prix payé). **À l'année**, tu paies 10 mois et tu en profites 12.
 
 Ton accès à l'IA (Claude, ChatGPT ou Gemini) n'est **pas** compris : il est facturé par ton fournisseur, directement à toi.
 
@@ -18,7 +18,7 @@ Si les paiements ne sont pas ouverts sur le service, les offres affichent **Bien
 
 ## Voir et gérer son abonnement
 **Mon compte → Usage de la semaine** affiche le bloc **Ton offre** :
-- **Ton offre : Démarrage · 10 € TTC par mois** et **Prochain paiement le …** ;
+- **Ton offre : Démarrage · 9 € TTC par mois** et **Prochain paiement le …** ;
 - **Gérer mon abonnement** : ouvre le portail de Stripe pour changer de carte, télécharger les factures ou résilier ;
 - **Changer d'offre** : mène à Tarifs ;
 - en **mode test**, la mention « Mode test : aucun paiement réel » (réservée à une configuration d'essai).

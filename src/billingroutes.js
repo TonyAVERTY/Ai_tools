@@ -13,6 +13,7 @@ import { DOC_BY_KEY } from './services/billing.js';
 import { slug } from './services/accounting.js';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { requireFeature } from './services/plans.js';
 
 const BILLING_JOBS = ['billing_quotes', 'billing_refine', 'billing_docs'];
 const refuse = (status, msg) => new HttpError(status, msg, { expose: true });
@@ -89,6 +90,7 @@ export function registerBillingRoutes(router, app, { aiOpts = {} } = {}) {
   }, { limit: 'compta' });
 
   const startJob = async (ctx, p, type, params = {}) => {
+    await requireFeature(db, p.userId, 'billing');
     const r = await enqueue(db, { userId: p.userId, projectId: p.id, type, params }, aiOpts);
     if (r.existing) throw refuse(409, 'Une demande est déjà en cours pour ce projet : attends sa fin.');
     return r;

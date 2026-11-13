@@ -83,3 +83,6 @@ Chaque phrase générée est nettoyée automatiquement avant d'être placée sur
 Le MP4 final n'est contrôlé que sur l'image (deux agents IA : mise en page et mouvement). La piste audio n'est ni mesurée ni relue par un agent.
 
 Personne ne vérifie le son à ta place. La réduction de bruit ne garantit pas l'élimination de tout bruit ni la qualité de prononciation ; un extrait doit toujours être écouté avant publication.
+
+## Offre requise
+Les vidéos de promotion demandent l'offre **Business** ou au-dessus. Avec une offre plus basse, « Générer » est refusé avec le message « Vidéos de promotion : inclus à partir de l'offre Business » ; les vidéos déjà produites restent visibles, téléchargeables et supprimables. La liste complète est dans « Offres, plafonds et limites ».

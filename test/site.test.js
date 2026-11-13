@@ -355,11 +355,11 @@ test('liens entre pages : chaque lien et chaque image du site mène quelque part
   assert.doesNotMatch(html['/'], /<img(?![^>]*\salt="[^"]+")/, 'toutes les images ont un texte alternatif');
 });
 
-test('offres : prix de 10 à 100 € TTC, annuel = 2 mois offerts, plafonds tenables par le serveur et croissants', async () => {
+test('offres : prix croissants de l\'entrée au sommet, TTC, annuel = 2 mois offerts, plafonds tenables par le serveur et croissants', async () => {
   const keys = Object.keys(PLAN_PRICES);
   const prices = keys.map((k) => PLAN_PRICES[k]);
-  assert.equal(Math.min(...prices), 10);
-  assert.equal(Math.max(...prices), 100);
+  assert.equal(Math.min(...prices), 9);
+  assert.equal(Math.max(...prices), 75);
   assert.deepEqual(prices, [...prices].sort((a, b) => a - b), 'prix croissants');
   assert.equal(ANNUAL_FREE_MONTHS, 2);
   const h = await text('/tarifs');

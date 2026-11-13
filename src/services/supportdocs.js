@@ -7,7 +7,7 @@ import { readdirSync, readFileSync, writeFileSync, mkdirSync, rmSync, renameSync
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { PLAN_LIMITS, PLAN_LABELS, PLAN_PRICES, ANNUAL_FREE_MONTHS } from '../limits.js';
+import { PLAN_LIMITS, FEATURES, PLAN_LABELS, PLAN_PRICES, ANNUAL_FREE_MONTHS } from '../limits.js';
 import { CATALOGS, modelLabel } from './models.js';
 import { PROMPT_DEFS } from './prompts.js';
 import { PROMO, FORMATS } from './promovideo.js';
@@ -24,6 +24,7 @@ export const STATIC_DOCS_DIR = fileURLToPath(new URL('../../docs/support/', impo
 const SECTION_TITLES = { recap: 'Récapitulatif', target: 'Cible', prospect: 'Prospecter', linkedin: 'LinkedIn', promo: 'Promotion', evolution: 'Évolution', audit: 'Audit du projet' };
 
 const mo = (n) => `${Math.round(n / 1048576)} Mo`;
+const featureRows = () => Object.values(FEATURES).map((f) => `| ${f.label} | ${PLAN_LABELS[f.plan]} |`).join('\n');
 const lim = (v) => (v == null ? 'illimité' : String(v));
 
 /** Fichiers générés depuis le code. `facts` : { chat, files } (limites de la page IA et des pièces jointes, fournies par chat.js / chatfiles.js). */
@@ -49,6 +50,13 @@ Les plafonds de **mails** et de **jobs IA** se comptent **par semaine**, comme l
 | Offre | Prix | Projets | Prospects | Mails par semaine | Jobs IA par semaine | Jobs IA simultanés | Places d'équipe |
 |---|---|---|---|---|---|---|---|
 ${rows.join('\n')}
+
+## Fonctionnalités réservées à une offre
+Tout le reste (prospection, mails, relances, agenda, comptabilité au quotidien, page IA, équipe selon les places) est inclus dès l'offre gratuite. Les fonctionnalités ci-dessous demandent au moins l'offre indiquée ; les offres au-dessus les ont aussi. Sans l'offre, le **lancement** d'une nouvelle tâche est refusé avec un message qui renvoie vers les tarifs (« inclus à partir de l'offre … ») ; ce qui existe déjà (documents, vidéos, brouillons) reste visible et rien n'est supprimé.
+
+| Fonctionnalité | À partir de l'offre |
+|---|---|
+${featureRows()}
 
 Les offres se voient aussi sur la page publique « Tarifs ». Un administrateur d'iaboss peut attribuer une offre à un compte. Le prix de l'abonnement Claude, du compte ChatGPT ou de la clé API (Anthropic, OpenAI, Google) est à part : il se paie directement à ton fournisseur d'IA.
 

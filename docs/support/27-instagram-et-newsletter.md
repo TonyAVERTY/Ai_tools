@@ -42,3 +42,6 @@ Chaque génération est une **tâche IA** : elle compte dans « Jobs IA cette se
 - **« L'image écrite par Claude ne passe pas au rendu »** : trois documents d'image de suite ont été refusés (script, adresse externe, image sans texte ou unie). Un élément qui dépasse du cadre n'est pas refusé : c'est un choix de composition courant (un produit rogné par le bord) ; le directeur artistique juge si un texte est coupé. Réessaie ; précise le sujet si besoin.
 - **Les couleurs ou les polices ne ressemblent pas à mon produit** : l'IA cherche le design dans le dépôt (fichiers de styles, thème, logo). Si le dépôt n'a presque pas d'interface (une API, un outil en ligne de commande), elle reprend le nom et l'ambiance trouvés dans la documentation. Les polices web ne sont pas installées sur le serveur : elles sont remplacées par une police système proche.
 - **L'image est correcte mais banale** : régénère avec une direction plus précise (un cas d'usage, un avant/après, un chiffre réel de ta fiche).
+
+## Offre requise
+Les posts Instagram, les newsletters et les posts LinkedIn générés par l'IA demandent l'offre **Démarrage** ou au-dessus. Les brouillons déjà créés restent lisibles. Pour un projet d'équipe, c'est l'offre du propriétaire qui compte. La liste complète est dans « Offres, plafonds et limites ».

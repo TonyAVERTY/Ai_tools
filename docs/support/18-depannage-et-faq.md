@@ -297,3 +297,6 @@ Chaque message renvoie à l'IA le début de la conversation. Pour une longue con
 
 ## Une tâche IA s'est arrêtée à cause de la limite de mon IA
 Coche **Relancer automatiquement les tâches IA arrêtées par une limite** dans « Réglages → Garde-fous » : la tâche repart seule après la remise à zéro du quota (3 relances au plus). Sans l'option, relance-la toi-même avec « Réessayer ». Si rien ne repart, regarde le journal de la tâche : une erreur de liaison (jeton refusé) ou un plafond de l'offre atteint n'est pas relancé.
+
+## « … : inclus à partir de l'offre … » : une fonctionnalité est refusée
+Certaines fonctionnalités sont réservées à une offre (posts et devis dès Démarrage ; postes, export de la comptabilité et mode développeur dès Croissance ; vidéos de promotion dès Business). Le message dit laquelle. Rien n'est supprimé : ce qui existe déjà reste lisible. Remède : Mon compte → « Voir les offres » (ou la page Tarifs) puis choisis une offre qui l'inclut. Pour un projet d'équipe, c'est l'offre du propriétaire qui compte. La liste à jour est dans « Offres, plafonds et limites ».

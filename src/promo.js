@@ -14,6 +14,7 @@ import { PROMO, FORMATS, parsePromoParams, promoSupported } from './services/pro
 import { PLATFORMS } from './services/promoplatforms.js';
 import { PROMO_STYLES } from './services/promokit.js';
 import { voiceCatalog, parseVoiceParams, sampleFor, listVoices, VOICE_PROVIDERS, VOICE_LANGS, REGION, localStatus, audioType } from './services/voiceover.js';
+import { requireFeature } from './services/plans.js';
 
 // Clés API des fournisseurs de voix : chiffrées dans les réglages du compte, jamais renvoyées (seuls les 4 derniers caractères le sont)
 const keyName = (provider) => `voice_key_${provider}`;
@@ -186,6 +187,7 @@ export function registerPromoRoutes(router, app, { project, aiOpts }) {
 
   router.post('/api/projects/:id/promo/generate', async (ctx) => {
     const p = await project(ctx);
+    await requireFeature(db, p.userId, 'promo');
     const b = await readBody(ctx.req);
     const sup = (app.promoSupported || promoSupported)(cfg);
     if (!sup.ok) throw new HttpError(503, sup.reason, { expose: true });

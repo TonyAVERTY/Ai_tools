@@ -29,3 +29,6 @@ Les consignes communes à toutes ces tâches se modifient dans **Réglages → P
 
 ## Lancement et résultat
 Les tâches des postes se lancent depuis l'application, partent tout de suite, et chaque tâche garde le dernier résultat produit.
+
+## Offre requise
+Les tâches des postes demandent l'offre **Croissance** ou au-dessus. Avec une offre plus basse, le lancement d'une tâche est refusé (« Postes (rôles) : tâches IA métier : inclus à partir de l'offre Croissance ») ; les livrables déjà produits restent lisibles. Pour un projet d'équipe, c'est l'offre du propriétaire qui compte. La liste complète est dans « Offres, plafonds et limites ».
