@@ -400,7 +400,7 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
       ? await followupCandidates(db, project)
       : await db.prepare(`SELECT * FROM prospects WHERE project_id = ? AND status = 'new'
           AND email NOT IN (SELECT email FROM blacklist) ORDER BY score DESC, id LIMIT 100`).all(project.id);
-    // Plafond mensuel du plan : on n'envoie que ce qui reste (le reste attend, rien n'est perdu)
+    // Plafond hebdomadaire du plan : on n'envoie que ce qui reste (le reste attend, rien n'est perdu)
     const user = await getUser(db, userId);
     const mq = await quotaFor(db, user, 'mails');
     if (!mq.unlimited && mq.remaining <= 0) throw new Error(planLimitMessage(user, mq));

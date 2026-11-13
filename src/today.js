@@ -4,7 +4,7 @@
 import { now } from './db.js';
 import { parisParts, parisTime } from './services/paris-time.js';
 import { monthEvents } from './calendar.js';
-import { usageView } from './services/plans.js';
+import { usageView, weekBounds } from './services/plans.js';
 import {
   fmtEur, todayIso, periodToDeclare, deadlineOf, daysLeft, periodRange, rowsInRange, computeTotals, dayLabel,
 } from './services/accounting.js';
@@ -223,17 +223,16 @@ async function projectsOf(db, userId, ids, names, onboarding, replyCounts) {
   });
 }
 
-// ---------- Usage du mois ----------
+// ---------- Usage de la semaine ----------
 const USAGE_LABEL = { mails: 'Mails envoyés', aiJobs: 'Tâches IA', prospects: 'Contacts', projects: 'Projets' };
 const USAGE_ORDER = ['mails', 'aiJobs', 'prospects', 'projects'];
 export function usageRows(u, at = now()) {
   if (!u) return [];
-  const p = parisParts(new Date(at * 1000));
-  const nextMonth = new Date(Date.UTC(p.year, p.month, 1)).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', timeZone: 'UTC' });
+  const nextMonday = new Date(weekBounds(at).end * 1000).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: TZ });
   return USAGE_ORDER.map((k) => u.items.find((i) => i.kind === k)).filter(Boolean).map((i) => {
     const warn = i.full || (i.limit != null && i.used / i.limit >= 0.8);
     const note = i.limit == null ? 'Sans plafond' : i.full ? 'Plafond atteint pour ton offre'
-      : i.kind === 'mails' ? `Repart de zéro le ${nextMonth}` : i.kind === 'aiJobs' ? `${i.pct} % du plafond : ${plural(i.limit - i.used, 'restante', 'restantes')}`
+      : i.kind === 'mails' ? `Repart de zéro ${nextMonday}` : i.kind === 'aiJobs' ? `${i.pct} % du plafond : ${plural(i.limit - i.used, 'restante', 'restantes')}`
         : i.kind === 'prospects' ? plural(i.limit - i.used, 'place libre', 'places libres') : `${plural(i.limit - i.used, 'place libre', 'places libres')}`;
     return { kind: i.kind, label: USAGE_LABEL[i.kind], used: i.used, max: i.limit, pct: i.pct, warn, note };
   });
@@ -277,7 +276,7 @@ export async function todayData(db, user, { projects, onboarding = new Map(), se
     onboarding: [...onboarding.entries()].map(([id, c]) => ({ id, name: names.get(id) || '', ...c })).find((c) => !c.ready) || null,
     kpis: [
       { label: 'Réponses à traiter', value: String(repOpen), sub: repOpen ? 'à lire et à traiter' : 'rien en attente', href: '/mails', tone: '' },
-      { label: 'Mails cette semaine', value: last.sent.toLocaleString('fr-FR'), sub: mails ? `${mails.used.toLocaleString('fr-FR')}${mails.limit == null ? '' : ` sur ${mails.limit.toLocaleString('fr-FR')}`} ce mois-ci` : '', href: '/mails', tone: '' },
+      { label: 'Mails cette semaine', value: last.sent.toLocaleString('fr-FR'), sub: mails ? `${mails.used.toLocaleString('fr-FR')}${mails.limit == null ? '' : ` sur ${mails.limit.toLocaleString('fr-FR')}`} cette semaine` : '', href: '/mails', tone: '' },
       { label: 'À encaisser', value: fmtEur(cash.toCollect), sub: cash.invoices.length ? `${plural(cash.invoices.length, 'facture', 'factures')}${cash.lateCount ? `, ${cash.lateCount} en retard` : ''}` : 'aucune facture en attente', href: '/compta', tone: cash.lateCount ? 'warn' : '' },
       { label: `Encaissé en ${monthName(cash.month).toLowerCase()}`, value: fmtEur(cash.collected), sub: `${fmtEur(cash.previous)} le mois dernier`, href: '/compta', tone: '' },
     ],

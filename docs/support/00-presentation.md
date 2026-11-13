@@ -17,7 +17,7 @@ Tout ce que fait l'IA passe par le accès de la personne à son IA, jamais par u
 - **Prospect** : une entreprise trouvée, avec son email professionnel, sa source publique, une accroche personnalisée et un score de pertinence de 1 à 10.
 - **Job** : une tâche lancée en arrière-plan (analyse, recherche, envoi, évolution, audit, post LinkedIn, vidéo…). Ses jobs en cours se voient dans « Activité ».
 - **Mon IA** : l'accès à l'IA reliée au compte, Claude, ChatGPT ou Gemini (voir le fichier sur la liaison de l'IA).
-- **Plafond** : limite mensuelle de l'offre (projets, prospects, mails, jobs IA, places d'équipe) ; voir « Offres, plafonds et limites ».
+- **Plafond** : limite de l'offre (projets et prospects en total ; mails et jobs IA par semaine ; places d'équipe) ; voir « Offres, plafonds et limites ».
 - **Liste d'opposition** : adresses qui ne doivent plus être contactées (désinscription, refus, adresse invalide), commune à tous les comptes.
 
 ## La barre du haut (de gauche à droite)

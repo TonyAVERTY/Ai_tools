@@ -168,11 +168,11 @@ test('déclaration : la période à déclarer, sa date limite et son montant ; r
   assert.equal(declarationNote({ rows, settings: { ...settings, regime: 'unknown' }, today: '2026-11-06' }), null);
 });
 
-test('usage du mois : une barre par plafond, alerte à 80 % et à 100 %, « Sans plafond » pour une offre illimitée', () => {
+test('usage de la semaine : une barre par plafond, alerte à 80 % et à 100 %, « Sans plafond » pour une offre illimitée', () => {
   const item = (kind, used, limit) => ({ kind, label: kind, used, limit, pct: limit == null ? 0 : Math.min(100, Math.round((used / limit) * 100)), full: limit != null && used >= limit });
   const rows = usageRows({ items: [item('projects', 2, 2), item('prospects', 186, 300), item('mails', 86, 500), item('aiJobs', 16, 20)] }, Date.UTC(2026, 10, 6) / 1000);
   assert.deepEqual(rows.map((r) => r.kind), ['mails', 'aiJobs', 'prospects', 'projects']);
-  assert.equal(rows[0].note, 'Repart de zéro le 1 décembre');
+  assert.equal(rows[0].note, 'Repart de zéro lundi 9 novembre');
   assert.equal(rows[1].warn, true);
   assert.equal(rows[1].note, '80 % du plafond : 4 restantes');
   assert.equal(rows[2].note, '114 places libres');

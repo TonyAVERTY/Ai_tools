@@ -37,7 +37,7 @@ Dans le projet, onglet **Envoi** (adresse `/p/N/envoi`). En haut, un bandeau dit
 1. **Mails à envoyer** : le nombre voulu (un lot fait 100 mails au plus).
 2. Bouton **Envoyer** : une confirmation est demandée à chaque envoi.
 3. L'envoi tourne en arrière-plan (« Activité ») : « Envoi terminé : N envoyé(s), M échec(s) ».
-Conditions pour que ça parte : un **SMTP** enregistré dans « Configuration du projet », un **modèle validé**, des prospects « À contacter », un plafond mensuel de mails non atteint, pas de pause d'envoi.
+Conditions pour que ça parte : un **SMTP** enregistré dans « Configuration du projet », un **modèle validé**, des prospects « À contacter », un plafond de mails de la semaine non atteint, pas de pause d'envoi.
 
 ## Garde-fous d'envoi
 - **Plafond par projet sur 24 h** (champ « Plafond mails / 24 h », 200 au maximum) dans « Configuration du projet », et **plafond global sur 24 h** (300 au maximum) dans **Réglages → Garde-fous**. Un lot fait 100 mails au plus.

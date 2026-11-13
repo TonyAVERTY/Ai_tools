@@ -141,7 +141,7 @@ const projects = (d) => `<section class="td-card" aria-labelledby="pj-h">
 </section>`;
 
 const usage = (d) => `<section class="td-card" aria-labelledby="um-h">
-  <div class="td-sec-h"><h2 id="um-h">Ce mois-ci</h2><span class="td-plan">Offre ${esc(d.plan)} · <a href="/tarifs">Offres</a></span></div>
+  <div class="td-sec-h"><h2 id="um-h">Cette semaine</h2><span class="td-plan">Offre ${esc(d.plan)} · <a href="/tarifs">Offres</a></span></div>
   <div class="td-usage">
     ${d.usage.map((u) => `<div class="td-u${u.warn ? ' warn' : ''}">
       <div class="td-u-h"><span>${esc(u.label)}</span><span><b>${fr(u.used)}</b>${u.max == null ? '' : ` sur ${fr(u.max)}`}</span></div>

@@ -39,14 +39,14 @@ export function generatedDocs(facts = {}) {
   out.push({
     name: 'plans-et-limites.md',
     content: `# Offres, plafonds et limites
-Résumé : prix des offres, plafonds mensuels (projets, prospects, mails, jobs IA, places d'équipe) et limites techniques (page IA, pièces jointes, vidéos de promotion). Fichier généré depuis le code : toujours à jour.
+Résumé : prix des offres, plafonds (projets, prospects, mails, jobs IA, places d'équipe) et limites techniques (page IA, pièces jointes, vidéos de promotion). Fichier généré depuis le code : toujours à jour.
 
 ## Offres
-Les plafonds se renouvellent le 1er de chaque mois (heure de Paris). Quand un plafond est atteint, rien n'est perdu : l'action est refusée avec un message clair et reprend le mois suivant ou après un changement d'offre. La page « Mon compte » et le tableau de bord montrent l'usage du mois (« Usage du mois »).
+Les plafonds de **mails** et de **jobs IA** se comptent **par semaine**, comme le quota de l'IA : ils repartent de zéro **chaque lundi à minuit** (heure de Paris). Les plafonds de projets et de prospects sont des totaux du compte. Quand un plafond est atteint, rien n'est perdu : l'action est refusée avec un message clair et reprend le lundi suivant ou après un changement d'offre. La page « Mon compte » montre l'usage de la semaine (« Usage de la semaine »).
 
 **Jobs IA simultanés (multi jobs)** : combien de tâches IA ton compte fait tourner en même temps. L'offre gratuite en fait tourner **une seule à la fois** ; le multi jobs est réservé aux offres payantes, et plus l'offre est chère, plus il y en a. Les tâches en trop attendent leur tour dans « Activité » (« En attente : … »). Ce nombre est propre à chaque compte : il n'y a pas de limite globale sur le serveur. Les envois de mails (premiers mails et relances) ne se chevauchent jamais, même avec le multi jobs.
 
-| Offre | Prix | Projets | Prospects | Mails par mois | Jobs IA par mois | Jobs IA simultanés | Places d'équipe |
+| Offre | Prix | Projets | Prospects | Mails par semaine | Jobs IA par semaine | Jobs IA simultanés | Places d'équipe |
 |---|---|---|---|---|---|---|---|
 ${rows.join('\n')}
 

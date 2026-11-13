@@ -72,7 +72,7 @@ export const RATE_LIMITS = {
 /**
  * Plafonds par plan. `null` = illimité.
  *  - `projects` et `prospects` : totaux du compte ;
- *  - `mails` et `aiJobs` : par mois calendaire, heure de Paris ;
+ *  - `mails` et `aiJobs` : par SEMAINE (du lundi 0 h au lundi suivant, heure de Paris), comme le quota de l'IA ;
  *  - `parallelJobs` : jobs IA qu'un compte peut faire tourner EN MÊME TEMPS (multi jobs). 1 = un à la fois : c'est l'offre gratuite ; le multi jobs
  *    est réservé aux offres payantes et grandit avec l'offre. Aucune limite globale sur le serveur : seule l'offre compte ;
  *  - `seats` : places d'équipe, propriétaire compris (1 = pas d'équipe). L'équipe utilise le plan et les plafonds de son propriétaire.
@@ -80,15 +80,15 @@ export const RATE_LIMITS = {
  * mais il n'est pas proposé sur la page Tarifs.
  *
  * Les offres payantes respectent deux contraintes du serveur :
- *  - `mails` ne dépasse jamais 300 × 30 : un compte ne peut pas envoyer plus de 300 mails par 24 h (voir README) ;
- *  - `aiJobs` couvre au moins `prospects / 50` recherches (une recherche ramène 50 contacts au plus), plus l'analyse et les modèles.
+ *  - `mails` ne dépasse jamais 300 × 7 : un compte ne peut pas envoyer plus de 300 mails par 24 h (voir README) ;
+ *  - `aiJobs` × 4 semaines couvre au moins `prospects / 50` recherches (une recherche ramène 50 contacts au plus), plus l'analyse et les modèles.
  */
 export const PLAN_LIMITS = {
-  free: { projects: 1, prospects: 50, mails: 100, aiJobs: 6, parallelJobs: 1, seats: 1 },
-  starter: { projects: 2, prospects: 300, mails: 500, aiJobs: 20, parallelJobs: 2, seats: 2 },
-  growth: { projects: 5, prospects: 1000, mails: 1500, aiJobs: 60, parallelJobs: 3, seats: 3 },
-  business: { projects: 10, prospects: 3000, mails: 4000, aiJobs: 150, parallelJobs: 4, seats: 10 },
-  intensive: { projects: 25, prospects: 10000, mails: 8000, aiJobs: 400, parallelJobs: 6, seats: 25 },
+  free: { projects: 2, prospects: 100, mails: 50, aiJobs: 4, parallelJobs: 1, seats: 1 },
+  starter: { projects: 3, prospects: 500, mails: 250, aiJobs: 12, parallelJobs: 2, seats: 2 },
+  growth: { projects: 8, prospects: 1500, mails: 700, aiJobs: 35, parallelJobs: 3, seats: 3 },
+  business: { projects: 15, prospects: 5000, mails: 1400, aiJobs: 90, parallelJobs: 4, seats: 10 },
+  intensive: { projects: 40, prospects: 15000, mails: 2100, aiJobs: 220, parallelJobs: 6, seats: 25 },
   pro: { projects: null, prospects: null, mails: null, aiJobs: null, parallelJobs: 6, seats: null },
   admin: { projects: null, prospects: null, mails: null, aiJobs: null, parallelJobs: 6, seats: null },
 };
