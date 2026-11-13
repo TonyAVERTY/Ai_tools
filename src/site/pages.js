@@ -409,7 +409,7 @@ export function pricingPage({ appUrl, billing = false }) {
   const paidRow = (k) => `<tr class="plan-row" aria-labelledby="plan-${k}">
         <th scope="row"><h2 id="plan-${k}">${PLAN_LABELS[k]}</h2>${billing ? '' : badge('b-info', 'clock', 'Bientôt')}<p class="tag">${PLAN_BLURBS[k]}</p></th>
         <td data-label="Prix"><span class="price when-month">${euros(PLAN_PRICES[k])} <small>par mois, TTC</small></span><span class="price when-year">${euros(annualPrice(k))} <small>par an, TTC</small></span>
-          <small class="sub when-month">ou ${euros(annualPrice(k))} par an, ${ANNUAL_FREE_MONTHS} mois offerts</small><small class="sub when-year">soit ${euros(annualPrice(k) / 12)} par mois, ${ANNUAL_FREE_MONTHS} mois offerts</small></td>
+          <small class="sub when-month">Sans engagement, résiliable à tout moment</small><small class="sub when-year">soit ${euros(annualPrice(k) / 12)} par mois, ${ANNUAL_FREE_MONTHS} mois offerts</small></td>
         ${limitCells(PLAN_LIMITS[k])}
         <td class="plan-act">${billing ? buyForms(k) : `<a class="btn btn-secondary" href="mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(`Me prévenir : offre ${PLAN_LABELS[k]}`)}">Me prévenir à l'ouverture</a>`}</td>
       </tr>`;
@@ -432,7 +432,7 @@ export function pricingPage({ appUrl, billing = false }) {
       <button class="seg-b" type="button" data-period="month" aria-pressed="true">Au mois</button>
       <button class="seg-b" type="button" data-period="year" aria-pressed="false">À l'année</button>
     </div>
-    ${badge('b-ok', 'check', `${ANNUAL_FREE_MONTHS} mois offerts`)}
+    <span data-year-only hidden>${badge('b-ok', 'check', `${ANNUAL_FREE_MONTHS} mois offerts`)}</span>
   </div>
 
   <div class="plans" data-billing="month">
