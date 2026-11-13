@@ -9,6 +9,11 @@ import { PERIODS, stripeCall } from './services/stripe.js';
 
 const DAY = 86_400;
 const STRIPE_PLANS = Object.keys(PLAN_PRICES);
+// Un compte Stripe peut servir plusieurs produits : le point d'arrivée reçoit TOUS ses événements. Ceux d'iaboss portent ce marqueur (metadata.app),
+// posé à la création de l'abonnement ; un abonnement déjà enregistré chez nous est reconnu même sans lui. Le reste est ignoré.
+export const APP_TAG = 'iaboss';
+const isOurs = async (db, meta, subscriptionId) => meta?.app === APP_TAG
+  || (!!subscriptionId && !!(await db.prepare('SELECT 1 AS x FROM subscriptions WHERE subscription_id = ?').get(String(subscriptionId))));
 
 export const subscriptionOf = async (db, userId) => (await db.prepare('SELECT * FROM subscriptions WHERE user_id = ?').get(Number(userId))) || null;
 
@@ -27,6 +32,7 @@ async function userFor(db, sub) {
 
 /** Applique l'état d'un abonnement Stripe au compte. Renvoie { userId, entitled, plan } ou null si l'abonnement n'est celui d'aucun compte. */
 export async function applySubscription(db, sub, { at = now() } = {}) {
+  if (!(await isOurs(db, sub.metadata, sub.id))) return null; // abonnement d'un autre produit du même compte Stripe
   const userId = await userFor(db, sub);
   if (!userId) return null;
   const prev = await subscriptionOf(db, userId);
@@ -82,7 +88,7 @@ export async function handleEvent(app, event, { at = now() } = {}) {
   let handled = true;
   switch (event.type) {
     case 'checkout.session.completed': {
-      if (obj.mode !== 'subscription') { handled = false; break; }
+      if (obj.mode !== 'subscription' || obj.metadata?.app !== APP_TAG) { handled = false; break; } // pas un abonnement iaboss
       const userId = Number(obj.client_reference_id || obj.metadata?.user_id);
       const user = userId ? await db.prepare('SELECT id FROM users WHERE id = ?').get(userId) : null;
       if (!user || !obj.customer) { handled = false; break; }
