@@ -41,9 +41,9 @@ const loc = (r) => decodeURIComponent(String(r.headers.get('location')).replace(
 const dbUser = (id) => s.db.prepare('SELECT id, plan, is_admin FROM users WHERE id = ?').get(id);
 const sub = (over = {}) => ({
   id: 'sub_1', customer: 'cus_1', status: 'active', cancel_at_period_end: false, current_period_end: now() + 30 * DAY,
-  metadata: { user_id: '0', plan: 'starter', period: 'month' }, items: { data: [{ id: 'si_1' }] }, ...over,
+  metadata: { app: 'iaboss', user_id: '0', plan: 'starter', period: 'month' }, items: { data: [{ id: 'si_1' }] }, ...over,
 });
-const withUser = (u, over = {}) => sub({ ...over, metadata: { user_id: String(u.id), plan: 'starter', period: 'month', ...(over.metadata || {}) } });
+const withUser = (u, over = {}) => sub({ ...over, metadata: { app: 'iaboss', user_id: String(u.id), plan: 'starter', period: 'month', ...(over.metadata || {}) } });
 const event = (type, object, id = `evt_${Math.random().toString(36).slice(2)}`) => ({ id, type, data: { object } });
 const webhook = (ev, { secret = WH, at, header, target = s } = {}) => {
   const raw = JSON.stringify(ev);
@@ -163,7 +163,7 @@ test('événements : signature obligatoire, abonnement créé = plan du compte, 
   const again = await webhook(ev);
   assert.equal((await again.json()).duplicate, true, 'le même événement n\'est traité qu\'une fois');
   // Un abonnement dont le compte n'existe pas (supprimé entre-temps) : on répond 200, rien à faire
-  const ghost = await webhook(event('customer.subscription.updated', sub({ customer: 'cus_fantome', metadata: { user_id: '99999999', plan: 'starter', period: 'month' } })));
+  const ghost = await webhook(event('customer.subscription.updated', sub({ customer: 'cus_fantome', metadata: { app: 'iaboss', user_id: '99999999', plan: 'starter', period: 'month' } })));
   assert.equal(ghost.status, 200);
   assert.equal((await s.db.prepare("SELECT COUNT(*) n FROM subscriptions WHERE customer_id = 'cus_fantome'").get()).n, 0);
   // Les événements sans effet répondent 200 (Stripe ne doit pas les renvoyer)
@@ -175,7 +175,7 @@ test('événements : signature obligatoire, abonnement créé = plan du compte, 
 test('paiement abouti : « checkout.session.completed » lie le client Stripe au compte et relit l\'abonnement', async () => {
   const u = await user('checkout@x.fr');
   stripe['GET /subscriptions/sub_9'] = { json: withUser(u, { id: 'sub_9', customer: 'cus_9', metadata: { plan: 'business', period: 'year' } }) };
-  const ev = event('checkout.session.completed', { mode: 'subscription', customer: 'cus_9', subscription: 'sub_9', client_reference_id: String(u.id), metadata: { user_id: String(u.id), plan: 'business', period: 'year' } });
+  const ev = event('checkout.session.completed', { mode: 'subscription', customer: 'cus_9', subscription: 'sub_9', client_reference_id: String(u.id), metadata: { app: 'iaboss', user_id: String(u.id), plan: 'business', period: 'year' } });
   assert.equal((await webhook(ev)).status, 200);
   assert.equal((await dbUser(u.id)).plan, 'business');
   assert.equal((await subscriptionOf(s.db, u.id)).customer_id, 'cus_9');
@@ -346,4 +346,24 @@ test('pages : Tarifs propose « Choisir cette offre » quand les paiements sont 
   assert.match(await page(s, '/confidentialite'), /Stripe Payments Europe/);
   assert.match(await page(off, '/cgu'), /Ces plans ouvrent prochainement/);
   assert.doesNotMatch(await page(off, '/confidentialite'), /Stripe Payments Europe/);
+});
+
+test('compte Stripe partagé : les abonnements et paiements d\'un autre produit du même compte ne touchent jamais un compte iaboss', async () => {
+  const u = await user('partage@x.fr');
+  // Un autre produit du même compte Stripe qui réutilise les mêmes noms de métadonnées (user_id, plan) : sans marqueur « app », rien n'est appliqué
+  const foreign = withUser(u, { id: 'sub_autre', customer: 'cus_autre', metadata: { app: undefined, plan: 'business' } });
+  delete foreign.metadata.app;
+  assert.equal((await webhook(event('customer.subscription.created', foreign))).status, 200);
+  assert.equal((await dbUser(u.id)).plan, 'free', 'abonnement d\'un autre produit : plan inchangé');
+  assert.equal((await s.db.prepare('SELECT COUNT(*) n FROM subscriptions WHERE user_id = ?').get(u.id)).n, 0);
+  const co = event('checkout.session.completed', { mode: 'subscription', customer: 'cus_autre', subscription: 'sub_autre', client_reference_id: String(u.id), metadata: { user_id: String(u.id), plan: 'business' } });
+  assert.equal((await webhook(co)).status, 200);
+  assert.equal((await s.db.prepare('SELECT COUNT(*) n FROM subscriptions WHERE user_id = ?').get(u.id)).n, 0, 'paiement d\'un autre produit : aucun abonnement créé');
+  // Le client Stripe d'un abonnement iaboss ne sert pas à rattacher un abonnement étranger
+  assert.equal((await webhook(event('customer.subscription.created', withUser(u, { id: 'sub_ok', customer: 'cus_ok' })))).status, 200);
+  assert.equal((await dbUser(u.id)).plan, 'starter');
+  const sameCustomer = withUser(u, { id: 'sub_etranger', customer: 'cus_ok', status: 'canceled', metadata: { plan: 'growth' } });
+  delete sameCustomer.metadata.app; delete sameCustomer.metadata.user_id;
+  await webhook(event('customer.subscription.deleted', sameCustomer));
+  assert.equal((await dbUser(u.id)).plan, 'starter', 'la fin d\'un abonnement étranger du même client ne rétrograde pas le compte');
 });

@@ -3,7 +3,7 @@
 import { HttpError, json, redirect, readBody } from './http.js';
 import { PLAN_PRICES, PLAN_LABELS } from './limits.js';
 import { PERIODS, stripeCall, ensurePrice, verifyWebhook } from './services/stripe.js';
-import { subscriptionOf, applySubscription, handleEvent } from './subscriptions.js';
+import { subscriptionOf, applySubscription, handleEvent, APP_TAG } from './subscriptions.js';
 
 const fail = (status, message) => new HttpError(status, message, { expose: true });
 const MAX_EVENT = 512 * 1024;
@@ -43,13 +43,13 @@ export function registerSubscriptionRoutes(router, app) {
       if (!item) throw fail(502, "Stripe n'a pas renvoyé la ligne de ton abonnement : réessaie dans un instant.");
       const updated = await stripeCall(app, 'POST', `/subscriptions/${encodeURIComponent(row.subscription_id)}`, {
         items: [{ id: item, price }], proration_behavior: 'create_prorations', cancel_at_period_end: 'false',
-        metadata: { user_id: session.userId, plan, period },
+        metadata: { app: APP_TAG, user_id: session.userId, plan, period },
       });
-      await applySubscription(db, { ...updated, metadata: { ...updated.metadata, user_id: session.userId, plan, period } });
+      await applySubscription(db, { ...updated, metadata: { ...updated.metadata, app: APP_TAG, user_id: session.userId, plan, period } });
       return back(res, { t: 'ok', m: `Offre ${PLAN_LABELS[plan]} activée : la différence est calculée au prorata sur ta prochaine facture.` });
     }
     const price = await ensurePrice(app, plan, period);
-    const meta = { user_id: session.userId, plan, period };
+    const meta = { app: APP_TAG, user_id: session.userId, plan, period };
     const checkout = await stripeCall(app, 'POST', '/checkout/sessions', {
       mode: 'subscription', locale: 'fr', client_reference_id: session.userId,
       line_items: [{ price, quantity: 1 }],
