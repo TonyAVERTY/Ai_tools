@@ -8,6 +8,7 @@ import { JOB_LABELS } from './today.js';
 import { ROLES } from './services/roles.js';
 import { aiName } from './services/ainame.js';
 import { clientProjectBlock } from './clientsviews.js';
+import { lockedCard } from './lockviews.js';
 
 const fr = (n) => Number(n).toLocaleString('fr-FR');
 const shortDay = (ts) => new Date(ts * 1000).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', timeZone: 'Europe/Paris' });
@@ -166,12 +167,16 @@ function journalCard(p, j) {
 /**
  * @param {{email:string, entry:object, tab:string, stats:object|null, checklist:object|null, jobs:object}} a
  */
-export function projectTabPage({ email, entry, tab, stats = null, checklist = null, jobs = {}, journal = null, scheduled = [], clientCounts = null, billing = null }) {
+export function projectTabPage({ email, entry, tab, stats = null, checklist = null, jobs = {}, journal = null, scheduled = [], clientCounts = null, billing = null, locked = [] }) {
   const p = entry.project;
   const manage = p.access !== 'member';
   const tabs = TABS.filter(([, , needs]) => manage || !needs);
   const label = (TABS.find(([s]) => s === tab) || TABS[0])[1];
   const blocks = projectBlocks(p, entry.smtp, entry.dbCfg, entry.imap);
+  // Fonctionnalités que l'offre n'a pas : le bloc est remplacé par une carte qui mène aux tarifs
+  if (locked.includes('content')) { blocks.instagram = lockedCard('content', 'Post Instagram'); blocks.newsletter = lockedCard('content', 'Newsletter'); blocks.linkedin = lockedCard('content', 'Post LinkedIn'); }
+  if (locked.includes('promo')) blocks.promo = lockedCard('promo', 'Vidéo de promotion');
+  if (locked.includes('poste')) blocks.postes = lockedCard('poste', 'Postes et tâches IA');
   const profile = p.profile;
   const body = tab === '' ? overview(p, checklist, stats, jobs)
     : tab === 'clients' ? `<div class="bill-page" data-clients><div class="cl-projects">${clientProjectBlock({ id: Number(p.id), name: p.name, counts: clientCounts || { clients: 0, prospects: 0, pending: 0 } }, Number(p.id))}</div></div>`

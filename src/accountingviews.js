@@ -4,6 +4,7 @@ import { esc } from './http.js';
 import { layout } from './views.js';
 import { ic } from './icons.js';
 import { banner } from './banner.js';
+import { lockedLink } from './lockviews.js';
 import {
   KINDS, KIND_BY_KEY, CATEGORIES, METHODS, VAT_RATES, REGIMES, ACTIVITIES, VAT_MODES, FREQUENCIES, REFERENCE,
   categoryLabel, methodLabel, fmtEur, dayLabel,
@@ -185,9 +186,9 @@ export function accountingPage(d) {
       ${d.projectRows.map((g) => `<tr><td><b>${esc(g.label)}</b></td><td class="num">${esc(fmtEur(g.totals.revenue))}</td><td class="num">${esc(fmtEur(g.totals.expenses))}</td>
         <td class="num ${g.totals.result < 0 ? 'cmp-neg' : ''}">${esc(fmtEur(g.totals.result))}</td><td class="num">${g.count}</td>
         <td class="cmp-act">${g.count ? `<a class="btn small" href="/compta?${esc(qs({ projet: g.key }))}#journal">Voir</a>
-          <a class="btn small" href="${esc(exportHref({ projet: g.key }))}" data-noajax>${ic('dl')}Exporter</a>` : '<span class="muted small">Aucune ligne</span>'}</td></tr>`).join('')}
+          ${d.canExport ? `<a class="btn small" href="${esc(exportHref({ projet: g.key }))}" data-noajax>${ic('dl')}Exporter</a>` : lockedLink('comptaExport', 'Exporter')}` : '<span class="muted small">Aucune ligne</span>'}</td></tr>`).join('')}
       <tr class="cmp-total"><td><b>Tous les projets</b></td><td class="num"><b>${esc(fmtEur(t.revenue))}</b></td><td class="num"><b>${esc(fmtEur(t.expenses))}</b></td><td class="num"><b>${esc(fmtEur(t.result))}</b></td><td class="num"><b>${t.count}</b></td>
-        <td class="cmp-act">${t.count ? `<a class="btn small" href="${esc(exportHref())}" data-noajax>${ic('dl')}Exporter</a>` : ''}</td></tr>
+        <td class="cmp-act">${t.count ? (d.canExport ? `<a class="btn small" href="${esc(exportHref())}" data-noajax>${ic('dl')}Exporter</a>` : lockedLink('comptaExport', 'Exporter')) : ''}</td></tr>
     </tbody></table></div>`;
 
   const pendingKind = (r) => (r.kind === 'refund_out' ? 'À rembourser' : 'À encaisser');
@@ -227,8 +228,8 @@ export function accountingPage(d) {
       <div class="row-actions">
         <button type="button" class="btn primary" data-compta-add>${ic('plus')}Ajouter une ligne</button>
         <a class="btn" href="/compta?declarer=${esc(d.next?.period || '1')}#declaration">${ic('file')}Faire ma déclaration</a>
-        ${hasAny ? `<a class="btn" href="${esc(exportHref())}" data-noajax>${ic('dl')}Tout exporter</a>
-        <a class="btn" href="/compta/journal.csv?${esc(new URLSearchParams({ periode: d.periodValue }).toString())}" data-noajax>${ic('receipt')}Journal CSV</a>` : ''}
+        ${hasAny ? (d.canExport ? `<a class="btn" href="${esc(exportHref())}" data-noajax>${ic('dl')}Tout exporter</a>
+        <a class="btn" href="/compta/journal.csv?${esc(new URLSearchParams({ periode: d.periodValue }).toString())}" data-noajax>${ic('receipt')}Journal CSV</a>` : lockedLink('comptaExport', 'Tout exporter et journal CSV')) : ''}
       </div></div>
     ${hasAny ? `<p class="muted small">« Tout exporter » crée une archive avec tous les justificatifs de la période (${esc(d.periodLabel)}), classés par projet, et le journal pour ton comptable.</p>` : ''}
     ${flash}

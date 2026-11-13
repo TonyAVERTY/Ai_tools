@@ -6,7 +6,7 @@ import { HttpError, html, redirect, readBody, send } from './http.js';
 import { getUser } from './users.js';
 import { developerMode, setDeveloperMode, createApiToken, listApiTokens, revokeApiToken, MAX_TOKENS, SCOPES } from './apitokens.js';
 import { developerPage } from './developerviews.js';
-import { requireFeature } from './services/plans.js';
+import { requireFeature, hasFeature } from './services/plans.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (file) => readFileSync(join(ROOT, file), 'utf8');
@@ -28,7 +28,7 @@ export function registerDeveloperRoutes(router, app) {
   const show = async (res, session, extra = {}, status = 200) => {
     html(res, developerPage({
       user: await getUser(db, session.userId), enabled: await developerMode(db, session.userId), tokens: await listApiTokens(db, session.userId),
-      appUrl: cfg.appUrl, max: MAX_TOKENS, ...extra,
+      appUrl: cfg.appUrl, max: MAX_TOKENS, locked: !hasFeature(await getUser(db, session.userId), 'api'), ...extra,
     }), status);
   };
 

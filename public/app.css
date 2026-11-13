@@ -2063,3 +2063,10 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 7px; text-align: cen
 .chat-summary { align-self: stretch; border: 1px dashed var(--line-strong); border-radius: var(--radius-sm); padding: 8px 12px; color: var(--muted); }
 .chat-summary summary { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: .875rem; font-weight: 600; }
 .chat-summary .bubble { margin-top: 8px; color: var(--text); }
+
+/* Fonctionnalité réservée à une offre : carte qui remplace le bloc, avec un lien vers les tarifs (src/lockviews.js) */
+.locked-card { border-style: dashed; }
+.locked-h { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.locked-h h2 { margin: 0; font-size: 1.05rem; }
+.locked-h .ic { color: var(--muted); }
+.locked-link { color: var(--muted); }

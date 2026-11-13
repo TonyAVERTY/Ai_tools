@@ -5,14 +5,15 @@ import { ic } from './icons.js';
 import { SCOPES } from './apitokens.js';
 import { API_ENDPOINTS } from './apiv1.js';
 import { banner } from './banner.js';
+import { lockedCard } from './lockviews.js';
 
 /** Une valeur à copier telle quelle (adresse, commande) : monospace, bouton « Copier » (public/app.js, [data-copy-cmd]). */
 const cmd = (label, text) => `<div class="cmd"><span class="lbl">${label}</span><div class="cmd-b"><pre><code>${esc(text)}</code></pre><button type="button" class="btn small" data-copy-cmd aria-label="Copier : ${esc(label)}">${ic('copy')}Copier</button></div></div>`;
 
 const day = (ts) => (ts ? new Date(ts * 1000).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' }) : 'jamais');
 
-export function developerPage({ user, enabled, tokens = [], newToken = null, error = null, appUrl, max }) {
-  const body = !enabled ? `<section class="card">
+export function developerPage({ user, enabled, tokens = [], newToken = null, error = null, appUrl, max, locked = false }) {
+  const body = locked ? lockedCard('api', 'Mode développeur') : !enabled ? `<section class="card">
   <div class="card-h"><h2>Mode développeur</h2><p>Active le mode développeur pour utiliser l'API d'iaboss et le serveur MCP (piloter ton panel depuis Claude ou depuis tes propres scripts). Tant qu'il est désactivé, aucun jeton ne fonctionne.</p></div>
   <form method="post" action="/account/developer" class="cfg"><input type="hidden" name="enabled" value="on">
     <div class="row"><button class="btn primary">${ic('key')}Activer le mode développeur</button></div></form>

@@ -87,3 +87,31 @@ test('la page Tarifs liste les fonctionnalités par offre', async () => {
   assert.match(html, /Fonctionnalités par offre/);
   for (const f of Object.values(FEATURES)) assert.ok(html.includes(f.label.replace(/'/g, '&#39;')) || html.includes(f.label), f.label);
 });
+
+test('sans l\'offre, le bloc est remplacé par une carte qui dit laquelle et mène aux tarifs ; avec l\'offre, le vrai bloc', async () => {
+  const free = await user('free');
+  const pid = await addProject(s.db, free.id, { name: 'V', gitUrl: 'https://github.com/u/v.git' });
+  const page = async (u, path) => (await u.get(path)).text();
+  const card = (h, key) => h.includes(`id="lk-${key}"`);
+  let h = await page(free, `/p/${pid}/communication`);
+  assert.ok(card(h, 'content') && card(h, 'promo'));
+  assert.match(h, /Passer à l'offre Démarrage/);
+  assert.match(h, /Passer à l'offre Business/);
+  h = await page(free, `/p/${pid}/outils`);
+  assert.match(h, /Disponible à partir de l'offre <b>Croissance<\/b>/);
+  h = await page(free, `/p/${pid}/facturation`);
+  assert.ok(card(h, 'billing'));
+  h = await page(free, '/facturation');
+  assert.ok(card(h, 'billing'));
+  h = await page(free, '/developer');
+  assert.ok(card(h, 'api'));
+  assert.match(await page(free, '/account'), /Passer à l'offre Croissance/);
+  const business = await user('business');
+  const pb = await addProject(s.db, business.id, { name: 'W', gitUrl: 'https://github.com/u/w.git' });
+  h = await page(business, `/p/${pb}/communication`);
+  assert.ok(!card(h, 'content') && !card(h, 'promo'));
+  h = await page(business, `/p/${pb}/outils`);
+  assert.ok(!card(h, 'poste'));
+  assert.ok(!card(await page(business, '/facturation'), 'billing'));
+  assert.ok(!card(await page(business, '/developer'), 'api'));
+});
