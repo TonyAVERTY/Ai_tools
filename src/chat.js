@@ -10,7 +10,7 @@ import { join } from 'node:path';
 import { HttpError, json, readBody, html, redirect } from './http.js';
 import { now, getSetting, setSetting } from './db.js';
 import { makeClaude, makeSync } from './handlers.js';
-import { chatPrompt, supportPrompt, chatContext, parseCustomPrompts, CHAT_MAX_MESSAGE } from './services/prompts.js';
+import { chatPrompt, supportPrompt, compactPrompt, chatContext, parseCustomPrompts, CHAT_MAX_MESSAGE, CHAT_SUMMARY_CHARS } from './services/prompts.js';
 import { ensureSupportDocs } from './services/supportdocs.js';
 import { plan } from './services/orchestrator.js';
 import { repoProfile, renderRepoProfile } from './services/repoprofile.js';
@@ -19,7 +19,7 @@ import { needAccess, accessOn } from './teams.js';
 import { accessibleProjects } from './mailroutes.js';
 import { userChatRoot } from './users.js';
 import { FILES, shapeAttachment, removeAttachmentFiles, conversationAttachments, prepareRunDir, registerChatFileRoutes } from './chatfiles.js';
-import { normalizeModel, catalogOf, isModel } from './services/models.js';
+import { normalizeModel, catalogOf, isModel, defaultModelOf } from './services/models.js';
 import { renderMarkdown } from './services/markdown.js';
 import { budgetState, isPriced } from './services/budget.js';
 import { loadRatio } from './services/load.js';
@@ -46,7 +46,7 @@ const titleOf = (text) => {
 const shapeConv = (c) => ({ id: Number(c.id), title: c.title, model: c.model, mode: c.mode === 'support' ? 'support' : 'claude', updatedAt: Number(c.updated_at), createdAt: Number(c.created_at) });
 export const shapeMessage = (m) => ({
   id: Number(m.id), role: m.role, content: m.content, model: m.model || null, createdAt: Number(m.created_at),
-  ...(m.role === 'assistant' ? { html: renderMarkdown(m.content) } : {}),
+  ...(m.role === 'assistant' || m.role === 'summary' ? { html: renderMarkdown(m.content) } : {}),
 });
 
 /** Conversations d'un compte pour un mode : « claude » (assistant classique) ou « support » (aide sur iaboss). */
@@ -67,6 +67,12 @@ export async function conversationMessages(db, convId) {
     byMessage.get(a.messageId).push(a);
   }
   return rows.map((m) => ({ ...shapeMessage(m), attachments: byMessage.get(Number(m.id)) || [] }));
+}
+
+/** Ce qui part vers l'IA : le dernier résumé (commande /compacter) puis les messages écrits depuis. Sans résumé, toute la conversation. */
+export function sinceSummary(messages) {
+  const i = messages.findLastIndex((m) => m.role === 'summary');
+  return i < 0 ? messages : messages.slice(i);
 }
 
 const KIND_WORD = { image: 'image', pdf: 'PDF', text: 'fichier texte', video: 'vidéo', project: 'projet' };
@@ -145,6 +151,38 @@ export function registerChatRoutes(router, app) {
     json(res, { ok: true });
   }, { limit: 'chat' });
 
+  // Compactage (commande /compacter) : un résumé de la conversation remplace les messages plus anciens dans ce qui est envoyé à l'IA.
+  // La conversation reste affichée en entier ; le résumé y apparaît comme un repère (rôle « summary », avec son coût).
+  router.post('/api/chat/conversations/:id/compact', async ({ res, params, session }) => {
+    const userId = session.userId;
+    const c = await getConversation(db, userId, params.id);
+    if (!c) throw new HttpError(404, 'Conversation introuvable');
+    const all = sinceSummary(await conversationMessages(db, c.id));
+    const previous = all[0]?.role === 'summary' ? all[0].content : '';
+    const fresh = all.filter((m) => m.role !== 'summary');
+    if (fresh.length < 4) throw new HttpError(400, 'Rien à compacter : la conversation est encore courte.', { expose: true });
+    if (busy.has(userId)) throw new HttpError(409, 'Une réponse est déjà en cours : attends qu\'elle se termine.', { expose: true });
+    if (running >= CHAT.maxParallel || (app.loadRatio ?? loadRatio)() > CHAT.loadMax) throw new HttpError(503, 'Le serveur est très sollicité en ce moment : réessaie dans un instant.', { expose: true });
+    const budget = await budgetState(db, userId);
+    if (budget.blocked) throw new HttpError(429, `Budget IA atteint : ${budget.reason}`, { expose: true });
+    busy.add(userId);
+    running++;
+    try {
+      const provider = await userProvider(db, userId);
+      const model = defaultModelOf(provider); // le modèle économe suffit pour résumer
+      const p = compactPrompt({ messages: fresh.map((m) => ({ role: m.role, content: `${attachmentsNote(m.attachments)}${m.content}` })), previous });
+      const r = await claude(userId, { prompt: p.prompt, system: p.system, model, maxTurns: 1, tools: [], chat: true, timeoutMs: CHAT.timeoutMs });
+      const content = String(r.text ?? '').trim().slice(0, CHAT_SUMMARY_CHARS);
+      if (!r.ok || !content) throw new HttpError(502, friendly(r, content), { expose: true });
+      const at = now();
+      const id = Number((await db.prepare('INSERT INTO chat_messages(conversation_id, role, content, model, cost_usd, created_at) VALUES(?, ?, ?, ?, ?, ?)').run(c.id, 'summary', content, model, Number(r.costUsd) || 0, at)).lastInsertRowid);
+      await db.prepare('UPDATE chat_conversations SET updated_at = ? WHERE id = ?').run(at, c.id);
+      json(res, { ok: true, message: shapeMessage({ id, role: 'summary', content, model, created_at: at }), compacted: fresh.length });
+    } finally {
+      if (busy.delete(userId)) running--;
+    }
+  }, { limit: 'chat' });
+
   router.post('/api/chat/conversations/:id/rename', async ({ req, res, params, session }) => {
     const c = await getConversation(db, session.userId, params.id);
     if (!c) throw new HttpError(404, 'Conversation introuvable');
@@ -216,7 +254,7 @@ export function registerChatRoutes(router, app) {
         conv = await getConversation(db, userId, id);
       }
       const earlier = await conversationMessages(db, conv.id);
-      const history = earlier.map(({ role, content, attachments }) => ({ role, content: `${attachmentsNote(attachments)}${content}` }));
+      const history = sinceSummary(earlier).map(({ role, content, attachments }) => ({ role, content: `${attachmentsNote(attachments)}${content}` }));
       const userMessageId = Number((await db.prepare('INSERT INTO chat_messages(conversation_id, role, content, created_at) VALUES(?, ?, ?, ?)').run(conv.id, 'user', message, at)).lastInsertRowid);
       if (ids.length) await db.prepare(`UPDATE chat_attachments SET message_id = ?, conversation_id = ? WHERE user_id = ? AND message_id IS NULL AND id IN (${ids.map(() => '?').join(',')})`).run(userMessageId, conv.id, userId, ...ids);
       if (project) await db.prepare("INSERT INTO chat_attachments(user_id, conversation_id, message_id, kind, name, project_id, created_at) VALUES(?, ?, ?, 'project', ?, ?, ?)").run(userId, conv.id, userMessageId, project.name, project.id, at);

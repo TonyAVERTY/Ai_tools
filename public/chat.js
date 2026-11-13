@@ -219,8 +219,116 @@
     none.hidden = true;
   }
 
+
+  // ---------- Commandes « / » (comme dans les IA de bureau) ----------
+  const cmdBox = $('[data-chat-cmds]');
+  const norm = (t) => String(t).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const note = (text) => { const n = el('div', 'chat-sys', text); n.setAttribute('role', 'status'); $('[data-chat-empty]')?.remove(); log.append(n); toBottom(); };
+  const needConv = () => { if (root.dataset.conv) return true; showError('Pas de conversation en cours : écris d\'abord un message'); return false; };
+  const lastBot = () => [...log.querySelectorAll('.chat-msg.bot')].pop();
+
+  async function compact() {
+    if (!needConv()) return;
+    setBusy(true);
+    note('Compactage de la conversation…');
+    const wait = log.lastElementChild;
+    try {
+      const d = await window.AiTools.api(`/api/chat/conversations/${root.dataset.conv}/compact`, {});
+      wait.remove();
+      const box = el('details', 'chat-summary');
+      box.dataset.id = String(d.message.id);
+      const sum = el('summary');
+      sum.innerHTML = `${icon('spark')}<span>Conversation compactée</span>`;
+      const b = el('div', 'bubble md');
+      b.innerHTML = d.message.html;
+      box.append(sum, b);
+      log.append(box);
+      toBottom();
+    } catch (e) { wait.remove(); showError(e.message); } finally { setBusy(false); input.focus(); }
+  }
+
+  const COMMANDS = [
+    { names: ['aide', 'help'], desc: 'Liste des commandes', run: () => note(COMMANDS.map((c) => `/${c.names[0]}${c.arg ? ` ${c.arg}` : ''} : ${c.desc}`).join('\n')) },
+    { names: ['nouveau', 'new', 'clear'], desc: 'Nouvelle conversation', run: () => { if (window.AiNav) window.AiNav.go(base); else location.href = base; } },
+    { names: ['compacter', 'compact'], desc: 'Résumer la conversation pour consommer moins', run: compact },
+    {
+      names: ['modele', 'model'], arg: '[nom]', desc: 'Voir ou changer le modèle',
+      run: (arg) => {
+        const opts = [...modelSel.options];
+        if (!arg) { note(`Modèle actuel : ${modelSel.selectedOptions[0].text}\n${opts.map((o) => o.text).join('\n')}`); return; }
+        const q = norm(arg);
+        const hit = opts.find((o) => norm(o.value) === q) || opts.find((o) => norm(o.text).includes(q));
+        if (!hit) { showError(`Modèle inconnu « ${arg} » : tape /modele pour voir la liste`); return; }
+        modelSel.value = hit.value;
+        note(`Modèle changé : ${hit.text}`);
+      },
+    },
+    {
+      names: ['renommer', 'rename'], arg: '<titre>', desc: 'Renommer la conversation',
+      run: async (arg) => {
+        if (!needConv()) return;
+        if (!arg) { showError('Donne un titre : /renommer Mon nouveau titre'); return; }
+        try {
+          const d = await window.AiTools.api(`/api/chat/conversations/${root.dataset.conv}/rename`, { title: arg });
+          const a = list.querySelector('li.on a');
+          if (a) a.textContent = d.title;
+          note(`Conversation renommée : ${d.title}`);
+        } catch (e) { showError(e.message); }
+      },
+    },
+    { names: ['supprimer', 'delete'], desc: 'Supprimer la conversation', run: () => { if (needConv()) list.querySelector(`[data-chat-del="${root.dataset.conv}"]`)?.click(); } },
+    {
+      names: ['copier', 'copy'], desc: 'Copier la dernière réponse',
+      run: async () => {
+        const b = lastBot()?.querySelector('[data-chat-copy]');
+        if (!b) { showError('Rien à copier : attends une réponse'); return; }
+        try { await navigator.clipboard.writeText(b.dataset.md); note('Réponse copiée'); } catch { showError('Copie impossible : sélectionne le texte à la main'); }
+      },
+    },
+  ];
+  let cmdSel = 0;
+  let cmdShown = [];
+  const cmdQuery = () => { const m = /^\/([^\s/]*)$/.exec(input.value); return m ? norm(m[1]) : null; };
+  function drawCmds() {
+    const q = cmdQuery();
+    cmdShown = q === null ? [] : COMMANDS.filter((c) => c.names.some((n) => n.startsWith(q)));
+    cmdBox.hidden = !cmdShown.length;
+    if (cmdSel >= cmdShown.length) cmdSel = 0;
+    cmdBox.replaceChildren(...cmdShown.map((c, i) => {
+      const li = el('li');
+      li.setAttribute('role', 'option');
+      li.setAttribute('aria-selected', String(i === cmdSel));
+      li.dataset.cmd = c.names[0];
+      li.append(el('b', '', `/${c.names[0]}`), el('span', '', c.desc));
+      return li;
+    }));
+  }
+  /** Le message est-il une commande ? Si oui, on l'exécute (rien n'est envoyé à l'IA). Un « /mot » inconnu seul est signalé ; autrement le texte part tel quel (un chemin, par exemple). */
+  function runCommand(text) {
+    const m = /^\/([^\s/]+)(?:\s+([\s\S]*))?$/.exec(text.trim());
+    if (!m) return false;
+    const c = COMMANDS.find((x) => x.names.includes(norm(m[1])));
+    if (!c) { if (m[2] === undefined) { showError(`Commande inconnue « /${m[1]} » : tape /aide pour les voir`); return true; } return false; }
+    if (busy) { showError('Une réponse est en cours : attends qu\'elle se termine'); return true; }
+    showError('');
+    input.value = '';
+    grow();
+    drawCmds();
+    c.run((m[2] || '').trim());
+    return true;
+  }
+  cmdBox.addEventListener('mousedown', (e) => {
+    const li = e.target.closest('li[data-cmd]');
+    if (!li) return;
+    e.preventDefault();
+    const c = COMMANDS.find((x) => x.names[0] === li.dataset.cmd);
+    input.value = c.arg ? `/${c.names[0]} ` : '';
+    if (c.arg) { drawCmds(); input.focus(); } else { drawCmds(); c.run(''); }
+  });
+
   async function send(text) {
     text = text.trim();
+    if (runCommand(text)) return;
     const ready = staged.filter((f) => f.status === 'ok');
     if ((!text && !ready.length && !project) || busy || staged.some((f) => f.status === 'up')) return;
     showError('');
@@ -321,8 +429,20 @@
 
   form.addEventListener('submit', (e) => { e.preventDefault(); send(input.value); });
   stopBtn.addEventListener('click', () => ctrl?.abort());
-  input.addEventListener('input', grow);
+  input.addEventListener('input', () => { grow(); cmdSel = 0; drawCmds(); });
   input.addEventListener('keydown', (e) => {
+    if (cmdShown.length && !cmdBox.hidden) {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); cmdSel = (cmdSel + (e.key === 'ArrowDown' ? 1 : cmdShown.length - 1)) % cmdShown.length; drawCmds(); return; }
+      if (e.key === 'Escape') { e.preventDefault(); cmdShown = []; cmdBox.hidden = true; return; }
+      if ((e.key === 'Tab' || e.key === 'Enter') && !e.shiftKey && !e.isComposing) {
+        e.preventDefault();
+        const c = cmdShown[cmdSel];
+        input.value = `/${c.names[0]}${c.arg ? ' ' : ''}`;
+        if (e.key === 'Tab' || c.arg) { drawCmds(); grow(); return; }
+        send(input.value);
+        return;
+      }
+    }
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(input.value); }
   });
 
