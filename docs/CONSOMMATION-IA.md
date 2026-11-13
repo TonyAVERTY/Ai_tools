@@ -47,7 +47,7 @@ La latence est dominée par la réflexion du modèle (tokens de sortie qui varie
 
 ## Vérifié sans appel
 
-- Double déclenchement : `enqueue` (`services/jobs.js`) renvoie le job déjà en file ou en cours pour le même projet et le même type (test existant) ; la page IA refuse un second envoi tant qu'une réponse est en cours (409).
+- Double déclenchement : `enqueue` (`services/jobs.js`) renvoie le job déjà en file ou en cours pour le même projet et le même type (lu dans le code, aucun test dédié à ce cas) ; la page IA refuse un second envoi tant qu'une réponse est en cours (409).
 - Reprise après erreur : un job « running » au redémarrage passe en erreur (« Interrompu (redémarrage) »), rien n'est rejoué tout seul ; une relance vient de l'utilisateur (`retryJob`).
 - Arguments : `test/claude-run.test.js` contrôle `--tools`, son égalité avec `--allowedTools`, et que l'option récente n'est passée que si le CLI la connaît.
 
