@@ -72,7 +72,7 @@ import { normalizeModel, PROMPT_SCOPES, catalogOf } from './services/models.js';
 import { nextNightSlot } from './services/paris-time.js';
 import { notify, notifyConfig, saveDiscordHooks, publicHooks, EVENTS, MAX_HOOKS } from './services/notify.js';
 import { listChannels, saveChannels, publicChannels, notifyChannels, CHANNEL_TYPES } from './services/channels.js';
-import { budgetState, AI_JOBS } from './services/budget.js';
+import { budgetState, AI_JOBS, quotaPauseThreshold, QUOTA_PAUSE_DEFAULT_PERCENT, QUOTA_PAUSE_MIN_PERCENT, QUOTA_PAUSE_MAX_PERCENT } from './services/budget.js';
 import { currentClaudeQuota } from './services/usagelive.js';
 import { currentChatgptLimits } from './services/usagechatgpt.js';
 import { sendWeeklyReport } from './services/report.js';
@@ -283,6 +283,7 @@ export function registerRoutes(router, app) {
       global_daily_cap: await getSetting(db, userId, 'global_daily_cap', '100'),
       send_delay_min: await getSetting(db, userId, 'send_delay_min', '20'),
       send_delay_max: await getSetting(db, userId, 'send_delay_max', '60'),
+      quota_pause_percent: String(Math.round(await quotaPauseThreshold(db, userId) * 100)),
       prospect_model: models.prospect,
       analyze_model: models.analyze,
       write_model: models.write,
@@ -328,6 +329,8 @@ export function registerRoutes(router, app) {
     await set('global_daily_cap', String(cap));
     await set('send_delay_min', String(dmin));
     await set('send_delay_max', String(dmax));
+    // Absent (autre formulaire) : la valeur enregistrée ne bouge pas
+    if (b.quota_pause_percent !== undefined) await set('quota_pause_percent', String(int(b.quota_pause_percent, QUOTA_PAUSE_MIN_PERCENT, QUOTA_PAUSE_MAX_PERCENT, QUOTA_PAUSE_DEFAULT_PERCENT)));
     // Modèles : uniquement ceux du catalogue (services/models.js) ; un champ absent ne change rien
     const provider = await userProvider(db, userId);
     for (const k of ['prospect_model', 'analyze_model', 'write_model']) if (b[k] !== undefined) await set(k, normalizeModel(b[k], undefined, provider));
