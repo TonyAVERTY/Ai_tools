@@ -44,7 +44,16 @@ export const isQuotaSensitive = (type) => QUOTA_SENSITIVE_JOBS.has(type);
 
 // Palier à partir duquel on reporte : garde de la marge sur le quota du compte Claude
 // lui-même (pas le budget $ ci-dessus) pour les tâches qui comptent vraiment.
-export const QUOTA_PAUSE_THRESHOLD = 0.85;
+// Réglable dans Réglages → Garde-fous (en %) ; 85 % tant que rien n'est choisi.
+export const QUOTA_PAUSE_DEFAULT_PERCENT = 85;
+export const QUOTA_PAUSE_MIN_PERCENT = 50;
+export const QUOTA_PAUSE_MAX_PERCENT = 100;
+
+export async function quotaPauseThreshold(db, userId) {
+  const v = Number(await getSetting(db, userId, 'quota_pause_percent', ''));
+  const pct = Number.isFinite(v) && v >= QUOTA_PAUSE_MIN_PERCENT && v <= QUOTA_PAUSE_MAX_PERCENT ? v : QUOTA_PAUSE_DEFAULT_PERCENT;
+  return pct / 100;
+}
 
 const WINDOW_LABELS = { fiveHour: 'session Claude (5 h)', sevenDay: 'semaine Claude' };
 
@@ -52,12 +61,13 @@ const WINDOW_LABELS = { fiveHour: 'session Claude (5 h)', sevenDay: 'semaine Cla
 export async function quotaState(db, userId) {
   const raw = await getSetting(db, userId, 'claude_rate_limit_json');
   if (!raw) return { blocked: false, reason: null };
+  const threshold = await quotaPauseThreshold(db, userId);
   let rl;
   try { rl = JSON.parse(raw); } catch { return { blocked: false, reason: null }; }
   for (const [key, label] of Object.entries(WINDOW_LABELS)) {
     const w = rl[key];
     // Une mesure dont la fenêtre a été remise à zéro depuis ne bloque plus rien
-    if (w?.utilization >= QUOTA_PAUSE_THRESHOLD && !(w.resetsAt && w.resetsAt < now())) {
+    if (w?.utilization >= threshold && !(w.resetsAt && w.resetsAt < now())) {
       return { blocked: true, reason: `quota de la ${label} à ${Math.round(w.utilization * 100)} %` };
     }
   }
