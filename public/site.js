@@ -38,6 +38,7 @@
     const buttons = [...bill.querySelectorAll('[data-period]')];
     const set = (period) => {
       plans.dataset.billing = period;
+      for (const el of bill.querySelectorAll('[data-year-only]')) el.hidden = period !== 'year';
       for (const b of buttons) b.setAttribute('aria-pressed', String(b.dataset.period === period));
     };
     for (const b of buttons) b.addEventListener('click', () => set(b.dataset.period));
