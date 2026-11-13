@@ -757,6 +757,8 @@ ${saved ? banner('ok', 'Réglages enregistrés', { strong: true }) : ''}
     ${s.ai.id === 'claude' ? `<label class="field"><span class="lbl">Pause des tâches IA à partir de</span><span class="unit"><input name="quota_pause_percent" type="number" min="50" max="100" value="${esc(s.quota_pause_percent)}"><span>%</span></span></label>` : ''}
   </div>
   ${s.ai.id === 'claude' ? '<p class="hint">Quota Claude : quand ta session (5 h) ou ta semaine atteint ce seuil, les analyses, évolutions, audits et tâches des postes attendent la remise à zéro du quota ; la prospection et les envois continuent. Entre 50 et 100 %, 85 % par défaut.</p>' : ''}
+  ${check('auto_retry', s.auto_retry, 'Relancer automatiquement les tâches IA arrêtées par une limite')}
+  <p class="hint">Quand une tâche s'arrête parce que ton IA a atteint sa limite (quota, surcharge) ou ne se termine pas, elle repart toute seule : après la remise à zéro du quota si elle est connue, sinon dans 15 minutes, puis 1 heure, puis 3 heures. 3 relances au plus par tâche. La tâche en échec reste affichée.</p>
   ${check('read_receipt', s.read_receipt, 'Demander un accusé de lecture dans les mails de prospection')}
   <p class="hint">« Lu » repose sur l'accusé de lecture standard : la messagerie du destinataire lui demande s'il accepte de l'envoyer. « Lu » est donc un minimum ; « Répondu » vient de la boîte de réception du projet.</p>
   <div class="footer-opt" data-footer-opt data-on="${s.mail_footer ? '1' : '0'}">

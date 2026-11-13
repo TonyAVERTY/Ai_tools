@@ -32,6 +32,7 @@ import { memberTeamIds, purgeInvites } from './teams.js';
 import { needsWelcome } from './userprofile.js';
 import { sandboxStartupMessages } from './services/sandbox.js';
 import { probeClaudeFlags } from './services/claude.js';
+import { scheduleAutoRetry } from './services/autoretry.js';
 import { gitVersionNotes } from './services/git.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -199,6 +200,7 @@ export async function createApp(cfg, { db, worker = true, createTransport, fetch
       onError: (job, e) => reportError(app, e, { method: 'JOB', path: job.type, userId: job.user_id, status: null }),
       budget: (userId) => budgetState(db, userId),
       isAiJob: (type) => AI_JOBS.has(type),
+      autoRetry: (job, message) => scheduleAutoRetry(db, job, message, { cliModeEnabled: cfg.cliModeEnabled !== false }),
       onBudget: (reason, userId) => notify(app, userId, 'budget', {
         title: 'Budget IA atteint', level: 'warn',
         description: `${reason[0].toUpperCase()}${reason.slice(1)}. Les jobs IA attendent ; les envois et relances continuent.`,

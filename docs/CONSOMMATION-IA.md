@@ -45,6 +45,19 @@ Avec l'option de cache, deux appels depuis des dossiers différents (sans outil)
 
 La latence est dominée par la réflexion du modèle (tokens de sortie qui varient de 2 000 à 6 000 sur le même prompt) : les écarts mesurés (de 28 s à 17 s sur S2, de 10 s à 12 s sur S1) sont du bruit, aucun gain de latence n'est annoncé.
 
+## Tableau récapitulatif
+
+| # | Optimisation | Fournisseurs | Effet mesuré | Statut |
+|---|---|---|---|---|
+| 1 | `--tools` = outils autorisés (`runClaude`) | Claude | −8 900 à −11 500 tokens d'entrée par appel et par tour | appliqué, mesuré |
+| 2 | `--exclude-dynamic-system-prompt-sections`, seulement si le CLI l'annonce (`probeClaudeFlags`) | Claude | −60 % de tokens écrits en cache, coût d'un appel −56 % (sans outil) | appliqué, mesuré |
+| 3 | Outils déjà restreints : Gemini `tools.core` + liste vide, Codex `shell_tool=false`, `web_search`, `project_doc_max_bytes=0`, Antigravity règles `deny` | Gemini, ChatGPT, Antigravity | aucun changement possible sans les CLI | déjà en place ; non mesurable ici (CLI non installés) |
+| 4 | `/compacter` : le résumé remplace l'historique (modèle économe du fournisseur) | tous | historique du chat remplacé par ≤ 6 000 caractères | appliqué, testé avec un faux CLI ; économie non mesurée |
+| 5 | Doublons : un job identique déjà en file ou en cours est réutilisé ; une seule réponse de chat à la fois par compte | tous | 0 appel en double | déjà en place, vérifié dans le code |
+| 6 | Relance automatique (option « Relancer automatiquement les tâches IA arrêtées par une limite ») | tous | n'économise pas de tokens : évite qu'une tâche coupée par la limite soit perdue ; repart après la remise à zéro du quota | nouveau, testé (`test/jobs-autoretry.test.js`) |
+
+Relance automatique : `services/autoretry.js`, branchée sur la fin d'un job en erreur et sur le démarrage du serveur (tâches interrompues). Réglage `auto_retry`, coupé par défaut. Une erreur de liaison, un compte suspendu ou un budget en $ atteint n'est pas relancé ; 3 relances au plus ; attente jusqu'à la remise à zéro du quota Claude quand elle est connue, sinon 15 min, 1 h, 3 h. Les autres IA n'exposent pas l'heure de remise à zéro : elles utilisent les attentes par défaut. Les tâches mises « En attente » par le seuil de quota (analyses, évolutions, audits, postes) repartaient déjà seules.
+
 ## Vérifié sans appel
 
 - Double déclenchement : `enqueue` (`services/jobs.js`) renvoie le job déjà en file ou en cours pour le même projet et le même type (lu dans le code, aucun test dédié à ce cas) ; la page IA refuse un second envoi tant qu'une réponse est en cours (409).
