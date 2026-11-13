@@ -148,3 +148,6 @@ export async function usageView(db, user, { at = now() } = {}) {
 export async function requireFeature(db, userId, key) {
   assertFeature(await getUser(db, userId), key);
 }
+
+/** Les fonctionnalités que l'offre de ce compte ne comprend pas (pour afficher des cartes verrouillées au lieu des blocs). */
+export const lockedFeatures = (user) => Object.keys(FEATURES).filter((k) => !hasFeature(user, k));

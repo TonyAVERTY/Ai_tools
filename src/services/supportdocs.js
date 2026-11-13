@@ -52,7 +52,7 @@ Les plafonds de **mails** et de **jobs IA** se comptent **par semaine**, comme l
 ${rows.join('\n')}
 
 ## Fonctionnalités réservées à une offre
-Tout le reste (prospection, mails, relances, agenda, comptabilité au quotidien, page IA, équipe selon les places) est inclus dès l'offre gratuite. Les fonctionnalités ci-dessous demandent au moins l'offre indiquée ; les offres au-dessus les ont aussi. Sans l'offre, le **lancement** d'une nouvelle tâche est refusé avec un message qui renvoie vers les tarifs (« inclus à partir de l'offre … ») ; ce qui existe déjà (documents, vidéos, brouillons) reste visible et rien n'est supprimé.
+Tout le reste (prospection, mails, relances, agenda, comptabilité au quotidien, page IA, équipe selon les places) est inclus dès l'offre gratuite. Les fonctionnalités ci-dessous demandent au moins l'offre indiquée ; les offres au-dessus les ont aussi. Sans l'offre, le bloc est remplacé par une carte « Disponible à partir de l'offre … » avec le bouton « Passer à l'offre … » qui ouvre les tarifs (le cadenas 🔒 le signale aussi à la place des boutons d'export). En plus, le **lancement** d'une nouvelle tâche est refusé avec un message qui renvoie vers les tarifs (« inclus à partir de l'offre … ») ; ce qui existe déjà (documents, vidéos, brouillons) reste visible et rien n'est supprimé.
 
 | Fonctionnalité | À partir de l'offre |
 |---|---|

@@ -77,7 +77,8 @@ import { currentClaudeQuota } from './services/usagelive.js';
 import { currentChatgptLimits } from './services/usagechatgpt.js';
 import { sendWeeklyReport } from './services/report.js';
 import { exportProspects, importProspects } from './services/csv.js';
-import { quotaFor, planLimitError, withUserLock, assertRoom, usageView } from './services/plans.js';
+import { quotaFor, planLimitError, withUserLock, assertRoom, usageView, lockedFeatures, hasFeature } from './services/plans.js';
+import { lockedCard } from './lockviews.js';
 import { history, saveSnapshot } from './services/metrics.js';
 import { evolutionHtml } from './services/markdown.js';
 import {
@@ -244,7 +245,8 @@ export function registerRoutes(router, app) {
     html(res, projectTabPage({
       email: session.email, entry, tab, stats: (await projectStats(db, [full.id])).get(Number(full.id)),
       checklist: await projectChecklist(app, full), jobs: await latestJobs(db, full.id),
-      billing: tab === 'facturation' ? await app.billingTab(ctx) : null,
+      locked: lockedFeatures(await getUser(db, full.userId)),
+      billing: tab === 'facturation' ? (hasFeature(await getUser(db, full.userId), 'billing') ? await app.billingTab(ctx) : lockedCard('billing', 'Devis et factures')) : null,
       clientCounts: tab === 'clients' ? (await clientsOverview(db, session.userId, [Number(full.id)])).get(Number(full.id)) : null,
       journal: tab === 'envoi' ? await journalOf(db, full.id) : null,
       scheduled: tab === 'communication' ? (await db.prepare("SELECT body, scheduled_at at FROM linkedin_posts WHERE project_id = ? AND status = 'scheduled' ORDER BY scheduled_at LIMIT 5").all(full.id)).map((r) => ({ body: r.body, at: Number(r.at) })) : [],
@@ -489,7 +491,7 @@ export function registerRoutes(router, app) {
       : link && link.mode !== MODES.api_key && link.provider === 'claude' ? await currentClaudeQuota(app, session.userId).catch(() => null) : null;
     const account = { link, quota };
     html(res, accountPage({
-      user: session.user, error: url.searchParams.get('e'), link: account.link, quota: account.quota, developer: await developerMode(db, session.userId), appUrl: cfg.appUrl,
+      user: session.user, error: url.searchParams.get('e'), link: account.link, quota: account.quota, developer: await developerMode(db, session.userId), devLocked: !hasFeature(session.user, 'api'), appUrl: cfg.appUrl,
       ical: await (async () => { const t = await feedToken(app, session.userId); return t ? feedUrl(cfg, t) : null; })(),
       consent: await lastConsent(db, session.userId), profileSet: !isEmpty(await getProfile(db, session.userId)), cliModeEnabled, usage: { ...(await usageView(db, await getUser(db, session.userId))), billing: await billingView(app, session.userId), flash: url.searchParams.get('abonnement') },
       notice: t === 'unlinked' ? { ok: true, text: 'Liaison supprimée : le secret a été effacé et tes jobs IA en attente ont été annulés.' }

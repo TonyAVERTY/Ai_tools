@@ -13,7 +13,8 @@ import { DOC_BY_KEY } from './services/billing.js';
 import { slug } from './services/accounting.js';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { requireFeature } from './services/plans.js';
+import { requireFeature, hasFeature } from './services/plans.js';
+import { getUser } from './users.js';
 
 const BILLING_JOBS = ['billing_quotes', 'billing_refine', 'billing_docs'];
 const refuse = (status, msg) => new HttpError(status, msg, { expose: true });
@@ -51,7 +52,7 @@ export function registerBillingRoutes(router, app, { aiOpts = {} } = {}) {
       try { resume = JSON.parse(p.profile_json || 'null')?.resume || ''; } catch { resume = ''; }
       return { id: Number(p.id), name: p.name, gitUrl: p.git_url, resume, stage, missing: legalMissing(legal).length };
     });
-    html(res, billingOverviewPage({ email: session.email, rows }));
+    html(res, billingOverviewPage({ email: session.email, rows, locked: !hasFeature(await getUser(db, userId), 'billing') }));
   });
 
   // ---------- Un projet : informations légales, devis, documents ----------
