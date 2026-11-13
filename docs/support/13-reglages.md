@@ -17,6 +17,7 @@ GitHub est toujours accepté. Pour un **dépôt privé** : champ **Token (dépô
 ## Garde-fous
 - **Plafond global mails / 24 h** (300 au maximum), tous projets confondus.
 - **Délai min** et **Délai max entre 2 mails** (secondes, aléatoire entre les deux).
+- **Pause des tâches IA non urgentes à partir de (quota Claude)** (champ affiché avec une IA Claude, en %, entre 50 et 100, 85 par défaut) : quand ta session Claude (5 h) ou ta semaine atteint ce seuil, les analyses, évolutions, audits et tâches des postes passent « En attente » jusqu'à la remise à zéro du quota ; la prospection et les envois continuent. Baisse le seuil pour garder plus de marge sur ton compte Claude, monte-le pour consommer davantage.
 - Case **Demander un accusé de lecture dans les mails de prospection**.
 - **Pied de page des mails de prospection** : par défaut, chaque mail se termine par « Vous recevez ce message car l'adresse … est publiée publiquement (source) » et un lien **Ne plus recevoir de messages**. Le bouton **Retirer le pied de page des mails** les supprime de tous tes mails (premiers mails et relances, tous tes projets). Un message d'**attention** est affiché dans la page et une **confirmation** est demandée avant le retrait, car :
   - **Légal** : en prospection par e-mail, le RGPD et la CNIL demandent d'informer la personne de l'origine de son adresse et de lui offrir un moyen simple et gratuit de refuser les messages ; la responsabilité est la tienne (sanctions possibles) ;
