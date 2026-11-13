@@ -18,7 +18,7 @@ const PLAN_BLURBS = {
   intensive: 'Pour le plus gros volume que le service permet.',
 };
 const fr = (n) => n.toLocaleString('fr-FR');
-const LIMIT_COLS = [['Projets', (l) => l.projects], ['Contacts', (l) => fr(l.prospects)], ['Mails par mois', (l) => fr(l.mails)], ['Tâches IA par mois', (l) => l.aiJobs], ['Jobs IA simultanés', (l) => l.parallelJobs], ["Places d'équipe", (l) => l.seats]];
+const LIMIT_COLS = [['Projets', (l) => l.projects], ['Contacts', (l) => fr(l.prospects)], ['Mails par semaine', (l) => fr(l.mails)], ['Tâches IA par semaine', (l) => l.aiJobs], ['Jobs IA simultanés', (l) => l.parallelJobs], ["Places d'équipe", (l) => l.seats]];
 const limitCells = (l) => LIMIT_COLS.map(([label, f]) => `<td data-label="${label}"><b>${f(l)}</b></td>`).join('');
 
 /** « Google » ou « Google ou Apple » selon la configuration réelle de la connexion. */
@@ -100,7 +100,7 @@ const HOME_JSON_LD = (appUrl) => ({
   inLanguage: 'fr',
   description: 'Panel qui pilote ton IA (Claude, ChatGPT ou Gemini) pour analyser un projet, trouver des prospects, rédiger et envoyer des mails de prospection, relancer et suivre les réponses.',
   offers: [
-    { '@type': 'Offer', name: 'Gratuit', price: '0', priceCurrency: 'EUR', description: `Plan gratuit : ${FREE.projects} projet, ${FREE.prospects} prospects, ${FREE.mails} mails et ${FREE.aiJobs} jobs IA par mois` },
+    { '@type': 'Offer', name: 'Gratuit', price: '0', priceCurrency: 'EUR', description: `Plan gratuit : ${FREE.projects} projets, ${FREE.prospects} prospects, ${FREE.mails} mails et ${FREE.aiJobs} jobs IA par semaine` },
     ...PAID.map((k) => ({ '@type': 'Offer', name: PLAN_LABELS[k], price: String(PLAN_PRICES[k]), priceCurrency: 'EUR', description: `${PLAN_LABELS[k]} : ${PLAN_PRICES[k]} € TTC par mois, ou ${annualPrice(k)} € TTC par an (${ANNUAL_FREE_MONTHS} mois offerts)` })),
   ],
   publisher: { '@type': 'Person', name: 'Tony AVERTY' },
@@ -439,7 +439,7 @@ export function pricingPage({ appUrl, billing = false }) {
 
   <div class="mentions">
     <p>Prix TTC. L'éditeur est en franchise de TVA (art. 293 B du CGI) : le prix affiché est le prix payé. En annuel, tu paies ${12 - ANNUAL_FREE_MONTHS} mois et tu en profites 12. ${billing ? 'Le paiement est sécurisé par Stripe : iaboss ne voit jamais ton numéro de carte. Tu peux résilier à tout moment ; l\'offre reste active jusqu\'à la fin de la période payée, puis tu repasses au plan Gratuit sans rien perdre.' : 'Les offres payantes ouvrent prochainement : tu seras prévenu avant toute facturation.'}</p>
-    <p>Ces plafonds sont appliqués par le serveur. Les mails et les tâches IA se comptent par mois (heure de Paris) et repartent de zéro le 1er. Quand un plafond est atteint, la nouvelle action est refusée, mais rien n'est supprimé. Un compte ne peut pas envoyer plus de 300 mails par 24 heures, quelle que soit l'offre : c'est une protection pour la réputation de ton adresse.</p>
+    <p>Ces plafonds sont appliqués par le serveur. Les mails et les tâches IA se comptent par semaine, comme le quota de ton IA : ils repartent de zéro chaque lundi à minuit (heure de Paris). Quand un plafond est atteint, la nouvelle action est refusée, mais rien n'est supprimé. Un compte ne peut pas envoyer plus de 300 mails par 24 heures, quelle que soit l'offre : c'est une protection pour la réputation de ton adresse.</p>
   </div>
 
   <section class="more" id="acces-ia" aria-labelledby="h-ia">

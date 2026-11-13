@@ -1,4 +1,4 @@
-// Page /admin : comptes (identité, liaison, usage du mois) et journal d'audit. Aucune donnée métier.
+// Page /admin : comptes (identité, liaison, usage de la semaine) et journal d'audit. Aucune donnée métier.
 import { esc } from './http.js';
 import { layout } from './views.js';
 import { banner } from './banner.js';
@@ -7,7 +7,7 @@ const fmt = (ts) => (ts ? new Date(ts * 1000).toLocaleString('fr-FR', { dateStyl
 const PROVIDERS = { google: 'Google', apple: 'Apple' };
 const PLANS = { free: 'gratuit', pro: 'pro', admin: 'administrateur' };
 
-// Usage du mois : une colonne par plafond, « utilisé / plafond » (ou le seul nombre quand il n'y a pas de plafond), chiffres alignés à droite
+// Usage de la semaine : une colonne par plafond, « utilisé / plafond » (ou le seul nombre quand il n'y a pas de plafond), chiffres alignés à droite
 const cap = (used, limit) => (limit == null ? `${used}` : `${used} / ${limit}`);
 const USAGE_COLS = [['projects', 'Projets'], ['prospects', 'Prospects'], ['mails', 'Mails'], ['aiJobs', 'Tâches IA']];
 const full = (u, k) => u.limits[k] != null && u[k] >= u.limits[k];
@@ -55,7 +55,7 @@ ${error ? banner('err', error) : ''}
     <tbody>${rows || '<tr><td colspan="11">Aucun compte ne correspond.</td></tr>'}</tbody>
   </table></div>
   <p class="admin-pager">${list.page > 1 ? `<a class="btn small" href="${nav(list.page - 1)}">Précédent</a>` : ''} ${list.page < list.pages ? `<a class="btn small" href="${nav(list.page + 1)}">Suivant</a>` : ''}</p>
-  <p class="muted small">Les quatre colonnes de droite comptent l'usage du mois, en cours (heure de Paris), sur le plafond de l'offre. Un nombre en rouge : plafond atteint.</p>
+  <p class="muted small">Les quatre colonnes de droite comptent l'usage de la semaine en cours (du lundi à minuit, heure de Paris), sur le plafond de l'offre. Un nombre en rouge : plafond atteint.</p>
 </section>
 <section class="card">
   <h2>Journal d'audit</h2>

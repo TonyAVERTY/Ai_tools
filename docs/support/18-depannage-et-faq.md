@@ -70,7 +70,7 @@ Quand une partie de la page se charge après coup (la section **LinkedIn**, **Pr
 Une session expirée ne montre pas ce message : tu reviens directement à la page de connexion (voir « Un message s'affiche en bas à droite »).
 
 ## « Plafond atteint » ou refus de création
-Un plafond mensuel de l'offre (projets, prospects, mails, jobs IA, places d'équipe) est atteint. Le compteur est dans « Mon compte → Usage du mois » ; les plafonds se renouvellent le 1er du mois. Voir « Offres, plafonds et limites » et la page Tarifs.
+Un plafond de l'offre (projets, prospects, mails et jobs IA par semaine, places d'équipe) est atteint. Le compteur est dans « Mon compte → Usage de la semaine » ; les plafonds de mails et de jobs IA repartent de zéro chaque lundi à minuit (heure de Paris). Voir « Offres, plafonds et limites » et la page Tarifs.
 
 ## Un message s'affiche en bas à droite : que veut-il dire ?
 Après une action, une notification apparaît en bas à droite. Un **succès** (« Prospect ajouté », « SMTP enregistré ») disparaît tout seul après quelques secondes. Une **erreur** reste plus longtemps (environ 8 secondes) ; la croix **×** la ferme tout de suite. Plusieurs notifications s'empilent (trois au plus) et le même message ne s'affiche qu'une fois.
@@ -100,7 +100,7 @@ Avant une action difficile à défaire (supprimer un projet, un prospect, une vi
 Le serveur limite le rythme des actions pour se protéger d'une boucle ou d'un abus. Une action isolée n'est jamais concernée : le message apparaît seulement après un très grand nombre d'enregistrements ou de clics en peu de temps (plus de 600 écritures en 10 minutes pour un même compte, avec des seuils plus bas sur certaines actions comme les vidéos, le chat ou la liaison de l'IA). Attends la durée indiquée dans le message, puis recommence. Les lectures (consulter une page, une liste) ne sont pas limitées. Si le message revient en usage normal, signale-le à l'administrateur.
 
 ## Le bouton Envoyer refuse ou rien ne part
-Vérifier dans l'ordre : 1) SMTP enregistré (« Configuration du projet ») ; 2) modèle de mail **validé** (« Valider le modèle ») ; 3) des prospects au statut « À contacter » ; 4) pas de bandeau rouge de pause d'envoi sur la page Projets ; 5) plafond de mails du projet (24 h), plafond global (Réglages → Garde-fous) et plafond mensuel de l'offre ; 6) pas de job d'envoi déjà en cours ; 7) le message d'erreur du job dans Activité (erreur SMTP : identifiants, port).
+Vérifier dans l'ordre : 1) SMTP enregistré (« Configuration du projet ») ; 2) modèle de mail **validé** (« Valider le modèle ») ; 3) des prospects au statut « À contacter » ; 4) pas de bandeau rouge de pause d'envoi sur la page Projets ; 5) plafond de mails du projet (24 h), plafond global (Réglages → Garde-fous) et plafond de mails de la semaine de l'offre ; 6) pas de job d'envoi déjà en cours ; 7) le message d'erreur du job dans Activité (erreur SMTP : identifiants, port).
 
 ## Mes mails arrivent en spam
 Configurer SPF, DKIM et DMARC pour le domaine d'envoi ; envoyer de petits lots au début et augmenter progressivement ; garder des délais entre les mails ; éviter les liens et pièces jointes dans le premier mail ; soigner l'accroche. iaboss ajoute déjà un lien de désinscription dans le pied de page des mails.
@@ -184,7 +184,7 @@ Pour rédiger un mail, trouver des idées de posts, réfléchir à une stratégi
 - **iaboss modifie-t-il mon code ?** Non : le dépôt est cloné et lu en lecture seule.
 - **Puis-je changer le dépôt d'un projet ?** Non : créer un nouveau projet.
 - **Combien de temps dure une recherche ou une vidéo ?** Quelques minutes ; l'avancement est dans Activité.
-- **Où voir ce que j'ai consommé ?** « Mon compte → Usage du mois », la carte « Consommation » de la page Projets (suivie du nom de ton IA : « Consommation Gemini », par exemple) et « Mon compte → Mon IA → Limites d'utilisation ».
+- **Où voir ce que j'ai consommé ?** « Mon compte → Usage de la semaine », la carte « Consommation » de la page Projets (suivie du nom de ton IA : « Consommation Gemini », par exemple) et « Mon compte → Mon IA → Limites d'utilisation ».
 - **Comment arrêter les notifications ?** Réglages → Notifications : décocher les événements ou retirer le canal.
 - **Comment supprimer mes données ?** « Mon compte → Zone de danger → Supprimer mon compte et mes données ».
 - **Y a-t-il une application mobile ?** Non : le site s'adapte aux téléphones. Sur un écran étroit, les cinq onglets de la barre du haut (Aujourd'hui, Projets, Mails, Agenda, Compta) tiennent sur une ligne. Facturation, Clients et Équipe sont dans le menu de l'avatar.

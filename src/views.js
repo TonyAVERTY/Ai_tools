@@ -123,7 +123,7 @@ ${email ? `<header class="top">
 
 // Rangée de quatre indicateurs en haut de la page Projets : mêmes chiffres que les plafonds du plan (usageView), rien d'inventé.
 // Un indicateur passe en « attention » à 80 % du plafond et en « atteint » à 100 %.
-const KPI_SUB = { projects: '', prospects: '', mails: 'ce mois-ci', aiJobs: 'ce mois-ci' };
+const KPI_SUB = { projects: '', prospects: '', mails: 'cette semaine', aiJobs: 'cette semaine' };
 const KPI_LABEL = { projects: 'Projets', prospects: 'Prospects', mails: 'Mails envoyés', aiJobs: 'Tâches IA' };
 const KPI_ICON = { projects: 'folder', prospects: 'users', mails: 'send', aiJobs: 'spark' };
 export function usageKpis(u) {
@@ -138,7 +138,7 @@ export function usageKpis(u) {
   <h2 class="sr-only" id="h-kpis">Utilisation du plan ${esc(u.planLabel)}</h2>
   <dl class="ukpi-r">${u.items.map(cell).join('')}</dl>
   ${full.length ? `<p class="cap" role="alert">${ic('alert')}<span>Plafond atteint : ${full.map((i) => esc(i.label.toLowerCase())).join(', ')}. Rien n'est perdu. <a href="/tarifs">Voir les tarifs</a></span></p>`
-    : `<p class="ukpi-n">Plan ${esc(u.planLabel)}. Les plafonds mensuels repartent de zéro le 1er (heure de Paris).${u.plan === 'free' ? ' <a href="/tarifs">Voir les tarifs</a>' : ''}</p>`}
+    : `<p class="ukpi-n">Plan ${esc(u.planLabel)}. Les plafonds de mails et de tâches IA repartent de zéro chaque lundi à minuit (heure de Paris).${u.plan === 'free' ? ' <a href="/tarifs">Voir les tarifs</a>' : ''}</p>`}
 </section>`;
 }
 
@@ -150,7 +150,7 @@ export function claudePanel() {
 </section>`;
 }
 
-// Usage du mois : une barre par plafond du plan (largeurs par classes w-N, la CSP interdit le style en ligne)
+// Usage de la semaine : une barre par plafond du plan (largeurs par classes w-N, la CSP interdit le style en ligne)
 const frDay = (ts) => new Date(ts * 1000).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Paris' });
 
 /** Bloc « Ton offre » de Mon compte : abonnement en cours, fin, paiement à régulariser, ou invitation à passer à une offre payante. Rien si les paiements ne sont pas ouverts. */
@@ -181,7 +181,7 @@ export function usagePanel(u) {
   const rows = u.items.map((i) => `<li class="g"><div class="g-h"><span>${esc(i.label)}</span><span class="g-v">${i.used}${i.limit == null ? '' : ` / ${i.limit}`}</span></div>${i.limit == null ? '' : `<div class="bar usage${i.full ? ' full' : ''}" role="progressbar" aria-label="${esc(i.label)}" aria-valuemin="0" aria-valuemax="${i.limit}" aria-valuenow="${i.used}"><span class="w-${Math.round(i.pct / 5) * 5}"></span></div>`}</li>`).join('');
   const full = u.items.filter((i) => i.full);
   return `<section class="panel usage-card" aria-labelledby="h-usage">
-  <div class="panel-h"><h2 id="h-usage">Usage du mois</h2><span class="badge">plan ${esc(u.planLabel)}</span></div>
+  <div class="panel-h"><h2 id="h-usage">Usage de la semaine</h2><span class="badge">plan ${esc(u.planLabel)}</span></div>
   <ul class="usage-list">${rows}</ul>
   ${offerBlock(u.billing ? { ...u.billing, flash: u.flash } : null)}
   <div data-claude-card hidden><ul class="usage-list usage-claude" data-usage-claude aria-label="Usage de ${esc(aiName())}"></ul></div>

@@ -195,17 +195,17 @@ En mémoire (fenêtre glissante, sans dépendance), par adresse IP et par compte
 
 ### Plafonds des plans
 
-Offres (définies dans `src/limits.js`, une seule source : serveur, page Tarifs, CGU et tests en dépendent). Plafonds ; projets et prospects = totaux du compte, mails et jobs IA = par mois calendaire (heure de Paris) :
+Offres (définies dans `src/limits.js`, une seule source : serveur, page Tarifs, CGU et tests en dépendent). Plafonds ; projets et prospects = totaux du compte, mails et jobs IA = par semaine, du lundi 0 h au lundi suivant (heure de Paris), comme le quota de l'IA :
 
-| Offre | Prix TTC / mois | TTC / an (2 mois offerts) | Projets | Prospects | Mails / mois | Jobs IA / mois | Places d'équipe |
+| Offre | Prix TTC / mois | TTC / an (2 mois offerts) | Projets | Prospects | Mails / semaine | Jobs IA / semaine | Places d'équipe |
 |---|---|---|---|---|---|---|---|
-| Gratuit | 0 € | | 1 | 50 | 100 | 6 | 1 |
-| Démarrage (`starter`) | 10 € | 100 € | 2 | 300 | 500 | 20 | 2 |
-| Croissance (`growth`) | 25 € | 250 € | 5 | 1 000 | 1 500 | 60 | 3 |
-| Business (`business`) | 50 € | 500 € | 10 | 3 000 | 4 000 | 150 | 10 |
-| Intensif (`intensive`) | 100 € | 1 000 € | 25 | 10 000 | 8 000 | 400 | 25 |
+| Gratuit | 0 € | | 2 | 100 | 50 | 4 | 1 |
+| Démarrage (`starter`) | 10 € | 100 € | 3 | 500 | 250 | 12 | 2 |
+| Croissance (`growth`) | 25 € | 250 € | 8 | 1 500 | 700 | 35 | 3 |
+| Business (`business`) | 50 € | 500 € | 15 | 5 000 | 1 400 | 90 | 10 |
+| Intensif (`intensive`) | 100 € | 1 000 € | 40 | 15 000 | 2 100 | 220 | 25 |
 
-Prix TTC : l'éditeur est en franchise de TVA (art. 293 B du CGI). Les offres payantes sont affichées « Bientôt » : **le paiement n'existe pas encore** (jalon Stripe). Un administrateur peut attribuer un plan à la main dans le back-office. Contraintes tenues par un test : `mails` ≤ 300 × 30 (plafond d'envoi de 300 mails par 24 h) et assez de jobs IA pour trouver tous les prospects (une recherche = 50 au plus). Un administrateur (`ADMIN_EMAILS`) n'a pas de limite ; l'ancien plan `pro` reste illimité (attribué à la main, non vendu). Projets et prospects se comptent dans leurs tables ; mails et jobs IA dans `usage_events`, qui survit à la suppression d'un projet. Rien ne se stocke en compteur : l'usage est toujours une somme. Un dépassement refuse l'action (`403`, code `plan_limit`, lien `/tarifs`) sans rien supprimer : un import CSV trop gros est refusé en entier, un lot de mails est tronqué à ce qui reste, une recherche de prospects n'enregistre pas au-delà du plafond. L'usage du mois s'affiche (barres) dans Mon compte et sur le tableau de bord.
+Prix TTC : l'éditeur est en franchise de TVA (art. 293 B du CGI). Les offres payantes sont affichées « Bientôt » : **le paiement n'existe pas encore** (jalon Stripe). Un administrateur peut attribuer un plan à la main dans le back-office. Contraintes tenues par un test : `mails` ≤ 300 × 7 (plafond d'envoi de 300 mails par 24 h) et assez de jobs IA pour trouver tous les prospects (une recherche = 50 au plus). Un administrateur (`ADMIN_EMAILS`) n'a pas de limite ; l'ancien plan `pro` reste illimité (attribué à la main, non vendu). Projets et prospects se comptent dans leurs tables ; mails et jobs IA dans `usage_events`, qui survit à la suppression d'un projet. Rien ne se stocke en compteur : l'usage est toujours une somme. Un dépassement refuse l'action (`403`, code `plan_limit`, lien `/tarifs`) sans rien supprimer : un import CSV trop gros est refusé en entier, un lot de mails est tronqué à ce qui reste, une recherche de prospects n'enregistre pas au-delà du plafond. L'usage du mois s'affiche (barres) dans Mon compte et sur le tableau de bord.
 
 ### SMTP par projet et équipes
 
