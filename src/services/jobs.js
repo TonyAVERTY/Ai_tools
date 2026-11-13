@@ -15,6 +15,7 @@ import { createJobLog } from './joblog.js';
 import { attachJobEta } from './jobeta.js';
 import { assertRoom, recordUsage, withUserLock, MAIL_JOBS } from './plans.js';
 import { sendPause, pauseMessage } from './abuse.js';
+import { AUTO_RETRY } from './autoretry.js';
 
 // Job en cours d'exécution, retrouvé par le wrapper claude() : c'est lui qui dit quel modèle a réellement servi (affiché dans l'avancement et le résultat)
 export const jobContext = new AsyncLocalStorage();
@@ -152,8 +153,9 @@ export async function latestJobs(db, projectId) {
 export class Worker {
   constructor(db, handlers, {
     maxJobs = Infinity, loadMax = LOAD.defaultMax, load = loadRatio, pollMs = 3000, log = console, clock = now, onFinish, onLoad, onError,
-    budget, isAiJob, onBudget, quota, isQuotaSensitive, onQuotaHold, cliModeEnabled = true, parallel,
+    budget, isAiJob, onBudget, quota, isQuotaSensitive, onQuotaHold, cliModeEnabled = true, parallel, autoRetry,
   } = {}) {
+    this.autoRetry = autoRetry; // async (job, message) => {at, attempt}|null : relance automatique d'une tâche IA arrêtée par une limite (services/autoretry.js)
     this.parallel = parallel; // async (userId) => nombre de jobs simultanés permis à CET utilisateur (selon son offre) ; absent = 1
     this.cliModeEnabled = cliModeEnabled;
     this.clock = clock;
@@ -192,7 +194,9 @@ export class Worker {
 
   async start() {
     // Un job "running" au démarrage = crash/reboot pendant l'exécution
+    const cut = this.autoRetry ? await this.db.prepare("SELECT * FROM jobs WHERE status = 'running'").all() : [];
     await this.db.prepare("UPDATE jobs SET status = 'error', error = 'Interrompu (redémarrage)', finished_at = ? WHERE status = 'running'").run(now());
+    for (const j of cut) await this.autoRetry(j, 'Interrompu (redémarrage)').catch(() => {});
     this.loopDone = this.loop();
   }
 
@@ -430,6 +434,9 @@ export class Worker {
             .run(String(e.message).slice(0, 2000), now(), ctx.usage.costUsd, ctx.usage.tokensIn, ctx.usage.tokensOut, job.id);
           this.emit('onFinish', job, { status: 'error', error: e.message });
           try { this.onError?.(job, e); } catch { /* l'alerte ne fait jamais échouer le traitement du job */ }
+          // Relance automatique (option de l'utilisateur) : le journal dit quand la tâche repart
+          const again = await this.autoRetry?.(job, e.message).catch(() => null);
+          if (again) journal.append('status', `Relance automatique prévue (essai ${again.attempt}/${AUTO_RETRY.max})`);
         }
       }
     } finally {

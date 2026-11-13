@@ -289,6 +289,7 @@ export function registerRoutes(router, app) {
       write_model: models.write,
       weekly_report: await getSetting(db, userId, 'weekly_report', '0') === '1',
       read_receipt: await getSetting(db, userId, 'read_receipt', '0') === '1',
+      auto_retry: await getSetting(db, userId, 'auto_retry', '0') === '1',
       mail_footer: await getSetting(db, userId, 'mail_footer', '1') !== '0',
       budget_day_usd: await getSetting(db, userId, 'budget_day_usd', ''),
       budget_month_usd: await getSetting(db, userId, 'budget_month_usd', ''),
@@ -338,6 +339,7 @@ export function registerRoutes(router, app) {
     await set('weekly_report', b.weekly_report === 'on' ? '1' : '0');
     // Les cases décochées ne sont pas envoyées : la présence du champ « délais » signale le formulaire complet
     if (b.send_delay_min !== undefined) await set('read_receipt', b.read_receipt === 'on' ? '1' : '0');
+    if (b.send_delay_min !== undefined) await set('auto_retry', b.auto_retry === 'on' ? '1' : '0');
     // Champs absents du formulaire (compte en abonnement : pas de plafond en $) : les valeurs enregistrées ne bougent pas
     if (b.budget_day_usd !== undefined) await set('budget_day_usd', money(b.budget_day_usd));
     if (b.budget_month_usd !== undefined) await set('budget_month_usd', money(b.budget_month_usd));

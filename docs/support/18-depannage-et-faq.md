@@ -294,3 +294,6 @@ L'activation arrive par un message signé de Stripe, en général en quelques se
 Chaque message renvoie à l'IA le début de la conversation. Pour une longue conversation, tape **/compacter** dans la zone de saisie : elle est résumée et le quota baisse. Ou ouvre une **nouvelle conversation** (**/nouveau**). Voir « Les commandes / » dans « La page IA : Claude et Support ».
 - « Rien à compacter : la conversation est encore courte » : il faut au moins 4 messages.
 - « Pas de conversation en cours » : écris d'abord un message.
+
+## Une tâche IA s'est arrêtée à cause de la limite de mon IA
+Coche **Relancer automatiquement les tâches IA arrêtées par une limite** dans « Réglages → Garde-fous » : la tâche repart seule après la remise à zéro du quota (3 relances au plus). Sans l'option, relance-la toi-même avec « Réessayer ». Si rien ne repart, regarde le journal de la tâche : une erreur de liaison (jeton refusé) ou un plafond de l'offre atteint n'est pas relancé.
