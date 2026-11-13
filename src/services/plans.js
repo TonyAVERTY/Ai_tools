@@ -7,7 +7,8 @@
 // Un dépassement refuse l'action avec un message clair et un lien vers /tarifs ; il ne supprime ni ne tronque jamais de données.
 import { now } from '../db.js';
 import { HttpError } from '../http.js';
-import { PLAN_LIMITS, PLAN_LABELS } from '../limits.js';
+import { PLAN_LIMITS, PLAN_LABELS, PLAN_ORDER, FEATURES } from '../limits.js';
+import { getUser } from '../users.js';
 import { parisParts, parisTime, addParisDays } from './paris-time.js';
 
 export const USAGE_KINDS = ['projects', 'prospects', 'mails', 'aiJobs'];
@@ -22,6 +23,21 @@ export function planOf(user) {
   return PLAN_LIMITS[user?.plan] ? user.plan : 'free';
 }
 export const limitsFor = (user) => PLAN_LIMITS[planOf(user)];
+
+/** Le plan de ce compte comprend-il cette fonctionnalité ? Un plan hors de la liste des offres (pro, administrateur) a tout. */
+export function hasFeature(user, key) {
+  const f = FEATURES[key];
+  if (!f) throw new Error(`Fonctionnalité inconnue : ${key}`);
+  const rank = PLAN_ORDER.indexOf(planOf(user));
+  return rank < 0 || rank >= PLAN_ORDER.indexOf(f.plan);
+}
+
+/** Refuse (403) le lancement d'une fonctionnalité que l'offre du compte ne comprend pas. */
+export function assertFeature(user, key) {
+  if (hasFeature(user, key)) return;
+  const f = FEATURES[key];
+  throw new HttpError(403, `${f.label} : inclus à partir de l'offre ${PLAN_LABELS[f.plan]}. Ce que tu as déjà créé reste disponible, rien n'est supprimé. Voir les tarifs : /tarifs`, { expose: true });
+}
 
 /** Bornes [début, fin[ de la semaine (lundi 0 h à lundi suivant 0 h, heure de Paris), en secondes. */
 export function weekBounds(at = now()) {
@@ -126,4 +142,9 @@ export async function usageView(db, user, { at = now() } = {}) {
     }),
     period: usage.period,
   };
+}
+
+/** Comme assertFeature, pour un compte lu en base (le propriétaire du projet pour le travail d'une équipe). */
+export async function requireFeature(db, userId, key) {
+  assertFeature(await getUser(db, userId), key);
 }

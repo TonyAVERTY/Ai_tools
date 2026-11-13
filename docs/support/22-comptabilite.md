@@ -65,3 +65,6 @@ En bas de la page, **Questions fréquentes** est une liste de questions : clique
 
 ## Sécurité et confidentialité
 Les justificatifs sont des fichiers du serveur, rangés dans un dossier propre à ton compte, ouverts sans exécution (ni script ni réseau) et lisibles par toi seul. Ils sont supprimés avec la ligne ou avec ton compte.
+
+## Offre requise
+L'**export** de la comptabilité (archive des justificatifs et journal CSV) demande l'offre **Croissance** ou au-dessus. La saisie des lignes, les justificatifs, les chiffres et le guide de déclaration restent disponibles dès l'offre gratuite. La liste complète est dans « Offres, plafonds et limites ».

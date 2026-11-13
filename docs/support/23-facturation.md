@@ -69,3 +69,6 @@ Tous les documents sortent en **PDF** (format A4, avec la mise en page choisie e
 
 ## Si ça ne marche pas
 Voir « Facturation » dans « Dépannage et FAQ ».
+
+## Offre requise
+La génération et l'affinage des documents par l'IA (devis, acompte, facture finale, avoir) demandent l'offre **Démarrage** ou au-dessus. Les documents déjà créés restent consultables et leurs PDF téléchargeables. La liste complète est dans « Offres, plafonds et limites ».

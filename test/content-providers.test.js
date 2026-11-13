@@ -38,6 +38,7 @@ const LINKS = {
 for (const [name, link] of Object.entries(LINKS)) {
   test(`${name} : la recherche d'inspiration tourne, et la newsletter la reçoit`, async () => {
     const u = await s.newUser({ admin: false, link: link() });
+    await s.db.prepare("UPDATE users SET plan = 'starter' WHERE id = ?").run(u.id);
     const p = await addProject(s.db, u.id, { name: 'Cartes Fidèles', gitUrl: 'https://github.com/u/cf.git' });
     await s.db.prepare('UPDATE projects SET profile_json = ?, target_json = ? WHERE id = ?').run(JSON.stringify(PROFILE), JSON.stringify({ description: 'commerces' }), p);
     const gen = async (body) => { const r = await u.post(`/api/projects/${p}/content/newsletter/generate`, body); assert.equal(r.status, 200, await r.clone().text()); await s.app.worker.tick(); };

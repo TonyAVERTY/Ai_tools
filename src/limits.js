@@ -101,7 +101,22 @@ export const PLAN_LABELS = {
  * Offres payantes : prix mensuel TTC en euros. L'éditeur est en franchise de TVA (art. 293 B du CGI) : le prix TTC est le prix payé.
  * En annuel, 2 mois sont offerts : on paie 10 mois et on en profite 12.
  */
-export const PLAN_PRICES = { starter: 10, growth: 25, business: 50, intensive: 100 };
+export const PLAN_PRICES = { starter: 9, growth: 19, business: 29, intensive: 75 };
+
+/**
+ * Fonctionnalités réservées à une offre : chacune donne la PREMIÈRE offre qui la comprend (les offres au-dessus l'ont aussi).
+ * Les plans « pro » et administrateur ont tout. Ce qui n'est pas listé ici est inclus dès le plan gratuit.
+ * Seul le LANCEMENT d'un nouveau travail est refusé : ce qui existe déjà (documents, vidéos, brouillons, jetons) reste lisible, rien n'est supprimé.
+ */
+export const PLAN_ORDER = ['free', 'starter', 'growth', 'business', 'intensive'];
+export const FEATURES = {
+  content: { plan: 'starter', label: 'Posts LinkedIn, Instagram et newsletter' },
+  billing: { plan: 'starter', label: 'Devis et factures (génération et relecture par l\'IA)' },
+  poste: { plan: 'growth', label: 'Postes (rôles) : tâches IA métier' },
+  comptaExport: { plan: 'growth', label: 'Export de la comptabilité (archive et journal CSV)' },
+  api: { plan: 'growth', label: 'Mode développeur : API et serveur MCP' },
+  promo: { plan: 'business', label: 'Vidéos de promotion' },
+};
 export const ANNUAL_FREE_MONTHS = 2;
 export const annualPrice = (plan) => PLAN_PRICES[plan] * (12 - ANNUAL_FREE_MONTHS);
 /** Abonnement payant : après un paiement refusé, les droits de l'offre sont gardés ce nombre de jours (le temps de mettre la carte à jour), puis retour au plan gratuit. Aucune donnée n'est supprimée. */

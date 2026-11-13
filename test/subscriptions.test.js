@@ -74,9 +74,9 @@ test('configuration : les deux clés ensemble, bon format, mode test ou producti
 
 test('outils Stripe : paramètres imbriqués, montants, signature des événements', () => {
   assert.equal(formParams({ a: { b: 1 }, c: ['x', { d: 2 }], e: null, f: undefined, g: 'é & =' }).toString(), 'a%5Bb%5D=1&c%5B0%5D=x&c%5B1%5D%5Bd%5D=2&g=%C3%A9+%26+%3D');
-  assert.equal(amountCents('starter', 'month'), 1000);
-  assert.equal(amountCents('starter', 'year'), 10_000, 'annuel : 2 mois offerts');
-  assert.equal(amountCents('intensive', 'year'), 100_00 * 10);
+  assert.equal(amountCents('starter', 'month'), 900);
+  assert.equal(amountCents('starter', 'year'), 9000, 'annuel : 2 mois offerts');
+  assert.equal(amountCents('intensive', 'year'), 75_00 * 10);
   assert.throws(() => amountCents('inconnu', 'month'), /Offre inconnue/);
   assert.throws(() => amountCents('starter', 'week'), /Périodicité/);
   const raw = JSON.stringify(event('x.y', {}, 'evt_a'));
@@ -99,13 +99,13 @@ test('paiement : « Choisir cette offre » ouvre la page de paiement Stripe avec
   assert.equal(r.status, 303);
   assert.equal(r.headers.get('location'), 'https://checkout.stripe.com/c/pay/cs_1');
   const price = calls.find((c) => c.method === 'POST' && c.path === '/prices');
-  assert.equal(price.body.unit_amount, '25000', 'annuel : 10 mois de 25 €');
+  assert.equal(price.body.unit_amount, '19000', 'annuel : 10 mois de 19 €');
   assert.equal(price.body['recurring[interval]'], 'year');
   assert.equal(price.body.currency, 'eur');
-  assert.equal(price.body.lookup_key, 'iaboss_growth_year_25000');
+  assert.equal(price.body.lookup_key, 'iaboss_growth_year_19000');
   const co = calls.find((c) => c.path === '/checkout/sessions').body;
   assert.equal(co.mode, 'subscription');
-  assert.equal(co['line_items[0][price]'], 'price_iaboss_growth_year_25000');
+  assert.equal(co['line_items[0][price]'], 'price_iaboss_growth_year_19000');
   assert.equal(co.client_reference_id, String(u.id));
   assert.equal(co.customer_email, 'achat@x.fr');
   assert.equal(co['metadata[plan]'], 'growth');
@@ -202,7 +202,7 @@ test('changement d\'offre : un abonnement actif est modifié (au prorata), jamai
   assert.ok(!calls.some((c) => c.path === '/checkout/sessions'), 'pas de second abonnement');
   const upd = calls.find((c) => c.method === 'POST' && c.path === '/subscriptions/sub_1').body;
   assert.equal(upd['items[0][id]'], 'si_1');
-  assert.equal(upd['items[0][price]'], 'price_iaboss_business_month_5000');
+  assert.equal(upd['items[0][price]'], 'price_iaboss_business_month_2900');
   assert.equal(upd.proration_behavior, 'create_prorations');
   assert.equal((await dbUser(u.id)).plan, 'business');
   // Un paiement refusé : on renvoie vers le portail, pas de changement
@@ -329,7 +329,7 @@ test('pages : Tarifs propose « Choisir cette offre » quand les paiements sont 
   assert.match(acc, /Mode test : aucun paiement réel/);
   await applySubscription(s.db, withUser(u, { current_period_end: Math.floor(Date.UTC(2027, 0, 15, 12) / 1000) }));
   acc = await page(s, '/account', u);
-  assert.match(acc, /Ton offre : Démarrage[^]*10 € TTC par mois[^]*Prochain paiement le 15 janvier 2027/);
+  assert.match(acc, /Ton offre : Démarrage[^]*9 € TTC par mois[^]*Prochain paiement le 15 janvier 2027/);
   assert.match(acc, /action="\/abonnement\/portail"[^]*Gérer mon abonnement/);
   assert.match(acc, /Changer d'offre/);
   await applySubscription(s.db, withUser(u, { cancel_at_period_end: true, current_period_end: Math.floor(Date.UTC(2027, 0, 15, 12) / 1000) }));

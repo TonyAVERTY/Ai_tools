@@ -7,6 +7,7 @@ import { budgetState } from './services/budget.js';
 import { needAccess } from './teams.js';
 import { renderMarkdown } from './services/markdown.js';
 import { roleTaskById, MAX_NOTES } from './services/roles.js';
+import { requireFeature } from './services/plans.js';
 
 const taskOf = (ctx) => {
   const task = roleTaskById(ctx.params.task);
@@ -21,6 +22,7 @@ export function registerPosteRoutes(router, app, { project, aiOpts }) {
   router.post('/api/projects/:id/poste/:task', async (ctx) => {
     const task = taskOf(ctx);
     const p = await project(ctx);
+    await requireFeature(db, p.userId, 'poste');
     const b = await readBody(ctx.req);
     if (!p.profile) throw new HttpError(400, "Analyse le projet d'abord", { expose: true });
     if (task.repo) needAccess(p.access, 'admin', `la tâche « ${task.label} » (elle lit le dépôt)`);
