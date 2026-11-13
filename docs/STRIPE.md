@@ -4,7 +4,7 @@ Ce guide suit ce que le code attend (`src/services/stripe.js`, `src/subscription
 
 ## Ce que le code fait tout seul (rien à créer à la main)
 
-- **Produits et prix** : créés à la demande au premier achat (`iaboss Démarrage`, etc., en euros, mensuel et annuel), avec une clé de recherche `iaboss_<offre>_<période>_<centimes>`. Si tu changes un tarif dans `src/limits.js`, un nouveau prix est créé ; les abonnés en cours gardent l'ancien.
+- **Produits (les « articles ») et prix** : un **produit Stripe par offre**, à identifiant fixe (`iaboss_starter`, `iaboss_growth`, `iaboss_business`, `iaboss_intensive`), créé au premier achat avec le nom `iaboss Démarrage`…, le libellé de relevé de carte `IABOSS DÉMARRAGE`… (sans accent, 22 caractères au plus) et la marque `metadata.app = iaboss`. Chaque produit a deux **prix récurrents** en euros, mensuel et annuel (clé de recherche `iaboss_<offre>_<période>_<centimes>`). Tout paiement est un **abonnement** à l'un de ces prix : il n'existe aucun paiement libre (montant saisi). Si tu changes un tarif dans `src/limits.js`, un nouveau prix est créé sur le même produit ; les abonnés en cours gardent l'ancien.
 - **Page de paiement** : Stripe Checkout (hébergée par Stripe, iaboss ne voit jamais la carte). **Gestion de l'abonnement** : portail client de Stripe.
 - **Changement d'offre** : géré par iaboss (au prorata), pas par le portail.
 
@@ -14,6 +14,20 @@ Le point d'arrivée (webhook) reçoit **tous** les événements du compte. iabos
 
 - ne crée **pas** d'autres produits dont le nom commence par « iaboss » ;
 - garde **un point d'arrivée par application** (un pour iaboss, un par autre produit), chacun avec son propre secret `whsec_…`.
+
+## Savoir ce qui est généré par application (et ce que montre le virement)
+
+**Ce que le virement ne peut pas dire.** Stripe verse sur ta banque des *versements* qui regroupent tous les paiements de plusieurs jours et de tous tes produits, moins les frais. La banque n'affiche qu'une ligne, avec le libellé de versement du **compte** (réglé dans les paramètres de versement du tableau de bord, un seul pour tout le compte). Il est impossible d'y écrire automatiquement le nom du projet : l'argent est dans un solde commun.
+
+**Ce qui permet de s'y retrouver quand même.**
+
+1. **Chaque vente iaboss est identifiable** : produits `iaboss_*`, marque `metadata.app = iaboss` sur le produit, l'abonnement et la session de paiement, nom `iaboss …` sur la facture. Pour chaque autre application du compte, applique la même règle (`metadata.app = <nom>`, produits préfixés `<nom>_`).
+2. **Rapprochement** : dans Stripe, ouvre un versement et exporte sa liste de paiements (rapport de rapprochement des versements), puis regroupe par produit dans un tableur. Les rapports de facturation et, si tu l'actives, Sigma (requêtes SQL) permettent de totaliser par produit et par période. Ces menus évoluent : cherche « versements » et « rapports » dans le tableau de bord.
+3. **Sur la carte du client**, chaque offre apparaît sous son propre libellé (`IABOSS CROISSANCE`) : ce libellé aide le client, pas ton relevé bancaire.
+
+**Si tu veux un virement séparé par application** (un IBAN ou un libellé par produit), il faut un **compte Stripe par application** : chacun a son solde, son libellé et son IBAN. Stripe permet de rattacher plusieurs comptes à une même organisation ; vérifie avec leur support si ton entreprise individuelle peut en ouvrir plusieurs avec le même SIRET. Dans ce cas, iaboss ne change pas : il suffit de mettre la clé et le secret de webhook du compte dédié.
+
+**Un état « recettes par application » dans iaboss** (somme des factures payées des produits `iaboss_*`, par mois, frais et net) est possible avec l'API de Stripe : dis-le-moi si tu le veux dans l'administration.
 
 ## 1. Le compte (une fois)
 
