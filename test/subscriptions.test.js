@@ -28,7 +28,7 @@ before(async () => {
     const body = init.body ? Object.fromEntries(new URLSearchParams(String(init.body))) : {};
     calls.push({ method, path: u.pathname.replace('/v1', ''), query: Object.fromEntries(u.searchParams), body, auth: init.headers?.Authorization });
     const key = `${method} ${u.pathname.replace('/v1', '')}`;
-    const h = stripe[key] ?? stripe[`${method} *`];
+    const h = stripe[key] ?? stripe[`${method} *`] ?? (key.startsWith('GET /products/') ? stripe['GET /products/*'] : undefined);
     if (!h) return reply({ status: 404, json: { error: { message: `rien de prévu pour ${key}` } } });
     return reply(typeof h === 'function' ? h({ body, query: Object.fromEntries(u.searchParams) }) : h);
   };
@@ -51,6 +51,7 @@ const webhook = (ev, { secret = WH, at, header, target = s } = {}) => {
 };
 const priceStub = () => {
   stripe['GET /prices'] = { json: { data: [] } };
+  stripe['GET /products/*'] = { json: { id: 'produit' } };
   stripe['POST /prices'] = ({ body }) => ({ json: { id: `price_${body.lookup_key}` } });
 };
 
@@ -366,4 +367,27 @@ test('compte Stripe partagé : les abonnements et paiements d\'un autre produit 
   delete sameCustomer.metadata.app; delete sameCustomer.metadata.user_id;
   await webhook(event('customer.subscription.deleted', sameCustomer));
   assert.equal((await dbUser(u.id)).plan, 'starter', 'la fin d\'un abonnement étranger du même client ne rétrograde pas le compte');
+});
+
+test('articles : un produit Stripe par offre (identifiant fixe, libellé de relevé, marqueur iaboss), rattaché à ses prix mensuel et annuel', async () => {
+  const u = await user('produit@x.fr');
+  stripe['GET /prices'] = { json: { data: [] } };
+  stripe['GET /products/iaboss_growth'] = { status: 404, json: { error: { message: 'No such product' } } };
+  stripe['POST /products'] = ({ body }) => ({ json: { id: body.id } });
+  stripe['POST /prices'] = ({ body }) => ({ json: { id: `price_${body.lookup_key}` } });
+  stripe['POST /checkout/sessions'] = { json: { id: 'cs_p', url: 'https://checkout.stripe.com/c/pay/cs_p' } };
+  await u.post('/abonnement/choisir', { plan: 'growth', period: 'month' }, { form: true });
+  const prod = calls.find((c) => c.method === 'POST' && c.path === '/products').body;
+  assert.equal(prod.id, 'iaboss_growth');
+  assert.equal(prod.name, 'iaboss Croissance');
+  assert.equal(prod.statement_descriptor, 'IABOSS CROISSANCE');
+  assert.equal(prod['metadata[app]'], 'iaboss');
+  assert.equal(prod['metadata[plan]'], 'growth');
+  assert.equal(calls.find((c) => c.path === '/prices' && c.method === 'POST').body.product, 'iaboss_growth', 'le prix est rattaché au produit, pas à un produit créé en ligne');
+  assert.ok(!calls.some((c) => c.method === 'POST' && c.path === '/prices' && 'product_data[name]' in c.body));
+  // Le même produit sert au prix annuel, sans être recréé
+  calls = [];
+  await u.post('/abonnement/choisir', { plan: 'growth', period: 'year' }, { form: true });
+  assert.ok(!calls.some((c) => c.path === '/products' && c.method === 'POST'), 'produit déjà créé : pas recréé');
+  assert.equal(calls.find((c) => c.path === '/prices' && c.method === 'POST').body.product, 'iaboss_growth');
 });
