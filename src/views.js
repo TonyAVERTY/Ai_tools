@@ -754,9 +754,9 @@ ${saved ? banner('ok', 'Réglages enregistrés', { strong: true }) : ''}
     <label class="field"><span class="lbl">Plafond global mails / 24 h (max 300)</span><span class="unit"><input name="global_daily_cap" type="number" min="1" max="300" value="${esc(s.global_daily_cap)}"><span>mails</span></span></label>
     <label class="field"><span class="lbl">Délai min entre 2 mails</span><span class="unit"><input name="send_delay_min" type="number" min="5" value="${esc(s.send_delay_min)}"><span>secondes</span></span></label>
     <label class="field"><span class="lbl">Délai max entre 2 mails</span><span class="unit"><input name="send_delay_max" type="number" min="5" value="${esc(s.send_delay_max)}"><span>secondes</span></span></label>
-    ${s.ai.id === 'claude' ? `<label class="field"><span class="lbl">Pause des tâches IA non urgentes à partir de (quota Claude)</span><span class="unit"><input name="quota_pause_percent" type="number" min="50" max="100" value="${esc(s.quota_pause_percent)}"><span>%</span></span></label>` : ''}
+    ${s.ai.id === 'claude' ? `<label class="field"><span class="lbl">Pause des tâches IA à partir de</span><span class="unit"><input name="quota_pause_percent" type="number" min="50" max="100" value="${esc(s.quota_pause_percent)}"><span>%</span></span></label>` : ''}
   </div>
-  ${s.ai.id === 'claude' ? '<p class="hint">Quand ta session Claude (5 h) ou ta semaine atteint ce seuil, les analyses, évolutions, audits et tâches des postes attendent la remise à zéro du quota ; la prospection et les envois continuent. Entre 50 et 100 %, 85 % par défaut.</p>' : ''}
+  ${s.ai.id === 'claude' ? '<p class="hint">Quota Claude : quand ta session (5 h) ou ta semaine atteint ce seuil, les analyses, évolutions, audits et tâches des postes attendent la remise à zéro du quota ; la prospection et les envois continuent. Entre 50 et 100 %, 85 % par défaut.</p>' : ''}
   ${check('read_receipt', s.read_receipt, 'Demander un accusé de lecture dans les mails de prospection')}
   <p class="hint">« Lu » repose sur l'accusé de lecture standard : la messagerie du destinataire lui demande s'il accepte de l'envoyer. « Lu » est donc un minimum ; « Répondu » vient de la boîte de réception du projet.</p>
   <div class="footer-opt" data-footer-opt data-on="${s.mail_footer ? '1' : '0'}">

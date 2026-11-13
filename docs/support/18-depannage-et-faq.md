@@ -60,7 +60,7 @@ L'envoi vérifie le sens de chaque mail avec ton IA : quand elle ne peut pas ré
 - **Pas de rendez-vous dans l'agenda du jour** : seul le calendrier d'iaboss est lu, pas un agenda externe.
 
 ## Mon job reste « En attente »
-Lire le message « En attente : … » dans le menu **Activité**. Raisons possibles : budget IA atteint (clé API) ; quota Claude serré (au-delà du seuil de « Réglages → Garde-fous → Pause des tâches IA non urgentes à partir de (quota Claude) », 85 % par défaut) ; charge élevée du serveur ; job programmé « Cette nuit » ; déjà un job IA en cours pour le compte. Il repart seul. On peut l'**Annuler** depuis Activité.
+Lire le message « En attente : … » dans le menu **Activité**. Raisons possibles : budget IA atteint (clé API) ; quota Claude serré (au-delà du seuil de « Réglages → Garde-fous → Pause des tâches IA à partir de », 85 % par défaut) ; charge élevée du serveur ; job programmé « Cette nuit » ; déjà un job IA en cours pour le compte. Il repart seul. On peut l'**Annuler** depuis Activité.
 
 ## Une section ou une liste n'a pas pu se charger : « Réessayer »
 Quand une partie de la page se charge après coup (la section **LinkedIn**, **Promotion** ou **Récapitulatif** d'un projet, la liste de la page **Clients**, le menu **Joindre un projet iaboss** de la page IA), un petit cercle accompagne « Chargement… ». Si la requête échoue, le cercle laisse la place à **un message et un bouton « Réessayer »** : le cercle ne tourne jamais pour toujours.
