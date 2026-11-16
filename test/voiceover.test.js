@@ -178,6 +178,7 @@ test('voix toujours trop longue : trois tentatives, aucune troncature ni vidéo 
     assert.equal(job.status, 'error');
     assert.match(job.error, /La voix dure 3.0 s de plus/);
     assert.equal(log.prepared, 3);
+    assert.equal(log.synth.length, 1, 'la même phrase n\'est demandée (et payée) qu\'une fois au service de voix pour les trois essais');
     assert.equal(log.rendered.length, 0, 'chaque version est refusée avant le rendu');
     assert.equal(log.mixed.length, 0);
     assert.deepEqual((await (await u.get(`/api/projects/${pid}/promo`)).json()).videos, []);
@@ -256,9 +257,28 @@ test('ElevenLabs : clé dans l\'en-tête (jamais dans l\'adresse), modèle multi
   // 402 : voix de la bibliothèque avec le plan gratuit ; autre refus : le message du fournisseur est repris, sans la clé
   await assert.rejects(synthesize({ provider: 'elevenlabs', voice: 'abc', text: 'x y z', key: KEY }, { fetchImpl: async () => jsonRes({ detail: { status: 'paid_plan_required', message: 'Free users cannot use library voices via the API' } }, 402) }), (e) => /voix premium/.test(e.message) && /sans couronne/.test(e.message) && /abonnement payant/.test(e.message) && !e.message.includes(KEY));
   await assert.rejects(synthesize({ provider: 'elevenlabs', voice: 'abc', text: 'x y z', key: KEY }, { fetchImpl: async () => jsonRes({ detail: { status: 'voice_not_found', message: 'A voice with the voice_id abc was not found.' } }, 404) }), /refusé la requête \(404 : A voice with the voice_id abc was not found\.\)/);
-  await assert.rejects(synthesize({ provider: 'elevenlabs', voice: 'abc', text: 'x y z', key: KEY }, { fetchImpl: async () => ({ ok: false, status: 500, json: async () => { throw new Error('pas du JSON'); } }) }), (e) => /refusé la requête \(500\)$/.test(e.message));
-  await assert.rejects(synthesize({ provider: 'elevenlabs', voice: 'abc', text: 'x y z', key: KEY }, { fetchImpl: async () => { throw new Error(`boom ${KEY}`); } }), (e) => /ElevenLabs ne répond pas/.test(e.message) && !e.message.includes(KEY));
+  await assert.rejects(synthesize({ provider: 'elevenlabs', voice: 'abc', text: 'x y z', key: KEY }, { retryMs: 1, fetchImpl: async () => ({ ok: false, status: 500, json: async () => { throw new Error('pas du JSON'); } }) }), (e) => /refusé la requête \(500\)$/.test(e.message));
+  await assert.rejects(synthesize({ provider: 'elevenlabs', voice: 'abc', text: 'x y z', key: KEY }, { retryMs: 1, fetchImpl: async () => { throw new Error(`boom ${KEY}`); } }), (e) => /ElevenLabs ne répond pas/.test(e.message) && !e.message.includes(KEY));
   await assert.rejects(synthesize({ provider: 'elevenlabs', voice: 'abc', text: 'x y z' }), /Aucune clé API ElevenLabs/);
+});
+
+test('service de voix : une panne passagère (5xx, réseau) est retentée une fois ; un refus (clé, quota, 4xx) ne l\'est jamais', async () => {
+  const audio = { ok: true, status: 200, arrayBuffer: async () => Buffer.alloc(400) };
+  const run = (answers) => { let n = 0; const fetchImpl = async (_url, init) => { assert.ok(init.signal instanceof AbortSignal, 'la requête est coupée si le service ne répond pas'); const a = answers[Math.min(n++, answers.length - 1)]; if (a instanceof Error) throw a; return a; }; return { n: () => n, p: synthesize({ provider: 'elevenlabs', voice: 'abc', text: 'x y z', key: KEY }, { fetchImpl, retryMs: 1 }) }; };
+  const after503 = run([jsonRes({}, 503), audio]);
+  assert.equal((await after503.p).length, 400);
+  assert.equal(after503.n(), 2, '503 puis succès : la phrase est lue');
+  const afterCut = run([new Error('socket hang up'), audio]);
+  assert.equal((await afterCut.p).length, 400);
+  assert.equal(afterCut.n(), 2);
+  const down = run([jsonRes({}, 502)]);
+  await assert.rejects(down.p, /refusé la requête \(502\)/);
+  assert.equal(down.n(), 2, 'deux essais au plus');
+  for (const status of [400, 401, 402, 404, 429]) {
+    const refused = run([jsonRes({}, status), audio]);
+    await assert.rejects(refused.p);
+    assert.equal(refused.n(), 1, `${status} : jamais retenté`);
+  }
 });
 
 test('Google Cloud : clé dans l\'en-tête, langue déduite de la voix, audio décodé', async () => {

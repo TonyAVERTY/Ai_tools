@@ -170,7 +170,7 @@ Le message affiché dit la cause :
 La liste n'affiche qu'une sélection de ta bibliothèque ElevenLabs : 3 voix françaises gratuites, 2 françaises premium 👑, 2 anglaises gratuites et 1 anglaise premium. Une voix premium n'y figure pas si sa langue ne se lit pas dans ses étiquettes ou son nom (accent « standard » seul, par exemple) ou si d'autres plus soignées passent avant elle ; une voix gratuite est choisie parmi les voix de base de ton compte. Dans ElevenLabs, ajoute-lui une étiquette de langue ou un accent (« french », « parisian », « american »…) ; elle apparaît au prochain chargement de la liste.
 
 ## La vidéo de promotion échoue
-Avec « Ajouter une voix » : si le message nomme le fournisseur de voix (« Google Traduction », « ElevenLabs », « Google Cloud » ou « Microsoft Azure »), c'est lui qui ne répond pas ou qui refuse la clé : essayer un autre fournisseur, vérifier la clé (« Retirer la clé » puis « Enregistrer la clé »), ou décocher la voix. Pour des voix plus naturelles : ElevenLabs, ou Piper (locale, sans clé) si l'administrateur l'a installée. Les extraits (« Écouter un extrait ») permettent de tester un fournisseur sans lancer de vidéo.
+Avec « Ajouter une voix » : si le message nomme le fournisseur de voix (« Google Traduction », « ElevenLabs », « Google Cloud » ou « Microsoft Azure »), c'est lui qui ne répond pas ou qui refuse la clé : essayer un autre fournisseur, vérifier la clé (« Retirer la clé » puis « Enregistrer la clé »), ou décocher la voix. Pour des voix plus naturelles : ElevenLabs, ou Piper (locale, sans clé) si l'administrateur l'a installée. Les extraits (« Écouter un extrait ») permettent de tester un fournisseur sans lancer de vidéo. Une panne passagère du service de voix (coupure réseau, erreur 5xx) est retentée une fois toute seule ; si le message revient, le service est vraiment en panne ou refuse la demande.
 Lire le message du job : outils manquants sur le serveur (Chromium, ffmpeg), plafond de 20 vidéos, scène refusée après correction (relancer ou changer de modèle). Si le message parle d'un « Trop de vide », d'une « Image figée » ou de « Titres trop petits », c'est le contrôle qualité automatique : relancer, choisir un « Style » précis dans l'onglet Promotion, ou passer sur Opus ou Fable. Voir le fichier sur la Promotion.
 
 ## L'agenda externe ne se met pas à jour
@@ -301,3 +301,9 @@ Le message commence par ce qui n'a pas été fait (« Modèle de mail non rédig
 4. Autre texte (« overloaded », « internal error ») : panne passagère du service d'IA. **Réessayer** quelques minutes plus tard.
 
 Avant, la même panne s'affichait « Aucun JSON dans la réponse », ou la tâche se terminait avec le message d'erreur à la place du résultat (un audit, ou le mail des évolutions). Une recherche de prospects qui ne trouve rien parce que l'IA est en panne est maintenant un échec, plus un « 0 trouvé ».
+
+## L'assistant a « oublié » le début d'une longue conversation
+C'est voulu : à chaque question, seuls les 20 derniers messages (24 000 caractères au plus) sont renvoyés à ton IA, pour ne pas consommer ton quota avec toute la conversation. Rappelle l'information utile dans ton message, ou ouvre une nouvelle conversation. Après une très longue réponse (plus de 24 000 caractères), l'IA n'en reçoit que le début et la fin : recolle le passage dont tu veux parler.
+
+## Le contenu généré reprend la même « inspiration » que le précédent
+La recherche d'inspiration (web) est gardée 24 heures pour le même projet, le même type de contenu et le même sujet, pour ne pas refaire une dizaine de recherches web à chaque brouillon. L'angle du texte change quand même (les brouillons précédents sont donnés à l'IA). Pour forcer une nouvelle recherche : change le sujet, ou attends le lendemain.

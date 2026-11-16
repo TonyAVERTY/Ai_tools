@@ -12,6 +12,7 @@ import { prepareStill, extractVisual, TOOLS } from '../src/services/stillimage.j
 import { instagramPrompt, instagramResearchPrompt, inspirationPrompt, linkedinPostPrompt, newsletterPrompt } from '../src/services/prompts.js';
 import { parseStillReview, reviewVerdict, MIN_SCORE } from '../src/services/stillqa.js';
 import { SceneError } from '../src/services/promovideo.js';
+import { INSPIRATION_CACHE } from '../src/handlers.js';
 import { newsletterHtml } from '../src/contentroutes.js';
 import { ROLES } from '../src/services/roles.js';
 
@@ -238,6 +239,41 @@ test('Instagram : légende, hashtags et texte alternatif modifiables et bornés 
   assert.equal(del.status, 200);
   assert.equal((await state(u, p, 'instagram')).drafts.length, 0);
   assert.equal((await u.get(`/api/projects/${p}/content/instagram/${d.id}/image`)).status, 404);
+});
+
+test('recherche d\'inspiration : faite une fois par projet, type et direction, puis réutilisée 24 h ; jamais partagée entre projets', async () => {
+  const { u, p } = await setup('veille@x.fr');
+  const other = await setup('veille2@x.fr');
+  const logOf = async (project) => (await s.db.prepare("SELECT log_json FROM jobs WHERE project_id = ? AND type = 'newsletter' ORDER BY id DESC").get(project)).log_json;
+  const SEARCH = /Recherche d'inspiration dans ton secteur…/, REUSED = /recherche d'il y a moins de 24 h réutilisée/;
+  await gen(u, p, 'newsletter', { direction: 'les cartes cadeaux' });
+  assert.equal((await job(p, 'newsletter')).status, 'done');
+  assert.match(await logOf(p), SEARCH);
+  assert.doesNotMatch(await logOf(p), REUSED);
+  const first = (await state(u, p, 'newsletter')).drafts[0];
+  // Même projet, même direction : pas de nouvelle recherche web, et le brouillon reçoit la même inspiration
+  await gen(u, p, 'newsletter', { direction: 'les cartes cadeaux' });
+  assert.equal((await job(p, 'newsletter')).status, 'done');
+  assert.match(await logOf(p), REUSED);
+  assert.doesNotMatch(await logOf(p), SEARCH);
+  const second = (await state(u, p, 'newsletter')).drafts[0];
+  assert.notEqual(second.id, first.id);
+  assert.equal(second.extra.inspiration, first.extra.inspiration);
+  assert.ok(first.extra.inspiration.length > 20);
+  // Autre direction : nouvelle recherche. Autre projet (autre compte), même direction : sa propre recherche
+  await gen(u, p, 'newsletter', { direction: 'le programme de parrainage' });
+  assert.match(await logOf(p), SEARCH);
+  await gen(other.u, other.p, 'newsletter', { direction: 'les cartes cadeaux' });
+  assert.match(await logOf(other.p), SEARCH);
+  assert.doesNotMatch(await logOf(other.p), REUSED);
+  // Fiche projet modifiée (nouvelle analyse) : la recherche gardée ne sert plus
+  await s.db.prepare('UPDATE projects SET profile_json = ? WHERE id = ?').run(JSON.stringify({ ...PROFILE, resume: 'Nouveau positionnement.' }), p);
+  await gen(u, p, 'newsletter', { direction: 'les cartes cadeaux' });
+  assert.match(await logOf(p), SEARCH);
+  // Au-delà de 24 h : nouvelle recherche
+  for (const e of s.app.inspirationCache.values()) e.at -= INSPIRATION_CACHE.ttlMs + 1000;
+  await gen(u, p, 'newsletter', { direction: 'les cartes cadeaux' });
+  assert.match(await logOf(p), SEARCH);
 });
 
 test('Newsletter : objet, aperçu et texte ; modification ; HTML d\'e-mail téléchargeable ; texte inutilisable refusé', async () => {

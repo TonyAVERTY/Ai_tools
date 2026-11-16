@@ -1031,12 +1031,26 @@ Aucune intro ni conclusion hors de ces rubriques.`,
 export const CHAT_HISTORY = { messages: 20, chars: 24000 };
 export const CHAT_MAX_MESSAGE = 8000;
 
-/** Garde la fin de la conversation : au plus CHAT_HISTORY.messages messages et CHAT_HISTORY.chars caractères. */
+const CLIP_MARK = '\n\n[… milieu du message retiré, trop long pour être renvoyé en entier …]\n\n';
+
+/**
+ * Garde la fin de la conversation : au plus CHAT_HISTORY.messages messages et CHAT_HISTORY.chars caractères.
+ * Si le message le plus récent dépasse à lui seul la limite (une longue réponse avec du code), son début et sa fin sont gardés : sans cela
+ * l'historique partait VIDE et l'IA répondait à « corrige la deuxième fonction » sans rien savoir de ce qui précédait.
+ */
 export function trimHistory(history) {
   const out = [];
   let size = 0;
   for (const m of [...history].reverse()) {
-    if (out.length >= CHAT_HISTORY.messages || size + m.content.length > CHAT_HISTORY.chars) break;
+    if (out.length >= CHAT_HISTORY.messages) break;
+    if (size + m.content.length > CHAT_HISTORY.chars) {
+      if (!out.length) {
+        const keep = CHAT_HISTORY.chars - CLIP_MARK.length;
+        const head = Math.round(keep * 0.6);
+        out.unshift({ ...m, content: `${m.content.slice(0, head)}${CLIP_MARK}${m.content.slice(m.content.length - (keep - head))}` });
+      }
+      break;
+    }
     out.unshift(m);
     size += m.content.length;
   }

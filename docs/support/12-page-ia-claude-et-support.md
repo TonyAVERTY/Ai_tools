@@ -41,3 +41,4 @@ Bouton **dossier** (« Joindre un projet iaboss ») : l'IA lit le **code du proj
 - « Budget IA atteint » : le plafond en $ réglé dans Réglages (clé API seulement) est atteint.
 - « Limite de N réponses par 24 h atteinte » : voir « Offres, plafonds et limites ».
 - Erreur de quota ou de jeton : voir « Relier, tester et déconnecter son IA (Claude, ChatGPT ou Gemini) ».
+- Longue conversation : seuls les 20 derniers messages (24 000 caractères au plus) sont renvoyés à l'IA à chaque question ; toute la conversation reste affichée. Si la dernière réponse dépasse à elle seule cette limite (un long fichier de code), son début et sa fin sont renvoyés, le milieu non : pour retravailler un passage du milieu, recolle-le dans ton message.

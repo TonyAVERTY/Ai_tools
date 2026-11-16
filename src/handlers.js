@@ -1,6 +1,7 @@
 // Handlers des jobs en arrière-plan.
 import { now, getSetting, setSetting } from './db.js';
 import { readdirSync, statSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { extractJson } from './services/claude.js';
 import { getProvider } from './services/providers/index.js';
@@ -252,6 +253,13 @@ export function makeSync(app) {
   };
 }
 
+// Recherche d'inspiration (jusqu'à 12 étapes de recherche web par contenu) : ce qui marche dans un secteur ne change pas d'une heure à l'autre.
+// Le résultat est gardé en mémoire pour le MÊME projet, le même type de contenu, la même direction, la même fiche projet et le même modèle ; il n'est
+// jamais partagé entre projets (donc entre comptes) et disparaît au redémarrage. Seule une recherche qui a abouti est gardée.
+export const INSPIRATION_CACHE = { ttlMs: 24 * 3600_000, max: 300 };
+const inspirationKey = ({ project, kind, direction, model }) => `${Number(project.id)}/${kind}/${createHash('sha256')
+  .update(JSON.stringify([direction, model, project.name, project.siteUrl ?? '', project.profile ?? null, project.target ?? null])).digest('hex')}`;
+
 // Rondes de contrôle des agents (2 agents par ronde, plusieurs centaines de milliers de tokens) : la scène, la voix et le rendu gardent leurs 3 essais
 const REVIEW_ROUNDS = 2;
 
@@ -330,12 +338,25 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
   // reconnues de ce secteur. Le web SEUL (jamais avec le dépôt : une page piégée ne doit pas pouvoir exfiltrer du code). Une recherche en échec ne fait pas échouer le contenu.
   async function researchInspiration(ctx, { userId, project, model, kind, direction = '', from = 8, to = 22 }) {
     const label = "Recherche d'inspiration dans ton secteur…";
+    const cache = (app.inspirationCache ??= new Map());
+    const key = inspirationKey({ project, kind, direction, model });
+    const known = cache.get(key);
+    if (known && known.at > Date.now() - INSPIRATION_CACHE.ttlMs) {
+      await ctx.progress({ message: "Inspiration de ton secteur : recherche d'il y a moins de 24 h réutilisée", pct: to });
+      return known.text;
+    }
     try {
       await ctx.progress({ message: label, pct: from });
       const rp = inspirationPrompt({ kind, projectName: project.name, profile: project.profile, target: project.target || {}, direction, site: project.siteUrl });
       const rr = await creeping(ctx, label, from, () => claude(userId, { prompt: rp.prompt, system: rp.system, model, maxTurns: 12, tools: STILL_TOOLS.research, signal: ctx.signal }), { to });
       addUsage(ctx, rr);
-      return (String(rr.text ?? '').match(/<inspiration>([\s\S]*?)<\/inspiration>/i) || [])[1]?.trim().replace(/\n{3,}/g, '\n\n').slice(0, 900) ?? '';
+      const text = (String(rr.text ?? '').match(/<inspiration>([\s\S]*?)<\/inspiration>/i) || [])[1]?.trim().replace(/\n{3,}/g, '\n\n').slice(0, 900) ?? '';
+      if (text) {
+        cache.delete(key);
+        cache.set(key, { at: Date.now(), text });
+        while (cache.size > INSPIRATION_CACHE.max) cache.delete(cache.keys().next().value); // les plus anciennes d'abord
+      }
+      return text;
     } catch (e) { if (ctx.signal?.aborted) throw e; return ''; }
   }
 
@@ -976,6 +997,8 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
         // « Corriger » relance le job avec le verdict du contrôle et la dernière scène refusée
         let fix = String(ctx.params.fix ?? '').slice(0, 6000) || null;
         let previousScene = fix ? takeScene(cfg, userId, ctx.params.fixScene) : '';
+        // Phrases déjà lues par le service de voix pendant CE job : une scène corrigée garde souvent ses phrases, elles ne sont ni redemandées ni repayées
+        const spoken = new Map();
         // Une seule recherche, avant la première conception ; une correction repart de la scène refusée, sans refaire de recherche
         const inspiration = fix ? '' : await researchInspiration(ctx, { userId, project, model, kind: 'promo', direction: params.subject, from: 3, to: 8 });
         for (let attempt = fix ? 2 : 1; ; attempt++) {
@@ -1003,7 +1026,12 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
               const synth = app.synthVoice || synthesize;
               voiceSegments.push(...extractVoiceScript(html, params.seconds));
               prepared = await (app.prepareVoice || prepareVoice)({
-                cfg, segments: voiceSegments, voice, seconds: params.seconds, synth: (o) => synth({ ...o, key, region }, { cfg }), signal: ctx.signal,
+                cfg, segments: voiceSegments, voice, seconds: params.seconds, signal: ctx.signal,
+                synth: (o) => {
+                  const id = JSON.stringify([o.provider, o.voice, o.text]);
+                  if (!spoken.has(id)) spoken.set(id, Promise.resolve(synth({ ...o, key, region }, { cfg })).catch((e) => { spoken.delete(id); throw e; }));
+                  return spoken.get(id);
+                },
                 onProgress: ({ done, total, stage }) => sink.push(() => ctx.progress({ message: `Voix : ${stage==='clean'?'nettoyage et contrôle de la phrase':'phrase'} ${Math.min(done + 1, total)}/${total}`, pct: 44 })),
               });
               await sink.flush();
