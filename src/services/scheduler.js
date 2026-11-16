@@ -56,7 +56,7 @@ export class Scheduler {
         try { await checkInbox(this.app, userId, id); }
         catch (e) { this.log.error(`[inbox ${id}]`, e.message); }
       }
-      await this.queueFollowups();
+      try { await this.queueFollowups(); } catch (e) { this.log.error('[relances]', e.message); }
       try { await publishDuePosts(this.app, { at: this.clock() }); } catch (e) { this.log.error('[linkedin programmés]', e.message); }
       // Offres payantes : délai de grâce écoulé après un paiement refusé → retour au plan gratuit ; vieux événements Stripe oubliés
       try { await expireGrace(this.app.db, { at: this.clock() }); await purgeEvents(this.app.db, { at: this.clock() }); } catch (e) { this.log.error('[abonnements]', e.message); }
@@ -66,7 +66,7 @@ export class Scheduler {
         try { await maybeSendWeekly(this.app, userId); }
         catch (e) { this.log.error('[rapport hebdo]', e.message); }
       }
-      await snapshotAll(this.app, { log: this.log });
+      try { await snapshotAll(this.app, { log: this.log }); } catch (e) { this.log.error('[métriques]', e.message); }
       // Entretien : comptes inactifs (avertissement puis suppression) et ancien journal d'audit
       try {
         await runInactiveCleanup(this.app, { at: this.clock(), log: this.log });
@@ -80,11 +80,16 @@ export class Scheduler {
     const queued = [];
     for (const { id, user_id: userId } of await db.prepare(`SELECT p.id, p.user_id FROM projects p JOIN users u ON u.id = p.user_id
         WHERE p.followup_enabled = 1 AND u.status = 'active'`).all()) {
-      const plan = await followupPlan(db, await getProject(this.app, id, { userId }), opts);
-      if (!plan.ready) continue;
-      // Plafond mensuel atteint ou envois en pause : la relance attend, les autres comptes ne sont pas touchés
-      try { queued.push({ id, ...await enqueue(db, { userId, projectId: id, type: 'followup', params: { count: plan.due } }) }); }
-      catch (e) { if (!(e.status === 403 && ['plan_limit', 'send_paused'].includes(e.code))) throw e; }
+      // Un projet en erreur (donnée illisible, refus imprévu) ne bloque ni les relances des autres projets ni la suite du passage :
+      // avant, l'erreur d'UN projet arrêtait tout (posts LinkedIn programmés, rapports, courbes, entretien) à chaque passage.
+      try {
+        const plan = await followupPlan(db, await getProject(this.app, id, { userId }), opts);
+        if (!plan.ready) continue;
+        queued.push({ id, ...await enqueue(db, { userId, projectId: id, type: 'followup', params: { count: plan.due } }) });
+      } catch (e) {
+        // Plafond mensuel atteint ou envois en pause : la relance attend, sans bruit dans les journaux
+        if (!(e.status === 403 && ['plan_limit', 'send_paused'].includes(e.code))) this.log.error(`[relances ${id}]`, e.message);
+      }
     }
     return queued;
   }
