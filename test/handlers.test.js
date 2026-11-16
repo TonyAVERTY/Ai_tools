@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { setSetting, getSetting, now } from '../src/db.js';
-import { toolActivity } from '../src/handlers.js';
+import { toolActivity, aiFailure } from '../src/handlers.js';
 import { testDb } from './helpers/db.js';
 import { Worker, enqueue, latestJobs } from '../src/services/jobs.js';
 import { makeHandlers, parseProspectLine } from '../src/handlers.js';
@@ -353,6 +353,43 @@ test('audit du dépôt, accroche régénérée, consignes personnalisées transm
     await setSetting(s.db, s.userId, 'prompts_json', '');
     assert.equal((await run(s, 'template')).status, 'done', 'retour au défaut');
   } finally { rmSync(s.tmp, { recursive: true, force: true }); }
+});
+
+test('IA en erreur (quota, crédit, accès) : la tâche échoue avec ce que l\'IA a dit, jamais « aucun JSON » ni un faux résultat', async () => {
+  const s = await setup();
+  try {
+    assert.equal((await run(s, 'analyze')).status, 'done');
+    await s.db.prepare('UPDATE projects SET target_validated = 1 WHERE id = ?').run(s.id);
+    await setSetting(s.db, s.userId, 'notify_email', 'moi@x.fr');
+    // La fausse CLI répond « Claude usage limit reached » (is_error) dès que le prompt contient QUOTAERR
+    await setSetting(s.db, s.userId, 'prompts_json', JSON.stringify({ '*': { template: 'QUOTAERR', audit: 'QUOTAERR', evolution: 'QUOTAERR', prospect: 'QUOTAERR' } }));
+    const tpl = await run(s, 'template');
+    assert.equal(tpl.status, 'error');
+    assert.match(tpl.error, /Modèle de mail non rédigé : .* a répondu par une erreur \(Claude usage limit reached\)/);
+    assert.doesNotMatch(tpl.error, /JSON/);
+    // Pour les tâches dont les consignes partent dans le prompt système : le nom et la fiche du projet portent le mot-clé
+    const prof = (await getProject(s.app, s.id, { userId: s.userId })).profile;
+    await s.db.prepare('UPDATE projects SET name = ?, profile_json = ? WHERE id = ?').run('Projet QUOTAERR', JSON.stringify({ ...prof, resume: 'QUOTAERR' }), s.id);
+    const audit = await run(s, 'audit', { level: 'rapide' });
+    assert.equal(audit.status, 'error', 'le message d\'erreur de l\'IA n\'est plus gardé comme rapport d\'audit');
+    assert.match(audit.error, /Audit interrompu : .*usage limit reached/);
+    const before = s.sentMails.length;
+    const evo = await run(s, 'evolution', { count: 3, level: 'rapide' });
+    assert.equal(evo.status, 'error');
+    assert.match(evo.error, /Évolutions non trouvées : .*usage limit reached/);
+    assert.equal(s.sentMails.length, before, 'le message d\'erreur de l\'IA ne part plus par mail à la place des évolutions');
+    const pr = await run(s, 'prospect', { count: 3 });
+    assert.equal(pr.status, 'error', 'zéro prospect à cause d\'une panne de l\'IA : un échec, pas « 0 trouvé »');
+    assert.match(pr.error, /Recherche de prospects interrompue : .*usage limit reached/);
+  } finally { rmSync(s.tmp, { recursive: true, force: true }); }
+});
+
+test('aiFailure : une erreur de l\'IA est reconnue, une limite d\'étapes ou une réponse normale ne le sont pas', () => {
+  assert.equal(aiFailure({ ok: false, subtype: 'success', text: ' Credit balance\n is too low ' }), 'Credit balance is too low');
+  assert.equal(aiFailure({ ok: false, subtype: 'error', text: '' }), 'aucune réponse (error)');
+  assert.equal(aiFailure({ ok: false, subtype: 'error_max_turns', text: 'rapport partiel' }), null, 'un texte tronqué reste exploitable');
+  assert.equal(aiFailure({ ok: true, subtype: 'success', text: 'ok' }), null);
+  assert.equal(aiFailure({ text: 'réponse sans champ ok' }), null);
 });
 
 test('activité de Claude en direct : recherche web, site lu (nom d\'hôte seulement), fichier lu ; rien pour le reste', () => {

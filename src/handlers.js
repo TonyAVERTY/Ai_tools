@@ -51,10 +51,29 @@ function factsOf(dir) {
   try { return renderRepoProfile(repoProfile(dir)); } catch (e) { console.warn('[repoprofile]', e.message); return ''; }
 }
 
+// L'écouteur d'annulation est retiré à la fin de l'attente : un envoi de 100 mails n'en empile pas 100 sur le signal du job
 const sleep = (ms, signal) => new Promise((resolve, reject) => {
-  const t = setTimeout(resolve, ms);
-  signal?.addEventListener('abort', () => { clearTimeout(t); reject(new Error('Annulé')); }, { once: true });
+  if (signal?.aborted) return reject(new Error('Annulé'));
+  const onAbort = () => { clearTimeout(t); reject(new Error('Annulé')); };
+  const t = setTimeout(() => { signal?.removeEventListener('abort', onAbort); resolve(); }, ms);
+  signal?.addEventListener('abort', onAbort, { once: true });
 });
+
+/**
+ * L'IA a-t-elle répondu par une erreur (quota épuisé, crédit insuffisant, accès refusé, panne du service) ? Renvoie ce qu'elle a dit, sinon null.
+ * Une limite d'étapes atteinte n'en est pas une : le texte partiel reste exploitable par les tâches qui l'acceptent.
+ */
+export function aiFailure(r) {
+  if (!r || r.ok !== false || r.subtype === 'error_max_turns') return null;
+  const said = String(r.text ?? '').replace(/\s+/g, ' ').trim().slice(0, 240);
+  return said || `aucune réponse (${r.subtype ?? 'erreur'})`;
+}
+
+/** Arrête la tâche avec la vraie cause quand l'IA a répondu par une erreur : sans cela, la tâche annonçait « aucun JSON » ou gardait le message d'erreur comme résultat. */
+function assertAnswered(r, what) {
+  const failure = aiFailure(r);
+  if (failure) throw new Error(`${what} : Claude a répondu par une erreur (${failure})`);
+}
 
 // Les callbacks du flux Claude (onText, onTurn) sont synchrones : leurs écritures en base passent par une file
 // ordonnée, attendue à la fin de la phase (flush). Une erreur d'écriture fait échouer le job au lieu de se perdre.
@@ -422,104 +441,106 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
     const sense = new Map(); // id du prospect -> avis de l'IA sur son mail rempli
     let unclear = 0, unclearRow = 0, senseStop = null, firstProblem = null;
 
-    const transport = (app.createTransport || createTransport)(await pinSmtp(app, userId, project.smtp));
-    await transport.verify();
-    const minDelay = Number(await getSetting(db, userId, 'send_delay_min', '20')) * 1000;
-    const maxDelay = Number(await getSetting(db, userId, 'send_delay_max', '60')) * 1000;
-    const log = db.prepare(`INSERT INTO mail_log(project_id, prospect_id, email, sent_at, error, kind, variant, subject, message_id, body)
-      VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-    // Le texte du mail tel qu'il est rempli pour ce prospect (sans le pied de page) : gardé dans le journal pour la page Mails
-    const bodyFor = (c) => fillBody(template.body, mailVars(c, project.smtp, project.siteUrl)).replace(/\n{3,}/g, '\n\n').trim().slice(0, 10_000);
-    const markInitial = db.prepare('UPDATE prospects SET status = ?, sent_at = ?, variant = ? WHERE id = ?');
-    const markFollowup = db.prepare('UPDATE prospects SET followup_at = ? WHERE id = ?');
-    const markBounced = db.prepare("UPDATE prospects SET status = 'bounced' WHERE id = ?");
-    const original = db.prepare("SELECT subject, message_id FROM mail_log WHERE prospect_id = ? AND kind = 'initial' AND error IS NULL ORDER BY id LIMIT 1");
-    const current = db.prepare('SELECT status, followup_at FROM prospects WHERE id = ?');
-    const markInvalid = db.prepare("UPDATE prospects SET status = 'invalid' WHERE id = ? AND status = 'new'");
-    const mxCache = new Map();
-    const readReceipt = (await getSetting(db, userId, 'read_receipt', '0')) === '1';
-    const footer = (await getSetting(db, userId, 'mail_footer', '1')) !== '0'; // pied de page : actif sauf retrait explicite dans les Réglages
     let sent = 0, failed = 0, invalid = 0;
-    await ctx.progress({ sent, failed, total: n, message: `0/${n} ${kind === 'followup' ? 'relances envoyées' : 'envoyés'}`, pct: 0 });
+    const transport = (app.createTransport || createTransport)(await pinSmtp(app, userId, project.smtp));
+    // La connexion SMTP est fermée quoi qu'il arrive (SMTP injoignable, erreur en cours de lot) : elle ne reste jamais ouverte après un échec
+    try {
+      await transport.verify();
+      const minDelay = Number(await getSetting(db, userId, 'send_delay_min', '20')) * 1000;
+      const maxDelay = Number(await getSetting(db, userId, 'send_delay_max', '60')) * 1000;
+      const log = db.prepare(`INSERT INTO mail_log(project_id, prospect_id, email, sent_at, error, kind, variant, subject, message_id, body)
+        VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      // Le texte du mail tel qu'il est rempli pour ce prospect (sans le pied de page) : gardé dans le journal pour la page Mails
+      const bodyFor = (c) => fillBody(template.body, mailVars(c, project.smtp, project.siteUrl)).replace(/\n{3,}/g, '\n\n').trim().slice(0, 10_000);
+      const markInitial = db.prepare('UPDATE prospects SET status = ?, sent_at = ?, variant = ? WHERE id = ?');
+      const markFollowup = db.prepare('UPDATE prospects SET followup_at = ? WHERE id = ?');
+      const markBounced = db.prepare("UPDATE prospects SET status = 'bounced' WHERE id = ?");
+      const original = db.prepare("SELECT subject, message_id FROM mail_log WHERE prospect_id = ? AND kind = 'initial' AND error IS NULL ORDER BY id LIMIT 1");
+      const current = db.prepare('SELECT status, followup_at FROM prospects WHERE id = ?');
+      const markInvalid = db.prepare("UPDATE prospects SET status = 'invalid' WHERE id = ? AND status = 'new'");
+      const mxCache = new Map();
+      const readReceipt = (await getSetting(db, userId, 'read_receipt', '0')) === '1';
+      const footer = (await getSetting(db, userId, 'mail_footer', '1')) !== '0'; // pied de page : actif sauf retrait explicite dans les Réglages
+      await ctx.progress({ sent, failed, total: n, message: `0/${n} ${kind === 'followup' ? 'relances envoyées' : 'envoyés'}`, pct: 0 });
 
-    // Les adresses refusées par la vérification ne comptent pas dans le lot : on continue dans la liste jusqu'à `n` envois tentés
-    for (const [at, p] of candidates.entries()) {
-      if (sent + failed >= n) break;
-      if (await ctx.cancelled()) break;
-      if (kind === 'followup' && !inHours()) break; // le reste repartira au prochain créneau
-      // Re-vérifie juste avant l'envoi : désinscription, réponse arrivée pendant le batch…
-      if (await db.prepare('SELECT 1 FROM blacklist WHERE email = ?').get(p.email)) continue;
-      if (kind === 'followup') {
-        const c = await current.get(p.id);
-        if (c.status !== 'sent' || c.followup_at) continue;
-      }
-      if (kind === 'initial') {
-        // Adresse mal formée, jetable ou sans serveur de réception : on ne l'essaie pas (un rejet abîme la réputation d'envoi)
-        const v = await verifyAddress(p.email, { resolveMx: app.resolveMx || defaultMx, cache: mxCache });
-        if (!v.ok) {
-          await markInvalid.run(p.id);
-          await log.run(project.id, p.id, p.email, now(), `Adresse non envoyée : ${v.reason}`, kind, null, null, null, null);
-          invalid++;
+      // Les adresses refusées par la vérification ne comptent pas dans le lot : on continue dans la liste jusqu'à `n` envois tentés
+      for (const [at, p] of candidates.entries()) {
+        if (sent + failed >= n) break;
+        if (await ctx.cancelled()) break;
+        if (kind === 'followup' && !inHours()) break; // le reste repartira au prochain créneau
+        // Re-vérifie juste avant l'envoi : désinscription, réponse arrivée pendant le batch…
+        if (await db.prepare('SELECT 1 FROM blacklist WHERE email = ?').get(p.email)) continue;
+        if (kind === 'followup') {
+          const c = await current.get(p.id);
+          if (c.status !== 'sent' || c.followup_at) continue;
+        }
+        if (kind === 'initial') {
+          // Adresse mal formée, jetable ou sans serveur de réception : on ne l'essaie pas (un rejet abîme la réputation d'envoi)
+          const v = await verifyAddress(p.email, { resolveMx: app.resolveMx || defaultMx, cache: mxCache });
+          if (!v.ok) {
+            await markInvalid.run(p.id);
+            await log.run(project.id, p.id, p.email, now(), `Adresse non envoyée : ${v.reason}`, kind, null, null, null, null);
+            invalid++;
+            continue;
+          }
+        }
+        // Relecture du sens par lots : ce prospect et les suivants pas encore relus
+        if (!sense.has(p.id)) {
+          const items = candidates.slice(at, at + SENSE_BATCH).filter((c) => !sense.has(c.id)).map((c) => {
+            const vars = mailVars(c, project.smtp, project.siteUrl);
+            return { id: c.id, subject: kind === 'initial' ? fillSubject(template.subject, vars) : '', body: fillBody(template.body, vars).replace(/\n{3,}/g, '\n\n').trim() };
+          });
+          await ctx.progress({ sent, failed, total: n, message: "Relecture des mails par l'IA…", pct: Math.round(((sent + failed) / n) * 100) });
+          try {
+            const { verdicts, run } = await checkSense({ claude, userId, model: senseModel, signal: ctx.signal, kind, template: template.body, items });
+            addUsage(ctx, run);
+            for (const [id, v] of verdicts) sense.set(id, v);
+          } catch (e) {
+            if (!(e instanceof SenseUnavailable)) throw e;
+            senseStop = e.message;
+            break; // rien d'autre ne part tant que l'IA ne peut pas relire
+          }
+        }
+        const verdict = sense.get(p.id);
+        if (!verdict.ok) {
+          await log.run(project.id, p.id, p.email, now(), `Non envoyé : le texte n'a pas de sens (${verdict.problem})`, kind, null, null, null, bodyFor(p));
+          firstProblem ??= verdict.problem;
+          unclear++;
+          if (++unclearRow >= SENSE_BATCH) break; // un lot entier refusé : c'est le modèle lui-même qui est en cause
           continue;
         }
-      }
-      // Relecture du sens par lots : ce prospect et les suivants pas encore relus
-      if (!sense.has(p.id)) {
-        const items = candidates.slice(at, at + SENSE_BATCH).filter((c) => !sense.has(c.id)).map((c) => {
-          const vars = mailVars(c, project.smtp, project.siteUrl);
-          return { id: c.id, subject: kind === 'initial' ? fillSubject(template.subject, vars) : '', body: fillBody(template.body, vars).replace(/\n{3,}/g, '\n\n').trim() };
-        });
-        await ctx.progress({ sent, failed, total: n, message: "Relecture des mails par l'IA…", pct: Math.round(((sent + failed) / n) * 100) });
-        try {
-          const { verdicts, run } = await checkSense({ claude, userId, model: senseModel, signal: ctx.signal, kind, template: template.body, items });
-          addUsage(ctx, run);
-          for (const [id, v] of verdicts) sense.set(id, v);
-        } catch (e) {
-          if (!(e instanceof SenseUnavailable)) throw e;
-          senseStop = e.message;
-          break; // rien d'autre ne part tant que l'IA ne peut pas relire
+        unclearRow = 0;
+        const unsubUrl = `${cfg.appUrl}/u/${encodeURIComponent(p.email)}/${unsubToken(cfg.secretKey, p.email)}`;
+        let variant = null, subject, inReplyTo;
+        if (kind === 'initial') {
+          variant = await pickVariant(db, project.id, template);
+          subject = variant === 'B' ? template.subject_b : template.subject;
+        } else {
+          const orig = await original.get(p.id);
+          subject = followupSubject(template, orig);
+          inReplyTo = orig?.message_id;
         }
+        const mail = buildProspectMail({
+          template, prospect: p, smtp: project.smtp, site: project.siteUrl, unsubUrl, subject, inReplyTo,
+          messageId: makeMessageId(project.smtp.fromEmail), readReceipt, footer, html: !!template.html,
+        });
+        try {
+          await transport.sendMail(mail);
+          await log.run(project.id, p.id, p.email, now(), null, kind, variant, mail.subject, mail.messageId, bodyFor(p));
+          await recordUsage(db, userId, 'mail');
+          if (kind === 'initial') await markInitial.run('sent', now(), variant, p.id);
+          else await markFollowup.run(now(), p.id);
+          sent++;
+        } catch (e) {
+          await log.run(project.id, p.id, p.email, now(), String(e.message).slice(0, 500), kind, variant, mail.subject, mail.messageId, bodyFor(p));
+          if (/^5\d\d/.test(String(e.responseCode))) await markBounced.run(p.id);
+          failed++;
+        }
+        const label = kind === 'followup' ? 'relances envoyées' : 'envoyés';
+        await ctx.progress({ sent, failed, total: n, message: `${sent + failed}/${n} ${label}`, pct: Math.round(((sent + failed) / n) * 100) });
+        if (sent + failed < n) await sleep(minDelay + Math.random() * (maxDelay - minDelay), ctx.signal).catch(() => {});
       }
-      const verdict = sense.get(p.id);
-      if (!verdict.ok) {
-        await log.run(project.id, p.id, p.email, now(), `Non envoyé : le texte n'a pas de sens (${verdict.problem})`, kind, null, null, null, bodyFor(p));
-        firstProblem ??= verdict.problem;
-        unclear++;
-        if (++unclearRow >= SENSE_BATCH) break; // un lot entier refusé : c'est le modèle lui-même qui est en cause
-        continue;
-      }
-      unclearRow = 0;
-      const unsubUrl = `${cfg.appUrl}/u/${encodeURIComponent(p.email)}/${unsubToken(cfg.secretKey, p.email)}`;
-      let variant = null, subject, inReplyTo;
-      if (kind === 'initial') {
-        variant = await pickVariant(db, project.id, template);
-        subject = variant === 'B' ? template.subject_b : template.subject;
-      } else {
-        const orig = await original.get(p.id);
-        subject = followupSubject(template, orig);
-        inReplyTo = orig?.message_id;
-      }
-      const mail = buildProspectMail({
-        template, prospect: p, smtp: project.smtp, site: project.siteUrl, unsubUrl, subject, inReplyTo,
-        messageId: makeMessageId(project.smtp.fromEmail), readReceipt, footer, html: !!template.html,
-      });
-      try {
-        await transport.sendMail(mail);
-        await log.run(project.id, p.id, p.email, now(), null, kind, variant, mail.subject, mail.messageId, bodyFor(p));
-        await recordUsage(db, userId, 'mail');
-        if (kind === 'initial') await markInitial.run('sent', now(), variant, p.id);
-        else await markFollowup.run(now(), p.id);
-        sent++;
-      } catch (e) {
-        await log.run(project.id, p.id, p.email, now(), String(e.message).slice(0, 500), kind, variant, mail.subject, mail.messageId, bodyFor(p));
-        if (/^5\d\d/.test(String(e.responseCode))) await markBounced.run(p.id);
-        failed++;
-      }
-      const label = kind === 'followup' ? 'relances envoyées' : 'envoyés';
-      await ctx.progress({ sent, failed, total: n, message: `${sent + failed}/${n} ${label}`, pct: Math.round(((sent + failed) / n) * 100) });
-      if (sent + failed < n) await sleep(minDelay + Math.random() * (maxDelay - minDelay), ctx.signal).catch(() => {});
-    }
-    transport.close();
+    } finally { transport.close?.(); }
     await evaluateSending(app, userId); // trop de rejets : le compte passe en pause d'envoi
     if (sent + failed === 0 && (senseStop || unclear)) {
       throw new Error(senseStop
@@ -558,6 +579,7 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
     });
     await sink.flush();
     addUsage(ctx, r);
+    assertAnswered(r, `${task.label} non rédigé`);
     if (!r.text?.trim()) throw new Error(`Pas de résultat (${r.subtype})`);
     return { markdown: r.text.trim(), task: task.id, role: task.role, notes };
   };
@@ -662,6 +684,8 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
       onText('\n');
       await sink.flush();
       addUsage(ctx, r);
+      // Aucun prospect ET une erreur de l'IA : c'est une panne, pas une recherche infructueuse
+      if (!found) assertAnswered(r, 'Recherche de prospects interrompue');
       return { found, requested: count, stoppedBy: r.subtype, ...(capped ? { capped: true } : {}) };
     },
 
@@ -674,6 +698,7 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
       const { prompt, system } = templatePrompt({ profile: project.profile, target: project.target || {}, senderName: project.smtp?.fromName, site: project.siteUrl, custom: await custom(userId), model });
       const r = await creeping(ctx, 'Rédaction du modèle par Claude…', 40, () => claude(userId, { prompt, system, model, maxTurns: 1, tools: [], signal: ctx.signal }));
       addUsage(ctx, r);
+      assertAnswered(r, 'Modèle de mail non rédigé');
       const t = extractJson(r.text);
       if (!t.subject || !t.body) throw new Error('Modèle de mail invalide');
       // Objet B (test A/B) : gardé seulement s'il est écrit, différent de l'objet A et d'une longueur d'objet
@@ -701,6 +726,7 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
       const { prompt, system } = followupTemplatePrompt({ profile: project.profile, senderName: project.smtp?.fromName, custom: await custom(userId), model });
       const r = await creeping(ctx, 'Rédaction de la relance par Claude…', 40, () => claude(userId, { prompt, system, model, maxTurns: 1, tools: [], signal: ctx.signal }));
       addUsage(ctx, r);
+      assertAnswered(r, 'Modèle de relance non rédigé');
       const t = extractJson(r.text);
       if (!t.body) throw new Error('Modèle de relance invalide');
       // Comme le premier mail : relecture de la forme, correction de style, contrôle du sens, PUIS enregistrement
@@ -725,6 +751,7 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
       const { prompt, system } = billingQuotesPrompt({ projectName: project.name, profile: project.profile, legal, custom: await custom(userId), model });
       const r = await creeping(ctx, 'Claude rédige trois exemples de devis…', 12, () => claude(userId, { prompt, system, model, maxTurns: 1, tools: [], signal: ctx.signal }));
       addUsage(ctx, r);
+      assertAnswered(r, 'Devis non rédigés');
       const raw = extractJson(r.text);
       const options = (Array.isArray(raw.options) ? raw.options : []).map((o) => normalizeContent(o, 'devis')).filter(Boolean).slice(0, 3);
       if (options.length < 3) throw new Error("Claude n'a pas produit trois devis exploitables : réessaie");
@@ -748,6 +775,7 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
       const { prompt, system } = billingRefinePrompt({ projectName: project.name, profile: project.profile, legal, kind, content: doc.content, request, custom: await custom(userId), model });
       const r = await creeping(ctx, 'Claude affine le document selon ta demande…', 8, () => claude(userId, { prompt, system, model, maxTurns: 1, tools: [], signal: ctx.signal }));
       addUsage(ctx, r);
+      assertAnswered(r, 'Document non modifié');
       const next = normalizeContent(extractJson(r.text), kind === 'acompte' ? 'acompte' : kind);
       if (!next) throw new Error("Claude n'a pas produit un document exploitable : réessaie");
       next.layout = doc.layout; // la mise en page choisie ne change pas en route
@@ -775,6 +803,7 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
       const { prompt, system } = billingDocsPrompt({ projectName: project.name, profile: project.profile, legal, quote: quote.content, custom: await custom(userId), model });
       const r = await creeping(ctx, 'Claude prépare le devis, l\'acompte, la facture finale et l\'avoir…', 8, () => claude(userId, { prompt, system, model, maxTurns: 1, tools: [], signal: ctx.signal }));
       addUsage(ctx, r);
+      assertAnswered(r, 'Documents non rédigés');
       const raw = extractJson(r.text);
       const out = {};
       for (const { key } of DOC_KINDS) {
@@ -808,6 +837,7 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
       await ctx.progress({ message: direction ? 'Rédaction du post selon ta direction…' : 'Claude choisit un angle et rédige le post…', pct: 40 });
       const r = await creeping(ctx, direction ? 'Rédaction du post selon ta direction…' : 'Claude choisit un angle et rédige le post…', 40, () => claude(userId, { prompt, system, model, maxTurns: 1, tools: [], signal: ctx.signal }));
       addUsage(ctx, r);
+      assertAnswered(r, 'Post non rédigé');
       let body = '';
       try { body = String(extractJson(r.text).post ?? ''); } catch { body = ''; }
       body = body.replace(/\r\n/g, '\n').trim().slice(0, 3000);
@@ -860,6 +890,7 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
         }), { to: 60 });
         await sink.flush();
         addUsage(ctx, r);
+        assertAnswered(r, 'Post non conçu');
         const caption = field(r.text, 'legende').replace(/\r\n/g, '\n').slice(0, CONTENT.caption);
         if (caption.length < 40) throw new Error(`Claude n'a pas produit de légende exploitable (${r.subtype}) : réessaie`);
         const html = extractVisual(r.text);
@@ -915,6 +946,7 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
       });
       const r = await creeping(ctx, label, 40, () => claude(userId, { prompt, system, model, maxTurns: 1, tools: [], signal: ctx.signal }));
       addUsage(ctx, r);
+      assertAnswered(r, 'Newsletter non rédigée');
       const field = (tag) => (String(r.text ?? '').match(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`, 'i')) || [])[1]?.trim() ?? '';
       const subject = field('objet').replace(/\s+/g, ' ').slice(0, CONTENT.subject);
       const body = field('texte').replace(/\r\n/g, '\n').slice(0, CONTENT.newsletter);
@@ -1054,6 +1086,8 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
       });
       await sink.flush();
       addUsage(ctx, r);
+      // Sans ce contrôle, le message d'erreur de l'IA partait par mail à la place des évolutions
+      assertAnswered(r, 'Évolutions non trouvées');
       if (!r.text?.trim()) throw new Error(`Pas de résultat (${r.subtype})`);
 
       await ctx.progress({ message: 'Envoi par mail…', pct: 95 });
@@ -1087,6 +1121,7 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
       });
       await sink.flush();
       addUsage(ctx, r);
+      assertAnswered(r, 'Audit interrompu');
       if (!r.text?.trim()) throw new Error(`Pas de résultat (${r.subtype})`);
       return { markdown: r.text, level };
     },
@@ -1106,6 +1141,7 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
         tools: prospect.website ? ['WebFetch'] : [], maxTurns: prospect.website ? 6 : 1, signal: ctx.signal,
       });
       addUsage(ctx, r);
+      assertAnswered(r, 'Accroche non rédigée');
       let out = {};
       try { out = extractJson(r.text); } catch { out = {}; }
       const hook = String(out.hook ?? '').replace(/\s+/g, ' ').trim().slice(0, 300);

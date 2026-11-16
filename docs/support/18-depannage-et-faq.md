@@ -292,3 +292,12 @@ L'activation arrive par un message signé de Stripe, en général en quelques se
 
 ## Une tâche échoue avec « … n'a pas répondu en 30 minutes : la tâche a été arrêtée »
 L'IA n'a rien renvoyé dans le délai maximal (30 minutes pour une tâche, 5 minutes pour une réponse de la page IA) : la tâche est arrêtée pour ne pas rester « en cours » indéfiniment. Clique sur **Réessayer**. Si cela se répète sur un gros dépôt, choisis un niveau plus rapide ou un modèle plus léger dans les **Réglages**.
+
+## Une tâche échoue avec « … a répondu par une erreur (…) »
+Le message commence par ce qui n'a pas été fait (« Modèle de mail non rédigé », « Audit interrompu », « Évolutions non trouvées », « Recherche de prospects interrompue », « Post non rédigé »…) et donne entre parenthèses ce que ton IA a répondu. Ce n'est pas un défaut du projet : c'est ton IA qui a refusé ou n'a pas pu répondre.
+1. « usage limit reached », « rate limit », « quota » : le quota de ton compte d'IA est atteint. Attends la remise à zéro (carte **Consommation** du menu **Activité**), puis clique sur **Réessayer**.
+2. « Credit balance is too low » : avec une clé API, le crédit du compte est épuisé. Recharge-le chez le fournisseur, puis **Réessayer**.
+3. « Invalid API key », « Please run /login », « token expired » : l'accès n'est plus valide. Relie de nouveau ton IA (**Mon compte → Relier mon IA**).
+4. Autre texte (« overloaded », « internal error ») : panne passagère du service d'IA. **Réessayer** quelques minutes plus tard.
+
+Avant, la même panne s'affichait « Aucun JSON dans la réponse », ou la tâche se terminait avec le message d'erreur à la place du résultat (un audit, ou le mail des évolutions). Une recherche de prospects qui ne trouve rien parce que l'IA est en panne est maintenant un échec, plus un « 0 trouvé ».
