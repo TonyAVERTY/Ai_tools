@@ -1342,4 +1342,17 @@ export const MIGRATIONS = [
       ) ${T}`,
     ],
   },
+  {
+    // Performances : la page d'un projet lit le dernier job de chaque type (projet + type), l'envoi d'une relance et la fiche d'un prospect relisent
+    // son premier mail (prospect). Sans ces index, chaque lecture parcourait toute la table. Ajoutée à la fin de la liste, jamais au milieu.
+    name: 'jobs_mail_log_lookup_indexes',
+    sqlite: [
+      'CREATE INDEX IF NOT EXISTS jobs_project_type ON jobs(project_id, type, id)',
+      'CREATE INDEX IF NOT EXISTS mail_log_prospect ON mail_log(prospect_id, kind)',
+    ],
+    mysql: [
+      { sql: 'CREATE INDEX jobs_project_type ON jobs(project_id, type, id)', when: idxMissing('jobs', 'jobs_project_type') },
+      { sql: 'CREATE INDEX mail_log_prospect ON mail_log(prospect_id, kind)', when: idxMissing('mail_log', 'mail_log_prospect') },
+    ],
+  },
 ];

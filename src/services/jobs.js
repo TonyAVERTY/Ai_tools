@@ -119,8 +119,11 @@ export async function retryJob(db, userId, jobId, opts = {}, { fix = false } = {
 
 /** Derniers jobs d'un projet (le projet doit déjà avoir été vérifié comme appartenant à l'utilisateur). */
 export async function latestJobs(db, projectId) {
+  // Le journal (jusqu'à 120 Ko par job) ne sert qu'à estimer la fin d'un job EN COURS : il n'est pas relu pour les jobs terminés
   const rows = await db.prepare(`
-    SELECT j.* FROM jobs j
+    SELECT j.id, j.user_id, j.type, j.status, j.error, j.params_json, j.progress_json, j.result_json, j.tokens_in, j.tokens_out,
+      j.created_at, j.started_at, j.finished_at, j.run_after, CASE WHEN j.status = 'running' THEN j.log_json END log_json
+    FROM jobs j
     JOIN (SELECT type, MAX(id) id FROM jobs WHERE project_id = ? GROUP BY type) lj ON lj.id = j.id
   `).all(projectId);
   const out = {};
@@ -297,9 +300,14 @@ export class Worker {
         if (!byUser.has(j.user_id)) byUser.set(j.user_id, []);
         byUser.get(j.user_id).push(j);
       }
+      // Offre, droit d'exécuter, budget et quota sont les mêmes pour tous les jobs d'un compte pendant CE passage : lus une fois par compte, pas une
+      // fois par job (un compte dont 12 jobs attendent le budget coûtait 73 requêtes toutes les 3 secondes). Rien n'est gardé d'un passage à l'autre.
+      const seen = new Map();
+      const once = (key, read) => { if (!seen.has(key)) seen.set(key, read()); return seen.get(key); };
+      const capFor = (userId) => once(`cap/${userId}`, () => this.capOf(userId));
       const candidates = []; // un seul candidat par utilisateur : son premier job exécutable
       for (const [userId, jobs] of byUser) {
-        const cap = await this.capOf(userId);
+        const cap = await capFor(userId);
         if ((this.busyUsers.get(Number(userId)) || 0) >= cap) { // autant de jobs en cours que son offre le permet : les suivants attendent, et le disent
           const why = cap === 1
             ? "un job est déjà en cours (ton offre en fait tourner un seul à la fois ; les offres payantes en font tourner plusieurs en même temps)"
@@ -311,15 +319,16 @@ export class Worker {
         for (const j of jobs) {
           if (MAIL_JOBS.has(j.type) && this.busyMail.has(Number(userId))) continue; // un seul envoi de mails à la fois pour ce compte
           // Compte suspendu ou supprimé, job IA sans liaison Claude valide : refusé sans exécution
-          const refusal = await jobRefusal(this.db, j, { cliModeEnabled: this.cliModeEnabled });
+          const refusal = await once(`refus/${userId}/${AI_JOBS.has(j.type)}`, () => jobRefusal(this.db, j, { cliModeEnabled: this.cliModeEnabled }));
           if (refusal) {
             await this.db.prepare("UPDATE jobs SET status = 'error', error = ?, finished_at = ? WHERE id = ? AND status = 'queued'").run(refusal, now(), j.id);
             continue;
           }
-          const b = (await this.budget?.(j.user_id)) || { blocked: false };
-          if (b.blocked && this.isAiJob?.(j.type)) { budgetReason = b.reason; await hold(j, b.reason); continue; }
-          const q = (await this.quota?.(j.user_id)) || { blocked: false };
-          if (q.blocked && this.isQuotaSensitive?.(j.type)) { quotaReason = q.reason; await hold(j, q.reason); continue; }
+          // Budget et quota ne concernent que les jobs IA : ils ne sont pas lus pour un envoi de mails
+          const b = (this.isAiJob?.(j.type) && await once(`budget/${userId}`, () => this.budget?.(j.user_id))) || { blocked: false };
+          if (b.blocked) { budgetReason = b.reason; await hold(j, b.reason); continue; }
+          const q = (this.isQuotaSensitive?.(j.type) && await once(`quota/${userId}`, () => this.quota?.(j.user_id))) || { blocked: false };
+          if (q.blocked) { quotaReason = q.reason; await hold(j, q.reason); continue; }
           cand = j;
           break;
         }
@@ -348,7 +357,7 @@ export class Worker {
       // Tourniquet : le moins récemment servi d'abord (jamais servi = en tête), puis l'ordre des jobs
       candidates.sort((a, b) => (this.served.get(a.user_id) ?? -1) - (this.served.get(b.user_id) ?? -1) || a.id - b.id);
       for (const job of candidates) {
-        const cap = await this.capOf(job.user_id);
+        const cap = await capFor(job.user_id);
         if ((this.busyUsers.get(Number(job.user_id)) || 0) >= cap) continue; // pris entre-temps par un claim concurrent
         if (MAIL_JOBS.has(job.type) && this.busyMail.has(Number(job.user_id))) continue;
         if (!(await this.reserve(job, cap))) continue;
