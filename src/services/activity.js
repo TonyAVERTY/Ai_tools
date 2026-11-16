@@ -10,7 +10,7 @@ export async function activitySnapshot(db, userId) {
     const queue = (await db.prepare(`SELECT COUNT(*) n FROM jobs j LEFT JOIN projects p ON p.id = j.project_id WHERE ${mine} AND (j.status = 'running'
       OR (j.status = 'queued' AND (j.run_after IS NULL OR j.run_after <= ?)))`).get(...mineArgs, now())).n;
     const scheduled = (await db.prepare(`SELECT COUNT(*) n FROM jobs j LEFT JOIN projects p ON p.id = j.project_id WHERE ${mine} AND j.status = 'queued' AND j.run_after > ?`).get(...mineArgs, now())).n;
-    const jobs = (await attachJobEta(db, await db.prepare(`SELECT j.id, j.user_id, j.type, j.params_json, j.log_json, j.status, j.error, j.tokens_in, j.tokens_out, j.progress_json, j.run_after, j.started_at, j.created_at, p.id pid, p.name project
+    const jobs = (await attachJobEta(db, await db.prepare(`SELECT j.id, j.user_id, j.type, j.params_json, CASE WHEN j.status = 'running' THEN j.log_json END log_json, j.status, j.error, j.tokens_in, j.tokens_out, j.progress_json, j.run_after, j.started_at, j.created_at, p.id pid, p.name project
       FROM jobs j LEFT JOIN projects p ON p.id = j.project_id
       WHERE ${mine} AND (j.status IN ('queued','running') OR (j.status = 'error' AND j.created_at > ${now() - 86400}
         AND NOT EXISTS (SELECT 1 FROM jobs newer WHERE newer.user_id = j.user_id AND newer.type = j.type AND newer.id > j.id AND (newer.project_id = j.project_id OR (newer.project_id IS NULL AND j.project_id IS NULL)))))

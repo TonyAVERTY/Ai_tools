@@ -5,6 +5,7 @@ import { testDb, USING_MYSQL } from './helpers/db.js';
 import { addUser } from './helpers/users.js';
 import { Worker, latestJobs, aiStats, usageSummary } from '../src/services/jobs.js';
 import { createJobLog } from '../src/services/joblog.js';
+import { activitySnapshot } from '../src/services/activity.js';
 
 // Garde-fous de performance : ces tests comptent des écritures et des lectures. Ils échouent si une régression remet une requête par job
 // dans la boucle du worker, ou une écriture du journal entier par ligne.
@@ -136,4 +137,21 @@ test('mesures des tâches IA : nombre, échecs, durée moyenne, tokens et coût,
   assert.deepEqual((await usageSummary(db, u)).ai, a, 'exposé avec la consommation du compte');
   const none = await aiStats(db, await addUser(db));
   assert.deepEqual(none, { jobs: 0, failed: 0, failureRate: null, avgSeconds: null, tokens: 0, costUsd: 0, chatAnswers: 0 });
+});
+
+test('relevé d\'activité (interrogé en boucle par le navigateur) : le journal d\'une tâche en échec ou en file n\'est pas relu', async () => {
+  const db = await testDb();
+  const u = await addUser(db);
+  const p = await project(db, u);
+  const big = JSON.stringify([{ id: 1, at: Date.now(), kind: 'progress', text: 'x'.repeat(8000) }]);
+  await db.prepare("INSERT INTO jobs(user_id, project_id, type, status, error, params_json, log_json, created_at, started_at, finished_at) VALUES(?, ?, 'audit', 'error', 'échec', '{}', ?, ?, ?, ?)").run(u, p, big, now(), now(), now());
+  await db.prepare("INSERT INTO jobs(user_id, project_id, type, status, params_json, log_json, created_at, started_at) VALUES(?, ?, 'analyze', 'running', '{}', ?, ?, ?)").run(u, p, big, now(), now());
+  const read = [];
+  const spy = { prepare: (sql) => { const st = db.prepare(sql); return { all: async (...args) => { const rows = await st.all(...args); if (/j\.params_json/.test(sql)) read.push(...rows); return rows; }, get: (...args) => st.get(...args), run: (...args) => st.run(...args) }; } };
+  const snap = await activitySnapshot(spy, u);
+  assert.deepEqual(snap.jobs.map((j) => `${j.type}:${j.status}`).sort(), ['analyze:running', 'audit:error']);
+  assert.equal(snap.jobs.find((j) => j.type === 'audit').error, 'échec');
+  assert.ok(snap.jobs.find((j) => j.type === 'analyze').eta, 'la tâche en cours garde son estimation');
+  assert.equal(read.find((r) => r.type === 'audit').log_json, null);
+  assert.ok(read.find((r) => r.type === 'analyze').log_json.length > 8000);
 });

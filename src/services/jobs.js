@@ -469,7 +469,22 @@ export async function usageSummary(db, userId) {
   const day = now() - 86400;
   const q = (s) => db.prepare(`SELECT COALESCE(SUM(cost_usd),0) cost, COALESCE(SUM(tokens_in),0) tin, COALESCE(SUM(tokens_out),0) tout, COUNT(*) n
     FROM jobs WHERE user_id = ? AND COALESCE(finished_at, created_at) > ?`).get(userId, s);
-  return { month: await q(since), day: await q(day), ai: await aiStats(db, userId, since) };
+  return { month: await q(since), day: await q(day), ai: await cachedAiStats(db, userId) };
+}
+
+// Le relevé d'activité est interrogé toutes les 3 à 30 secondes par onglet ouvert : un bilan sur 30 jours n'a pas à être recalculé à chaque fois
+const AI_STATS_TTL_MS = 60_000;
+const aiStatsCache = new WeakMap(); // base → Map(compte → { at, value })
+async function cachedAiStats(db, userId) {
+  if (!aiStatsCache.has(db)) aiStatsCache.set(db, new Map());
+  const cache = aiStatsCache.get(db);
+  const hit = cache.get(Number(userId));
+  if (hit && hit.at > Date.now() - AI_STATS_TTL_MS) return hit.value;
+  const value = await aiStats(db, userId);
+  cache.delete(Number(userId));
+  cache.set(Number(userId), { at: Date.now(), value });
+  while (cache.size > 1000) cache.delete(cache.keys().next().value);
+  return value;
 }
 
 /**
