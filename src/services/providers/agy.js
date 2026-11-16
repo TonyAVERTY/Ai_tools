@@ -23,6 +23,7 @@ import { dirname, join } from 'node:path';
 import { prepareLaunch } from '../sandbox.js';
 import { estimateCost } from '../pricing.js';
 import { HttpError } from '../../http.js';
+import { readLines, tailText, guardChild, delayLabel } from './childio.js';
 
 export const TOKEN_FILE = ['.gemini', 'antigravity-cli', 'antigravity-oauth-token'];
 export const CATALOG_DEFAULT = 'gemini-3.8-flash-high';
@@ -128,14 +129,13 @@ export function runAgy(o) {
   const maxActions = o.maxTurns || 10;
 
   return new Promise((resolve, reject) => {
-    let buf = '', stderr = '';
     let result = null, turns = 0, tooMany = false, needLogin = false;
     const answer = [], errors = [];
-    const timer = setTimeout(() => child.kill('SIGTERM'), o.timeoutMs || 30 * 60_000);
-    o.signal?.addEventListener('abort', () => child.kill('SIGTERM'), { once: true });
-    const done = () => { clearTimeout(timer); launch.cleanup(); cleanHome(); };
+    const timeoutMs = o.timeoutMs || 30 * 60_000;
+    const guard = guardChild(child, { timeoutMs, signal: o.signal });
+    const done = () => { guard.clear(); launch.cleanup(); cleanHome(); };
     // Sans connexion valable, agy affiche un lien et attend un code 60 s : on n'attend pas, c'est un refus d'accès
-    const watchLogin = (text) => { if (!needLogin && /authentication required|please visit the url to log in/i.test(text)) { needLogin = true; child.kill('SIGTERM'); } };
+    const watchLogin = (text) => { if (!needLogin && /authentication required|please visit the url to log in/i.test(text)) { needLogin = true; guard.stop(); } };
 
     function handle(line) {
       let ev;
@@ -151,7 +151,7 @@ export function runAgy(o) {
           o.onTurn?.(turns);
           const name = s.tool_name ?? s.tool?.name ?? s.name ?? 'outil';
           o.onTool?.(CLAUDE_NAME[name] || name, toolInput(s.tool_input ?? s.tool?.input ?? s.input ?? s.parameters));
-          if (++handle.actions > maxActions && !tooMany) { tooMany = true; child.kill('SIGTERM'); }
+          if (++handle.actions > maxActions && !tooMany) { tooMany = true; guard.stop(); }
         }
       } else if (ev.event === 'result') {
         result = ev.result || {};
@@ -163,17 +163,16 @@ export function runAgy(o) {
     handle.seen = new Set();
     handle.actions = 0;
 
-    child.stdout.on('data', (chunk) => {
-      buf += chunk;
-      let i;
-      while ((i = buf.indexOf('\n')) >= 0) { const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1); if (line) handle(line); }
-    });
-    child.stderr.on('data', (c) => { stderr = (stderr + c).slice(-4000); watchLogin(stderr); });
+    const flush = readLines(child.stdout, (line) => handle(line));
+    const errTail = tailText(child.stderr);
+    child.stderr.on('data', () => watchLogin(errTail()));
     child.on('error', (e) => { done(); reject(new Error(redact(`Impossible de lancer Antigravity : ${e.message}`))); });
     child.on('close', (code) => {
       done();
-      if (buf.trim()) handle(buf.trim());
+      flush();
+      const stderr = errTail();
       if (needLogin || isAuthRefusal(result?.error)) return reject(new Error('Authentication required : la connexion du compte Google est expirée ou révoquée.'));
+      if (!result && !tooMany && guard.timedOut()) return reject(new Error(`Antigravity n'a pas répondu en ${delayLabel(timeoutMs)} : la tâche a été arrêtée. Réessaie`));
       if (!result && !tooMany) return reject(new Error(redact(`Antigravity s'est arrêté sans résultat (code ${code}). ${[...errors, stderr.trim()].filter(Boolean).join(' ')}`)));
       const u = result?.usage || {};
       const tokensIn = (Number(u.input_tokens) || 0) + (Number(u.cache_read_tokens) || 0);

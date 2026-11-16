@@ -289,3 +289,6 @@ Le message précise maintenant la cause : produits manquants dans l'application 
 
 ## Je viens de payer une offre et mon plan n'a pas changé
 L'activation arrive par un message signé de Stripe, en général en quelques secondes : recharge « Mon compte ». Au bout de quelques minutes sans changement, écris-nous avec l'email de ton compte. Détails dans « Abonnement et paiement : choisir, changer ou résilier son offre ».
+
+## Une tâche échoue avec « … n'a pas répondu en 30 minutes : la tâche a été arrêtée »
+L'IA n'a rien renvoyé dans le délai maximal (30 minutes pour une tâche, 5 minutes pour une réponse de la page IA) : la tâche est arrêtée pour ne pas rester « en cours » indéfiniment. Clique sur **Réessayer**. Si cela se répète sur un gros dépôt, choisis un niveau plus rapide ou un modèle plus léger dans les **Réglages**.

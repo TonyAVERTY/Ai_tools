@@ -27,6 +27,7 @@ import { prepareLaunch } from '../sandbox.js';
 import { estimateCost } from '../pricing.js';
 import { HttpError } from '../../http.js';
 import { SECRET_ENV } from './secretenv.js';
+import { readLines, tailText, guardChild, delayLabel } from './childio.js';
 
 const MODELS_URL = 'https://api.openai.com/v1/models';
 const CATALOG_DEFAULT = 'gpt-6-luna';
@@ -123,13 +124,12 @@ export function runCodex(o) {
   const maxActions = o.maxTurns || 10;
 
   return new Promise((resolve, reject) => {
-    let buf = '', stderr = '';
     let usage = null, completed = false, failed = null, actions = 0, tooMany = false, turns = 0;
     let final = '';
     const errors = [];
-    const timer = setTimeout(() => child.kill('SIGTERM'), o.timeoutMs || 30 * 60_000);
-    o.signal?.addEventListener('abort', () => child.kill('SIGTERM'), { once: true });
-    const done = () => { clearTimeout(timer); launch.cleanup(); cleanAuth(); };
+    const timeoutMs = o.timeoutMs || 30 * 60_000;
+    const guard = guardChild(child, { timeoutMs, signal: o.signal });
+    const done = () => { guard.clear(); launch.cleanup(); cleanAuth(); };
 
     function handle(line) {
       let ev;
@@ -141,7 +141,7 @@ export function runCodex(o) {
         // Le journal d'activité parle comme avec Claude : une commande = une recherche dans le code
         if (item.type === 'web_search') o.onTool?.('WebSearch', { query: item.query });
         else o.onTool?.('Grep', {});
-        if (++actions > maxActions && !tooMany) { tooMany = true; child.kill('SIGTERM'); }
+        if (++actions > maxActions && !tooMany) { tooMany = true; guard.stop(); }
       } else if (ev.type === 'item.started' && item.type === 'reasoning') {
         o.onActivity?.('ChatGPT réfléchit à la prochaine étape…');
       } else if (ev.type === 'item.completed' && item.type === 'agent_message' && typeof item.text === 'string') {
@@ -156,16 +156,14 @@ export function runCodex(o) {
       }
     }
 
-    child.stdout.on('data', (chunk) => {
-      buf += chunk;
-      let i;
-      while ((i = buf.indexOf('\n')) >= 0) { const line = buf.slice(0, i).trim(); buf = buf.slice(i + 1); if (line) handle(line); }
-    });
-    child.stderr.on('data', (c) => { stderr = (stderr + c).slice(-4000); });
+    const flush = readLines(child.stdout, (line) => handle(line));
+    const errTail = tailText(child.stderr);
     child.on('error', (e) => { done(); reject(new Error(redact(`Impossible de lancer Codex : ${e.message}`))); });
     child.on('close', (code) => {
       done();
-      if (buf.trim()) handle(buf.trim());
+      flush();
+      const stderr = errTail();
+      if (!completed && !failed && !tooMany && guard.timedOut()) return reject(new Error(`Codex n'a pas répondu en ${delayLabel(timeoutMs)} : la tâche a été arrêtée. Réessaie`));
       if (!completed && !failed && !tooMany) return reject(new Error(redact(`Codex s'est arrêté sans résultat (code ${code}). ${[...errors, stderr.trim()].filter(Boolean).join(' ')}`)));
       const tokensIn = Number(usage?.input_tokens) || 0;
       const tokensOut = Number(usage?.output_tokens) || 0;

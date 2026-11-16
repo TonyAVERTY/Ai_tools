@@ -3,6 +3,7 @@
 import { spawn } from 'node:child_process';
 import { prepareLaunch } from './sandbox.js';
 import { createLiveUsage } from './liveusage.js';
+import { readLines, tailText, guardChild, delayLabel } from './providers/childio.js';
 
 export const MODELS = { rapide: 'haiku', normal: 'sonnet', approfondi: 'opus' };
 
@@ -53,28 +54,17 @@ export function runClaude(o) {
   const child = spawn(launch.command, launch.args, { cwd: launch.cwd, env: launch.env, stdio: ['ignore', 'pipe', 'pipe'] });
 
   return new Promise((resolve, reject) => {
-    let buf = '';
-    let stderr = '';
     let result = null;
     let rateLimit = null;
     let turns = 0;
     const texts = [];
     const trackUsage = createLiveUsage(o.onUsage);
 
-    const timer = setTimeout(() => child.kill('SIGTERM'), o.timeoutMs || 30 * 60_000);
-    o.signal?.addEventListener('abort', () => child.kill('SIGTERM'), { once: true });
-
-    child.stdout.on('data', (chunk) => {
-      buf += chunk;
-      let i;
-      while ((i = buf.indexOf('\n')) >= 0) {
-        const line = buf.slice(0, i).trim();
-        buf = buf.slice(i + 1);
-        if (line) handle(line);
-      }
-    });
-    child.stderr.on('data', (c) => { stderr = (stderr + c).slice(-4000); });
-    const done = () => { clearTimeout(timer); launch.cleanup(); };
+    const timeoutMs = o.timeoutMs || 30 * 60_000;
+    const guard = guardChild(child, { timeoutMs, signal: o.signal });
+    const flush = readLines(child.stdout, (line) => handle(line));
+    const stderr = tailText(child.stderr);
+    const done = () => { guard.clear(); launch.cleanup(); };
 
     function handle(line) {
       let ev;
@@ -102,8 +92,9 @@ export function runClaude(o) {
     child.on('error', (e) => { done(); reject(new Error(redact(`Impossible de lancer Claude : ${e.message}`))); });
     child.on('close', (code) => {
       done();
-      if (buf.trim()) handle(buf.trim());
-      if (!result) return reject(new Error(redact(`Claude s'est arrêté sans résultat (code ${code}). ${stderr.trim()}`)));
+      flush();
+      if (!result && guard.timedOut()) return reject(new Error(`Claude n'a pas répondu en ${delayLabel(timeoutMs)} : la tâche a été arrêtée. Réessaie`));
+      if (!result) return reject(new Error(redact(`Claude s'est arrêté sans résultat (code ${code}). ${stderr().trim()}`)));
       const usage = result.usage || {};
       resolve({
         ok: !result.is_error,
