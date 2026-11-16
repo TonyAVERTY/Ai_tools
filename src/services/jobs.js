@@ -469,5 +469,26 @@ export async function usageSummary(db, userId) {
   const day = now() - 86400;
   const q = (s) => db.prepare(`SELECT COALESCE(SUM(cost_usd),0) cost, COALESCE(SUM(tokens_in),0) tin, COALESCE(SUM(tokens_out),0) tout, COUNT(*) n
     FROM jobs WHERE user_id = ? AND COALESCE(finished_at, created_at) > ?`).get(userId, s);
-  return { month: await q(since), day: await q(day) };
+  return { month: await q(since), day: await q(day), ai: await aiStats(db, userId, since) };
+}
+
+/**
+ * Mesures des tâches IA terminées depuis `since` (30 jours par défaut) : combien, combien en échec, durée moyenne, tokens et coût estimé,
+ * plus le nombre de réponses de la page IA. Sert à suivre la fiabilité et le coût des générations (menu Activité, carte de consommation).
+ * @returns {Promise<{jobs: number, failed: number, failureRate: number|null, avgSeconds: number|null, tokens: number, costUsd: number, chatAnswers: number}>}
+ */
+export async function aiStats(db, userId, since = now() - 30 * 86400) {
+  const types = [...AI_JOBS];
+  const r = await db.prepare(`SELECT COUNT(*) n, COALESCE(SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END), 0) failed,
+      AVG(CASE WHEN started_at IS NOT NULL AND finished_at >= started_at THEN finished_at - started_at END) secs,
+      COALESCE(SUM(tokens_in), 0) + COALESCE(SUM(tokens_out), 0) tokens, COALESCE(SUM(cost_usd), 0) cost
+    FROM jobs WHERE user_id = ? AND status IN ('done', 'error') AND finished_at > ? AND type IN (${types.map(() => '?').join(',')})`).get(userId, since, ...types);
+  const chat = await db.prepare(`SELECT COUNT(*) n FROM chat_messages m JOIN chat_conversations c ON c.id = m.conversation_id
+    WHERE c.user_id = ? AND m.role = 'assistant' AND m.created_at > ?`).get(userId, since);
+  const jobs = Number(r.n) || 0, failed = Number(r.failed) || 0;
+  return {
+    jobs, failed, failureRate: jobs ? failed / jobs : null,
+    avgSeconds: r.secs == null ? null : Math.round(Number(r.secs)),
+    tokens: Number(r.tokens) || 0, costUsd: Math.round((Number(r.cost) || 0) * 1e4) / 1e4, chatAnswers: Number(chat.n) || 0,
+  };
 }

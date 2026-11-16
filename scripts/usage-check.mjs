@@ -8,6 +8,13 @@ const exe = process.env.PLAYWRIGHT_CHROMIUM;
 const s = await startApp();
 const sub = await s.newUser({ admin: false, link: testTokenLink() });
 const api = await s.newUser({ admin: false, link: { v: 1, mode: 'api_key', valid: true } });
+// Trois tâches IA terminées (dont une en échec) pour le compte « clé API » : la carte en fait le bilan sur 30 jours ; le compte « abonnement » n'en a aucune
+{
+  const t = Math.floor(Date.now() / 1000);
+  for (const [type, status] of [['analyze', 'done'], ['template', 'done'], ['audit', 'error']]) {
+    await s.db.prepare('INSERT INTO jobs(user_id, type, status, params_json, tokens_in, tokens_out, created_at, started_at, finished_at) VALUES(?, ?, ?, ?, 100, 50, ?, ?, ?)').run(api.id, type, status, '{}', t - 300, t - 300, t - 240);
+  }
+}
 const b = await chromium.launch(exe ? { executablePath: exe } : {});
 let bad = 0;
 const ok = (c, m) => { console.log(`${c ? 'OK ' : 'KO '} ${m}`); if (!c) bad++; };
@@ -36,10 +43,14 @@ for (const [who, u, priced] of [['abonnement', sub, false], ['clé API', api, tr
       await p.waitForSelector('[data-claude-card]:not([hidden]) [data-usage-claude]:not([hidden])');
       const card = await p.locator('[data-usage-claude]').innerText();
       ok(/\$/.test(card) && /IA via iaboss/.test(card), `${tag} carte « Consommation Claude » : lignes « IA via iaboss » en $`);
+      ok(/Tâches IA 30 j\s*3 · 1 en échec/.test(card), `${tag} carte : bilan des tâches IA sur 30 jours (« ${card.split('\n').slice(-2).join(' ')} »)`);
+      const tip = await p.locator('[data-usage-claude] .g-h', { hasText: 'Tâches IA 30 j' }).first().getAttribute('title');
+      ok(/dont 1 en échec \(33 %\)/.test(tip) && /Durée moyenne d'une tâche : 60 s/.test(tip), `${tag} détail au survol : taux d'échec et durée moyenne (${tip})`);
     } else {
       // Abonnement : aucun montant nulle part, et pas de carte vide quand le quota n'est pas mesuré
       ok(!(await p.locator('#contenu').innerText()).includes('$'), `${tag} page Aujourd'hui : aucun montant en $`);
       await p.waitForSelector('[data-claude-card]:not([hidden]) .g-r');
+      ok(!(await p.locator('[data-usage-claude]').innerText()).includes('Tâches IA'), `${tag} aucune tâche IA terminée : pas de ligne de bilan`);
       const notes = await p.locator('[data-usage-claude] .g-r').allInnerTexts();
       ok(notes.length === 2 && notes.every((n) => /^Remise à zéro (aujourd'hui|demain|[a-zé]+) à \d\d:\d\d$/.test(n)), `${tag} carte « Consommation Claude » : date de remise à zéro sous chaque barre (${notes.join(' | ')})`);
       ok(await p.locator('.g-r').first().evaluate((e) => getComputedStyle(e).color === getComputedStyle(document.querySelector('.g-v')).color), `${tag} le texte de remise à zéro est grisé`);

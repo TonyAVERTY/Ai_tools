@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { now } from '../src/db.js';
 import { testDb, USING_MYSQL } from './helpers/db.js';
 import { addUser } from './helpers/users.js';
-import { Worker, latestJobs } from '../src/services/jobs.js';
+import { Worker, latestJobs, aiStats, usageSummary } from '../src/services/jobs.js';
 import { createJobLog } from '../src/services/joblog.js';
 
 // Garde-fous de performance : ces tests comptent des écritures et des lectures. Ils échouent si une régression remet une requête par job
@@ -109,4 +109,31 @@ test('index de recherche : dernier job par projet et type, premier mail d\'un pr
   const plan = async (sql) => (await db.prepare(`EXPLAIN QUERY PLAN ${sql}`).all()).map((r) => r.detail).join(' | ');
   assert.match(await plan('SELECT type, MAX(id) id FROM jobs WHERE project_id = 1 GROUP BY type'), /USING COVERING INDEX jobs_project_type/);
   assert.match(await plan("SELECT subject FROM mail_log WHERE prospect_id = 1 AND kind = 'initial' AND error IS NULL ORDER BY id LIMIT 1"), /USING INDEX mail_log_prospect/);
+});
+
+test('mesures des tâches IA : nombre, échecs, durée moyenne, tokens et coût, pour CE compte seulement et sans les envois', async () => {
+  const db = await testDb();
+  const u = await addUser(db), other = await addUser(db);
+  const p = await project(db, u), po = await project(db, other);
+  const t = now();
+  const add = (userId, projectId, type, status, secs, extra = {}) => db.prepare('INSERT INTO jobs(user_id, project_id, type, status, params_json, tokens_in, tokens_out, cost_usd, created_at, started_at, finished_at) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+    .run(userId, projectId, type, status, '{}', extra.tin ?? 100, extra.tout ?? 50, extra.cost ?? 0.01, extra.at ?? t - 500, (extra.at ?? t - 500), (extra.at ?? t - 500) + secs);
+  await add(u, p, 'analyze', 'done', 60);
+  await add(u, p, 'template', 'done', 20);
+  await add(u, p, 'audit', 'error', 100);
+  await add(u, p, 'prospect', 'cancelled', 5);                       // annulée : ni réussite ni échec
+  await add(u, p, 'send', 'done', 30);                               // envoi de mails : pas une tâche IA
+  await add(u, p, 'analyze', 'done', 60, { at: t - 40 * 86400 });    // hors des 30 jours
+  await add(other, po, 'analyze', 'error', 60);                      // un autre compte
+  const a = await aiStats(db, u);
+  assert.equal(a.jobs, 3);
+  assert.equal(a.failed, 1);
+  assert.ok(Math.abs(a.failureRate - 1 / 3) < 1e-9);
+  assert.equal(a.avgSeconds, 60);
+  assert.equal(a.tokens, 450);
+  assert.equal(a.costUsd, 0.03);
+  assert.equal(a.chatAnswers, 0);
+  assert.deepEqual((await usageSummary(db, u)).ai, a, 'exposé avec la consommation du compte');
+  const none = await aiStats(db, await addUser(db));
+  assert.deepEqual(none, { jobs: 0, failed: 0, failureRate: null, avgSeconds: null, tokens: 0, costUsd: 0, chatAnswers: 0 });
 });
