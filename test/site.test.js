@@ -355,11 +355,11 @@ test('liens entre pages : chaque lien et chaque image du site mène quelque part
   assert.doesNotMatch(html['/'], /<img(?![^>]*\salt="[^"]+")/, 'toutes les images ont un texte alternatif');
 });
 
-test('offres : prix de 10 à 100 € TTC, annuel = 2 mois offerts, plafonds tenables par le serveur et croissants', async () => {
+test('offres : prix croissants de l\'entrée au sommet, TTC, annuel = 2 mois offerts, plafonds tenables par le serveur et croissants', async () => {
   const keys = Object.keys(PLAN_PRICES);
   const prices = keys.map((k) => PLAN_PRICES[k]);
-  assert.equal(Math.min(...prices), 10);
-  assert.equal(Math.max(...prices), 100);
+  assert.equal(Math.min(...prices), 9);
+  assert.equal(Math.max(...prices), 75);
   assert.deepEqual(prices, [...prices].sort((a, b) => a - b), 'prix croissants');
   assert.equal(ANNUAL_FREE_MONTHS, 2);
   const h = await text('/tarifs');
@@ -368,8 +368,8 @@ test('offres : prix de 10 à 100 € TTC, annuel = 2 mois offerts, plafonds tena
     assert.equal(annualPrice(k), PLAN_PRICES[k] * 10, `${k} : 12 mois pour le prix de 10`);
     const l = PLAN_LIMITS[k];
     for (const kind of ['projects', 'prospects', 'mails', 'aiJobs', 'parallelJobs', 'seats']) assert.ok(l[kind] > prev[kind], `${k} : ${kind} plus large que l'offre précédente`);
-    assert.ok(l.mails <= 300 * 30, `${k} : ${l.mails} mails par mois dépasserait le plafond de 300 par 24 h`);
-    assert.ok(l.aiJobs >= Math.ceil(l.prospects / 50), `${k} : assez de tâches IA pour trouver ${l.prospects} contacts`);
+    assert.ok(l.mails <= 300 * 7, `${k} : ${l.mails} mails par semaine dépasserait le plafond de 300 par 24 h`);
+    assert.ok(l.aiJobs * 4 >= Math.ceil(l.prospects / 50), `${k} : assez de tâches IA (4 semaines) pour trouver ${l.prospects} contacts`);
     prev = l;
     // la page montre le nom, les deux prix, l'équivalent mensuel et les plafonds
     assert.ok(h.includes(`id="plan-${k}">${PLAN_LABELS[k]}</h2><span class="badge b-info">`), `${k} : carte`);

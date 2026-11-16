@@ -60,7 +60,7 @@ L'envoi vérifie le sens de chaque mail avec ton IA : quand elle ne peut pas ré
 - **Pas de rendez-vous dans l'agenda du jour** : seul le calendrier d'iaboss est lu, pas un agenda externe.
 
 ## Mon job reste « En attente »
-Lire le message « En attente : … » dans le menu **Activité**. Raisons possibles : budget IA atteint (clé API) ; quota Claude serré (au-delà de 85 %) ; charge élevée du serveur ; job programmé « Cette nuit » ; déjà un job IA en cours pour le compte. Il repart seul. On peut l'**Annuler** depuis Activité.
+Lire le message « En attente : … » dans le menu **Activité**. Raisons possibles : budget IA atteint (clé API) ; quota Claude serré (au-delà du seuil de « Réglages → Garde-fous → Pause des tâches IA à partir de », 85 % par défaut) ; charge élevée du serveur ; job programmé « Cette nuit » ; déjà un job IA en cours pour le compte. Il repart seul. On peut l'**Annuler** depuis Activité.
 
 ## Une section ou une liste n'a pas pu se charger : « Réessayer »
 Quand une partie de la page se charge après coup (la section **LinkedIn**, **Promotion** ou **Récapitulatif** d'un projet, la liste de la page **Clients**, le menu **Joindre un projet iaboss** de la page IA), un petit cercle accompagne « Chargement… ». Si la requête échoue, le cercle laisse la place à **un message et un bouton « Réessayer »** : le cercle ne tourne jamais pour toujours.
@@ -70,7 +70,7 @@ Quand une partie de la page se charge après coup (la section **LinkedIn**, **Pr
 Une session expirée ne montre pas ce message : tu reviens directement à la page de connexion (voir « Un message s'affiche en bas à droite »).
 
 ## « Plafond atteint » ou refus de création
-Un plafond mensuel de l'offre (projets, prospects, mails, jobs IA, places d'équipe) est atteint. Le compteur est dans « Mon compte → Usage du mois » ; les plafonds se renouvellent le 1er du mois. Voir « Offres, plafonds et limites » et la page Tarifs.
+Un plafond de l'offre (projets, prospects, mails et jobs IA par semaine, places d'équipe) est atteint. Le compteur est dans « Mon compte → Usage de la semaine » ; les plafonds de mails et de jobs IA repartent de zéro chaque lundi à minuit (heure de Paris). Voir « Offres, plafonds et limites » et la page Tarifs.
 
 ## Un message s'affiche en bas à droite : que veut-il dire ?
 Après une action, une notification apparaît en bas à droite. Un **succès** (« Prospect ajouté », « SMTP enregistré ») disparaît tout seul après quelques secondes. Une **erreur** reste plus longtemps (environ 8 secondes) ; la croix **×** la ferme tout de suite. Plusieurs notifications s'empilent (trois au plus) et le même message ne s'affiche qu'une fois.
@@ -100,7 +100,7 @@ Avant une action difficile à défaire (supprimer un projet, un prospect, une vi
 Le serveur limite le rythme des actions pour se protéger d'une boucle ou d'un abus. Une action isolée n'est jamais concernée : le message apparaît seulement après un très grand nombre d'enregistrements ou de clics en peu de temps (plus de 600 écritures en 10 minutes pour un même compte, avec des seuils plus bas sur certaines actions comme les vidéos, le chat ou la liaison de l'IA). Attends la durée indiquée dans le message, puis recommence. Les lectures (consulter une page, une liste) ne sont pas limitées. Si le message revient en usage normal, signale-le à l'administrateur.
 
 ## Le bouton Envoyer refuse ou rien ne part
-Vérifier dans l'ordre : 1) SMTP enregistré (« Configuration du projet ») ; 2) modèle de mail **validé** (« Valider le modèle ») ; 3) des prospects au statut « À contacter » ; 4) pas de bandeau rouge de pause d'envoi sur la page Projets ; 5) plafond de mails du projet (24 h), plafond global (Réglages → Garde-fous) et plafond mensuel de l'offre ; 6) pas de job d'envoi déjà en cours ; 7) le message d'erreur du job dans Activité (erreur SMTP : identifiants, port).
+Vérifier dans l'ordre : 1) SMTP enregistré (« Configuration du projet ») ; 2) modèle de mail **validé** (« Valider le modèle ») ; 3) des prospects au statut « À contacter » ; 4) pas de bandeau rouge de pause d'envoi sur la page Projets ; 5) plafond de mails du projet (24 h), plafond global (Réglages → Garde-fous) et plafond de mails de la semaine de l'offre ; 6) pas de job d'envoi déjà en cours ; 7) le message d'erreur du job dans Activité (erreur SMTP : identifiants, port).
 
 ## Mes mails arrivent en spam
 Configurer SPF, DKIM et DMARC pour le domaine d'envoi ; envoyer de petits lots au début et augmenter progressivement ; garder des délais entre les mails ; éviter les liens et pièces jointes dans le premier mail ; soigner l'accroche. iaboss ajoute déjà un lien de désinscription dans le pied de page des mails.
@@ -184,7 +184,7 @@ Pour rédiger un mail, trouver des idées de posts, réfléchir à une stratégi
 - **iaboss modifie-t-il mon code ?** Non : le dépôt est cloné et lu en lecture seule.
 - **Puis-je changer le dépôt d'un projet ?** Non : créer un nouveau projet.
 - **Combien de temps dure une recherche ou une vidéo ?** Quelques minutes ; l'avancement est dans Activité.
-- **Où voir ce que j'ai consommé ?** « Mon compte → Usage du mois », la carte « Consommation » de la page Projets (suivie du nom de ton IA : « Consommation Gemini », par exemple) et « Mon compte → Mon IA → Limites d'utilisation ».
+- **Où voir ce que j'ai consommé ?** « Mon compte → Usage de la semaine », la carte « Consommation » de la page Projets (suivie du nom de ton IA : « Consommation Gemini », par exemple) et « Mon compte → Mon IA → Limites d'utilisation ».
 - **Comment arrêter les notifications ?** Réglages → Notifications : décocher les événements ou retirer le canal.
 - **Comment supprimer mes données ?** « Mon compte → Zone de danger → Supprimer mon compte et mes données ».
 - **Y a-t-il une application mobile ?** Non : le site s'adapte aux téléphones. Sur un écran étroit, les cinq onglets de la barre du haut (Aujourd'hui, Projets, Mails, Agenda, Compta) tiennent sur une ligne. Facturation, Clients et Équipe sont dans le menu de l'avatar.
@@ -290,8 +290,8 @@ Le message précise maintenant la cause : produits manquants dans l'application 
 ## Je viens de payer une offre et mon plan n'a pas changé
 L'activation arrive par un message signé de Stripe, en général en quelques secondes : recharge « Mon compte ». Au bout de quelques minutes sans changement, écris-nous avec l'email de ton compte. Détails dans « Abonnement et paiement : choisir, changer ou résilier son offre ».
 
-## Une tâche échoue avec « … n'a pas répondu en 30 minutes : la tâche a été arrêtée »
-L'IA n'a rien renvoyé dans le délai maximal (30 minutes pour une tâche, 5 minutes pour une réponse de la page IA) : la tâche est arrêtée pour ne pas rester « en cours » indéfiniment. Clique sur **Réessayer**. Si cela se répète sur un gros dépôt, choisis un niveau plus rapide ou un modèle plus léger dans les **Réglages**.
+## Une tâche échoue avec « … n'a pas répondu dans le délai de 30 minutes : la tâche a été arrêtée »
+L'IA n'a rien renvoyé dans le délai maximal (30 minutes pour une tâche, 5 minutes pour une réponse de la page IA) : la tâche est arrêtée pour ne pas rester « en cours » indéfiniment. Clique sur **Réessayer** (avec « Relancer automatiquement les tâches IA arrêtées par une limite » coché dans « Réglages → Garde-fous », elle repart seule). Si cela se répète sur un gros dépôt, choisis un niveau plus rapide ou un modèle plus léger dans les **Réglages**.
 
 ## Une tâche échoue avec « … a répondu par une erreur (…) »
 Le message commence par ce qui n'a pas été fait (« Modèle de mail non rédigé », « Audit interrompu », « Évolutions non trouvées », « Recherche de prospects interrompue », « Post non rédigé »…) et donne entre parenthèses ce que ton IA a répondu. Ce n'est pas un défaut du projet : c'est ton IA qui a refusé ou n'a pas pu répondre.
@@ -307,3 +307,14 @@ C'est voulu : à chaque question, seuls les 20 derniers messages (24 000 caract�
 
 ## Le contenu généré reprend la même « inspiration » que le précédent
 La recherche d'inspiration (web) est gardée 24 heures pour le même projet, le même type de contenu et le même sujet, pour ne pas refaire une dizaine de recherches web à chaque brouillon. L'angle du texte change quand même (les brouillons précédents sont donnés à l'IA). Pour forcer une nouvelle recherche : change le sujet, ou attends le lendemain.
+
+## Mon quota part trop vite dans la page IA
+Chaque message renvoie à l'IA le début de la conversation. Pour une longue conversation, tape **/compacter** dans la zone de saisie : elle est résumée et le quota baisse. Ou ouvre une **nouvelle conversation** (**/nouveau**). Voir « Les commandes / » dans « La page IA : Claude et Support ».
+- « Rien à compacter : la conversation est encore courte » : il faut au moins 4 messages.
+- « Pas de conversation en cours » : écris d'abord un message.
+
+## Une tâche IA s'est arrêtée à cause de la limite de mon IA
+Coche **Relancer automatiquement les tâches IA arrêtées par une limite** dans « Réglages → Garde-fous » : la tâche repart seule après la remise à zéro du quota (3 relances au plus). Sans l'option, relance-la toi-même avec « Réessayer ». Si rien ne repart, regarde le journal de la tâche : une erreur de liaison (jeton refusé) ou un plafond de l'offre atteint n'est pas relancé.
+
+## « … : inclus à partir de l'offre … » : une fonctionnalité est refusée
+Certaines fonctionnalités sont réservées à une offre (posts et devis dès Démarrage ; postes, export de la comptabilité et mode développeur dès Croissance ; vidéos de promotion dès Business). À la place de la fonctionnalité, tu vois une carte « Disponible à partir de l'offre … » avec le bouton « Passer à l'offre … » ; si tu lances quand même l'action, le message dit laquelle. Rien n'est supprimé : ce qui existe déjà reste lisible. Remède : Mon compte → « Voir les offres » (ou la page Tarifs) puis choisis une offre qui l'inclut. Pour un projet d'équipe, c'est l'offre du propriétaire qui compte. La liste à jour est dans « Offres, plafonds et limites ».

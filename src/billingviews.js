@@ -6,6 +6,7 @@ import { layout } from './views.js';
 import { ic } from './icons.js';
 import { LEGAL_FIELDS, LEGAL_SECTIONS, DOC_KINDS, DOC_BY_KEY, LAYOUTS, stageLabel, legalMissing, DOC_VARIABLES } from './services/billing.js';
 import { banner } from './banner.js';
+import { lockedPageBody } from './lockviews.js';
 
 const CTA = { legal: 'Compléter les informations', generate: 'Générer un modèle de document', choose: 'Choisir mon devis', docs_pending: 'Suivre la préparation', validate: 'Valider mes documents', ready: 'Voir mes documents' };
 const host = (u) => String(u || '').replace(/^https?:\/\//, '').replace(/\.git$/, '').slice(0, 80);
@@ -17,7 +18,8 @@ const stageStep = { legal: 'legal', generate: 'quote', choose: 'quote', docs_pen
 
 // ---------- Recap ----------
 
-export function billingOverviewPage({ email, rows }) {
+export function billingOverviewPage({ email, rows, locked = false }) {
+  if (locked) return layout({ title: 'Facturation', email, body: lockedPageBody('billing', 'Facturation', 'Devis, acompte, facture finale et avoir, rédigés avec ton IA, projet par projet.') });
   const ready = rows.filter((r) => r.stage.stage === 'ready').length;
   const list = rows.length ? rows.map((r) => {
     const [label, tone] = stageLabel(r.stage, r.missing);

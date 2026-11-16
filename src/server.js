@@ -31,6 +31,8 @@ import { withAiName } from './services/ainame.js';
 import { memberTeamIds, purgeInvites } from './teams.js';
 import { needsWelcome } from './userprofile.js';
 import { sandboxStartupMessages } from './services/sandbox.js';
+import { probeClaudeFlags } from './services/claude.js';
+import { scheduleAutoRetry } from './services/autoretry.js';
 import { gitVersionNotes } from './services/git.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -198,6 +200,7 @@ export async function createApp(cfg, { db, worker = true, createTransport, fetch
       onError: (job, e) => reportError(app, e, { method: 'JOB', path: job.type, userId: job.user_id, status: null }),
       budget: (userId) => budgetState(db, userId),
       isAiJob: (type) => AI_JOBS.has(type),
+      autoRetry: (job, message) => scheduleAutoRetry(db, job, message, { cliModeEnabled: cfg.cliModeEnabled !== false }),
       onBudget: (reason, userId) => notify(app, userId, 'budget', {
         title: 'Budget IA atteint', level: 'warn',
         description: `${reason[0].toUpperCase()}${reason.slice(1)}. Les jobs IA attendent ; les envois et relances continuent.`,
@@ -246,6 +249,7 @@ if (isEntryPoint(import.meta.url)) { // lancé par `node src/server.js` ou par p
   const cfg = loadConfig();
   if (!cfg.adminEmails.length) console.warn('ADMIN_EMAILS est vide : aucun administrateur (back-office inaccessible).');
   for (const m of sandboxStartupMessages(cfg.sandbox)) console.warn(m);
+  cfg.claudeFlags = probeClaudeFlags(cfg.claudeBin);
   try { for (const m of gitVersionNotes(execFileSync('git', ['--version'], { encoding: 'utf8', timeout: 5000 }))) console.warn(m); } catch { console.warn('git est introuvable ou ne répond pas : aucun dépôt ne pourra être cloné.'); }
   if (cfg.production && cfg.allowPrivateHosts) console.warn('ALLOW_PRIVATE_HOSTS est actif en production : seuls les administrateurs peuvent viser des hôtes privés.');
   if (cfg.production && !cfg.trustProxy) console.warn("TRUST_PROXY est désactivé : derrière Nginx, tous les visiteurs partagent la même adresse pour la limitation de débit. Pose TRUST_PROXY=true.");

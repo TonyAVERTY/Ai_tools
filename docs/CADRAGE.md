@@ -108,7 +108,7 @@ Hors paiement Stripe (Could, +3–5 j).
 7. **Raspberry Pi** : plus rien dessus. Tout tourne sur CloudPanel ; l'instance de Tony est migrée dans le SaaS (Tony = admin). Les contraintes thermiques (`thermal.js`, `nice`) sont remplacées par des limites serveur.
 
 ### Décisions complémentaires
-8. **Plans** : gratuit (1 projet, 50 prospects, 100 mails/mois, 6 jobs IA/mois) puis Démarrage 10 €, Croissance 25 €, Business 50 €, Intensif 100 € TTC par mois, annuel = 2 mois offerts (voir `src/limits.js` et le README). Le paiement reste à construire (jalon Stripe).
+8. **Plans** : gratuit (1 projet, 50 prospects, 100 mails/mois, 6 jobs IA/mois) puis Démarrage 9 €, Croissance 19 €, Business 29 €, Intensif 75 € TTC par mois, annuel = 2 mois offerts (voir `src/limits.js` et le README). Le paiement reste à construire (jalon Stripe).
 9. **Apple** : compte Apple Developer disponible → Google **et** Apple dès la première version.
 10. **Mode login CLI** : au clic sur « Connecter via Claude CLI », une fenêtre d'avertissement s'affiche (risque de suspension du compte Claude au regard des conditions d'Anthropic). L'utilisateur doit cocher une case d'acceptation des risques pour continuer ; l'acceptation est horodatée en base. Les CGU contiennent la clause correspondante. Flag global pour désactiver ce mode. *Note : la case et les CGU documentent le consentement mais ne garantissent pas juridiquement l'exonération totale ; relecture juridique recommandée.*
 

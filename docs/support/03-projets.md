@@ -7,7 +7,7 @@ Barre du haut → **Projets** (adresse `/projets`). Une **carte** par projet (le
 - le dépôt ;
 - **Prospects** (avec « n à contacter ») et **Réponses** (avec « dernier envoi : … ») ; sans prospect : « Aucun prospect pour l'instant » ;
 - **À encaisser** : le total des factures de ce projet pas encore encaissées.
-Un projet partagé par une équipe affiche « Facturation et Comptabilité restent celles de … ». Sous le titre, « 2 projets sur 2 avec ton offre Démarrage » dit combien de projets l'offre permet. Les plafonds du mois sont dans **Aujourd'hui** (« Ce mois-ci ») et dans **Mon compte → Usage du mois**.
+Un projet partagé par une équipe affiche « Facturation et Comptabilité restent celles de … ». Sous le titre, « 2 projets sur 2 avec ton offre Démarrage » dit combien de projets l'offre permet. Les plafonds du mois sont dans **Aujourd'hui** (« Ce mois-ci ») et dans **Mon compte → Usage de la semaine**.
 
 ## Créer un projet
 Bouton **Nouveau projet** → champs **Nom**, **Dépôt Git** et **Site du produit (facultatif)** → **Créer et analyser** (ou **Annuler**). GitHub est accepté ; les autres serveurs Git doivent d'abord être ajoutés dans **Réglages → Dépôts Git** (avec un token pour un dépôt privé). Le site est demandé dès la création : il remplit `{{site}}` dans les mails (tu pourras le changer dans l'onglet **Réglages du projet**). Le lien du dépôt ne peut plus être modifié après la création : pour changer de dépôt, créer un nouveau projet. Si le plafond de projets de l'offre est atteint, la création est refusée avec un message.

@@ -4,6 +4,7 @@ import { randomBytes } from 'node:crypto';
 import { now, getSetting, setSetting } from './db.js';
 import { hashSid } from './crypto.js';
 import { HttpError } from './http.js';
+import { hasFeature } from './services/plans.js';
 
 export const SCOPES = {
   read: 'Lire les projets, prospects, réponses et statistiques',
@@ -52,10 +53,11 @@ export async function revokeApiToken(db, userId, id) {
 export async function authenticateApi(db, req) {
   const m = /^Bearer\s+(\S+)$/i.exec(req.headers.authorization || '');
   if (!m || !TOKEN_RE.test(m[1])) throw new HttpError(401, 'Jeton d\'API manquant ou invalide', { expose: true, code: 'invalid_token', headers: { 'WWW-Authenticate': 'Bearer' } });
-  const row = await db.prepare(`SELECT t.id, t.user_id, t.scopes, u.email, u.status, u.plan FROM api_tokens t JOIN users u ON u.id = t.user_id WHERE t.token_hash = ?`).get(hashSid(m[1]));
+  const row = await db.prepare(`SELECT t.id, t.user_id, t.scopes, u.email, u.status, u.plan, u.is_admin FROM api_tokens t JOIN users u ON u.id = t.user_id WHERE t.token_hash = ?`).get(hashSid(m[1]));
   if (!row) throw new HttpError(401, 'Jeton d\'API manquant ou invalide', { expose: true, code: 'invalid_token', headers: { 'WWW-Authenticate': 'Bearer' } });
   if (row.status !== 'active') throw new HttpError(403, 'Compte suspendu', { expose: true, code: 'suspended' });
   if (!(await developerMode(db, row.user_id))) throw new HttpError(403, 'Le mode développeur est désactivé sur ce compte', { expose: true, code: 'developer_mode_off' });
+  if (!hasFeature({ plan: row.plan, isAdmin: Number(row.is_admin) === 1 }, 'api')) throw new HttpError(403, "L'API est incluse à partir de l'offre Croissance : voir les tarifs (/tarifs)", { expose: true, code: 'plan_required' });
   // « dernière utilisation » : au plus une écriture par minute et par jeton
   await db.prepare('UPDATE api_tokens SET last_used_at = ? WHERE id = ? AND (last_used_at IS NULL OR last_used_at < ?)').run(now(), row.id, now() - 60);
   return { userId: Number(row.user_id), tokenId: Number(row.id), scopes: row.scopes.split(','), email: row.email };

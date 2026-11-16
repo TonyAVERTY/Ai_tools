@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { readLines, tailText, guardChild, delayLabel } from '../src/services/providers/childio.js';
 import { runClaude } from '../src/services/claude.js';
+import { retryReason } from '../src/services/autoretry.js';
 
 // Lecture du flux des CLI d'IA et arrêt du processus : les défauts corrigés ici abîmaient les accents des réponses longues
 // et laissaient tourner un job annulé juste avant son lancement.
@@ -53,6 +54,12 @@ test('guardChild : un signal déjà annulé arrête le processus tout de suite, 
   assert.equal(guard.timedOut(), false);
 });
 
+test('relance automatique : un délai dépassé et une erreur de quota remontée par une tâche sont bien reconnus', () => {
+  assert.equal(retryReason("Claude n'a pas répondu dans le délai de 30 minutes : la tâche a été arrêtée. Réessaie"), 'unfinished');
+  assert.equal(retryReason('Modèle de mail non rédigé : Claude a répondu par une erreur (Claude usage limit reached)'), 'quota');
+  assert.equal(retryReason('Audit interrompu : Claude a répondu par une erreur (Invalid API key)'), null, 'un accès refusé ne se relance pas');
+});
+
 test('delayLabel : minutes au-delà de deux minutes, secondes en dessous', () => {
   assert.equal(delayLabel(5 * 60_000), '5 minutes');
   assert.equal(delayLabel(90_000), '90 secondes');
@@ -82,7 +89,7 @@ test('runClaude : délai dépassé = erreur qui le dit (plus « arrêté sans r�
   const dir = mkdtempSync(join(tmpdir(), 'aitools-io-'));
   try {
     const bin = fakeCli(dir, 'setInterval(() => {}, 1000);');
-    await assert.rejects(runClaude({ bin, prompt: 'x', sandbox, timeoutMs: 300 }), /n'a pas répondu en \d+ secondes/);
+    await assert.rejects(runClaude({ bin, prompt: 'x', sandbox, timeoutMs: 300 }), /n'a pas répondu dans le délai de \d+ secondes/);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
 

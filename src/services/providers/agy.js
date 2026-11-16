@@ -172,7 +172,7 @@ export function runAgy(o) {
       flush();
       const stderr = errTail();
       if (needLogin || isAuthRefusal(result?.error)) return reject(new Error('Authentication required : la connexion du compte Google est expirée ou révoquée.'));
-      if (!result && !tooMany && guard.timedOut()) return reject(new Error(`Antigravity n'a pas répondu en ${delayLabel(timeoutMs)} : la tâche a été arrêtée. Réessaie`));
+      if (!result && !tooMany && guard.timedOut()) return reject(new Error(`Antigravity n'a pas répondu dans le délai de ${delayLabel(timeoutMs)} : la tâche a été arrêtée. Réessaie`));
       if (!result && !tooMany) return reject(new Error(redact(`Antigravity s'est arrêté sans résultat (code ${code}). ${[...errors, stderr.trim()].filter(Boolean).join(' ')}`)));
       const u = result?.usage || {};
       const tokensIn = (Number(u.input_tokens) || 0) + (Number(u.cache_read_tokens) || 0);

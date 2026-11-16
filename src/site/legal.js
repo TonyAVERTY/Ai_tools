@@ -271,7 +271,7 @@ export function termsPage({ appUrl, apple = false, billing = false }) {
       },
       {
         id: 'plans', title: 'Plan gratuit et plans payants',
-        html: `<p>Le plan gratuit comprend ${PLAN_LIMITS.free.projects} projet, ${PLAN_LIMITS.free.prospects} prospects, ${PLAN_LIMITS.free.mails} mails et ${PLAN_LIMITS.free.aiJobs} jobs IA par mois. Ces limites peuvent évoluer, avec information préalable.</p>
+        html: `<p>Le plan gratuit comprend ${PLAN_LIMITS.free.projects} projets, ${PLAN_LIMITS.free.prospects} prospects, ${PLAN_LIMITS.free.mails} mails et ${PLAN_LIMITS.free.aiJobs} jobs IA par semaine. Ces limites peuvent évoluer, avec information préalable.</p>
 ${billing ? `<p>Les plans payants sont ouverts : ${Object.keys(PLAN_PRICES).map((k) => `${PLAN_LABELS[k]} (${PLAN_PRICES[k]} € TTC par mois, ou ${annualPrice(k)} € TTC par an, ${ANNUAL_FREE_MONTHS} mois offerts)`).join(', ')}. Les prix sont TTC ; l'éditeur est en franchise de TVA (art. 293 B du CGI).</p>
 <p><strong>Paiement.</strong> Il se fait par carte sur une page sécurisée de Stripe ; iaboss ne voit ni ne conserve ton numéro de carte. Tu choisis la périodicité (mensuelle ou annuelle) et le prix affiché au moment du paiement est celui que tu paies.</p>
 <p><strong>Renouvellement et résiliation.</strong> L'abonnement se renouvelle automatiquement à chaque période jusqu'à ta résiliation. Tu peux le résilier à tout moment depuis Mon compte (« Gérer mon abonnement ») : l'offre reste active jusqu'à la fin de la période déjà payée, puis ton compte repasse au plan Gratuit. La période commencée n'est pas remboursée, sauf obligation légale. Tu peux aussi changer d'offre ; la différence est calculée au prorata.</p>

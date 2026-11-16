@@ -163,7 +163,7 @@ export function runCodex(o) {
       done();
       flush();
       const stderr = errTail();
-      if (!completed && !failed && !tooMany && guard.timedOut()) return reject(new Error(`Codex n'a pas répondu en ${delayLabel(timeoutMs)} : la tâche a été arrêtée. Réessaie`));
+      if (!completed && !failed && !tooMany && guard.timedOut()) return reject(new Error(`Codex n'a pas répondu dans le délai de ${delayLabel(timeoutMs)} : la tâche a été arrêtée. Réessaie`));
       if (!completed && !failed && !tooMany) return reject(new Error(redact(`Codex s'est arrêté sans résultat (code ${code}). ${[...errors, stderr.trim()].filter(Boolean).join(' ')}`)));
       const tokensIn = Number(usage?.input_tokens) || 0;
       const tokensOut = Number(usage?.output_tokens) || 0;

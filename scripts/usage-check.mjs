@@ -1,4 +1,4 @@
-// Vérifie dans un vrai navigateur : aucun montant en $ avec un compte Claude relié par abonnement (carte « Consommation Claude » et carte « Usage du mois »),
+// Vérifie dans un vrai navigateur : aucun montant en $ avec un compte Claude relié par abonnement (carte « Consommation Claude » et carte « Usage de la semaine »),
 // les montants restent avec une clé API. Nécessite Playwright (PLAYWRIGHT_MODULE, PLAYWRIGHT_CHROMIUM). Sortie « TOUT EST BON » attendue.
 import { startApp, APP_URL } from '../test/helpers/server.js';
 import { testTokenLink } from '../test/helpers/users.js';

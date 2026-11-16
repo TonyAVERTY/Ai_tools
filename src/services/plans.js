@@ -1,20 +1,21 @@
 // Plafonds des plans, appliqués côté serveur. Les valeurs vivent dans src/limits.js (PLAN_LIMITS).
 //
 //  - projets et prospects : totaux du compte, recomptés dans leurs tables ;
-//  - mails et jobs IA : par mois calendaire (heure de Paris), recomptés depuis le journal d'usage (usage_events).
+//  - mails et jobs IA : par semaine (du lundi 0 h au lundi suivant, heure de Paris), recomptés depuis le journal d'usage (usage_events).
 // Aucun compteur n'est stocké : chaque consommation est une ligne, et l'usage est une somme. Le journal d'usage survit à la
 // suppression d'un projet (sinon supprimer puis recréer le projet remettrait le mois à zéro).
 // Un dépassement refuse l'action avec un message clair et un lien vers /tarifs ; il ne supprime ni ne tronque jamais de données.
 import { now } from '../db.js';
 import { HttpError } from '../http.js';
-import { PLAN_LIMITS, PLAN_LABELS } from '../limits.js';
-import { parisParts, parisTime } from './paris-time.js';
+import { PLAN_LIMITS, PLAN_LABELS, PLAN_ORDER, FEATURES } from '../limits.js';
+import { getUser } from '../users.js';
+import { parisParts, parisTime, addParisDays } from './paris-time.js';
 
 export const USAGE_KINDS = ['projects', 'prospects', 'mails', 'aiJobs'];
 
 const NOUNS = { projects: ['projet', 'projets'], prospects: ['prospect', 'prospects'], mails: ['mail', 'mails'], aiJobs: ['job IA', 'jobs IA'] };
-export const KIND_LABELS = { projects: 'Projets', prospects: 'Prospects', mails: 'Mails ce mois-ci', aiJobs: 'Jobs IA ce mois-ci' };
-const MONTHLY = new Set(['mails', 'aiJobs']);
+export const KIND_LABELS = { projects: 'Projets', prospects: 'Prospects', mails: 'Mails cette semaine', aiJobs: 'Jobs IA cette semaine' };
+const WEEKLY = new Set(['mails', 'aiJobs']);
 
 /** Clé du plan appliqué : un administrateur n'a aucune limite ; un plan inconnu retombe sur « gratuit » (jamais sur illimité). */
 export function planOf(user) {
@@ -23,13 +24,30 @@ export function planOf(user) {
 }
 export const limitsFor = (user) => PLAN_LIMITS[planOf(user)];
 
-/** Bornes [début, fin[ du mois calendaire à Paris, en secondes. */
-export function monthBounds(at = now()) {
+/** Le plan de ce compte comprend-il cette fonctionnalité ? Un plan hors de la liste des offres (pro, administrateur) a tout. */
+export function hasFeature(user, key) {
+  const f = FEATURES[key];
+  if (!f) throw new Error(`Fonctionnalité inconnue : ${key}`);
+  const rank = PLAN_ORDER.indexOf(planOf(user));
+  return rank < 0 || rank >= PLAN_ORDER.indexOf(f.plan);
+}
+
+/** Refuse (403) le lancement d'une fonctionnalité que l'offre du compte ne comprend pas. */
+export function assertFeature(user, key) {
+  if (hasFeature(user, key)) return;
+  const f = FEATURES[key];
+  throw new HttpError(403, `${f.label} : inclus à partir de l'offre ${PLAN_LABELS[f.plan]}. Ce que tu as déjà créé reste disponible, rien n'est supprimé. Voir les tarifs : /tarifs`, { expose: true });
+}
+
+/** Bornes [début, fin[ de la semaine (lundi 0 h à lundi suivant 0 h, heure de Paris), en secondes. */
+export function weekBounds(at = now()) {
   const p = parisParts(new Date(at * 1000));
-  const [ny, nm] = p.month === 12 ? [p.year + 1, 1] : [p.year, p.month + 1];
+  const back = { Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6 }[p.weekday] ?? 0;
+  const monday = addParisDays(new Date(at * 1000), -back);
+  const next = addParisDays(parisTime(monday.year, monday.month, monday.day, 12), 7);
   return {
-    start: Math.floor(parisTime(p.year, p.month, 1, 0).getTime() / 1000),
-    end: Math.floor(parisTime(ny, nm, 1, 0).getTime() / 1000),
+    start: Math.floor(parisTime(monday.year, monday.month, monday.day, 0).getTime() / 1000),
+    end: Math.floor(parisTime(next.year, next.month, next.day, 0).getTime() / 1000),
   };
 }
 
@@ -38,7 +56,7 @@ export function monthBounds(at = now()) {
  * Un job IA compte dès sa mise en file, sauf s'il a été annulé ou refusé sans jamais démarrer.
  */
 export async function usageOf(db, userId, { at = now() } = {}) {
-  const { start, end } = monthBounds(at);
+  const { start, end } = weekBounds(at);
   const n = async (sql, ...p) => Number((await db.prepare(sql).get(...p)).n);
   const id = Number(userId);
   return {
@@ -52,7 +70,7 @@ export async function usageOf(db, userId, { at = now() } = {}) {
   };
 }
 
-/** Une consommation du mois : un mail parti, un job IA mis en file. */
+/** Une consommation de la semaine : un mail parti, un job IA mis en file. */
 export async function recordUsage(db, userId, kind, { ref = null, at = now() } = {}) {
   if (kind !== 'mail' && kind !== 'ai_job') throw new Error(`Type d'usage inconnu : ${kind}`);
   await db.prepare('INSERT INTO usage_events(user_id, kind, ref, at) VALUES(?, ?, ?, ?)').run(Number(userId), kind, ref, at);
@@ -71,7 +89,7 @@ const plural = (n, kind) => NOUNS[kind][n > 1 ? 1 : 0];
 /** Message destiné à l'écran quand un plafond bloque une action. Toujours : ce qui est atteint, ce qui reste intact, où voir les offres. */
 export function planLimitMessage(user, quota, { wanted = 1, note = '' } = {}) {
   const { kind, used, limit, remaining } = quota;
-  const period = MONTHLY.has(kind) ? ' ce mois-ci' : '';
+  const period = WEEKLY.has(kind) ? ' cette semaine' : '';
   const where = remaining > 0 && wanted > remaining
     ? `Il te reste ${remaining} ${plural(remaining, kind)}${period} sur ${limit}.`
     : `Tu as atteint le plafond du plan ${PLAN_LABELS[planOf(user)]} : ${used} ${plural(used, kind)}${period} sur ${limit}.`;
@@ -92,7 +110,7 @@ export async function assertRoom(db, user, kind, wanted = 1, { at = now(), note 
   return q;
 }
 
-/** Types de jobs qui envoient des mails de prospection (comptés dans le plafond mensuel de mails). */
+/** Types de jobs qui envoient des mails de prospection (comptés dans le plafond hebdomadaire de mails). */
 export const MAIL_JOBS = new Set(['send', 'followup']);
 
 // Section critique par compte : « compter puis écrire » ne doit pas être entrelacé par deux requêtes simultanées du même
@@ -112,7 +130,7 @@ export async function withUserLock(userId, fn) {
   }
 }
 
-/** Données d'affichage de l'usage du mois (barres de Mon compte et du tableau de bord). */
+/** Données d'affichage de l'usage de la semaine (barres de Mon compte et du tableau de bord). */
 export async function usageView(db, user, { at = now() } = {}) {
   const usage = await usageOf(db, user.id, { at });
   const limits = limitsFor(user);
@@ -125,3 +143,11 @@ export async function usageView(db, user, { at = now() } = {}) {
     period: usage.period,
   };
 }
+
+/** Comme assertFeature, pour un compte lu en base (le propriétaire du projet pour le travail d'une équipe). */
+export async function requireFeature(db, userId, key) {
+  assertFeature(await getUser(db, userId), key);
+}
+
+/** Les fonctionnalités que l'offre de ce compte ne comprend pas (pour afficher des cartes verrouillées au lieu des blocs). */
+export const lockedFeatures = (user) => Object.keys(FEATURES).filter((k) => !hasFeature(user, k));

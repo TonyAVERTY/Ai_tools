@@ -165,3 +165,15 @@ test('budget : avec un abonnement, un ancien plafond en $ ne bloque jamais', asy
   await s.spend(5, 600);
   assert.equal((await budgetState(s.db, s.u)).blocked, true, 'clé API : le plafond s\'applique');
 });
+
+test('quotaState : le seuil de pause se règle (85 % par défaut, valeur hors bornes ignorée)', async () => {
+  const s = await setup();
+  await setSetting(s.db, s.u, 'claude_rate_limit_json', JSON.stringify({ fiveHour: { utilization: 0.7 }, sevenDay: { utilization: 0.1 } }));
+  assert.equal((await quotaState(s.db, s.u)).blocked, false);
+  await setSetting(s.db, s.u, 'quota_pause_percent', '60');
+  assert.equal((await quotaState(s.db, s.u)).blocked, true);
+  await setSetting(s.db, s.u, 'quota_pause_percent', '95');
+  assert.equal((await quotaState(s.db, s.u)).blocked, false);
+  await setSetting(s.db, s.u, 'quota_pause_percent', '10');
+  assert.equal((await quotaState(s.db, s.u)).blocked, false, 'hors bornes : retour à 85 %');
+});

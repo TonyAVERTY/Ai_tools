@@ -72,6 +72,7 @@ test('liste des comptes : identité, plan, statut, dates, mode de liaison et usa
     const bob = await s.newUser({ admin: false, email: 'bob@exemple.fr', link });
     await s.db.prepare('UPDATE users SET last_login_at = ? WHERE id = ?').run(1_800_000_000, bob.id);
     const pid = Number((await s.db.prepare("INSERT INTO projects(user_id, name, git_url, profile_json, created_at) VALUES(?, 'ProjetConfidentiel', 'https://git.test/b/secret.git', ?, ?)").run(bob.id, JSON.stringify({ resume: 'RESUMEPRIVE' }), now())).lastInsertRowid);
+    await s.db.prepare("INSERT INTO projects(user_id, name, git_url, created_at) VALUES(?, 'Second', 'https://git.test/b/second.git', ?)").run(bob.id, now()); // 2 projets sur 2 : plafond atteint
     await s.db.prepare("INSERT INTO prospects(project_id, company, email, hook, created_at) VALUES(?, 'EntreprisePrivee', 'client@prive.fr', 'ACCROCHEPRIVEE', ?)").run(pid, now());
     const prospect = (await s.db.prepare('SELECT id FROM prospects WHERE project_id = ?').get(pid)).id;
     await s.db.prepare("INSERT INTO prospect_notes(prospect_id, body, created_at) VALUES(?, 'NOTEPRIVEE', ?)").run(prospect, now());
@@ -80,9 +81,9 @@ test('liste des comptes : identité, plan, statut, dates, mode de liaison et usa
 
     const page = await (await admin.get('/admin', html)).text();
     for (const f of ['bob@exemple.fr', 'tony@x.fr', 'Google', 'gratuit', 'actif', 'Clé API Anthropic', '15/01/2027']) assert.ok(page.includes(f), f);
-    // Usage du mois : une colonne par plafond, « utilisé / plafond », rouge quand il est atteint
-    for (const [label, v] of [['Projets', '1 / 1'], ['Prospects', '1 / 50'], ['Mails', '0 / 100'], ['Tâches IA', '0 / 6']]) assert.match(page, new RegExp(`<td class="num[^"]*" data-label="${label}">${v}</td>`), label);
-    assert.match(page, /<td class="num error" data-label="Projets">1 \/ 1<\/td>/, 'plafond atteint en rouge');
+    // Usage de la semaine : une colonne par plafond, « utilisé / plafond », rouge quand il est atteint
+    for (const [label, v] of [['Projets', '2 / 2'], ['Prospects', '1 / 100'], ['Mails', '0 / 50'], ['Tâches IA', '0 / 4']]) assert.match(page, new RegExp(`<td class="num[^"]*" data-label="${label}">${v}</td>`), label);
+    assert.match(page, /<td class="num error" data-label="Projets">2 \/ 2<\/td>/, 'plafond atteint en rouge');
     assert.doesNotMatch(page, /Pr 1\/50|IA 0\/6/, 'plus d\'abréviations');
     for (const secret of [SECRET, 'SECRETSECRET', '1234</', 'secret_enc', link.secret_enc, 'SMTPCHIFFRE', 'ProjetConfidentiel', 'secret.git', 'RESUMEPRIVE', 'EntreprisePrivee', 'client@prive.fr', 'ACCROCHEPRIVEE', 'NOTEPRIVEE', 'OBJETPRIVE']) {
       assert.ok(!page.includes(secret), `la page d'administration ne doit pas contenir « ${secret} »`);

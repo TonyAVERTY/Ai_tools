@@ -117,7 +117,7 @@ export function runGemini(o) {
       done();
       flush();
       const stderr = errTail();
-      if (!result && guard.timedOut()) return reject(new Error(`Gemini n'a pas répondu en ${delayLabel(timeoutMs)} : la tâche a été arrêtée. Réessaie`));
+      if (!result && guard.timedOut()) return reject(new Error(`Gemini n'a pas répondu dans le délai de ${delayLabel(timeoutMs)} : la tâche a été arrêtée. Réessaie`));
       if (!result) return reject(new Error(redact(`Gemini s'est arrêté sans résultat (code ${code}). ${[...errors, stderr.trim()].filter(Boolean).join(' ')}`)));
       const stats = result.stats || {};
       const tokensIn = Number(stats.input_tokens ?? stats.input ?? 0) || 0;

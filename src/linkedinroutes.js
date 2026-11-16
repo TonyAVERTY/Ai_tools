@@ -1,6 +1,7 @@
 // Routes LinkedIn : connexion OAuth d'un compte à un projet, brouillons écrits par Claude, publication.
 // Droits : un membre génère et modifie les brouillons ; connecter, déconnecter et publier demandent d'être administrateur du projet
 // (la publication part sur le profil du compte relié).
+import { requireFeature } from './services/plans.js';
 import { HttpError, json, redirect, readBody } from './http.js';
 import { getProject } from './projects.js';
 import { enqueue } from './services/jobs.js';
@@ -59,6 +60,7 @@ export function registerLinkedinRoutes(router, app, { project, aiOpts }) {
 
   router.post('/api/projects/:id/linkedin/generate', async (ctx) => {
     const p = await project(ctx);
+    await requireFeature(db, p.userId, 'content');
     const b = await readBody(ctx.req);
     if (!linkedinAvailable(cfg)) throw new HttpError(503, NOT_CONFIGURED, { expose: true });
     const acc = await linkedinAccount(db, p.id);

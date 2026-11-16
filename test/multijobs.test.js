@@ -10,6 +10,7 @@ import { Worker, enqueue } from '../src/services/jobs.js';
 import { makeSync } from '../src/handlers.js';
 import { PLAN_LIMITS, PLAN_PRICES } from '../src/limits.js';
 import { limitsFor } from '../src/services/plans.js';
+import { roleTaskById } from '../src/services/roles.js';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const log = { error() {} };
@@ -201,9 +202,9 @@ test('de bout en bout : le vrai serveur lit l\'offre du compte (gratuit = 1 job 
     const paid = await mk('business');
     const free = await mk('free');
     // Trois tâches de poste (pas de dépôt à cloner) pour chacun
-    for (const [who, tasks] of [[paid, ['faq', 'okr', 'budget']], [free, ['faq', 'okr', 'budget']]]) {
-      for (const t of tasks) assert.equal((await who.u.post(`/api/projects/${who.pid}/poste/${t}`, {})).status, 200);
-    }
+    // (les postes sont réservés à l'offre Croissance : le compte gratuit met ses tâches en file directement)
+    for (const t of ['faq', 'okr', 'budget']) assert.equal((await paid.u.post(`/api/projects/${paid.pid}/poste/${t}`, {})).status, 200);
+    for (const t of ['faq', 'okr', 'budget']) await enqueue(s.db, { userId: free.u.id, projectId: free.pid, type: roleTaskById(t).job, params: { notes: '' } });
     const running = async (who) => Number((await s.db.prepare("SELECT COUNT(*) n FROM jobs WHERE user_id = ? AND status = 'running'").get(who.u.id)).n);
     let maxPaid = 0, maxFree = 0;
     const t0 = Date.now();

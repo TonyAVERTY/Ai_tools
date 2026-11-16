@@ -54,6 +54,7 @@ test('tableau de bord : le nom de l\'IA de l\'utilisateur, dans le menu, les sec
 
 test('sections d\'un projet : « Gemini cherche des entreprises… », « Gemini écrit des posts », « Gemini conçoit une vidéo »', async () => {
   const g = await s.newUser({ admin: false, link: linked('gemini') });
+  await s.db.prepare("UPDATE users SET plan = 'business' WHERE id = ?").run(g.id); // posts et vidéos sont réservés aux offres payantes
   await s.db.prepare(`INSERT INTO projects(user_id, name, git_url, profile_json, target_json, target_validated, created_at) VALUES(?, 'P', 'https://git.test/p.git', '{}', '{}', 1, 1)`).run(g.id);
   const page = await projectsHtml(g);
   assert.match(page, /Gemini cherche des entreprises qui collent à la cible/);

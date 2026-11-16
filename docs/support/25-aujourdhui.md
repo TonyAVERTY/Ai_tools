@@ -10,7 +10,7 @@ Résumé : la page « Aujourd'hui » (barre du haut, première entrée) : la lis
 - **Mise en route** : tant qu'un de tes projets n'est pas prêt, un bandeau indique l'étape en cours (« Étape 3 sur 6 : valider la cible ») avec une rangée de repères (faits, en cours, à faire) et un bouton qui mène à Projets. Ce sont les étapes obligatoires de la liste de mise en route du projet.
 
 ## Les quatre chiffres
-Chaque carte est un lien : **Réponses à traiter** (vers Mails), **Mails cette semaine** (avec ce que tu as envoyé ce mois-ci sur le plafond de ton offre), **À encaisser** (le total des factures émises et pas encore payées, avec le nombre de factures et celles en retard ; vers Comptabilité) et **Encaissé** du mois en cours, comparé au mois précédent.
+Chaque carte est un lien : **Réponses à traiter** (vers Mails), **Mails cette semaine** (avec ce que tu as envoyé cette semaine sur le plafond de ton offre), **À encaisser** (le total des factures émises et pas encore payées, avec le nombre de factures et celles en retard ; vers Comptabilité) et **Encaissé** du mois en cours, comparé au mois précédent.
 
 ## La liste « À traiter »
 Le chiffre à côté du titre compte les lignes ouvertes. Trois sortes de lignes, de la plus récente à la plus ancienne :
@@ -31,8 +31,8 @@ Trois lignes de barres, chacune avec **sa propre échelle** (le maximum est écr
 ## Mes projets
 Pour chaque projet, un parcours en cinq chiffres : **Prospects**, **Contactés**, **Réponses**, **Devis**, **Factures**, l'état (« Prêt » ou « Mise en route 3 sur 6 ») et la prochaine chose à faire. **Tous les projets** ouvre Projets.
 
-## Ce mois-ci
-L'usage de ton offre, avec une barre par plafond : **Mails envoyés**, **Tâches IA**, **Contacts**, **Projets**. La barre passe en alerte à 80 % du plafond et le dit (« 80 % du plafond : 4 restantes », « Plafond atteint pour ton offre »). Mêmes chiffres que sur Projets et dans « Mon compte » ; les plafonds mensuels repartent de zéro le 1er, à l'heure de Paris. **Offres** ouvre la page Tarifs.
+## Cette semaine
+L'usage de ton offre, avec une barre par plafond : **Mails envoyés**, **Tâches IA**, **Contacts**, **Projets**. La barre passe en alerte à 80 % du plafond et le dit (« 80 % du plafond : 4 restantes », « Plafond atteint pour ton offre »). Mêmes chiffres que sur Projets et dans « Mon compte » ; les plafonds de mails et de tâches IA repartent de zéro chaque lundi à minuit, à l'heure de Paris. **Offres** ouvre la page Tarifs.
 
 ## La visite guidée
 Elle démarre sur cette page : voir le fichier « Visite guidée du tableau de bord ». Elle se relance depuis le menu du compte, « Visite guidée ».
