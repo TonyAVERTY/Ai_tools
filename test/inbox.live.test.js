@@ -1,5 +1,5 @@
 // Test de bout en bout contre un vrai serveur IMAP. Ignoré par défaut.
-// IMAP_TEST=host:port:user:pass npm test   (la boîte doit contenir les 4 mails de test, cf. README)
+// IMAP_TEST=host:port:user:pass npm test   (la boîte doit contenir les 4 mails de test, cf. docs/TECHNIQUE.md)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
