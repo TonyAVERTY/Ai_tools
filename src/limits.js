@@ -80,7 +80,7 @@ export const RATE_LIMITS = {
  * mais il n'est pas proposé sur la page Tarifs.
  *
  * Les offres payantes respectent deux contraintes du serveur :
- *  - `mails` ne dépasse jamais 300 × 7 : un compte ne peut pas envoyer plus de 300 mails par 24 h (voir README) ;
+ *  - `mails` ne dépasse jamais 300 × 7 : un compte ne peut pas envoyer plus de 300 mails par 24 h (voir docs/TECHNIQUE.md) ;
  *  - `aiJobs` × 4 semaines couvre au moins `prospects / 50` recherches (une recherche ramène 50 contacts au plus), plus l'analyse et les modèles.
  */
 export const PLAN_LIMITS = {

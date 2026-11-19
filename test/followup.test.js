@@ -173,3 +173,26 @@ test('génération du modèle de relance par l\'IA', async () => {
     assert.match(t.body, /relance/i);
   } finally { rmSync(s.tmp, { recursive: true, force: true }); }
 });
+
+test('planificateur : un projet illisible ne bloque ni les relances des autres projets ni la suite du passage', async () => {
+  const s = await setup();
+  try {
+    await s.add('contact@fournil.fr', 8);
+    // Un second compte dont le projet a une fiche abîmée en base : sa lecture échoue à chaque passage
+    const other = await addUser(s.db);
+    const broken = await createProject(s.app, { userId: other, name: 'Cassé', gitUrl: 'https://git.x/T/casse.git' });
+    await s.db.prepare("UPDATE projects SET followup_enabled = 1, profile_json = '{pas du json' WHERE id = ?").run(broken);
+    const errors = [];
+    const sched = new Scheduler(s.app, { log: { error: (...a) => errors.push(a.join(' ')) } });
+    const queued = await sched.queueFollowups({ date: new Date(WED_10H * 1000) });
+    assert.deepEqual(queued.map((q) => q.id), [s.id], 'la relance du projet sain est mise en file');
+    assert.equal(errors.length, 1);
+    assert.match(errors[0], new RegExp(`\\[relances ${broken}\\]`), 'le projet en erreur est nommé dans les journaux');
+    // Le passage complet va au bout : la photo quotidienne (dernière étape avant l'entretien) est bien demandée
+    let snapshots = 0;
+    s.app.fetchRecap = async () => { snapshots++; return { users: 1, clients: 1, revenue: 1 }; };
+    await saveSecretConfig(s.app, s.id, 'db_enc', { type: 'mysql', host: 'db.x', port: 3306, user: 'u', pass: 'p', database: 'd' }, 'pass');
+    await sched.tick();
+    assert.equal(snapshots, 1, 'les étapes suivantes du passage tournent malgré le projet en erreur');
+  } finally { rmSync(s.tmp, { recursive: true, force: true }); }
+});

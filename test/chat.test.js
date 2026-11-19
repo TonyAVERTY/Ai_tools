@@ -190,6 +190,15 @@ test('historique envoyé : fin de la conversation seulement, dans les limites de
   assert.equal(kept.at(-1).content, 'm39');
   const big = [{ role: 'user', content: 'a'.repeat(CHAT_HISTORY.chars - 10) }, { role: 'assistant', content: 'b'.repeat(50) }, { role: 'user', content: 'c' }];
   assert.deepEqual(trimHistory(big).map((m) => m.content.slice(0, 1)), ['b', 'c'], 'le message qui ferait dépasser est écarté');
+  // Le dernier message dépasse à lui seul la limite (longue réponse) : son début et sa fin restent, l'historique n'est plus vide
+  const long = `DEBUT${'x'.repeat(CHAT_HISTORY.chars * 2)}FIN`;
+  const cut = trimHistory([{ role: 'user', content: 'question' }, { role: 'assistant', content: long }]);
+  assert.equal(cut.length, 1);
+  assert.equal(cut[0].role, 'assistant');
+  assert.ok(cut[0].content.startsWith('DEBUT') && cut[0].content.endsWith('FIN'));
+  assert.match(cut[0].content, /milieu du message retiré/);
+  assert.ok(cut[0].content.length <= CHAT_HISTORY.chars, 'la limite reste respectée');
+  assert.equal(long.length, CHAT_HISTORY.chars * 2 + 8, 'le message d\'origine n\'est pas modifié');
   assert.equal(chatPrompt({ message: 'Salut' }).prompt, 'Salut');
   assert.match(chatPrompt({ history: [{ role: 'user', content: 'a' }, { role: 'assistant', content: 'b' }], message: 'c' }).prompt, /Utilisateur : a\n\nAssistant : b\n\nUtilisateur : c$/);
   // l'assistant a ses consignes, réglables comme les autres (par gamme de modèle)

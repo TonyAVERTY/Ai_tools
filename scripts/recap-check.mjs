@@ -73,6 +73,15 @@ await p.waitForSelector('[data-charts] .chart svg');
 await p.locator('[data-recap-refresh]').click();
 await p.waitForSelector('[data-recap] .kpis', { timeout: 15000 });
 ok(true, 'Rafraîchir recharge le récapitulatif');
+// Une valeur lue dans la base du projet (requête SQL du Récapitulatif) est du texte, jamais du HTML : une table qui renvoie une balise ne l'injecte pas dans la page
+await p.route('**/api/projects/*/recap*', async (route) => {
+  const j = await (await route.fetch()).json();
+  await route.fulfill({ json: { ...j, business: { users: '<img src=x id="inj-users">', clients: '<b id="inj-clients">9</b>', revenue: '<i id="inj-rev">1</i>' } } });
+});
+await p.locator('[data-recap-refresh]').click();
+await p.waitForFunction(() => document.querySelector('[data-recap] .kpis')?.textContent.includes('inj-users'), null, { timeout: 15000 });
+ok(await p.locator('#inj-users, #inj-clients, #inj-rev').count() === 0, 'une valeur de la base du projet contenant du HTML est affichée comme du texte');
+await p.unroute('**/api/projects/*/recap*');
 
 // Navigation sans rechargement vers une autre page, puis retour : le récapitulatif doit marcher avec les scripts relancés
 await p.evaluate(() => { window.__marker = 'vivante'; });

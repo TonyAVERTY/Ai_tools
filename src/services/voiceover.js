@@ -145,7 +145,7 @@ export function googleChunks(text, max = 180) {
 async function googleSynth(text, lang, { fetchImpl = fetch } = {}) {
   const bufs = [];
   for (const q of googleChunks(text)) {
-    const res = await fetchImpl(`https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${encodeURIComponent(lang)}&q=${encodeURIComponent(q)}`, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+    const res = await fetchImpl(`https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${encodeURIComponent(lang)}&q=${encodeURIComponent(q)}`, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: cutoff() });
     if (!res.ok) throw new Error(`Google Traduction a refusé la requête (${res.status})`);
     bufs.push(Buffer.from(await res.arrayBuffer()));
   }
@@ -163,9 +163,20 @@ const providerDetail = async (res) => {
   } catch { return ''; }
 };
 
-const keyedFetch = async (fetchImpl, url, init, label) => {
+// Une requête abandonnée par le délai de `synthesize` est aussi coupée côté réseau (un peu après, pour que le message reste « délai dépassé »)
+const cutoff = () => AbortSignal.timeout(VOICE.timeoutMs + 2000);
+const pause = (ms) => new Promise((r) => { setTimeout(r, ms); });
+
+// Une panne passagère (réseau coupé, erreur 5xx du service) est retentée UNE fois : sans cela, une seule phrase en échec faisait perdre toute la vidéo
+// (scène déjà écrite par l'IA, phrases précédentes déjà payées). Un refus (clé, quota, abonnement, requête invalide) n'est jamais retenté.
+const keyedFetch = async (fetchImpl, url, init, label, { retryMs = 700 } = {}) => {
   let res;
-  try { res = await fetchImpl(url, init); } catch { throw new Error(`${label} ne répond pas`); }
+  for (let attempt = 1; ; attempt++) {
+    try { res = await fetchImpl(url, { ...init, signal: cutoff() }); } catch { res = null; }
+    if ((res && res.status < 500) || attempt >= 2) break;
+    await pause(retryMs);
+  }
+  if (!res) throw new Error(`${label} ne répond pas`);
   if (res.status === 401 || res.status === 403) throw new Error(`${label} a refusé la clé API (vérifie-la, ou son quota)`);
   if (res.status === 429) throw new Error(`${label} : quota ou débit dépassé`);
   // 402 : un abonnement payant est exigé. Chez ElevenLabs, c'est le cas des voix de la bibliothèque partagée avec le plan gratuit (seules les voix de base passent)
@@ -174,30 +185,30 @@ const keyedFetch = async (fetchImpl, url, init, label) => {
   return res;
 };
 
-async function elevenSynth(text, voice, { key, fetchImpl = fetch }) {
+async function elevenSynth(text, voice, { key, fetchImpl = fetch, retryMs }) {
   const res = await keyedFetch(fetchImpl, `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voice)}?output_format=mp3_44100_128`, {
     method: 'POST', headers: { 'xi-api-key': key, 'Content-Type': 'application/json', Accept: 'audio/mpeg' },
     body: JSON.stringify({ text, model_id: 'eleven_multilingual_v2', voice_settings: { stability: 0.5, similarity_boost: 0.8, style: 0.2, use_speaker_boost: true } }),
-  }, 'ElevenLabs');
+  }, 'ElevenLabs', { retryMs });
   return Buffer.from(await res.arrayBuffer());
 }
 
-async function googleCloudSynth(text, voice, { key, fetchImpl = fetch }) {
+async function googleCloudSynth(text, voice, { key, fetchImpl = fetch, retryMs }) {
   const res = await keyedFetch(fetchImpl, 'https://texttospeech.googleapis.com/v1/text:synthesize', {
     method: 'POST', headers: { 'X-Goog-Api-Key': key, 'Content-Type': 'application/json' },
     body: JSON.stringify({ input: { text }, voice: { languageCode: voice.split('-').slice(0, 2).join('-'), name: voice }, audioConfig: { audioEncoding: 'MP3', sampleRateHertz: 24000 } }),
-  }, 'Google Cloud');
+  }, 'Google Cloud', { retryMs });
   return Buffer.from(String((await res.json())?.audioContent || ''), 'base64');
 }
 
 const azureHost = (region) => `https://${region}.tts.speech.microsoft.com/cognitiveservices`;
 
-async function azureSynth(text, voice, { key, region, fetchImpl = fetch }) {
+async function azureSynth(text, voice, { key, region, fetchImpl = fetch, retryMs }) {
   const lang = voice.split('-').slice(0, 2).join('-');
   const ssml = `<speak version='1.0' xml:lang='${lang}'><voice name='${voice}'>${xmlEscape(text)}</voice></speak>`;
   const res = await keyedFetch(fetchImpl, `${azureHost(region)}/v1`, {
     method: 'POST', headers: { 'Ocp-Apim-Subscription-Key': key, 'Content-Type': 'application/ssml+xml', 'X-Microsoft-OutputFormat': 'audio-24khz-96kbitrate-mono-mp3', 'User-Agent': 'iaboss' }, body: ssml,
-  }, 'Microsoft Azure');
+  }, 'Microsoft Azure', { retryMs });
   return Buffer.from(await res.arrayBuffer());
 }
 

@@ -8,6 +8,7 @@ const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright-c
 const exe = process.env.PLAYWRIGHT_CHROMIUM;
 const s = await startApp();
 const u = await s.newUser({ admin: false, link: testTokenLink() });
+await s.db.prepare("UPDATE users SET plan = 'growth' WHERE id = ?").run(u.id); // le mode développeur est réservé aux offres à partir de Croissance
 await u.post('/account/developer', { enabled: 'on' }, { form: true });
 const b = await chromium.launch(exe ? { executablePath: exe } : {});
 let bad = 0;

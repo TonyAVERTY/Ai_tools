@@ -168,8 +168,8 @@
       const eur = (v) => (typeof v === 'number' ? v.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' }) : esc(v ?? '—'));
       box.innerHTML = `
         <div class="kpis">
-          <div class="kpi"><span>Utilisateurs</span><strong>${b?.users ?? '—'}</strong></div>
-          <div class="kpi"><span>Clients payants</span><strong>${b?.clients ?? '—'}</strong></div>
+          <div class="kpi"><span>Utilisateurs</span><strong>${esc(b?.users ?? '—')}</strong></div>
+          <div class="kpi"><span>Clients payants</span><strong>${esc(b?.clients ?? '—')}</strong></div>
           <div class="kpi"><span>Revenu total</span><strong>${b ? eur(b.revenue) : '—'}</strong></div>
         </div>
         ${r.error ? `<p class="muted small">BDD : ${esc(r.error)}</p>` : ''}

@@ -44,9 +44,9 @@ const titleOf = (text) => {
 };
 
 const shapeConv = (c) => ({ id: Number(c.id), title: c.title, model: c.model, mode: c.mode === 'support' ? 'support' : 'claude', updatedAt: Number(c.updated_at), createdAt: Number(c.created_at) });
-export const shapeMessage = (m) => ({
+export const shapeMessage = (m, { html = true } = {}) => ({
   id: Number(m.id), role: m.role, content: m.content, model: m.model || null, createdAt: Number(m.created_at),
-  ...(m.role === 'assistant' || m.role === 'summary' ? { html: renderMarkdown(m.content) } : {}),
+  ...(html && (m.role === 'assistant' || m.role === 'summary') ? { html: renderMarkdown(m.content) } : {}),
 });
 
 /** Conversations d'un compte pour un mode : « claude » (assistant classique) ou « support » (aide sur iaboss). */
@@ -59,14 +59,15 @@ export async function getConversation(db, userId, id) {
   return c ? shapeConv(c) : null;
 }
 
-export async function conversationMessages(db, convId) {
+/** `html: false` : sans le rendu Markdown des réponses (inutile quand les messages servent à construire le prompt, pas à être affichés). */
+export async function conversationMessages(db, convId, { html = true } = {}) {
   const rows = await db.prepare('SELECT * FROM chat_messages WHERE conversation_id = ? ORDER BY id').all(Number(convId));
   const byMessage = new Map();
   for (const a of (await db.prepare('SELECT * FROM chat_attachments WHERE conversation_id = ? ORDER BY id').all(Number(convId))).map(shapeAttachment)) {
     if (!byMessage.has(a.messageId)) byMessage.set(a.messageId, []);
     byMessage.get(a.messageId).push(a);
   }
-  return rows.map((m) => ({ ...shapeMessage(m), attachments: byMessage.get(Number(m.id)) || [] }));
+  return rows.map((m) => ({ ...shapeMessage(m, { html }), attachments: byMessage.get(Number(m.id)) || [] }));
 }
 
 /** Ce qui part vers l'IA : le dernier résumé (commande /compacter) puis les messages écrits depuis. Sans résumé, toute la conversation. */
@@ -253,13 +254,15 @@ export function registerChatRoutes(router, app) {
         const id = Number((await db.prepare('INSERT INTO chat_conversations(user_id, title, model, mode, created_at, updated_at) VALUES(?, ?, ?, ?, ?, ?)').run(userId, titleOf(message), model, mode, at, at)).lastInsertRowid);
         conv = await getConversation(db, userId, id);
       }
-      const earlier = await conversationMessages(db, conv.id);
+      // Ces lectures servent au prompt, pas à l'affichage : pas de rendu Markdown de toute la conversation à chaque message
+      const earlier = await conversationMessages(db, conv.id, { html: false });
       const history = sinceSummary(earlier).map(({ role, content, attachments }) => ({ role, content: `${attachmentsNote(attachments)}${content}` }));
       const userMessageId = Number((await db.prepare('INSERT INTO chat_messages(conversation_id, role, content, created_at) VALUES(?, ?, ?, ?)').run(conv.id, 'user', message, at)).lastInsertRowid);
       if (ids.length) await db.prepare(`UPDATE chat_attachments SET message_id = ?, conversation_id = ? WHERE user_id = ? AND message_id IS NULL AND id IN (${ids.map(() => '?').join(',')})`).run(userMessageId, conv.id, userId, ...ids);
       if (project) await db.prepare("INSERT INTO chat_attachments(user_id, conversation_id, message_id, kind, name, project_id, created_at) VALUES(?, ?, ?, 'project', ?, ?, ?)").run(userId, conv.id, userMessageId, project.name, project.id, at);
       await db.prepare('UPDATE chat_conversations SET model = ?, updated_at = ? WHERE id = ?').run(model, at, conv.id);
-      const sent = (await conversationMessages(db, conv.id)).find((m) => m.id === userMessageId);
+      const thread = await conversationMessages(db, conv.id, { html: false });
+      const sent = thread.find((m) => m.id === userMessageId);
       if (b.model !== undefined) await setSetting(db, userId, 'chat_model', model);
 
       res.writeHead(200, { 'Content-Type': 'application/x-ndjson; charset=utf-8', 'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no' });
@@ -286,7 +289,7 @@ export function registerChatRoutes(router, app) {
           }
         }
         // Fichiers de TOUTE la conversation (les plus récents d'abord, bornés) : Claude peut y revenir d'un message à l'autre
-        const files = (await conversationMessages(db, conv.id)).flatMap((m) => m.attachments).filter((a) => a.kind !== 'project').slice(-12);
+        const files = thread.flatMap((m) => m.attachments).filter((a) => a.kind !== 'project').slice(-12);
         run = files.length ? prepareRunDir(cfg, userId, files) : null;
         // Support : Claude lit la documentation d'iaboss (dossier partagé, en lecture seule, sans donnée d'aucun compte)
         const docs = mode === 'support' ? ensureSupportDocs(cfg, { chat: CHAT, files: FILES }) : null;
