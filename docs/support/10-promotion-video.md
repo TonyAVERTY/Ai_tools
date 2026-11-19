@@ -50,6 +50,14 @@ L'IA écrit une scène animée, sans aucun outil. Elle est ensuite dessinée **i
 ## Ce que la vidéo contient
 L'IA compose une affiche animée : un fond vivant (halos qui dérivent, grille discrète), de grands titres qui entrent mot par mot, des maquettes d'écran dessinées qui montent, trois bénéfices avec leurs icônes, puis un plan final avec le nom du produit et, si le projet en a un, l'adresse du site (« Site du produit » dans la configuration du projet). Les plans se répartissent sur toute la durée. Rien n'est inventé : pas de chiffre, de client ni de démonstration qui ne figure pas dans la fiche du projet. Les savoir-faire « direction artistique », « mouvement » et « scénario » de la vidéo sont lus automatiquement (voir « Savoir-faire de l'IA dans iaboss »).
 
+L'IA applique les quatre réglages qui distinguent une vidéo de motion design d'un diaporama :
+1. **Vitesse** : chaque mouvement démarre doucement, accélère puis freine ; rien ne démarre d'un coup ni ne s'arrête net.
+2. **Flou de mouvement** : un élément qui se déplace vite laisse une légère traînée, pour que l'image ne saccade pas.
+3. **Raccords** : pas de coupe franche entre deux plans ; un élément du plan qui finit devient le plan suivant (une carte qui devient un écran, un mot qui devient le titre suivant).
+4. **Son** : avec une voix, chaque mot du titre apparaît au moment où la voix le dit.
+
+Et il se passe quelque chose d'utile à chaque seconde (des mots qui arrivent, des cartes qui s'ouvrent, des compteurs qui tournent), sauf sur le plan final qui reste lisible au moins 2 secondes. L'agent de contrôle « montage et synchronisation » vérifie ces réglages sur les images de la vidéo rendue.
+
 ## Contrôle qualité avant livraison
 La scène est d'abord mesurée dans le navigateur : lisibilité, débordements, occupation, cadrage, fond, dernier plan et mouvement. Les erreurs restent bloquantes à chaque tentative : la dernière version n'est pas acceptée simplement avec une remarque.
 
