@@ -728,6 +728,15 @@
     format: 'réponse inattendue du relevé en direct',
   };
   const tokensOf = (x) => `${((x?.tin || 0) + (x?.tout || 0)).toLocaleString('fr-FR')} tokens`;
+  // Fiabilité des générations sur 30 jours : nombre de tâches IA terminées, échecs, durée moyenne (détail au survol)
+  function usageStats(s) {
+    const a = s.usage?.ai;
+    if (!a || !a.jobs) return '';
+    const secs = a.avgSeconds;
+    const dur = secs == null ? '' : secs >= 90 ? `${Math.round(secs / 60)} min` : `${secs} s`;
+    const tip = `Tâches IA terminées sur 30 jours : ${a.jobs}, dont ${a.failed} en échec (${Math.round((a.failureRate || 0) * 100)} %).${dur ? ` Durée moyenne d'une tâche : ${dur}.` : ''} Réponses de la page IA : ${a.chatAnswers}.`;
+    return usageRow('Tâches IA 30 j', `${a.jobs.toLocaleString('fr-FR')}${a.failed ? ` · ${a.failed} en échec` : ''}`, { tip });
+  }
   function usageOtherAi(s) {
     const rows = [];
     const ai = aiName();
@@ -744,7 +753,7 @@
     }
     const tip = `Tokens (entrée + sortie) des jobs lancés par iaboss uniquement. Ce que tu fais ailleurs avec ${ai} n'est pas compté ici.`;
     rows.push(usageRow(`${ai} via iaboss 24 h`, tokensOf(s.usage?.day), { tip }), usageRow(`${ai} via iaboss 30 j`, tokensOf(s.usage?.month), { tip }));
-    return rows.join('');
+    return rows.join('') + usageStats(s);
   }
   function usageClaude(s) {
     if (s.provider && s.provider !== 'claude' && s.linkMode !== 'api_key') return usageOtherAi(s);
@@ -770,7 +779,7 @@
       const r = x.limit ? x.used / x.limit : null;
       rows.push(usageRow(label, `${x.used.toFixed(2)} $${x.limit ? ` / ${x.limit} $` : ''}`, { ratio: r, tip: GAUGE_TIP, cls: r >= 1 ? 'error' : r >= 0.8 ? 'warn' : '' }));
     }
-    return rows.join('');
+    return rows.join('') + usageStats(s);
   }
 
   let sysTimer;

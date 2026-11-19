@@ -5,7 +5,7 @@ import { mkdirSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node
 import { join } from 'node:path';
 import { HttpError, html, json, redirect, readBody } from './http.js';
 import { getSetting, setSetting, now } from './db.js';
-import { userAccountingRoot } from './users.js';
+import { userAccountingRoot, getUser } from './users.js';
 import { accessibleProjects } from './mailroutes.js';
 import { sniff, displayName } from './chatfiles.js';
 import { writeZip } from './services/zip.js';
@@ -14,6 +14,7 @@ import {
   validDate, LIMITS, computeTotals, rowsInRange, computeAlerts, declarationGuide, buildCsv, exportFileName, extOf, slug, deadlineOf, daysLeft,
 } from './services/accounting.js';
 import { accountingPage } from './accountingviews.js';
+import { requireFeature, hasFeature } from './services/plans.js';
 
 const MB = 1024 * 1024;
 const refuse = (status, msg) => new HttpError(status, msg, { expose: true });
@@ -144,7 +145,7 @@ export function registerAccountingRoutes(router, app) {
       email: session.email, today, settings, projects, periodValue, periodOptions: periodOptions(today), periodLabel: periodValue === 'tout' ? 'toute la période' : periodRange(periodValue).label,
       filters: { projet: projectFilter, type: kindFilter, q: String(q.get('q') || '').slice(0, 80) },
       totals, projectRows, rows, total: list.length, count: all.length, pendingRows, page, pages, alerts, next, guide, declOptions,
-      editSituation: q.get('situation') === '1', usedBytes: await used(userId), limits: LIMITS, error: q.get('e'), saved: q.get('ok'),
+      canExport: hasFeature(await getUser(db, session.userId), 'comptaExport'), editSituation: q.get('situation') === '1', usedBytes: await used(userId), limits: LIMITS, error: q.get('e'), saved: q.get('ok'),
     }));
   });
 
@@ -290,6 +291,7 @@ export function registerAccountingRoutes(router, app) {
   };
 
   router.get('/compta/export', async ({ res, url, session }) => {
+    await requireFeature(db, session.userId, 'comptaExport');
     const { rows, label, period } = await exportRows(session.userId, url.searchParams);
     if (!rows.length) throw new HttpError(404, 'Aucun justificatif à exporter pour cette sélection.', { expose: true });
     const folder = (r) => (r.project_name ? r.project_name.replace(/[\\/]+/g, '-') : 'Hors projet');
@@ -315,6 +317,7 @@ export function registerAccountingRoutes(router, app) {
   }, { limit: 'compta_export' });
 
   router.get('/compta/journal.csv', async ({ res, url, session }) => {
+    await requireFeature(db, session.userId, 'comptaExport');
     const { rows, label, period } = await exportRows(session.userId, url.searchParams);
     const csv = buildCsv(rows);
     res.writeHead(200, {

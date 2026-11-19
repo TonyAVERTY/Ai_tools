@@ -4,7 +4,7 @@
 import { esc } from '../http.js';
 import { brandMark, assetUrl } from '../assets.js';
 import { siteLayout, ic, guest, CONTACT_EMAIL } from './layout.js';
-import { PLAN_LIMITS, PLAN_PRICES, PLAN_LABELS, ANNUAL_FREE_MONTHS, annualPrice } from '../limits.js';
+import { PLAN_LIMITS, PLAN_PRICES, PLAN_LABELS, PLAN_ORDER, FEATURES, ANNUAL_FREE_MONTHS, annualPrice } from '../limits.js';
 import { PERIODS } from '../services/stripe.js';
 
 const FREE = PLAN_LIMITS.free;
@@ -18,7 +18,7 @@ const PLAN_BLURBS = {
   intensive: 'Pour le plus gros volume que le service permet.',
 };
 const fr = (n) => n.toLocaleString('fr-FR');
-const LIMIT_COLS = [['Projets', (l) => l.projects], ['Contacts', (l) => fr(l.prospects)], ['Mails par mois', (l) => fr(l.mails)], ['Tâches IA par mois', (l) => l.aiJobs], ['Jobs IA simultanés', (l) => l.parallelJobs], ["Places d'équipe", (l) => l.seats]];
+const LIMIT_COLS = [['Projets', (l) => l.projects], ['Contacts', (l) => fr(l.prospects)], ['Mails par semaine', (l) => fr(l.mails)], ['Tâches IA par semaine', (l) => l.aiJobs], ['Jobs IA simultanés', (l) => l.parallelJobs], ["Places d'équipe", (l) => l.seats]];
 const limitCells = (l) => LIMIT_COLS.map(([label, f]) => `<td data-label="${label}"><b>${f(l)}</b></td>`).join('');
 
 /** « Google » ou « Google ou Apple » selon la configuration réelle de la connexion. */
@@ -100,7 +100,7 @@ const HOME_JSON_LD = (appUrl) => ({
   inLanguage: 'fr',
   description: 'Panel qui pilote ton IA (Claude, ChatGPT ou Gemini) pour analyser un projet, trouver des prospects, rédiger et envoyer des mails de prospection, relancer et suivre les réponses.',
   offers: [
-    { '@type': 'Offer', name: 'Gratuit', price: '0', priceCurrency: 'EUR', description: `Plan gratuit : ${FREE.projects} projet, ${FREE.prospects} prospects, ${FREE.mails} mails et ${FREE.aiJobs} jobs IA par mois` },
+    { '@type': 'Offer', name: 'Gratuit', price: '0', priceCurrency: 'EUR', description: `Plan gratuit : ${FREE.projects} projets, ${FREE.prospects} prospects, ${FREE.mails} mails et ${FREE.aiJobs} jobs IA par semaine` },
     ...PAID.map((k) => ({ '@type': 'Offer', name: PLAN_LABELS[k], price: String(PLAN_PRICES[k]), priceCurrency: 'EUR', description: `${PLAN_LABELS[k]} : ${PLAN_PRICES[k]} € TTC par mois, ou ${annualPrice(k)} € TTC par an (${ANNUAL_FREE_MONTHS} mois offerts)` })),
   ],
   publisher: { '@type': 'Person', name: 'Tony AVERTY' },
@@ -155,6 +155,20 @@ const TRUST = (apple) => [
   ['Une connexion en un clic', `Tu te connectes avec ${providersText(apple)}, sans mot de passe à retenir.`],
 ];
 
+/** Tableau « Fonctionnalités par offre » : ce que chaque offre comprend en plus des plafonds (FEATURES dans limits.js). */
+const featuresTable = () => {
+  const plans = PLAN_ORDER;
+  const cell = (plan, f) => (PLAN_ORDER.indexOf(plan) >= PLAN_ORDER.indexOf(f.plan) ? '<td data-label="' + PLAN_LABELS[plan] + '"><b>Inclus</b></td>' : '<td data-label="' + PLAN_LABELS[plan] + '"><span class="muted">Non</span></td>');
+  return `<section class="more" id="fonctionnalites" aria-labelledby="h-fn">
+    <h2 id="h-fn">Fonctionnalités par offre</h2>
+    <p class="lead">Tout le reste (prospection, mails, relances, agenda, comptabilité au quotidien, page IA) est inclus dès le plan Gratuit.</p>
+    <div class="tw"><table class="plan-table">
+      <caption class="sr-only">Fonctionnalités réservées à certaines offres</caption>
+      <thead><tr><th scope="col">Fonctionnalité</th>${plans.map((k) => `<th scope="col">${PLAN_LABELS[k]}</th>`).join('')}</tr></thead>
+      <tbody>${Object.values(FEATURES).map((f) => `<tr class="plan-row"><th scope="row">${esc(f.label)}</th>${plans.map((k) => cell(k, f)).join('')}</tr>`).join('')}</tbody>
+    </table></div>
+  </section>`;
+};
 const planLimits = (l) => LIMIT_COLS.map(([label, f]) => [label, f(l)]);
 // Une carte par offre payante : prix selon la période (public/site.js bascule data-billing), plafonds, prévenir à l'ouverture
 /** Les deux formulaires d'achat d'une offre (un par période : public/site.js montre celui de la période choisie). Un visiteur non connecté est envoyé se connecter. */
@@ -172,7 +186,7 @@ const HOME_FAQ = [
   ['Mon projet doit-il avoir un dépôt Git ?', "Oui. Ton IA lit ton dépôt (GitHub ou ton propre serveur) pour comprendre ce que tu proposes, sans rien y modifier."],
   ['Les mails partent-ils tout seuls ?', "Non. Chaque lot attend ta confirmation, et les mails partent de ta propre boîte, avec un lien de désinscription. Tu n'écris qu'à des professionnels."],
   ['Puis-je facturer mes clients avec iaboss ?', "Oui : devis, acompte, facture et avoir, rattachés au projet, puis le suivi des encaissements et le montant à déclarer à l'URSSAF."],
-  ["Que se passe-t-il quand j'atteins un plafond ?", "La nouvelle action est refusée, mais rien n'est supprimé. Les plafonds repartent de zéro le 1er du mois, à l'heure de Paris."],
+  ["Que se passe-t-il quand j'atteins un plafond ?", "La nouvelle action est refusée, mais rien n'est supprimé. Les mails et les tâches IA repartent de zéro chaque lundi à minuit, à l'heure de Paris."],
 ];
 
 export function homePage({ appUrl, apple = false, billing = false }) {
@@ -395,13 +409,13 @@ export function pricingPage({ appUrl, billing = false }) {
   const paidRow = (k) => `<tr class="plan-row" aria-labelledby="plan-${k}">
         <th scope="row"><h2 id="plan-${k}">${PLAN_LABELS[k]}</h2>${billing ? '' : badge('b-info', 'clock', 'Bientôt')}<p class="tag">${PLAN_BLURBS[k]}</p></th>
         <td data-label="Prix"><span class="price when-month">${euros(PLAN_PRICES[k])} <small>par mois, TTC</small></span><span class="price when-year">${euros(annualPrice(k))} <small>par an, TTC</small></span>
-          <small class="sub when-month">ou ${euros(annualPrice(k))} par an, ${ANNUAL_FREE_MONTHS} mois offerts</small><small class="sub when-year">soit ${euros(annualPrice(k) / 12)} par mois, ${ANNUAL_FREE_MONTHS} mois offerts</small></td>
+          <small class="sub when-month">Sans engagement, résiliable à tout moment</small><small class="sub when-year">soit ${euros(annualPrice(k) / 12)} par mois, ${ANNUAL_FREE_MONTHS} mois offerts</small></td>
         ${limitCells(PLAN_LIMITS[k])}
         <td class="plan-act">${billing ? buyForms(k) : `<a class="btn btn-secondary" href="mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(`Me prévenir : offre ${PLAN_LABELS[k]}`)}">Me prévenir à l'ouverture</a>`}</td>
       </tr>`;
   return siteLayout({
     appUrl, path: '/tarifs',
-    title: 'Tarifs : gratuit, puis 10 à 100 € par mois · iaboss',
+    title: `Tarifs : gratuit, puis ${PLAN_PRICES.starter} à ${PLAN_PRICES.intensive} € par mois · iaboss`,
     description: `Plan gratuit, puis des offres de ${PLAN_PRICES.starter} € à ${PLAN_PRICES.intensive} € TTC par mois, avec ${ANNUAL_FREE_MONTHS} mois offerts en annuel. Ton accès à l'IA (Claude, ChatGPT ou Gemini) est facturé à part, par son fournisseur.`,
     body: `<div class="page">
 <div class="wrap">
@@ -418,7 +432,7 @@ export function pricingPage({ appUrl, billing = false }) {
       <button class="seg-b" type="button" data-period="month" aria-pressed="true">Au mois</button>
       <button class="seg-b" type="button" data-period="year" aria-pressed="false">À l'année</button>
     </div>
-    ${badge('b-ok', 'check', `${ANNUAL_FREE_MONTHS} mois offerts`)}
+    <span data-year-only hidden>${badge('b-ok', 'check', `${ANNUAL_FREE_MONTHS} mois offerts`)}</span>
   </div>
 
   <div class="plans" data-billing="month">
@@ -437,9 +451,11 @@ export function pricingPage({ appUrl, billing = false }) {
     </table></div>
   </div>
 
+  ${featuresTable()}
+
   <div class="mentions">
     <p>Prix TTC. L'éditeur est en franchise de TVA (art. 293 B du CGI) : le prix affiché est le prix payé. En annuel, tu paies ${12 - ANNUAL_FREE_MONTHS} mois et tu en profites 12. ${billing ? 'Le paiement est sécurisé par Stripe : iaboss ne voit jamais ton numéro de carte. Tu peux résilier à tout moment ; l\'offre reste active jusqu\'à la fin de la période payée, puis tu repasses au plan Gratuit sans rien perdre.' : 'Les offres payantes ouvrent prochainement : tu seras prévenu avant toute facturation.'}</p>
-    <p>Ces plafonds sont appliqués par le serveur. Les mails et les tâches IA se comptent par mois (heure de Paris) et repartent de zéro le 1er. Quand un plafond est atteint, la nouvelle action est refusée, mais rien n'est supprimé. Un compte ne peut pas envoyer plus de 300 mails par 24 heures, quelle que soit l'offre : c'est une protection pour la réputation de ton adresse.</p>
+    <p>Ces plafonds sont appliqués par le serveur. Les mails et les tâches IA se comptent par semaine, comme le quota de ton IA : ils repartent de zéro chaque lundi à minuit (heure de Paris). Quand un plafond est atteint, la nouvelle action est refusée, mais rien n'est supprimé. Un compte ne peut pas envoyer plus de 300 mails par 24 heures, quelle que soit l'offre : c'est une protection pour la réputation de ton adresse.</p>
   </div>
 
   <section class="more" id="acces-ia" aria-labelledby="h-ia">

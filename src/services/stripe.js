@@ -81,6 +81,29 @@ export function amountCents(plan, period) {
 }
 
 const priceCache = new Map();
+const productCache = new Set();
+
+/** Identifiant fixe du produit Stripe d'une offre (« iaboss_starter »…) : le même partout, retrouvé sans recherche, créé une seule fois. */
+export const productId = (plan) => `iaboss_${plan}`;
+/** Libellé sur le relevé de carte du client (22 caractères au plus, majuscules sans accent, sans < > \ ' " *). */
+export const descriptorOf = (plan) => `IABOSS ${PLAN_LABELS[plan]}`.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9 ]/g, '').trim().slice(0, 22).trim();
+
+/**
+ * Le « produit » Stripe d'une offre (un par offre, avec ses deux prix, mensuel et annuel). Marqué `metadata.app = iaboss` : c'est ce qui sépare les
+ * ventes d'iaboss de celles des autres produits du même compte Stripe, dans les rapports et les exports.
+ */
+export async function ensureProduct(app, plan) {
+  const id = productId(plan);
+  if (productCache.has(id)) return id;
+  try { await stripeCall(app, 'GET', `/products/${id}`); }
+  catch {
+    try {
+      await stripeCall(app, 'POST', '/products', { id, name: `iaboss ${PLAN_LABELS[plan]}`, statement_descriptor: descriptorOf(plan), metadata: { app: 'iaboss', plan } });
+    } catch (e) { await stripeCall(app, 'GET', `/products/${id}`).catch(() => { throw e; }); } // créé en même temps par une autre requête
+  }
+  productCache.add(id);
+  return id;
+}
 
 /**
  * Identifiant du prix Stripe d'une offre. Le prix est créé la première fois (avec sa clé de recherche « iaboss_plan_periode_centimes »), puis retrouvé :
@@ -96,7 +119,7 @@ export async function ensurePrice(app, plan, period) {
     try {
       id = (await stripeCall(app, 'POST', '/prices', {
         currency: 'eur', unit_amount: cents, recurring: { interval: period }, lookup_key: key,
-        product_data: { name: `iaboss ${PLAN_LABELS[plan]}`, metadata: { plan } }, metadata: { plan, period },
+        product: await ensureProduct(app, plan), metadata: { app: 'iaboss', plan, period },
       })).id;
     } catch (e) { id = await find(); if (!id) throw e; } // créé en même temps par une autre requête
   }
@@ -105,4 +128,4 @@ export async function ensurePrice(app, plan, period) {
 }
 
 /** Les prix déjà connus sont gardés en mémoire ; pour les tests. */
-export const resetPriceCache = () => priceCache.clear();
+export const resetPriceCache = () => { priceCache.clear(); productCache.clear(); };

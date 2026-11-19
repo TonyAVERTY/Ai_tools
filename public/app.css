@@ -953,6 +953,17 @@ html.nav-busy { cursor: progress; }
 /* ---------- Promotion : formulaire et vidéos produites ---------- */
 .promo-form { display: flex; flex-direction: column; gap: var(--s-3); margin-bottom: var(--s-3); }
 .promo-platforms { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); margin: var(--s-1) 0; }
+/* Style de la vidéo : cartes à cliquer (boutons radio), l'input reste focusable mais invisible */
+.promo-styles { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: var(--s-2); margin-top: var(--s-1); }
+.promo-style { position: relative; display: flex; flex-direction: column; gap: var(--s-1); padding: var(--s-2); border: 1.5px solid var(--line-strong); border-radius: var(--radius); background: var(--card); cursor: pointer; font-weight: 600; font-size: .875rem; }
+.promo-style input { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; }
+.promo-style:has(input:checked) { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary); }
+.promo-style:has(input:focus-visible) { outline: 3px solid var(--focus); outline-offset: 2px; }
+.promo-swatch { display: block; border-radius: var(--radius-sm); overflow: hidden; }
+.promo-swatch svg { display: block; width: 100%; height: auto; }
+.promo-swatch-auto rect { fill: var(--bg-sunk); stroke: var(--line-strong); }
+.promo-swatch-auto text { fill: var(--muted); font-size: 18px; font-weight: 700; }
+.promo-style .small { font-weight: 400; }
 .promo-voice { display: flex; flex-direction: column; gap: var(--s-3); padding: var(--s-3); border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--card); }
 .promo-voice[hidden], .promo-key[hidden], .promo-voice [hidden] { display: none; }
 .promo-key { display: flex; flex-direction: column; gap: var(--s-2); }
@@ -2050,3 +2061,23 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 7px; text-align: cen
 .bill-brand ul { padding-left: var(--s-4); }
 .bill-review { list-style: none; padding-left: 0; display: flex; flex-direction: column; gap: var(--s-1); }
 .bb-dot { vertical-align: -1px; }
+
+/* Page IA : commandes « / » */
+.chat-form { position: relative; }
+.chat-cmds { position: absolute; left: 16px; right: 16px; bottom: 100%; margin: 0 0 4px; padding: 6px; list-style: none; max-height: 280px; overflow-y: auto; background: var(--card); border: 1px solid var(--line-strong); border-radius: var(--radius-sm); box-shadow: var(--shadow-2); z-index: 5; }
+.chat-cmds[hidden] { display: none; }
+.chat-cmds li { display: flex; gap: 12px; align-items: baseline; padding: 8px 10px; border-radius: var(--radius-sm); cursor: pointer; }
+.chat-cmds li b { flex: none; min-width: 108px; font-weight: 600; }
+.chat-cmds li span { color: var(--muted); font-size: .875rem; }
+.chat-cmds li[aria-selected="true"] { background: var(--info-bg); }
+.chat-sys { align-self: center; max-width: min(760px, 92%); padding: 8px 12px; border: 1px dashed var(--line-strong); border-radius: var(--radius-sm); color: var(--muted); font-size: .875rem; white-space: pre-line; }
+.chat-summary { align-self: stretch; border: 1px dashed var(--line-strong); border-radius: var(--radius-sm); padding: 8px 12px; color: var(--muted); }
+.chat-summary summary { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: .875rem; font-weight: 600; }
+.chat-summary .bubble { margin-top: 8px; color: var(--text); }
+
+/* Fonctionnalité réservée à une offre : carte qui remplace le bloc, avec un lien vers les tarifs (src/lockviews.js) */
+.locked-card { border-style: dashed; }
+.locked-h { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.locked-h h2 { margin: 0; font-size: 1.05rem; }
+.locked-h .ic { color: var(--muted); }
+.locked-link { color: var(--muted); }

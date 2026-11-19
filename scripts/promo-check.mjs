@@ -126,8 +126,20 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   await p.fill('[data-promo-form] input[name="fps"]', '10'); await p.fill('[data-promo-form] input[name="seconds"]', '3');
   await p.fill('[data-promo-form] input[name="subject"]', 'Les cartes de fidélité');
   await p.selectOption('[data-promo-form] select[name="format"]', 'carre');
+  // Style : une carte par style, « Automatique » cochée d'office ; un clic sur une carte la coche, et c'est ce style qui part avec la demande
+  const cards = p.locator('[data-promo-form] .promo-style');
+  ok(await cards.count() === 5 && await p.locator('[data-promo-form] input[name="style"][value="auto"]').isChecked(), `${tag} style : 5 cartes, « Automatique » cochée par défaut`);
+  ok(await p.locator('[data-promo-form] .promo-style svg circle').count() === 8, `${tag} style : chaque carte de couleur montre ses accents`);
+  await cards.filter({ hasText: 'Chaud et humain' }).click();
+  ok(await p.locator('[data-promo-form] input[name="style"][value="chaud"]').isChecked() && !(await p.locator('[data-promo-form] input[name="style"][value="auto"]').isChecked()), `${tag} style : un clic coche la carte, une seule à la fois`);
+  const cardBox = await cards.first().boundingBox();
+  ok(cardBox.height >= 44, `${tag} style : carte assez grande pour le doigt (${Math.round(cardBox.height)} px)`);
+  ok(await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), `${tag} style : pas de défilement horizontal`);
+  if (process.env.SHOTS) await p.locator('[data-promo-form] [role="radiogroup"]').screenshot({ path: `${process.env.SHOTS}/promo-styles-${vp.width}.png` });
+  const sentStyle = p.waitForRequest((r) => /\/promo\/generate$/.test(r.url()) && r.method() === 'POST');
   ok(await p.locator('[data-promo-go]').isEnabled(), `${tag} bouton actif`);
   await p.locator('[data-promo-go]').click();
+  ok(JSON.parse((await sentStyle).postData() || '{}').style === 'chaud', `${tag} style : le style choisi est envoyé avec la demande`);
   const served = p.waitForResponse((r) => /\/api\/promo\/\d+\/file$/.test(r.url()), { timeout: 30000 }).catch(() => null);
   await p.waitForSelector('.pv video', { timeout: 60000 });
   // Le Chromium de Playwright (build libre) n'embarque pas H.264 : dans ce cas on vérifie que le fichier est bien servi (son contenu est validé par ffprobe dans les tests)

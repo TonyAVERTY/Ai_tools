@@ -96,3 +96,17 @@ Ajoutées après l'audit initial ; relues et testées localement, **non auditée
 | Prompts modifiables | Seules les consignes se modifient ; contexte, format de réponse et règles légales de collecte restent dans le code ; 4 000 caractères au plus ; propres à chaque compte | Un prompt mal écrit dégrade la qualité des résultats de ce compte, pas la sécurité |
 | Réponses lues dans la boîte | Texte borné (3 000 caractères), échappé à l'affichage, classement local (aucun appel externe), refus écrit = opposition | Le classement par mots-clés peut se tromper : l'utilisateur relit |
 | Posts LinkedIn programmés | Confirmation obligatoire, réservé aux administrateurs du projet, verrou anti double publication, un échec remet en brouillon (jamais de nouvelle tentative en boucle) et prévient | Publication jusqu'à ~15 minutes après l'heure (cadence du planificateur) |
+
+## 11. Addendum : audit du 16 novembre 2026
+
+Relecture du pipeline IA (lanceurs de CLI, worker, handlers, page IA), des routes ajoutées depuis octobre et du front. Tests locaux seulement (SQLite, faux CLI, Chromium) : rien contre la production, MySQL, bwrap ni un vrai fournisseur d'IA.
+
+| # | Gravité | Problème | Emplacement | État |
+|---|---|---|---|---|
+| V10 | FAIBLE | Injection HTML : les valeurs « Utilisateurs » et « Clients payants » du Récapitulatif viennent de la base du projet (requête SQL configurée) et étaient insérées sans échappement. La CSP bloque tout script ; restait l'injection de balises (lien, formulaire vers une origine autorisée) visible du propriétaire et des administrateurs du projet. | `public/app-recap.js` | **Corrigé**, vérifié dans Chromium (`scripts/recap-check.mjs`, échoue sans le correctif) |
+| V11 | FAIBLE (disponibilité, coût) | Un job annulé juste avant le lancement du CLI tournait jusqu'au bout (le signal déjà annulé n'était pas lu) ; un CLI qui ignorait SIGTERM n'était jamais tué. | `src/services/providers/childio.js` | **Corrigé et testé** (`test/childio.test.js`) |
+| V12 | FAIBLE (disponibilité) | Planificateur : l'erreur d'un seul projet (donnée illisible) arrêtait tout le passage pour tous les comptes (relances, posts LinkedIn programmés, rapports, entretien). | `src/services/scheduler.js` | **Corrigé et testé** (`test/followup.test.js`) |
+
+Contrôlés sans défaut trouvé : accès par identifiant (aucune lecture ni écriture sur une ressource d'un autre compte), redirections (cibles fixes), exports CSV (formules neutralisées), jetons d'API, signature Stripe, scènes HTML écrites par l'IA (CSP, résolution DNS coupée, requêtes bloquées), téléversements (type lu à la signature), `npm audit` (0 vulnérabilité).
+
+Non vérifié cette fois encore : bac à sable bwrap en conditions réelles, MySQL 8, configuration Nginx / Cloudflare, vrais flux OAuth, vrais CLI d'IA. Les risques résiduels des sections 4 et 6 restent valables.

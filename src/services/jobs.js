@@ -15,6 +15,7 @@ import { createJobLog } from './joblog.js';
 import { attachJobEta } from './jobeta.js';
 import { assertRoom, recordUsage, withUserLock, MAIL_JOBS } from './plans.js';
 import { sendPause, pauseMessage } from './abuse.js';
+import { AUTO_RETRY } from './autoretry.js';
 
 // Job en cours d'exécution, retrouvé par le wrapper claude() : c'est lui qui dit quel modèle a réellement servi (affiché dans l'avancement et le résultat)
 export const jobContext = new AsyncLocalStorage();
@@ -119,8 +120,11 @@ export async function retryJob(db, userId, jobId, opts = {}, { fix = false } = {
 
 /** Derniers jobs d'un projet (le projet doit déjà avoir été vérifié comme appartenant à l'utilisateur). */
 export async function latestJobs(db, projectId) {
+  // Le journal (jusqu'à 120 Ko par job) ne sert qu'à estimer la fin d'un job EN COURS : il n'est pas relu pour les jobs terminés
   const rows = await db.prepare(`
-    SELECT j.* FROM jobs j
+    SELECT j.id, j.user_id, j.type, j.status, j.error, j.params_json, j.progress_json, j.result_json, j.tokens_in, j.tokens_out,
+      j.created_at, j.started_at, j.finished_at, j.run_after, CASE WHEN j.status = 'running' THEN j.log_json END log_json
+    FROM jobs j
     JOIN (SELECT type, MAX(id) id FROM jobs WHERE project_id = ? GROUP BY type) lj ON lj.id = j.id
   `).all(projectId);
   const out = {};
@@ -152,8 +156,9 @@ export async function latestJobs(db, projectId) {
 export class Worker {
   constructor(db, handlers, {
     maxJobs = Infinity, loadMax = LOAD.defaultMax, load = loadRatio, pollMs = 3000, log = console, clock = now, onFinish, onLoad, onError,
-    budget, isAiJob, onBudget, quota, isQuotaSensitive, onQuotaHold, cliModeEnabled = true, parallel,
+    budget, isAiJob, onBudget, quota, isQuotaSensitive, onQuotaHold, cliModeEnabled = true, parallel, autoRetry,
   } = {}) {
+    this.autoRetry = autoRetry; // async (job, message) => {at, attempt}|null : relance automatique d'une tâche IA arrêtée par une limite (services/autoretry.js)
     this.parallel = parallel; // async (userId) => nombre de jobs simultanés permis à CET utilisateur (selon son offre) ; absent = 1
     this.cliModeEnabled = cliModeEnabled;
     this.clock = clock;
@@ -192,7 +197,9 @@ export class Worker {
 
   async start() {
     // Un job "running" au démarrage = crash/reboot pendant l'exécution
+    const cut = this.autoRetry ? await this.db.prepare("SELECT * FROM jobs WHERE status = 'running'").all() : [];
     await this.db.prepare("UPDATE jobs SET status = 'error', error = 'Interrompu (redémarrage)', finished_at = ? WHERE status = 'running'").run(now());
+    for (const j of cut) await this.autoRetry(j, 'Interrompu (redémarrage)').catch(() => {});
     this.loopDone = this.loop();
   }
 
@@ -297,9 +304,14 @@ export class Worker {
         if (!byUser.has(j.user_id)) byUser.set(j.user_id, []);
         byUser.get(j.user_id).push(j);
       }
+      // Offre, droit d'exécuter, budget et quota sont les mêmes pour tous les jobs d'un compte pendant CE passage : lus une fois par compte, pas une
+      // fois par job (un compte dont 12 jobs attendent le budget coûtait 73 requêtes toutes les 3 secondes). Rien n'est gardé d'un passage à l'autre.
+      const seen = new Map();
+      const once = (key, read) => { if (!seen.has(key)) seen.set(key, read()); return seen.get(key); };
+      const capFor = (userId) => once(`cap/${userId}`, () => this.capOf(userId));
       const candidates = []; // un seul candidat par utilisateur : son premier job exécutable
       for (const [userId, jobs] of byUser) {
-        const cap = await this.capOf(userId);
+        const cap = await capFor(userId);
         if ((this.busyUsers.get(Number(userId)) || 0) >= cap) { // autant de jobs en cours que son offre le permet : les suivants attendent, et le disent
           const why = cap === 1
             ? "un job est déjà en cours (ton offre en fait tourner un seul à la fois ; les offres payantes en font tourner plusieurs en même temps)"
@@ -311,15 +323,16 @@ export class Worker {
         for (const j of jobs) {
           if (MAIL_JOBS.has(j.type) && this.busyMail.has(Number(userId))) continue; // un seul envoi de mails à la fois pour ce compte
           // Compte suspendu ou supprimé, job IA sans liaison Claude valide : refusé sans exécution
-          const refusal = await jobRefusal(this.db, j, { cliModeEnabled: this.cliModeEnabled });
+          const refusal = await once(`refus/${userId}/${AI_JOBS.has(j.type)}`, () => jobRefusal(this.db, j, { cliModeEnabled: this.cliModeEnabled }));
           if (refusal) {
             await this.db.prepare("UPDATE jobs SET status = 'error', error = ?, finished_at = ? WHERE id = ? AND status = 'queued'").run(refusal, now(), j.id);
             continue;
           }
-          const b = (await this.budget?.(j.user_id)) || { blocked: false };
-          if (b.blocked && this.isAiJob?.(j.type)) { budgetReason = b.reason; await hold(j, b.reason); continue; }
-          const q = (await this.quota?.(j.user_id)) || { blocked: false };
-          if (q.blocked && this.isQuotaSensitive?.(j.type)) { quotaReason = q.reason; await hold(j, q.reason); continue; }
+          // Budget et quota ne concernent que les jobs IA : ils ne sont pas lus pour un envoi de mails
+          const b = (this.isAiJob?.(j.type) && await once(`budget/${userId}`, () => this.budget?.(j.user_id))) || { blocked: false };
+          if (b.blocked) { budgetReason = b.reason; await hold(j, b.reason); continue; }
+          const q = (this.isQuotaSensitive?.(j.type) && await once(`quota/${userId}`, () => this.quota?.(j.user_id))) || { blocked: false };
+          if (q.blocked) { quotaReason = q.reason; await hold(j, q.reason); continue; }
           cand = j;
           break;
         }
@@ -348,7 +361,7 @@ export class Worker {
       // Tourniquet : le moins récemment servi d'abord (jamais servi = en tête), puis l'ordre des jobs
       candidates.sort((a, b) => (this.served.get(a.user_id) ?? -1) - (this.served.get(b.user_id) ?? -1) || a.id - b.id);
       for (const job of candidates) {
-        const cap = await this.capOf(job.user_id);
+        const cap = await capFor(job.user_id);
         if ((this.busyUsers.get(Number(job.user_id)) || 0) >= cap) continue; // pris entre-temps par un claim concurrent
         if (MAIL_JOBS.has(job.type) && this.busyMail.has(Number(job.user_id))) continue;
         if (!(await this.reserve(job, cap))) continue;
@@ -430,6 +443,9 @@ export class Worker {
             .run(String(e.message).slice(0, 2000), now(), ctx.usage.costUsd, ctx.usage.tokensIn, ctx.usage.tokensOut, job.id);
           this.emit('onFinish', job, { status: 'error', error: e.message });
           try { this.onError?.(job, e); } catch { /* l'alerte ne fait jamais échouer le traitement du job */ }
+          // Relance automatique (option de l'utilisateur) : le journal dit quand la tâche repart
+          const again = await this.autoRetry?.(job, e.message).catch(() => null);
+          if (again) journal.append('status', `Relance automatique prévue (essai ${again.attempt}/${AUTO_RETRY.max})`);
         }
       }
     } finally {
@@ -460,5 +476,41 @@ export async function usageSummary(db, userId) {
   const day = now() - 86400;
   const q = (s) => db.prepare(`SELECT COALESCE(SUM(cost_usd),0) cost, COALESCE(SUM(tokens_in),0) tin, COALESCE(SUM(tokens_out),0) tout, COUNT(*) n
     FROM jobs WHERE user_id = ? AND COALESCE(finished_at, created_at) > ?`).get(userId, s);
-  return { month: await q(since), day: await q(day) };
+  return { month: await q(since), day: await q(day), ai: await cachedAiStats(db, userId) };
+}
+
+// Le relevé d'activité est interrogé toutes les 3 à 30 secondes par onglet ouvert : un bilan sur 30 jours n'a pas à être recalculé à chaque fois
+const AI_STATS_TTL_MS = 60_000;
+const aiStatsCache = new WeakMap(); // base → Map(compte → { at, value })
+async function cachedAiStats(db, userId) {
+  if (!aiStatsCache.has(db)) aiStatsCache.set(db, new Map());
+  const cache = aiStatsCache.get(db);
+  const hit = cache.get(Number(userId));
+  if (hit && hit.at > Date.now() - AI_STATS_TTL_MS) return hit.value;
+  const value = await aiStats(db, userId);
+  cache.delete(Number(userId));
+  cache.set(Number(userId), { at: Date.now(), value });
+  while (cache.size > 1000) cache.delete(cache.keys().next().value);
+  return value;
+}
+
+/**
+ * Mesures des tâches IA terminées depuis `since` (30 jours par défaut) : combien, combien en échec, durée moyenne, tokens et coût estimé,
+ * plus le nombre de réponses de la page IA. Sert à suivre la fiabilité et le coût des générations (menu Activité, carte de consommation).
+ * @returns {Promise<{jobs: number, failed: number, failureRate: number|null, avgSeconds: number|null, tokens: number, costUsd: number, chatAnswers: number}>}
+ */
+export async function aiStats(db, userId, since = now() - 30 * 86400) {
+  const types = [...AI_JOBS];
+  const r = await db.prepare(`SELECT COUNT(*) n, COALESCE(SUM(CASE WHEN status = 'error' THEN 1 ELSE 0 END), 0) failed,
+      AVG(CASE WHEN started_at IS NOT NULL AND finished_at >= started_at THEN finished_at - started_at END) secs,
+      COALESCE(SUM(tokens_in), 0) + COALESCE(SUM(tokens_out), 0) tokens, COALESCE(SUM(cost_usd), 0) cost
+    FROM jobs WHERE user_id = ? AND status IN ('done', 'error') AND finished_at > ? AND type IN (${types.map(() => '?').join(',')})`).get(userId, since, ...types);
+  const chat = await db.prepare(`SELECT COUNT(*) n FROM chat_messages m JOIN chat_conversations c ON c.id = m.conversation_id
+    WHERE c.user_id = ? AND m.role = 'assistant' AND m.created_at > ?`).get(userId, since);
+  const jobs = Number(r.n) || 0, failed = Number(r.failed) || 0;
+  return {
+    jobs, failed, failureRate: jobs ? failed / jobs : null,
+    avgSeconds: r.secs == null ? null : Math.round(Number(r.secs)),
+    tokens: Number(r.tokens) || 0, costUsd: Math.round((Number(r.cost) || 0) * 1e4) / 1e4, chatAnswers: Number(chat.n) || 0,
+  };
 }

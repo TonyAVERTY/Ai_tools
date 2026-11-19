@@ -7,6 +7,7 @@ import { budgetState } from './services/budget.js';
 import { renderMarkdown } from './services/markdown.js';
 import { stillSupported } from './services/stillimage.js';
 import { KINDS, INSTAGRAM_FORMATS, LIMITS, listDrafts, getDraft, getImage, editDraft, removeDraft } from './contentdrafts.js';
+import { requireFeature } from './services/plans.js';
 
 const JOB = { instagram: 'instagram_post', newsletter: 'newsletter' };
 const slug = (s) => String(s || 'projet').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'projet';
@@ -58,6 +59,7 @@ export function registerContentRoutes(router, app, { project, aiOpts }) {
   router.post('/api/projects/:id/content/:kind/generate', async (ctx) => {
     const kind = kindOf(ctx);
     const p = await project(ctx);
+    await requireFeature(db, p.userId, 'content');
     const b = await readBody(ctx.req);
     if (!p.profile) throw new HttpError(400, "Analyse le projet d'abord", { expose: true });
     if (kind === 'instagram') {

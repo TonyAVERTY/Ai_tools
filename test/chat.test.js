@@ -190,6 +190,15 @@ test('historique envoyé : fin de la conversation seulement, dans les limites de
   assert.equal(kept.at(-1).content, 'm39');
   const big = [{ role: 'user', content: 'a'.repeat(CHAT_HISTORY.chars - 10) }, { role: 'assistant', content: 'b'.repeat(50) }, { role: 'user', content: 'c' }];
   assert.deepEqual(trimHistory(big).map((m) => m.content.slice(0, 1)), ['b', 'c'], 'le message qui ferait dépasser est écarté');
+  // Le dernier message dépasse à lui seul la limite (longue réponse) : son début et sa fin restent, l'historique n'est plus vide
+  const long = `DEBUT${'x'.repeat(CHAT_HISTORY.chars * 2)}FIN`;
+  const cut = trimHistory([{ role: 'user', content: 'question' }, { role: 'assistant', content: long }]);
+  assert.equal(cut.length, 1);
+  assert.equal(cut[0].role, 'assistant');
+  assert.ok(cut[0].content.startsWith('DEBUT') && cut[0].content.endsWith('FIN'));
+  assert.match(cut[0].content, /milieu du message retiré/);
+  assert.ok(cut[0].content.length <= CHAT_HISTORY.chars, 'la limite reste respectée');
+  assert.equal(long.length, CHAT_HISTORY.chars * 2 + 8, 'le message d\'origine n\'est pas modifié');
   assert.equal(chatPrompt({ message: 'Salut' }).prompt, 'Salut');
   assert.match(chatPrompt({ history: [{ role: 'user', content: 'a' }, { role: 'assistant', content: 'b' }], message: 'c' }).prompt, /Utilisateur : a\n\nAssistant : b\n\nUtilisateur : c$/);
   // l'assistant a ses consignes, réglables comme les autres (par gamme de modèle)
@@ -206,4 +215,28 @@ test('conversations supprimées avec le compte', async () => {
   await s.db.prepare('DELETE FROM users WHERE id = ?').run(u.id);
   assert.equal(Number((await s.db.prepare('SELECT COUNT(*) n FROM chat_conversations WHERE user_id = ?').get(u.id)).n), 0);
   void setSetting;
+});
+
+test('commande /compacter : un résumé remplace les anciens messages dans le prompt, la conversation reste affichée', async () => {
+  const u = await s.newUser();
+  const first = await events(await send(u, { message: 'ECHO un' }));
+  const id = first[0].conversationId;
+  assert.equal((await u.post(`/api/chat/conversations/${id}/compact`, {})).status, 400, 'trop courte pour être compactée');
+  await events(await send(u, { message: 'ECHO deux', conversationId: id }));
+  const r = await u.post(`/api/chat/conversations/${id}/compact`, {});
+  assert.equal(r.status, 200);
+  const d = await r.json();
+  assert.equal(d.message.role, 'summary');
+  assert.equal(d.compacted, 4);
+  assert.equal(calls().at(-1).args[calls().at(-1).args.indexOf('--max-turns') + 1], '1');
+  await events(await send(u, { message: 'ECHO trois', conversationId: id }));
+  const prompt = calls().at(-1).prompt;
+  assert.match(prompt, /Résumé de la conversation avant les messages ci-dessous/);
+  assert.doesNotMatch(prompt, /Utilisateur : ECHO un/, 'les anciens messages ne repartent plus');
+  assert.match(prompt, /Utilisateur : ECHO trois$/);
+  const page = await (await html(u, `/chat/${id}`)).text();
+  assert.match(page, /Conversation compactée/);
+  assert.match(page, /ECHO un/, 'le fil garde tout');
+  const other = await s.newUser();
+  assert.equal((await other.post(`/api/chat/conversations/${id}/compact`, {})).status, 404, 'conversation d\'un autre compte');
 });

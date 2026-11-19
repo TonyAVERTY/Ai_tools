@@ -14,6 +14,20 @@
     catch (e) { loadFailed(box, e.message, () => loadPromo(proj)); }
   }
 
+  // Aperçu des couleurs d'un style : un petit dessin SVG (des attributs fill, pas de style en ligne : la CSP les refuse).
+  // « Automatique » n'a pas de couleurs fixes : quatre pastilles neutres et un point d'interrogation.
+  const HEX = /^#[0-9a-f]{6}([0-9a-f]{2})?$/i;
+  const swatch = (st) => {
+    const c = (st.colors || []).filter((x) => HEX.test(x));
+    if (c.length < 4) return '<svg viewBox="0 0 64 40" class="promo-swatch-auto"><rect width="64" height="40" rx="6"/><text x="32" y="27" text-anchor="middle">?</text></svg>';
+    return `<svg viewBox="0 0 64 40"><rect width="64" height="40" fill="${c[0]}"/><path d="M64 0v40H22z" fill="${c[1]}"/><circle cx="20" cy="20" r="7" fill="${c[2]}"/><circle cx="40" cy="22" r="5" fill="${c[3]}"/></svg>`;
+  };
+  // Style de la vidéo : une carte par style (un seul choix), avec l'aperçu de ses couleurs
+  const styleCards = (styles) => `<div class="field" role="radiogroup" aria-labelledby="promo-style-lbl">
+          <span class="lbl" id="promo-style-lbl">Style</span>
+          <div class="promo-styles">${styles.map((st, i) => `<label class="promo-style"><input type="radio" name="style" value="${esc(st.id)}"${i === 0 ? ' checked' : ''}><span class="promo-swatch" aria-hidden="true">${swatch(st)}</span><span class="promo-style-name">${esc(st.label)}</span>${st.note ? `<span class="muted small">${esc(st.note)}</span>` : ''}</label>`).join('')}</div>
+        </div>`;
+
   // « TikTok · » devant la ligne de détails d'une vidéo produite pour une plateforme
   const promoPlatformLabel = (v, s) => {
     const p = v.platform && s.platforms?.find((x) => x.id === v.platform);
@@ -50,7 +64,7 @@
           <label class="field"><span class="lbl">Durée (secondes)</span><input name="seconds" type="number" inputmode="numeric" min="${L.seconds.min}" max="${L.seconds.max}" value="${L.seconds.def}" required></label>
           <label class="field"><span class="lbl">Format</span><span class="sel"><select name="format">${s.formats.map((f) => `<option value="${esc(f.id)}">${esc(f.label)}</option>`).join('')}</select>${icon('down')}</span></label>
         </div>
-        <label class="field"><span class="lbl">Style</span><span class="sel"><select name="style">${s.styles.map((f) => `<option value="${esc(f.id)}">${esc(f.label)}</option>`).join('')}</select>${icon('down')}</span></label>
+        ${styleCards(s.styles)}
         <label class="check"><input type="checkbox" name="voice" data-promo-voice-toggle><span>Ajouter une voix</span></label>
         <div class="promo-voice" data-promo-voice hidden>
           <div class="grid2">
@@ -231,7 +245,7 @@
     }
     btn.disabled = true;
     try {
-      const r = await api(`/api/projects/${proj.dataset.id}/promo/generate`, { subject: f.subject.value, fps: Number(f.fps.value), seconds: Number(f.seconds.value), format: f.format.value, platform: $('[data-promo-platform]:checked', f)?.value || '', style: f.style.value, voice: f.voice.checked, voiceProvider: f.voiceProvider.value, voiceName: f.voiceName.value, voiceLang: f.voiceLang.value });
+      const r = await api(`/api/projects/${proj.dataset.id}/promo/generate`, { subject: f.subject.value, fps: Number(f.fps.value), seconds: Number(f.seconds.value), format: f.format.value, platform: $('[data-promo-platform]:checked', f)?.value || '', style: f.elements.style.value, voice: f.voice.checked, voiceProvider: f.voiceProvider.value, voiceName: f.voiceName.value, voiceLang: f.voiceLang.value });
       toast(r.budgetBlocked ? `En file, mais ${r.budgetBlocked}` : r.existing ? 'Une vidéo est déjà en cours de production' : `${aiName()} conçoit la vidéo…`, r.budgetBlocked ? 'error' : 'ok');
       refreshProject(proj);
     } catch (err) { toast(err.message, 'error'); }

@@ -3,7 +3,7 @@ Résumé : comment l'IA cherche des prospects (cible, nombre, maintenant ou la n
 
 ## Avant de chercher
 - Le projet doit être **analysé** (fiche projet) et sa **Cible validée** (« Valider la cible »). Sans fiche, la recherche et les posts demandent d'abord d'analyser.
-- Le plafond mensuel de **prospects** et de **jobs IA** de l'offre s'applique (voir « Offres, plafonds et limites »).
+- Le plafond de **prospects** (total) et de **jobs IA** (par semaine) de l'offre s'applique (voir « Offres, plafonds et limites »).
 
 ## Lancer une recherche (onglet Prospection → Recherche de prospects)
 1. **Prospects à chercher** : le nombre voulu, de 1 à 50.
@@ -29,5 +29,5 @@ Le modèle de la recherche se choisit dans **Réglages → Budget et modèles IA
 - **Cible validée** : la section Cible se résume alors en une phrase (par exemple « Cabinets de kinésithérapie, 2 à 10 praticiens, Bretagne, décideur : titulaire du cabinet. ») et les champs sont masqués. **Modifier** les rouvre ; **Mettre à jour** enregistre et **Annuler** remet les valeurs validées.
 - **0 prospect trouvé** : la cible est trop étroite ou les requêtes trop vagues → corriger la section Cible (secteurs, zone, requêtes de recherche, une par ligne) et relancer.
 - **Le job reste « En attente »** : plafond ou quota atteint, charge du serveur élevée, ou job programmé « Cette nuit ». Le message « En attente : … » donne la raison dans « Activité ».
-- **« Plafond atteint »** : la limite mensuelle de l'offre est atteinte ; rien n'est perdu, voir « Offres, plafonds et limites ».
+- **« Plafond atteint »** : la limite de l'offre est atteinte ; rien n'est perdu, voir « Offres, plafonds et limites ».
 - **Une recherche est déjà en cours** : un seul job du même type à la fois par projet ; attendre sa fin ou l'annuler depuis « Activité ».

@@ -401,3 +401,31 @@ test('diagnostic d\'un échec Claude : forme du secret et contenu du dépôt, ja
   assert.match(claudeDiagnostic({ userId: 1, cred: { mode: 'server', secretEnv: {} }, cfg: {}, cwd: null, r: {} }), /secret=AUCUN/);
   rmSync(dir, { recursive: true, force: true });
 });
+
+test('runClaude : --tools reprend exactement les outils autorisés (la définition des autres outils ne part plus à chaque tour)', async () => {
+  const { runClaude, probeClaudeFlags } = await import('../src/services/claude.js');
+  const { mkdtempSync, writeFileSync, chmodSync, readFileSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const dir = mkdtempSync(join(tmpdir(), 'tools-'));
+  const log = join(dir, 'args.json');
+  const bin = join(dir, 'cli.sh');
+  writeFileSync(bin, `#!/bin/bash\nprintf '%s\\n' "$@" | python3 -c "import sys,json;print(json.dumps(sys.stdin.read().split(chr(10))))" > ${log}\necho '{"type":"result","subtype":"success","is_error":false,"result":"ok","usage":{}}'\n`);
+  chmodSync(bin, 0o755);
+  const sandbox = { enabled: false, production: false };
+  const argsOf = async (o) => { await runClaude({ prompt: 'x', bin, sandbox, ...o }); return JSON.parse(readFileSync(log, 'utf8')); };
+  const val = (a, f) => a[a.indexOf(f) + 1];
+  let a = await argsOf({ tools: [] });
+  assert.equal(val(a, '--tools'), '', 'aucun outil : --tools vide');
+  assert.equal(val(a, '--allowedTools'), '');
+  assert.ok(!a.includes('--exclude-dynamic-system-prompt-sections'), 'option récente : seulement si le CLI du serveur la connaît');
+  a = await argsOf({ tools: ['Read', 'Glob', 'Grep'] });
+  assert.equal(val(a, '--tools'), 'Read,Glob,Grep');
+  assert.equal(val(a, '--allowedTools'), val(a, '--tools'), 'même liste : le modèle ne perd aucun outil qu\'il pouvait utiliser');
+  a = await argsOf({ tools: ['WebSearch', 'WebFetch'], excludeDynamic: true });
+  assert.equal(val(a, '--tools'), 'WebSearch,WebFetch');
+  assert.ok(a.includes('--exclude-dynamic-system-prompt-sections'));
+  a = await argsOf({ chat: true, tools: [] });
+  assert.equal(a.filter((x) => x === '--tools').length, 1, 'chat : --tools une seule fois');
+  assert.deepEqual(probeClaudeFlags(join(dir, 'absent')), { excludeDynamic: false }, 'CLI introuvable ou muet : aucune option récente');
+});

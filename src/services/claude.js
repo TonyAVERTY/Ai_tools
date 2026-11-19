@@ -1,10 +1,29 @@
 // Lance Claude Code en headless (`claude -p`) avec un périmètre d'outils restreint,
 // et parse le flux stream-json pour remonter la progression en direct.
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { prepareLaunch } from './sandbox.js';
 import { createLiveUsage } from './liveusage.js';
+import { readLines, tailText, guardChild, delayLabel } from './providers/childio.js';
 
 export const MODELS = { rapide: 'haiku', normal: 'sonnet', approfondi: 'opus' };
+
+/**
+ * Options récentes du CLI, lues UNE fois au démarrage du serveur dans `claude --help` (un CLI plus ancien refuserait un argument qu'il ne connaît pas :
+ * on ne passe une option que si l'exécutable du serveur l'annonce). HOME jetable, aucun secret.
+ * `excludeDynamic` : --exclude-dynamic-system-prompt-sections range le dossier de travail, l'environnement et l'état git dans le premier message plutôt
+ * que dans les consignes : le préfixe devient identique d'un appel à l'autre et le cache du fournisseur le réutilise (mesuré : 2 758 → 1 102 tokens
+ * écrits en cache pour un appel sans outil depuis un autre dossier). Le modèle reçoit les mêmes informations.
+ */
+export function probeClaudeFlags(bin = 'claude') {
+  const home = mkdtempSync(join(tmpdir(), 'aitools-probe-'));
+  try {
+    const help = execFileSync(bin, ['--help'], { encoding: 'utf8', timeout: 10_000, stdio: ['ignore', 'pipe', 'ignore'], env: { PATH: process.env.PATH, LANG: 'C.UTF-8', HOME: home } });
+    return { excludeDynamic: help.includes('--exclude-dynamic-system-prompt-sections') };
+  } catch { return { excludeDynamic: false }; } finally { rmSync(home, { recursive: true, force: true }); }
+}
 
 /**
  * @param {object} o
@@ -13,6 +32,7 @@ export const MODELS = { rapide: 'haiku', normal: 'sonnet', approfondi: 'opus' };
  * @param {string} [o.model]        haiku | sonnet | opus
  * @param {number} [o.maxTurns]     borne dure sur le nombre d'allers-retours (= tokens)
  * @param {string[]} [o.tools]      outils autorisés, tout le reste est refusé
+ * @param {boolean} [o.excludeDynamic]  voir probeClaudeFlags
  * @param {string} [o.system]       consignes ajoutées au prompt système
  * @param {(text:string)=>void} [o.onText]  appelé à chaque bloc texte de Claude
  * @param {(n:number)=>void} [o.onTurn]     appelé à chaque message de Claude (sert à estimer l'avancement)
@@ -38,8 +58,13 @@ export function runClaude(o) {
     '--disallowedTools', 'Bash,Edit,Write,MultiEdit,NotebookEdit,Task',
   ];
   if (o.system) args.push('--append-system-prompt', o.system);
-  // Conversation : uniquement les outils de lecture demandés (aucun par défaut), pas de session enregistrée
-  if (o.chat) args.push('--tools', (o.tools || []).join(','), '--no-session-persistence', '--disable-slash-commands', '--include-partial-messages');
+  // `--tools` : seuls les outils demandés existent pour le modèle. Sans lui, la définition de chaque outil intégré (Bash, WebFetch, Task, TodoWrite…)
+  // part à CHAQUE appel et à chaque tour (mesuré : ~15 000 tokens d'entrée pour un « ok » contre ~3 400 avec `--tools ""`). `--allowedTools` n'ôte rien
+  // du contexte du modèle : il ne fait qu'autoriser. Le modèle ne peut utiliser que ce qu'`allowedTools` autorisait déjà, donc rien ne change pour lui.
+  args.push('--tools', (o.tools || []).join(','));
+  if (o.excludeDynamic) args.push('--exclude-dynamic-system-prompt-sections'); // seulement si le CLI du serveur le connaît (probeClaudeFlags)
+  // Conversation : pas de session enregistrée ni de commandes slash
+  if (o.chat) args.push('--no-session-persistence', '--disable-slash-commands', '--include-partial-messages');
   else if (o.onDelta || o.onActivity || o.onUsage) args.push('--include-partial-messages');
   for (const d of o.extraDirs || []) args.push('--add-dir', d);
 
@@ -53,28 +78,17 @@ export function runClaude(o) {
   const child = spawn(launch.command, launch.args, { cwd: launch.cwd, env: launch.env, stdio: ['ignore', 'pipe', 'pipe'] });
 
   return new Promise((resolve, reject) => {
-    let buf = '';
-    let stderr = '';
     let result = null;
     let rateLimit = null;
     let turns = 0;
     const texts = [];
     const trackUsage = createLiveUsage(o.onUsage);
 
-    const timer = setTimeout(() => child.kill('SIGTERM'), o.timeoutMs || 30 * 60_000);
-    o.signal?.addEventListener('abort', () => child.kill('SIGTERM'), { once: true });
-
-    child.stdout.on('data', (chunk) => {
-      buf += chunk;
-      let i;
-      while ((i = buf.indexOf('\n')) >= 0) {
-        const line = buf.slice(0, i).trim();
-        buf = buf.slice(i + 1);
-        if (line) handle(line);
-      }
-    });
-    child.stderr.on('data', (c) => { stderr = (stderr + c).slice(-4000); });
-    const done = () => { clearTimeout(timer); launch.cleanup(); };
+    const timeoutMs = o.timeoutMs || 30 * 60_000;
+    const guard = guardChild(child, { timeoutMs, signal: o.signal });
+    const flush = readLines(child.stdout, (line) => handle(line));
+    const stderr = tailText(child.stderr);
+    const done = () => { guard.clear(); launch.cleanup(); };
 
     function handle(line) {
       let ev;
@@ -102,8 +116,9 @@ export function runClaude(o) {
     child.on('error', (e) => { done(); reject(new Error(redact(`Impossible de lancer Claude : ${e.message}`))); });
     child.on('close', (code) => {
       done();
-      if (buf.trim()) handle(buf.trim());
-      if (!result) return reject(new Error(redact(`Claude s'est arrêté sans résultat (code ${code}). ${stderr.trim()}`)));
+      flush();
+      if (!result && guard.timedOut()) return reject(new Error(`Claude n'a pas répondu dans le délai de ${delayLabel(timeoutMs)} : la tâche a été arrêtée. Réessaie`));
+      if (!result) return reject(new Error(redact(`Claude s'est arrêté sans résultat (code ${code}). ${stderr().trim()}`)));
       const usage = result.usage || {};
       resolve({
         ok: !result.is_error,

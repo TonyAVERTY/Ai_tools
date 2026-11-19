@@ -14,6 +14,7 @@ import { PROMO, FORMATS, parsePromoParams, promoSupported } from './services/pro
 import { PLATFORMS } from './services/promoplatforms.js';
 import { PROMO_STYLES } from './services/promokit.js';
 import { voiceCatalog, parseVoiceParams, sampleFor, listVoices, VOICE_PROVIDERS, VOICE_LANGS, REGION, localStatus, audioType } from './services/voiceover.js';
+import { requireFeature } from './services/plans.js';
 
 // Clés API des fournisseurs de voix : chiffrées dans les réglages du compte, jamais renvoyées (seuls les 4 derniers caractères le sont)
 const keyName = (provider) => `voice_key_${provider}`;
@@ -103,7 +104,8 @@ export function registerPromoRoutes(router, app, { project, aiOpts }) {
       limits: { fps: PROMO.fps, seconds: PROMO.seconds, maxFrames: PROMO.maxFrames, maxSubject: PROMO.maxSubject, maxVideos: PROMO.maxVideos },
       formats: Object.entries(FORMATS).map(([id, f]) => ({ id, label: f.label })),
       platforms: Object.entries(PLATFORMS).map(([id, pf]) => ({ id, label: pf.label, format: pf.format, fps: pf.fps, seconds: pf.seconds })),
-      styles: [{ id: 'auto', label: 'Automatique' }, ...Object.entries(PROMO_STYLES).map(([id, st]) => ({ id, label: st.label }))],
+      // Chaque style porte ses couleurs (fond, accents) : la page les montre en aperçu sur la carte à cliquer
+      styles: [{ id: 'auto', label: 'Automatique', note: 'choisi d\'après le projet' }, ...Object.entries(PROMO_STYLES).map(([id, st]) => ({ id, label: st.label, colors: [...st.fond, st.a, st.b] }))],
       voices: voiceCatalog(...Object.values(await voiceKeyHints(app, p.userId)), (app.localStatus || localStatus)(cfg)),
       voiceLangs: VOICE_LANGS,
       canManageKeys: p.access !== 'member',
@@ -186,6 +188,7 @@ export function registerPromoRoutes(router, app, { project, aiOpts }) {
 
   router.post('/api/projects/:id/promo/generate', async (ctx) => {
     const p = await project(ctx);
+    await requireFeature(db, p.userId, 'promo');
     const b = await readBody(ctx.req);
     const sup = (app.promoSupported || promoSupported)(cfg);
     if (!sup.ok) throw new HttpError(503, sup.reason, { expose: true });

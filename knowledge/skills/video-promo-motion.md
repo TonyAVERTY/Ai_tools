@@ -1,28 +1,23 @@
 ---
 nom: video-promo-motion
 titre: Vidéo de promotion : mouvement et technique
-resume: Comment une scène HTML animée par renderFrame(t) bouge bien : temps, courbes, décalages, mouvement continu, transitions et contraintes techniques.
+resume: Comment une scène HTML animée par renderFrame(t) bouge comme un studio de motion design : vitesse, flou de mouvement, raccords, son calé, un événement par seconde.
 taches: promo
 ---
-Une vidéo de promotion est une affiche animée : tout est une fonction du temps `t`, jamais de l'horloge réelle.
+Une image fixe, on la survole ; un mouvement, on le suit. Tout est une fonction du temps `t`, jamais de l'horloge réelle.
 
-Technique (obligatoire) :
-- Un seul document HTML autonome ; `window.renderFrame(t)` place TOUS les éléments à partir de `t` (position, taille, opacité, texte visible). Aucune ressource externe, aucun hasard non déterministe, aucune dépendance à la vitesse de la machine.
-- Mesure en U = 1 % du petit côté de l'image : les tailles se règlent en U, la scène tient alors en vertical, en paysage et en carré.
-- Place chaque élément par transformation (translate, scale, rotate) et opacité ; mesure sa taille une fois, à la création (un élément masqué n'a plus de taille).
+Technique : un document HTML autonome ; `window.renderFrame(t)` place TOUS les éléments depuis `t` (transformations et opacité), sans ressource externe ni hasard. Tailles en U = 1 % du petit côté de l'image ; taille d'un élément mesurée une fois, à la création.
 
-Mouvement qui donne de la vie :
-- Courbes : ease-out à l'entrée, ease-in-out aux transitions, léger dépassement (overshoot, back) pour les éléments qui « atterrissent », expo pour les grandes entrées. Jamais de mouvement linéaire.
-- Décalage (stagger) : les éléments d'un groupe entrent l'un après l'autre (0,15 à 0,25 s), les mots d'un titre aussi.
-- Mouvement continu : le fond respire (halos qui dérivent, grille qui défile), les cartes flottent de quelques pixels, les compteurs et les barres avancent, les traits se dessinent (stroke-dashoffset). Il n'y a jamais d'image immobile plus de deux secondes.
-- Transitions : le plan suivant commence 0,3 à 0,6 s avant la fin du précédent ; un élément qui sort glisse et se floute, un élément qui entre arrive de la direction opposée. Une transition réutilise un objet (la carte qui sort devient la carte qui entre) plutôt que de couper.
-- Rythme : un plan dure 4 à 6 s ; une idée par plan ; le plan final reste au moins 2 s.
-Pas de clignotement : jamais plus de 3 changements brusques de luminosité par seconde.
+Les 4 réglages du pro (obligatoires) :
+1. Vitesse : lent, rapide, lent. Rien ne démarre d'un coup, rien ne s'arrête net : chaque déplacement accélère puis freine (E.inOut, E.expo pour une grande entrée, E.back pour un léger dépassement à l'arrivée). Jamais de mouvement linéaire ni d'apparition sèche.
+2. Flou de mouvement : ce qui va vite laisse une traînée, sinon l'image saccade. Un élément qui parcourt plus de 30 U en moins de 0,4 s reçoit un flou proportionnel à sa vitesse (put(n,{blur}) : 1 à 2 U au plus vite, 0 à l'arrêt). Un élément immobile n'est jamais flou.
+3. Raccords : on ne coupe pas. Un élément du plan qui finit survit et devient le plan suivant (la carte qui sort devient l'écran qui entre, le mot clé grossit et devient le titre suivant). Le plan suivant commence 0,3 à 0,6 s avant la fin du précédent ; deux titres lisibles ne se superposent jamais.
+4. Son : il tombe pile sur l'image. Avec une voix, chaque mot du titre apparaît quand la voix le dit (2,5 mots par seconde depuis le début de la phrase), ni avant ni après.
 
-Contrat de mouvement et de contrôle :
-- La scène de référence reçue est déjà adaptée à la durée demandée : garde sa conversion de temps unique, ne recale pas chaque nombre une deuxième fois.
-- Tout état doit être recalculé depuis t. Masque explicitement tous les plans inactifs. Un appel à t=8 suivi de t=0 doit produire le même début qu'un premier appel à t=0.
-- Les mouvements de fond ne suffisent pas : anime le contenu qui explique le produit (carte qui se trie, ligne qui se complète, notification qui arrive). Prévois un événement utile toutes les 1 à 2 secondes, sans faire trembler en permanence les textes.
-- Une transition ne superpose jamais deux titres lisibles au même endroit. Une sortie peut chevaucher l'entrée du décor suivant ; le texte principal, lui, reste distinct.
-- À chaque changement de plan, vérifie début − 0,15 s, début, début + 0,15 s, milieu et fin. Aucun flash, écran vide, élément restant du plan précédent ou saut de position.
-- Contrôle le rendu, pas seulement le code : des agents inspectent les captures horodatées extraites du MP4. Leurs défauts sont des corrections obligatoires, jamais une invitation à ajouter simplement des halos.
+Une chose à chaque seconde : des mots qui arrivent mot par mot (0,15 à 0,25 s d'écart), des cartes qui s'ouvrent, des traits qui se dessinent, des compteurs qui tournent (seulement des valeurs fournies). Au moins un événement utile par seconde dans le contenu, pas seulement le fond ; aucune image immobile plus d'une seconde, sauf le plan final (au moins 2 s), sans faire trembler les textes. Un plan dure 4 à 6 s, une idée par plan. Jamais plus de 3 changements brusques de luminosité par seconde.
+
+Contrôle :
+- La scène de référence est déjà adaptée à la durée : garde sa conversion de temps unique.
+- Tout état se recalcule depuis t ; masque les plans inactifs ; t=8 puis t=0 redonne le début.
+- À chaque changement de plan, vérifie début − 0,15 s, début, début + 0,15 s, milieu et fin : ni flash, ni écran vide, ni reste du plan précédent, ni saut.
+- Des agents inspectent les captures du MP4 : leurs défauts sont des corrections obligatoires.

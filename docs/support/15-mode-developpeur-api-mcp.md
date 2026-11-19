@@ -17,3 +17,6 @@ La page Développeur a deux cartes, **API** et **Serveur MCP (Claude)**. Chaque 
 - **Serveur MCP** : relie Claude (ou un autre client MCP) au panel pour lire, classer et agir avec les droits donnés au jeton.
 - Documentation technique complète sur le site public : pages **/docs** (démarrage), **/docs/api** (API REST) et **/docs/mcp** (serveur MCP), accessibles depuis le lien « Docs » du site ou depuis la page Développeur.
 - Limite : 120 requêtes par minute et par compte ; au-delà, l'appel reçoit une erreur de limite.
+
+## Offre requise
+Le mode développeur, l'API et le serveur MCP demandent l'offre **Croissance** ou au-dessus. Avec une offre plus basse, « Activer le mode développeur » est refusé. Si ton offre redescend, l'API répond 403 (code `plan_required`) ; tes jetons ne sont pas supprimés et refonctionnent dès que l'offre revient. La liste complète est dans « Offres, plafonds et limites ».

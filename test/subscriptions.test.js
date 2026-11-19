@@ -28,7 +28,7 @@ before(async () => {
     const body = init.body ? Object.fromEntries(new URLSearchParams(String(init.body))) : {};
     calls.push({ method, path: u.pathname.replace('/v1', ''), query: Object.fromEntries(u.searchParams), body, auth: init.headers?.Authorization });
     const key = `${method} ${u.pathname.replace('/v1', '')}`;
-    const h = stripe[key] ?? stripe[`${method} *`];
+    const h = stripe[key] ?? stripe[`${method} *`] ?? (key.startsWith('GET /products/') ? stripe['GET /products/*'] : undefined);
     if (!h) return reply({ status: 404, json: { error: { message: `rien de prévu pour ${key}` } } });
     return reply(typeof h === 'function' ? h({ body, query: Object.fromEntries(u.searchParams) }) : h);
   };
@@ -41,9 +41,9 @@ const loc = (r) => decodeURIComponent(String(r.headers.get('location')).replace(
 const dbUser = (id) => s.db.prepare('SELECT id, plan, is_admin FROM users WHERE id = ?').get(id);
 const sub = (over = {}) => ({
   id: 'sub_1', customer: 'cus_1', status: 'active', cancel_at_period_end: false, current_period_end: now() + 30 * DAY,
-  metadata: { user_id: '0', plan: 'starter', period: 'month' }, items: { data: [{ id: 'si_1' }] }, ...over,
+  metadata: { app: 'iaboss', user_id: '0', plan: 'starter', period: 'month' }, items: { data: [{ id: 'si_1' }] }, ...over,
 });
-const withUser = (u, over = {}) => sub({ ...over, metadata: { user_id: String(u.id), plan: 'starter', period: 'month', ...(over.metadata || {}) } });
+const withUser = (u, over = {}) => sub({ ...over, metadata: { app: 'iaboss', user_id: String(u.id), plan: 'starter', period: 'month', ...(over.metadata || {}) } });
 const event = (type, object, id = `evt_${Math.random().toString(36).slice(2)}`) => ({ id, type, data: { object } });
 const webhook = (ev, { secret = WH, at, header, target = s } = {}) => {
   const raw = JSON.stringify(ev);
@@ -51,6 +51,7 @@ const webhook = (ev, { secret = WH, at, header, target = s } = {}) => {
 };
 const priceStub = () => {
   stripe['GET /prices'] = { json: { data: [] } };
+  stripe['GET /products/*'] = { json: { id: 'produit' } };
   stripe['POST /prices'] = ({ body }) => ({ json: { id: `price_${body.lookup_key}` } });
 };
 
@@ -73,9 +74,9 @@ test('configuration : les deux clés ensemble, bon format, mode test ou producti
 
 test('outils Stripe : paramètres imbriqués, montants, signature des événements', () => {
   assert.equal(formParams({ a: { b: 1 }, c: ['x', { d: 2 }], e: null, f: undefined, g: 'é & =' }).toString(), 'a%5Bb%5D=1&c%5B0%5D=x&c%5B1%5D%5Bd%5D=2&g=%C3%A9+%26+%3D');
-  assert.equal(amountCents('starter', 'month'), 1000);
-  assert.equal(amountCents('starter', 'year'), 10_000, 'annuel : 2 mois offerts');
-  assert.equal(amountCents('intensive', 'year'), 100_00 * 10);
+  assert.equal(amountCents('starter', 'month'), 900);
+  assert.equal(amountCents('starter', 'year'), 9000, 'annuel : 2 mois offerts');
+  assert.equal(amountCents('intensive', 'year'), 75_00 * 10);
   assert.throws(() => amountCents('inconnu', 'month'), /Offre inconnue/);
   assert.throws(() => amountCents('starter', 'week'), /Périodicité/);
   const raw = JSON.stringify(event('x.y', {}, 'evt_a'));
@@ -98,13 +99,13 @@ test('paiement : « Choisir cette offre » ouvre la page de paiement Stripe avec
   assert.equal(r.status, 303);
   assert.equal(r.headers.get('location'), 'https://checkout.stripe.com/c/pay/cs_1');
   const price = calls.find((c) => c.method === 'POST' && c.path === '/prices');
-  assert.equal(price.body.unit_amount, '25000', 'annuel : 10 mois de 25 €');
+  assert.equal(price.body.unit_amount, '19000', 'annuel : 10 mois de 19 €');
   assert.equal(price.body['recurring[interval]'], 'year');
   assert.equal(price.body.currency, 'eur');
-  assert.equal(price.body.lookup_key, 'iaboss_growth_year_25000');
+  assert.equal(price.body.lookup_key, 'iaboss_growth_year_19000');
   const co = calls.find((c) => c.path === '/checkout/sessions').body;
   assert.equal(co.mode, 'subscription');
-  assert.equal(co['line_items[0][price]'], 'price_iaboss_growth_year_25000');
+  assert.equal(co['line_items[0][price]'], 'price_iaboss_growth_year_19000');
   assert.equal(co.client_reference_id, String(u.id));
   assert.equal(co.customer_email, 'achat@x.fr');
   assert.equal(co['metadata[plan]'], 'growth');
@@ -163,7 +164,7 @@ test('événements : signature obligatoire, abonnement créé = plan du compte, 
   const again = await webhook(ev);
   assert.equal((await again.json()).duplicate, true, 'le même événement n\'est traité qu\'une fois');
   // Un abonnement dont le compte n'existe pas (supprimé entre-temps) : on répond 200, rien à faire
-  const ghost = await webhook(event('customer.subscription.updated', sub({ customer: 'cus_fantome', metadata: { user_id: '99999999', plan: 'starter', period: 'month' } })));
+  const ghost = await webhook(event('customer.subscription.updated', sub({ customer: 'cus_fantome', metadata: { app: 'iaboss', user_id: '99999999', plan: 'starter', period: 'month' } })));
   assert.equal(ghost.status, 200);
   assert.equal((await s.db.prepare("SELECT COUNT(*) n FROM subscriptions WHERE customer_id = 'cus_fantome'").get()).n, 0);
   // Les événements sans effet répondent 200 (Stripe ne doit pas les renvoyer)
@@ -175,7 +176,7 @@ test('événements : signature obligatoire, abonnement créé = plan du compte, 
 test('paiement abouti : « checkout.session.completed » lie le client Stripe au compte et relit l\'abonnement', async () => {
   const u = await user('checkout@x.fr');
   stripe['GET /subscriptions/sub_9'] = { json: withUser(u, { id: 'sub_9', customer: 'cus_9', metadata: { plan: 'business', period: 'year' } }) };
-  const ev = event('checkout.session.completed', { mode: 'subscription', customer: 'cus_9', subscription: 'sub_9', client_reference_id: String(u.id), metadata: { user_id: String(u.id), plan: 'business', period: 'year' } });
+  const ev = event('checkout.session.completed', { mode: 'subscription', customer: 'cus_9', subscription: 'sub_9', client_reference_id: String(u.id), metadata: { app: 'iaboss', user_id: String(u.id), plan: 'business', period: 'year' } });
   assert.equal((await webhook(ev)).status, 200);
   assert.equal((await dbUser(u.id)).plan, 'business');
   assert.equal((await subscriptionOf(s.db, u.id)).customer_id, 'cus_9');
@@ -201,7 +202,7 @@ test('changement d\'offre : un abonnement actif est modifié (au prorata), jamai
   assert.ok(!calls.some((c) => c.path === '/checkout/sessions'), 'pas de second abonnement');
   const upd = calls.find((c) => c.method === 'POST' && c.path === '/subscriptions/sub_1').body;
   assert.equal(upd['items[0][id]'], 'si_1');
-  assert.equal(upd['items[0][price]'], 'price_iaboss_business_month_5000');
+  assert.equal(upd['items[0][price]'], 'price_iaboss_business_month_2900');
   assert.equal(upd.proration_behavior, 'create_prorations');
   assert.equal((await dbUser(u.id)).plan, 'business');
   // Un paiement refusé : on renvoie vers le portail, pas de changement
@@ -328,7 +329,7 @@ test('pages : Tarifs propose « Choisir cette offre » quand les paiements sont 
   assert.match(acc, /Mode test : aucun paiement réel/);
   await applySubscription(s.db, withUser(u, { current_period_end: Math.floor(Date.UTC(2027, 0, 15, 12) / 1000) }));
   acc = await page(s, '/account', u);
-  assert.match(acc, /Ton offre : Démarrage[^]*10 € TTC par mois[^]*Prochain paiement le 15 janvier 2027/);
+  assert.match(acc, /Ton offre : Démarrage[^]*9 € TTC par mois[^]*Prochain paiement le 15 janvier 2027/);
   assert.match(acc, /action="\/abonnement\/portail"[^]*Gérer mon abonnement/);
   assert.match(acc, /Changer d'offre/);
   await applySubscription(s.db, withUser(u, { cancel_at_period_end: true, current_period_end: Math.floor(Date.UTC(2027, 0, 15, 12) / 1000) }));
@@ -346,4 +347,47 @@ test('pages : Tarifs propose « Choisir cette offre » quand les paiements sont 
   assert.match(await page(s, '/confidentialite'), /Stripe Payments Europe/);
   assert.match(await page(off, '/cgu'), /Ces plans ouvrent prochainement/);
   assert.doesNotMatch(await page(off, '/confidentialite'), /Stripe Payments Europe/);
+});
+
+test('compte Stripe partagé : les abonnements et paiements d\'un autre produit du même compte ne touchent jamais un compte iaboss', async () => {
+  const u = await user('partage@x.fr');
+  // Un autre produit du même compte Stripe qui réutilise les mêmes noms de métadonnées (user_id, plan) : sans marqueur « app », rien n'est appliqué
+  const foreign = withUser(u, { id: 'sub_autre', customer: 'cus_autre', metadata: { app: undefined, plan: 'business' } });
+  delete foreign.metadata.app;
+  assert.equal((await webhook(event('customer.subscription.created', foreign))).status, 200);
+  assert.equal((await dbUser(u.id)).plan, 'free', 'abonnement d\'un autre produit : plan inchangé');
+  assert.equal((await s.db.prepare('SELECT COUNT(*) n FROM subscriptions WHERE user_id = ?').get(u.id)).n, 0);
+  const co = event('checkout.session.completed', { mode: 'subscription', customer: 'cus_autre', subscription: 'sub_autre', client_reference_id: String(u.id), metadata: { user_id: String(u.id), plan: 'business' } });
+  assert.equal((await webhook(co)).status, 200);
+  assert.equal((await s.db.prepare('SELECT COUNT(*) n FROM subscriptions WHERE user_id = ?').get(u.id)).n, 0, 'paiement d\'un autre produit : aucun abonnement créé');
+  // Le client Stripe d'un abonnement iaboss ne sert pas à rattacher un abonnement étranger
+  assert.equal((await webhook(event('customer.subscription.created', withUser(u, { id: 'sub_ok', customer: 'cus_ok' })))).status, 200);
+  assert.equal((await dbUser(u.id)).plan, 'starter');
+  const sameCustomer = withUser(u, { id: 'sub_etranger', customer: 'cus_ok', status: 'canceled', metadata: { plan: 'growth' } });
+  delete sameCustomer.metadata.app; delete sameCustomer.metadata.user_id;
+  await webhook(event('customer.subscription.deleted', sameCustomer));
+  assert.equal((await dbUser(u.id)).plan, 'starter', 'la fin d\'un abonnement étranger du même client ne rétrograde pas le compte');
+});
+
+test('articles : un produit Stripe par offre (identifiant fixe, libellé de relevé, marqueur iaboss), rattaché à ses prix mensuel et annuel', async () => {
+  const u = await user('produit@x.fr');
+  stripe['GET /prices'] = { json: { data: [] } };
+  stripe['GET /products/iaboss_growth'] = { status: 404, json: { error: { message: 'No such product' } } };
+  stripe['POST /products'] = ({ body }) => ({ json: { id: body.id } });
+  stripe['POST /prices'] = ({ body }) => ({ json: { id: `price_${body.lookup_key}` } });
+  stripe['POST /checkout/sessions'] = { json: { id: 'cs_p', url: 'https://checkout.stripe.com/c/pay/cs_p' } };
+  await u.post('/abonnement/choisir', { plan: 'growth', period: 'month' }, { form: true });
+  const prod = calls.find((c) => c.method === 'POST' && c.path === '/products').body;
+  assert.equal(prod.id, 'iaboss_growth');
+  assert.equal(prod.name, 'iaboss Croissance');
+  assert.equal(prod.statement_descriptor, 'IABOSS CROISSANCE');
+  assert.equal(prod['metadata[app]'], 'iaboss');
+  assert.equal(prod['metadata[plan]'], 'growth');
+  assert.equal(calls.find((c) => c.path === '/prices' && c.method === 'POST').body.product, 'iaboss_growth', 'le prix est rattaché au produit, pas à un produit créé en ligne');
+  assert.ok(!calls.some((c) => c.method === 'POST' && c.path === '/prices' && 'product_data[name]' in c.body));
+  // Le même produit sert au prix annuel, sans être recréé
+  calls = [];
+  await u.post('/abonnement/choisir', { plan: 'growth', period: 'year' }, { form: true });
+  assert.ok(!calls.some((c) => c.path === '/products' && c.method === 'POST'), 'produit déjà créé : pas recréé');
+  assert.equal(calls.find((c) => c.path === '/prices' && c.method === 'POST').body.product, 'iaboss_growth');
 });

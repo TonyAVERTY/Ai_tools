@@ -72,12 +72,13 @@ import { normalizeModel, PROMPT_SCOPES, catalogOf } from './services/models.js';
 import { nextNightSlot } from './services/paris-time.js';
 import { notify, notifyConfig, saveDiscordHooks, publicHooks, EVENTS, MAX_HOOKS } from './services/notify.js';
 import { listChannels, saveChannels, publicChannels, notifyChannels, CHANNEL_TYPES } from './services/channels.js';
-import { budgetState, AI_JOBS } from './services/budget.js';
+import { budgetState, AI_JOBS, quotaPauseThreshold, QUOTA_PAUSE_DEFAULT_PERCENT, QUOTA_PAUSE_MIN_PERCENT, QUOTA_PAUSE_MAX_PERCENT } from './services/budget.js';
 import { currentClaudeQuota } from './services/usagelive.js';
 import { currentChatgptLimits } from './services/usagechatgpt.js';
 import { sendWeeklyReport } from './services/report.js';
 import { exportProspects, importProspects } from './services/csv.js';
-import { quotaFor, planLimitError, withUserLock, assertRoom, usageView } from './services/plans.js';
+import { quotaFor, planLimitError, withUserLock, assertRoom, usageView, lockedFeatures, hasFeature } from './services/plans.js';
+import { lockedCard } from './lockviews.js';
 import { history, saveSnapshot } from './services/metrics.js';
 import { evolutionHtml } from './services/markdown.js';
 import {
@@ -244,7 +245,8 @@ export function registerRoutes(router, app) {
     html(res, projectTabPage({
       email: session.email, entry, tab, stats: (await projectStats(db, [full.id])).get(Number(full.id)),
       checklist: await projectChecklist(app, full), jobs: await latestJobs(db, full.id),
-      billing: tab === 'facturation' ? await app.billingTab(ctx) : null,
+      locked: lockedFeatures(await getUser(db, full.userId)),
+      billing: tab === 'facturation' ? (hasFeature(await getUser(db, full.userId), 'billing') ? await app.billingTab(ctx) : lockedCard('billing', 'Devis et factures')) : null,
       clientCounts: tab === 'clients' ? (await clientsOverview(db, session.userId, [Number(full.id)])).get(Number(full.id)) : null,
       journal: tab === 'envoi' ? await journalOf(db, full.id) : null,
       scheduled: tab === 'communication' ? (await db.prepare("SELECT body, scheduled_at at FROM linkedin_posts WHERE project_id = ? AND status = 'scheduled' ORDER BY scheduled_at LIMIT 5").all(full.id)).map((r) => ({ body: r.body, at: Number(r.at) })) : [],
@@ -283,11 +285,13 @@ export function registerRoutes(router, app) {
       global_daily_cap: await getSetting(db, userId, 'global_daily_cap', '100'),
       send_delay_min: await getSetting(db, userId, 'send_delay_min', '20'),
       send_delay_max: await getSetting(db, userId, 'send_delay_max', '60'),
+      quota_pause_percent: String(Math.round(await quotaPauseThreshold(db, userId) * 100)),
       prospect_model: models.prospect,
       analyze_model: models.analyze,
       write_model: models.write,
       weekly_report: await getSetting(db, userId, 'weekly_report', '0') === '1',
       read_receipt: await getSetting(db, userId, 'read_receipt', '0') === '1',
+      auto_retry: await getSetting(db, userId, 'auto_retry', '0') === '1',
       mail_footer: await getSetting(db, userId, 'mail_footer', '1') !== '0',
       budget_day_usd: await getSetting(db, userId, 'budget_day_usd', ''),
       budget_month_usd: await getSetting(db, userId, 'budget_month_usd', ''),
@@ -328,6 +332,8 @@ export function registerRoutes(router, app) {
     await set('global_daily_cap', String(cap));
     await set('send_delay_min', String(dmin));
     await set('send_delay_max', String(dmax));
+    // Absent (autre formulaire) : la valeur enregistrée ne bouge pas
+    if (b.quota_pause_percent !== undefined) await set('quota_pause_percent', String(int(b.quota_pause_percent, QUOTA_PAUSE_MIN_PERCENT, QUOTA_PAUSE_MAX_PERCENT, QUOTA_PAUSE_DEFAULT_PERCENT)));
     // Modèles : uniquement ceux du catalogue (services/models.js) ; un champ absent ne change rien
     const provider = await userProvider(db, userId);
     for (const k of ['prospect_model', 'analyze_model', 'write_model']) if (b[k] !== undefined) await set(k, normalizeModel(b[k], undefined, provider));
@@ -335,6 +341,7 @@ export function registerRoutes(router, app) {
     await set('weekly_report', b.weekly_report === 'on' ? '1' : '0');
     // Les cases décochées ne sont pas envoyées : la présence du champ « délais » signale le formulaire complet
     if (b.send_delay_min !== undefined) await set('read_receipt', b.read_receipt === 'on' ? '1' : '0');
+    if (b.send_delay_min !== undefined) await set('auto_retry', b.auto_retry === 'on' ? '1' : '0');
     // Champs absents du formulaire (compte en abonnement : pas de plafond en $) : les valeurs enregistrées ne bougent pas
     if (b.budget_day_usd !== undefined) await set('budget_day_usd', money(b.budget_day_usd));
     if (b.budget_month_usd !== undefined) await set('budget_month_usd', money(b.budget_month_usd));
@@ -484,7 +491,7 @@ export function registerRoutes(router, app) {
       : link && link.mode !== MODES.api_key && link.provider === 'claude' ? await currentClaudeQuota(app, session.userId).catch(() => null) : null;
     const account = { link, quota };
     html(res, accountPage({
-      user: session.user, error: url.searchParams.get('e'), link: account.link, quota: account.quota, developer: await developerMode(db, session.userId), appUrl: cfg.appUrl,
+      user: session.user, error: url.searchParams.get('e'), link: account.link, quota: account.quota, developer: await developerMode(db, session.userId), devLocked: !hasFeature(session.user, 'api'), appUrl: cfg.appUrl,
       ical: await (async () => { const t = await feedToken(app, session.userId); return t ? feedUrl(cfg, t) : null; })(),
       consent: await lastConsent(db, session.userId), profileSet: !isEmpty(await getProfile(db, session.userId)), cliModeEnabled, usage: { ...(await usageView(db, await getUser(db, session.userId))), billing: await billingView(app, session.userId), flash: url.searchParams.get('abonnement') },
       notice: t === 'unlinked' ? { ok: true, text: 'Liaison supprimée : le secret a été effacé et tes jobs IA en attente ont été annulés.' }

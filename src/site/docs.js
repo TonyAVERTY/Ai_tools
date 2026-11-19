@@ -186,7 +186,7 @@ export function docsApiPage({ appUrl }) {
           <tr><td><span class="status s-4">429</span></td><td><code>rate_limited</code></td><td>Trop de requêtes : attends <code>Retry-After</code> secondes</td></tr></tbody></table></div>` },
       { id: 'limites', title: 'Limites', html: `<ul><li><strong>120 requêtes par minute et par compte</strong> (300 par minute et par adresse IP, avant authentification). Au-delà : <code>429</code> avec l'en-tête <code>Retry-After</code>.</li>
         <li>100 prospects au plus par appel d'ajout ; 200 mails au plus par page d'historique.</li>
-        <li>Les plafonds de ton plan (prospects, mails par mois, tâches IA) s'appliquent exactement comme dans le panel.</li></ul>` },
+        <li>Les plafonds de ton plan (prospects, mails par semaine, tâches IA) s'appliquent exactement comme dans le panel.</li></ul>` },
       ...groups.map((g) => ({
         id: g.id, title: g.label,
         sub: g.list.map((e) => [slug(`${e.method} ${e.path}`), `${e.method} ${e.path}`]),
