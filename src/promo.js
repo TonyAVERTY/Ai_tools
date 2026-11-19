@@ -104,7 +104,8 @@ export function registerPromoRoutes(router, app, { project, aiOpts }) {
       limits: { fps: PROMO.fps, seconds: PROMO.seconds, maxFrames: PROMO.maxFrames, maxSubject: PROMO.maxSubject, maxVideos: PROMO.maxVideos },
       formats: Object.entries(FORMATS).map(([id, f]) => ({ id, label: f.label })),
       platforms: Object.entries(PLATFORMS).map(([id, pf]) => ({ id, label: pf.label, format: pf.format, fps: pf.fps, seconds: pf.seconds })),
-      styles: [{ id: 'auto', label: 'Automatique' }, ...Object.entries(PROMO_STYLES).map(([id, st]) => ({ id, label: st.label }))],
+      // Chaque style porte ses couleurs (fond, accents) : la page les montre en aperçu sur la carte à cliquer
+      styles: [{ id: 'auto', label: 'Automatique', note: 'choisi d\'après le projet' }, ...Object.entries(PROMO_STYLES).map(([id, st]) => ({ id, label: st.label, colors: [...st.fond, st.a, st.b] }))],
       voices: voiceCatalog(...Object.values(await voiceKeyHints(app, p.userId)), (app.localStatus || localStatus)(cfg)),
       voiceLangs: VOICE_LANGS,
       canManageKeys: p.access !== 'member',

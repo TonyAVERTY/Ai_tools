@@ -11,7 +11,7 @@ Le projet doit être **analysé** (sinon : « Analyse d'abord le projet : Claude
 3. **Images par seconde** : de 10 à 60 (30 par défaut). Plus il y en a, plus le mouvement est fluide et plus le rendu est long.
 4. **Durée (secondes)** : de 3 à 60 (15 par défaut).
 5. **Format** : Paysage 16:9, Vertical 9:16 (réseaux) ou Carré 1:1.
-6. **Style** : la direction artistique. « Automatique » (par défaut) choisit une allure d'après le projet, toujours la même pour un même projet ; sinon « Sombre et lumineux » (fond nuit, halos), « Dégradé vif » (grand dégradé saturé, accent jaune), « Clair et net » (fond clair teinté, cartes blanches) ou « Chaud et humain » (cuivre et braise). Chaque style impose ses couleurs exactes à l'IA : plus de fond blanc vide.
+6. **Style** : la direction artistique. Clique sur une des cartes (un seul style par vidéo) ; chaque carte montre les couleurs du style. « Automatique » (par défaut) choisit une allure d'après le projet, toujours la même pour un même projet ; sinon « Sombre et lumineux » (fond nuit, halos), « Dégradé vif » (grand dégradé saturé, accent jaune), « Clair et net » (fond clair teinté, cartes blanches) ou « Chaud et humain » (cuivre et braise). Chaque style impose ses couleurs exactes à l'IA : plus de fond blanc vide.
 7. **Ajouter une voix** (case à cocher, facultative) : fait lire la vidéo à voix haute. Cocher la case affiche :
    - **Fournisseur** : six choix, dont trois sans clé.
      - « Google Traduction (gratuit) » : sans clé ni compte, une seule voix par langue, simple (voix un peu robotique). C'est le choix par défaut. Service non officiel : il peut changer ou refuser des demandes.
