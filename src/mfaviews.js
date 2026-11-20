@@ -1,11 +1,11 @@
 // Vues de l'authentification à deux facteurs : carte « Sécurité » du compte, page de saisie du code à la connexion, page des codes de secours.
 import { esc } from './http.js';
 import { ic } from './icons.js';
+import { banner } from './banner.js';
 import { layout } from './views.js';
 import { siteLayout } from './site/layout.js';
 import { otpauthUrl } from './totp.js';
-
-const group = (secret) => secret.match(/.{1,4}/g).join(' ');
+import { qrSvg } from './qr.js';
 
 /** Carte « Sécurité » de la page Mon compte : trois états (désactivée, en cours d'activation, activée). */
 export function securityCard({ enabled, setup = null, email, recoveryLeft = 0 }) {
@@ -19,12 +19,19 @@ export function securityCard({ enabled, setup = null, email, recoveryLeft = 0 })
   <form method="post" action="/account/2fa/disable" class="cfg" data-confirm="Désactiver l'A2F ? Ton compte ne sera plus protégé que par ton compte Google ou Apple."><p class="muted small">Pour la désactiver, saisis un code de ton application ou un code de secours.</p>${code()}
     <div class="row"><button class="btn danger">Désactiver l'A2F</button></div></form>`;
   } else if (setup) {
-    body = `<p>1. Dans ton application d'authentification (Google Authenticator, Authy, 1Password, Bitwarden…), ajoute un compte avec cette clé :</p>
-  <div class="cmd"><span class="lbl">Clé de configuration</span><div class="cmd-b"><pre><code>${esc(group(setup))}</code></pre><button type="button" class="btn small" data-copy-cmd aria-label="Copier : clé de configuration">${ic('copy')}Copier</button></div></div>
-  <p class="muted small">Sur un téléphone, <a href="${esc(otpauthUrl(setup, email))}">ouvre directement l'application</a> pour l'ajouter sans rien taper. Type de clé : temporelle, 6 chiffres, 30 secondes.</p>
+    body = `<p>1. Dans ton application d'authentification (Google Authenticator, Authy, 1Password, Bitwarden…), scanne ce QR code.</p>
+  <div class="qr-box">${qrSvg(otpauthUrl(setup, email), 'QR code à scanner avec ton application d\'authentification')}
+    <button type="button" class="btn" data-open-dialog="mfa-key">${ic('key')}Clé de configuration</button></div>
+  <p class="muted small">Sur un téléphone, <a href="${esc(otpauthUrl(setup, email))}">ouvre directement l'application</a> pour l'ajouter sans scanner.</p>
   <form method="post" action="/account/2fa/enable" class="cfg"><p>2. Saisis le code qu'elle affiche pour vérifier que tout est en place.</p>${code()}
     <div class="row"><button class="btn primary">${ic('shield')}Activer l'A2F</button></div></form>
-  <form method="post" action="/account/2fa/cancel" class="cfg"><div class="row"><button class="btn">Annuler</button></div></form>`;
+  <form method="post" action="/account/2fa/cancel" class="cfg"><div class="row"><button class="btn">Annuler</button></div></form>
+  <dialog class="prospect-dialog modal" id="mfa-key" aria-labelledby="mfa-key-t"><div class="cfg">
+    <h2 id="mfa-key-t">${ic('key')}Clé de configuration</h2>
+    <p class="muted small">Si tu ne peux pas scanner le QR code, ajoute un compte dans ton application avec cette clé. Type de clé : temporelle, 6 chiffres, 30 secondes.</p>
+    <div class="cmd"><span class="lbl">Clé</span><div class="cmd-b"><pre><code>${esc(setup)}</code></pre><button type="button" class="btn small" data-copy-cmd aria-label="Copier la clé de configuration">${ic('copy')}Copier</button></div></div>
+    <div class="modal-f"><button type="button" class="btn primary" data-close-dialog>Fermer</button></div>
+  </div></dialog>`;
   } else {
     body = `<p class="muted">L'A2F ajoute un second contrôle à la connexion : en plus de ton compte Google ou Apple, il faut un code à 6 chiffres qui change toutes les 30 secondes.</p>
   <form method="post" action="/account/2fa/start" class="cfg"><div class="row"><button class="btn primary">${ic('shield')}Activer l'A2F</button></div></form>`;
@@ -42,7 +49,7 @@ export function mfaLoginPage({ appUrl, error = null }) {
     description: 'Saisis le code de ton application d\'authentification pour finir ta connexion.',
     body: `<div class="stage-p"><div class="wrap"><section class="auth" aria-labelledby="m-h">
   <div><h1 id="m-h">Code de vérification</h1><p class="sub">Saisis le code à 6 chiffres de ton application d'authentification. Tu n'y as plus accès ? Utilise un code de secours.</p></div>
-  ${error ? `<p class="msg msg-err" role="alert">${esc(error)}</p>` : ''}
+  ${error ? banner('err', error) : ''}
   <form method="post" action="/login/2fa" class="cfg">
     <label class="field"><span class="lbl">Code</span><input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="20" required autofocus></label>
     <div class="row"><button class="btn primary">Valider</button></div>

@@ -56,7 +56,7 @@ export function verifyTotp(secret, input, { at = Math.floor(Date.now() / 1000), 
 
 /** Adresse à scanner ou à ouvrir dans l'application d'authentification. */
 export const otpauthUrl = (secret, account, issuer = 'iaboss') =>
-  `otpauth://totp/${encodeURIComponent(issuer)}:${encodeURIComponent(account)}?secret=${secret}&issuer=${encodeURIComponent(issuer)}&algorithm=SHA1&digits=6&period=${STEP}`;
+  `otpauth://totp/${encodeURIComponent(issuer)}:${encodeURIComponent(account)}?secret=${secret}&issuer=${encodeURIComponent(issuer)}`; // SHA-1, 6 chiffres, 30 s : les valeurs par défaut de toutes les applications
 
 // ---------- Codes de secours ----------
 
