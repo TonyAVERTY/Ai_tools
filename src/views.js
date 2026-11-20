@@ -275,7 +275,7 @@ export function accountPage({ user, error, link = null, consent = null, notice =
   <p class="tools-grp">Réglages</p><a href="/settings#notif">Notifications</a><a href="/settings#git">Dépôts Git</a><a href="/settings#garde">Garde-fous</a><a href="/settings#garde">Liste d'opposition</a><a href="/settings#budget">Budget et modèles IA</a><a href="/settings#prompts">Prompts IA</a>
   <p class="tools-grp">Équipe et avancé</p><a href="/team">Équipe</a><a href="/developer">Mode développeur</a><a href="/?tour=1">Visite guidée</a><a href="#danger">Zone de danger</a></nav>
 <div class="pj-flat tools-main">
-${notice ? banner(notice.ok ? 'ok' : 'err', notice.text) : ''}
+${notice ? banner(notice.ok ? 'ok' : 'err', notice.text, { flash: true }) : ''}
 <div id="mon-ia">${linkSection(link, consent, quota)}</div>
 <div id="usage">${usagePanel(usage)}</div>
 <section class="card" id="profil">
@@ -300,7 +300,7 @@ ${notice ? banner(notice.ok ? 'ok' : 'err', notice.text) : ''}
 <section class="card danger" id="danger">
   <div class="card-h"><h2>Zone de danger</h2></div>
   <p class="card-d">Supprimer ton compte efface définitivement ton compte et toutes tes données : projets, prospects, notes, modèles de mail, journaux d'envoi, lignes de comptabilité et leurs justificatifs, jobs, réglages et clones du code. Les adresses qui ont demandé à ne plus être contactées restent dans la liste d'opposition commune. Cette action est irréversible.</p>
-  ${error ? banner('err', error) : ''}
+  ${error ? banner('err', error, { flash: true }) : ''}
   <form method="post" action="/account/delete" class="cfg">
     <label class="field"><span class="lbl">Pour confirmer, saisis ton email (${esc(user.email)})</span><input name="confirm" type="email" required autocomplete="off"></label>
     <div class="row"><button class="btn danger-fill">${ic('trash')}Supprimer mon compte et mes données</button></div>

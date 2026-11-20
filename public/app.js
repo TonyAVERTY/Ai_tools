@@ -1883,6 +1883,22 @@
     }
   });
 
+  // Résultat d'une redirection (ex. « Ton compte n'a pas besoin d'offre » après « Choisir cette offre ») : le serveur écrit un bandeau marqué
+  // data-flash et met le message dans l'adresse (?e=, ?t=&m=). Ici il devient un toast comme les autres, et l'adresse est nettoyée pour qu'un
+  // rechargement ne le rejoue pas. Sans JavaScript, le bandeau reste.
+  $$('[data-flash]').forEach((bar) => {
+    const text = $('span', bar)?.textContent.trim();
+    if (!text) return;
+    const err = bar.dataset.flash === 'err';
+    toast(err ? text : text.replace(/\.$/, ''), err ? 'error' : 'ok');
+    bar.remove();
+    const u = new URL(location.href);
+    if (['e', 't', 'm'].some((k) => u.searchParams.has(k))) {
+      ['e', 't', 'm'].forEach((k) => u.searchParams.delete(k));
+      history.replaceState(history.state, '', `${u.pathname}${u.search}${u.hash}`);
+    }
+  });
+
   // Barre d'enregistrement des réglages : visible seulement tant qu'un champ diffère de sa valeur enregistrée
   const fieldChanged = (el) => {
     if (el.type === 'checkbox' || el.type === 'radio') return el.checked !== el.defaultChecked;
