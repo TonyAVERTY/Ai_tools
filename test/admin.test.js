@@ -16,7 +16,7 @@ import { startApp } from './helpers/server.js';
 const html = { headers: { accept: 'text/html' } };
 const ADMIN_ROUTES = [
   ['GET', '/admin'], ['GET', '/admin?page=2&q=x'], ['POST', '/admin/users/1/suspend'], ['POST', '/admin/users/1/reactivate'],
-  ['POST', '/admin/users/1/plan'], ['POST', '/admin/users/1/delete'], ['POST', '/admin/users/1/resume-send'],
+  ['POST', '/admin/users/1/plan'], ['POST', '/admin/users/1/delete'], ['POST', '/admin/users/1/resume-send'], ['GET', '/admin/stats'],
 ];
 const form = (u, path, body = {}, o = {}) => u.post(path, body, { form: true, ...o });
 const where = (r) => decodeURIComponent(r.headers.get('location') || '');

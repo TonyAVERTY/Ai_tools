@@ -25,8 +25,8 @@ ${newToken ? `<section class="card" role="status">
   <div class="card-h"><h2>Jeton créé : copie-le maintenant</h2><p>Il ne sera plus jamais affiché. Si tu le perds, supprime-le et crées-en un autre.</p></div>
   <div class="tokenbox"><code data-token>${esc(newToken)}</code><button type="button" class="btn small" data-copy-token>${ic('copy')}Copier</button></div>
 </section>` : ''}
-<section class="card">
-  <div class="card-h"><h2>Jetons d'API</h2><p>Un jeton donne accès à ton compte avec les droits cochés, et à rien d'autre. Garde-le secret : ne le mets jamais dans une page web, un dépôt ou un message. ${max} jetons au plus.</p></div>
+<section class="card" id="jetons" aria-labelledby="h-djet">
+  <div class="card-h"><h2 id="h-djet">Jetons d'API</h2><p>Un jeton donne accès à ton compte avec les droits cochés, et à rien d'autre. Garde-le secret : ne le mets jamais dans une page web, un dépôt ou un message. ${max} jetons au plus.</p></div>
   ${error ? banner('err', error) : ''}
   ${tokens.length ? `<div class="table-wrap"><table><thead><tr><th>Nom</th><th>Jeton</th><th>Droits</th><th>Créé</th><th>Dernier usage</th><th><span class="sr-only">Action</span></th></tr></thead><tbody>
     ${tokens.map((t) => `<tr><td>${esc(t.name)}</td><td><code>${TOKEN_MASK}</code></td><td>${t.scopes.map((s) => `<span class="badge">${esc(s)}</span>`).join(' ')}</td><td>${esc(day(t.createdAt))}</td><td>${esc(day(t.lastUsedAt))}</td>
@@ -40,7 +40,8 @@ ${newToken ? `<section class="card" role="status">
     <div class="row"><button class="btn primary">${ic('key')}Créer un jeton</button></div>
   </form>` : ''}
 </section>
-<section class="card" aria-labelledby="h-dapi">
+<div class="dev-grid">
+<section class="card" id="api" aria-labelledby="h-dapi">
   <div class="card-h"><h2 id="h-dapi">API</h2><p>Chaque requête porte <code>Authorization: Bearer iaboss_…</code> ; les corps sont en JSON ; limite de 120 requêtes par minute et par compte. <a href="/docs/api">Référence complète, exemples et erreurs</a>.</p></div>
   ${cmd("Adresse de l'API", `${appUrl}/api/v1`)}
   ${cmd('Exemple', `curl -H "Authorization: Bearer $IABOSS_TOKEN" ${appUrl}/api/v1/projects`)}
@@ -51,7 +52,7 @@ ${newToken ? `<section class="card" role="status">
   </details>
   <p class="muted small">Réponses d'erreur : <code>{ "error": "message", "code": "…" }</code>.</p>
 </section>
-<section class="card" aria-labelledby="h-dmcp">
+<section class="card" id="mcp" aria-labelledby="h-dmcp">
   <div class="card-h"><h2 id="h-dmcp">Serveur MCP (Claude)</h2><p>Le serveur MCP relie Claude à ton panel avec ces mêmes jetons : tu peux lui demander « quelles réponses sont arrivées ? » ou « ajoute une note à ce prospect ». Il tourne sur ton ordinateur (il a besoin de Node.js) et parle à ce panel par internet, avec ton jeton. Il n'a aucun droit propre : il ne peut faire que ce que son jeton autorise.</p></div>
   <ol class="mcp-steps">
     <li><span><b>Télécharge le fichier</b> et range-le où tu veux sur ton ordinateur (par exemple dans ton dossier personnel).</span>
@@ -61,10 +62,18 @@ ${newToken ? `<section class="card" role="status">
   </ol>
   <p class="muted small">Installation et outils : <a href="/docs/mcp">documentation du serveur MCP</a>.</p>
 </section>
-<section class="card">
-  <div class="card-h"><h2>Désactiver</h2><p>Désactiver le mode développeur coupe immédiatement tous les jetons (ils sont conservés, mais inutilisables).</p></div>
+</div>
+<section class="card" id="desactiver" aria-labelledby="h-doff">
+  <div class="card-h"><h2 id="h-doff">Désactiver</h2><p>Désactiver le mode développeur coupe immédiatement tous les jetons (ils sont conservés, mais inutilisables).</p></div>
   <form method="post" action="/account/developer" class="cfg"><input type="hidden" name="enabled" value="">
     <div class="row"><button class="btn">Désactiver le mode développeur</button></div></form>
 </section>`;
-  return layout({ title: 'Développeur', email: user.email, body: `<div class="narrow"><h1 class="h1">${ic('key')}Développeur</h1>${body}</div>` });
+  const ready = enabled && !locked;
+  // Mode actif : même mise en page que les pages de tâches (barre à gauche qui suit la lecture, blocs à droite, API et MCP côte à côte). Sinon, une seule carte.
+  const nav = `<nav class="tools-nav" data-spy aria-label="Développeur"><p class="tools-grp">Accès</p><a href="#jetons" aria-current="true">Jetons d'API</a>
+  <p class="tools-grp">Intégrations</p><a href="#api">API</a><a href="#mcp">Serveur MCP</a><a href="/docs/api">Référence de l'API</a><a href="/docs/mcp">Documentation MCP</a>
+  <p class="tools-grp">Réglage</p><a href="#desactiver">Désactiver</a></nav>`;
+  return layout({ title: 'Développeur', email: user.email, body: ready
+    ? `<div class="pj-page dev"><div class="ph"><div class="t"><h1>Développeur</h1><span class="muted small">Jetons d'API, API et serveur MCP pour piloter iaboss depuis tes outils</span></div></div>\n<div class="pj-tools">${nav}<div class="pj-flat tools-main">${body}</div></div></div>`
+    : `<div class="narrow"><h1 class="h1">${ic('key')}Développeur</h1>${body}</div>` });
 }

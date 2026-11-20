@@ -211,6 +211,11 @@ body.site {
 .auth .sub { color: var(--muted); font-size: .9375rem; min-height: 0; margin-top: 8px; }
 .auth-b { display: flex; flex-direction: column; gap: 12px; width: 100%; }
 .auth-b form { display: contents; }
+.auth-f { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+.auth-f label { font-weight: 600; }
+.auth-f input[type="text"], .auth-f input:not([type]) { min-height: 48px; padding: 0 14px; border: 1px solid var(--control); border-radius: var(--radius); background: var(--bg); color: var(--text); font: inherit; font-size: 1.25rem; letter-spacing: .12em; }
+.auth-f .chk { display: flex; align-items: flex-start; gap: 10px; font-weight: 400; }
+.auth-f .chk input { width: 20px; height: 20px; margin-top: 2px; accent-color: var(--primary); }
 .prov { width: 20px; height: 20px; flex: none; }
 .safe { display: flex; gap: 10px; align-items: flex-start; text-align: left; padding: 12px 14px; border-radius: var(--radius-sm); background: var(--ok-bg); color: var(--ok); font-size: .9375rem; font-weight: 600; width: 100%; }
 .safe .ic { margin-top: 2px; width: 18px; height: 18px; }

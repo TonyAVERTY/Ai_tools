@@ -1841,6 +1841,9 @@ a.pj-card:hover { border-color: var(--primary); }
 .pj-lead { margin: 0; color: var(--muted); font-size: 1.0625rem; }
 .pj-tools { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; }
 @media (min-width: 900px) { .pj-tools { grid-template-columns: 240px minmax(0, 1fr); } }
+@media (min-width: 900px) { .tools-nav[data-spy] { position: sticky; top: 88px; max-height: calc(100vh - 104px); overflow-y: auto; overscroll-behavior: contain; } } /* la barre reste collée pendant le défilement, comme le sommaire des Réglages */
+.dev-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (min-width: 1200px) { .dev-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } } /* API et MCP côte à côte */
 .tools-nav { display: flex; flex-direction: column; gap: 2px; }
 .tools-grp { margin: 12px 0 4px 12px; font-size: .75rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
 .tools-nav button, .tools-nav a { display: flex; align-items: center; min-height: 44px; padding: 0 12px; border: 0; border-left: 3px solid transparent; border-radius: var(--radius-sm); background: transparent; color: var(--text); font: inherit; text-align: left; text-decoration: none; cursor: pointer; }
@@ -2083,3 +2086,9 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 7px; text-align: cen
 .locked-h h2 { margin: 0; font-size: 1.05rem; }
 .locked-h .ic { color: var(--muted); }
 .locked-link { color: var(--muted); }
+.stat-n { margin: 0; font-size: 1.9rem; font-weight: 700; line-height: 1.2; color: var(--text); }
+.per { display: flex; gap: 8px; margin-bottom: 16px; }
+.per a { padding: 8px 14px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--card); color: var(--text); text-decoration: none; }
+.per a[aria-current="true"] { border-color: var(--primary); background: var(--primary); color: var(--on-primary); font-weight: 700; }
+.qr-box { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; margin: 8px 0 12px; }
+.qr { width: min(240px, 100%); height: auto; border: 1px solid var(--line-strong); border-radius: var(--radius); } /* noir sur blanc dans les deux thèmes : un lecteur de QR code l'exige */
