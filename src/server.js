@@ -78,6 +78,7 @@ const STATIC = {
   '/static/tour.js': asset('tour.js', 'text/javascript; charset=utf-8', 3600),
   // Les navigateurs réclament /favicon.ico d'office
   '/favicon.ico': asset('favicon.ico', 'image/x-icon', 86400),
+  '/static/console-warning.js': asset('console-warning.js', 'text/javascript; charset=utf-8', 3600),
   '/static/site.js': asset('site.js', 'text/javascript; charset=utf-8', 3600),
   // Polices embarquées (Fraunces, Instrument Sans : licence OFL, textes de licence à côté)
   ...Object.fromEntries(readdirSync(join(ROOT, 'public', 'fonts')).filter((f) => extname(f) === '.woff2').map((f) => [`/static/fonts/${f}`, asset(`fonts/${f}`, FONT_TYPE['.woff2'], 604800)])),

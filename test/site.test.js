@@ -181,7 +181,7 @@ test('aucune ressource externe : tout est servi par l\'application, rien en lign
       for (const p of [...PUBLIC_PAGES, '/login', '/inexistant']) {
         const h = await (await client.get(p, { headers: { accept: 'text/html' } })).text();
         // Seuls scripts permis : ceux de l'application (mouvement du site, vérification de la connexion), jamais en ligne
-        for (const m of h.matchAll(/<script[^>]*\ssrc="([^"]+)"/gi)) assert.ok(['/static/site.js', '/static/responsive.js', '/static/captcha.js'].includes(m[1].split('?')[0]), `${p} : script ${m[1]}`);
+        for (const m of h.matchAll(/<script[^>]*\ssrc="([^"]+)"/gi)) assert.ok(['/static/console-warning.js', '/static/site.js', '/static/responsive.js', '/static/captcha.js'].includes(m[1].split('?')[0]), `${p} : script ${m[1]}`);
         assert.doesNotMatch(h, /<script(?![^>]*(ld\+json|\ssrc=))/i, `${p} : aucun script en ligne`);
         assert.doesNotMatch(h, /<style[\s>]/i, `${p} : pas de <style>`);
         assert.doesNotMatch(h, /\sstyle="/i, `${p} : pas de style en ligne (CSP)`);
@@ -492,4 +492,19 @@ test('site public : l\'IA est « ton IA » (Claude, ChatGPT ou Gemini), les troi
   const cgu = (await page('/cgu')).replace(/&#39;/g, "'");
   assert.match(cgu, /ton compte Claude, ChatGPT ou Google peut être limité, suspendu ou fermé/);
   assert.match(cgu, /Gemini se relie sinon par clé API/);
+});
+
+test('avertissement de la console (self-XSS) : chargé sur le site public et sur le tableau de bord, texte en français', async () => {
+  const { startApp } = await import('./helpers/server.js');
+  const s = await startApp();
+  try {
+    const u = await s.newUser({ admin: false });
+    for (const [c, path] of [[s.anon, '/tarifs'], [u, '/account']]) {
+      assert.match(await (await c.get(path, { headers: { accept: 'text/html' } })).text(), /\/static\/console-warning\.js/, path);
+    }
+    const js = await (await fetch(`${s.base}/static/console-warning.js`)).text();
+    assert.match(js, /Stop !/);
+    assert.match(js, /copier-coller/);
+    assert.match(js, /serveur Discord/);
+  } finally { await s.close(); }
 });
