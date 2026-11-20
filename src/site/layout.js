@@ -1,6 +1,7 @@
 // Gabarit du site public (design Claude Design) : balisage sémantique, métadonnées (title, description, canonical, Open Graph),
 // lien d'évitement, en-tête, pied de page. Aucune ressource externe : CSS, images, icônes (sprite SVG en ligne) et favicon sont
 // servis par l'application ; un seul script, site.js, pour les petits plus (période des tarifs, sommaire légal, onglets de code).
+import { themeAttr } from '../theme.js';
 import { esc } from '../http.js';
 import { assetUrl, brandMark, iconLinks } from '../assets.js';
 import { SPRITE, ic } from '../icons.js';
@@ -55,7 +56,7 @@ export function siteLayout({ appUrl, path, title, description, body, noindex = f
   const year = new Date().getFullYear();
   const here = (href) => (href === path ? ' aria-current="page"' : '');
   return `<!doctype html>
-<html lang="fr">
+<html lang="fr"${themeAttr()}>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -80,7 +81,7 @@ ${iconLinks()}
 <link rel="stylesheet" href="${assetUrl('/static/tokens.css')}">
 <link rel="stylesheet" href="${assetUrl('/static/site.css')}">
 <link rel="stylesheet" href="${assetUrl('/static/responsive.css')}">
-${['/static/site.js', '/static/responsive.js', ...scripts].map((src) => `<script src="${esc(assetUrl(src))}" defer></script>\n`).join('')}${jsonLd ? `<script type="application/ld+json">${JSON.stringify(jsonLd).replace(/</g, '\\u003c')}</script>\n` : ''}</head>
+${['/static/console-warning.js', '/static/site.js', '/static/responsive.js', ...scripts].map((src) => `<script src="${esc(assetUrl(src))}" defer></script>\n`).join('')}${jsonLd ? `<script type="application/ld+json">${JSON.stringify(jsonLd).replace(/</g, '\\u003c')}</script>\n` : ''}</head>
 <body class="site">
 <a class="skip" href="#contenu">Aller au contenu</a>
 ${SPRITE}

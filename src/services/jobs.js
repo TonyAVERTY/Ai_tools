@@ -428,8 +428,8 @@ export class Worker {
         await usageWrite.catch(() => {});
         const result = ctx.model && out && typeof out === 'object' && !Array.isArray(out) ? { ...out, model: ctx.model } : out;
         if (!(await this.isCancelled(job.id))) {
-          await this.db.prepare("UPDATE jobs SET status='done', result_json=?, finished_at=?, cost_usd=?, tokens_in=?, tokens_out=? WHERE id=?")
-            .run(JSON.stringify(result ?? null), now(), ctx.usage.costUsd, ctx.usage.tokensIn, ctx.usage.tokensOut, job.id);
+          await this.db.prepare("UPDATE jobs SET status='done', result_json=?, finished_at=?, cost_usd=?, tokens_in=?, tokens_out=?, model=? WHERE id=?")
+            .run(JSON.stringify(result ?? null), now(), ctx.usage.costUsd, ctx.usage.tokensIn, ctx.usage.tokensOut, ctx.model || null, job.id);
           this.emit('onFinish', job, { status: 'done', result });
         }
       } catch (e) {
@@ -439,8 +439,8 @@ export class Worker {
         await usageWrite.catch(() => {});
         this.log.error(`[job ${job.id} ${job.type}]`, e.message);
         if (!(await this.isCancelled(job.id))) {
-          await this.db.prepare("UPDATE jobs SET status='error', error=?, finished_at=?, cost_usd=?, tokens_in=?, tokens_out=? WHERE id=?")
-            .run(String(e.message).slice(0, 2000), now(), ctx.usage.costUsd, ctx.usage.tokensIn, ctx.usage.tokensOut, job.id);
+          await this.db.prepare("UPDATE jobs SET status='error', error=?, finished_at=?, cost_usd=?, tokens_in=?, tokens_out=?, model=? WHERE id=?")
+            .run(String(e.message).slice(0, 2000), now(), ctx.usage.costUsd, ctx.usage.tokensIn, ctx.usage.tokensOut, ctx.model || null, job.id);
           this.emit('onFinish', job, { status: 'error', error: e.message });
           try { this.onError?.(job, e); } catch { /* l'alerte ne fait jamais échouer le traitement du job */ }
           // Relance automatique (option de l'utilisateur) : le journal dit quand la tâche repart

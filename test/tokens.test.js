@@ -28,3 +28,13 @@ test('tokens.css : trois couleurs (Pétrole, Lin, Safran), polices locales, thè
   assert.match(tk, /--display:\s*"Fraunces"/);
   assert.match(tk, /--font:\s*"Instrument Sans"/);
 });
+
+test('tokens.css : le thème sombre choisi (data-theme="dark") reprend exactement celui du système', () => {
+  const tk = read('public/tokens.css');
+  const sys = tk.match(/@media \(prefers-color-scheme: dark\) \{\s*:root:not\(\[data-theme="light"\]\) \{([\s\S]*?)\n  \}\n\}/);
+  const chosen = tk.match(/:root\[data-theme="dark"\] \{\s*color-scheme: dark;([\s\S]*?)\n\}\n/);
+  assert.ok(sys && chosen, 'les deux blocs existent');
+  const norm = (x) => x.split('\n').map((l) => l.trim()).filter(Boolean).join('\n');
+  assert.equal(norm(chosen[1]), norm(sys[1]));
+  assert.match(tk, /:root\[data-theme="light"\] \{ color-scheme: light; \}/);
+});

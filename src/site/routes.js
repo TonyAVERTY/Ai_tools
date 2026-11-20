@@ -1,6 +1,7 @@
 // Routes du site public : toutes accessibles sans compte.
 import { html, send } from '../http.js';
 import { getSession } from '../auth.js';
+import { countView } from '../services/audience.js';
 import { withViewer } from './layout.js';
 import { homePage, howPage, pricingPage } from './pages.js';
 import { mentionsPage, privacyPage, termsPage } from './legal.js';
@@ -14,6 +15,7 @@ export function registerSiteRoutes(router, { cfg, db }) {
   // Les pages dépendent du cookie de connexion : ni cache partagé, ni cache du navigateur sans le cookie
   const show = async (req, res, page) => {
     res.setHeader('Vary', 'Cookie');
+    countView(db, req, new URL(req.url, cfg.appUrl).pathname, cfg.appUrl); // mesure sans cookie ni identifiant : voir services/audience.js
     html(res, withViewer(page, !!(await getSession(db, req))));
   };
 

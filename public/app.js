@@ -324,7 +324,7 @@
   });
 
   // ---------- Réglages : le sommaire suit la lecture (la section en cours est surlignée en direct) ----------
-  const tocLinks = $$('.settings .toc a[href^="#"]');
+  const tocLinks = $$('.settings .toc a[href^="#"], .tools-nav[data-spy] a[href^="#"]');
   if (tocLinks.length) {
     const sections = tocLinks.map((a) => document.getElementById(a.getAttribute('href').slice(1))).filter(Boolean);
     let queued = false;
