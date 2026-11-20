@@ -323,6 +323,8 @@ body.site {
 /* ---------- Documentation développeur ---------- */
 .doc { max-width: 58rem; }
 .doc-body .toc ol ol { padding: 0 0 0 14px; gap: 0; }
+.toc[data-fold] li > ol { display: none; }
+.toc[data-fold] li[data-open] > ol { display: flex; } /* sous-rubriques ouvertes seulement dans la section lue (public/site.js), sans animation */
 .doc-body .toc ol ol a { min-height: 44px; font-size: .875rem; }
 .doc .doc-s { scroll-margin-top: 24px; }
 .doc-s + .doc-s { margin-top: 56px; padding-top: 8px; }

@@ -508,3 +508,13 @@ test('avertissement de la console (self-XSS) : chargé sur le site public et sur
     assert.match(js, /serveur Discord/);
   } finally { await s.close(); }
 });
+
+test('sommaire de la documentation : sous-rubriques repliées sauf celles de la section lue (script + style, rien sans JavaScript)', () => {
+  const js = readFileSync(new URL('../public/site.js', import.meta.url), 'utf8');
+  const css = readFileSync(new URL('../public/site.css', import.meta.url), 'utf8');
+  assert.match(js, /toc\.dataset\.fold = ''/);
+  assert.match(js, /setAttribute\('data-open', ''\)/);
+  assert.match(css, /\.toc\[data-fold\] li > ol \{ display: none; \}/);
+  assert.match(css, /\.toc\[data-fold\] li\[data-open\] > ol \{ display: flex; \}/);
+  assert.doesNotMatch(css, /\.toc\[data-fold\][^{]*\{[^}]*transition/, 'aucune animation ajoutée');
+});

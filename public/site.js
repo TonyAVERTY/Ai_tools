@@ -55,7 +55,15 @@
     toc.querySelector('summary').addEventListener('click', (e) => { if (wide.matches) e.preventDefault(); });
 
     const links = [...toc.querySelectorAll('a[href^="#"]')];
-    const mark = (id) => { for (const a of links) { if (a.getAttribute('href') === `#${id}`) a.setAttribute('aria-current', 'true'); else a.removeAttribute('aria-current'); } };
+    // Sommaire à sous-rubriques (documentation de l'API) : elles restent repliées, sauf celles de la section où l'on se trouve, pour que tout le sommaire tienne à l'écran.
+    // Sans ce script, rien n'est replié (data-fold n'est posé qu'ici).
+    toc.dataset.fold = '';
+    const mark = (id) => {
+      for (const a of links) { if (a.getAttribute('href') === `#${id}`) a.setAttribute('aria-current', 'true'); else a.removeAttribute('aria-current'); }
+      for (const li of toc.querySelectorAll('li[data-open]')) li.removeAttribute('data-open');
+      const li = toc.querySelector('a[aria-current="true"]')?.closest('li');
+      (li?.parentElement.closest('li') || li)?.setAttribute('data-open', '');
+    };
     const heads = links.map((a) => document.getElementById(a.getAttribute('href').slice(1))).filter(Boolean);
     if ('IntersectionObserver' in window && heads.length) {
       const seen = new Set();
