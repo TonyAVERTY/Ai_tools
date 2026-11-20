@@ -8,9 +8,10 @@ import { ic } from './icons.js';
 const KINDS = { ok: { icon: 'check', role: 'status' }, err: { icon: 'alert', role: 'alert' }, warn: { icon: 'alert', role: 'status' } };
 
 /** `banner('ok', 'Réglages enregistrés')` ; `{ strong: true }` met le texte en gras. Le texte est échappé : jamais de HTML venant d'une donnée. */
-export function banner(kind, text, { strong = false } = {}) {
+export function banner(kind, text, { strong = false, flash = false } = {}) {
   const k = KINDS[kind];
   if (!k) throw new Error(`banner : type inconnu « ${kind} »`);
   const t = esc(kind === 'err' && !/[.!?…]$/.test(String(text)) ? `${text}.` : text); // une erreur est une phrase : elle finit par un point (comme le toast d'erreur)
-  return `<p class="msg msg-${kind}" role="${k.role}">${ic(k.icon)}<span>${strong ? `<b>${t}</b>` : t}</span></p>`;
+  // `flash` : résultat d'une redirection (?e=, ?t=&m=). Le navigateur le remplace par un toast et nettoie l'adresse (public/app.js) ; sans JavaScript, le bandeau reste.
+  return `<p class="msg msg-${kind}" role="${k.role}"${flash && kind !== 'warn' ? ` data-flash="${kind}"` : ''}>${ic(k.icon)}<span>${strong ? `<b>${t}</b>` : t}</span></p>`;
 }

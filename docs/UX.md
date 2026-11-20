@@ -15,6 +15,9 @@ Réutilise ce qui existe ; n'ajoute pas un second mécanisme pour le même besoi
 - Elles survivent à une navigation sans rechargement (`ajax.js` remet le conteneur).
 - À utiliser pour **le résultat d'une action sur la page où l'on est**. Pour un résultat affiché après un rechargement ou une redirection, ou un
   état qui doit rester lisible, voir les bandeaux (`.msg msg-ok / msg-err`).
+- **Résultat d'une redirection sur Mon compte** (« Choisir cette offre » sans plafond, « Tu as déjà cette offre »…) : le serveur écrit le bandeau avec
+  `banner(kind, texte, { flash: true })` (attribut `data-flash`) et met le message dans l'adresse (`?e=`, `?t=&m=`). `public/app.js` en fait un toast
+  et nettoie l'adresse ; sans JavaScript, le bandeau reste. Un succès perd son point final dans le toast, une erreur le garde.
 
 ## Bandeaux de résultat : `banner(kind, texte)` (`src/banner.js`)
 

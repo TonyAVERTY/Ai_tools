@@ -37,7 +37,8 @@ test('mode développeur : sans lui, ni jeton ni API ; page, création, affichage
   assert.equal((await u.post('/developer/tokens', { name: 'x' }, { form: true })).status, 403);
 
   assert.equal((await u.post('/account/developer', { enabled: 'on' }, { form: true })).status, 303);
-  const created = await u.post('/developer/tokens', { name: 'Claude Desktop', scope_read: 'on', scope_write: 'on' }, { form: true });
+  // Sans JavaScript (formulaire classique, la page attend du HTML) : la réponse est la page avec le jeton ; avec JavaScript, voir le test suivant
+  const created = await u.post('/developer/tokens', { name: 'Claude Desktop', scope_read: 'on', scope_write: 'on' }, { form: true, headers: { accept: 'text/html' } });
   assert.equal(created.status, 200);
   const page = await created.text();
   const token = /<code data-token>(iaboss_[A-Za-z0-9_-]{43})<\/code>/.exec(page)?.[1];
@@ -52,6 +53,34 @@ test('mode développeur : sans lui, ni jeton ni API ; page, création, affichage
   assert.match(again, /GET \/projects/, 'la référence de l\'API est sur la page');
   assert.match(await (await html(u, '/account')).text(), /Mode développeur[\s\S]*Activé/);
   assert.equal((await api(token, '/me').then(j)).email, u.email);
+});
+
+test('création d\'un jeton depuis la page : réponse JSON sans quitter /developer, jeton montré une fois, liste masquée, rechargement sans « Page introuvable »', async () => {
+  const u = await s.newUser();
+  await setDeveloperMode(s.db, u.id, true);
+  // Avec JavaScript, la page envoie du JSON et garde son adresse : le jeton n'est que dans cette réponse
+  const r = await u.post('/developer/tokens', { name: 'Popup', scope_read: 'on' });
+  assert.equal(r.status, 201);
+  const made = await r.json();
+  assert.match(made.token, /^iaboss_[A-Za-z0-9_-]{43}$/);
+  assert.equal(made.name, 'Popup');
+  assert.equal(r.headers.get('cache-control'), 'no-store');
+  // Erreur (nom manquant, plafond…) : JSON, pas une page
+  for (let i = 0; i < 4; i++) await u.post('/developer/tokens', { name: `t${i}`, scope_read: 'on' });
+  const over = await u.post('/developer/tokens', { name: 'de trop', scope_read: 'on' });
+  assert.equal(over.status, 400);
+  assert.match((await over.json()).error, /5 jetons au plus/);
+  // La liste ne montre jamais un caractère du jeton : « iaboss_************* »
+  const list = await (await html(u, '/developer')).text();
+  assert.ok(!list.includes(made.token) && !list.includes(made.token.slice(0, 12)), 'ni le jeton ni son début');
+  assert.equal((list.match(/<code>iaboss_\*{13}<\/code>/g) || []).length, 5, 'une ligne masquée par jeton');
+  // En base, seul « iaboss_ » est gardé en plus de l'empreinte
+  const rows = await s.db.prepare('SELECT prefix FROM api_tokens WHERE user_id = ?').all(u.id);
+  assert.ok(rows.length === 5 && rows.every((x) => x.prefix === 'iaboss_'));
+  // F5 sur la réponse d'une création sans JavaScript (GET /developer/tokens) : retour sur /developer
+  const back = await u.get('/developer/tokens', { headers: { accept: 'text/html' } });
+  assert.equal(back.status, 303);
+  assert.equal(back.headers.get('location'), '/developer');
 });
 
 test('jetons : 5 au plus, suppression, jamais celui d\'un autre compte, désactivation du mode = tout coupé', async () => {

@@ -26,6 +26,48 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
   await p.goto(`${s.base}/developer`);
   await p.waitForSelector('html[data-nav="ready"]');
+  // Onglet « Développeur » de la barre du haut : visible (en dernier, page courante) puisque le mode est actif
+  const pill = p.locator('.pills a.pill[href="/developer"]');
+  ok(await pill.count() === 1 && await pill.isVisible(), `${tag} l'onglet « Développeur » est dans la barre du haut`);
+  ok((await p.locator('.pills a.pill').last().getAttribute('href')) === '/developer', `${tag} l'onglet vient après les autres`);
+  ok((await pill.getAttribute('aria-current')) === 'page', `${tag} il est marqué comme page courante sur la page Développeur`);
+  const bar = await p.locator('.pills').evaluate((n) => ({ over: n.scrollWidth > n.clientWidth + 1, tabs: [...n.querySelectorAll('a.pill')].map((a) => { const r = a.getBoundingClientRect(); return { l: Math.round(r.left), r: Math.round(r.right), t: a.textContent.trim(), clipped: a.scrollWidth > a.clientWidth + 1 }; }) }));
+  ok(!bar.over && bar.tabs.every((t) => t.r <= vp.width && t.l >= 0 && !t.clipped), `${tag} les ${bar.tabs.length} onglets tiennent dans la barre sans être coupés (${bar.tabs.map((t) => `${t.t} ${t.l}-${t.r}`).join(' | ')})`);
+  // Depuis une autre page, un clic mène à la page Développeur (clés et documentations)
+  await p.goto(`${s.base}/projets`); await p.waitForSelector('html[data-nav="ready"]');
+  await p.locator('.pills a.pill[href="/developer"]').click();
+  await p.waitForURL('**/developer');
+  ok(await p.locator('a[href="/docs/api"]').count() > 0 && await p.locator('a[href="/docs/mcp"]').count() > 0 && await p.locator('form[action="/developer/tokens"]').count() === 1, `${tag} la page offre la création de clés et les liens vers les documentations API et MCP`);
+  // Création d'un jeton depuis la page : on reste sur /developer, le jeton apparaît dans une fenêtre au centre, une seule fois, puis la liste ne montre qu'un masque
+  await p.fill('form[data-action="token"] input[name="name"]', `Popup ${vp.width}`);
+  await p.locator('form[data-action="token"] button.btn.primary').click();
+  const dlg = p.locator('dialog.token-created');
+  await dlg.waitFor();
+  ok(new URL(p.url()).pathname === '/developer', `${tag} après la création, la page reste sur /developer (${new URL(p.url()).pathname})`);
+  const box = await dlg.boundingBox();
+  ok(Math.abs(box.x + box.width / 2 - vp.width / 2) <= 2 && Math.abs(box.y + box.height / 2 - vp.height / 2) <= 2, `${tag} la fenêtre est au centre de l'écran`);
+  const shown = (await dlg.locator('[data-token]').innerText()).trim();
+  ok(/^iaboss_[A-Za-z0-9_-]{43}$/.test(shown), `${tag} le jeton est montré en entier dans la fenêtre`);
+  ok(/Il ne sera plus jamais affiché/.test(await dlg.innerText()) && /conserve-le/.test(await dlg.locator('h2').innerText()), `${tag} la fenêtre dit de le conserver : il ne sera plus jamais affiché`);
+  if (process.env.SHOTS) await dlg.screenshot({ path: `${process.env.SHOTS}/jeton-cree-${vp.width}.png` });
+  await p.keyboard.press('Escape');
+  ok(await dlg.isVisible(), `${tag} Échap ne ferme pas la fenêtre (un jeton perdu ne se retrouve pas)`);
+  await dlg.locator('[data-copy-token]').click();
+  const copied = await p.evaluate(() => navigator.clipboard.readText());
+  ok(copied === shown, `${tag} « Copier » met le jeton dans le presse-papiers`);
+  await dlg.locator('[data-token-done]').click();
+  await dlg.waitFor({ state: 'detached' });
+  await p.waitForSelector('tr:has-text("Popup ' + vp.width + '")');
+  const pageText = await p.locator('body').innerText();
+  ok(!pageText.includes(shown) && !(await p.content()).includes(shown), `${tag} une fois la fenêtre fermée, le jeton n'est plus nulle part dans la page`);
+  const masks = await p.locator('table').first().locator('tbody tr td:nth-child(2) code').allInnerTexts();
+  ok(masks.length > 0 && masks.every((m) => m === 'iaboss_*************'), `${tag} la liste ne montre que « iaboss_************* » (${masks.join(' | ')})`);
+  ok(!/iaboss_[A-Za-z0-9_-]/.test(await p.locator('table').first().innerText()), `${tag} aucun caractère du jeton dans le tableau`);
+  await p.reload(); await p.waitForSelector('html[data-nav="ready"]');
+  ok(new URL(p.url()).pathname === '/developer' && await p.locator('h1', { hasText: 'Développeur' }).count() === 1, `${tag} un rechargement reste sur la page Développeur (pas de « Page introuvable »)`);
+  const old = await p.request.get(`${s.base}/developer/tokens`, { maxRedirects: 0 });
+  ok(old.status() === 303 && old.headers().location === '/developer', `${tag} l'ancienne adresse /developer/tokens renvoie vers /developer (${old.status()})`);
+  if (process.env.SHOTS) await p.locator('.pills').screenshot({ path: `${process.env.SHOTS}/nav-developpeur-${vp.width}.png` });
   ok(!(await p.locator('details.routes').evaluate((d) => d.open)), `${tag} les routes de l'API sont repliées`);
   await p.locator('details.routes > summary').click();
   ok(await p.locator('details.routes table').isVisible(), `${tag} un clic déplie le tableau des routes`);
@@ -52,6 +94,17 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
 
   ok(!(await p.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)), `${tag} pas de défilement horizontal`);
   ok(errs.length === 0, `${tag} aucune erreur console${errs.length ? ` : ${errs.join(' | ')}` : ''}`);
+  await ctx.close();
+}
+// Un compte sans le mode développeur n'a pas l'onglet
+{
+  const plain = await s.newUser({ admin: false, link: testTokenLink() });
+  const ctx = await b.newContext({ viewport: { width: 1280, height: 800 } });
+  const [name, value] = plain.cookie.split('=');
+  await ctx.addCookies([{ name, value, url: s.base }]);
+  const p = await ctx.newPage();
+  await p.goto(`${s.base}/projets`); await p.waitForSelector('html[data-nav="ready"]');
+  ok(await p.locator('.pills a.pill[href="/developer"]').count() === 0, 'sans le mode développeur : pas d\'onglet dans la barre du haut');
   await ctx.close();
 }
 await b.close();

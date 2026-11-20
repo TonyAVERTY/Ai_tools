@@ -49,3 +49,10 @@ test('le bandeau .msg n\'est plus écrasé par les bulles du chat (qui ont leur 
   assert.match(css, /^\.chat-msg\.user/m);
   for (const f of ['../public/chat.js', '../src/chatviews.js']) assert.doesNotMatch(readFileSync(new URL(f, import.meta.url), 'utf8'), /'msg (user|bot)'|"msg (user|bot)"/, f);
 });
+
+test('banner : « flash » marque le résultat d\'une redirection pour que le navigateur en fasse un toast ; jamais pour un avertissement', () => {
+  assert.match(banner('err', 'Ça n\'a pas marché', { flash: true }), /^<p class="msg msg-err" role="alert" data-flash="err">/);
+  assert.match(banner('ok', 'Réglage enregistré', { flash: true }), /data-flash="ok"/);
+  assert.doesNotMatch(banner('warn', 'Attention', { flash: true }), /data-flash/);
+  assert.doesNotMatch(banner('err', 'Sans marque'), /data-flash/, 'par défaut, un bandeau reste un bandeau');
+});
