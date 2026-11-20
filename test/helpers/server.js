@@ -1,6 +1,6 @@
 // Serveur HTTP de test : vraie application sur un port libre, base de test, comptes créés à la demande.
 import { randomBytes } from 'node:crypto';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { now } from '../../src/db.js';
@@ -19,13 +19,17 @@ export const APP_URL = 'https://ai.tony-averty.dev';
 // Résolveur DNS des tests : tout nom pointe vers une adresse publique (aucune requête DNS réelle)
 // Serveurs de réception : tout domaine en a un (la vérification d'adresses ne fait aucune requête DNS réelle)
 export const FAKE_MX = async () => [{ exchange: 'mx.test', priority: 10 }];
+// Clone Git des tests : un dossier vide, aucun accès réseau. Sans lui, un job qui lit le dépôt (analyse, facturation, postes…) clonait vraiment
+// l'adresse du projet de test, épinglée sur l'adresse de PUBLIC_DNS : sur le serveur de la CI, la connexion restait sans réponse jusqu'au délai de
+// git (2 minutes) à chaque clone, et la suite dépassait le délai du job. Un test qui veut un autre comportement remplace app.syncRepo.
+export const FAKE_SYNC = async (url, dir) => { mkdirSync(dir, { recursive: true }); return 'abc123'; };
 export const PUBLIC_DNS = async () => [{ address: '93.184.216.34', family: 4 }];
 
 const unlimited = () => new RateLimiter({
   rules: Object.fromEntries(Object.entries(RATE_LIMITS).map(([k, v]) => [k, Object.fromEntries(Object.entries(v).map(([sc, c]) => [sc, { ...c, max: 1e9 }]))])),
 });
 
-export async function startApp({ cfg = {}, worker = false, rateLimit = false, createTransport, resolveHost, resolveMx, fetch: injectedFetch } = {}) {
+export async function startApp({ cfg = {}, worker = false, rateLimit = false, createTransport, resolveHost, resolveMx, fetch: injectedFetch, syncRepo = FAKE_SYNC } = {}) {
   const tmp = mkdtempSync(join(tmpdir(), 'aitools-srv-'));
   const config = {
     appUrl: APP_URL, google: { clientId: 'gid', clientSecret: 'gsecret' }, apple: null, adminEmails: [],
@@ -34,7 +38,7 @@ export async function startApp({ cfg = {}, worker = false, rateLimit = false, cr
     sandbox: { enabled: false, production: false, roBinds: [] }, ...cfg,
   };
   const limiter = rateLimit ? new RateLimiter(rateLimit === true ? {} : rateLimit) : unlimited();
-  const app = await createApp(config, { db: await testDb(), worker, limiter, createTransport, fetch: injectedFetch, resolveHost: resolveHost || PUBLIC_DNS, resolveMx: resolveMx || FAKE_MX });
+  const app = await createApp(config, { db: await testDb(), worker, limiter, createTransport, fetch: injectedFetch, resolveHost: resolveHost || PUBLIC_DNS, resolveMx: resolveMx || FAKE_MX, syncRepo });
   await new Promise((r) => app.server.listen(0, '127.0.0.1', r));
   const base = `http://127.0.0.1:${app.server.address().port}`;
 

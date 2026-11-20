@@ -393,6 +393,9 @@ test('identité du projet : relecture à la génération des documents, ajusteme
   const font = readFileSync(new URL('../promo-video/assets/fonts/figtree-600.ttf', import.meta.url));
   await saveBrand(s.db, pid, u.id, { brand: { source: 'repo', primary: '#0e7a66', fontFamily: 'Figtree', fontName: 'Figtree', hasLogo: false }, assets: { fontRegular: font, fontBold: null, logo: null, logoType: '' }, notes: [] });
   const seen = [];
+  // Dépôt injoignable : l'identité enregistrée ci-dessus est gardée telle quelle (une nouvelle lecture du dépôt la remplacerait)
+  const keepSync = s.app.syncRepo;
+  s.app.syncRepo = async () => { throw new Error('dépôt injoignable (test)'); };
   s.app.reviewBillingDoc = async (o) => {
     seen.push(o.kind);
     const pdf = o.render(o.content, { ...o.adjust, fontScale: 0.95 });
@@ -429,7 +432,7 @@ test('identité du projet : relecture à la génération des documents, ajusteme
     const pdf = await u.get(`/facturation/documents/${doc.id}/pdf`);
     assert.equal(pdf.status, 200);
     assert.ok(Buffer.from(await pdf.arrayBuffer()).toString('latin1').includes('/Type0'), 'police du projet dans le PDF téléchargé');
-  } finally { delete s.app.reviewBillingDoc; }
+  } finally { delete s.app.reviewBillingDoc; s.app.syncRepo = keepSync; }
 });
 
 test('relecture en échec : la génération des documents n\'est jamais bloquée', async () => {
