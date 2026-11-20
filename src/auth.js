@@ -89,6 +89,7 @@ export async function destroyUserSessions(db, userId) {
 export async function purgeExpired(db) {
   await db.prepare('DELETE FROM sessions WHERE expires_at < ?').run(now());
   await db.prepare('DELETE FROM oauth_states WHERE created_at < ?').run(now() - STATE_TTL);
+  await db.prepare('DELETE FROM trusted_devices WHERE expires_at < ?').run(now());
 }
 
 // ---------- JWT ----------

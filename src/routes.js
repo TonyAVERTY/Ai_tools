@@ -15,6 +15,8 @@ import {
 } from './claudelink.js';
 import { loginPage } from './site/pages.js';
 import { registerMfaRoutes, securityHtml } from './mfaroutes.js';
+import { themeCard } from './themeviews.js';
+import { themeOf } from './theme.js';
 import { registerSiteRoutes } from './site/routes.js';
 import { registerAdminRoutes } from './adminroutes.js';
 import { loginsOf } from './claudelogin.js';
@@ -485,7 +487,7 @@ export function registerRoutes(router, app) {
   }, LINK_LIMIT);
 
   // ---------- Mon compte ----------
-  router.get('/account', async ({ res, session, url }) => {
+  router.get('/account', async ({ req, res, session, url }) => {
     const t = url.searchParams.get('t');
     const link = await getLinkState(db, session.userId);
     // Le relevé des limites ne doit jamais empêcher d'afficher la page (Anthropic injoignable, réponse inattendue…)
@@ -493,7 +495,7 @@ export function registerRoutes(router, app) {
       : link && link.mode !== MODES.api_key && link.provider === 'claude' ? await currentClaudeQuota(app, session.userId).catch(() => null) : null;
     const account = { link, quota };
     html(res, accountPage({
-      securityHtml: await securityHtml(db, cfg, session), user: session.user, error: url.searchParams.get('e'), link: account.link, quota: account.quota, developer: await developerMode(db, session.userId), devLocked: !hasFeature(session.user, 'api'), appUrl: cfg.appUrl,
+      securityHtml: await securityHtml(db, cfg, session), themeHtml: themeCard(themeOf(req)), user: session.user, error: url.searchParams.get('e'), link: account.link, quota: account.quota, developer: await developerMode(db, session.userId), devLocked: !hasFeature(session.user, 'api'), appUrl: cfg.appUrl,
       ical: await (async () => { const t = await feedToken(app, session.userId); return t ? feedUrl(cfg, t) : null; })(),
       consent: await lastConsent(db, session.userId), profileSet: !isEmpty(await getProfile(db, session.userId)), cliModeEnabled, usage: { ...(await usageView(db, await getUser(db, session.userId))), billing: await billingView(app, session.userId), flash: url.searchParams.get('abonnement') },
       notice: t === 'unlinked' ? { ok: true, text: 'Liaison supprimée : le secret a été effacé et tes jobs IA en attente ont été annulés.' }

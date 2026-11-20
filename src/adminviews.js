@@ -83,6 +83,8 @@ export function adminStatsPage({ user, stats, periods }) {
   </tbody></table></div>` : '<p class="muted">Aucune requête IA sur la période.</p>';
   const errs = stats.errorsByType.length ? `<div class="table-wrap"><table><thead><tr><th>Type de tâche</th><th class="num">Erreurs</th></tr></thead><tbody>
     ${stats.errorsByType.map((e) => `<tr><td><code>${esc(e.type)}</code></td><td class="num" data-label="Erreurs">${int(e.n)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="muted">Aucune tâche en erreur sur la période.</p>';
+  const list = (rows, key, head) => (rows.length ? `<div class="table-wrap"><table><thead><tr><th>${head}</th><th class="num">Pages vues</th></tr></thead><tbody>${rows.map((r) => `<tr><td><code>${esc(r[key])}</code></td><td class="num" data-label="Pages vues">${int(r.n)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="muted">Rien sur la période.</p>');
+  const audience = `${list(stats.audience.pages, 'path', 'Page')}<h3 class="h3">D'où viennent les visites</h3>${list(stats.audience.referrers, 'host', 'Site d\'origine')}`;
   const body = `<div class="pj-page"><div class="ph"><div class="t"><h1>Statistiques globales</h1><span class="muted small">Toute l'application, sur ${esc(periods[stats.period].label)} · <a href="/admin">Retour aux comptes</a></span></div></div>
 <nav class="per" aria-label="Période">${tabs}</nav>
 <div class="pj-cards">
@@ -94,6 +96,7 @@ ${tile('Erreurs IA', int(stats.ai.errors), `sur ${int(stats.ai.jobs)} tâches`)}
 ${tile('Consommation IA', usd(stats.ai.cost), `${int(stats.ai.tokensIn + stats.ai.tokensOut)} tokens sur les tâches`)}
 </div>
 <section class="card"><div class="card-h"><h2>Consommation par modèle</h2><p>Les tâches d'avant la mise en place de ce suivi n'ont pas de modèle enregistré.</p></div>${models}</section>
-<section class="card"><div class="card-h"><h2>Erreurs par type de tâche</h2></div>${errs}</section></div>`;
+<section class="card"><div class="card-h"><h2>Erreurs par type de tâche</h2></div>${errs}</section>
+<section class="card"><div class="card-h"><h2>Fréquentation du site public</h2><p>Mesure sans cookie ni identifiant : ${int(stats.audience.total)} pages vues sur la période. Les visites avec « Ne pas me suivre » et les robots ne sont pas comptés.</p></div>${audience}</section></div>`;
   return layout({ title: 'Statistiques globales', email: user.email, body });
 }

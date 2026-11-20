@@ -126,3 +126,35 @@ test('désactivation et renouvellement demandent un code ; sans A2F, la connexio
     assert.ok(secret);
   } finally { await s.close(); }
 });
+
+test('appareil de confiance : le cookie dispense du code 30 jours, seule son empreinte est en base, on peut l\'oublier', async () => {
+  const s = await startApp();
+  try {
+    const u = await s.newUser({ admin: false });
+    const { secret } = await enable(s, u);
+    await s.db.prepare('UPDATE users SET totp_last_step = 0 WHERE id = ?').run(u.id);
+    const c = s.client(await pendingCookie(s, u.id));
+    const ok = await c.post('/login/2fa', { code: codeAt(secret, step()), trust: 'on' }, form);
+    const setCookie = ok.headers.getSetCookie().find((x) => x.startsWith('mfa_td='));
+    assert.ok(/HttpOnly/.test(setCookie) && /Secure/.test(setCookie) && /Max-Age=2592000/.test(setCookie));
+    const token = decodeURIComponent(setCookie.split(';')[0].split('=')[1]);
+    const row = await s.db.prepare('SELECT token_hash FROM trusted_devices WHERE user_id = ?').get(u.id);
+    assert.equal(row.token_hash, hashSid(token));
+    assert.notEqual(row.token_hash, token);
+    // Nouvelle connexion sur le même navigateur : la page 2FA ouvre la session sans code
+    const again = s.client(`${await pendingCookie(s, u.id)}; mfa_td=${token}`);
+    assert.equal((await again.get('/login/2fa', { headers: { accept: 'text/html' } })).headers.get('location'), '/');
+    // Un autre navigateur (sans le cookie), ou le cookie d'un autre compte, ne passe pas
+    const other = await s.newUser({ admin: false });
+    const stranger = s.client(`${await pendingCookie(s, u.id)}; mfa_td=inconnu`);
+    assert.equal((await stranger.get('/login/2fa', { headers: { accept: 'text/html' } })).status, 200);
+    await s.db.prepare('UPDATE users SET totp_enabled = 1 WHERE id = ?').run(other.id);
+    const wrongUser = s.client(`${await pendingCookie(s, other.id)}; mfa_td=${token}`);
+    assert.equal((await wrongUser.get('/login/2fa', { headers: { accept: 'text/html' } })).status, 200);
+    // Oublier les appareils
+    assert.equal((await u.post('/account/2fa/forget', {}, form)).status, 303);
+    assert.equal((await s.db.prepare('SELECT COUNT(*) n FROM trusted_devices').get()).n, 0);
+    const forgotten = s.client(`${await pendingCookie(s, u.id)}; mfa_td=${token}`);
+    assert.equal((await forgotten.get('/login/2fa', { headers: { accept: 'text/html' } })).status, 200);
+  } finally { await s.close(); }
+});

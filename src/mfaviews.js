@@ -8,12 +8,13 @@ import { otpauthUrl } from './totp.js';
 import { qrSvg } from './qr.js';
 
 /** Carte « Sécurité » de la page Mon compte : trois états (désactivée, en cours d'activation, activée). */
-export function securityCard({ enabled, setup = null, email, recoveryLeft = 0 }) {
+export function securityCard({ enabled, setup = null, email, recoveryLeft = 0, devices = 0 }) {
   const code = (name = 'code') => `<label class="field"><span class="lbl">Code à 6 chiffres</span><input name="${name}" inputmode="numeric" autocomplete="one-time-code" maxlength="20" required></label>`;
   let body;
   if (enabled) {
     body = `<p><span class="badge ok">Activée</span> Un code de ton application d'authentification est demandé à chaque connexion.</p>
   <p class="muted small">Codes de secours restants : <b>${recoveryLeft}</b> sur 10.</p>
+  <form method="post" action="/account/2fa/forget" class="cfg"><p class="muted small">Appareils de confiance (sans code pendant 30 jours) : <b>${devices}</b>.</p>${devices ? '<div class="row"><button class="btn">Oublier mes appareils de confiance</button></div>' : ''}</form>
   <form method="post" action="/account/2fa/recovery" class="cfg"><p class="muted small">Pour en obtenir 10 nouveaux (les anciens cessent de marcher), saisis un code de ton application.</p>${code()}
     <div class="row"><button class="btn">Régénérer les codes de secours</button></div></form>
   <form method="post" action="/account/2fa/disable" class="cfg" data-confirm="Désactiver l'A2F ? Ton compte ne sera plus protégé que par ton compte Google ou Apple."><p class="muted small">Pour la désactiver, saisis un code de ton application ou un code de secours.</p>${code()}
@@ -50,9 +51,11 @@ export function mfaLoginPage({ appUrl, error = null }) {
     body: `<div class="stage-p"><div class="wrap"><section class="auth" aria-labelledby="m-h">
   <div><h1 id="m-h">Code de vérification</h1><p class="sub">Saisis le code à 6 chiffres de ton application d'authentification. Tu n'y as plus accès ? Utilise un code de secours.</p></div>
   ${error ? banner('err', error) : ''}
-  <form method="post" action="/login/2fa" class="cfg">
-    <label class="field"><span class="lbl">Code</span><input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="20" required autofocus></label>
-    <div class="row"><button class="btn primary">Valider</button></div>
+  <form method="post" action="/login/2fa" class="auth-f">
+    <label for="mfa-code">Code</label>
+    <input id="mfa-code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="20" required autofocus>
+    <label class="chk"><input type="checkbox" name="trust" value="on"><span>Faire confiance à cet appareil pendant 30 jours</span></label>
+    <button class="btn btn-primary btn-lg btn-block">Valider</button>
   </form>
   <p class="fine"><a href="/login">Annuler et revenir à la connexion</a></p>
 </section></div></div>`,

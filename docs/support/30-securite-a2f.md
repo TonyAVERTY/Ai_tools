@@ -6,16 +6,20 @@ La connexion se fait avec Google ou Apple, sans mot de passe. L'A2F ajoute un se
 
 ## L'activer (Mon compte → Sécurité : A2F)
 1. Ouvre **Mon compte** (avatar → Mon compte), rubrique **Sécurité : A2F**, puis clique sur **Activer l'A2F**.
-2. Dans ton application d'authentification (Google Authenticator, Authy, 1Password, Bitwarden…), ajoute un compte avec la **Clé de configuration** affichée (bouton **Copier**). Sur téléphone, le lien « ouvre directement l'application » l'ajoute sans rien taper. Type de clé : temporelle, 6 chiffres, 30 secondes.
+2. Dans ton application d'authentification (Google Authenticator, Authy, 1Password, Bitwarden…), **scanne le QR code** affiché. Tu ne peux pas scanner ? Clique sur **Clé de configuration** sous le QR code : une fenêtre affiche la clé avec un bouton **Copier**, à saisir dans l'application (type de clé : temporelle, 6 chiffres, 30 secondes). Sur téléphone, le lien « ouvre directement l'application » l'ajoute sans scanner.
 3. Saisis le code que l'application affiche dans « Code à 6 chiffres », puis clique sur **Activer l'A2F**.
 4. iaboss affiche alors **10 codes de secours**, une seule fois. Copie-les (bouton **Copier**) et range-les dans un gestionnaire de mots de passe, puis clique sur **J'ai conservé mes codes**.
 Le bouton **Annuler** abandonne l'activation en cours (la clé affichée est effacée).
 
 ## Se connecter avec l'A2F
 Après avoir choisi Google ou Apple, la page « Code de vérification » s'ouvre : saisis le code de ton application, puis **Valider**. Tu peux aussi saisir un code de secours (chaque code ne sert qu'une fois).
+- Pour ne pas retaper le code à chaque connexion sur ton propre ordinateur, coche **Faire confiance à cet appareil pendant 30 jours** avant de valider : un cookie (voir la politique de confidentialité) dispense du code sur ce navigateur pendant 30 jours. Ne le fais jamais sur un ordinateur partagé.
 - Un code ne marche qu'une fois : si tu viens de t'en servir, attends que l'application en affiche un nouveau.
 - Après **5 codes erronés**, la connexion est annulée : il faut repasser par Google ou Apple. Sans code valide en moins de 10 minutes, la connexion expire aussi.
 - L'API (mode développeur) et le serveur MCP utilisent des jetons, pas ce code : l'A2F n'y change rien.
+
+## Appareils de confiance
+La carte indique « Appareils de confiance » : le nombre de navigateurs dispensés de code. **Oublier mes appareils de confiance** les retire tous (le code est redemandé partout). Désactiver l'A2F ou renouveler les codes de secours les oublie aussi.
 
 ## Codes de secours
 La carte indique « Codes de secours restants : n sur 10 ». Pour en obtenir 10 nouveaux (les anciens cessent de marcher), saisis un code de ton application puis clique sur **Régénérer les codes de secours**.

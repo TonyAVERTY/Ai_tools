@@ -1382,4 +1382,30 @@ export const MIGRATIONS = [
       { sql: 'ALTER TABLE sessions ADD COLUMN mfa_tries INT NOT NULL DEFAULT 0', when: colMissing('sessions', 'mfa_tries') },
     ],
   },
+  {
+    // Cookies : appareils de confiance de l'A2F (seule l'empreinte du cookie est gardée) et fréquentation du site public SANS cookie ni identifiant :
+    // des compteurs par jour et par page (ou par site d'origine), rien qui permette de reconnaître un visiteur.
+    name: 'trusted_devices_and_audience',
+    sqlite: [
+      `CREATE TABLE trusted_devices (
+        token_hash TEXT PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL
+      )`,
+      'CREATE INDEX trusted_devices_user ON trusted_devices(user_id)',
+      'CREATE TABLE page_views (day INTEGER NOT NULL, path TEXT NOT NULL, views INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (day, path))',
+      'CREATE TABLE page_referrers (day INTEGER NOT NULL, host TEXT NOT NULL, views INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (day, host))',
+    ],
+    mysql: [
+      `CREATE TABLE IF NOT EXISTS trusted_devices (
+        token_hash VARCHAR(64) NOT NULL PRIMARY KEY,
+        user_id BIGINT NOT NULL,
+        created_at BIGINT NOT NULL, expires_at BIGINT NOT NULL,
+        KEY trusted_devices_user (user_id),
+        CONSTRAINT trusted_devices_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      ) ${T}`,
+      `CREATE TABLE IF NOT EXISTS page_views (day INT NOT NULL, path VARCHAR(80) NOT NULL, views BIGINT NOT NULL DEFAULT 0, PRIMARY KEY (day, path)) ${T}`,
+      `CREATE TABLE IF NOT EXISTS page_referrers (day INT NOT NULL, host VARCHAR(100) NOT NULL, views BIGINT NOT NULL DEFAULT 0, PRIMARY KEY (day, host)) ${T}`,
+    ],
+  },
 ];

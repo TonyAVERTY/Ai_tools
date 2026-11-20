@@ -293,9 +293,9 @@ test('couleurs : site.css lit les jetons de tokens.css, sans valeur en dur ni se
 
 test('contrastes AA (4,5:1) des couples texte/fond de la charte, thèmes clair et sombre', () => {
   const tk = read('public/tokens.css');
-  const dm = tk.match(/@media \(prefers-color-scheme: dark\) \{\s*:root \{([\s\S]*?)\n  \}\n\}/);
+  const dm = tk.match(/@media \(prefers-color-scheme: dark\) \{\s*:root:not\(\[data-theme="light"\]\) \{([\s\S]*?)\n  \}\n\}/);
   assert.ok(dm, 'bloc du thème sombre');
-  const lightRaw = declsOf(tk.replace(dm[0], ''));
+  const lightRaw = declsOf(tk.replace(dm[0], '').replace(/:root\[data-theme="dark"\] \{[\s\S]*?\n\}\n/, ''));
   const themes = { clair: resolved(lightRaw), sombre: resolved({ ...lightRaw, ...declsOf(dm[1]) }) };
   for (const [name, t] of Object.entries(themes)) {
     const pairs = [

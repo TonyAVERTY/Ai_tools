@@ -186,16 +186,19 @@ export function privacyPage({ appUrl, apple = false, captcha = false, inactiveMo
       },
       {
         id: 'cookies', title: 'Cookies et traceurs',
-        html: `<p>iaboss ne pose que des cookies <strong>strictement nécessaires</strong> au service. Ceux d'iaboss sont exemptés de consentement : c'est pourquoi aucun bandeau ne s'affiche${captcha ? ' (ceux de Google, sur la page de connexion, sont décrits plus bas)' : ''}. Pas d'analyse d'audience, pas de publicité, pas de police ni de script chargés depuis un autre site${captcha ? ', sauf la vérification anti-robot de Google, uniquement sur la page de connexion (voir plus bas)' : ''}.</p>
+        html: `<p>iaboss ne pose que des cookies <strong>strictement nécessaires</strong> au service. Ceux d'iaboss sont exemptés de consentement : c'est pourquoi aucun bandeau ne s'affiche${captcha ? ' (ceux de Google, sur la page de connexion, sont décrits plus bas)' : ''}. Pas de publicité, pas de traceur d'analyse (la fréquentation du site est comptée sans cookie : voir plus bas), pas de police ni de script chargés depuis un autre site${captcha ? ', sauf la vérification anti-robot de Google, uniquement sur la page de connexion (voir plus bas)' : ''}.</p>
 <div class="tw"><table>
   <caption>Cookies posés par iaboss</caption>
   <thead><tr><th scope="col">Nom</th><th scope="col">Rôle</th><th scope="col">Durée</th></tr></thead>
   <tbody>
     <tr><th scope="row"><code>sid</code></th><td>Te garder connecté (identifiant de session aléatoire). Sécurisé : HttpOnly, Secure, SameSite=Lax.</td><td>30 jours au plus</td></tr>
     <tr><th scope="row"><code>oauth_b</code></th><td>Relier une tentative de connexion à ton navigateur, pour empêcher qu'un tiers la détourne. Limité aux adresses de connexion.</td><td>10 minutes</td></tr>
+    <tr><th scope="row"><code>mfa_td</code></th><td>Seulement si tu coches « Faire confiance à cet appareil pendant 30 jours » après avoir saisi un code de vérification : dispense du code (A2F) sur ce navigateur. Identifiant aléatoire, dont seule l'empreinte est conservée ; HttpOnly, Secure, SameSite=Lax. Tu peux l'oublier dans Mon compte → Sécurité : A2F.</td><td>30 jours</td></tr>
+    <tr><th scope="row"><code>theme</code></th><td>Seulement si tu choisis un thème « Clair » ou « Sombre » dans Mon compte → Affichage : retient ton choix, y compris sur la page de connexion. Cookie de préférence, sans identifiant.</td><td>1 an</td></tr>
     ${captcha ? `<tr><th scope="row">Cookies de Google reCAPTCHA</th><td>Déposés par Google sur la page de connexion, pendant la vérification anti-robot automatique. Ils servent à distinguer un humain d'un programme.</td><td>Durée fixée par Google</td></tr>` : ''}
   </tbody>
 </table></div>
+<p><strong>Mesure d'audience sans cookie.</strong> Les pages du site public (accueil, tarifs, documentation…) sont comptées par jour et par page, avec le site d'où vient la visite. Rien n'est déposé dans ton navigateur et rien ne permet de te reconnaître : ni adresse IP, ni empreinte du navigateur, ni durée de visite ne sont conservées, et le « Ne pas me suivre » de ton navigateur est respecté. Les compteurs sont effacés après 13 mois. Cette mesure strictement statistique ne demande pas de consentement.</p>
 <p>Le tableau de bord retient aussi, dans la mémoire de session de ton navigateur, le projet que tu as ouvert en dernier ; cette mémoire est effacée à la fermeture de l'onglet et rien n'est envoyé au serveur.</p>
 ${captcha
   ? `<p>Sur la page de connexion, la vérification anti-robot de Google se charge toute seule. Aucune autre page du site ne charge quoi que ce soit depuis Google.</p>`

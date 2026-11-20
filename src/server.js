@@ -10,6 +10,8 @@ import { openDb } from './db.js';
 import { Router, json, redirect, html, esc, HttpError } from './http.js';
 import { RateLimiter, clientIp } from './ratelimit.js';
 import { getSession, checkOrigin, purgeExpired } from './auth.js';
+import { withTheme, themeOf } from './theme.js';
+import { countView, purgeAudience } from './services/audience.js';
 import { authenticateApi } from './apitokens.js';
 import { syncAdmins, getUser } from './users.js';
 import { limitsFor } from './services/plans.js';
@@ -94,7 +96,7 @@ export async function createApp(cfg, { db, worker = true, createTransport, fetch
 
   const server = createServer(async (req, res) => {
     // Un défaut imprévu dans un gestionnaire ne doit jamais arrêter le serveur pour tous les utilisateurs
-    try { await handle(req, res); } catch (e) {
+    try { await withTheme(themeOf(req), () => handle(req, res)); } catch (e) {
       console.error('[http]', e);
       reportError(app, e, { method: req.method, path: req.url });
       if (!res.headersSent) res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
@@ -150,6 +152,7 @@ export async function createApp(cfg, { db, worker = true, createTransport, fetch
           // Visiteur sur la racine : le site public. Connecté, la même adresse mène au tableau de bord.
           if (isRead && url.pathname === '/') {
             res.setHeader('Vary', 'Cookie');
+            countView(db, req, '/', cfg.appUrl); // mesure sans cookie : voir services/audience.js
             return html(res, homePage({ appUrl: cfg.appUrl, apple: !!cfg.apple, billing: !!cfg.stripe }));
           }
           if (url.pathname.startsWith('/api/')) throw new HttpError(401, 'Non connecté');
@@ -228,7 +231,7 @@ export async function createApp(cfg, { db, worker = true, createTransport, fetch
   let purging = null;
   const purge = setInterval(() => {
     app.limiter.sweep();
-    purging = Promise.all([purgeExpired(db), purgeInvites(db), purgePendingUploads(app), sweepRunDirs(cfg)]).catch((e) => console.error('[purge]', e.message));
+    purging = Promise.all([purgeExpired(db), purgeAudience(db), purgeInvites(db), purgePendingUploads(app), sweepRunDirs(cfg)]).catch((e) => console.error('[purge]', e.message));
   }, 3600_000);
   purge.unref();
 

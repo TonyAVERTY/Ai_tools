@@ -102,8 +102,9 @@
   color-scheme: light dark;
 }
 
+/* Thème sombre : le réglage du système, sauf si la personne a choisi (cookie « theme », src/theme.js → <html data-theme>). Les deux blocs sombres sont identiques (test/tokens.test.js). */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: var(--pet-950); --bg-sunk: #05161a; --card: #0d2a31; --card-2: #12333b;
     --text: #f3ecdc; --muted: #a9bfc3; --link: var(--pet-300); --focus: var(--pet-300);
     --line: #1b3b43; --line-strong: #2d5560; --control: #6e9199;
@@ -118,6 +119,22 @@
     --shadow: none; --shadow-2: 0 6px 16px rgba(0, 0, 0, .5), 0 1px 3px rgba(0, 0, 0, .4); --shadow-3: 0 22px 54px rgba(0, 0, 0, .65), 0 2px 8px rgba(0, 0, 0, .5);
   }
 }
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: var(--pet-950); --bg-sunk: #05161a; --card: #0d2a31; --card-2: #12333b;
+  --text: #f3ecdc; --muted: #a9bfc3; --link: var(--pet-300); --focus: var(--pet-300);
+  --line: #1b3b43; --line-strong: #2d5560; --control: #6e9199;
+  --primary: var(--pet-400); --primary-hover: var(--pet-300); --primary-active: var(--pet-200); --on-primary: #06191e;
+  --nav-bg: #04141a; --nav-on: #f3ecdc; --logo-ink: #f3ecdc;
+  --accent: var(--saf-500); --on-accent: var(--pet-900); --accent-text: var(--saf-400); --accent-bg: #3a2b08;
+  --mark: #5a4710; --on-mark: #fdf3cf;
+  --ok: var(--pet-300); --ok-bg: #10333b; --info: var(--pet-300); --info-bg: #10333b;
+  --warn: var(--saf-400); --warn-bg: #3a2b08; --err: #ff9b88; --err-bg: #3a1710; --on-err: #2a0a05;
+  --chart-1: var(--pet-400); --chart-2: var(--saf-500); --chart-3: #2f7f8d;
+  --m-get: var(--pet-300); --m-post: var(--saf-400); --on-m: #06191e;
+  --shadow: none; --shadow-2: 0 6px 16px rgba(0, 0, 0, .5), 0 1px 3px rgba(0, 0, 0, .4); --shadow-3: 0 22px 54px rgba(0, 0, 0, .65), 0 2px 8px rgba(0, 0, 0, .5);
+}
+:root[data-theme="light"] { color-scheme: light; }
 
 /* ——— Compatibilité (PR 1 seulement) : anciens noms encore lus par app.css et site.css. À retirer écran par écran (temps 3). ——— */
 :root {

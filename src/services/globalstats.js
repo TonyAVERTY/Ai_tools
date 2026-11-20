@@ -2,6 +2,7 @@
 // Ce sont des totaux : aucune donnée d'un compte en particulier (ni adresse, ni contenu, ni nom de projet).
 import { now } from '../db.js';
 import { modelLabel } from './models.js';
+import { audienceStats } from './audience.js';
 
 export const PERIODS = { '24h': { label: '24 heures', seconds: 86400 }, '7j': { label: '7 jours', seconds: 7 * 86400 }, '30j': { label: '30 jours', seconds: 30 * 86400 } };
 export const DEFAULT_PERIOD = '7j';
@@ -53,6 +54,7 @@ export async function globalStats(db, period = DEFAULT_PERIOD, at = now()) {
     replies: { total: Number(replies.n), rate: Number(mails.sent) ? Number(replies.n) / Number(mails.sent) : null },
     response: { count: durations.length, avg: durations.length ? durations.reduce((a, b) => a + b, 0) / durations.length : null, p50: percentile(durations, 50), p95: percentile(durations, 95) },
     errorsByType: errorsByType.map((r) => ({ type: r.type, n: Number(r.n) })),
+    audience: await audienceStats(db, since),
     models: [...models.values()].map((m) => ({ ...m, label: m.model === 'inconnu' ? 'Modèle non enregistré' : modelLabel(m.model) })).sort((a, b) => b.requests - a.requests),
   };
 }
