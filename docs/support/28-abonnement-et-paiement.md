@@ -26,6 +26,14 @@ Si les paiements ne sont pas ouverts sur le service, les offres affichent **Bien
 ## Changer d'offre
 Sur Tarifs, clique **Choisir cette offre** sur une autre offre (ou une autre période). Ton abonnement est **modifié** et non doublé : la différence est calculée **au prorata** sur ta prochaine facture. Message : « Offre … activée : la différence est calculée au prorata sur ta prochaine facture ». Si tu as déjà exactement cette offre : « Tu as déjà cette offre ».
 
+## Les messages après « Choisir cette offre »
+Quand tu cliques sur **Choisir cette offre**, le résultat s'affiche en **notification** en bas de l'écran de **Mon compte**, comme les autres actions de l'application (et l'adresse de la page est nettoyée : rien à copier ni à rejouer). Les messages possibles :
+- « Ton compte n'a pas besoin d'offre : il n'a aucun plafond » (notification rouge) : ton compte est administrateur ou a l'ancienne offre illimitée « pro », il n'a donc rien à acheter ;
+- « Ton dernier paiement a échoué : mets ta carte à jour dans « Gérer mon abonnement » avant de changer d'offre » : même notification rouge ;
+- « Tu as déjà cette offre » ou « Offre … activée : la différence est calculée au prorata sur ta prochaine facture » : notification verte ;
+- « Les paiements ne sont pas ouverts sur ce service » : les clés Stripe ne sont pas renseignées sur le serveur (voir l'administrateur).
+Si une notification disparaît trop vite, ferme-la avec la croix ou relis la liste ci-dessus.
+
 ## Résilier
 **Gérer mon abonnement** → résilier. Ton offre reste active **jusqu'à la fin de la période déjà payée** (Mon compte affiche « Se termine le … : tu repasseras ensuite au plan gratuit, tes données sont gardées »), puis ton compte repasse au plan Gratuit. La période commencée n'est pas remboursée, sauf obligation légale.
 

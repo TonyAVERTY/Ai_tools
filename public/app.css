@@ -662,6 +662,8 @@ input.copy { font-family: var(--mono); font-size: .8125rem; }
 /* ---------- Développeur : jeton affiché une fois ---------- */
 .tokenbox { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 12px; background: var(--bg-sunk); border: 1px solid var(--line-strong); border-radius: var(--radius); }
 .tokenbox code { flex: 1 1 280px; overflow-wrap: anywhere; user-select: all; font-size: .875rem; }
+.token-created .tokenbox { margin-top: 16px; }
+.token-created .modal-f { margin-top: 20px; }
 .h1 .ic { width: 26px; height: 26px; margin-right: 10px; vertical-align: -4px; }
 
 /* ---------- Calendrier ---------- */

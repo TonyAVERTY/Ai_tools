@@ -28,6 +28,8 @@ import { purgePendingUploads, sweepRunDirs } from './chatfiles.js';
 import { securityHeaders, robotsHeaderFor, cspFor } from './site/seo.js';
 import { hasUsableLink, isLinkExempt, LINK_REQUIRED_MESSAGE, providerLabelOf, setGoogleAccountEnabled } from './claudelink.js';
 import { withAiName } from './services/ainame.js';
+import { withDevTab } from './services/devnav.js';
+import { developerTabFor } from './developerroutes.js';
 import { memberTeamIds, purgeInvites } from './teams.js';
 import { needsWelcome } from './userprofile.js';
 import { sandboxStartupMessages } from './services/sandbox.js';
@@ -170,7 +172,9 @@ export async function createApp(cfg, { db, worker = true, createTransport, fetch
       if (!route.public && isRead && url.pathname === '/' && !req.headers.accept?.includes('json') && await needsWelcome(db, session.userId)) return redirect(res, '/welcome');
       // Les textes de la page parlent de l'IA de CET utilisateur (voir services/ainame.js)
       const ai = session && !route.public ? await providerLabelOf(db, session.userId) : null;
-      await withAiName(ai, () => route.handler({ req, res, url, params: route.params, session, app }));
+      // L'onglet « Développeur » de la barre du haut n'existe que pour un compte qui a activé le mode (voir services/devnav.js)
+      const devTab = session && !route.public ? await developerTabFor(db, session.userId) : false;
+      await withDevTab(devTab, () => withAiName(ai, () => route.handler({ req, res, url, params: route.params, session, app })));
     } catch (e) {
       const status = e.status || 500;
       if (status >= 500 && !e.expose) console.error(`[${req.method} ${url.pathname}]`, e);

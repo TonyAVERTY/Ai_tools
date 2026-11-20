@@ -115,3 +115,24 @@ test('sans l\'offre, le bloc est remplacé par une carte qui dit laquelle et mè
   assert.ok(!card(await page(business, '/facturation'), 'billing'));
   assert.ok(!card(await page(business, '/developer'), 'api'));
 });
+
+test('onglet « Développeur » de la barre du haut : seulement avec le mode activé et une offre qui le permet, partout dans l\'application', async () => {
+  const tab = /<a class="pill" href="\/developer">/;
+  const bar = async (u, path = '/projets') => (await (await u.get(path, { headers: { accept: 'text/html' } })).text());
+  const growth = await user('growth');
+  assert.doesNotMatch(await bar(growth), tab, 'mode éteint : pas d\'onglet');
+  assert.ok((await growth.post('/account/developer', { enabled: 'on' })).status < 400);
+  for (const path of ['/', '/projets', '/mails', '/account', '/developer']) assert.match(await bar(growth, path), tab, `mode activé : onglet sur ${path}`);
+  assert.match(await bar(growth), /href="\/compta">[^]*?href="\/developer">/, 'il vient après les autres onglets');
+  // Un autre compte ne le voit pas
+  assert.doesNotMatch(await bar(await user('growth')), tab, 'le réglage est propre à chaque compte');
+  // Mode éteint : l'onglet disparaît
+  await growth.post('/account/developer', { enabled: '' });
+  assert.doesNotMatch(await bar(growth), tab);
+  // Offre redescendue avec le mode resté allumé : pas d'onglet qui mène à une fonctionnalité fermée
+  await growth.post('/account/developer', { enabled: 'on' });
+  await s.db.prepare("UPDATE users SET plan = 'starter' WHERE id = ?").run(growth.id);
+  assert.doesNotMatch(await bar(growth), tab);
+  // Visiteur non connecté (site public) : jamais
+  assert.doesNotMatch(await (await s.anon.get('/tarifs', { headers: { accept: 'text/html' } })).text(), tab);
+});

@@ -10,6 +10,9 @@ import { lockedCard } from './lockviews.js';
 /** Une valeur à copier telle quelle (adresse, commande) : monospace, bouton « Copier » (public/app.js, [data-copy-cmd]). */
 const cmd = (label, text) => `<div class="cmd"><span class="lbl">${label}</span><div class="cmd-b"><pre><code>${esc(text)}</code></pre><button type="button" class="btn small" data-copy-cmd aria-label="Copier : ${esc(label)}">${ic('copy')}Copier</button></div></div>`;
 
+/** Tout ce qu'on montre d'un jeton après sa création : jamais un caractère du secret, seulement le préfixe commun à tous les jetons. */
+const TOKEN_MASK = 'iaboss_*************';
+
 const day = (ts) => (ts ? new Date(ts * 1000).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' }) : 'jamais');
 
 export function developerPage({ user, enabled, tokens = [], newToken = null, error = null, appUrl, max, locked = false }) {
@@ -25,11 +28,11 @@ ${newToken ? `<section class="card" role="status">
 <section class="card">
   <div class="card-h"><h2>Jetons d'API</h2><p>Un jeton donne accès à ton compte avec les droits cochés, et à rien d'autre. Garde-le secret : ne le mets jamais dans une page web, un dépôt ou un message. ${max} jetons au plus.</p></div>
   ${error ? banner('err', error) : ''}
-  ${tokens.length ? `<div class="table-wrap"><table><thead><tr><th>Nom</th><th>Début</th><th>Droits</th><th>Créé</th><th>Dernier usage</th><th><span class="sr-only">Action</span></th></tr></thead><tbody>
-    ${tokens.map((t) => `<tr><td>${esc(t.name)}</td><td><code>${esc(t.prefix)}…</code></td><td>${t.scopes.map((s) => `<span class="badge">${esc(s)}</span>`).join(' ')}</td><td>${esc(day(t.createdAt))}</td><td>${esc(day(t.lastUsedAt))}</td>
+  ${tokens.length ? `<div class="table-wrap"><table><thead><tr><th>Nom</th><th>Jeton</th><th>Droits</th><th>Créé</th><th>Dernier usage</th><th><span class="sr-only">Action</span></th></tr></thead><tbody>
+    ${tokens.map((t) => `<tr><td>${esc(t.name)}</td><td><code>${TOKEN_MASK}</code></td><td>${t.scopes.map((s) => `<span class="badge">${esc(s)}</span>`).join(' ')}</td><td>${esc(day(t.createdAt))}</td><td>${esc(day(t.lastUsedAt))}</td>
       <td><form method="post" action="/developer/tokens/${t.id}/revoke" data-confirm="Supprimer le jeton « ${esc(t.name)} » ? Les scripts ou Claude qui l'utilisent perdront l'accès tout de suite. Cette action est définitive."><button class="btn small danger" aria-label="Supprimer le jeton ${esc(t.name)}">${ic('trash')}Supprimer</button></form></td></tr>`).join('')}
   </tbody></table></div>` : '<p class="muted">Aucun jeton pour l\'instant.</p>'}
-  ${tokens.length < max ? `<form method="post" action="/developer/tokens" class="cfg">
+  ${tokens.length < max ? `<form method="post" action="/developer/tokens" class="cfg" data-action="token">
     <label class="field"><span class="lbl">Nom du jeton</span><input name="name" maxlength="100" placeholder="ex. Claude Desktop" required></label>
     <fieldset class="evs"><legend class="lbl">Droits</legend><div class="scopelist">
       ${Object.entries(SCOPES).map(([k, l]) => `<label class="opt"><input type="checkbox" name="scope_${k}" value="on"${k === 'read' ? ' checked' : ''}><span class="box">${ic('check')}</span><span><b><code>${k}</code></b> : ${esc(l)}</span></label>`).join('\n      ')}

@@ -3,6 +3,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { startApp } from './helpers/server.js';
+import { testTokenLink } from './helpers/users.js';
 import { TOUR_STEPS, needsTour, tourJson } from '../src/tour.js';
 import { getSetting } from '../src/db.js';
 import { getProfile } from '../src/userprofile.js';
@@ -37,9 +38,13 @@ test('chaque onglet de la barre du haut a son étape dans la visite, dans l\'ord
 test('chaque cible de la visite existe dans le tableau de bord rendu', async () => {
   const u = await s.newUser();
   // Les étapes visent l'accueil (Aujourd'hui) ou la page Projets : une étape dont l'élément n'est pas à l'écran est sautée, mais chacune doit exister quelque part
-  const html = (await text(u, '/')) + (await text(u, '/projets'));
+  // Un compte avec le mode développeur actif voit l'onglet « Développeur » (l'étape qui le vise est sautée pour les autres)
+  const dev = await s.newUser({ admin: false, link: testTokenLink() });
+  await s.db.prepare("UPDATE users SET plan = 'growth' WHERE id = ?").run(dev.id);
+  await dev.post('/account/developer', { enabled: 'on' });
+  const html = (await text(u, '/')) + (await text(u, '/projets')) + (await text(dev, '/projets'));
   const has = {
-    '.pills a[href="/"]': /<nav class="pills"[^]*?href="\/"/, '.pills a[href="/projets"]': /class="pill" href="\/projets"/, '[data-search-open]': /data-search-open/, '.td-todo': /class="td-todo"/, '.td-usage': /class="td-usage"/, '[data-new-project]': /data-new-project/, '.pills a[href="/mails"]': /class="pill" href="\/mails"/, '.pills a[href="/calendar"]': /class="pill" href="\/calendar"/, '.pills a[href="/compta"]': /class="pill" href="\/compta"/,
+    '.pills a[href="/"]': /<nav class="pills"[^]*?href="\/"/, '.pills a[href="/projets"]': /class="pill" href="\/projets"/, '.pills a[href="/developer"]': /class="pill" href="\/developer"/, '[data-search-open]': /data-search-open/, '.td-todo': /class="td-todo"/, '.td-usage': /class="td-usage"/, '[data-new-project]': /data-new-project/, '.pills a[href="/mails"]': /class="pill" href="\/mails"/, '.pills a[href="/calendar"]': /class="pill" href="\/calendar"/, '.pills a[href="/compta"]': /class="pill" href="\/compta"/,
     'details.user .user-pop a[href="/facturation"]': /<details class="user">[^]*?class="user-pop"[^]*?href="\/facturation"/, 'details.user .user-pop a[href="/clients"]': /<details class="user">[^]*?class="user-pop"[^]*?href="\/clients"/, 'details.user .user-pop a[href="/team"]': /<details class="user">[^]*?class="user-pop"[^]*?href="\/team"/, 'details.user .user-pop a[href="/raccourcis"]': /<details class="user">[^]*?class="user-pop"[^]*?href="\/raccourcis"/, '.ukpis': /class="ukpis"/, '[data-new-toggle]': /data-new-toggle/, '.ia-menu > summary': /<details class="ia-menu">\s*<summary/,
     '.ia-menu .ia-pop': /class="user-pop ia-pop"/, '[data-claude-card]': /data-claude-card/, 'details.user > summary': /<details class="user">\s*<summary/, 'details.user .user-pop': /<details class="user">[^]*?class="user-pop"/,
   };
