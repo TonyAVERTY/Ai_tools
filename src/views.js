@@ -273,7 +273,7 @@ export function accountPage({ user, error, link = null, consent = null, notice =
     title: 'Mon compte', email: user.email,
     body: `<div class="pj-page acct">
 <div class="ph"><div class="t"><h1>Mon compte</h1><span class="muted small">${esc(user.email)} · connecté avec ${esc(PROVIDER_NAMES[user.provider] || '—')}</span></div></div>
-<div class="pj-tools"><nav class="tools-nav" aria-label="Mon compte">
+<div class="pj-tools"><nav class="tools-nav" data-spy aria-label="Mon compte">
   <p class="tools-grp">Moi</p><a href="#mon-ia" aria-current="true">Mon IA</a><a href="#usage">Usage et offre</a><a href="#profil">Mon profil</a><a href="#agenda-ext">Agenda externe</a>
   <p class="tools-grp">Réglages</p><a href="/settings#notif">Notifications</a><a href="/settings#git">Dépôts Git</a><a href="/settings#garde">Garde-fous</a><a href="/settings#garde">Liste d'opposition</a><a href="/settings#budget">Budget et modèles IA</a><a href="/settings#prompts">Prompts IA</a>
   <p class="tools-grp">Équipe et avancé</p><a href="/team">Équipe</a><a href="/developer">Mode développeur</a><a href="/?tour=1">Visite guidée</a><a href="#danger">Zone de danger</a></nav>

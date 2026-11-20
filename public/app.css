@@ -1841,6 +1841,9 @@ a.pj-card:hover { border-color: var(--primary); }
 .pj-lead { margin: 0; color: var(--muted); font-size: 1.0625rem; }
 .pj-tools { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; }
 @media (min-width: 900px) { .pj-tools { grid-template-columns: 240px minmax(0, 1fr); } }
+@media (min-width: 900px) { .tools-nav[data-spy] { position: sticky; top: 88px; max-height: calc(100vh - 104px); overflow-y: auto; overscroll-behavior: contain; } } /* la barre reste collée pendant le défilement, comme le sommaire des Réglages */
+.dev-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (min-width: 1200px) { .dev-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } } /* API et MCP côte à côte */
 .tools-nav { display: flex; flex-direction: column; gap: 2px; }
 .tools-grp { margin: 12px 0 4px 12px; font-size: .75rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
 .tools-nav button, .tools-nav a { display: flex; align-items: center; min-height: 44px; padding: 0 12px; border: 0; border-left: 3px solid transparent; border-radius: var(--radius-sm); background: transparent; color: var(--text); font: inherit; text-align: left; text-decoration: none; cursor: pointer; }

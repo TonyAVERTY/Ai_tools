@@ -152,7 +152,7 @@ function toolsLayout(p, blocks) {
 function settingsLayout(p, blocks) {
   const shared = p.teamId ? 'Ce projet est partagé avec une équipe.' : 'Ce projet n\'est partagé avec personne.';
   const items = [['set-smtp', "Adresse d'envoi (SMTP)"], ['set-imap', 'Boîte de réception (IMAP)'], ['acc-header', 'Dépôt et site'], ['set-db', 'Base de données'], ['set-share', 'Partage'], ['set-danger', 'Zone de danger']];
-  return `<div class="pj-tools pj-settings"><nav class="tools-nav" aria-label="Rubriques">${items.map(([id, l], i) => `<a href="#${id}"${i === 0 ? ' aria-current="true"' : ''}>${esc(l)}</a>`).join('')}</nav>
+  return `<div class="pj-tools pj-settings"><nav class="tools-nav" data-spy aria-label="Rubriques">${items.map(([id, l], i) => `<a href="#${id}"${i === 0 ? ' aria-current="true"' : ''}>${esc(l)}</a>`).join('')}</nav>
     <div class="pj-flat tools-main">${blocks.config.replace('<form data-action="db"', `${blocks.header}<form data-action="db"`).replace('<section class="cfg danger-card"', `<section class="sheet" id="set-share" aria-labelledby="share-h"><h2 id="share-h">Partage</h2><p class="muted small">${esc(shared)} Le partage se règle dans <a href="/team">Équipe</a>.</p></section><section class="cfg danger-card"`)}</div></div>`;
 }
 
