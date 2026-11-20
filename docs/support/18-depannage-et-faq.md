@@ -324,3 +324,6 @@ L'onglet n'apparaît que si le **mode développeur est activé** (Mon compte →
 
 ## J'ai perdu mon jeton d'API : comment le retrouver ?
 On ne peut pas le retrouver : iaboss ne garde qu'une empreinte du jeton, jamais le jeton, et la liste ne montre que `iaboss_*************`. Sur la page **Développeur**, supprime le jeton perdu (bouton **Supprimer**), crée-en un nouveau, copie-le dans la fenêtre « Jeton créé : conserve-le maintenant » avant de la fermer, puis mets-le à jour dans tes scripts ou dans la configuration de Claude.
+
+## Le code de vérification (A2F) est refusé à la connexion
+Un code ne sert qu'une fois et dure 30 secondes : attends qu'un nouveau code s'affiche dans ton application et saisis-le. Vérifie que l'heure de ton téléphone est réglée sur « automatique » (un décalage de plus d'une minute fait refuser les codes). Après 5 erreurs la connexion est annulée : repasse par Google ou Apple. Tu as perdu ton téléphone ? Saisis un **code de secours** à la place du code (voir « Sécurité : l'authentification à deux facteurs »).

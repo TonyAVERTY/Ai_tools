@@ -39,6 +39,8 @@ export const RATE_LIMITS = {
   // Connexion : démarrage (Google, Apple) et retours des fournisseurs
   auth_start: { ip: { max: 20, windowMs: 10 * MIN } },
   auth_callback: { ip: { max: 40, windowMs: 10 * MIN } },
+  // A2F : saisie du code (à la connexion et dans Mon compte) ; la session en attente tombe en plus après 5 essais ratés
+  mfa: { ip: { max: 30, windowMs: 10 * MIN } },
   // Désinscription (page publique, lien reçu par mail) : large pour un lecteur légitime, étroit pour un robot qui devine
   unsub: { ip: { max: 60, windowMs: 10 * MIN } },
   // Abonnement : ouverture du paiement ou du portail (chacun crée une session chez Stripe)

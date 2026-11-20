@@ -7,6 +7,7 @@ import { parseCookies, setCookie, redirect, HttpError } from './http.js';
 import { loginIdentity } from './users.js';
 
 const SESSION_COOKIE = 'sid';
+const PENDING_TTL = 10 * 60;
 const BIND_COOKIE = 'oauth_b';
 const SESSION_TTL = 30 * 24 * 3600;
 const STATE_TTL = 600;
@@ -43,7 +44,7 @@ export async function getSession(db, req) {
   const sid = parseCookies(req)[SESSION_COOKIE];
   if (!sid) return null;
   const s = await db.prepare(`SELECT s.id, s.user_id, u.email, u.name, u.provider, u.status, u.is_admin
-    FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.id = ? AND s.expires_at > ?`).get(hashSid(sid), now());
+    FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.id = ? AND s.expires_at > ? AND s.mfa_pending = 0`).get(hashSid(sid), now());
   if (!s) return null;
   if (s.status !== 'active') {
     await db.prepare('DELETE FROM sessions WHERE user_id = ?').run(s.user_id);
@@ -55,11 +56,23 @@ export async function getSession(db, req) {
   };
 }
 
-export async function createSession(db, res, userId) {
+/**
+ * `pending` : compte protégé par l'A2F. La session existe mais ne donne accès à rien (getSession la refuse) tant que le code n'a pas été saisi ;
+ * elle ne dure que 10 minutes et tombe après 5 essais ratés (src/mfaroutes.js).
+ */
+export async function createSession(db, res, userId, { pending = false } = {}) {
   const id = randomId();
-  await db.prepare('INSERT INTO sessions(id, user_id, created_at, expires_at) VALUES(?, ?, ?, ?)')
-    .run(hashSid(id), userId, now(), now() + SESSION_TTL); // en base : l'empreinte ; le cookie garde l'identifiant
-  setCookie(res, SESSION_COOKIE, id, { maxAge: SESSION_TTL });
+  await db.prepare('INSERT INTO sessions(id, user_id, created_at, expires_at, mfa_pending) VALUES(?, ?, ?, ?, ?)')
+    .run(hashSid(id), userId, now(), now() + (pending ? PENDING_TTL : SESSION_TTL), pending ? 1 : 0); // en base : l'empreinte ; le cookie garde l'identifiant
+  setCookie(res, SESSION_COOKIE, id, { maxAge: pending ? PENDING_TTL : SESSION_TTL });
+}
+
+/** Session d'un compte qui attend encore son code A2F (jamais utilisable ailleurs que sur /login/2fa). */
+export async function getPendingSession(db, req) {
+  const sid = parseCookies(req)[SESSION_COOKIE];
+  if (!sid) return null;
+  const s = await db.prepare('SELECT s.id, s.user_id, s.mfa_tries, u.email, u.status FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.id = ? AND s.expires_at > ? AND s.mfa_pending = 1').get(hashSid(sid), now());
+  return s && s.status === 'active' ? { id: s.id, userId: Number(s.user_id), email: s.email, tries: Number(s.mfa_tries) } : null;
 }
 
 export async function destroySession(db, req, res) {
@@ -255,8 +268,9 @@ export async function finishLogin(app, name, params, req, res) {
   if (name === 'apple') id.name = appleName(get('user')) || id.name;
 
   const user = await loginIdentity(db, cfg, { provider: name, sub: id.sub, email: id.email, name: id.name });
-  await createSession(db, res, user.id);
-  redirect(res, '/');
+  const protectedAccount = !!(await db.prepare('SELECT totp_enabled FROM users WHERE id = ?').get(user.id))?.totp_enabled;
+  await createSession(db, res, user.id, { pending: protectedAccount });
+  redirect(res, protectedAccount ? '/login/2fa' : '/');
 }
 
 // Anti-CSRF : toute requête non-GET doit venir de notre origine (en plus de SameSite=Lax)

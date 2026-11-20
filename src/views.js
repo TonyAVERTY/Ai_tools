@@ -268,13 +268,13 @@ function linkSection(link, consent, quota = null) {
 // Barre de chargement avec pourcentage ESTIMÉ (public/app.js, track) : montée vers 95 % selon la durée habituelle, 100 % à la réponse
 export const pctBlock = (label) => `<div class="dl-pct" data-pct hidden><div class="bar" role="progressbar" aria-label="${esc(label)}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="w-0" data-pct-bar></span></div><p class="dl-pct-t"><span>${esc(label)} · estimation</span><b data-pct-text>0 %</b></p></div>`;
 
-export function accountPage({ user, error, link = null, consent = null, notice = null, usage = null, developer = false, devLocked = false, ical = null, appUrl = '', quota = null, profileSet = false }) {
+export function accountPage({ securityHtml = '', user, error, link = null, consent = null, notice = null, usage = null, developer = false, devLocked = false, ical = null, appUrl = '', quota = null, profileSet = false }) {
   return layout({
     title: 'Mon compte', email: user.email,
     body: `<div class="pj-page acct">
 <div class="ph"><div class="t"><h1>Mon compte</h1><span class="muted small">${esc(user.email)} · connecté avec ${esc(PROVIDER_NAMES[user.provider] || '—')}</span></div></div>
 <div class="pj-tools"><nav class="tools-nav" data-spy aria-label="Mon compte">
-  <p class="tools-grp">Moi</p><a href="#mon-ia" aria-current="true">Mon IA</a><a href="#usage">Usage et offre</a><a href="#profil">Mon profil</a><a href="#agenda-ext">Agenda externe</a>
+  <p class="tools-grp">Moi</p><a href="#mon-ia" aria-current="true">Mon IA</a><a href="#usage">Usage et offre</a><a href="#profil">Mon profil</a><a href="#agenda-ext">Agenda externe</a><a href="#securite">Sécurité : A2F</a>
   <p class="tools-grp">Réglages</p><a href="/settings#notif">Notifications</a><a href="/settings#git">Dépôts Git</a><a href="/settings#garde">Garde-fous</a><a href="/settings#garde">Liste d'opposition</a><a href="/settings#budget">Budget et modèles IA</a><a href="/settings#prompts">Prompts IA</a>
   <p class="tools-grp">Équipe et avancé</p><a href="/team">Équipe</a><a href="/developer">Mode développeur</a><a href="/?tour=1">Visite guidée</a><a href="#danger">Zone de danger</a></nav>
 <div class="pj-flat tools-main">
@@ -295,6 +295,7 @@ ${notice ? banner(notice.ok ? 'ok' : 'err', notice.text, { flash: true }) : ''}
     <span class="sp"><b>${esc(user.email)}</b><span class="hint">Connecté avec ${esc(PROVIDER_NAMES[user.provider] || '—')}, sans mot de passe</span></span></div>
   ${user.isAdmin ? '<div class="row"><a class="btn small" href="/admin">Administration</a></div>' : ''}
 </section>
+${securityHtml}
 <section class="card" id="developpeur">
   <div class="card-h"><h2>Mode développeur</h2><p>L'API d'iaboss et le serveur MCP (relier Claude à ton panel) ne sont disponibles que si tu actives ce mode.</p></div>
   ${devLocked ? `<p class="muted">Disponible à partir de l'offre <b>${esc(PLAN_LABELS[FEATURES.api.plan])}</b>.</p><div class="row"><a class="btn primary" href="/tarifs">${ic('lock')}Passer à l'offre ${esc(PLAN_LABELS[FEATURES.api.plan])}</a></div>` : `<div class="row"><span class="badge ${developer ? 'ok' : ''}">${developer ? 'Activé' : 'Désactivé'}</span><a class="btn small" href="/developer">${ic('key')}${developer ? 'Jetons et documentation' : 'Activer'}</a></div>

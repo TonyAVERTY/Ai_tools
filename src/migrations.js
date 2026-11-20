@@ -1361,4 +1361,25 @@ export const MIGRATIONS = [
     sqlite: ['ALTER TABLE jobs ADD COLUMN model TEXT'],
     mysql: [{ sql: 'ALTER TABLE jobs ADD COLUMN model VARCHAR(64) NULL', when: colMissing('jobs', 'model') }],
   },
+  {
+    // Authentification à deux facteurs (TOTP) : secret chiffré, état, empreintes des codes de secours, dernier pas de temps accepté (un code ne sert qu'une fois).
+    // Une session ouverte par Google ou Apple d'un compte protégé reste « en attente du code » (mfa_pending) tant que le second facteur n'est pas saisi.
+    name: 'two_factor',
+    sqlite: [
+      'ALTER TABLE users ADD COLUMN totp_secret_enc TEXT',
+      'ALTER TABLE users ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0',
+      'ALTER TABLE users ADD COLUMN totp_recovery TEXT',
+      'ALTER TABLE users ADD COLUMN totp_last_step INTEGER NOT NULL DEFAULT 0',
+      'ALTER TABLE sessions ADD COLUMN mfa_pending INTEGER NOT NULL DEFAULT 0',
+      'ALTER TABLE sessions ADD COLUMN mfa_tries INTEGER NOT NULL DEFAULT 0',
+    ],
+    mysql: [
+      { sql: 'ALTER TABLE users ADD COLUMN totp_secret_enc TEXT NULL', when: colMissing('users', 'totp_secret_enc') },
+      { sql: 'ALTER TABLE users ADD COLUMN totp_enabled TINYINT NOT NULL DEFAULT 0', when: colMissing('users', 'totp_enabled') },
+      { sql: 'ALTER TABLE users ADD COLUMN totp_recovery TEXT NULL', when: colMissing('users', 'totp_recovery') },
+      { sql: 'ALTER TABLE users ADD COLUMN totp_last_step BIGINT NOT NULL DEFAULT 0', when: colMissing('users', 'totp_last_step') },
+      { sql: 'ALTER TABLE sessions ADD COLUMN mfa_pending TINYINT NOT NULL DEFAULT 0', when: colMissing('sessions', 'mfa_pending') },
+      { sql: 'ALTER TABLE sessions ADD COLUMN mfa_tries INT NOT NULL DEFAULT 0', when: colMissing('sessions', 'mfa_tries') },
+    ],
+  },
 ];
