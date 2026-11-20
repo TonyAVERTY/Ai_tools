@@ -32,7 +32,7 @@ export async function createApiToken(db, userId, { name, scopes }) {
   const sc = cleanScopes(scopes);
   const token = PREFIX + randomBytes(32).toString('base64url');
   const r = await db.prepare('INSERT INTO api_tokens(user_id, name, token_hash, prefix, scopes, created_at) VALUES(?, ?, ?, ?, ?, ?)')
-    .run(Number(userId), label, hashSid(token), token.slice(0, 9), sc.join(','), now());
+    .run(Number(userId), label, hashSid(token), token.slice(0, PREFIX.length), sc.join(','), now());
   return { id: Number(r.lastInsertRowid), token, scopes: sc };
 }
 

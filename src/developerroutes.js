@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { HttpError, html, redirect, readBody, send } from './http.js';
+import { HttpError, html, json, redirect, readBody, send } from './http.js';
 import { getUser } from './users.js';
 import { developerMode, setDeveloperMode, createApiToken, listApiTokens, revokeApiToken, MAX_TOKENS, SCOPES } from './apitokens.js';
 import { developerPage } from './developerviews.js';
@@ -49,14 +49,20 @@ export function registerDeveloperRoutes(router, app) {
     redirect(res, '/developer');
   }, { limit: 'link' });
 
+  // Un rechargement (F5) de la réponse d'une création de jeton rouvre cette adresse en GET : retour sur la page Développeur, jamais « Page introuvable »
+  router.get('/developer/tokens', async ({ res }) => redirect(res, '/developer'));
+
   router.post('/developer/tokens', async ({ req, res, session }) => {
     const b = await readBody(req);
+    const wantsJson = !!req.headers.accept?.includes('json');
     try {
-      const t = await createApiToken(db, session.userId, { name: b.name, scopes: Object.keys(SCOPES).filter((k) => b[`scope_${k}`] === 'on') });
-      // Réponse directe (pas de redirection) : le jeton n'existe en clair que dans cette page, jamais dans une URL ni un cookie
+      const t = await createApiToken(db, session.userId, { name: b.name, scopes: Object.keys(SCOPES).filter((k) => b[`scope_${k}`] === 'on' || b[`scope_${k}`] === true) });
+      // Le jeton n'existe en clair que dans cette réponse, jamais dans une URL ni un cookie. Avec JavaScript, la page reste sur /developer et le montre dans une fenêtre ;
+      // sans JavaScript, la réponse est la page elle-même (un rechargement rouvre alors /developer, voir ci-dessus).
+      if (wantsJson) return json(res, { ok: true, id: t.id, name: String(b.name || '').trim().slice(0, 100) || 'Jeton sans nom', token: t.token }, 201);
       await show(res, session, { newToken: t.token });
     } catch (e) {
-      if (!(e instanceof HttpError)) throw e;
+      if (!(e instanceof HttpError) || wantsJson) throw e;
       await show(res, session, { error: e.message }, e.status);
     }
   }, { limit: 'link' });

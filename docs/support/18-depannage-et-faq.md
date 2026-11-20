@@ -321,3 +321,6 @@ Certaines fonctionnalités sont réservées à une offre (posts et devis dès D�
 
 ## Je ne vois pas l'onglet « Développeur » dans la barre du haut
 L'onglet n'apparaît que si le **mode développeur est activé** (Mon compte → Mode développeur → Activer) **et** que ton offre est **Croissance ou plus**. Vérifie ces deux points : avec une offre plus basse, le mode ne peut pas être activé (un compte dont l'offre est redescendue perd aussi l'onglet). Après l'activation, l'onglet est à la fin de la barre, après Compta ; recharge la page si tu ne le vois pas encore. Tu peux toujours ouvrir la page par Mon compte → « Mode développeur ».
+
+## J'ai perdu mon jeton d'API : comment le retrouver ?
+On ne peut pas le retrouver : iaboss ne garde qu'une empreinte du jeton, jamais le jeton, et la liste ne montre que `iaboss_*************`. Sur la page **Développeur**, supprime le jeton perdu (bouton **Supprimer**), crée-en un nouveau, copie-le dans la fenêtre « Jeton créé : conserve-le maintenant » avant de la fermer, puis mets-le à jour dans tes scripts ou dans la configuration de Claude.

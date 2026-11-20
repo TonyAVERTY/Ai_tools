@@ -1367,6 +1367,29 @@
     if (row && !btn.classList.contains('txt')) row.classList.toggle('to-delete', on);
   });
 
+  // ---------- Développeur : fenêtre « Jeton créé » ----------
+  // Au centre de l'écran, avec l'avertissement : il ne sera plus jamais affiché. Elle ne se ferme ni par Échap ni par un clic à côté (un jeton perdu
+  // se remplace, il ne se retrouve pas) : seulement par le bouton. À la fermeture le secret est effacé de la page, puis la liste des jetons se recharge.
+  function showNewToken(token, name) {
+    document.querySelector('dialog.token-created')?.remove();
+    const dlg = document.createElement('dialog');
+    dlg.className = 'prospect-dialog modal token-created';
+    dlg.setAttribute('aria-labelledby', 'token-t');
+    dlg.setAttribute('aria-describedby', 'token-d');
+    dlg.innerHTML = `<h2 id="token-t">${icon('key')}Jeton créé : conserve-le maintenant</h2>
+      <p id="token-d" class="confirm-d">Voici le jeton « <b data-token-name></b> ». <b>Il ne sera plus jamais affiché</b> : copie-le et range-le en lieu sûr (un gestionnaire de mots de passe, par exemple). Si tu le perds, il faudra le supprimer et en créer un autre.</p>
+      <div class="tokenbox"><code data-token></code><button type="button" class="btn small" data-copy-token>${icon('copy')}Copier</button></div>
+      <div class="modal-f"><button type="button" class="btn primary" data-token-done>J'ai conservé mon jeton</button></div>`;
+    $('[data-token-name]', dlg).textContent = name;
+    $('[data-token]', dlg).textContent = token;
+    dlg.addEventListener('cancel', (ev) => ev.preventDefault());
+    $('[data-token-done]', dlg).addEventListener('click', () => dlg.close());
+    dlg.addEventListener('close', () => { $('[data-token]', dlg).textContent = ''; dlg.remove(); reload(); });
+    document.body.append(dlg);
+    dlg.showModal();
+    $('[data-copy-token]', dlg).focus();
+  }
+
   // ---------- Développeur : copier le jeton affiché une seule fois ----------
   listen(document, 'click', async (e) => {
     const b = e.target.closest('[data-copy-token]');
@@ -1872,6 +1895,13 @@
         }
         case 'db': data.ssl = form.ssl.checked; await api(`/api/projects/${id}/db`, data); toast('Accès BDD enregistré'); form.password.value = ''; break;
         case 'delete': await api(`/api/projects/${id}/delete`, {}); reload(); break;
+        case 'token': {
+          // Page Développeur : le jeton est montré UNE fois, dans une fenêtre au centre ; la page reste sur /developer
+          const r = await api('/developer/tokens', data);
+          form.reset();
+          showNewToken(r.token, r.name);
+          break;
+        }
       }
       if (proj) refreshProject(proj);
     } catch (err) {
