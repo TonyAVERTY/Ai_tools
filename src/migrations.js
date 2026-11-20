@@ -1355,4 +1355,10 @@ export const MIGRATIONS = [
       { sql: 'CREATE INDEX mail_log_prospect ON mail_log(prospect_id, kind)', when: idxMissing('mail_log', 'mail_log_prospect') },
     ],
   },
+  {
+    // Statistiques globales (page admin) : le modèle utilisé par chaque tâche IA, pour la consommation par modèle. Les anciennes tâches restent sans modèle.
+    name: 'jobs_model',
+    sqlite: ['ALTER TABLE jobs ADD COLUMN model TEXT'],
+    mysql: [{ sql: 'ALTER TABLE jobs ADD COLUMN model VARCHAR(64) NULL', when: colMissing('jobs', 'model') }],
+  },
 ];

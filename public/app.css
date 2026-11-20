@@ -2086,3 +2086,7 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 7px; text-align: cen
 .locked-h h2 { margin: 0; font-size: 1.05rem; }
 .locked-h .ic { color: var(--muted); }
 .locked-link { color: var(--muted); }
+.stat-n { margin: 0; font-size: 1.9rem; font-weight: 700; line-height: 1.2; color: var(--text); }
+.per { display: flex; gap: 8px; margin-bottom: 16px; }
+.per a { padding: 8px 14px; border: 1px solid var(--line-strong); border-radius: 999px; background: var(--card); color: var(--text); text-decoration: none; }
+.per a[aria-current="true"] { border-color: var(--primary); background: var(--primary); color: var(--on-primary); font-weight: 700; }

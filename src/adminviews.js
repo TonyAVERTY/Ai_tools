@@ -44,6 +44,7 @@ export function adminPage({ user, list, audit, q = '', notice = null, error = nu
   return layout({
     title: 'Administration', email: user.email,
     body: `<div class="stack"><h1>Administration</h1>
+<p><a class="btn small" href="/admin/stats">Statistiques globales</a></p>
 <p class="muted">Comptes et compteurs d'usage uniquement : aucun accès aux prospects, mails ni notes des utilisateurs.</p>
 ${notice ? banner('ok', notice) : ''}
 ${error ? banner('err', error) : ''}
@@ -66,4 +67,33 @@ ${error ? banner('err', error) : ''}
   </table></div>` : '<p class="muted">Rien pour le moment : les actions d\'administration et les décisions automatiques apparaîtront ici.</p>'}
 </section></div>`,
   });
+}
+
+const int = (n) => Number(n).toLocaleString('fr-FR');
+const usd = (n) => `${Number(n).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} $`;
+const secs = (n) => (n == null ? '—' : n < 90 ? `${Math.round(n)} s` : `${Math.floor(n / 60)} min ${String(Math.round(n % 60)).padStart(2, '0')} s`);
+const pct = (n) => (n == null ? '—' : `${(n * 100).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} %`);
+
+/** Page /admin/stats : totaux de toute l'application, sans aucune donnée d'un compte en particulier. */
+export function adminStatsPage({ user, stats, periods }) {
+  const tile = (label, value, hint = '') => `<section class="card"><div class="card-h"><h2>${esc(label)}</h2></div><p class="stat-n">${value}</p>${hint ? `<p class="muted small">${hint}</p>` : ''}</section>`;
+  const tabs = Object.entries(periods).map(([k, p]) => `<a href="/admin/stats?p=${k}"${k === stats.period ? ' aria-current="true"' : ''}>${esc(p.label)}</a>`).join('');
+  const models = stats.models.length ? `<div class="table-wrap"><table><thead><tr><th>Modèle</th><th class="num">Requêtes</th><th class="num">Tokens entrants</th><th class="num">Tokens sortants</th><th class="num">Coût</th></tr></thead><tbody>
+    ${stats.models.map((m) => `<tr><td>${esc(m.label)}</td><td class="num" data-label="Requêtes">${int(m.requests)}</td><td class="num" data-label="Tokens entrants">${int(m.tokensIn)}</td><td class="num" data-label="Tokens sortants">${int(m.tokensOut)}</td><td class="num" data-label="Coût">${usd(m.cost)}</td></tr>`).join('')}
+  </tbody></table></div>` : '<p class="muted">Aucune requête IA sur la période.</p>';
+  const errs = stats.errorsByType.length ? `<div class="table-wrap"><table><thead><tr><th>Type de tâche</th><th class="num">Erreurs</th></tr></thead><tbody>
+    ${stats.errorsByType.map((e) => `<tr><td><code>${esc(e.type)}</code></td><td class="num" data-label="Erreurs">${int(e.n)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="muted">Aucune tâche en erreur sur la période.</p>';
+  const body = `<div class="pj-page"><div class="ph"><div class="t"><h1>Statistiques globales</h1><span class="muted small">Toute l'application, sur ${esc(periods[stats.period].label)} · <a href="/admin">Retour aux comptes</a></span></div></div>
+<nav class="per" aria-label="Période">${tabs}</nav>
+<div class="pj-cards">
+${tile('Requêtes IA', int(stats.ai.requests), `${int(stats.ai.jobs)} tâches et ${int(stats.ai.chats)} réponses de la page IA`)}
+${tile('Mails envoyés', int(stats.mails.sent), stats.mails.errors ? `${int(stats.mails.errors)} en échec` : 'aucun échec')}
+${tile('Réponses reçues', int(stats.replies.total), `soit ${pct(stats.replies.rate)} des mails envoyés`)}
+${tile('Temps de réponse IA', secs(stats.response.avg), `médiane ${secs(stats.response.p50)} · 95 % en moins de ${secs(stats.response.p95)} (${int(stats.response.count)} tâches terminées)`)}
+${tile('Erreurs IA', int(stats.ai.errors), `sur ${int(stats.ai.jobs)} tâches`)}
+${tile('Consommation IA', usd(stats.ai.cost), `${int(stats.ai.tokensIn + stats.ai.tokensOut)} tokens sur les tâches`)}
+</div>
+<section class="card"><div class="card-h"><h2>Consommation par modèle</h2><p>Les tâches d'avant la mise en place de ce suivi n'ont pas de modèle enregistré.</p></div>${models}</section>
+<section class="card"><div class="card-h"><h2>Erreurs par type de tâche</h2></div>${errs}</section></div>`;
+  return layout({ title: 'Statistiques globales', email: user.email, body });
 }

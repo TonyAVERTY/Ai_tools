@@ -2,7 +2,8 @@
 // comme si la page n'existait pas (voir server.js, option `admin`).
 import { html, redirect, readBody, HttpError } from './http.js';
 import { adminAction, listAccounts, recentAudit } from './admin.js';
-import { adminPage } from './adminviews.js';
+import { adminPage, adminStatsPage } from './adminviews.js';
+import { globalStats, PERIODS } from './services/globalstats.js';
 
 const DONE = {
   suspend: 'Compte suspendu : ses sessions sont fermées et ses jobs ne démarrent plus.',
@@ -24,6 +25,10 @@ export function registerAdminRoutes(router, app) {
       audit: await recentAudit(app.db),
       notice: DONE[done] || null, error: url.searchParams.get('e'),
     }));
+  }, opts);
+
+  router.get('/admin/stats', async ({ res, session, url }) => {
+    html(res, adminStatsPage({ user: session.user, stats: await globalStats(app.db, url.searchParams.get('p') || undefined), periods: PERIODS }));
   }, opts);
 
   const act = (action, route) => router.post(`/admin/users/:id/${route}`, async ({ req, res, session, params }) => {
