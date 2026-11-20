@@ -26,6 +26,19 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   p.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
   await p.goto(`${s.base}/developer`);
   await p.waitForSelector('html[data-nav="ready"]');
+  // Onglet « Développeur » de la barre du haut : visible (en dernier, page courante) puisque le mode est actif
+  const pill = p.locator('.pills a.pill[href="/developer"]');
+  ok(await pill.count() === 1 && await pill.isVisible(), `${tag} l'onglet « Développeur » est dans la barre du haut`);
+  ok((await p.locator('.pills a.pill').last().getAttribute('href')) === '/developer', `${tag} l'onglet vient après les autres`);
+  ok((await pill.getAttribute('aria-current')) === 'page', `${tag} il est marqué comme page courante sur la page Développeur`);
+  const bar = await p.locator('.pills').evaluate((n) => ({ over: n.scrollWidth > n.clientWidth + 1, tabs: [...n.querySelectorAll('a.pill')].map((a) => { const r = a.getBoundingClientRect(); return { l: Math.round(r.left), r: Math.round(r.right), t: a.textContent.trim(), clipped: a.scrollWidth > a.clientWidth + 1 }; }) }));
+  ok(!bar.over && bar.tabs.every((t) => t.r <= vp.width && t.l >= 0 && !t.clipped), `${tag} les ${bar.tabs.length} onglets tiennent dans la barre sans être coupés (${bar.tabs.map((t) => `${t.t} ${t.l}-${t.r}`).join(' | ')})`);
+  // Depuis une autre page, un clic mène à la page Développeur (clés et documentations)
+  await p.goto(`${s.base}/projets`); await p.waitForSelector('html[data-nav="ready"]');
+  await p.locator('.pills a.pill[href="/developer"]').click();
+  await p.waitForURL('**/developer');
+  ok(await p.locator('a[href="/docs/api"]').count() > 0 && await p.locator('a[href="/docs/mcp"]').count() > 0 && await p.locator('form[action="/developer/tokens"]').count() === 1, `${tag} la page offre la création de clés et les liens vers les documentations API et MCP`);
+  if (process.env.SHOTS) await p.locator('.pills').screenshot({ path: `${process.env.SHOTS}/nav-developpeur-${vp.width}.png` });
   ok(!(await p.locator('details.routes').evaluate((d) => d.open)), `${tag} les routes de l'API sont repliées`);
   await p.locator('details.routes > summary').click();
   ok(await p.locator('details.routes table').isVisible(), `${tag} un clic déplie le tableau des routes`);
@@ -52,6 +65,17 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
 
   ok(!(await p.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)), `${tag} pas de défilement horizontal`);
   ok(errs.length === 0, `${tag} aucune erreur console${errs.length ? ` : ${errs.join(' | ')}` : ''}`);
+  await ctx.close();
+}
+// Un compte sans le mode développeur n'a pas l'onglet
+{
+  const plain = await s.newUser({ admin: false, link: testTokenLink() });
+  const ctx = await b.newContext({ viewport: { width: 1280, height: 800 } });
+  const [name, value] = plain.cookie.split('=');
+  await ctx.addCookies([{ name, value, url: s.base }]);
+  const p = await ctx.newPage();
+  await p.goto(`${s.base}/projets`); await p.waitForSelector('html[data-nav="ready"]');
+  ok(await p.locator('.pills a.pill[href="/developer"]').count() === 0, 'sans le mode développeur : pas d\'onglet dans la barre du haut');
   await ctx.close();
 }
 await b.close();

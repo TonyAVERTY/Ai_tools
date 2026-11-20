@@ -4,6 +4,9 @@ Résumé : activer le mode développeur, créer des jetons, utiliser l'API REST 
 ## Activer
 Avatar → **Mon compte** → carte « Mode développeur » → bouton **Activer** (ou la page **Développeur**) puis **Activer le mode développeur**. Tant qu'il est désactivé, aucun jeton ne fonctionne ni sur l'API ni sur le MCP. Une fois activé, la page affiche les adresses de l'API et du serveur MCP, les liens vers leur documentation et les **jetons**.
 
+## L'onglet « Développeur » de la barre du haut
+Dès que le mode développeur est activé (et que ton offre le permet : Croissance ou plus), un onglet **Développeur** (icône de clé) s'ajoute **à la fin de la barre du haut**, après Compta, sur toutes les pages (sur téléphone, dans la barre du bas). Il ouvre la page Développeur : la création des clés d'accès (jetons d'API), l'adresse de l'API, le serveur MCP à télécharger et les liens vers la **Documentation API** et la **Documentation MCP**. Il est propre à chaque compte : un autre compte ne le voit pas. Si tu désactives le mode, ou si ton offre redescend sous Croissance, l'onglet disparaît ; la page Développeur reste atteignable depuis Mon compte. La visite guidée a une étape « Développeur : tes clés et la documentation » qui n'apparaît que lorsque l'onglet est visible.
+
 ## Jetons (page Développeur → « Jetons d'API »)
 Un jeton donne accès **à son propre compte** avec les droits cochés, et à rien d'autre. 5 jetons au plus : en supprimer un avant d'en créer un autre.
 - Créer : champ **Nom du jeton** (par exemple « Claude Desktop »), puis les **Droits** à cocher, puis **Créer un jeton**. Droits : **read** (lire les projets, prospects, réponses et statistiques, coché par défaut), **write** (modifier : ajouter des prospects et des notes, changer un statut ou une prochaine action), **jobs** (lancer des tâches : analyse, recherche, régénération d'accroche, audit, envoi de mails).

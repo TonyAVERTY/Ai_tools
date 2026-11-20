@@ -9,6 +9,13 @@ import { developerPage } from './developerviews.js';
 import { requireFeature, hasFeature } from './services/plans.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+
+/** L'onglet « Développeur » s'affiche-t-il pour ce compte ? Mode activé ET offre qui le permet. Une seule lecture de réglage pour la plupart des comptes (mode éteint). */
+export async function developerTabFor(db, userId) {
+  if (!(await developerMode(db, userId))) return false;
+  const user = await getUser(db, userId);
+  return !!user && hasFeature(user, 'api');
+}
 const read = (file) => readFileSync(join(ROOT, file), 'utf8');
 
 export function registerDeveloperRoutes(router, app) {

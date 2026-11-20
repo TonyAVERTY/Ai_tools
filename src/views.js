@@ -10,6 +10,7 @@ import { ROLES, MAX_NOTES, rolesOfSection } from './services/roles.js';
 import { describeKpi } from './services/dbschema.js';
 import { MODE_LABELS } from './claudelink.js';
 import { aiName, forAi } from './services/ainame.js';
+import { devTabShown } from './services/devnav.js';
 import { goAttr } from './shortcutdata.js';
 import { PLAN_PRICES, PLAN_LABELS, FEATURES, annualPrice } from './limits.js';
 import { banner } from './banner.js';
@@ -31,6 +32,8 @@ function acc(key, icon, title, sub, body, { open = false, cls = '' } = {}) {
 
 /** Entrées de la barre du haut : chacune doit avoir son étape dans la visite guidée (test/tour.test.js). */
 export const NAV = [['/', 'check', "Aujourd'hui"], ['/projets', 'folder', 'Projets'], ['/mails', 'mail', 'Mails'], ['/calendar', 'clock', 'Agenda'], ['/compta', 'wallet', 'Compta']];
+/** Onglet ajouté à la fin de la barre pour un compte qui a activé le mode développeur : clés d'API et documentations (services/devnav.js). */
+export const DEV_TAB = ['/developer', 'key', 'Développeur'];
 
 /** Pages qui ne sont plus dans la barre du haut mais restent à un clic : menu du compte (avatar). */
 export const MORE_PAGES = [['/facturation', 'receipt', 'Facturation'], ['/clients', 'user', 'Clients'], ['/team', 'users', 'Équipe']];
@@ -77,7 +80,7 @@ ${email ? `<header class="top">
   <div class="top-in">
     <a class="lockup" href="/" aria-label="iaboss, accueil">${brandMark()}<span class="wordmark">iaboss</span></a>
     <nav class="pills" aria-label="Navigation de l'application">
-      ${NAV.map(([href, icon, label]) => `<a class="pill" href="${href}">${ic(icon)}${label}</a>`).join('\n      ')}
+      ${(devTabShown() ? [...NAV, DEV_TAB] : NAV).map(([href, icon, label]) => `<a class="pill" href="${href}">${ic(icon)}${label}</a>`).join('\n      ')}
     </nav>
     <div class="top-r">
       <button type="button" class="search-btn" data-search-open aria-haspopup="dialog" aria-keyshortcuts="Control+K Meta+K">${ic('search')}<span class="search-l">Rechercher</span><kbd aria-hidden="true">⌘K</kbd></button>

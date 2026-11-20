@@ -318,3 +318,6 @@ Coche **Relancer automatiquement les tâches IA arrêtées par une limite** dans
 
 ## « … : inclus à partir de l'offre … » : une fonctionnalité est refusée
 Certaines fonctionnalités sont réservées à une offre (posts et devis dès Démarrage ; postes, export de la comptabilité et mode développeur dès Croissance ; vidéos de promotion dès Business). À la place de la fonctionnalité, tu vois une carte « Disponible à partir de l'offre … » avec le bouton « Passer à l'offre … » ; si tu lances quand même l'action, le message dit laquelle. Rien n'est supprimé : ce qui existe déjà reste lisible. Remède : Mon compte → « Voir les offres » (ou la page Tarifs) puis choisis une offre qui l'inclut. Pour un projet d'équipe, c'est l'offre du propriétaire qui compte. La liste à jour est dans « Offres, plafonds et limites ».
+
+## Je ne vois pas l'onglet « Développeur » dans la barre du haut
+L'onglet n'apparaît que si le **mode développeur est activé** (Mon compte → Mode développeur → Activer) **et** que ton offre est **Croissance ou plus**. Vérifie ces deux points : avec une offre plus basse, le mode ne peut pas être activé (un compte dont l'offre est redescendue perd aussi l'onglet). Après l'activation, l'onglet est à la fin de la barre, après Compta ; recharge la page si tu ne le vois pas encore. Tu peux toujours ouvrir la page par Mon compte → « Mode développeur ».
