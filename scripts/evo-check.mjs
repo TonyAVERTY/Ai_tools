@@ -19,6 +19,7 @@ const ok = (c, m) => { console.log(`${c ? 'OK ' : 'KO '} ${m}`); if (!c) bad++; 
 for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   const tag = `${vp.width}px`;
   await s.db.prepare('DELETE FROM evolution_decisions').run();
+  await s.db.prepare("DELETE FROM jobs WHERE type = 'implement'").run();
   await s.db.prepare("DELETE FROM user_settings WHERE `key` IN ('evo_impl_hint', 'evo_impl_choice')").run();
   const ctx = await b.newContext({ viewport: vp });
   const [name, value] = u.cookie.split('=');
@@ -88,6 +89,25 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   await p.waitForTimeout(600);
   ok(await p.locator('dialog[open]').count() === 0, `${tag} plus de question après « non » retenu`);
   ok(await s.db.prepare("SELECT COUNT(*) n FROM jobs WHERE type = 'implement'").get().then((r) => Number(r.n)) === 0, `${tag} aucune implémentation lancée`);
+  // Une implémentation en cours se montre comme les autres tâches : rond animé et avancement dans la section, « Annuler », et rond sous l'idée
+  await s.db.prepare("DELETE FROM jobs WHERE type = 'implement'").run();
+  await s.db.prepare("INSERT INTO jobs(user_id, project_id, type, status, params_json, progress_json, created_at, started_at) VALUES(?, ?, 'implement', 'running', ?, ?, ?, ?)").run(u.id, pid, JSON.stringify({ evo: Number((await s.db.prepare("SELECT id FROM jobs WHERE type = 'evolution'").get()).id), n: 2, target: 'branch' }), JSON.stringify({ message: 'Clone du dépôt…', pct: 12 }), now(), now());
+  await p.reload(); await p.waitForSelector('.job[data-job="implement"] .running', { timeout: 8000 }).catch(() => {});
+  const zone = p.locator('.job[data-job="implement"]');
+  ok(await zone.locator('.spinner').count() === 1 && (await zone.textContent()).includes('Clone du dépôt'), `${tag} l'implémentation en cours apparaît avec son rond animé et son message`);
+  ok(await zone.getByRole('button', { name: 'Annuler' }).count() === 1, `${tag} elle peut être annulée comme les autres tâches`);
+  ok(await p.locator('.evo-decide[data-n="2"] .evo-impl .spin-inline').count() === 1, `${tag} le rond animé est aussi sous l'idée`);
+  ok(await p.locator('[data-state]').first().textContent().then((x) => x.includes('Implémentation')), `${tag} l'en-tête du projet la compte dans les tâches en cours`);
+  // Terminée : l'idée quitte la liste (en direct, sans recharger) et un récapitulatif dit que la fonctionnalité est bien implémentée
+  const before = await p.locator('.evo-decide').count();
+  await s.db.prepare("UPDATE jobs SET status = 'done', finished_at = ?, result_json = ? WHERE type = 'implement'").run(now(), JSON.stringify({ branch: 'iaboss/modeles-2', target: 'branch', commit: 'abcdef1234567', files: ['src/a.js', 'README.md'], summary: 'Modèles partagés ajoutés.', url: 'https://github.com/o/r/tree/iaboss/modeles-2' }));
+  await p.waitForSelector('.evo-recaps .evo-recap', { timeout: 9000 }).catch(() => {});
+  ok(await p.locator('.evo-decide').count() === before - 1, `${tag} l'idée implémentée quitte la liste en direct`);
+  const recap = p.locator('.evo-recaps .evo-recap');
+  ok(await recap.count() === 1 && (await recap.textContent()).includes('est bien implémentée') && (await recap.textContent()).includes('iaboss/modeles-2'), `${tag} le récapitulatif dit que la fonctionnalité est bien implémentée, avec la branche`);
+  await p.reload(); await p.waitForSelector('.evo-decide');
+  ok(await p.locator('.evo-recaps .evo-recap').count() === 1 && await p.locator('.evo-decide').count() === before - 1, `${tag} après rechargement : récapitulatif présent, idée absente de la liste`);
+  ok(await p.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), `${tag} le récapitulatif ne déborde pas`);
   ok(errs.length === 0, `${tag} aucune erreur JavaScript ${errs.join(' | ')}`);
   await ctx.close();
 }

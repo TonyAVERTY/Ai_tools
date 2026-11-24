@@ -101,13 +101,15 @@ export function parseEvolutions(md) {
 export const EFFORTS = { S: 'Rapide', M: 'Moyen', L: 'Gros chantier' };
 
 /** Fiches d'évolution pour le panel (classes CSS, pas de style inline : CSP stricte). */
-/** `hidden` : numéros des idées refusées, retirées de la liste. `decide(idée)` : bloc HTML ajouté sous chaque fiche (décision acceptée / refusée), absent pour l'audit. */
-export function evolutionHtml(md, decide = null, hidden = new Set()) {
+/** `hidden` : numéros des idées refusées ou implémentées, retirées de la liste. `recaps(idées)` : HTML des récapitulatifs des idées implémentées. `decide(idée)` : bloc HTML ajouté sous chaque fiche (décision acceptée / refusée), absent pour l'audit. */
+export function evolutionHtml(md, decide = null, hidden = new Set(), recaps = null) {
   const all = parseEvolutions(md);
   if (!all.length) return `<div class="md">${renderMarkdown(md)}</div>`;
   const items = all.filter((e) => !hidden.has(e.n));
-  if (!items.length) return '<p class="muted small evo-empty">Toutes les idées ont été traitées : lance une nouvelle recherche pour en recevoir d\'autres.</p>';
-  return `<ol class="evos">${items.map((e) => `<li class="evo">
+  // Zone des récapitulatifs (idées implémentées) : toujours présente quand on peut implémenter, pour que l'écran y ajoute une ligne en direct
+  const zone = recaps === null ? '' : `<div class="evo-recaps">${recaps(all)}</div>`;
+  if (!items.length) return `${zone}<p class="muted small evo-empty">Toutes les idées ont été traitées : lance une nouvelle recherche pour en recevoir d\'autres.</p>`;
+  return `${zone}<ol class="evos">${items.map((e) => `<li class="evo">
   <div class="evo-head">
     <span class="evo-n">${e.n}</span>
     <h5>${inlineMd(e.title)}</h5>

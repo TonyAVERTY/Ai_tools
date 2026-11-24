@@ -565,6 +565,7 @@ export function projectBlocks(p, smtp, dbCfg, imap) {
       <label>Quand<select name="when"><option value="now">Maintenant</option><option value="night">Cette nuit (1h-6h)</option></select></label>
       <button class="btn primary">Chercher et envoyer par mail</button>
     </form>
+    <div class="job" data-job="implement" data-label="Implémentation"></div>
     <div class="job" data-job="evolution"></div>`, { open: true, cls: 'main' });
   const audit = p.access !== 'member' ? acc('audit', 'computer', 'Audit du projet', 'Rapport qualité et sécurité du code, en lecture seule', `
     <form data-action="audit" data-id="${p.id}" class="inline">

@@ -4,7 +4,7 @@
 import { HttpError, json, readBody } from './http.js';
 import { LEN } from './inputlimits.js';
 import { parseEvolutions } from './services/markdown.js';
-import { DECISIONS, FIX_GIT, acceptedIdea, decisionHtml, decisionsOf, implChoiceOf, implementationsOf, saveDecision } from './services/evodecisions.js';
+import { DECISIONS, FIX_GIT, acceptedIdea, decisionHtml, decisionsOf, implChoiceOf, implementationsOf, recapLine, saveDecision } from './services/evodecisions.js';
 import { enqueue } from './services/jobs.js';
 import { assertCanRunAi } from './claudelink.js';
 import { budgetState } from './services/budget.js';
@@ -21,8 +21,9 @@ export function registerEvolutionRoutes(router, app, { project, aiOpts }) {
     const jobId = Number(ctx.params.job), n = Number(ctx.params.n);
     const job = Number.isInteger(jobId) ? await db.prepare("SELECT id, result_json FROM jobs WHERE id = ? AND project_id = ? AND type = 'evolution' AND status = 'done'").get(jobId, p.id) : null;
     const ideas = job ? parseEvolutions(JSON.parse(job.result_json || '{}').markdown) : [];
-    if (!job || !ideas.some((e) => e.n === n)) throw new HttpError(404, 'Idée introuvable');
-    return { p, jobId, n };
+    const found = ideas.find((e) => e.n === n);
+    if (!job || !found) throw new HttpError(404, 'Idée introuvable');
+    return { p, jobId, n, title: found.title };
   }
 
   /** Bloc de décision à jour d'une idée (décision + état de l'implémentation). */
@@ -33,7 +34,11 @@ export function registerEvolutionRoutes(router, app, { project, aiOpts }) {
   }
 
   router.get('/api/projects/:id/evolution/:job/:n/decision', async (ctx) => {
-    json(ctx.res, { html: await blockOf(await idea(ctx)) });
+    const ref = await idea(ctx);
+    // Implémentation terminée : l'idée quitte la liste, l'écran ajoute ce récapitulatif à la place
+    const impl = (await implementationsOf(db, ref.p.id, ref.jobId)).get(ref.n);
+    if (impl?.status === 'done' && impl.result) return json(ctx.res, { done: true, title: ref.title, recap: recapLine(ref.title, { ...impl, n: ref.n }) });
+    json(ctx.res, { html: await blockOf(ref) });
   });
 
   /** Lance le job d'implémentation d'une idée acceptée. Lève une HttpError (message affichable) si quelque chose manque. */

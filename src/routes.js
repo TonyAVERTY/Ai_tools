@@ -87,7 +87,7 @@ import { quotaFor, planLimitError, withUserLock, assertRoom, usageView, lockedFe
 import { lockedCard } from './lockviews.js';
 import { history, saveSnapshot } from './services/metrics.js';
 import { evolutionHtml } from './services/markdown.js';
-import { decisionsOf, decisionHtml, refusedOf, implementationsOf, implChoiceOf } from './services/evodecisions.js';
+import { decisionsOf, decisionHtml, refusedOf, implementationsOf, implementedOf, recapsHtml, implChoiceOf } from './services/evodecisions.js';
 import { registerEvolutionRoutes } from './evoroutes.js';
 import {
   listProspects, kanbanColumns, parseFilters, STATUSES as PROSPECT_STATUSES, prospectDetail, addNote, deleteNote, setNextAction,
@@ -635,7 +635,8 @@ export function registerRoutes(router, app) {
     if (jobs.evolution?.result?.markdown) {
       const decided = await decisionsOf(db, jobs.evolution.id);
       const impls = await implementationsOf(db, p.id, jobs.evolution.id);
-      jobs.evolution.result.html = evolutionHtml(jobs.evolution.result.markdown, (e) => decisionHtml(jobs.evolution.id, e.n, decided.get(e.n), impls.get(e.n)), refusedOf(decided));
+      jobs.evolution.result.html = evolutionHtml(jobs.evolution.result.markdown, (e) => decisionHtml(jobs.evolution.id, e.n, decided.get(e.n), impls.get(e.n)),
+        new Set([...refusedOf(decided), ...implementedOf(impls)]), (ideas) => recapsHtml(ideas, impls));
     }
     if (jobs.audit?.result?.markdown) jobs.audit.result.html = evolutionHtml(jobs.audit.result.markdown);
     // Tâches des postes : le texte se lit à la demande (GET /api/projects/:id/poste/:task), pas à chaque rafraîchissement
