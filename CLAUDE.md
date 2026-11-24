@@ -21,6 +21,20 @@ La visite guidée du tableau de bord (`src/tour.js`, `TOUR_STEPS`) fait découvr
 - Ajoute le sélecteur de la cible dans le tableau `has` de `test/tour.test.js`, et relance `scripts/tour-check.mjs` (rendu dans Chromium).
 - La documentation du Support liste les étapes toute seule (générée depuis `TOUR_STEPS`) : ne la recopie pas.
 
+## Règle n° 3 : la sécurité et la conformité ne se négocient pas
+
+Le dossier `docs/security/` est l'état de l'audit de mise en production ; les règles détaillées sont dans **`.claude/rules/`** (`securite.md`, `donnees-personnelles.md`, `dependances-et-deploiement.md`) et s'appliquent à toute modification. En résumé :
+
+- Tout ce qui vient de l'extérieur est **non fiable** ; validation **côté serveur** ; SQL préparé ; sorties échappées ; CSP stricte.
+- **Refus par défaut**, contrôle d'accès à chaque route et filtre par compte ; une route publique nouvelle se déclare dans `test/route-security.test.js` après relecture. Le back-office exige l'A2F.
+- **Jamais de secret** dans le code, les tests, les journaux ou la documentation ; `.env` jamais commité ; un secret exposé se **révoque**.
+- **Données personnelles** : minimisation, durée de conservation, suppression en cascade, export (`src/services/dataexport.js`), documentation (`DATA_MAPPING.md`, politique de confidentialité) **dans le même commit**. Aucun cookie, traceur ni ressource tierce sans accord du propriétaire.
+- **Dépendances** : n'en ajoute pas sans raison, vérifie l'audit et la licence (`npm run security`).
+- **Tests de sécurité** pour toute fonctionnalité sensible ; ne désactive jamais un contrôle pour avoir du vert.
+- **Ne déploie jamais** en production, ne modifie jamais un service externe et ne dépense rien sans l'accord explicite du propriétaire.
+- Une fonctionnalité qui introduit un risque de sécurité non traité **n'est pas terminée**. Une vérification impossible se déclare « non vérifiée ».
+- Avant de terminer : `npm run lint`, `npm test`, `npm run security` (et `npm run ui:check` pour l'interface).
+
 ## Autres règles du dépôt
 
 - **Migrations** (`src/migrations.js`) : on ajoute **toujours à la fin** de la liste (la version est l'index). Jamais d'insertion au milieu : une base déjà migrée sauterait la migration. Les `ALTER TABLE` MySQL doivent être rejouables (`when: colMissing(…)`). La CI rejoue toute la suite sur MariaDB 10.11 (job `mysql`, `npm run test:mysql`) ; MySQL 8 n'est pas testé : le dire dans la PR si la migration y change quelque chose.

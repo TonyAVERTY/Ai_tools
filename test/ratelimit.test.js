@@ -199,8 +199,9 @@ test('chaque règle citée par une route existe, et les points sensibles sont to
     const used = new Set(routes.map((r) => r.limit).filter(Boolean));
     for (const rule of used) assert.ok(RATE_LIMITS[rule], `règle ${rule} absente de src/limits.js`);
     // « admin » n'est branchée qu'avec le back-office, « api » (par compte) qu'après l'authentification d'un jeton,
-    // « write » s'applique d'office à toute écriture connectée sans règle propre (voir le test suivant)
-    for (const rule of Object.keys(RATE_LIMITS).filter((r) => !['admin', 'api', 'write'].includes(r))) assert.ok(used.has(rule), `règle ${rule} sans route`);
+    // « write » s'applique d'office à toute écriture connectée sans règle propre (voir le test suivant),
+    // « mfa_code » est appliquée dans les routes A2F (src/mfaroutes.js, codeOk) : le compte vient de la session « en attente » ou connectée, pas de l'option `limit`
+    for (const rule of Object.keys(RATE_LIMITS).filter((r) => !['admin', 'api', 'write', 'mfa_code'].includes(r))) assert.ok(used.has(rule), `règle ${rule} sans route`);
     const find = (method, path) => routes.find((r) => r.method === method && r.re.test(path));
     for (const [m, p] of [
       ['GET', '/auth/google'], ['GET', '/auth/apple'], ['GET', '/auth/google/callback'], ['POST', '/auth/apple/callback'],
