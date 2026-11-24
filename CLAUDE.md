@@ -42,6 +42,7 @@ Le dossier `docs/security/` est l'état de l'audit de mise en production ; les r
 - **CSP stricte** : aucun `style="…"` ni `<script>` en ligne dans le HTML, aucune ressource externe. Les couleurs viennent des jetons de `public/tokens.css` (jamais en dur dans `public/site.css`).
 - **Rédaction de l'interface** (`docs/UX.md`, « Rédaction ») : on tutoie ; un succès se dit « Nom + participe passé » sans point ni « ! » ; une erreur dit ce qui n'a pas marché puis la suite après « : » (le point final est ajouté à l'affichage) ;
   boutons à l'infinitif (Enregistrer, Ajouter / Créer, Supprimer / Retirer / Effacer ont chacun leur sens). `test/wording.test.js` échoue sur « avec succès », un « ! », un point sur un succès ou un « vous » : corrige le texte, ne contourne pas le test.
+- **Formulaires** (`docs/UX.md`, « une seule saisie ») : **jamais deux champs identiques à la suite**. Plusieurs actions sur la même saisie = un seul champ et plusieurs boutons (`formaction`, `data-confirm` porté par le bouton). `test/form-fields.test.js` échoue sinon : ne l'assouplis pas, corrige l'écran.
 - **Animations** (`docs/UX.md`, « Animations ») : aucune n'est ajoutée, changée ni retirée sans l'accord du propriétaire du produit, présentée une par une ; une animation en boucle n'anime que `transform` et `opacity` (`test/motion.test.js`) ;
   un gain de performance s'annonce mesuré avant et après.
 - **Icônes** : `src/icons.js` (sprite par page) ; une icône utilisée doit exister.
