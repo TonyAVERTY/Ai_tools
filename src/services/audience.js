@@ -3,6 +3,8 @@
 import { now } from '../db.js';
 
 const DAY = 86400;
+/** Sites d'origine distincts retenus par jour ; au-delà, les nouveaux sont regroupés sous « (autres) » (un robot qui envoie des milliers de faux Referer ne fait pas grossir la base). */
+export const MAX_REFERRERS_PER_DAY = 200;
 const BOT = /bot|crawl|spider|slurp|preview|monitor|curl|wget|python|httpclient|headless|lighthouse/i;
 export const dayOf = (ts = now()) => Math.floor(ts / DAY);
 
@@ -29,7 +31,9 @@ export async function countView(db, req, pathname, appUrl, at = now()) {
     const day = dayOf(at);
     const path = String(pathname || '/').slice(0, 80);
     await db.prepare('INSERT INTO page_views(day, path, views) VALUES(?, ?, 1) ON CONFLICT(day, path) DO UPDATE SET views = views + 1').run(day, path);
-    const host = referrerHost(req, appUrl);
+    let host = referrerHost(req, appUrl);
+    if (host && !(await db.prepare('SELECT 1 x FROM page_referrers WHERE day = ? AND host = ?').get(day, host))
+      && Number((await db.prepare('SELECT COUNT(*) n FROM page_referrers WHERE day = ?').get(day)).n) >= MAX_REFERRERS_PER_DAY) host = '(autres)';
     if (host) await db.prepare('INSERT INTO page_referrers(day, host, views) VALUES(?, ?, 1) ON CONFLICT(day, host) DO UPDATE SET views = views + 1').run(day, host);
   } catch { /* mesure perdue : sans importance */ }
 }

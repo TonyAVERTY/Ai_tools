@@ -67,3 +67,24 @@ test('POST /account/export : fichier JSON à télécharger, réservé au compte 
     assert.match(page, /id="donnees"[\s\S]*Télécharger mes données/);
   } finally { await s.close(); }
 });
+
+test('réglages clé / valeur : les secrets chiffrés (lignes, pas colonnes) et tout texte chiffré sont retirés, les préférences restent', async () => {
+  const s = await startApp();
+  try {
+    const u = await s.newUser({ admin: false });
+    const enc = 'v1:QUJDREVGR0hJSktM:TU5PUFFSU1RVVldY:WVo0NTY3ODkw';
+    const put = (k, v) => s.db.prepare('INSERT INTO user_settings(user_id, `key`, value) VALUES(?, ?, ?)').run(u.id, k, v);
+    await put('github_token_enc', enc); await put('discord_webhook_enc', enc); await put('elevenlabs_enc', enc);
+    await put('notify_channels_json', JSON.stringify([{ type: 'slack', url_enc: enc }]));
+    await put('git_servers_json', JSON.stringify([{ host: 'git.test', token_enc: enc }]));
+    await put('autre_reglage_json', JSON.stringify({ secret_cache: enc })); // clé sans nom suspect : arrêté par le filet sur le texte chiffré
+    await put('acc_regime', 'micro'); await put('mail_footer', '1');
+    const doc = await exportAccount(s.db, u.id);
+    const text = JSON.stringify(doc);
+    assert.ok(!text.includes('QUJDREVGR0hJSktM') && !text.includes('WVo0NTY3ODkw'), 'aucun secret chiffré dans l\'export');
+    const keys = doc.data.user_settings.map((r) => r.key);
+    for (const k of ['github_token_enc', 'discord_webhook_enc', 'elevenlabs_enc', 'notify_channels_json', 'git_servers_json']) assert.ok(!keys.includes(k), `${k} retiré`);
+    assert.ok(keys.includes('acc_regime') && keys.includes('mail_footer'), 'les préférences restent');
+    assert.equal(doc.data.user_settings.find((r) => r.key === 'autre_reglage_json').value, '[secret chiffré : non exporté]');
+  } finally { await s.close(); }
+});

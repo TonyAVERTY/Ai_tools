@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { countView, countable, audienceStats, purgeAudience, dayOf } from '../src/services/audience.js';
+import { countView, countable, audienceStats, purgeAudience, dayOf, MAX_REFERRERS_PER_DAY } from '../src/services/audience.js';
 import { startApp } from './helpers/server.js';
 
 // Mesure d'audience sans cookie : compteurs par jour et par page, rien qui identifie un visiteur, « Ne pas me suivre » respecté.
@@ -49,5 +49,18 @@ test('une page du site public est comptée, sans poser le moindre cookie', async
     await fetch(`${s.base}/tarifs`, { headers: { 'user-agent': UA, dnt: '1' } });
     await new Promise((ok) => setTimeout(ok, 100));
     assert.equal((await s.db.prepare("SELECT COALESCE(SUM(views), 0) n FROM page_views WHERE path = '/tarifs'").get()).n, 1);
+  } finally { await s.close(); }
+});
+
+test('un robot qui envoie des milliers de faux Referer ne fait pas grossir la base : les nouveaux sites sont regroupés au-delà du plafond du jour', async () => {
+  const s = await startApp();
+  try {
+    const t = 1_800_000_000;
+    for (let i = 0; i < MAX_REFERRERS_PER_DAY + 30; i++) await countView(s.db, req({ referer: `https://site-${i}.example.org/` }), '/', 'https://iaboss.test', t);
+    const n = (await s.db.prepare('SELECT COUNT(*) n FROM page_referrers').get()).n;
+    assert.equal(n, MAX_REFERRERS_PER_DAY + 1, 'plafond + la ligne « (autres) »');
+    assert.equal((await s.db.prepare("SELECT views FROM page_referrers WHERE host = '(autres)'").get()).views, 30);
+    await countView(s.db, req({ referer: 'https://site-3.example.org/' }), '/', 'https://iaboss.test', t); // un site déjà connu continue d'être compté
+    assert.equal((await s.db.prepare("SELECT views FROM page_referrers WHERE host = 'site-3.example.org'").get()).views, 2);
   } finally { await s.close(); }
 });

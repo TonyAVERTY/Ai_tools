@@ -12,6 +12,8 @@ Une ligne par correction, la plus récente en haut. Le détail technique est dan
 - **V18** Politique de confidentialité corrigée (compteurs d'audience, données et journal de l'A2F).
 - **V19** Workflow « Sécurité » (secrets, licences, vulnérabilités, SBOM) et Dependabot.
 - **V20** Journal de sécurité JSON (`src/securitylog.js`).
+- **V24** Mesure d'audience : plafond de 200 sites d'origine distincts par jour (nouvel audit des corrections).
+- **V23** Export des données : les secrets chiffrés stockés en lignes de `user_settings` et dans des blocs JSON ne sortent plus (nouvel audit des corrections).
 - **V22** Cookie `li_oauth_b` (liaison LinkedIn) ajouté au tableau des cookies de la politique de confidentialité ; un test vérifie désormais que tout cookie posé par le code y figure.
 - **V21** Test de couverture des routes (`test/route-security.test.js`).
 

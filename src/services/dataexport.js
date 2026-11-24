@@ -57,6 +57,11 @@ export const EXCLUDED = {
 
 // Colonnes qui ne sortent jamais : chiffrées, empreintes, jetons, secrets, états de connexion, clé d'IA liée
 const SECRET_COL = /(_enc$|secret|password|^pass$|_hash$|^token$|_token$|verifier|binding|nonce|private_key|claude_link_json|totp_)/i;
+// Réglages « clé / valeur » (user_settings) : les secrets y sont des LIGNES (jeton chiffré, webhooks, état de quota), pas des colonnes
+const SECRET_SETTING_KEY = /(_enc$|token|secret|password|hooks_json|channels_json|servers_json|rate_limit|quota)/i;
+// Dernier filet, sur TOUTES les tables : un texte qui contient un secret chiffré (v1:iv:tag:données) n'est jamais exporté, même dans un JSON
+const CIPHERTEXT = /v1:[A-Za-z0-9+/=]{8,}:[A-Za-z0-9+/=]{8,}:[A-Za-z0-9+/=]{2,}/;
+const REDACTED = '[secret chiffré : non exporté]';
 const ROW_CAP = 100_000;
 
 export async function exportAccount(db, userId, at = now()) {
@@ -65,11 +70,11 @@ export async function exportAccount(db, userId, at = now()) {
   for (const [table, spec] of Object.entries(EXPORTED)) {
     const n = (where) => (where.match(/\?/g) || []).length;
     const rows = await db.prepare(`SELECT * FROM ${table} WHERE ${spec.where} LIMIT ${ROW_CAP}`).all(...Array(n(spec.where)).fill(userId));
-    data[table] = rows.map((r) => {
+    data[table] = rows.filter((r) => table !== 'user_settings' || !SECRET_SETTING_KEY.test(String(r.key))).map((r) => {
       const out = {};
       for (const [k, v] of Object.entries(r)) {
         if (spec.cols ? !spec.cols.includes(k) : (SECRET_COL.test(k) || (spec.omit || []).includes(k))) continue;
-        out[k] = typeof v === 'bigint' ? Number(v) : v;
+        out[k] = typeof v === 'bigint' ? Number(v) : typeof v === 'string' && CIPHERTEXT.test(v) ? REDACTED : v;
       }
       return out;
     });

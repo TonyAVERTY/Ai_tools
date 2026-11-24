@@ -28,7 +28,7 @@ La CI rejoue tout à chaque PR : jobs « check » (SQLite), « mysql » (MariaDB
 | Paiement | `test/subscriptions.test.js` | Signature de webhook, rejeu, idempotence, mauvais secret refusé |
 | Abus | `test/abuse.test.js`, `test/budget.test.js`, `test/plans.test.js` | Plafonds, pauses d'envoi, liste d'opposition, budgets |
 | Disponibilité | `test/security.test.js`, `test/childio.test.js`, `test/followup.test.js` | Pas d'arrêt du processus, annulation des CLI d'IA, planificateur isolé par projet |
-| Données personnelles | `test/dataexport.test.js`, `test/schema.test.js` | Export complet sans secret ni donnée d'autrui ; chaque table classée ; suppression en cascade |
+| Données personnelles | `test/dataexport.test.js`, `test/schema.test.js` | Export complet sans secret ni donnée d'autrui (y compris les secrets rangés en lignes de réglages) ; chaque table classée ; suppression en cascade |
 | Cookies et audience | `test/theme.test.js`, `test/audience.test.js` | Cookie de préférence seulement sur choix ; mesure sans cookie ni identifiant ; « Ne pas me suivre » |
 | Sauvegarde | `test/backup-scripts.test.js` + job CI « backup » | Refus sans chiffrement ; fichiers chiffrés sans clair ; mot de passe absent de la ligne de commande ; rotation ; restauration dans une base temporaire (jamais la production) ; **restauration réelle sur MariaDB en CI** |
 | Outils de contrôle | `test/security-tools.test.js` | Détection de secrets (jamais la valeur affichée), fichiers sensibles, licences ; le dépôt et son historique sont propres |
