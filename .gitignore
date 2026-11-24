@@ -37,3 +37,4 @@ Thumbs.db
 
 # Captures produites par les vérifications d'interface (npm run ui:check)
 gen-*.png
+sbom.cdx.json

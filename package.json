@@ -16,7 +16,13 @@
     "test:mysql": "node --no-warnings=ExperimentalWarning --import ./scripts/test-setup.js --test --test-concurrency=1 \"test/**/*.test.js\"",
     "migrate:sqlite": "node --env-file=.env --no-warnings=ExperimentalWarning scripts/migrate-sqlite-to-mysql.js",
     "check": "npm run lint && npm run test",
-    "hooks": "git config core.hooksPath .githooks"
+    "hooks": "git config core.hooksPath .githooks",
+    "security:secrets": "node scripts/secret-scan.js",
+    "security:history": "node scripts/secret-scan.js --history",
+    "security:licenses": "node scripts/license-check.js",
+    "security:audit": "npm audit --omit=dev --audit-level=high",
+    "security": "npm run security:secrets && npm run security:licenses && npm run security:audit",
+    "sbom": "npm sbom --sbom-format cyclonedx --omit dev > sbom.cdx.json"
   },
   "dependencies": {
     "imapflow": "^2.10.0",

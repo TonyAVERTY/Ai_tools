@@ -1,0 +1,46 @@
+# Contrôles de sécurité automatiques : secrets (fichiers suivis et historique), licences, vulnérabilités des dépendances, inventaire (SBOM).
+# Lancés à chaque PR, à chaque push sur main, et chaque lundi (une vulnérabilité peut apparaître sans qu'on ait changé une ligne).
+# Un échec bloque la fusion : ne jamais contourner, corriger (révoquer le secret, remplacer la dépendance, changer de licence).
+name: Sécurité
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '17 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0   # l'historique complet est relu pour y chercher des secrets
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --omit=dev --ignore-scripts
+      - name: Secrets (fichiers suivis et historique)
+        run: npm run security:history
+      - name: Licences des dépendances de production
+        run: npm run security:licenses
+      - name: Vulnérabilités connues (production, niveau élevé ou plus)
+        run: npm run security:audit
+      - name: Inventaire des composants (SBOM CycloneDX)
+        run: npm run sbom
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.cdx.json
+          retention-days: 30
