@@ -1,5 +1,5 @@
 // Vérifie dans Chromium la liste « Évolution » : Accepter / Refuser (justification obligatoire pour un refus, l'idée refusée quitte la liste), la question posée
-// à l'acceptation (Accepter ne demande aucune raison) (oui / non, branche, « Ne plus afficher ce message ») et le bouton « Implémenter ». Aucun appel réel à l'IA ni à Git : aucun job n'est exécuté.
+// à l'acceptation (Accepter ne demande aucune raison) (oui / non, branche, « Ne plus afficher ce message ») et le lien de correction quand il manque un token Git. Aucun appel réel à l'IA ni à Git : aucun job n'est exécuté.
 // Nécessite Playwright (PLAYWRIGHT_MODULE, PLAYWRIGHT_CHROMIUM). Sortie « TOUT EST BON » attendue.
 import { startApp, APP_URL } from '../test/helpers/server.js';
 import { testTokenLink } from '../test/helpers/users.js';
@@ -19,7 +19,7 @@ const ok = (c, m) => { console.log(`${c ? 'OK ' : 'KO '} ${m}`); if (!c) bad++; 
 for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   const tag = `${vp.width}px`;
   await s.db.prepare('DELETE FROM evolution_decisions').run();
-  await s.db.prepare("DELETE FROM user_settings WHERE `key` = 'evo_impl_hint'").run();
+  await s.db.prepare("DELETE FROM user_settings WHERE `key` IN ('evo_impl_hint', 'evo_impl_choice')").run();
   const ctx = await b.newContext({ viewport: vp });
   const [name, value] = u.cookie.split('=');
   await ctx.addCookies([{ name, value, url: s.base }]);
@@ -44,7 +44,7 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   await p.locator('.evo-decide[data-n="1"] [data-evo-form] button[type=submit]').click();
   await p.waitForFunction(() => document.querySelectorAll('.evo-decide').length === 3, null, { timeout: 4000 }).catch(() => {});
   ok(await p.locator('.evo-decide').count() === 3, `${tag} l'idée refusée quitte la liste`);
-  // Acceptation : la question « Veux-tu que l'IA écrive le code ? »
+  // Acceptation : aucune raison demandée, puis la question « Veux-tu que l'IA écrive le code ? »
   await p.locator('.evo-decide[data-n="2"] [data-evo-open="accepted"]').click();
   ok(!(await p.locator('.evo-decide[data-n="2"] [data-evo-form]').isVisible()), `${tag} Accepter ne demande aucune raison`);
   const dlg = p.locator('dialog[open]');
@@ -54,25 +54,40 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   ok(await dlg.locator('input[type=radio]').count() === 2 && await dlg.locator('input[type=checkbox]').count() === 1, `${tag} deux branches possibles et « Ne plus afficher ce message »`);
   const box = await dlg.boundingBox();
   ok(box.x >= 0 && box.x + box.width <= vp.width, `${tag} la fenêtre tient dans la largeur`);
-  await dlg.getByRole('button', { name: 'Non' }).click();
-  await p.waitForTimeout(300);
-  ok(await p.locator('.evo-decide[data-n="2"] .evo-state').textContent().then((x) => x.includes('Acceptée')), `${tag} « Non » : l'idée reste acceptée`);
-  ok(await p.locator('.evo-decide[data-n="2"] [data-evo-impl-open]').isVisible(), `${tag} le bouton « Implémenter » reste disponible`);
-  await p.locator('.evo-decide[data-n="2"] [data-evo-impl-open]').click();
-  ok(await p.locator('.evo-decide[data-n="2"] [data-evo-impl-form]').isVisible() && await p.locator('.evo-decide[data-n="2"] [data-evo-impl-form] input[type=radio]').count() === 2, `${tag} « Implémenter » propose les deux branches`);
-  await p.locator('.evo-decide[data-n="2"] [data-evo-impl-cancel]').click();
-  ok(!(await p.locator('.evo-decide[data-n="2"] [data-evo-impl-form]').isVisible()), `${tag} Annuler referme le choix`);
-  // « Ne plus afficher ce message » : plus de question ensuite
+  await dlg.locator('input[value=default]').check();
+  ok(await dlg.locator('input[type=checkbox]').isDisabled(), `${tag} « Ne plus afficher » est indisponible pour la branche principale`);
+  await dlg.locator('input[value=branch]').check();
+  ok(await dlg.locator('input[type=checkbox]').isEnabled(), `${tag} « Ne plus afficher » revient pour une nouvelle branche`);
+  await dlg.locator('input[type=checkbox]').check();
+  await dlg.getByRole('button', { name: "Oui, l'implémenter" }).click();
+  // Pas de token Git : l'erreur porte un LIEN souligné (pas un bouton) vers les Réglages
+  const fix = p.locator('.toast a.toast-fix');
+  await fix.first().waitFor({ timeout: 4000 }).catch(() => {});
+  ok(await fix.count() === 1 && (await fix.getAttribute('href')) === '/settings#git', `${tag} l'erreur « Aucun token Git » propose un lien vers Réglages → Dépôts Git`);
+  ok(await fix.evaluate((a) => getComputedStyle(a).textDecorationLine === 'underline' && !a.classList.contains('btn')), `${tag} c'est un lien souligné, pas un bouton`);
+  const fb = await fix.boundingBox();
+  ok(fb && fb.x >= 0 && fb.x + fb.width <= vp.width, `${tag} le lien tient dans l'écran`);
+  ok(await p.locator('.evo-decide[data-n="2"] .evo-state').textContent().then((x) => x.includes('Acceptée')), `${tag} l'idée reste acceptée`);
+  ok(await getSetting(s.db, u.id, 'evo_impl_choice') === 'yes', `${tag} « Ne plus afficher » retient le choix « oui »`);
+  ok(await p.getByRole('button', { name: 'Implémenter' }).count() === 0, `${tag} aucun bouton « Implémenter »`);
+  // Choix retenu : l'acceptation suivante ne pose plus la question et tente l'implémentation tout de suite
+  await p.locator('.toast-x').first().click().catch(() => {});
   await p.locator('.evo-decide[data-n="3"] [data-evo-open="accepted"]').click();
+  await p.waitForTimeout(800);
+  ok(await p.locator('dialog[open]').count() === 0, `${tag} plus de question quand le choix est retenu`);
+  ok(await p.locator('.toast a.toast-fix').count() >= 1, `${tag} l'échec de l'implémentation automatique propose aussi le lien`);
+  // Retenir « non » : plus de question ni d'implémentation
+  await s.db.prepare("UPDATE user_settings SET value = 'ask' WHERE user_id = ? AND `key` = 'evo_impl_choice'").run(u.id);
+  await p.locator('.evo-decide[data-n="4"] [data-evo-open="accepted"]').click();
   await p.locator('dialog[open]').waitFor({ timeout: 4000 });
   await p.locator('dialog[open] input[type=checkbox]').check();
   await p.locator('dialog[open]').getByRole('button', { name: 'Non' }).click();
-  await p.waitForTimeout(400);
-  ok(await getSetting(s.db, u.id, 'evo_impl_hint') === '1', `${tag} « Ne plus afficher » est enregistré`);
+  await p.waitForTimeout(500);
+  ok(await getSetting(s.db, u.id, 'evo_impl_choice') === 'no', `${tag} « Non » + « Ne plus afficher » retient « non »`);
   await p.locator('.evo-decide[data-n="4"] [data-evo-open="accepted"]').click();
-  await p.waitForTimeout(700);
-  ok(await p.locator('dialog[open]').count() === 0, `${tag} plus de question après « Ne plus afficher »`);
-  ok(await s.db.prepare("SELECT COUNT(*) n FROM jobs WHERE type = 'implement'").get().then((r) => Number(r.n)) === 0, `${tag} aucune implémentation lancée sans « oui »`);
+  await p.waitForTimeout(600);
+  ok(await p.locator('dialog[open]').count() === 0, `${tag} plus de question après « non » retenu`);
+  ok(await s.db.prepare("SELECT COUNT(*) n FROM jobs WHERE type = 'implement'").get().then((r) => Number(r.n)) === 0, `${tag} aucune implémentation lancée`);
   ok(errs.length === 0, `${tag} aucune erreur JavaScript ${errs.join(' | ')}`);
   await ctx.close();
 }

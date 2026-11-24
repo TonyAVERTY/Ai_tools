@@ -1,5 +1,5 @@
 // Évolution : décision (acceptée / refusée) et justification pour chaque idée de la liste produite par un job.
-import { now } from '../db.js';
+import { getSetting, now } from '../db.js';
 import { LEN } from '../inputlimits.js';
 import { esc } from '../http.js';
 import { parseEvolutions } from './markdown.js';
@@ -37,10 +37,21 @@ export async function implementationsOf(db, projectId, evoJobId) {
   return out;
 }
 
+
+/** Où régler un problème de jeton Git (Réglages → Dépôts Git). */
+export const FIX_GIT = { label: 'Ouvrir les Réglages', href: '/settings#git' };
+
+/** Choix de CETTE personne quand elle accepte une idée : 'ask' (poser la question), 'yes' (toujours implémenter, nouvelle branche) ou 'no' (jamais). */
+export async function implChoiceOf(db, userId) {
+  const v = await getSetting(db, userId, 'evo_impl_choice', null);
+  if (['ask', 'yes', 'no'].includes(v)) return v;
+  return (await getSetting(db, userId, 'evo_impl_hint', '0')) === '1' ? 'no' : 'ask'; // ancien réglage « Ne plus afficher ce message »
+}
+
 const ACTIVE = ['queued', 'running'];
 
-/** État de l'implémentation d'une idée acceptée (texte échappé), et boutons pour la lancer. */
-function implHtml(jobId, n, impl, canImplement) {
+/** État de l'implémentation d'une idée acceptée (texte échappé). Elle se lance à l'acceptation ; pour recommencer après un échec, on clique de nouveau sur « Accepter ». */
+function implHtml(impl) {
   if (impl && ACTIVE.includes(impl.status)) return `<p class="evo-impl s-running" data-evo-running>Implémentation en cours : l'IA écrit le code, puis il est poussé sur ton dépôt…</p>`;
   if (impl?.status === 'done' && impl.result) {
     const r = impl.result;
@@ -50,22 +61,16 @@ function implHtml(jobId, n, impl, canImplement) {
   ${r.summary ? `<p class="small">${esc(r.summary)}</p>` : ''}<ul class="small evo-files">${files}</ul>
   <p class="muted small">Code écrit par l'IA : relis-le et lance tes tests avant de le fusionner.</p></div>`;
   }
-  const failed = impl?.status === 'error' ? `<p class="evo-impl s-error error small">Implémentation en échec : ${esc(impl.error || 'erreur inconnue')}</p>` : impl?.status === 'cancelled' ? '<p class="muted small">Implémentation annulée.</p>' : '';
-  if (!canImplement) return failed;
-  const label = impl ? 'Réessayer l\'implémentation' : 'Implémenter';
-  return `${failed}<div class="evo-actions"><button type="button" class="btn small primary" data-evo-impl-open>${label}</button></div>
-  <form class="evo-form" data-evo-impl-form hidden>
-    <fieldset class="evo-target"><legend>Où pousser le code ?</legend>
-      <label class="check"><input type="radio" name="target" value="branch" checked> Sur une nouvelle branche (recommandé)</label>
-      <label class="check"><input type="radio" name="target" value="default"> Directement sur la branche principale</label>
-    </fieldset>
-    <p class="hint">L'IA écrit le code, l'application le vérifie (aucun secret, aucun fichier sensible), puis le commite et le pousse avec le token Git de Réglages → Dépôts Git, qui doit avoir le droit d'écrire.</p>
-    <div class="evo-actions"><button type="submit" class="btn small primary">Lancer l'implémentation</button><button type="button" class="btn small" data-evo-impl-cancel>Annuler</button></div>
-  </form>`;
+  if (impl?.status === 'error') {
+    // Un problème de jeton Git se règle dans les Réglages : un bouton y mène
+    const fix = /token/i.test(impl.error || '') ? ` <a class="evo-fix" href="${FIX_GIT.href}">${FIX_GIT.label}</a>` : '';
+    return `<p class="evo-impl s-error error small">Implémentation en échec : ${esc(impl.error || 'erreur inconnue')}${fix}</p><p class="muted small">Clique sur « Accepter » pour la relancer.</p>`;
+  }
+  return impl?.status === 'cancelled' ? '<p class="muted small">Implémentation annulée. Clique sur « Accepter » pour la relancer.</p>' : '';
 }
 
-/** Bloc « décision » d'une idée : état, justification, boutons, formulaire de justification (replié) et, si acceptée, implémentation. */
-export function decisionHtml(jobId, n, d, impl = null, canImplement = false) {
+/** Bloc « décision » d'une idée : état, boutons, formulaire de justification d'un refus (replié) et, si acceptée, état de l'implémentation. */
+export function decisionHtml(jobId, n, d, impl = null) {
   const state = d
     ? `<p class="evo-state s-${d.status}"><strong>${DECISIONS[d.status]}</strong>${d.reason ? ` : ${esc(d.reason)}` : ''}</p>`
     : '';
@@ -77,7 +82,7 @@ export function decisionHtml(jobId, n, d, impl = null, canImplement = false) {
     <label>Pourquoi ?<textarea name="reason" rows="2" maxlength="${LEN.reason}"></textarea></label>
     <div class="evo-actions"><button type="submit" class="btn small primary">Enregistrer</button><button type="button" class="btn small" data-evo-cancel>Annuler</button></div>
   </form>
-  ${d?.status === 'accepted' ? implHtml(jobId, n, impl, canImplement) : ''}
+  ${d?.status === 'accepted' ? implHtml(impl) : ''}
 </div>`;
 }
 

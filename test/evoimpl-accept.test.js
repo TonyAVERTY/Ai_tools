@@ -21,22 +21,31 @@ before(async () => {
 });
 after(() => s.close());
 
-test('réglage désactivé : accepter pose la question, « Ne plus afficher » la coupe, rien n\'est lancé sans réponse « oui »', async () => {
+test('réglage désactivé : accepter pose la question ; le choix retenu (oui / non) s\'applique ensuite sans question', async () => {
   const r = await accept(A, 1);
   assert.equal(r.next, 'ask');
   assert.match(r.html, /Acceptée/);
+  assert.doesNotMatch(r.html, /data-evo-impl-open|Implémenter</, 'plus de bouton « Implémenter »');
   assert.equal((await implJobs()).length, 0, 'aucune écriture sans accord');
-  // ré-accepter ne repose pas la question
-  assert.equal((await accept(A, 1)).next, null);
-  // « Ne plus afficher ce message » : préférence de cette personne seulement
-  assert.equal((await s.anon.post('/api/evolution/implement-hint', { hide: true })).status, 401);
-  assert.equal((await A.post('/api/evolution/implement-hint', { hide: true }, { origin: null })).status, 403);
-  assert.equal((await A.post('/api/evolution/implement-hint', { hide: true })).status, 200);
-  assert.equal(await getSetting(s.db, A.id, 'evo_impl_hint'), '1');
-  assert.equal(await getSetting(s.db, B.id, 'evo_impl_hint'), null, 'pas celle d\'un autre compte');
-  assert.equal((await accept(A, 2)).next, null, 'plus de question');
-  // elle se remet en route
-  await A.post('/api/evolution/implement-hint', { hide: false });
+  // Choix retenu : propre à cette personne, validé côté serveur
+  assert.equal((await s.anon.post('/api/evolution/implement-choice', { choice: 'no' })).status, 401);
+  assert.equal((await A.post('/api/evolution/implement-choice', { choice: 'no' }, { origin: null })).status, 403);
+  assert.equal((await A.post('/api/evolution/implement-choice', { choice: 'peut-être' })).status, 400);
+  assert.equal((await A.post('/api/evolution/implement-choice', { choice: 'no' })).status, 200);
+  assert.equal(await getSetting(s.db, A.id, 'evo_impl_choice'), 'no');
+  assert.equal(await getSetting(s.db, B.id, 'evo_impl_choice'), null, 'pas celui d\'un autre compte');
+  const none = await accept(A, 2);
+  assert.equal(none.next, null, 'retenu « non » : plus de question, rien de lancé');
+  assert.equal((await implJobs()).length, 0);
+  // Retenu « oui » : l'implémentation démarre à chaque acceptation (ici sans token : l'idée reste acceptée, avec un lien vers les Réglages)
+  await A.post('/api/evolution/implement-choice', { choice: 'yes' });
+  const yes = await accept(A, 3);
+  assert.match(yes.warn, /Aucun token Git/);
+  assert.deepEqual(yes.fix, { label: 'Ouvrir les Réglages', href: '/settings#git' });
+  assert.match(yes.html, /Acceptée/);
+  // Remise en route de la question
+  await A.post('/api/evolution/implement-choice', { choice: 'ask' });
+  await A.post(url(3, 'decision'), { status: 'pending' });
   assert.equal((await accept(A, 3)).next, 'ask');
   assert.equal((await implJobs()).length, 0);
 });
@@ -54,8 +63,9 @@ test('réglage activé avec un token : accepter lance l\'implémentation sur une
 });
 
 test('réglage activé : une implémentation déjà en cours ou l\'absence de token sont signalées, l\'idée reste acceptée', async () => {
-  const busy = await accept(A, 1).catch(() => null); // déjà acceptée : pas de relance
+  const busy = await accept(A, 4); // implémentation en cours : pas de relance
   assert.equal(busy.next, null);
+  assert.equal((await implJobs()).length, 1);
   await A.post(url(2, 'decision'), { status: 'pending' });
   const second = await accept(A, 2);
   assert.match(second.warn, /déjà en cours/);
@@ -67,6 +77,18 @@ test('réglage activé : une implémentation déjà en cours ou l\'absence de to
   const noToken = await accept(A, 3);
   assert.match(noToken.warn, /Aucun token Git/);
   assert.equal((await implJobs()).length, 1, 'rien de plus lancé');
+  // Après un échec, un nouveau clic sur « Accepter » relance ; après une réussite, non
+  await setSetting(s.db, A.id, 'github_token_enc', encrypt(TEST_SECRET_KEY, 'ghp_AbCdEfTestTokenNotReal'));
+  await s.db.prepare("UPDATE jobs SET status = 'error', error = 'Git : le token n''a pas le droit d''écrire' WHERE type = 'implement'").run();
+  const failedBlock = await (await A.get(url(4, 'decision'))).json();
+  assert.match(failedBlock.html, /Implémentation en échec/);
+  assert.match(failedBlock.html, /<a class="evo-fix" href="\/settings#git">Ouvrir les Réglages<\/a>/, 'un lien (pas un bouton) vers les Réglages');
+  const retry = await accept(A, 4);
+  assert.equal(retry.next, 'started');
+  assert.equal((await implJobs()).length, 2, 'relancée');
+  await s.db.prepare("UPDATE jobs SET status = 'done', result_json = ? WHERE type = 'implement'").run(JSON.stringify({ branch: 'iaboss/x-1', target: 'branch', commit: 'abcdef123456', files: ['a.js'], summary: '' }));
+  assert.equal((await accept(A, 4)).next, null);
+  assert.equal((await implJobs()).length, 2, 'pas de relance après une réussite');
 });
 
 test('un simple membre accepte sans question ni implémentation, même réglage activé', async () => {
