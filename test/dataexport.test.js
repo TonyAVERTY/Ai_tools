@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { now } from '../src/db.js';
 import { EXPORTED, EXCLUDED, exportAccount } from '../src/services/dataexport.js';
 import { startApp } from './helpers/server.js';
+import { USING_MYSQL } from './helpers/db.js';
 
 // Export complet du compte (RGPD art. 15 et 20) : toutes les tables classées, aucun secret, rien d'un autre compte, 3 exports par heure.
 
@@ -11,7 +12,10 @@ const form = { form: true };
 test('chaque table de la base est exportée ou exclue avec une raison : une nouvelle table oblige à décider', async () => {
   const s = await startApp();
   try {
-    const tables = (await s.db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'").all()).map((r) => r.name);
+    // SQLite (tests locaux) ou MariaDB (job « mysql » de la CI) : la liste des tables se lit à des endroits différents
+    const tables = (USING_MYSQL
+      ? await s.db.prepare("SELECT table_name AS name FROM information_schema.tables WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE'").all()
+      : await s.db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'").all()).map((r) => r.name);
     const unknown = tables.filter((t) => !(t in EXPORTED) && !(t in EXCLUDED));
     assert.deepEqual(unknown, [], 'tables à classer dans src/services/dataexport.js (EXPORTED ou EXCLUDED)');
     for (const [t, why] of Object.entries(EXCLUDED)) assert.ok(why.length > 20, `raison de l'exclusion de ${t}`);
