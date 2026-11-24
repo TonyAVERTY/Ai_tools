@@ -2,8 +2,6 @@
 // Règle (docs/UX.md, « Champs de saisie ») : un champ de N caractères attendus n'en accepte jamais plus de N ; un texte libre a toujours un maximum ;
 // un nombre a un minimum et un maximum. Le navigateur aide, le serveur décide : une valeur trop longue est REFUSÉE (jamais tronquée en silence :
 // tronquer un mot de passe ou un jeton le changerait).
-import { HttpError } from './http.js';
-
 export const LEN = {
   totp: 6,            // code d'une application d'authentification
   recovery: 11,       // code de secours « xxxxx-xxxxx »
@@ -30,13 +28,26 @@ export const LEN = {
 };
 export const PORT = { min: 1, max: 65535 };
 
-/**
- * Refuse (400) une valeur trop longue : `checkLengths(body, { host: [LEN.host, 'Hôte'], pass: [LEN.password, 'Mot de passe'] })`.
- * Seules les chaînes sont mesurées ; un champ absent n'est pas une erreur ici (la route décide s'il est obligatoire).
- */
-export function checkLengths(body, spec) {
-  for (const [field, [max, label]] of Object.entries(spec)) {
-    const v = body?.[field];
-    if (typeof v === 'string' && v.length > max) throw new HttpError(400, `${label} trop long : ${max} caractères au plus`, { expose: true });
+// Champs dont le NOM est sans ambiguïté dans toute l'application (réglages de services, secrets, adresses) : une valeur plus longue est refusée par readBody (src/http.js),
+// pour TOUTES les routes d'un coup. Les champs de contenu (description, objet, corps de mail…) ont leur propre plafond dans leur route, parce que leur nom sert à
+// plusieurs écrans. Un suffixe `_<numéro>` (git_host_2, discord_url_0) est ignoré.
+export const FIELD_LIMITS = {
+  apiKey: [LEN.token, 'Clé API'], token: [LEN.token, 'Jeton'], authJson: [LEN.authFile, 'Fichier de connexion'], authFile: [LEN.authFile, 'Fichier de connexion'],
+  code: [LEN.deviceCode, 'Code'], gitUrl: [LEN.url, 'Adresse du dépôt'], email: [LEN.email, 'Adresse e-mail'], confirm: [LEN.email, 'Confirmation'],
+  host: [LEN.host, 'Hôte'], user: [LEN.user, 'Utilisateur'], pass: [LEN.password, 'Mot de passe'], password: [LEN.password, 'Mot de passe'], database: [LEN.database, 'Base de données'],
+  fromEmail: [LEN.email, "Adresse d'envoi"], fromName: [LEN.fromName, "Nom d'expéditeur"],
+  git_host: [LEN.url, 'Adresse du serveur Git'], git_token: [LEN.token, 'Jeton Git'], discord_url: [LEN.webhook, 'Lien du webhook'], slack_url: [LEN.webhook, 'Lien du webhook'],
+  telegram_token: [100, 'Jeton Telegram'], telegram_chat: [LEN.chat, 'Conversation Telegram'], email_to: [LEN.email, 'Adresse e-mail'], notify_email: [LEN.email, 'Adresse e-mail'],
+  github_token: [LEN.token, 'Jeton GitHub'], voiceKey: [LEN.token, 'Clé API'], voiceRegion: [LEN.region, 'Région'],
+};
+
+/** Premier champ connu dont la valeur dépasse sa limite : { field, label, max } ; sinon null. Ne mesure que les chaînes du premier niveau. */
+export function findTooLong(body) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return null;
+  for (const [k, v] of Object.entries(body)) {
+    if (typeof v !== 'string') continue;
+    const lim = FIELD_LIMITS[k] || FIELD_LIMITS[k.replace(/_\d{1,2}$/, '')];
+    if (lim && v.length > lim[0]) return { field: k, label: lim[1], max: lim[0] };
   }
+  return null;
 }

@@ -47,6 +47,14 @@ Quand plusieurs actions demandent **la même saisie** (ex. un code A2F pour « R
 - le texte au-dessus du champ dit ce qui se passe avec chaque bouton ; le bouton à effet destructeur est en rouge (`danger`) et vient après les autres.
 `test/form-fields.test.js` échoue si deux formulaires voisins partagent un champ visible (liste des exceptions justifiées dans le test) ; `scripts/mfa-card-check.mjs` le vérifie dans Chromium pour la carte A2F (1280 et 390 px).
 
+## Champs de saisie : une longueur, une forme, jamais plus que prévu
+
+- **Un champ de N caractères attendus n'en accepte jamais plus de N.** Un code A2F de 6 chiffres : `maxlength="6"`, `pattern="[0-9]{6}"`, `inputmode="numeric"`, `autocomplete="one-time-code"` ; le texte tapé **et collé** est nettoyé (« 123 456 » devient `123456`) par `public/code-field.js`. Le code de secours (11 caractères) est un autre mode du même champ, choisi par un lien « Utiliser un code de secours ».
+- **Tout champ de texte a un `maxlength`**, tout champ numérique un `min` et un `max` ; dates et heures sont bornées par le navigateur. Les valeurs sont dans `LEN` (`src/inputlimits.js`) : une seule source pour l'écran et pour le serveur.
+- **Le serveur décide.** `readBody` refuse (400, « Hôte trop long : 255 caractères au plus ») toute valeur trop longue d'un champ connu (`FIELD_LIMITS`), pour toutes les routes à la fois. Pas de troncature silencieuse : tronquer un mot de passe ou un jeton le changerait.
+- Un attribut ne se pose **qu'une fois** par balise (le navigateur retient la première occurrence).
+- `test/input-limits.test.js` garde l'ensemble (aucun champ sans limite, limites du navigateur ≤ serveur, refus réel par les routes) ; `scripts/code-field-check.mjs` vérifie frappe, collage et bascule dans Chromium (connexion et carte A2F, 1280 et 390 px).
+
 ## Formulaires : une erreur ne vide jamais ce qui a été saisi
 
 Un formulaire que le serveur refuse **garde ses champs, reste à l'écran et le bouton se réactive** ; l'erreur s'affiche en notification (`public/ajax.js`).

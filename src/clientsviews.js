@@ -71,7 +71,7 @@ export const clientProjectBlock = (r, openId) => `<details class="cl-proj" data-
             <div class="grid2">
               <label class="field" for="ca-n-${r.id}"><span class="lbl">Nom du client</span><input id="ca-n-${r.id}" name="name" maxlength="120" required autocomplete="off"></label>
               <label class="field" for="ca-c-${r.id}"><span class="lbl">Contact <span class="muted small">(facultatif)</span></span><input id="ca-c-${r.id}" name="contact" maxlength="120" autocomplete="off"></label>
-              <label class="field" for="ca-e-${r.id}"><span class="lbl">E-mail</span><input id="ca-e-${r.id}" type="email" name="email" maxlength="255" autocomplete="off"></label>
+              <label class="field" for="ca-e-${r.id}"><span class="lbl">E-mail</span><input id="ca-e-${r.id}" type="email" name="email" maxlength="254" autocomplete="off"></label>
               <label class="field" for="ca-p-${r.id}"><span class="lbl">Téléphone</span><input id="ca-p-${r.id}" name="phone" maxlength="40" autocomplete="off"></label>
               <label class="field wide" for="ca-a-${r.id}"><span class="lbl">Adresse</span><input id="ca-a-${r.id}" name="address" maxlength="200" autocomplete="off"></label>
               <label class="field" for="ca-s-${r.id}"><span class="lbl">SIRET <span class="muted small">(vide pour un particulier)</span></span><input id="ca-s-${r.id}" name="siret" inputmode="numeric" maxlength="20" autocomplete="off"></label>
@@ -146,7 +146,7 @@ export function clientSheetPage({ email, project: p, client: c, documents, total
       <div class="grid2">
         <label class="field" for="c-n"><span class="lbl">Nom du client</span><input id="c-n" name="name" value="${esc(c.name)}" maxlength="120" required autocomplete="off"></label>
         <label class="field" for="c-c"><span class="lbl">Contact</span><input id="c-c" name="contact" value="${esc(c.contact)}" maxlength="120" autocomplete="off"></label>
-        <label class="field" for="c-e"><span class="lbl">E-mail</span><input id="c-e" type="email" name="email" value="${esc(c.email)}" maxlength="255" autocomplete="off"></label>
+        <label class="field" for="c-e"><span class="lbl">E-mail</span><input id="c-e" type="email" name="email" value="${esc(c.email)}" maxlength="254" autocomplete="off"></label>
         <label class="field" for="c-p"><span class="lbl">Téléphone</span><input id="c-p" name="phone" value="${esc(c.phone)}" maxlength="40" autocomplete="off"></label>
         <label class="field wide" for="c-a"><span class="lbl">Adresse</span><input id="c-a" name="address" value="${esc(c.address)}" maxlength="200" autocomplete="off"></label>
         <label class="field" for="c-s"><span class="lbl">SIRET <span class="muted small">(vide pour un particulier)</span></span><input id="c-s" name="siret" value="${esc(c.siret)}" inputmode="numeric" maxlength="20" autocomplete="off"></label>

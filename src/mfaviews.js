@@ -16,10 +16,7 @@ import { LEN } from './inputlimits.js';
 export function codeField({ mode = 'totp', toSecours = '?mode=secours', toTotp = '?', toggle = true, id = '' } = {}) {
   const sec = mode === 'secours';
   const label = sec ? 'Code de secours' : 'Code à 6 chiffres';
-  const attrs = sec
-    ? `data-mode="secours" inputmode="text" maxlength="${LEN.recovery}" pattern="[0-9a-fA-F]{5}-?[0-9a-fA-F]{5}"`
-    : `data-mode="totp" inputmode="numeric" maxlength="${LEN.totp}" pattern="[0-9]{6}"`;
-  return `<div data-code-field><label class="field"><span class="lbl" data-code-label>${label}</span><input${id ? ` id="${esc(id)}"` : ''} name="code" data-code-input ${attrs} autocomplete="one-time-code" spellcheck="false" autocapitalize="off" required></label>${toggle
+  return `<div data-code-field><label class="field"><span class="lbl" data-code-label>${label}</span><input${id ? ` id="${esc(id)}"` : ''} name="code" data-code-input data-mode="${sec ? 'secours' : 'totp'}" inputmode="${sec ? 'text' : 'numeric'}" maxlength="${sec ? LEN.recovery : LEN.totp}" pattern="${sec ? '[0-9a-fA-F]{5}-?[0-9a-fA-F]{5}' : '[0-9]{6}'}" autocomplete="one-time-code" spellcheck="false" autocapitalize="off" required></label>${toggle
     ? `<a class="small" href="${esc(sec ? toTotp : toSecours)}" data-code-toggle data-to-secours="${esc(toSecours)}" data-to-totp="${esc(toTotp)}">${sec ? 'Utiliser le code de mon application' : 'Utiliser un code de secours'}</a>` : ''}</div>`;
 }
 

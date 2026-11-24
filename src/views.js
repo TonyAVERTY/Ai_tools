@@ -118,7 +118,7 @@ ${email ? `<header class="top">
   </div>
 </header>
 <dialog class="search-dialog" id="search" aria-label="Recherche">
-  <label class="s-in">${ic('search')}<span class="sr-only">Rechercher une page, un projet, un prospect, un client ou un mail</span><input type="text" role="searchbox" data-search-q placeholder="Rechercher une page, un projet, un prospect, un mail…" autocomplete="off" spellcheck="false" aria-controls="search-out"></label>
+  <label class="s-in">${ic('search')}<span class="sr-only">Rechercher une page, un projet, un prospect, un client ou un mail</span><input maxlength="100" type="text" role="searchbox" data-search-q placeholder="Rechercher une page, un projet, un prospect, un mail…" autocomplete="off" spellcheck="false" aria-controls="search-out"></label>
   <div class="s-out" id="search-out" data-search-out aria-live="polite"></div>
   <p class="s-hint" aria-hidden="true"><kbd>↑</kbd> <kbd>↓</kbd> pour choisir · <kbd>Entrée</kbd> pour ouvrir · <kbd>Échap</kbd> pour fermer</p>
 </dialog>` : ''}
@@ -314,7 +314,7 @@ ${themeHtml}
   <p class="card-d">Supprimer ton compte efface définitivement ton compte et toutes tes données : projets, prospects, notes, modèles de mail, journaux d'envoi, lignes de comptabilité et leurs justificatifs, jobs, réglages et clones du code. Les adresses qui ont demandé à ne plus être contactées restent dans la liste d'opposition commune. Cette action est irréversible.</p>
   ${error ? banner('err', error, { flash: true }) : ''}
   <form method="post" action="/account/delete" class="cfg">
-    <label class="field"><span class="lbl">Pour confirmer, saisis ton email (${esc(user.email)})</span><input name="confirm" type="email" required autocomplete="off"></label>
+    <label class="field"><span class="lbl">Pour confirmer, saisis ton email (${esc(user.email)})</span><input maxlength="254" name="confirm" type="email" required autocomplete="off"></label>
     <div class="row"><button class="btn danger-fill">${ic('trash')}Supprimer mon compte et mes données</button></div>
   </form>
 </section>
@@ -328,15 +328,15 @@ function targetForm(p) {
   const lock = p.targetValidated ? ' readonly' : ''; // cible validée : grisée et en lecture seule jusqu'à « Modifier » (public/app.js)
   return `<form class="target cfg${p.targetValidated ? ' target-locked' : ''}" data-action="target" data-id="${p.id}">
   ${p.targetValidated ? `<p class="target-sum">${esc([t.description, t.taille, t.zone].filter(Boolean).join(', '))}${t.decideur ? `, décideur : ${esc(t.decideur)}` : ''}${t.description || t.taille || t.zone || t.decideur ? '.' : ''}</p>` : ''}
-  <label>Description<input name="description" value="${esc(t.description)}"${lock}></label>
+  <label>Description<input maxlength="300" name="description" value="${esc(t.description)}"${lock}></label>
   <div class="grid3">
-    <label>Zone<input name="zone" value="${esc(t.zone)}"${lock}></label>
-    <label>Taille<input name="taille" value="${esc(t.taille)}"${lock}></label>
-    <label>Décideur<input name="decideur" value="${esc(t.decideur)}"${lock}></label>
+    <label>Zone<input maxlength="100" name="zone" value="${esc(t.zone)}"${lock}></label>
+    <label>Taille<input maxlength="100" name="taille" value="${esc(t.taille)}"${lock}></label>
+    <label>Décideur<input maxlength="100" name="decideur" value="${esc(t.decideur)}"${lock}></label>
   </div>
   <div class="grid2">
-    <label>Secteurs (1 par ligne)<textarea name="secteurs" rows="4"${lock}>${list(t.secteurs)}</textarea></label>
-    <label>Requêtes de recherche (1 par ligne)<textarea name="requetes" rows="4"${lock}>${list(t.requetes)}</textarea></label>
+    <label>Secteurs (1 par ligne)<textarea maxlength="2000" name="secteurs" rows="4"${lock}>${list(t.secteurs)}</textarea></label>
+    <label>Requêtes de recherche (1 par ligne)<textarea maxlength="2000" name="requetes" rows="4"${lock}>${list(t.requetes)}</textarea></label>
   </div>
   <div class="row">${p.targetValidated ? `<button type="button" class="btn small" data-target-unlock>${ic('pen')}Modifier</button>` : ''}
     <button class="btn${p.targetValidated ? '' : ' primary'}" data-target-save${p.targetValidated ? ' disabled' : ''}>${p.targetValidated ? 'Mettre à jour' : `${ic('check')}Valider la cible`}</button>
@@ -372,12 +372,12 @@ function configForms(p, smtp, dbCfg, imap) {
   <h4>Adresse d'envoi (SMTP)</h4>
   <p class="muted small" data-smtp-source>${source} Les mails de prospection et les relances de ce projet partent de cette adresse (une boîte par projet). Les mails d'iaboss (rapport, évolutions, invitations) partent, eux, du serveur.</p>
   <div class="grid3">
-    <label>Hôte<input name="host" value="${esc(smtp.host)}" placeholder="smtp.exemple.fr"></label>
-    <label>Port<input name="port" type="number" value="${esc(smtp.port || 587)}"></label>
-    <label>Utilisateur<input name="user" value="${esc(smtp.user)}" autocomplete="off"></label>
-    <label>Mot de passe<input name="pass" type="password" placeholder="${smtp.passSet ? '•••••• (inchangé)' : ''}" autocomplete="new-password"></label>
-    <label>Email expéditeur<input name="fromEmail" type="email" value="${esc(smtp.fromEmail)}"></label>
-    <label>Nom expéditeur<input name="fromName" value="${esc(smtp.fromName)}"></label>
+    <label>Hôte<input maxlength="255" name="host" value="${esc(smtp.host)}" placeholder="smtp.exemple.fr"></label>
+    <label>Port<input min="1" max="65535" name="port" type="number" value="${esc(smtp.port || 587)}"></label>
+    <label>Utilisateur<input maxlength="255" name="user" value="${esc(smtp.user)}" autocomplete="off"></label>
+    <label>Mot de passe<input maxlength="256" name="pass" type="password" placeholder="${smtp.passSet ? '•••••• (inchangé)' : ''}" autocomplete="new-password"></label>
+    <label>Email expéditeur<input maxlength="254" name="fromEmail" type="email" value="${esc(smtp.fromEmail)}"></label>
+    <label>Nom expéditeur<input maxlength="80" name="fromName" value="${esc(smtp.fromName)}"></label>
   </div>
   <label>Plafond mails / 24 h (max 200)<input name="dailyCap" type="number" min="1" max="200" value="${p.dailyMailCap}"></label>
   <button class="btn">Enregistrer SMTP</button>
@@ -386,10 +386,10 @@ function configForms(p, smtp, dbCfg, imap) {
   <h4>Boîte de réception (IMAP)</h4>
   <p class="muted small">Sert à détecter les réponses et les adresses invalides. Utilisateur vide = mêmes identifiants que le SMTP. Hôte vide = désactivé.</p>
   <div class="grid3">
-    <label>Hôte IMAP<input name="host" value="${esc(imap.host)}" placeholder="imap.mondomaine.fr"></label>
-    <label>Port<input name="port" type="number" value="${esc(imap.port || 993)}"></label>
-    <label>Utilisateur<input name="user" value="${esc(imap.user)}" placeholder="identique au SMTP" autocomplete="off"></label>
-    <label>Mot de passe<input name="pass" type="password" placeholder="${imap.passSet ? '•••••• (inchangé)' : 'identique au SMTP'}" autocomplete="new-password"></label>
+    <label>Hôte IMAP<input maxlength="255" name="host" value="${esc(imap.host)}" placeholder="imap.mondomaine.fr"></label>
+    <label>Port<input min="1" max="65535" name="port" type="number" value="${esc(imap.port || 993)}"></label>
+    <label>Utilisateur<input maxlength="255" name="user" value="${esc(imap.user)}" placeholder="identique au SMTP" autocomplete="off"></label>
+    <label>Mot de passe<input maxlength="256" name="pass" type="password" placeholder="${imap.passSet ? '•••••• (inchangé)' : 'identique au SMTP'}" autocomplete="new-password"></label>
   </div>
   <button class="btn">Enregistrer et tester</button>
 </form>
@@ -398,11 +398,11 @@ function configForms(p, smtp, dbCfg, imap) {
   <p class="muted small">Utilise un compte en lecture seule. iaboss lit la structure de ta base, te propose les bonnes tables et affiche un aperçu des chiffres : tu n'écris aucune requête.</p>
   <div class="grid3">
     <label>Type<select name="type"><option value="mysql" ${dbCfg.type !== 'pg' ? 'selected' : ''}>MySQL / MariaDB</option><option value="pg" ${dbCfg.type === 'pg' ? 'selected' : ''}>PostgreSQL</option></select></label>
-    <label>Hôte<input name="host" value="${esc(dbCfg.host)}"></label>
-    <label>Port<input name="port" type="number" value="${esc(dbCfg.port)}"></label>
-    <label>Base<input name="database" value="${esc(dbCfg.database)}"></label>
-    <label>Utilisateur<input name="user" value="${esc(dbCfg.user)}" autocomplete="off"></label>
-    <label>Mot de passe<input name="password" type="password" placeholder="${dbCfg.passwordSet ? '•••••• (inchangé)' : ''}" autocomplete="new-password"></label>
+    <label>Hôte<input maxlength="255" name="host" value="${esc(dbCfg.host)}"></label>
+    <label>Port<input min="1" max="65535" name="port" type="number" value="${esc(dbCfg.port)}"></label>
+    <label>Base<input maxlength="64" name="database" value="${esc(dbCfg.database)}"></label>
+    <label>Utilisateur<input maxlength="255" name="user" value="${esc(dbCfg.user)}" autocomplete="off"></label>
+    <label>Mot de passe<input maxlength="256" name="password" type="password" placeholder="${dbCfg.passwordSet ? '•••••• (inchangé)' : ''}" autocomplete="new-password"></label>
   </div>
   <label class="check"><input type="checkbox" name="ssl" ${dbCfg.ssl ? 'checked' : ''}> SSL</label>
   ${bddTables(dbCfg)}
@@ -421,9 +421,9 @@ function templateForm(p, kind) {
         <span class="row"><button type="button" class="btn small" data-tpl-unlock hidden>${ic('pen')}Modifier</button>
         <button type="button" class="btn small" data-run="${job}" data-id="${p.id}">Générer avec l'IA</button></span></div>
       <p class="muted small" data-tpl-help>Variables : {{entreprise}} {{ville}}${initial ? ' {{accroche}}' : ''} {{expediteur}} {{site}}. Le lien de désinscription est ajouté automatiquement.</p>
-      <label>Objet${initial ? '' : ' <span class="muted small" data-tpl-help>(vide = « Re: » + objet du premier mail, dans le même fil)</span>'}<input name="subject"></label>
-      ${initial ? '<label>Objet B <span class="muted small" data-tpl-help>(optionnel : test A/B, les envois alternent entre les deux objets)</span><input name="subjectB"></label>' : ''}
-      <label>Corps<textarea name="body" rows="${initial ? 9 : 5}"></textarea></label>
+      <label>Objet${initial ? '' : ' <span class="muted small" data-tpl-help>(vide = « Re: » + objet du premier mail, dans le même fil)</span>'}<input maxlength="200" name="subject"></label>
+      ${initial ? '<label>Objet B <span class="muted small" data-tpl-help>(optionnel : test A/B, les envois alternent entre les deux objets)</span><input maxlength="200" name="subjectB"></label>' : ''}
+      <label>Corps<textarea maxlength="5000" name="body" rows="${initial ? 9 : 5}"></textarea></label>
       <label class="opt"><input type="checkbox" name="html"><span class="box">${ic('check')}</span><span>Envoyer en mail HTML<small class="muted"> Sans cette case, le mail part en texte simple, comme un mail écrit à la main.</small></span></label>
       <div class="row">
         <button type="button" class="btn" data-tpl-preview>${ic('eye')}Aperçu</button>
@@ -486,7 +486,7 @@ export function projectBlocks(p, smtp, dbCfg, imap) {
   const template = acc('template', 'mail', 'Modèle de mail', 'Objet, test A/B et corps du premier mail', templateForm(p, 'initial'), { open: true, cls: 'main' });
   const send = `<section class="sheet pj-send" id="acc-send" data-acc="send" aria-labelledby="send-h"><h2 id="send-h">Envoyer</h2>
     <form data-action="send" data-id="${p.id}" class="send">
-      <label class="field"><span class="lbl">Mails à envoyer</span><input name="count" type="number" min="1" value="10"></label>
+      <label class="field"><span class="lbl">Mails à envoyer</span><input max="50" name="count" type="number" min="1" value="10"></label>
       <p class="muted small">Un lot fait 100 mails au plus. Chaque mail est relu par ${esc(aiName())} avant de partir.</p>
       <button class="btn primary" disabled>${ic('send')}Envoyer</button>
       <span class="muted small" data-send-info></span>
@@ -521,7 +521,7 @@ export function projectBlocks(p, smtp, dbCfg, imap) {
             <button type="button" class="chip" data-chip="replied" aria-pressed="false">A répondu <span data-chip-n="replied"></span></button>
             <button type="button" class="chip" data-chip-todo aria-pressed="false">Actions à faire <span data-chip-n="todo"></span></button>
           </div>
-          <label class="pr-search">${ic('search', 'ic-s')}<input type="search" name="q" placeholder="Rechercher" aria-label="Rechercher : entreprise, email, ville, secteur"></label>
+          <label class="pr-search">${ic('search', 'ic-s')}<input maxlength="100" type="search" name="q" placeholder="Rechercher" aria-label="Rechercher : entreprise, email, ville, secteur"></label>
         </div>
         <details class="pr-more"><summary>Plus de filtres</summary>
           <div class="pr-more-b">
@@ -605,8 +605,8 @@ function gitRow(i, srv, { fresh = false } = {}) {
       <input type="hidden" name="git_id_${i}" value="${esc(srv.id)}">
       <div class="gitrow-head"><span class="srv-n">${ic('git')}<span class="badge">${esc(srv.label)}</span></span>${fresh ? ' <button type="button" class="linklike" data-git-cancel>Annuler</button>' : trash(`git_del_${i}`, 'Retirer ce serveur')}</div>
       <div class="grid2">
-        <label class="field"><span class="lbl">URL du serveur</span><input name="git_host_${i}" value="${esc(srv.host)}" placeholder="https://git.mon-serveur.fr" autocomplete="off" spellcheck="false"></label>
-        <label class="field"><span class="lbl">Token (lecture repo)</span><input name="git_token_${i}" type="password" placeholder="${srv.hasToken ? '•••••• (inchangé)' : ''}" autocomplete="new-password"></label>
+        <label class="field"><span class="lbl">URL du serveur</span><input maxlength="500" name="git_host_${i}" value="${esc(srv.host)}" placeholder="https://git.mon-serveur.fr" autocomplete="off" spellcheck="false"></label>
+        <label class="field"><span class="lbl">Token (lecture repo)</span><input maxlength="600" name="git_token_${i}" type="password" placeholder="${srv.hasToken ? '•••••• (inchangé)' : ''}" autocomplete="new-password"></label>
       </div>
       <p class="hint" data-git-hint>${esc(hint)}</p>
       ${!fresh && srv.hasToken ? `<div class="row"><span class="hint">Un token est enregistré.</span>${trash(`git_token_clear_${i}`, 'Supprimer le token enregistré', { text: 'Supprimer le token' })}</div>` : ''}
@@ -633,7 +633,7 @@ function hookRow(i, h, all, { fresh = false } = {}) {
       <fieldset class="evs"><legend class="lbl">${fresh ? '1. Quelles notifications veux-tu y recevoir ?' : 'Ce webhook reçoit'}</legend>
         <div class="checks">${Object.entries(all).map(([k, label]) => check(`discord_ev_${i}_${k}`, fresh ? CHANNEL_DEFAULT_EVENTS.includes(k) : h.events.includes(k), esc(label))).join('')}</div>
       </fieldset>
-      <label class="field"><span class="lbl">${fresh ? '2. ' : ''}Lien du webhook Discord</span><input name="discord_url_${i}" type="password" placeholder="${fresh ? 'https://discord.com/api/webhooks/…' : '•••••• (inchangé)'}" autocomplete="off"><span class="hint">Discord : salon › Modifier › Intégrations › Webhooks › Nouveau webhook › Copier l'URL. Stocké chiffré.</span></label>
+      <label class="field"><span class="lbl">${fresh ? '2. ' : ''}Lien du webhook Discord</span><input maxlength="300" name="discord_url_${i}" type="password" placeholder="${fresh ? 'https://discord.com/api/webhooks/…' : '•••••• (inchangé)'}" autocomplete="off"><span class="hint">Discord : salon › Modifier › Intégrations › Webhooks › Nouveau webhook › Copier l'URL. Stocké chiffré.</span></label>
     </div>`;
 }
 
@@ -701,7 +701,7 @@ ${saved ? banner('ok', 'Réglages enregistrés', { strong: true }) : ''}
 
 <section class="card" id="notif" aria-labelledby="t-notif">
   <div class="card-h"><h2 id="t-notif">Notifications</h2><p>Où et quand iaboss te prévient : réponses de prospects, jobs terminés ou en erreur, alertes. Les liens et jetons sont stockés chiffrés et ne sont jamais réaffichés.</p></div>
-  <label class="field"><span class="lbl">Email de réception (évolutions, rapport hebdo)</span><input name="notify_email" type="email" value="${esc(s.notify_email)}" placeholder="toi@exemple.fr"><span class="hint">Ces mails partent de l'adresse d'iaboss (SMTP du serveur).</span></label>
+  <label class="field"><span class="lbl">Email de réception (évolutions, rapport hebdo)</span><input maxlength="254" name="notify_email" type="email" value="${esc(s.notify_email)}" placeholder="toi@exemple.fr"><span class="hint">Ces mails partent de l'adresse d'iaboss (SMTP du serveur).</span></label>
   ${check('weekly_report', s.weekly_report, 'Rapport hebdo le lundi à 8h (mail + canaux ci-dessous)')}
   <div class="save"><button type="button" class="btn" data-report-send>${ic('send')}Envoyer le rapport maintenant</button></div>
 
@@ -711,10 +711,10 @@ ${saved ? banner('ok', 'Réglages enregistrés', { strong: true }) : ''}
     <div class="gitlist" data-discordlist data-next="${s.discord.hooks.length}" data-max="${s.discord.max}">
       ${s.discord.hooks.map((h, i) => hookRow(i, h, s.discord.all)).join('\n      ')}
     </div>
-    ${channelCard('slack', 'Slack', s, `<label class="field"><span class="lbl">Lien du webhook Slack</span><input name="slack_url" type="password" placeholder="${s.channels.slack ? '•••••• (inchangé)' : 'https://hooks.slack.com/services/…'}" autocomplete="off"><span class="hint">Slack : Apps → Incoming Webhooks.</span></label>`)}
-    ${channelCard('telegram', 'Telegram', s, `<label class="field"><span class="lbl">Jeton du bot</span><input name="telegram_token" type="password" placeholder="${s.channels.telegram ? '•••••• (inchangé)' : '123456789:AA…'}" autocomplete="off"><span class="hint">Crée un bot avec @BotFather.</span></label>
-      <label class="field"><span class="lbl">Identifiant de la conversation</span><input name="telegram_chat" value="${esc(s.channels.telegram?.chat || '')}" placeholder="123456789 ou @mon_canal" autocomplete="off"><span class="hint">Écris d'abord à ton bot, puis lis l'identifiant avec @userinfobot.</span></label>`)}
-    ${channelCard('email', 'E-mail', s, `<label class="field"><span class="lbl">Adresse de réception</span><input name="email_to" type="email" value="${esc(s.channels.email?.to || '')}" placeholder="toi@exemple.fr" autocomplete="off"><span class="hint">${s.canEmail ? "Envoyé depuis l'adresse d'iaboss. Au plus 20 notifications par heure." : "Ce canal s'active dès que l'administrateur a réglé le SMTP du serveur."}</span></label>`)}
+    ${channelCard('slack', 'Slack', s, `<label class="field"><span class="lbl">Lien du webhook Slack</span><input maxlength="300" name="slack_url" type="password" placeholder="${s.channels.slack ? '•••••• (inchangé)' : 'https://hooks.slack.com/services/…'}" autocomplete="off"><span class="hint">Slack : Apps → Incoming Webhooks.</span></label>`)}
+    ${channelCard('telegram', 'Telegram', s, `<label class="field"><span class="lbl">Jeton du bot</span><input maxlength="100" name="telegram_token" type="password" placeholder="${s.channels.telegram ? '•••••• (inchangé)' : '123456789:AA…'}" autocomplete="off"><span class="hint">Crée un bot avec @BotFather.</span></label>
+      <label class="field"><span class="lbl">Identifiant de la conversation</span><input maxlength="64" name="telegram_chat" value="${esc(s.channels.telegram?.chat || '')}" placeholder="123456789 ou @mon_canal" autocomplete="off"><span class="hint">Écris d'abord à ton bot, puis lis l'identifiant avec @userinfobot.</span></label>`)}
+    ${channelCard('email', 'E-mail', s, `<label class="field"><span class="lbl">Adresse de réception</span><input maxlength="254" name="email_to" type="email" value="${esc(s.channels.email?.to || '')}" placeholder="toi@exemple.fr" autocomplete="off"><span class="hint">${s.canEmail ? "Envoyé depuis l'adresse d'iaboss. Au plus 20 notifications par heure." : "Ce canal s'active dès que l'administrateur a réglé le SMTP du serveur."}</span></label>`)}
   </div>
   <template id="discord-row-tpl">${hookRow('__I__', { id: '', events: [] }, s.discord.all, { fresh: true })}</template>
   <p class="hint" data-chan-empty${s.discord.hooks.length || Object.keys(s.channels).length ? ' hidden' : ''}>Ajoute un canal ci-dessus pour recevoir les notifications.</p>
@@ -738,7 +738,7 @@ ${saved ? banner('ok', 'Réglages enregistrés', { strong: true }) : ''}
   <div class="gitlist" data-gitlist data-next="${s.git_servers.length}" data-max="${MAX_GIT_SERVERS}">
     <div class="gitrow">
       <div class="gitrow-head"><span class="srv-n">${ic('git')}<span class="badge">github.com</span></span></div>
-      <label class="field"><span class="lbl">Token (dépôts privés, lecture seule)</span><input name="github_token" type="password" placeholder="${s.github_token_set ? '•••••• (inchangé)' : 'github_pat_…'}" autocomplete="new-password"></label>
+      <label class="field"><span class="lbl">Token (dépôts privés, lecture seule)</span><input maxlength="600" name="github_token" type="password" placeholder="${s.github_token_set ? '•••••• (inchangé)' : 'github_pat_…'}" autocomplete="new-password"></label>
       <div class="row">
         <button type="button" class="btn" data-github-test><span data-label>Tester ce token</span></button>
         <span class="hint">Teste le token tapé ci-dessus, sinon celui qui est enregistré. Rien n'est modifié.</span>
@@ -764,8 +764,8 @@ ${saved ? banner('ok', 'Réglages enregistrés', { strong: true }) : ''}
   <div class="card-h"><h2 id="t-garde">Garde-fous</h2><p>Des plafonds et des délais pour garder la main.</p></div>
   <div class="grid2">
     <label class="field"><span class="lbl">Plafond global mails / 24 h (max 300)</span><span class="unit"><input name="global_daily_cap" type="number" min="1" max="300" value="${esc(s.global_daily_cap)}"><span>mails</span></span></label>
-    <label class="field"><span class="lbl">Délai min entre 2 mails</span><span class="unit"><input name="send_delay_min" type="number" min="5" value="${esc(s.send_delay_min)}"><span>secondes</span></span></label>
-    <label class="field"><span class="lbl">Délai max entre 2 mails</span><span class="unit"><input name="send_delay_max" type="number" min="5" value="${esc(s.send_delay_max)}"><span>secondes</span></span></label>
+    <label class="field"><span class="lbl">Délai min entre 2 mails</span><span class="unit"><input max="3600" name="send_delay_min" type="number" min="5" value="${esc(s.send_delay_min)}"><span>secondes</span></span></label>
+    <label class="field"><span class="lbl">Délai max entre 2 mails</span><span class="unit"><input max="3600" name="send_delay_max" type="number" min="5" value="${esc(s.send_delay_max)}"><span>secondes</span></span></label>
     ${s.ai.id === 'claude' ? `<label class="field"><span class="lbl">Pause des tâches IA à partir de</span><span class="unit"><input name="quota_pause_percent" type="number" min="50" max="100" value="${esc(s.quota_pause_percent)}"><span>%</span></span></label>` : ''}
   </div>
   ${s.ai.id === 'claude' ? '<p class="hint">Quota Claude : quand ta session (5 h) ou ta semaine atteint ce seuil, les analyses, évolutions, audits et tâches des postes attendent la remise à zéro du quota ; la prospection et les envois continuent. Entre 50 et 100 %, 85 % par défaut.</p>' : ''}
@@ -796,8 +796,8 @@ ${saved ? banner('ok', 'Réglages enregistrés', { strong: true }) : ''}
     ? `<p>Avec ta clé API, chaque job est facturé par ${esc(ai.company)}${ai.id === 'claude' ? ' : en équivalent $ API remonté par Claude Code' : ' : le coût est estimé d\'après les jetons utilisés et la grille de prix du modèle'}. Au-delà d'un plafond, les jobs IA attendent sans être perdus, et les envois et relances ne partent pas non plus : chaque mail est relu par ton IA avant de partir. Renseigne un montant pour activer un plafond.</p>`
     : `<p>Avec ton ${ai.id === 'claude' ? 'abonnement Claude' : `compte ${esc(ai.name)}`} rien n'est facturé en plus par iaboss : ${ai.id === 'claude' ? 'le garde-fou est ton quota Claude (affiché en haut)' : 'les limites de ton abonnement s\'appliquent'}, pas un budget en $.</p>`}</div>
   <div class="grid2">
-    ${s.priced ? `<label class="field"><span class="lbl">Plafond sur 24 h glissantes</span><span class="unit"><input name="budget_day_usd" inputmode="decimal" value="${esc(s.budget_day_usd)}" placeholder="ex. 2"><span>$</span></span></label>
-    <label class="field"><span class="lbl">Plafond sur 30 jours glissants</span><span class="unit"><input name="budget_month_usd" inputmode="decimal" value="${esc(s.budget_month_usd)}" placeholder="ex. 30"><span>$</span></span></label>` : ''}
+    ${s.priced ? `<label class="field"><span class="lbl">Plafond sur 24 h glissantes</span><span class="unit"><input maxlength="10" name="budget_day_usd" inputmode="decimal" value="${esc(s.budget_day_usd)}" placeholder="ex. 2"><span>$</span></span></label>
+    <label class="field"><span class="lbl">Plafond sur 30 jours glissants</span><span class="unit"><input maxlength="10" name="budget_month_usd" inputmode="decimal" value="${esc(s.budget_month_usd)}" placeholder="ex. 30"><span>$</span></span></label>` : ''}
     ${model('prospect_model', s.prospect_model, 'Modèle pour la prospection')}
     ${model('analyze_model', s.analyze_model, "Modèle pour l'analyse de projet")}
     ${model('write_model', s.write_model, 'Modèle pour la rédaction (mails, relances, posts LinkedIn)')}
