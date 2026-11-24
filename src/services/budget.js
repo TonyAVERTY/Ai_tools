@@ -6,7 +6,7 @@ export { isPriced };
 import { ROLE_TASKS } from './roles.js';
 
 // Jobs qui appellent Claude. Les envois et relances n'y figurent pas (le worker ne les met pas en attente) mais relisent chaque mail avec l'IA : ils vérifient eux-mêmes le budget (handlers.js, sendMails)
-export const AI_JOBS = new Set(['analyze', 'prospect', 'template', 'followup_template', 'evolution', 'linkedin_post', 'instagram_post', 'newsletter', 'promo_video', 'audit', 'hook', 'billing_quotes', 'billing_refine', 'billing_docs', ...ROLE_TASKS.map((t) => t.job)]);
+export const AI_JOBS = new Set(['analyze', 'prospect', 'template', 'followup_template', 'evolution', 'implement', 'linkedin_post', 'instagram_post', 'newsletter', 'promo_video', 'audit', 'hook', 'billing_quotes', 'billing_refine', 'billing_docs', ...ROLE_TASKS.map((t) => t.job)]);
 
 const usd = (n) => `${n.toFixed(2)} $`;
 
@@ -39,7 +39,7 @@ export async function budgetState(db, userId, { at = now() } = {}) {
 
 // Jobs IA non urgents : on peut les retarder sans perdre une occasion commerciale.
 // La prospection et l'envoi (y compris les relances) continuent même quota serré.
-const QUOTA_SENSITIVE_JOBS = new Set(['analyze', 'evolution', 'audit', ...ROLE_TASKS.map((t) => t.job)]);
+const QUOTA_SENSITIVE_JOBS = new Set(['analyze', 'evolution', 'implement', 'audit', ...ROLE_TASKS.map((t) => t.job)]);
 export const isQuotaSensitive = (type) => QUOTA_SENSITIVE_JOBS.has(type);
 
 // Palier à partir duquel on reporte : garde de la marge sur le quota du compte Claude

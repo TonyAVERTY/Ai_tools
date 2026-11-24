@@ -104,7 +104,16 @@ const styleReply = () => {
   if (!/cordialement/i.test(b)) b += '\n\nBien cordialement,\nTony';
   return JSON.stringify({ body: b });
 };
-const lines = prompt.includes('CORRECTION DE FORME') ? [styleReply()]
+// Implémentation d'une idée acceptée (mode texte) : le titre de l'idée pilote le scénario
+const implementReply = () => {
+  const title = /Titre : « (.*?) »/.exec(prompt)?.[1] || '';
+  if (title.includes('IMPLBAD')) return JSON.stringify({ summary: 'x', edits: [{ path: '.env', content: 'A=1' }] });
+  if (title.includes('IMPLSECRET')) return JSON.stringify({ summary: 'x', edits: [{ path: 'config.js', content: 'const k = "' + 'ghp_' + 'Zq9XmK2vL8'.repeat(4) + '";' }] });
+  if (title.includes('IMPLJUNK')) return 'pas du json';
+  return JSON.stringify({ summary: 'Export CSV ajouté.', edits: [{ path: 'README.md', find: '# MonEspacePro', replace: '# MonEspacePro\n\nExport CSV disponible.' }, { path: 'src/export.js', content: 'export const csv = () => "";\n' }] });
+};
+const lines = prompt.includes("Idée acceptée par l'utilisateur") ? [implementReply()]
+  : prompt.includes('CORRECTION DE FORME') ? [styleReply()]
   : prompt.includes('CHANGER UNE PHRASE') ? [rephraseReply()]
   : prompt.includes('CONTRÔLE DU SENS') ? [senseReply()]
   : prompt.includes('proposer TROIS exemples de devis') ? [billQuotes()]

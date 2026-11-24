@@ -9,9 +9,9 @@ import { withUserLock } from './services/userlock.js';
 import { tidyTemplateText, acceptReview, fillBody, fillSubject, styleProblems } from './services/mailcheck.js';
 import { checkSense, acceptSenseFix, SenseUnavailable, SENSE_BATCH } from './services/mailsense.js';
 import { addUsage, jobContext, liveJobUsage } from './services/jobs.js';
-import { syncRepo } from './services/git.js';
+import { syncRepo, removeRepo } from './services/git.js';
 import { normalizeModel, defaultModelOf, tierEquivalent, modelFamily } from './services/models.js';
-import { analyzePrompt, prospectPrompt, templatePrompt, reviewMailPrompt, fixStylePrompt, followupTemplatePrompt, evolutionPrompt, linkedinPostPrompt, instagramPrompt, inspirationPrompt, newsletterPrompt, hookPrompt, auditPrompt, promoPrompt, rolePrompt, parseCustomPrompts, LEVELS } from './services/prompts.js';
+import { analyzePrompt, prospectPrompt, templatePrompt, reviewMailPrompt, fixStylePrompt, followupTemplatePrompt, evolutionPrompt, implementPrompt, linkedinPostPrompt, instagramPrompt, inspirationPrompt, newsletterPrompt, hookPrompt, auditPrompt, promoPrompt, rolePrompt, parseCustomPrompts, LEVELS } from './services/prompts.js';
 import { VOICE_PROVIDERS, parseVoiceParams, extractVoiceScript, prepareVoice, cleanVoice, mixVoice, synthesize, langName } from './services/voiceover.js';
 import { PROMO, FORMATS, SCENE_REFUSED, SceneError, parsePromoParams, extractScene, promoSupported, renderPromo } from './services/promovideo.js';
 import { reviewPromo } from './services/promoqa.js';
@@ -34,7 +34,9 @@ import { pinSmtp, pinGit } from './netguard.js';
 import { sendPause, pauseMessage, evaluateSending } from './services/abuse.js';
 import { verifyAddress, defaultMx } from './services/verify.js';
 import { evolutionMail } from './services/mailhtml.js';
-import { decisionHistory } from './services/evodecisions.js';
+import { decisionHistory, acceptedIdea } from './services/evodecisions.js';
+import { PatchError, applyEdits, checkChanges, copyWithoutGit, diffTrees } from './services/codepatch.js';
+import { branchUrl, commitAndPush, defaultBranch, newBranchName } from './services/gitwrite.js';
 import { gitCredentialFor } from './gitservers.js';
 import { ROLE_TASKS, roleById, MAX_NOTES } from './services/roles.js';
 import { getProject, repoDir, sentSince, getTemplate, saveTemplate, pickVariant } from './projects.js';
@@ -1129,6 +1131,65 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
       });
       transport.close();
       return { markdown: r.text, sentTo: to };
+    },
+
+    // Idée d'évolution acceptée : l'IA écrit le code, le code de l'APPLICATION le revérifie, le commite et le pousse (jamais l'IA).
+    // Deux voies : « direct » (réglage « Écriture directe du code », Claude seulement) : l'IA écrit dans une copie jetable du dépôt SANS .git ;
+    // sinon « patch » : l'IA renvoie des remplacements en JSON, appliqués ici. Le travail se fait dans un clone jetable, jamais dans celui des analyses.
+    async implement(ctx) {
+      const userId = ctx.job.user_id;
+      const project = await getProject(app, ctx.job.project_id, { userId, secrets: true });
+      const target = ctx.params.target === 'default' ? 'default' : 'branch';
+      const idea = await acceptedIdea(db, project.id, Number(ctx.params.evo), Number(ctx.params.n));
+      if (!idea) throw new Error("Idée introuvable ou plus acceptée : recharge la page");
+      const cred = await gitCredentialFor(app, userId, project.gitUrl);
+      if (!cred?.token) throw new Error("Aucun token Git pour ce dépôt : ajoute-en un, avec le droit d'écriture, dans Réglages → Dépôts Git");
+      const provider = await userProvider(db, userId);
+      const direct = provider === 'claude' && (await getSetting(db, userId, 'ai_code_edit', '0')) === '1';
+      const base = repoDir(cfg, userId, project.id);
+      const dir = `${base}-impl-${Number(ctx.job.id)}`, work = `${base}-work-${Number(ctx.job.id)}`;
+      try {
+        await ctx.progress({ message: 'Clone du dépôt…', pct: 5 });
+        await sync(userId, project.gitUrl, dir);
+        copyWithoutGit(dir, work);
+        await ctx.progress({ message: direct ? 'Écriture du code par l\'IA…' : 'Rédaction des modifications par l\'IA…', pct: 12 });
+        const { prompt, system } = implementPrompt({ projectName: project.name, profile: project.profile, idea, reason: idea.reason, mode: direct ? 'direct' : 'patch', repoFacts: factsOf(work) });
+        const level = LEVELS.normal;
+        const model = tierEquivalent(level.model, provider);
+        const sink = makeSink();
+        const r = await claude(userId, {
+          prompt, system, cwd: work, model, maxTurns: 30, signal: ctx.signal,
+          tools: direct ? ['Read', 'Glob', 'Grep', 'Edit', 'Write'] : ['Read', 'Glob', 'Grep'], ...(direct ? { allowEdit: true } : {}),
+          onTurn: (n) => sink.push(() => ctx.progress({ message: `${direct ? 'Écriture du code' : 'Rédaction des modifications'} · étape ${n}…`, pct: turnPct(12, 80, n, 30) })),
+        });
+        await sink.flush();
+        addUsage(ctx, r);
+        assertAnswered(r, 'Implémentation non faite');
+        if (!r.text?.trim()) throw new Error(`Pas de résultat (${r.subtype})`);
+
+        await ctx.progress({ message: 'Vérification des modifications…', pct: 84 });
+        let files, summary;
+        try {
+          if (direct) { files = diffTrees(dir, work); summary = r.text; }
+          else { const out = extractJson(r.text); files = applyEdits(dir, out?.edits); summary = out?.summary; }
+          checkChanges(dir, files);
+        } catch (e) {
+          if (e instanceof PatchError) throw new Error(`Modifications refusées : ${e.message}`);
+          throw new Error("Réponse de l'IA illisible : relance l'implémentation");
+        }
+        summary = String(summary ?? '').trim().slice(0, 1500);
+
+        await ctx.progress({ message: target === 'default' ? 'Commit et push sur la branche principale…' : 'Commit et push sur une nouvelle branche…', pct: 90 });
+        const auth = { token: cred.token, scheme: cred.scheme, user: cred.user, pin: await pinGit(app, userId, project.gitUrl), cwd: dir };
+        const gw = app.gitWrite || { defaultBranch, commitAndPush }; // injectable dans les tests (aucun push réel)
+        const branch = target === 'default' ? await gw.defaultBranch(auth) : newBranchName(idea.title, ctx.job.id);
+        const message = `feat: ${idea.title.replace(/\s+/g, ' ').slice(0, 68)}\n\nIdée d'évolution acceptée dans iaboss, implémentée par l'IA du projet : à relire avant de fusionner.${summary ? `\n\n${summary}` : ''}`;
+        const commit = await gw.commitAndPush(dir, { files, branch, createBranch: target !== 'default', message }, auth);
+        return { branch, target, commit, files, summary, mode: direct ? 'direct' : 'patch', url: branchUrl(project.gitUrl, branch), title: idea.title };
+      } finally {
+        removeRepo(dir);
+        removeRepo(work);
+      }
     },
 
     // Audit du dépôt : rapport en lecture seule (Read / Glob / Grep), gardé dans le résultat du job
