@@ -1838,10 +1838,23 @@
     const projectId = location.pathname.match(/\/p\/(\d+)/)?.[1];
     try {
       const r = await api(`/api/projects/${projectId}/evolution/${job}/${n}/decision`, { status, reason });
+      if (r.removed) {
+        // Refusée : l'idée quitte la liste (le serveur garde le titre et la raison pour ne plus la proposer)
+        const list = box.closest('.evos');
+        box.closest('.evo').remove();
+        if (list && !list.children.length) {
+          const empty = document.createElement('p');
+          empty.className = 'muted small evo-empty';
+          empty.textContent = 'Toutes les idées ont été traitées : lance une nouvelle recherche pour en recevoir d\'autres.';
+          list.replaceWith(empty);
+        }
+        toast('Idée refusée et retirée de la liste');
+        return;
+      }
       const tmp = document.createElement('div');
       tmp.innerHTML = r.html;
       box.replaceWith(tmp.firstElementChild);
-      toast(status === 'accepted' ? 'Idée acceptée' : status === 'refused' ? 'Idée refusée' : 'Idée remise en attente');
+      toast(status === 'accepted' ? 'Idée acceptée' : 'Idée remise en attente');
     } catch (err) { toast(err.message, 'error'); }
   }
   listen(document, 'submit', async (e) => {

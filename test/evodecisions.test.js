@@ -27,7 +27,11 @@ test('accepter, refuser avec justification, remettre en attente', async () => {
   assert.equal((await A.post(url(2), { status: 'refused', reason: 'Trop cher <b>' })).status, 200);
   const st = await (await A.get(`/api/projects/${pa}/status`)).json();
   const html = st.jobs.evolution.result.html;
-  assert.match(html, /Refusée<\/strong> : Trop cher &lt;b&gt;/, 'justification échappée');
+  assert.doesNotMatch(html, /Export PDF/, 'une idée refusée quitte la liste');
+  assert.match(html, /Mode sombre/);
+  const gone = await (await A.post(url(2), { status: 'refused', reason: 'Trop cher <b>' })).json();
+  assert.equal(gone.removed, true);
+  assert.equal((await s.db.prepare('SELECT reason FROM evolution_decisions WHERE n = 2').get()).reason, 'Trop cher <b>', 'la raison reste gardée');
   assert.equal((await A.post(url(1), { status: 'pending' })).status, 200);
   assert.equal((await s.db.prepare('SELECT COUNT(*) n FROM evolution_decisions').get()).n, 1);
 });

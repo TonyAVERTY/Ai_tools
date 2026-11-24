@@ -101,10 +101,12 @@ export function parseEvolutions(md) {
 export const EFFORTS = { S: 'Rapide', M: 'Moyen', L: 'Gros chantier' };
 
 /** Fiches d'évolution pour le panel (classes CSS, pas de style inline : CSP stricte). */
-/** `decide(idée)` : bloc HTML ajouté sous chaque fiche (décision acceptée / refusée), absent pour l'audit. */
-export function evolutionHtml(md, decide = null) {
-  const items = parseEvolutions(md);
-  if (!items.length) return `<div class="md">${renderMarkdown(md)}</div>`;
+/** `hidden` : numéros des idées refusées, retirées de la liste. `decide(idée)` : bloc HTML ajouté sous chaque fiche (décision acceptée / refusée), absent pour l'audit. */
+export function evolutionHtml(md, decide = null, hidden = new Set()) {
+  const all = parseEvolutions(md);
+  if (!all.length) return `<div class="md">${renderMarkdown(md)}</div>`;
+  const items = all.filter((e) => !hidden.has(e.n));
+  if (!items.length) return '<p class="muted small evo-empty">Toutes les idées ont été traitées : lance une nouvelle recherche pour en recevoir d\'autres.</p>';
   return `<ol class="evos">${items.map((e) => `<li class="evo">
   <div class="evo-head">
     <span class="evo-n">${e.n}</span>

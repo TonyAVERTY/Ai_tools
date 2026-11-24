@@ -13,6 +13,9 @@ export async function decisionsOf(db, jobId) {
   return new Map(rows.map((r) => [Number(r.n), r]));
 }
 
+/** Numéros des idées refusées : elles ne sont plus affichées (leur titre et leur raison restent gardés pour ne pas être reproposées). */
+export const refusedOf = (decided) => new Set([...decided].filter(([, d]) => d.status === 'refused').map(([n]) => n));
+
 export async function saveDecision(db, { jobId, projectId, ownerId, userId, n, status, reason }) {
   await db.prepare('DELETE FROM evolution_decisions WHERE job_id = ? AND n = ?').run(jobId, n);
   if (!status) return;
