@@ -773,8 +773,10 @@ ${saved ? banner('ok', 'Réglages enregistrés', { strong: true }) : ''}
   <p class="hint">Quand une tâche s'arrête parce que ton IA a atteint sa limite (quota, surcharge) ou ne se termine pas, elle repart toute seule : après la remise à zéro du quota si elle est connue, sinon dans 15 minutes, puis 1 heure, puis 3 heures. 3 relances au plus par tâche. La tâche en échec reste affichée.</p>
   ${check('ai_code_edit', s.ai_code_edit, 'Implémenter automatiquement les idées acceptées')}
   <p class="hint">Quand tu acceptes une idée d'évolution : <strong>activé</strong>, l'IA écrit le code tout de suite et le pousse sur une nouvelle branche de ton dépôt (avec Claude, elle écrit directement dans une copie jetable du dépôt, sans accès à Git ni à la ligne de commande ; avec ChatGPT ou Gemini, elle décrit les modifications et l'application les applique) ; <strong>désactivé</strong>, une question te demande si l'IA doit le faire. Dans tous les cas, l'application revérifie tout (aucun secret, aucun fichier sensible), puis commite et pousse : l'IA ne touche jamais à Git. Il faut un token Git avec le droit d'écrire.</p>
-  ${check('evo_impl_ask', s.evo_impl_ask, "Me demander si l'IA doit écrire le code quand j'accepte une idée")}
-  <p class="hint">Décoche-la si tu as coché « Ne plus afficher ce message » dans la question : tu peux la remettre ici. Elle ne sert à rien quand l'implémentation automatique est activée.</p>
+  <label class="field"><span class="lbl">Quand j'accepte une idée d'évolution</span><span class="sel"><select name="evo_impl_choice">
+    ${[['ask', "Me demander si l'IA doit écrire le code"], ['yes', 'Toujours faire écrire le code par l\'IA (nouvelle branche)'], ['no', "Ne jamais faire écrire le code"]].map(([v, t]) => `<option value="${v}"${s.evo_impl_choice === v ? ' selected' : ''}>${t}</option>`).join('')}
+  </select>${ic('down')}</span></label>
+  <p class="hint">C'est ton choix personnel : la question « Veux-tu que l'IA écrive le code de cette idée ? » le retient quand tu coches « Ne plus afficher ce message ». Il ne sert à rien quand « Implémenter automatiquement les idées acceptées » est cochée.</p>
   ${check('read_receipt', s.read_receipt, 'Demander un accusé de lecture dans les mails de prospection')}
   <p class="hint">« Lu » repose sur l'accusé de lecture standard : la messagerie du destinataire lui demande s'il accepte de l'envoyer. « Lu » est donc un minimum ; « Répondu » vient de la boîte de réception du projet.</p>
   <div class="footer-opt" data-footer-opt data-on="${s.mail_footer ? '1' : '0'}">

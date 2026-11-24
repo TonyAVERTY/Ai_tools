@@ -87,7 +87,7 @@ import { quotaFor, planLimitError, withUserLock, assertRoom, usageView, lockedFe
 import { lockedCard } from './lockviews.js';
 import { history, saveSnapshot } from './services/metrics.js';
 import { evolutionHtml } from './services/markdown.js';
-import { decisionsOf, decisionHtml, refusedOf, implementationsOf } from './services/evodecisions.js';
+import { decisionsOf, decisionHtml, refusedOf, implementationsOf, implChoiceOf } from './services/evodecisions.js';
 import { registerEvolutionRoutes } from './evoroutes.js';
 import {
   listProspects, kanbanColumns, parseFilters, STATUSES as PROSPECT_STATUSES, prospectDetail, addNote, deleteNote, setNextAction,
@@ -304,7 +304,7 @@ export function registerRoutes(router, app) {
       read_receipt: await getSetting(db, userId, 'read_receipt', '0') === '1',
       auto_retry: await getSetting(db, userId, 'auto_retry', '0') === '1',
       ai_code_edit: await getSetting(db, userId, 'ai_code_edit', '0') === '1',
-      evo_impl_ask: await getSetting(db, userId, 'evo_impl_hint', '0') !== '1',
+      evo_impl_choice: await implChoiceOf(db, userId),
       mail_footer: await getSetting(db, userId, 'mail_footer', '1') !== '0',
       budget_day_usd: await getSetting(db, userId, 'budget_day_usd', ''),
       budget_month_usd: await getSetting(db, userId, 'budget_month_usd', ''),
@@ -356,7 +356,7 @@ export function registerRoutes(router, app) {
     if (b.send_delay_min !== undefined) await set('read_receipt', b.read_receipt === 'on' ? '1' : '0');
     if (b.send_delay_min !== undefined) await set('auto_retry', b.auto_retry === 'on' ? '1' : '0');
     if (b.send_delay_min !== undefined) await set('ai_code_edit', b.ai_code_edit === 'on' ? '1' : '0');
-    if (b.send_delay_min !== undefined) await set('evo_impl_hint', b.evo_impl_ask === 'on' ? '0' : '1');
+    if (b.send_delay_min !== undefined && ['ask', 'yes', 'no'].includes(b.evo_impl_choice)) await set('evo_impl_choice', b.evo_impl_choice);
     // Champs absents du formulaire (compte en abonnement : pas de plafond en $) : les valeurs enregistrées ne bougent pas
     if (b.budget_day_usd !== undefined) await set('budget_day_usd', money(b.budget_day_usd));
     if (b.budget_month_usd !== undefined) await set('budget_month_usd', money(b.budget_month_usd));
@@ -635,8 +635,7 @@ export function registerRoutes(router, app) {
     if (jobs.evolution?.result?.markdown) {
       const decided = await decisionsOf(db, jobs.evolution.id);
       const impls = await implementationsOf(db, p.id, jobs.evolution.id);
-      const canImpl = ['owner', 'admin'].includes(p.access);
-      jobs.evolution.result.html = evolutionHtml(jobs.evolution.result.markdown, (e) => decisionHtml(jobs.evolution.id, e.n, decided.get(e.n), impls.get(e.n), canImpl), refusedOf(decided));
+      jobs.evolution.result.html = evolutionHtml(jobs.evolution.result.markdown, (e) => decisionHtml(jobs.evolution.id, e.n, decided.get(e.n), impls.get(e.n)), refusedOf(decided));
     }
     if (jobs.audit?.result?.markdown) jobs.audit.result.html = evolutionHtml(jobs.audit.result.markdown);
     // Tâches des postes : le texte se lit à la demande (GET /api/projects/:id/poste/:task), pas à chaque rafraîchissement
