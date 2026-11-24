@@ -304,6 +304,7 @@ export function registerRoutes(router, app) {
       read_receipt: await getSetting(db, userId, 'read_receipt', '0') === '1',
       auto_retry: await getSetting(db, userId, 'auto_retry', '0') === '1',
       ai_code_edit: await getSetting(db, userId, 'ai_code_edit', '0') === '1',
+      evo_impl_ask: await getSetting(db, userId, 'evo_impl_hint', '0') !== '1',
       mail_footer: await getSetting(db, userId, 'mail_footer', '1') !== '0',
       budget_day_usd: await getSetting(db, userId, 'budget_day_usd', ''),
       budget_month_usd: await getSetting(db, userId, 'budget_month_usd', ''),
@@ -355,6 +356,7 @@ export function registerRoutes(router, app) {
     if (b.send_delay_min !== undefined) await set('read_receipt', b.read_receipt === 'on' ? '1' : '0');
     if (b.send_delay_min !== undefined) await set('auto_retry', b.auto_retry === 'on' ? '1' : '0');
     if (b.send_delay_min !== undefined) await set('ai_code_edit', b.ai_code_edit === 'on' ? '1' : '0');
+    if (b.send_delay_min !== undefined) await set('evo_impl_hint', b.evo_impl_ask === 'on' ? '0' : '1');
     // Champs absents du formulaire (compte en abonnement : pas de plafond en $) : les valeurs enregistrées ne bougent pas
     if (b.budget_day_usd !== undefined) await set('budget_day_usd', money(b.budget_day_usd));
     if (b.budget_month_usd !== undefined) await set('budget_month_usd', money(b.budget_month_usd));
