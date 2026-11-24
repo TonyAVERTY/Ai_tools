@@ -11,9 +11,13 @@ Date : 24 novembre 2026. Ordre = priorité, en tenant compte des dépendances. *
 | 3 | MySQL : compte applicatif limité à sa base, droits `SELECT/INSERT/UPDATE/DELETE` (+ DDL le temps des migrations), écoute locale | Tony | **À faire** | 1 |
 | 4 | Cloudflare : TLS « Full (strict) », HTTPS forcé, règle de rate limiting sur `/auth/*`, `/u/*`, `/login/2fa`, WAF géré ; port de l'application non joignable de l'extérieur | Tony | **À faire** | — |
 | 5 | Activer l'A2F sur le compte administrateur (obligatoire pour `/admin`) et ranger ses codes de secours | Tony | **À faire** au prochain déploiement | déploiement |
-| 6 | Installer les sauvegardes : clé `age` (clé privée **hors du serveur**), `SECRET_KEY` rangée à part, tâche planifiée, **restauration jouée une fois pour de vrai** | Tony | **À faire** | `BACKUP_RESTORE.md` |
+| 6 | **Décision du propriétaire le 24 novembre : non installées, risque accepté (perte totale possible).** Installer les sauvegardes : clé `age` (clé privée **hors du serveur**), `SECRET_KEY` rangée à part, tâche planifiée, **restauration jouée une fois pour de vrai** | Tony | **À faire** | `BACKUP_RESTORE.md` |
 | 7 | Relecture juridique : mentions légales, CGU, confidentialité, applicabilité du droit de la consommation aux petits professionnels, AI Act, facturation électronique | Tony (avocat / juriste) | **À faire** | `LEGAL_COMPLIANCE.md` |
 | 8 | Envoyer un mail de test (SMTP projet et `SYSTEM_SMTP_*`) après déploiement | Tony | **À faire** | déploiement |
+| 9a | **Constaté sur le serveur** : l'application écoute sur toutes les interfaces (`*:3100`) : vérifier `HOST` (`.env`, environnement de `pm2`, variable `HOST` du shell) et la ramener à `127.0.0.1` | Tony | **À faire (P1)** | — |
+| 9b | **Constaté sur le serveur** : MySQL écoute sur `0.0.0.0:3306` et `*:33060` : `bind-address` et `mysqlx-bind-address` à `127.0.0.1`, ou pare-feu | Tony | **À faire (P1)** | — |
+| 9c | **Constaté** : `X-Frame-Options` (deux valeurs), `X-Content-Type-Options` et `Referrer-Policy` envoyés deux fois : retirer les `add_header` du vhost Nginx | Tony | À faire | — |
+| 9d | Vérifier depuis l'extérieur les ports 21, 25, 2006, 3000, 6081, 8080, 8443 ; restreindre 8443 (CloudPanel) à ton adresse, désactiver FTP si inutile | Tony | À faire | — |
 | 9 | Tester le QR code de l'A2F avec une vraie application d'authentification, et une connexion Google réelle avec A2F | Tony | **À faire** | déploiement |
 
 ## Lot 2 : avant l'ouverture, ou risque accepté par écrit (P2)

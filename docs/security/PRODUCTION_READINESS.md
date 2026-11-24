@@ -29,6 +29,23 @@ Date : 24 novembre 2026. Ce document ne constitue ni une certification de sécur
 | Vérifications sur l'environnement **réel** de production | ❌ | Aucune : Nginx, Cloudflare, MySQL, bwrap, `.env`, port, en-têtes publics : `PRODUCTION_CHECKLIST.md` §B |
 | Contrôles nécessitant une intervention humaine validés | ❌ | Voir ci-dessous |
 
+## Constats sur le serveur réel (24 novembre 2026, sorties de commandes fournies par le propriétaire)
+
+| Contrôle | Résultat | Verdict |
+|---|---|---|
+| Adresse du visiteur vue par l'application (`TRUST_PROXY`) | Le journal de sécurité note une adresse de particulier (tronquée), pas celle du proxy | ✅ correct |
+| `https://iaboss.fr/.env` | 404 | ✅ |
+| En-têtes `Content-Security-Policy`, `Strict-Transport-Security` (une fois), `Referrer-Policy`, `X-Content-Type-Options`, `X-Frame-Options` ; pas de `X-Powered-By` | Présents | ✅ |
+| `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy` | **Envoyés deux fois** (l'application et Nginx), avec deux valeurs différentes pour `X-Frame-Options` (`DENY` et `SAMEORIGIN`) | 🟡 à corriger : retirer ces `add_header` du vhost Nginx |
+| Port de l'application (3100) | Écoute sur **toutes les interfaces** (`*:3100`) | ❌ **P1** : doit écouter sur `127.0.0.1` seulement |
+| MySQL (3306) et protocole X (33060) | Écoutent sur **toutes les interfaces** (`0.0.0.0:3306`, `*:33060`) | ❌ **P1** : `bind-address` à `127.0.0.1`, ou pare-feu |
+| Autres ports ouverts sur toutes les interfaces : 21 (FTP), 25, 80, 443, 2006, 3000, 6081, 8080, 8443 (CloudPanel) | À confirmer contre le pare-feu | 🟡 vérifier l'accessibilité depuis l'extérieur ; restreindre 8443, désactiver FTP s'il ne sert pas |
+| Base de production | **MySQL 8** (protocole X présent) : les migrations de l'audit s'y sont appliquées et l'application démarre | ✅ preuve pratique que les migrations passent sur MySQL 8 (non testé en CI) |
+
+## Décisions du propriétaire
+
+- **Sauvegardes (24 novembre 2026) : le propriétaire a décidé de ne pas les installer pour l'instant.** Risque accepté par le propriétaire : en cas de panne de disque, d'erreur de manipulation ou d'attaque, **toutes les données sont perdues sans retour possible**. La condition « sauvegardes et restaurations vérifiées » du §23 de la mission n'est donc **pas remplie** : le statut reste **NO-GO** tant qu'elle ne l'est pas ou que ce risque n'est pas explicitement revalidé. Les scripts restent livrés et testés (`BACKUP_RESTORE.md`) si le propriétaire change d'avis.
+
 ## Résumé exécutif (en clair)
 
 Ton application a été durcie à plusieurs niveaux : accès, sessions, double authentification, chiffrement des secrets, cloisonnement entre comptes, protection contre les attaques web courantes. Des contrôles automatiques vérifient maintenant à chaque modification qu'aucun secret n'est publié, qu'aucune dépendance dangereuse n'est ajoutée, qu'aucune porte d'entrée n'est laissée ouverte par erreur, et que les sauvegardes peuvent vraiment être restaurées. Les droits des utilisateurs (accéder à leurs données, les emporter, les effacer) fonctionnent depuis l'application.
