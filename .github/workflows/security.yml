@@ -39,7 +39,7 @@ jobs:
         run: npm run security:audit
       - name: Inventaire des composants (SBOM CycloneDX)
         run: npm run sbom
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: sbom
           path: sbom.cdx.json
