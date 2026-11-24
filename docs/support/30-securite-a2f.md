@@ -15,8 +15,11 @@ Le bouton **Annuler** abandonne l'activation en cours (la clé affichée est eff
 Après avoir choisi Google ou Apple, la page « Code de vérification » s'ouvre : saisis le code de ton application, puis **Valider**. Tu peux aussi saisir un code de secours (chaque code ne sert qu'une fois).
 - Pour ne pas retaper le code à chaque connexion sur ton propre ordinateur, coche **Faire confiance à cet appareil pendant 30 jours** avant de valider : un cookie (voir la politique de confidentialité) dispense du code sur ce navigateur pendant 30 jours. Ne le fais jamais sur un ordinateur partagé.
 - Un code ne marche qu'une fois : si tu viens de t'en servir, attends que l'application en affiche un nouveau.
-- Après **5 codes erronés**, la connexion est annulée : il faut repasser par Google ou Apple. Sans code valide en moins de 10 minutes, la connexion expire aussi.
+- Après **5 codes erronés**, la connexion est annulée : il faut repasser par Google ou Apple. Au total, **10 codes** au plus sont acceptés à l'essai par compte et par tranche de 15 minutes (connexion, désactivation et codes de secours confondus), puis il faut attendre. Sans code valide en moins de 10 minutes, la connexion expire aussi.
 - L'API (mode développeur) et le serveur MCP utilisent des jetons, pas ce code : l'A2F n'y change rien.
+
+## Administrateurs
+Un compte administrateur doit avoir activé l'A2F pour ouvrir la page **Administration** : sans elle, le lien renvoie vers Mon compte → Sécurité : A2F avec un message. L'exploitant du service peut lever cette exigence avec la variable `ADMIN_REQUIRE_MFA=false` (déconseillé en production).
 
 ## Appareils de confiance
 La carte indique « Appareils de confiance » : le nombre de navigateurs dispensés de code. **Oublier mes appareils de confiance** les retire tous (le code est redemandé partout). Désactiver l'A2F ou renouveler les codes de secours les oublie aussi.

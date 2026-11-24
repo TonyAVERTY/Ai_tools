@@ -11,6 +11,7 @@ import { Router, json, redirect, html, esc, HttpError } from './http.js';
 import { RateLimiter, clientIp } from './ratelimit.js';
 import { getSession, checkOrigin, purgeExpired } from './auth.js';
 import { withTheme, themeOf } from './theme.js';
+import { securityLog } from './securitylog.js';
 import { countView, purgeAudience } from './services/audience.js';
 import { authenticateApi } from './apitokens.js';
 import { syncAdmins, getUser } from './users.js';
@@ -147,6 +148,13 @@ export async function createApp(cfg, { db, worker = true, createTransport, fetch
       if (route.admin && !session?.user.isAdmin) {
         if (url.pathname.startsWith('/api/') || !isRead || req.headers.accept?.includes('json')) throw new HttpError(404, 'Page introuvable');
         return html(res, notFoundPage({ appUrl: cfg.appUrl }), 404);
+      }
+      // Le back-office exige l'A2F : un compte administrateur sans second facteur est renvoyé vers sa page de sécurité (ADMIN_REQUIRE_MFA, actif par défaut)
+      if (route.admin && cfg.requireAdminMfa === true && !(await db.prepare('SELECT totp_enabled FROM users WHERE id = ?').get(session.userId))?.totp_enabled) {
+        securityLog('admin_mfa_required', { userId: session.userId, ip });
+        const msg = 'Active l\'A2F pour ouvrir l\'administration : Mon compte → Sécurité : A2F';
+        if (!isRead || req.headers.accept?.includes('json')) throw new HttpError(403, msg, { expose: true, code: 'mfa_required' });
+        return redirect(res, `/account?e=${encodeURIComponent(msg)}#securite`);
       }
       if (!route.public) {
         if (!session) {

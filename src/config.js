@@ -164,6 +164,8 @@ export function loadConfig() {
     // Développement : autorise les hôtes privés (SMTP local, etc.). En production, seulement pour les administrateurs.
     allowPrivateHosts: flag(env.ALLOW_PRIVATE_HOSTS, false),
     // Administrateurs : ces adresses seulement (la première est aussi propriétaire des données migrées)
+    // L'A2F est obligatoire pour ouvrir le back-office (/admin) : activée par défaut, désactivable seulement en le disant (ADMIN_REQUIRE_MFA=false)
+    requireAdminMfa: flag(env.ADMIN_REQUIRE_MFA, true),
     adminEmails: (env.ADMIN_EMAILS || '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean),
     // Destinataires des alertes d'erreur (HTML) : l'adresse du développeur, séparées par des virgules ; ERROR_ALERT_TO la remplace
     errorAlertTo: (env.ERROR_ALERT_TO || 'contact@tony-averty.dev').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean),

@@ -506,6 +506,7 @@ test('avertissement de la console (self-XSS) : chargé sur le site public et sur
     assert.match(js, /Stop !/);
     assert.match(js, /copier-coller/);
     assert.match(js, /serveur Discord/);
+    assert.match(js, /https:\/\/discord\.gg\/V5heFHy5U4/);
   } finally { await s.close(); }
 });
 
