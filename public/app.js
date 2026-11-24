@@ -1854,10 +1854,66 @@
         return;
       }
       evoReplace(box, r.html);
-      toast(status === 'accepted' ? 'Idée acceptée' : 'Idée remise en attente');
+      if (r.warn) toast(`Idée acceptée, mais ${r.warn.charAt(0).toLowerCase()}${r.warn.slice(1)}`, 'error');
+      else toast(r.next === 'started' ? 'Idée acceptée, implémentation lancée' : status === 'accepted' ? 'Idée acceptée' : 'Idée remise en attente');
+      // Réglage « Implémenter automatiquement » absent : on demande si l'IA doit écrire le code
+      if (r.next === 'ask') await evoAsk(evoBlock(box, r.html));
     } catch (err) { toast(err.message, 'error'); }
   }
   const evoUrl = (box, what) => `/api/projects/${location.pathname.match(/\/p\/(\d+)/)?.[1]}/evolution/${box.dataset.job}/${box.dataset.n}/${what}`;
+  // Le bloc d'une idée après remplacement (l'ancien nœud n'est plus dans la page)
+  const evoBlock = (box, html) => document.querySelector(`.evo-decide[data-job="${box.dataset.job}"][data-n="${box.dataset.n}"]`);
+  // Question posée à l'acceptation : « Veux-tu que l'IA écrive le code ? » (oui / non, branche, « Ne plus afficher »). Renvoie le choix.
+  function implementChoice() {
+    if (document.querySelector('dialog.confirm')) return Promise.resolve({ yes: false, hide: false });
+    return new Promise((resolve) => {
+      const dlg = document.createElement('dialog');
+      dlg.className = 'prospect-dialog modal confirm';
+      dlg.setAttribute('aria-labelledby', 'impl-t');
+      dlg.setAttribute('aria-describedby', 'impl-d');
+      const h = document.createElement('h2'); h.id = 'impl-t'; h.textContent = "Veux-tu que l'IA écrive le code de cette idée ?"; dlg.append(h);
+      const d = document.createElement('p'); d.id = 'impl-d'; d.className = 'confirm-d';
+      d.textContent = "Elle le prépare, l'application le vérifie (aucun secret, aucun fichier sensible), puis le pousse sur ton Git. Tu pourras le relire avant de le fusionner.";
+      dlg.append(d);
+      const fs = document.createElement('fieldset'); fs.className = 'evo-target';
+      const lg = document.createElement('legend'); lg.textContent = 'Où pousser le code ?'; fs.append(lg);
+      for (const [value, text, on] of [['branch', 'Sur une nouvelle branche (recommandé)', true], ['default', 'Directement sur la branche principale', false]]) {
+        const lab = document.createElement('label'); lab.className = 'check';
+        const r = document.createElement('input'); r.type = 'radio'; r.name = 'target'; r.value = value; r.checked = on;
+        lab.append(r, ` ${text}`); fs.append(lab);
+      }
+      dlg.append(fs);
+      const hideLab = document.createElement('label'); hideLab.className = 'check';
+      const hide = document.createElement('input'); hide.type = 'checkbox'; hide.name = 'hide';
+      hideLab.append(hide, ' Ne plus afficher ce message'); dlg.append(hideLab);
+      const row = document.createElement('div'); row.className = 'modal-f';
+      const no = document.createElement('button'); no.type = 'button'; no.className = 'btn'; no.textContent = 'Non';
+      const yes = document.createElement('button'); yes.type = 'button'; yes.className = 'btn primary'; yes.textContent = "Oui, l'implémenter";
+      no.addEventListener('click', () => dlg.close('no'));
+      yes.addEventListener('click', () => dlg.close('yes'));
+      row.append(no, yes); dlg.append(row);
+      dlg.addEventListener('click', (ev) => { if (ev.target === dlg) dlg.close('no'); });
+      dlg.addEventListener('close', () => {
+        const out = { yes: dlg.returnValue === 'yes', hide: hide.checked, target: dlg.querySelector('input[name=target]:checked')?.value || 'branch' };
+        dlg.remove(); resolve(out);
+      });
+      document.body.append(dlg);
+      dlg.showModal();
+      yes.focus();
+    });
+  }
+  async function evoAsk(box) {
+    if (!box) return;
+    const c = await implementChoice();
+    try {
+      if (c.hide) await api('/api/evolution/implement-hint', { hide: true });
+      if (!c.yes) return;
+      if (c.target === 'default' && !(await confirmBox("Pousser directement sur la branche principale ?\nLe code écrit par l'IA y arrive sans branche de relecture.", { confirm: 'Pousser sur la branche principale', danger: true }))) return;
+      const r = await api(evoUrl(box, 'implement'), { target: c.target, confirm: c.target === 'default' });
+      evoReplace(box, r.html);
+      toast(r.budgetBlocked ? `En file, mais ${r.budgetBlocked}` : 'Implémentation lancée', r.budgetBlocked ? 'error' : 'ok');
+    } catch (err) { toast(err.message, 'error'); }
+  }
   // Remplace un bloc d'idée par le HTML (échappé) du serveur
   function evoReplace(box, html) {
     const tmp = document.createElement('div');

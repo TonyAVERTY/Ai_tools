@@ -1134,7 +1134,7 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
     },
 
     // Idée d'évolution acceptée : l'IA écrit le code, le code de l'APPLICATION le revérifie, le commite et le pousse (jamais l'IA).
-    // Deux voies : « direct » (réglage « Écriture directe du code », Claude seulement) : l'IA écrit dans une copie jetable du dépôt SANS .git ;
+    // Deux voies : « direct » (réglage « Implémenter automatiquement les idées acceptées », Claude seulement) : l'IA écrit dans une copie jetable du dépôt SANS .git ;
     // sinon « patch » : l'IA renvoie des remplacements en JSON, appliqués ici. Le travail se fait dans un clone jetable, jamais dans celui des analyses.
     async implement(ctx) {
       const userId = ctx.job.user_id;
