@@ -10,9 +10,10 @@ const live = ['sk', 'live', 'Zq8Lm3Rt7Vw1Xy5Bn2Kd'].join('_');
 const anthropic = ['sk-ant', 'api03', 'Zq8Lm3Rt7Vw1Xy5Bn2KdPq9'].join('-');
 const hook = `https://discord.com/api/webhooks/${'9'.repeat(18)}/${'Zq8Lm3Rt7Vw1Xy5Bn2KdPq9Hs4Jf6Gc'}`;
 const pem = ['-----BEGIN', 'RSA PRIVATE KEY-----'].join(' ');
+const dsn = ['mysql:/', '/app:Zq8Lm3Rt7Vw@db/x'].join('');
 
 test('un secret qui a l\'air réel est détecté, avec son type mais sans sa valeur', () => {
-  const found = scanText('src/x.js', [`const a = '${live}';`, `const b = '${anthropic}';`, `const h = '${hook}';`, pem, "const dsn = 'mysql://app:Zq8Lm3Rt7Vw@db/x';"].join('\n'));
+  const found = scanText('src/x.js', [`const a = '${live}';`, `const b = '${anthropic}';`, `const h = '${hook}';`, pem, `const dsn = '${dsn}';`].join('\n'));
   assert.deepEqual(found.map((f) => f.kind), ['clé Stripe', 'clé API Anthropic', 'webhook Discord', 'clé privée', 'URL de base avec mot de passe']);
   for (const f of found) assert.deepEqual(Object.keys(f).sort(), ['file', 'kind', 'line'], 'jamais la valeur trouvée');
 });
@@ -39,4 +40,13 @@ test('toutes les dépendances de production ont une licence autorisée', () => {
   const all = readLicenses();
   assert.ok(all.length >= 40);
   assert.deepEqual(all.filter((p) => !isAllowed(p.license)).map((p) => `${p.name}: ${p.license}`), []);
+});
+
+import { readBaseline, scanHistory } from '../scripts/secret-scan.js';
+
+test('l\'historique complet ne contient aucun secret, hors faux positifs documentés (commit complet, fichier, raison)', () => {
+  const base = readBaseline();
+  assert.ok(base.length >= 1);
+  for (const e of base) { assert.match(e.commit, /^[0-9a-f]{40}$/); assert.ok(e.reason.length >= 20); }
+  assert.deepEqual(scanHistory(), []);
 });

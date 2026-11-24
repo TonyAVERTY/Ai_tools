@@ -3,7 +3,7 @@
 // Une vraie clé qui contiendrait par hasard un de ces marqueurs passerait : c'est pourquoi l'audit relit aussi l'historique à la main (docs/security/).
 // Ne jamais afficher la valeur trouvée : seulement le fichier, la ligne et le type.
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 export const PATTERNS = [
   ['clé privée', /-----BEGIN [A-Z ]*PRIVATE KEY-----/],
@@ -49,17 +49,27 @@ export function scanRepo(cwd = process.cwd()) {
   return findings;
 }
 
+/** Faux positifs connus de l'historique (scripts/secret-scan-baseline.json) : { commit complet, fichier, raison obligatoire }. */
+export function readBaseline(cwd = process.cwd()) {
+  const f = `${cwd}/scripts/secret-scan-baseline.json`;
+  const list = existsSync(f) ? JSON.parse(readFileSync(f, 'utf8')).entries || [] : [];
+  for (const e of list) if (!/^[0-9a-f]{40}$/.test(e.commit || '') || !e.file || String(e.reason || '').length < 20) throw new Error('secret-scan-baseline.json : commit complet, fichier et raison (20 caractères au moins) obligatoires');
+  return list;
+}
+
 export function scanHistory(cwd = process.cwd()) {
   const findings = [];
+  const baseline = readBaseline(cwd);
   // `git -G` lit une expression POSIX : un préfiltre large (les motifs précis, en JavaScript, tranchent ensuite ligne par ligne)
   const re = 'PRIVATE KEY|AKIA[0-9A-Z]|sk-ant-|_live_|whsec_|gh[pousr]_|github_pat_|AIza|xox[abp]-|webhooks/|hooks.slack.com|iaboss_|(mysql|postgres|mariadb)://[^ ]*:[^ ]*@|:AA[A-Za-z0-9_-]{30}';
-  const log = execFileSync('git', ['log', '--all', '-p', '--no-color', '--format=COMMIT %h', '-G' + re], { cwd, maxBuffer: 1024 * 1024 * 1024 }).toString();
+  const log = execFileSync('git', ['log', '--all', '-p', '--no-color', '--format=COMMIT %H', '-G' + re], { cwd, maxBuffer: 1024 * 1024 * 1024 }).toString();
   let commit = ''; let file = '';
   for (const l of log.split('\n')) {
     if (l.startsWith('COMMIT ')) { commit = l.slice(7); continue; }
     if (l.startsWith('diff --git ')) { file = l.split(' b/')[1] || ''; continue; }
     if (!l.startsWith('+') || l.startsWith('+++')) continue;
-    for (const f of scanText(`${file} (commit ${commit})`, l.slice(1))) findings.push(f);
+    if (baseline.some((e) => e.commit === commit && e.file === file)) continue;
+    for (const f of scanText(`${file} (commit ${commit.slice(0, 7)})`, l.slice(1))) findings.push(f);
   }
   return findings;
 }
