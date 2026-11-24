@@ -1638,6 +1638,20 @@
       }
       return;
     }
+    // Évolution : Accepter / Refuser ouvre la justification ; Enregistrer envoie la décision, « Remettre en attente » l'annule
+    const evoOpen = e.target.closest('[data-evo-open]');
+    if (evoOpen) {
+      const box = evoOpen.closest('.evo-decide');
+      const form = $('[data-evo-form]', box);
+      form.dataset.status = evoOpen.dataset.evoOpen;
+      $('label', form).firstChild.textContent = evoOpen.dataset.evoOpen === 'refused' ? 'Pourquoi tu refuses ?' : 'Pourquoi tu acceptes ? (facultatif)';
+      form.hidden = false;
+      $('textarea', form).focus();
+      return;
+    }
+    if (e.target.closest('[data-evo-cancel]')) { const f = e.target.closest('[data-evo-form]'); f.hidden = true; return; }
+    const evoClear = e.target.closest('[data-evo-clear]');
+    if (evoClear) { await evoDecide(evoClear.closest('.evo-decide'), 'pending', ''); return; }
     const copy = e.target.closest('[data-copy-md]');
     if (copy) {
       const md = copy.closest('.job')?._markdown || '';
@@ -1818,6 +1832,24 @@
   });
 
   // ---------- Formulaires ----------
+  // Évolution : enregistre la décision d'une idée et remplace son bloc par celui que renvoie le serveur (déjà échappé)
+  async function evoDecide(box, status, reason) {
+    const { job, n } = box.dataset;
+    const projectId = location.pathname.match(/\/p\/(\d+)/)?.[1];
+    try {
+      const r = await api(`/api/projects/${projectId}/evolution/${job}/${n}/decision`, { status, reason });
+      const tmp = document.createElement('div');
+      tmp.innerHTML = r.html;
+      box.replaceWith(tmp.firstElementChild);
+      toast(status === 'accepted' ? 'Idée acceptée' : status === 'refused' ? 'Idée refusée' : 'Idée remise en attente');
+    } catch (err) { toast(err.message, 'error'); }
+  }
+  listen(document, 'submit', async (e) => {
+    const form = e.target.closest('form[data-evo-form]');
+    if (!form) return;
+    e.preventDefault();
+    await evoDecide(form.closest('.evo-decide'), form.dataset.status, form.elements.reason.value);
+  });
   listen(document, 'submit', async (e) => {
     const form = e.target.closest('form[data-action]');
     if (!form) return;

@@ -17,6 +17,7 @@ Date : 24 novembre 2026. Ordre = priorité, en tenant compte des dépendances. *
 | 9a | **Constaté sur le serveur** : l'application écoute sur toutes les interfaces (`*:3100`) : vérifier `HOST` (`.env`, environnement de `pm2`, variable `HOST` du shell) et la ramener à `127.0.0.1` | Tony | **À faire (P1)** | — |
 | 9b | **Constaté sur le serveur** : MySQL écoute sur `0.0.0.0:3306` et `*:33060` : `bind-address` et `mysqlx-bind-address` à `127.0.0.1`, ou pare-feu | Tony | **À faire (P1)** | — |
 | 9c | **Constaté** : `X-Frame-Options` (deux valeurs), `X-Content-Type-Options` et `Referrer-Policy` envoyés deux fois : retirer les `add_header` du vhost Nginx | Tony | À faire | — |
+| 9e | **Constaté** : SSH (port 2006) avec mot de passe et `root` autorisés, ouvert à tout Internet. **Mot de passe conservé par choix du propriétaire (risque accepté)** : mot de passe `root` aléatoire long, fail2ban (port 2006), `MaxAuthTries 3`, `LoginGraceTime 30` ; recommandé : limiter 2006 à ses adresses | Tony | **À faire (compensations)** | — |
 | 9d | Vérifier depuis l'extérieur les ports 21, 25, 2006, 3000, 6081, 8080, 8443 ; restreindre 8443 (CloudPanel) à ton adresse, désactiver FTP si inutile | Tony | À faire | — |
 | 9 | Tester le QR code de l'A2F avec une vraie application d'authentification, et une connexion Google réelle avec A2F | Tony | **À faire** | déploiement |
 
