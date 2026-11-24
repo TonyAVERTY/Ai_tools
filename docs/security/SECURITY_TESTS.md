@@ -1,14 +1,14 @@
 # Résultats des tests et preuves de validation
 
-Date : 24 novembre 2026. **Un test non exécuté est écrit « non exécuté ». Rien n'est falsifié.** Les chiffres de la dernière exécution complète sont en §1 ; ce qui n'a pas pu être testé est en §4.
+Date : 24 novembre 2026 (exécution finale après la dernière correction). **Un test non exécuté est écrit « non exécuté ». Rien n'est falsifié.** Les chiffres de la dernière exécution complète sont en §1 ; ce qui n'a pas pu être testé est en §4.
 
 ## 1. Dernière exécution complète (poste de travail, SQLite, Chromium local)
 
 | Contrôle | Résultat | Commande |
 |---|---|---|
-| Syntaxe de tous les fichiers (lint) | `[À COMPLÉTER : résultat final de la dernière exécution]` | `npm run lint` |
-| Suite de tests (parallèles + sérialisés) | `[À COMPLÉTER : résultat final]` | `npm test` |
-| Vérifications d'interface dans Chromium (contrastes clair et sombre, débordements, parcours) | `[À COMPLÉTER : résultat final]` | `npm run ui:check` |
+| Syntaxe de tous les fichiers (lint) | 373 fichiers OK (le contrôle `shellcheck` des scripts bash n'est pas installé ici : seule la syntaxe est vérifiée) | `npm run lint` |
+| Suite de tests (parallèles + sérialisés) | **1 127 tests : 1 120 réussis, 0 échec, 7 ignorés d'office** (outils absents ici) ; puis **35 tests sérialisés : 35 réussis** | `npm test` |
+| Vérifications d'interface dans Chromium (contrastes clair et sombre, débordements, parcours) | **59 vérifications : TOUT EST BON** (un script, `agy-check`, exige un vrai outil et une vraie connexion : non lancé) | `npm run ui:check` |
 | Secrets (fichiers suivis et historique complet) | Aucun détecté ; faux positifs connus documentés dans `scripts/secret-scan-baseline.json` | `npm run security:history` |
 | Licences des dépendances de production | 49 paquets, toutes autorisées | `npm run security:licenses` |
 | Vulnérabilités connues (production) | 0 | `npm run security:audit` |
