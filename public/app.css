@@ -2092,3 +2092,4 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 7px; text-align: cen
 .per a[aria-current="true"] { border-color: var(--primary); background: var(--primary); color: var(--on-primary); font-weight: 700; }
 .qr-box { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; margin: 8px 0 12px; }
 .qr { width: min(240px, 100%); height: auto; border: 1px solid var(--line-strong); border-radius: var(--radius); } /* noir sur blanc dans les deux thèmes : un lecteur de QR code l'exige */
+[data-code-field] > .small { display: inline-block; margin-top: 6px; }
