@@ -276,7 +276,7 @@ export function accountPage({ securityHtml = '', themeHtml = '', user, error, li
     body: `<div class="pj-page acct">
 <div class="ph"><div class="t"><h1>Mon compte</h1><span class="muted small">${esc(user.email)} · connecté avec ${esc(PROVIDER_NAMES[user.provider] || '—')}</span></div></div>
 <div class="pj-tools"><nav class="tools-nav" data-spy aria-label="Mon compte">
-  <p class="tools-grp">Moi</p><a href="#mon-ia" aria-current="true">Mon IA</a><a href="#usage">Usage et offre</a><a href="#profil">Mon profil</a><a href="#agenda-ext">Agenda externe</a><a href="#securite">Sécurité : A2F</a><a href="#affichage">Affichage</a>
+  <p class="tools-grp">Moi</p><a href="#mon-ia" aria-current="true">Mon IA</a><a href="#usage">Usage et offre</a><a href="#profil">Mon profil</a><a href="#agenda-ext">Agenda externe</a><a href="#securite">Sécurité : A2F</a><a href="#affichage">Affichage</a><a href="#donnees">Mes données</a>
   <p class="tools-grp">Réglages</p><a href="/settings#notif">Notifications</a><a href="/settings#git">Dépôts Git</a><a href="/settings#garde">Garde-fous</a><a href="/settings#garde">Liste d'opposition</a><a href="/settings#budget">Budget et modèles IA</a><a href="/settings#prompts">Prompts IA</a>
   <p class="tools-grp">Équipe et avancé</p><a href="/team">Équipe</a><a href="/developer">Mode développeur</a><a href="/?tour=1">Visite guidée</a><a href="#danger">Zone de danger</a></nav>
 <div class="pj-flat tools-main">
@@ -299,6 +299,10 @@ ${notice ? banner(notice.ok ? 'ok' : 'err', notice.text, { flash: true }) : ''}
 </section>
 ${securityHtml}
 ${themeHtml}
+<section class="card" id="donnees" aria-labelledby="h-donnees">
+  <div class="card-h"><h2 id="h-donnees">Mes données</h2><p>Télécharge toutes les données de ton compte dans un fichier JSON : profil, projets, prospects, mails envoyés, réponses, comptabilité, facturation, conversations… Il ne contient aucun secret (clés d'IA, mots de passe, jetons). Les fichiers (justificatifs, pièces jointes, vidéos) n'y sont pas inclus, écris-nous pour les recevoir.</p></div>
+  <form method="post" action="/account/export" class="cfg"><div class="row"><button class="btn">${ic('dl')}Télécharger mes données</button></div></form>
+</section>
 <section class="card" id="developpeur">
   <div class="card-h"><h2>Mode développeur</h2><p>L'API d'iaboss et le serveur MCP (relier Claude à ton panel) ne sont disponibles que si tu actives ce mode.</p></div>
   ${devLocked ? `<p class="muted">Disponible à partir de l'offre <b>${esc(PLAN_LABELS[FEATURES.api.plan])}</b>.</p><div class="row"><a class="btn primary" href="/tarifs">${ic('lock')}Passer à l'offre ${esc(PLAN_LABELS[FEATURES.api.plan])}</a></div>` : `<div class="row"><span class="badge ${developer ? 'ok' : ''}">${developer ? 'Activé' : 'Désactivé'}</span><a class="btn small" href="/developer">${ic('key')}${developer ? 'Jetons et documentation' : 'Activer'}</a></div>

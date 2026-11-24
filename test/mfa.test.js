@@ -84,7 +84,8 @@ test('connexion : la session en attente ne donne accès à rien tant que le code
     await s.db.prepare('UPDATE users SET totp_last_step = 0 WHERE id = ?').run(u.id);
     const ok = await c.post('/login/2fa', { code: codeAt(secret, step()) }, form);
     assert.equal(ok.headers.get('location'), '/');
-    assert.equal((await c.get('/account', { headers: { accept: 'text/html' } })).status, 200);
+    const fresh = ok.headers.getSetCookie().find((x) => x.startsWith('sid='));
+    assert.equal((await s.client(fresh.split(';')[0]).get('/account', { headers: { accept: 'text/html' } })).status, 200);
     // Le même code ne passe pas deux fois
     const again = s.client(await pendingCookie(s, u.id));
     assert.match(where(await again.post('/login/2fa', { code: codeAt(secret, step()) }, form)), /\/login\/2fa\?e=/);
@@ -157,4 +158,83 @@ test('appareil de confiance : le cookie dispense du code 30 jours, seule son emp
     const forgotten = s.client(`${await pendingCookie(s, u.id)}; mfa_td=${token}`);
     assert.equal((await forgotten.get('/login/2fa', { headers: { accept: 'text/html' } })).status, 200);
   } finally { await s.close(); }
+});
+
+import { coarseIp, securityLog } from '../src/securitylog.js';
+
+test('plafond par compte : après 10 codes essayés en 15 minutes, même un bon code est refusé', async () => {
+  const s = await startApp({ rateLimit: true });
+  try {
+    const u = await s.newUser({ admin: false });
+    await enable(s, u);
+    let last;
+    for (let i = 0; i < 10; i++) last = await u.post('/account/2fa/disable', { code: '000000' }, form);
+    assert.match(where(last), /Code incorrect/);
+    const blocked = await u.post('/account/2fa/disable', { code: '000000' }, form);
+    assert.match(where(blocked), /Trop de codes essayés/);
+    assert.equal((await s.db.prepare('SELECT totp_enabled e FROM users WHERE id = ?').get(u.id)).e, 1, 'l\'A2F reste activée');
+    // La connexion est bloquée de la même façon pour ce compte, d'où qu'arrive la session en attente
+    const c = s.client(await pendingCookie(s, u.id));
+    assert.match(where(await c.post('/login/2fa', { code: '123456' }, form)), /^\/login\?e=.*Trop de codes/);
+  } finally { await s.close(); }
+});
+
+test('un code de ton application valide la connexion avec un NOUVEL identifiant de session', async () => {
+  const s = await startApp();
+  try {
+    const u = await s.newUser({ admin: false });
+    const { secret } = await enable(s, u);
+    await s.db.prepare('UPDATE users SET totp_last_step = 0 WHERE id = ?').run(u.id);
+    const pendingSid = (await pendingCookie(s, u.id));
+    const c = s.client(pendingSid);
+    const ok = await c.post('/login/2fa', { code: codeAt(secret, step()) }, form);
+    const fresh = ok.headers.getSetCookie().find((x) => x.startsWith('sid='));
+    assert.ok(fresh, 'un nouveau cookie de session est posé');
+    const newSid = decodeURIComponent(fresh.split(';')[0].split('=')[1]);
+    assert.notEqual(`sid=${newSid}`, pendingSid, 'identifiant différent de celui de la session en attente');
+    assert.equal((await s.db.prepare('SELECT COUNT(*) n FROM sessions WHERE id = ?').get(hashSid(pendingSid.slice(4)))).n, 0, 'l\'ancienne session n\'existe plus');
+    assert.equal((await s.client(`sid=${newSid}`).get('/account', { headers: { accept: 'text/html' } })).status, 200);
+    assert.equal((await s.client(pendingSid).get('/account', { headers: { accept: 'text/html' } })).status, 303, 'l\'ancien identifiant n\'ouvre plus rien');
+  } finally { await s.close(); }
+});
+
+test('le back-office exige l\'A2F de l\'administrateur (ADMIN_REQUIRE_MFA)', async () => {
+  const s = await startApp({ cfg: { requireAdminMfa: true } });
+  try {
+    const admin = await s.newUser({ admin: true });
+    const r = await admin.get('/admin', { headers: { accept: 'text/html' } });
+    assert.equal(r.status, 303);
+    assert.match(where(r), /^\/account\?e=.*A2F.*#securite$/);
+    assert.equal((await admin.get('/admin/stats')).status, 403, 'JSON : 403 mfa_required');
+    assert.equal((await admin.post('/admin/users/999/suspend', {}, form)).status, 403);
+    await enable(s, admin);
+    assert.equal((await admin.get('/admin', { headers: { accept: 'text/html' } })).status, 200);
+    // Un compte ordinaire voit toujours un 404 (rien n'est révélé)
+    const user = await s.newUser({ admin: false });
+    assert.equal((await user.get('/admin', { headers: { accept: 'text/html' } })).status, 404);
+  } finally { await s.close(); }
+});
+
+test('journal de sécurité : événements JSON, jamais le code, le secret ni l\'adresse complète', async () => {
+  const lines = [];
+  securityLog('mfa_failed', { userId: 7, ip: '203.0.113.42' }, (l) => lines.push(l));
+  securityLog('mfa_locked', { userId: 7, ip: '2001:db8:85a3:8d3:1319:8a2e:370:7348', detail: 'x'.repeat(500) }, (l) => lines.push(l));
+  const [a, b] = lines.map(JSON.parse);
+  assert.deepEqual([a.type, a.event, a.userId, a.ip], ['security', 'mfa_failed', 7, '203.0.113.0']);
+  assert.equal(b.ip, '2001:db8:85a3::');
+  assert.equal(b.detail.length, 120);
+  assert.equal(coarseIp('pas une ip'), '');
+  // Le routeur A2F journalise sans fuite : on capture la sortie d'une vraie tentative ratée
+  const s = await startApp();
+  const seen = [];
+  const orig = console.log; console.log = (...a) => { seen.push(a.join(' ')); };
+  try {
+    const u = await s.newUser({ admin: false });
+    const { secret, codes } = await enable(s, u);
+    await u.post('/account/2fa/disable', { code: '654321' }, form);
+    console.log = orig;
+    const security = seen.filter((x) => x.includes('"type":"security"'));
+    assert.ok(security.some((x) => x.includes('"event":"mfa_enabled"')) && security.some((x) => x.includes('"event":"mfa_failed"')));
+    for (const x of security) { assert.ok(!x.includes(secret) && !x.includes(codes[0]) && !x.includes('654321') && !x.includes(u.email)); }
+  } finally { console.log = orig; await s.close(); }
 });

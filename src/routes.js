@@ -16,6 +16,9 @@ import {
 import { loginPage } from './site/pages.js';
 import { registerMfaRoutes, securityHtml } from './mfaroutes.js';
 import { themeCard } from './themeviews.js';
+import { securityLog } from './securitylog.js';
+import { clientIp } from './ratelimit.js';
+import { exportAccount } from './services/dataexport.js';
 import { themeOf } from './theme.js';
 import { registerSiteRoutes } from './site/routes.js';
 import { registerAdminRoutes } from './adminroutes.js';
@@ -137,6 +140,7 @@ export function registerRoutes(router, app) {
   // Erreur de connexion : message du serveur s'il est destiné à l'utilisateur, sinon générique (rien de technique à l'écran)
   const loginFailed = (res, e) => {
     if (!e.status || (e.status >= 500 && !e.expose)) console.error('[connexion]', e);
+    securityLog('login_failed', { detail: e.status ? String(e.status) : 'erreur' }); // jamais le message ni l'adresse e-mail : un code d'état seulement
     redirect(res, `/login?e=${encodeURIComponent(e.status && (e.status < 500 || e.expose) ? e.message : 'Connexion impossible, réessaie dans un instant')}`);
   };
   // Démarrage : avec reCAPTCHA, seul un POST portant un jeton valide démarre le flux (le GET renvoie vers la page de connexion)
@@ -503,6 +507,18 @@ export function registerRoutes(router, app) {
     }));
   });
 
+  // Export de toutes les données du compte (RGPD art. 15 et 20) : un fichier JSON, jamais de secret (voir services/dataexport.js)
+  router.post('/account/export', async ({ req, res, session }) => {
+    const doc = await exportAccount(db, session.userId);
+    securityLog('data_exported', { userId: session.userId, ip: clientIp(req, cfg.trustProxy) });
+    const body = JSON.stringify(doc);
+    res.writeHead(200, {
+      'Content-Type': 'application/json; charset=utf-8', 'Content-Disposition': `attachment; filename="iaboss-donnees-${new Date().toISOString().slice(0, 10)}.json"`,
+      'Content-Length': Buffer.byteLength(body), 'Cache-Control': 'no-store',
+    });
+    res.end(body);
+  }, { limit: 'account_export' });
+
   // Suppression du compte : confirmée en saisissant son email ; efface TOUTES les données de l'utilisateur
   router.post('/account/delete', async ({ req, res, session }) => {
     const b = await readBody(req);
@@ -517,6 +533,7 @@ export function registerRoutes(router, app) {
     }
     app.worker?.abortUser(session.userId); // un job en cours pour ce compte s'arrête avant l'effacement
     await deleteUser(app, session.userId);
+    securityLog('account_deleted', { userId: session.userId, ip: clientIp(req, cfg.trustProxy) });
     await destroySession(db, req, res);
     redirect(res, '/login?bye=1');
   }, { limit: 'account_delete' });

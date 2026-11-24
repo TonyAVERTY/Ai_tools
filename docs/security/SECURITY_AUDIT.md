@@ -110,3 +110,46 @@ Relecture du pipeline IA (lanceurs de CLI, worker, handlers, page IA), des route
 Contrôlés sans défaut trouvé : accès par identifiant (aucune lecture ni écriture sur une ressource d'un autre compte), redirections (cibles fixes), exports CSV (formules neutralisées), jetons d'API, signature Stripe, scènes HTML écrites par l'IA (CSP, résolution DNS coupée, requêtes bloquées), téléversements (type lu à la signature), `npm audit` (0 vulnérabilité).
 
 Non vérifié cette fois encore : bac à sable bwrap en conditions réelles, MySQL 8, configuration Nginx / Cloudflare, vrais flux OAuth, vrais CLI d'IA. Les risques résiduels des sections 4 et 6 restent valables.
+
+## 12. Addendum : audit du 24 novembre 2026 (mise en production publique)
+
+Audit complet de l'état de `main` (commit `2df9df8`) puis des corrections de cette PR. Méthode : relecture du code, tests dynamiques **locaux** (serveur de test, bases jetables, données fictives), recherche de secrets dans les 1 247 commits de toutes les branches, `npm audit`, audit des licences, vérification des en-têtes sur un serveur local. **Rien contre la production, aucun service externe.**
+
+Niveaux : **P0** critique (mise en production interdite) · **P1** à corriger avant la production · **P2** à corriger ou à accepter par écrit · **P3** amélioration.
+
+### 12.1 Problèmes trouvés et corrigés
+
+| # | Niveau | Problème | Où | Correction | Preuve |
+|---|---|---|---|---|---|
+| V13 | **P1** | Aucune sauvegarde de la base **MySQL** de production : le seul script (`aitools-backup.sh`) ne sait faire que SQLite, et rien ne sauvegarde les fichiers des comptes (justificatifs, pièces jointes, vidéos). Aucune restauration jamais testée. | `deploy/` | `aitools-backup-mysql.sh` (chiffré avec une clé publique `age`, refuse de tourner sans chiffrement, mot de passe hors ligne de commande, rotation), `aitools-restore-check.sh` (base temporaire, jamais la production) | `test/backup-scripts.test.js` ; job CI « backup » : sauvegarde puis restauration réelles sur MariaDB 10.11 |
+| V14 | **P1** | Un compte **administrateur** (liste des comptes, suspension, suppression de compte) n'avait que Google ou Apple comme protection, sans second facteur. | `src/server.js` | L'A2F est exigée pour toute route d'administration (`ADMIN_REQUIRE_MFA`, actif par défaut) | `test/mfa.test.js` (« le back-office exige l'A2F ») |
+| V15 | P2 | A2F : le nombre de codes essayés n'était limité que par adresse IP et par session « en attente » : une session volée pouvait deviner un code de 6 chiffres depuis plusieurs adresses. | `src/mfaroutes.js` | Plafond par **compte** : 10 codes / 15 minutes, connexion, désactivation et codes de secours confondus | `test/mfa.test.js` |
+| V16 | P2 | A2F : la session « en attente » devenait la session connectée avec **le même identifiant** (fixation de session). | `src/mfaroutes.js` | Nouvel identifiant émis, l'ancien supprimé | `test/mfa.test.js` |
+| V17 | P2 | RGPD art. 15 et 20 : pas d'export complet des données en libre-service (CSV des prospects et de la compta seulement, « écris-nous » pour le reste). | `src/services/dataexport.js` | « Mes données » : fichier JSON de toutes les tables du compte, sans aucun secret, 3 par heure ; toute nouvelle table doit être classée (exportée ou exclue avec raison) | `test/dataexport.test.js` |
+| V18 | P2 | Politique de confidentialité inexacte : « aucune statistique de visite » (faux depuis les compteurs d'audience), données de l'A2F et journal de sécurité non mentionnés. | `src/site/legal.js` | Textes et durées corrigés | `test/site.test.js` |
+| V19 | P2 | Aucun contrôle automatique des secrets, des licences, des vulnérabilités ni inventaire des composants ; pas de mise à jour automatique des dépendances. | `.github/` | Workflow « Sécurité » (secrets fichiers + historique, licences, `npm audit`, SBOM CycloneDX), hebdomadaire et à chaque PR ; Dependabot | `test/security-tools.test.js` |
+| V20 | P3 | Aucun journal de sécurité exploitable (échecs de code, A2F, exports). | `src/securitylog.js` | Lignes JSON sur la sortie standard, sans secret ni e-mail, IP tronquée | `test/mfa.test.js` |
+| V22 | P2 | Le cookie `li_oauth_b` (liaison LinkedIn) était posé par le code mais absent du tableau des cookies de la politique de confidentialité (transparence, ePrivacy). Détecté par le nouveau contrôle automatique. | `src/site/legal.js` | Ajouté au tableau | `test/security-docs.test.js` (« tout cookie posé par le code est déclaré ») |
+| V23 | P2 | **Trouvé au nouvel audit des corrections** : l'export de données excluait les colonnes secrètes par leur nom, mais `user_settings` est une table clé/valeur : les jetons et webhooks chiffrés y sont des **lignes**, donc partaient dans le fichier (chiffrés, mais exportés), ainsi que des blocs JSON contenant des secrets chiffrés. | `src/services/dataexport.js` | Les lignes dont la clé est secrète sont retirées ; tout texte qui contient un secret chiffré (`v1:…`) est remplacé, dans **toutes** les tables | `test/dataexport.test.js` (« réglages clé / valeur ») |
+| V24 | P3 | **Trouvé au nouvel audit** : la mesure d'audience stockait un site d'origine par valeur d'en-tête `Referer` sans limite : un robot pouvait faire grossir la base. | `src/services/audience.js` | 200 sites distincts par jour, les suivants regroupés sous « (autres) » | `test/audience.test.js` |
+| V21 | P3 | Aucune garantie qu'une nouvelle route non protégée soit détectée. | `test/route-security.test.js` | Chaque route est essayée sans compte, avec un compte ordinaire (404 sur le back-office), sans l'origine (CSRF) ; une route publique nouvelle fait échouer le test | `test/route-security.test.js` |
+
+### 12.1 bis Nouvel audit des corrections (phase 5)
+
+Après les corrections, j'ai relu **mon propre code neuf** (A2F, export, audience, thème, journal, scripts de sauvegarde) comme un attaquant. Résultat : **deux défauts que j'avais moi-même introduits** (V23, V24), corrigés et testés. Cela illustre pourquoi une correction ne se déclare jamais « finie » avant d'avoir été re-auditée. Points relus sans défaut : comparaison de codes (aucune fuite par le temps), rejeu d'un code A2F (refusé), promotion de session (ancien identifiant détruit), validation de la valeur du cookie `theme` (liste blanche), échappement de la page de statistiques, mot de passe des scripts de sauvegarde (jamais en argument), droits des fichiers de sauvegarde (`umask 077`). Risque noté : l'export charge une table entière en mémoire (au plus 100 000 lignes par table) ; les plafonds des offres le bornent en pratique (P3).
+
+### 12.2 Contrôlés sans défaut trouvé (preuve dans les tests ou la lecture du code)
+
+Secrets : aucun dans les fichiers suivis ni dans l'historique (les 33 occurrences de motifs trouvées sont des valeurs factices de tests, revues une à une). En-têtes : CSP stricte, HSTS, `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy`, COOP/CORP, `Cache-Control: no-store`, ni `Server` ni `X-Powered-By`. Fichiers sensibles : `/.env`, `/.git/*`, `/package.json`, `/src/*`, `/deploy/*`, `/data/`, traversées de chemin (`..%2f`, `%2e%2e`) répondent tous 404. Webhook Stripe : signature HMAC comparée à temps constant, tolérance de date, idempotence par identifiant d'événement, état relu chez Stripe. Connexion : `email_verified` exigé. Dépendances : `npm audit` 0 vulnérabilité, 49 paquets de production, toutes licences autorisées. Les 246 routes : voir V21.
+
+### 12.3 Risques ouverts (non corrigés) et décision
+
+| Niveau | Sujet | Pourquoi | Action |
+|---|---|---|---|
+| **P1** | Configuration réelle de la production non vérifiée : MySQL (droits du compte, écoute), Nginx / CloudPanel / Cloudflare (TLS, WAF, rate limiting), `.env`, port de l'application | Inaccessible depuis cet environnement | À faire par le propriétaire, voir `PRODUCTION_CHECKLIST.md` |
+| **P1** | Sauvegardes à installer et restauration à rejouer **sur le vrai serveur** | Les scripts sont livrés et testés en CI, pas installés | `BACKUP_RESTORE.md` |
+| **P1** | Validation juridique : CGU, mentions, confidentialité, applicabilité du droit de la consommation aux petits professionnels, AI Act, facturation électronique | Je ne peux pas valider une obligation juridique | `LEGAL_COMPLIANCE.md` |
+| P2 | Test d'intrusion / DAST (ZAP, Burp) sur un environnement de test | Aucun scanner disponible ici | Non exécuté |
+| P2 | Bac à sable bwrap des exécutions de Claude, MySQL 8, vrais flux OAuth Google/Apple avec A2F, vrais CLI d'IA | Non testables ici | Tests manuels avant ouverture |
+| P2 | Limiteur de débit en mémoire (une instance) | Un abus distribué se traite chez Cloudflare | Règle de rate limiting |
+| P3 | HSTS sans `includeSubDomains` / `preload` ; actions GitHub épinglées par version et non par empreinte ; session de 30 jours sans expiration d'inactivité ; course bénigne entre deux événements Stripe identiques simultanés (l'application d'un abonnement est idempotente) | Voir `SECURITY_ACTION_PLAN.md` | Accepté ou planifié |

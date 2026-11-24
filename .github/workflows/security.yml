@@ -1,0 +1,103 @@
+# Contrôles de sécurité automatiques : secrets (fichiers suivis et historique), licences, vulnérabilités des dépendances, inventaire (SBOM).
+# Lancés à chaque PR, à chaque push sur main, et chaque lundi (une vulnérabilité peut apparaître sans qu'on ait changé une ligne).
+# Un échec bloque la fusion : ne jamais contourner, corriger (révoquer le secret, remplacer la dépendance, changer de licence).
+name: Sécurité
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '17 5 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0   # l'historique complet est relu pour y chercher des secrets
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --omit=dev --ignore-scripts
+      - name: Secrets (fichiers suivis et historique)
+        run: npm run security:history
+      - name: Licences des dépendances de production
+        run: npm run security:licenses
+      - name: Vulnérabilités connues (production, niveau élevé ou plus)
+        run: npm run security:audit
+      - name: Inventaire des composants (SBOM CycloneDX)
+        run: npm run sbom
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.cdx.json
+          retention-days: 30
+
+  # Sauvegarde et restauration pour de vrai : migre une base MariaDB, la sauvegarde chiffrée (clé age jetable), la restaure dans une base temporaire
+  # et vérifie le contenu. Prouve que les scripts de deploy/ marchent avec un vrai mysqldump et un vrai MariaDB.
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_USER: root
+      DB_PASSWORD: test
+      DB_NAME: aitools_prod
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --omit=dev --ignore-scripts
+      - run: sudo apt-get update && sudo apt-get install -y --no-install-recommends age
+      - name: Base de production factice (migrations réelles, un compte)
+        run: |
+          mysql -h127.0.0.1 -uroot -ptest -e "CREATE DATABASE aitools_prod CHARACTER SET utf8mb4"
+          node --no-warnings --input-type=module -e "
+            import { openDb } from './src/db.js';
+            const db = await openDb({ host: '127.0.0.1', port: 3306, user: 'root', password: 'test', database: 'aitools_prod' });
+            await db.prepare(\"INSERT INTO users(email, name, provider, provider_sub, created_at) VALUES('sauvegarde@example.test', 'x', 'google', 'sub-1', 1)\").run();
+            await db.close();"
+          mkdir -p data-test && echo "justificatif de test" > data-test/piece.txt
+      - name: "Sauvegarde sans clé de chiffrement : doit être refusée"
+        run: |
+          if deploy/aitools-backup-mysql.sh /tmp/refus; then echo "La sauvegarde non chiffrée aurait dû être refusée" >&2; exit 1; fi
+      - name: Sauvegarde chiffrée
+        run: |
+          age-keygen -o /tmp/age-key.txt 2> /tmp/age-pub.txt
+          export BACKUP_AGE_RECIPIENT="$(sed -n 's/^Public key: //p' /tmp/age-pub.txt)"
+          DATA_DIR="$PWD/data-test" deploy/aitools-backup-mysql.sh /tmp/backups 14
+          ls -l /tmp/backups
+          ! grep -q "sauvegarde@example.test" /tmp/backups/*db.sql.gz.age   # rien de lisible dans le fichier chiffré
+      - name: Restauration dans une base temporaire
+        run: |
+          out=$(AGE_IDENTITY=/tmp/age-key.txt deploy/aitools-restore-check.sh /tmp/backups/*-db.sql.gz.age)
+          echo "$out"
+          echo "$out" | grep -q "1 comptes"
+          echo "$out" | grep -q "RESTAURATION VÉRIFIÉE"
