@@ -61,7 +61,7 @@ test('ChatGPT : clé API OpenAI, connexion guidée avec son avertissement, fichi
   assert.match(h, /name="provider" value="openai"/);
   assert.match(h, /<h2 id="h-alt-openai">Avec ton compte ChatGPT \(Plus, Pro, Business\)<\/h2><span class="badge warn">[^]*?Risque pour ton compte/);
   assert.match(h, /<h3>Se connecter avec ChatGPT<\/h3>[^]*?data-open-dialog="chatgpt-dialog"/);
-  assert.match(h, /<h3>Fichier de connexion collé<\/h3>[^]*?action="\/link\/chatgpt\/auth"[^]*?<textarea name="authJson"/);
+  assert.match(h, /<h3>Fichier de connexion collé<\/h3>[^]*?action="\/link\/chatgpt\/auth"[^]*?<textarea[^>]*name="authJson"/);
   assert.match(h, /<dialog[^>]*id="chatgpt-dialog"/);
   assert.match(h, /contrevenir aux conditions d'utilisation d'OpenAI/);
   assert.match(h, /Tes tâches passent l'une après l'autre/);

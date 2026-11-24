@@ -6,10 +6,22 @@ import { layout } from './views.js';
 import { siteLayout } from './site/layout.js';
 import { otpauthUrl } from './totp.js';
 import { qrSvg } from './qr.js';
+import { LEN } from './inputlimits.js';
 
 /** Carte « Sécurité » de la page Mon compte : trois états (désactivée, en cours d'activation, activée). */
-export function securityCard({ enabled, setup = null, email, recoveryLeft = 0, devices = 0 }) {
-  const code = (name = 'code') => `<label class="field"><span class="lbl">Code à 6 chiffres</span><input name="${name}" inputmode="numeric" autocomplete="one-time-code" maxlength="20" required></label>`;
+/**
+ * Champ de code : 6 chiffres par défaut (jamais plus de 6 caractères), ou code de secours (11) avec `mode: 'secours'`. `toggle: false` = pas de bascule (activation :
+ * seul un code d'application convient). Le lien de bascule est un vrai lien (page rendue dans l'autre mode) que public/code-field.js intercepte.
+ */
+export function codeField({ mode = 'totp', toSecours = '?mode=secours', toTotp = '?', toggle = true, id = '' } = {}) {
+  const sec = mode === 'secours';
+  const label = sec ? 'Code de secours' : 'Code à 6 chiffres';
+  return `<div data-code-field><label class="field"><span class="lbl" data-code-label>${label}</span><input${id ? ` id="${esc(id)}"` : ''} name="code" data-code-input data-mode="${sec ? 'secours' : 'totp'}" inputmode="${sec ? 'text' : 'numeric'}" maxlength="${sec ? LEN.recovery : LEN.totp}" pattern="${sec ? '[0-9a-fA-F]{5}-?[0-9a-fA-F]{5}' : '[0-9]{6}'}" autocomplete="one-time-code" spellcheck="false" autocapitalize="off" required></label>${toggle
+    ? `<a class="small" href="${esc(sec ? toTotp : toSecours)}" data-code-toggle data-to-secours="${esc(toSecours)}" data-to-totp="${esc(toTotp)}">${sec ? 'Utiliser le code de mon application' : 'Utiliser un code de secours'}</a>` : ''}</div>`;
+}
+
+export function securityCard({ enabled, setup = null, email, recoveryLeft = 0, devices = 0, mode = 'totp' }) {
+  const code = (opts = {}) => codeField({ mode, toSecours: '/account?mode=secours#securite', toTotp: '/account#securite', ...opts });
   let body;
   if (enabled) {
     body = `<p><span class="badge ok">Activée</span> Un code de ton application d'authentification est demandé à chaque connexion.</p>
@@ -25,7 +37,7 @@ export function securityCard({ enabled, setup = null, email, recoveryLeft = 0, d
   <div class="qr-box">${qrSvg(otpauthUrl(setup, email), 'QR code à scanner avec ton application d\'authentification')}
     <button type="button" class="btn" data-open-dialog="mfa-key">${ic('key')}Clé de configuration</button></div>
   <p class="muted small">Sur un téléphone, <a href="${esc(otpauthUrl(setup, email))}">ouvre directement l'application</a> pour l'ajouter sans scanner.</p>
-  <form method="post" action="/account/2fa/enable" class="cfg"><p>2. Saisis le code qu'elle affiche pour vérifier que tout est en place.</p>${code()}
+  <form method="post" action="/account/2fa/enable" class="cfg"><p>2. Saisis le code qu'elle affiche pour vérifier que tout est en place.</p>${code({ mode: 'totp', toggle: false })}
     <div class="row"><button class="btn primary">${ic('shield')}Activer l'A2F</button></div></form>
   <form method="post" action="/account/2fa/cancel" class="cfg"><div class="row"><button class="btn">Annuler</button></div></form>
   <dialog class="prospect-dialog modal" id="mfa-key" aria-labelledby="mfa-key-t"><div class="cfg">
@@ -45,7 +57,7 @@ export function securityCard({ enabled, setup = null, email, recoveryLeft = 0, d
 }
 
 /** Saisie du code après le retour de Google ou d'Apple (session « en attente »). */
-export function mfaLoginPage({ appUrl, error = null }) {
+export function mfaLoginPage({ appUrl, error = null, secours = false }) {
   return siteLayout({
     appUrl, path: '/login/2fa', noindex: true, title: 'Code de vérification · iaboss',
     description: 'Saisis le code de ton application d\'authentification pour finir ta connexion.',
@@ -53,8 +65,8 @@ export function mfaLoginPage({ appUrl, error = null }) {
   <div><h1 id="m-h">Code de vérification</h1><p class="sub">Saisis le code à 6 chiffres de ton application d'authentification. Tu n'y as plus accès ? Utilise un code de secours.</p></div>
   ${error ? banner('err', error) : ''}
   <form method="post" action="/login/2fa" class="auth-f">
-    <label for="mfa-code">Code</label>
-    <input id="mfa-code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="20" required autofocus>
+    ${secours ? '<input type="hidden" name="mode" value="secours">' : ''}
+    ${codeField({ mode: secours ? 'secours' : 'totp', toSecours: '/login/2fa?mode=secours', toTotp: '/login/2fa', id: 'mfa-code' })}
     <label class="chk"><input type="checkbox" name="trust" value="on"><span>Faire confiance à cet appareil pendant 30 jours</span></label>
     <button class="btn btn-primary btn-lg btn-block">Valider</button>
   </form>

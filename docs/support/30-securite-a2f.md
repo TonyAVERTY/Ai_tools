@@ -21,6 +21,9 @@ Après avoir choisi Google ou Apple, la page « Code de vérification » s'ouvre
 ## Administrateurs
 Un compte administrateur doit avoir activé l'A2F pour ouvrir la page **Administration** : sans elle, le lien renvoie vers Mon compte → Sécurité : A2F avec un message. L'exploitant du service peut lever cette exigence avec la variable `ADMIN_REQUIRE_MFA=false` (déconseillé en production).
 
+## Les champs de code
+Le champ « Code à 6 chiffres » n'accepte que des chiffres et **jamais plus de 6** : si tu tapes ou colles plus, le surplus est ignoré (tu peux coller « 123 456 » tel que ton application l'affiche). Pour utiliser un **code de secours**, clique sur **Utiliser un code de secours** sous le champ : il accepte alors 11 caractères (« xxxxx-xxxxx », chiffres et lettres de a à f). **Utiliser le code de mon application** te ramène au mode normal.
+
 ## Appareils de confiance
 La carte indique « Appareils de confiance » : le nombre de navigateurs dispensés de code. **Oublier mes appareils de confiance** les retire tous (le code est redemandé partout). Désactiver l'A2F ou renouveler les codes de secours les oublie aussi.
 

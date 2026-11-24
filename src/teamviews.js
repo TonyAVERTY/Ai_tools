@@ -42,7 +42,7 @@ function ownerSection(d) {
   ${invites}
   <h3>Inviter quelqu'un</h3>
   <form method="post" action="/team/invite" class="cfg">
-    <label>Adresse email<input name="email" type="email" required autocomplete="off"></label>
+    <label>Adresse email<input maxlength="254" name="email" type="email" required autocomplete="off"></label>
     <label>Rôle ${roleSelect('member')}</label>
     <button class="btn primary"${seats.free === 0 ? ' disabled' : ''}>Inviter</button>
   </form>

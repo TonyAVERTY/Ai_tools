@@ -76,7 +76,7 @@ ${projects.length ? `<div class="pj-cards">${projects.map((x) => card(x, d)).joi
   <h2 id="h-new">Nouveau projet</h2>
   <div class="form pj-new">
     <label class="field"><span class="lbl">Nom</span><input name="name" required maxlength="80" placeholder="Ex. Atelier Exemple"></label>
-    <label class="field"><span class="lbl">Dépôt Git</span><input name="gitUrl" required placeholder="https://github.com/utilisateur/projet.git"></label>
+    <label class="field"><span class="lbl">Dépôt Git</span><input maxlength="500" name="gitUrl" required placeholder="https://github.com/utilisateur/projet.git"></label>
     <label class="field"><span class="lbl">Site du produit (facultatif)</span><input name="site_url" maxlength="300" inputmode="url" autocomplete="off" placeholder="https://monproduit.fr"></label>
   </div>
   <div class="form-b"><button class="btn primary">Créer et analyser</button><button type="button" class="btn linklike" data-new-toggle>Annuler</button></div>

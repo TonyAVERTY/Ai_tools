@@ -1,4 +1,5 @@
 // Mini-routeur + helpers HTTP. Pas de framework : moins de RAM, moins de surface.
+import { findTooLong } from './inputlimits.js';
 
 export class Router {
   constructor() { this.routes = []; }
@@ -55,10 +56,14 @@ export async function readBody(req, { max = MAX_BODY } = {}) {
   }
   const raw = Buffer.concat(chunks).toString('utf8');
   const type = req.headers['content-type'] || '';
+  let body;
   if (type.includes('application/json')) {
-    try { return raw ? JSON.parse(raw) : {}; } catch { throw new HttpError(400, 'Corps JSON invalide', { expose: true }); }
-  }
-  return Object.fromEntries(new URLSearchParams(raw));
+    try { body = raw ? JSON.parse(raw) : {}; } catch { throw new HttpError(400, 'Corps JSON invalide', { expose: true }); }
+  } else body = Object.fromEntries(new URLSearchParams(raw));
+  // Longueur des champs connus (src/inputlimits.js) : refusée ici pour toutes les routes, jamais tronquée en silence (tronquer un mot de passe le changerait)
+  const bad = findTooLong(body);
+  if (bad) throw new HttpError(400, `${bad.label} trop long : ${bad.max} caractères au plus`, { expose: true });
+  return body;
 }
 
 export function send(res, status, body, type = 'text/html; charset=utf-8') {
