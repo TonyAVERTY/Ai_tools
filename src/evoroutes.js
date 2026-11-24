@@ -22,6 +22,7 @@ export function registerEvolutionRoutes(router, app, { project }) {
     if (status === 'refused' && !reason) throw new HttpError(400, 'Justification manquante : dis pourquoi tu refuses cette idée', { expose: true });
     const userId = ctx.session.userId;
     await saveDecision(db, { jobId, projectId: p.id, ownerId: p.userId, userId, n, status, reason: status ? reason : '' });
-    json(ctx.res, { ok: true, html: decisionHtml(jobId, n, status ? { status, reason } : null) });
+    // Une idée refusée quitte la liste (sa raison reste gardée) ; les autres états renvoient le bloc à jour
+    json(ctx.res, status === 'refused' ? { ok: true, removed: true } : { ok: true, html: decisionHtml(jobId, n, status ? { status, reason } : null) });
   }, { limit: 'evo_decision' });
 }
