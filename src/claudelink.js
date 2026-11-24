@@ -435,7 +435,7 @@ export async function lastConsent(db, userId) {
 /** Routes accessibles sans liaison valide : lier, Mon compte, déconnexion, suppression du compte. */
 export function isLinkExempt(method, pathname) {
   if (pathname === '/link' || pathname.startsWith('/link/')) return true;
-  if (pathname === '/account' || pathname === '/account/delete' || pathname === '/account/theme' || pathname.startsWith('/account/2fa/')) return true; // l'A2F protège le compte, elle ne dépend pas de l'IA
+  if (pathname === '/account' || pathname === '/account/delete' || pathname === '/account/theme' || pathname === '/account/export' || pathname.startsWith('/account/2fa/')) return true; // l'A2F protège le compte, elle ne dépend pas de l'IA
   if (pathname === '/raccourcis') return true; // une page d'aide, sans accès à l'IA
   if (pathname === '/abonnement/portail') return true; // on doit toujours pouvoir gérer ou résilier son abonnement, même sans IA reliée
   if (pathname === '/welcome' || pathname === '/welcome/skip') return true; // le profil ne demande pas d'accès Claude

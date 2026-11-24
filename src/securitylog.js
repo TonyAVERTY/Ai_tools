@@ -13,7 +13,7 @@ export function coarseIp(ip) {
 
 export const EVENTS = [
   'mfa_failed', 'mfa_locked', 'mfa_enabled', 'mfa_disabled', 'mfa_recovery_used', 'mfa_recovery_regenerated', 'mfa_device_trusted',
-  'admin_mfa_required', 'login_failed', 'session_rotated',
+  'admin_mfa_required', 'login_failed', 'session_rotated', 'data_exported', 'account_deleted',
 ];
 
 /** `securityLog('mfa_failed', { userId, ip })`. Écrit `{"ts":…,"type":"security","event":…}` ; ne lève jamais. */

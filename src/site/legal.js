@@ -209,7 +209,7 @@ ${captcha
         html: `<p>Tu peux demander l'accès à tes données, leur rectification, leur effacement, la limitation ou l'opposition à leur traitement, et leur portabilité.</p>
 <ul>
   <li><strong>Suppression :</strong> directement dans Mon compte. Elle efface ton compte et ses données, immédiatement.</li>
-  <li><strong>Export :</strong> tes prospects s'exportent en CSV depuis le tableau de bord. Pour le reste de tes données, écris-nous.</li>
+  <li><strong>Accès et export :</strong> dans Mon compte, le bouton « Télécharger mes données » te donne un fichier JSON avec toutes les données de ton compte (sans aucun secret). Tes prospects et ta comptabilité s'exportent aussi en CSV. Les fichiers (justificatifs, pièces jointes, vidéos) ne sont pas dans ce fichier : écris-nous pour les recevoir.</li>
   <li><strong>Autres demandes :</strong> par email à <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a>. Réponse sous un mois au plus. Nous pouvons demander une preuve que la demande vient bien de toi.</li>
 </ul>
 <p>Tu peux aussi saisir la CNIL : <a href="https://www.cnil.fr/fr/plaintes" rel="noopener noreferrer">cnil.fr/fr/plaintes</a>.</p>`,

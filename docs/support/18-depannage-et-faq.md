@@ -336,3 +336,6 @@ L'appareil de confiance est un cookie lié à ce navigateur, valable 30 jours. I
 
 ## « Trop de codes essayés » ou « Active l'A2F pour ouvrir l'administration »
 Le premier message veut dire que 10 codes ont été essayés en moins de 15 minutes sur ton compte : attends un quart d'heure, puis saisis le code actuel de ton application. Le second concerne les comptes administrateurs : active d'abord l'A2F dans Mon compte → Sécurité : A2F, puis rouvre l'Administration.
+
+## Je veux récupérer toutes mes données
+Mon compte → **Mes données** → **Télécharger mes données** : tu reçois un fichier JSON avec les données de ton compte, sans secret. Si le message « Trop de requêtes » s'affiche, tu as déjà demandé 3 exports dans l'heure : réessaie plus tard. Les fichiers (justificatifs, pièces jointes, vidéos de promotion) ne sont pas inclus ; pour les recevoir, écris à l'adresse de contact de la page de confidentialité.
