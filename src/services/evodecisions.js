@@ -2,6 +2,9 @@
 import { now } from '../db.js';
 import { LEN } from '../inputlimits.js';
 import { esc } from '../http.js';
+import { parseEvolutions } from './markdown.js';
+
+export const HISTORY_MAX = 30;
 
 export const DECISIONS = { accepted: 'Acceptée', refused: 'Refusée' };
 
@@ -31,4 +34,20 @@ export function decisionHtml(jobId, n, d) {
     <div class="evo-actions"><button type="submit" class="btn small primary">Enregistrer</button><button type="button" class="btn small" data-evo-cancel>Annuler</button></div>
   </form>
 </div>`;
+}
+
+/** Les décisions les plus récentes du projet, toutes listes confondues, avec le titre de l'idée : de quoi ne pas reproposer ce qui a été refusé. */
+export async function decisionHistory(db, projectId, limit = HISTORY_MAX) {
+  const rows = await db.prepare(`SELECT d.job_id, d.n, d.status, d.reason, j.result_json FROM evolution_decisions d JOIN jobs j ON j.id = d.job_id
+    WHERE d.project_id = ? AND j.project_id = ? ORDER BY d.decided_at DESC, d.job_id DESC LIMIT ?`).all(projectId, projectId, limit);
+  const titles = new Map();
+  const titleOf = (r) => {
+    if (!titles.has(r.job_id)) {
+      let md = '';
+      try { md = JSON.parse(r.result_json || '{}').markdown; } catch { /* résultat illisible : pas de titre */ }
+      titles.set(r.job_id, new Map(parseEvolutions(md).map((e) => [e.n, e.title])));
+    }
+    return titles.get(r.job_id).get(Number(r.n));
+  };
+  return rows.map((r) => ({ title: titleOf(r), status: r.status, reason: r.reason })).filter((d) => d.title);
 }
