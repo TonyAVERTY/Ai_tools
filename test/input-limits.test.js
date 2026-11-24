@@ -90,3 +90,9 @@ test('le serveur REFUSE (400) une valeur trop longue, sans rien enregistrer ni t
     assert.ok(!/trop long/.test(JSON.stringify(await ok.json().catch(() => ({})))), 'les valeurs à la limite exacte sont acceptées');
   } finally { await s.close(); }
 });
+
+test('la navigation (ajax.js) laisse en place les scripts qui branchent des écouteurs sur document ou écrivent dans la console', () => {
+  const ajax = readFileSync(new URL('../public/ajax.js', import.meta.url), 'utf8');
+  const stay = ajax.match(/const STAY = (\/.*?\/);/)?.[1] || '';
+  for (const f of ['ajax', 'fx', 'code-field', 'console-warning']) assert.ok(stay.includes(f), `${f}.js doit rester en place (sinon ses écouteurs s'accumulent à chaque navigation)`);
+});
