@@ -34,6 +34,7 @@ import { pinSmtp, pinGit } from './netguard.js';
 import { sendPause, pauseMessage, evaluateSending } from './services/abuse.js';
 import { verifyAddress, defaultMx } from './services/verify.js';
 import { evolutionMail } from './services/mailhtml.js';
+import { decisionHistory } from './services/evodecisions.js';
 import { gitCredentialFor } from './gitservers.js';
 import { ROLE_TASKS, roleById, MAX_NOTES } from './services/roles.js';
 import { getProject, repoDir, sentSince, getTemplate, saveTemplate, pickVariant } from './projects.js';
@@ -1104,7 +1105,7 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
       await sync(userId, project.gitUrl, dir);
 
       await ctx.progress({ message: `Recherche de ${count} évolutions (${level})…`, pct: 10 });
-      const { prompt, system } = evolutionPrompt({ projectName: project.name, profile: project.profile, count, level, custom: await custom(userId), repoFacts: factsOf(dir) });
+      const { prompt, system } = evolutionPrompt({ projectName: project.name, profile: project.profile, count, level, custom: await custom(userId), repoFacts: factsOf(dir), decided: await decisionHistory(db, project.id) });
       const { maxTurns } = LEVELS[level];
       const model = tierEquivalent(LEVELS[level].model, await userProvider(db, userId));
       const sink = makeSink();
