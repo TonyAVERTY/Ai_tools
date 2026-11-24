@@ -1410,10 +1410,13 @@
   // Action définitive : un formulaire qui porte data-confirm demande confirmation avant de partir
   listen(document, 'submit', async (e) => {
     const form = e.target;
-    const msg = form.dataset?.confirm;
+    // Un formulaire peut avoir plusieurs boutons sur un seul champ (ex. A2F : « Régénérer » et « Désactiver » partagent le code) : la confirmation
+    // peut alors être portée par le bouton qui a envoyé le formulaire (data-confirm sur le bouton), sinon par le formulaire.
+    const src = e.submitter?.dataset?.confirm ? e.submitter : form;
+    const msg = src.dataset?.confirm;
     if (!msg || form.dataset.action || form.dataset.confirmed === '1') return; // data-action : voir « Formulaires » plus bas (une seule confirmation)
     e.preventDefault();
-    if (!(await confirmBox(msg, { confirm: form.dataset.confirmLabel }))) return;
+    if (!(await confirmBox(msg, { confirm: src.dataset.confirmLabel }))) return;
     form.dataset.confirmed = '1';
     form.requestSubmit(e.submitter || undefined); // même envoi qu'avant, avec le même bouton, sans redemander
     delete form.dataset.confirmed;

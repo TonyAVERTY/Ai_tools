@@ -15,10 +15,11 @@ export function securityCard({ enabled, setup = null, email, recoveryLeft = 0, d
     body = `<p><span class="badge ok">Activée</span> Un code de ton application d'authentification est demandé à chaque connexion.</p>
   <p class="muted small">Codes de secours restants : <b>${recoveryLeft}</b> sur 10.</p>
   <form method="post" action="/account/2fa/forget" class="cfg"><p class="muted small">Appareils de confiance (sans code pendant 30 jours) : <b>${devices}</b>.</p>${devices ? '<div class="row"><button class="btn">Oublier mes appareils de confiance</button></div>' : ''}</form>
-  <form method="post" action="/account/2fa/recovery" class="cfg"><p class="muted small">Pour en obtenir 10 nouveaux (les anciens cessent de marcher), saisis un code de ton application.</p>${code()}
-    <div class="row"><button class="btn">Régénérer les codes de secours</button></div></form>
-  <form method="post" action="/account/2fa/disable" class="cfg" data-confirm="Désactiver l'A2F ? Ton compte ne sera plus protégé que par ton compte Google ou Apple."><p class="muted small">Pour la désactiver, saisis un code de ton application ou un code de secours.</p>${code()}
-    <div class="row"><button class="btn danger">Désactiver l'A2F</button></div></form>`;
+  <form method="post" action="/account/2fa/recovery" class="cfg" data-one-code>
+    <p class="muted small">Pour régénérer les codes de secours (les anciens cessent de marcher) ou pour désactiver l'A2F, saisis un code de ton application ou un code de secours, puis choisis l'action.</p>${code()}
+    <div class="row"><button class="btn">Régénérer les codes de secours</button>
+      <button class="btn danger" formaction="/account/2fa/disable" data-confirm="Désactiver l'A2F ? Ton compte ne sera plus protégé que par ton compte Google ou Apple." data-confirm-label="Désactiver l'A2F">Désactiver l'A2F</button></div>
+  </form>`;
   } else if (setup) {
     body = `<p>1. Dans ton application d'authentification (Google Authenticator, Authy, 1Password, Bitwarden…), scanne ce QR code.</p>
   <div class="qr-box">${qrSvg(otpauthUrl(setup, email), 'QR code à scanner avec ton application d\'authentification')}
