@@ -1638,13 +1638,15 @@
       }
       return;
     }
-    // Évolution : Accepter / Refuser ouvre la justification ; Enregistrer envoie la décision, « Remettre en attente » l'annule
+    // Évolution : Accepter enregistre tout de suite (aucune raison demandée) ; Refuser ouvre « Pourquoi tu refuses ? » (obligatoire), Enregistrer l'envoie ;
+    // « Remettre en attente » annule une acceptation
     const evoOpen = e.target.closest('[data-evo-open]');
     if (evoOpen) {
       const box = evoOpen.closest('.evo-decide');
+      if (evoOpen.dataset.evoOpen === 'accepted') { await evoDecide(box, 'accepted', ''); return; }
       const form = $('[data-evo-form]', box);
-      form.dataset.status = evoOpen.dataset.evoOpen;
-      $('label', form).firstChild.textContent = evoOpen.dataset.evoOpen === 'refused' ? 'Pourquoi tu refuses ?' : 'Pourquoi tu acceptes ? (facultatif)';
+      form.dataset.status = 'refused';
+      $('label', form).firstChild.textContent = 'Pourquoi tu refuses ?';
       form.hidden = false;
       $('textarea', form).focus();
       return;
