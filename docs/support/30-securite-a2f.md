@@ -25,10 +25,10 @@ Un compte administrateur doit avoir activé l'A2F pour ouvrir la page **Administ
 La carte indique « Appareils de confiance » : le nombre de navigateurs dispensés de code. **Oublier mes appareils de confiance** les retire tous (le code est redemandé partout). Désactiver l'A2F ou renouveler les codes de secours les oublie aussi.
 
 ## Codes de secours
-La carte indique « Codes de secours restants : n sur 10 ». Pour en obtenir 10 nouveaux (les anciens cessent de marcher), saisis un code de ton application puis clique sur **Régénérer les codes de secours**.
+La carte indique « Codes de secours restants : n sur 10 ». Pour en obtenir 10 nouveaux (les anciens cessent de marcher), saisis un code de ton application ou un code de secours dans le **même** champ **Code à 6 chiffres** (il sert aux deux actions : « Régénérer les codes de secours » et « Désactiver l'A2F »), puis clique sur **Régénérer les codes de secours**.
 
 ## La désactiver
-Dans la même carte, saisis un code de ton application (ou un code de secours) puis clique sur **Désactiver l'A2F** et confirme. Le compte n'est plus protégé que par Google ou Apple ; la clé et les codes de secours sont effacés.
+Dans la même carte, saisis un code de ton application (ou un code de secours) dans le champ **Code à 6 chiffres** puis clique sur **Désactiver l'A2F** et confirme. Le compte n'est plus protégé que par Google ou Apple ; la clé et les codes de secours sont effacés.
 
 ## Téléphone perdu ou application effacée
 Connecte-toi avec un **code de secours**, puis va dans Mon compte → Sécurité : A2F, désactive l'A2F et réactive-la avec ta nouvelle application. Si tu n'as plus de code de secours, écris au support du service depuis l'adresse de ton compte : sans code, personne ne peut lever l'A2F à ta place depuis l'application.

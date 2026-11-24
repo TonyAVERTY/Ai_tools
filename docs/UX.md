@@ -39,6 +39,14 @@ Une erreur dit **ce qui s'est passé** et **quoi faire** ; jamais « Failed to f
 - Session expirée (401) : retour à `/login?e=…` avec « Ta session a expiré : reconnecte-toi. » (pas de redirection muette).
 - Ne jamais présenter une action comme réussie quand elle a échoué : on affiche le succès **après** la réponse.
 
+## Formulaires : une seule saisie, jamais deux champs identiques à la suite
+
+Quand plusieurs actions demandent **la même saisie** (ex. un code A2F pour « Régénérer » et pour « Désactiver »), il n'y a **qu'un champ** et **autant de boutons que d'actions** :
+- un seul `<form>` ; le bouton principal envoie vers l'`action` du formulaire, les autres portent **`formaction="/autre/adresse"`** (natif, marche sans JavaScript) ;
+- l'action sensible garde sa confirmation sur **son bouton** : `data-confirm="Question ? Conséquence."` et `data-confirm-label="Verbe"` posés sur le `<button>`, pas sur le formulaire (`public/app.js` lit d'abord le bouton qui a envoyé) ;
+- le texte au-dessus du champ dit ce qui se passe avec chaque bouton ; le bouton à effet destructeur est en rouge (`danger`) et vient après les autres.
+`test/form-fields.test.js` échoue si deux formulaires voisins partagent un champ visible (liste des exceptions justifiées dans le test) ; `scripts/mfa-card-check.mjs` le vérifie dans Chromium pour la carte A2F (1280 et 390 px).
+
 ## Formulaires : une erreur ne vide jamais ce qui a été saisi
 
 Un formulaire que le serveur refuse **garde ses champs, reste à l'écran et le bouton se réactive** ; l'erreur s'affiche en notification (`public/ajax.js`).
@@ -102,6 +110,7 @@ Tout ce que l'application écrit à l'utilisateur suit ces règles. `test/wordin
   quand on supprime, efface, retire ou déconnecte ; dans ce cas « Annuler » a le focus par défaut. Échap ou un clic à côté annule.
 - JS : `if (!(await confirmBox('…', { confirm: 'Publier' }))) return;`. Formulaire rendu par le serveur : `data-confirm="Question ? Conséquence."`, avec
   `data-confirm-label="Verbe"` quand le verbe de la question ne suffit pas (« Passer en client »). Un formulaire `data-action` n'est confirmé qu'une fois.
+  Quand un formulaire a plusieurs boutons sur un même champ, `data-confirm` se pose **sur le bouton** concerné (voir « une seule saisie »).
 - Ne demande pas de confirmation pour une action réversible ou sans conséquence (remettre le pied de page des mails n'en demande pas).
 
 ## Animations
