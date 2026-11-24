@@ -1,7 +1,7 @@
 // Modifications de code proposées par l'IA pour une idée acceptée : tout ce qu'elle écrit est NON FIABLE et revérifié ici avant d'être commité.
 // Deux voies, une seule sortie (la liste des fichiers changés dans le clone) :
 //   - `applyEdits`  : l'IA a renvoyé des remplacements en texte (écriture directe désactivée) ; le code les applique lui-même ;
-//   - `diffTrees`   : l'IA a écrit dans une copie jetable du dépôt (réglage « Écriture directe du code ») ; le code reprend ce qui a changé.
+//   - `diffTrees`   : l'IA a écrit dans une copie jetable du dépôt (réglage « Implémenter automatiquement les idées acceptées ») ; le code reprend ce qui a changé.
 // Dans les deux cas, `checkChanges` refuse les chemins interdits, les secrets, les liens symboliques et les volumes excessifs.
 import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, relative, resolve, sep } from 'node:path';

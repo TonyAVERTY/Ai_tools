@@ -10,6 +10,7 @@ import { assertCanRunAi } from './claudelink.js';
 import { budgetState } from './services/budget.js';
 import { gitCredentialFor } from './gitservers.js';
 import { needAccess } from './teams.js';
+import { getSetting, setSetting } from './db.js';
 
 export function registerEvolutionRoutes(router, app, { project, aiOpts }) {
   const { db } = app;
@@ -35,6 +36,18 @@ export function registerEvolutionRoutes(router, app, { project, aiOpts }) {
     json(ctx.res, { html: await blockOf(await idea(ctx)) });
   });
 
+  /** Lance le job d'implémentation d'une idée acceptée. Lève une HttpError (message affichable) si quelque chose manque. */
+  async function startImplementation(p, jobId, n, target) {
+    if (!(await acceptedIdea(db, p.id, jobId, n))) throw new HttpError(400, "Accepte d'abord l'idée", { expose: true });
+    const cred = await gitCredentialFor(app, p.userId, p.gitUrl);
+    if (!cred?.token) throw new HttpError(400, "Aucun token Git pour ce dépôt : ajoute-en un, avec le droit d'écriture, dans Réglages → Dépôts Git", { expose: true });
+    await assertCanRunAi(db, p.userId, aiOpts);
+    const r = await enqueue(db, { userId: p.userId, projectId: p.id, type: 'implement', params: { evo: jobId, n, target } }, aiOpts);
+    if (r.existing) throw new HttpError(409, 'Une implémentation est déjà en cours sur ce projet : attends sa fin', { expose: true });
+    const budget = await budgetState(db, p.userId);
+    return { id: r.id, budgetBlocked: budget?.blocked ? budget.reason : null };
+  }
+
   router.post('/api/projects/:id/evolution/:job/:n/decision', async (ctx) => {
     const ref = await idea(ctx);
     const { p, jobId, n } = ref;
@@ -44,12 +57,35 @@ export function registerEvolutionRoutes(router, app, { project, aiOpts }) {
     const reason = String(b.reason ?? '').replace(/\r\n?/g, '\n').trim();
     if (reason.length > LEN.reason) throw new HttpError(400, `Justification trop longue : ${LEN.reason} caractères au plus`, { expose: true });
     if (status === 'refused' && !reason) throw new HttpError(400, 'Justification manquante : dis pourquoi tu refuses cette idée', { expose: true });
-    await saveDecision(db, { jobId, projectId: p.id, ownerId: p.userId, userId: ctx.session.userId, n, status, reason: status ? reason : '' });
-    // Une idée refusée quitte la liste (sa raison reste gardée) ; les autres états renvoient le bloc à jour
-    json(ctx.res, status === 'refused' ? { ok: true, removed: true } : { ok: true, html: await blockOf(ref) });
+    const userId = ctx.session.userId;
+    const before = (await decisionsOf(db, jobId)).get(n);
+    await saveDecision(db, { jobId, projectId: p.id, ownerId: p.userId, userId, n, status, reason: status ? reason : '' });
+    // Une idée refusée quitte la liste (sa raison reste gardée)
+    if (status === 'refused') return json(ctx.res, { ok: true, removed: true });
+    // Une idée acceptée : réglage du propriétaire « Implémenter automatiquement » → le code est écrit et poussé tout de suite (nouvelle branche) ;
+    // sinon `next: 'ask'` : l'écran demande « Veux-tu que l'IA écrive le code ? » (sauf si cette personne a coché « Ne plus afficher »).
+    // Seuls le propriétaire et les administrateurs implémentent (le code est écrit dans le dépôt) ; ré-accepter ne relance rien.
+    let next = null, warn = null;
+    if (status === 'accepted' && ['owner', 'admin'].includes(p.access) && before?.status !== 'accepted') {
+      if ((await getSetting(db, p.userId, 'ai_code_edit', '0')) === '1') {
+        try {
+          const r = await startImplementation(p, jobId, n, 'branch');
+          next = 'started';
+          if (r.budgetBlocked) warn = `En file, mais ${r.budgetBlocked}`;
+        } catch (e) { if (!(e instanceof HttpError)) throw e; warn = e.message; }
+      } else if ((await getSetting(db, userId, 'evo_impl_hint', '0')) !== '1') next = 'ask';
+    }
+    json(ctx.res, { ok: true, html: await blockOf(ref), next, warn });
   }, { limit: 'evo_decision' });
 
-  // Implémentation d'une idée ACCEPTÉE : un job IA qui écrit le code puis le pousse sur le dépôt du projet
+  // « Ne plus afficher ce message » (et sa remise en route dans Réglages) : préférence de CETTE personne
+  router.post('/api/evolution/implement-hint', async (ctx) => {
+    const b = await readBody(ctx.req);
+    await setSetting(db, ctx.session.userId, 'evo_impl_hint', b.hide === true ? '1' : '0');
+    json(ctx.res, { ok: true });
+  }, { limit: 'evo_decision' });
+
+  // Implémentation d'une idée ACCEPTÉE (bouton « Implémenter », ou « Oui » de la question posée à l'acceptation)
   router.post('/api/projects/:id/evolution/:job/:n/implement', async (ctx) => {
     const ref = await idea(ctx);
     const { p, jobId, n } = ref;
@@ -57,13 +93,7 @@ export function registerEvolutionRoutes(router, app, { project, aiOpts }) {
     const b = await readBody(ctx.req);
     const target = b.target === 'default' ? 'default' : 'branch';
     if (target === 'default' && b.confirm !== true) throw new HttpError(400, 'Confirmation requise pour pousser sur la branche principale', { expose: true });
-    if (!(await acceptedIdea(db, p.id, jobId, n))) throw new HttpError(400, "Accepte d'abord l'idée", { expose: true });
-    const cred = await gitCredentialFor(app, p.userId, p.gitUrl);
-    if (!cred?.token) throw new HttpError(400, "Aucun token Git pour ce dépôt : ajoute-en un, avec le droit d'écriture, dans Réglages → Dépôts Git", { expose: true });
-    await assertCanRunAi(db, p.userId, aiOpts);
-    const r = await enqueue(db, { userId: p.userId, projectId: p.id, type: 'implement', params: { evo: jobId, n, target } }, aiOpts);
-    if (r.existing) throw new HttpError(409, 'Une implémentation est déjà en cours sur ce projet : attends sa fin', { expose: true });
-    const budget = await budgetState(db, p.userId);
-    json(ctx.res, { ok: true, id: r.id, budgetBlocked: budget?.blocked ? budget.reason : null, html: await blockOf(ref) });
+    const r = await startImplementation(p, jobId, n, target);
+    json(ctx.res, { ok: true, id: r.id, budgetBlocked: r.budgetBlocked, html: await blockOf(ref) });
   }, { limit: 'evo_impl' });
 }
