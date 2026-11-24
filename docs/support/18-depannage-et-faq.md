@@ -333,3 +333,6 @@ Va dans Mon compte → Affichage et choisis **Clair** ou **Sombre** : le choix e
 
 ## L'A2F redemande le code alors que j'avais coché « Faire confiance à cet appareil »
 L'appareil de confiance est un cookie lié à ce navigateur, valable 30 jours. Il est oublié si tu effaces les cookies, si tu changes de navigateur ou d'ordinateur, si tu utilises la navigation privée, ou si tu as cliqué sur **Oublier mes appareils de confiance**, désactivé l'A2F ou renouvelé les codes de secours. Saisis ton code et coche la case de nouveau.
+
+## « Trop de codes essayés » ou « Active l'A2F pour ouvrir l'administration »
+Le premier message veut dire que 10 codes ont été essayés en moins de 15 minutes sur ton compte : attends un quart d'heure, puis saisis le code actuel de ton application. Le second concerne les comptes administrateurs : active d'abord l'A2F dans Mon compte → Sécurité : A2F, puis rouvre l'Administration.

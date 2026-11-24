@@ -16,6 +16,7 @@ import {
 import { loginPage } from './site/pages.js';
 import { registerMfaRoutes, securityHtml } from './mfaroutes.js';
 import { themeCard } from './themeviews.js';
+import { securityLog } from './securitylog.js';
 import { themeOf } from './theme.js';
 import { registerSiteRoutes } from './site/routes.js';
 import { registerAdminRoutes } from './adminroutes.js';
@@ -137,6 +138,7 @@ export function registerRoutes(router, app) {
   // Erreur de connexion : message du serveur s'il est destiné à l'utilisateur, sinon générique (rien de technique à l'écran)
   const loginFailed = (res, e) => {
     if (!e.status || (e.status >= 500 && !e.expose)) console.error('[connexion]', e);
+    securityLog('login_failed', { detail: e.status ? String(e.status) : 'erreur' }); // jamais le message ni l'adresse e-mail : un code d'état seulement
     redirect(res, `/login?e=${encodeURIComponent(e.status && (e.status < 500 || e.expose) ? e.message : 'Connexion impossible, réessaie dans un instant')}`);
   };
   // Démarrage : avec reCAPTCHA, seul un POST portant un jeton valide démarre le flux (le GET renvoie vers la page de connexion)
