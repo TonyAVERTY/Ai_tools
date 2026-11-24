@@ -238,3 +238,41 @@ test('journal de sécurité : événements JSON, jamais le code, le secret ni l\
     for (const x of security) { assert.ok(!x.includes(secret) && !x.includes(codes[0]) && !x.includes('654321') && !x.includes(u.email)); }
   } finally { console.log = orig; await s.close(); }
 });
+
+test('champ de code : 6 chiffres = 6 caractères au plus, secours = 11 ; la page rendue dans l\'autre mode existe sans JavaScript', async () => {
+  const s = await startApp();
+  try {
+    const u = await s.newUser({ admin: false });
+    await enable(s, u);
+    const c = s.client(await pendingCookie(s, u.id));
+    const std = await (await c.get('/login/2fa', { headers: { accept: 'text/html' } })).text();
+    assert.match(std, /name="code" data-code-input data-mode="totp" inputmode="numeric" maxlength="6" pattern="\[0-9\]\{6\}"/);
+    assert.match(std, /href="\/login\/2fa\?mode=secours"[^>]*data-code-toggle/);
+    const sec = await (await c.get('/login/2fa?mode=secours', { headers: { accept: 'text/html' } })).text();
+    assert.match(sec, /data-mode="secours" inputmode="text" maxlength="11"/);
+    assert.match(sec, /name="mode" value="secours"/);
+    const card = await (await u.get('/account', { headers: { accept: 'text/html' } })).text();
+    assert.match(card, /id="securite"[\s\S]*maxlength="6"/);
+    const cardSec = await (await u.get('/account?mode=secours', { headers: { accept: 'text/html' } })).text();
+    assert.match(cardSec, /id="securite"[\s\S]*maxlength="11"/);
+  } finally { await s.close(); }
+});
+
+test('serveur : un code de plus de 32 caractères est refusé sans calcul et compte comme un essai raté ; un code de secours exige exactement 10 caractères utiles', async () => {
+  const s = await startApp();
+  try {
+    const u = await s.newUser({ admin: false });
+    const { secret, codes } = await enable(s, u);
+    await s.db.prepare('UPDATE users SET totp_last_step = 0 WHERE id = ?').run(u.id);
+    const c = s.client(await pendingCookie(s, u.id));
+    const valid = codeAt(secret, step());
+    // Un bon code noyé dans une longue chaîne n'est pas un bon code
+    assert.match(where(await c.post('/login/2fa', { code: `${valid}${'0'.repeat(40)}` }, form)), /\/login\/2fa\?e=/);
+    assert.match(where(await c.post('/login/2fa', { code: `${codes[0]}${'a'.repeat(30)}` }, form)), /\/login\/2fa\?e=/);
+    assert.match(where(await c.post('/login/2fa', { code: `${codes[0]}0` }, form)), /\/login\/2fa\?e=/, '11 caractères utiles : refusé');
+    assert.equal((await c.post('/login/2fa', { code: valid }, form)).headers.get('location'), '/', 'le bon code, lui, passe toujours');
+    // le mode se conserve après une erreur
+    const c2 = s.client(await pendingCookie(s, u.id));
+    assert.match(where(await c2.post('/login/2fa', { code: 'zzzzz-zzzzz', mode: 'secours' }, form)), /mode=secours/);
+  } finally { await s.close(); }
+});

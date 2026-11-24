@@ -9,7 +9,7 @@
   mark('ready');
   history.replaceState({ y: scrollY }, '');
 
-  const STAY = /\/static\/(ajax|fx)\.js(\?|$)/; // scripts qui restent en place (le reste est relancé à chaque page)
+  const STAY = /\/static\/(ajax|fx|code-field|console-warning)\.js(\?|$)/; // scripts qui restent en place (le reste est relancé à chaque page) : ceux-ci branchent des écouteurs sur document une fois pour toutes, ou écrivent dans la console
   const abs = (u) => new URL(u, location.href);
   const here = () => location.pathname + location.search;
   const sheets = (d) => [...d.querySelectorAll('link[rel="stylesheet"]')].map((l) => l.getAttribute('href')).sort().join('|');

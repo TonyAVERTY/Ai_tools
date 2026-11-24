@@ -122,7 +122,7 @@ function dialog(d) {
     </fieldset>
     <div class="grid2">
       <label class="field"><span class="lbl">Date du paiement</span><input type="date" name="date" max="${esc(d.today)}" value="${esc(d.today)}" required></label>
-      <label class="field"><span class="lbl">Montant TTC (réellement payé)</span><span class="unit"><input name="amount" inputmode="decimal" placeholder="49,90" autocomplete="off" required><span>€</span></span></label>
+      <label class="field"><span class="lbl">Montant TTC (réellement payé)</span><span class="unit"><input maxlength="12" name="amount" inputmode="decimal" placeholder="49,90" autocomplete="off" required><span>€</span></span></label>
     </div>
     <label class="field" data-compta-vat${d.settings.vat === 'franchise' ? ' hidden' : ''}><span class="lbl">TVA</span>
       <select name="vatRate">${VAT_RATES.map(([r, l]) => opt(r, l, r === 2000)).join('')}</select>

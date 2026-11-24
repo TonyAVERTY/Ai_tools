@@ -40,11 +40,13 @@ export function registerMfaRoutes(router, app) {
 
   /** Comme checkCode, avec un plafond par compte (10 codes / 15 min, d'où qu'ils viennent) et le journal de sécurité. Lève 429 au-delà du plafond. */
   async function codeOk(userId, input, req) {
+    // Un code a 6 chiffres ou 11 caractères : tout ce qui est plus long est refusé sans calcul (et compte comme un essai raté)
+    const tooLong = String(input ?? '').length > 32;
     if (!app.limiter.check('mfa_code', { userId }).ok) {
       securityLog('mfa_locked', { userId, ip: ipOf(req) });
       throw new HttpError(429, 'Trop de codes essayés : réessaie dans quelques minutes', { expose: true });
     }
-    const ok = await checkCode(userId, input);
+    const ok = !tooLong && await checkCode(userId, input);
     if (!ok) securityLog('mfa_failed', { userId, ip: ipOf(req) });
     return ok;
   }
@@ -79,7 +81,7 @@ export function registerMfaRoutes(router, app) {
     const pending = await getPendingSession(db, req);
     if (!pending) return redirect(res, '/login');
     if (await trusted(pending.userId, req)) return promote(req, res, pending);
-    html(res, mfaLoginPage({ appUrl: cfg.appUrl, error: url.searchParams.get('e') }));
+    html(res, mfaLoginPage({ appUrl: cfg.appUrl, error: url.searchParams.get('e'), secours: url.searchParams.get('mode') === 'secours' }));
   }, { public: true, limit: 'mfa' });
 
   router.post('/login/2fa', async ({ req, res }) => {
@@ -107,7 +109,7 @@ export function registerMfaRoutes(router, app) {
       await db.prepare('DELETE FROM sessions WHERE id = ?').run(pending.id);
       return redirect(res, `/login?e=${encodeURIComponent('Trop de codes erronés : reconnecte-toi pour réessayer')}`);
     }
-    redirect(res, `/login/2fa?e=${encodeURIComponent('Code incorrect ou déjà utilisé : réessaie avec le code actuel de ton application')}`);
+    redirect(res, `/login/2fa?e=${encodeURIComponent('Code incorrect ou déjà utilisé : réessaie avec le code actuel de ton application')}${b.mode === 'secours' ? '&mode=secours' : ''}`);
   }, { public: true, limit: 'mfa' });
 
   // ---------- Mon compte ----------
@@ -162,11 +164,11 @@ export function registerMfaRoutes(router, app) {
 }
 
 /** HTML de la carte « Sécurité » de Mon compte (le secret en cours d'activation n'est montré que tant que l'A2F n'est pas activée). */
-export async function securityHtml(db, cfg, session) {
+export async function securityHtml(db, cfg, session, { mode = 'totp' } = {}) {
   const u = await db.prepare('SELECT totp_secret_enc, totp_enabled, totp_recovery FROM users WHERE id = ?').get(session.userId);
   const enabled = !!u?.totp_enabled;
   let left = 0;
   try { left = JSON.parse(u?.totp_recovery || '[]').length; } catch { /* aucune empreinte lisible : 0 code restant */ }
   const devices = enabled ? Number((await db.prepare('SELECT COUNT(*) n FROM trusted_devices WHERE user_id = ? AND expires_at > ?').get(session.userId, now())).n) : 0;
-  return securityCard({ devices, enabled, setup: !enabled && u?.totp_secret_enc ? decrypt(cfg.secretKey, u.totp_secret_enc) : null, email: session.email, recoveryLeft: left });
+  return securityCard({ devices, enabled, setup: !enabled && u?.totp_secret_enc ? decrypt(cfg.secretKey, u.totp_secret_enc) : null, email: session.email, recoveryLeft: left, mode });
 }

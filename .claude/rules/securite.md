@@ -28,6 +28,12 @@ Une fonctionnalité qui marche mais qui introduit un risque de sécurité non tr
 - Un secret exposé est **révoqué et remplacé** (`docs/security/INCIDENT_RESPONSE.md`). Le supprimer du code ne suffit pas.
 - `.env` n'est jamais commité ; `.env.example` ne contient aucune valeur confidentielle.
 
+## Champs de saisie (longueur et forme)
+- **Un champ de N caractères attendus n'en accepte jamais plus de N** (code A2F : 6 chiffres = `maxlength="6"`, `pattern`, `inputmode`, et nettoyage à la frappe ET au collage : `public/code-field.js`).
+- **Tout champ de texte a un `maxlength`**, tout champ numérique un `min` et un `max` (dates et heures : bornées par le navigateur). Les valeurs viennent de `LEN` dans `src/inputlimits.js` ; une balise n'a jamais deux fois le même attribut (le navigateur retient le premier). `test/input-limits.test.js` échoue sinon.
+- **Le serveur décide** : un nom de champ sans ambiguïté (secret, hôte, adresse, jeton…) est mesuré pour TOUTES les routes par `readBody` (`FIELD_LIMITS`, `src/inputlimits.js`) et refusé en 400 s'il est trop long. Un champ de contenu a son plafond dans sa route. **Jamais de troncature silencieuse d'un secret** (tronquer un mot de passe le change). Le `maxlength` d'un champ n'est jamais plus large que la limite du serveur (testé).
+- Un nouveau champ : ajoute sa limite à `LEN`, son nom à `FIELD_LIMITS` s'il est sans ambiguïté, et son `maxlength` dans l'écran, dans le même commit.
+
 ## Journaux
 - Jamais de mot de passe, de jeton, de code A2F, de secret, de contenu de mail ni d'adresse e-mail dans un journal. Pour la sécurité : `securityLog()` (`src/securitylog.js`) : événement + numéro de compte + IP tronquée.
 - Les erreurs renvoyées au client ne contiennent aucun détail technique (`HttpError` avec `expose` seulement pour un message destiné à l'utilisateur).

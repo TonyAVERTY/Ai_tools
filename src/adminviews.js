@@ -23,7 +23,7 @@ function actions(a, page, q, selfId) {
     ${f('plan', `<select name="plan" aria-label="Plan de ${esc(a.email)}"><option value="free"${a.plan === 'free' ? ' selected' : ''}>gratuit</option><option value="pro"${a.plan === 'pro' ? ' selected' : ''}>pro</option></select> <button class="btn small">Appliquer</button>`)}
     ${a.sendPause ? f('resume-send', '<button class="btn small">Rétablir les envois</button>') : ''}
     <details class="del"><summary class="btn small danger">Supprimer</summary>
-      ${f('delete', `<label>Saisis l'email du compte pour confirmer<input name="confirm" type="email" required autocomplete="off" placeholder="${esc(a.email)}"></label><button class="btn small danger">Supprimer définitivement</button>`)}
+      ${f('delete', `<label>Saisis l'email du compte pour confirmer<input maxlength="254" name="confirm" type="email" required autocomplete="off" placeholder="${esc(a.email)}"></label><button class="btn small danger">Supprimer définitivement</button>`)}
     </details>
   </div>`;
 }

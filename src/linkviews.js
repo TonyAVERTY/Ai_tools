@@ -24,7 +24,7 @@ function keyPanel({ id, title, body, placeholder, provider, badge = 'Recommandé
   ${body}
   <form method="post" action="/link/api-key" class="cfg link-key">
     <input type="hidden" name="provider" value="${provider}">
-    <label class="field"><span class="lbl">Clé API</span><input name="apiKey" type="password" autocomplete="new-password" spellcheck="false" required placeholder="${placeholder}"></label>
+    <label class="field"><span class="lbl">Clé API</span><input maxlength="600" name="apiKey" type="password" autocomplete="new-password" spellcheck="false" required placeholder="${placeholder}"></label>
     <button class="btn primary">Vérifier et relier</button>
   </form>
 </section>`;
@@ -51,7 +51,7 @@ function claudePanel(cliModeEnabled) {
         ${notice(CONSENT_TEXT)}
         ${consentBox()}
         <p class="hint">Sur ta propre machine, lance la commande <code>claude setup-token</code>, connecte-toi à ton compte Claude quand le navigateur s'ouvre, puis copie le jeton affiché et colle-le ci-dessous. Le jeton est chiffré, utilisé uniquement pour tes jobs, et n'est jamais réaffiché.</p>
-        <label class="field"><span class="lbl">Jeton d'abonnement</span><input name="token" type="password" autocomplete="new-password" spellcheck="false" required></label>
+        <label class="field"><span class="lbl">Jeton d'abonnement</span><input maxlength="600" name="token" type="password" autocomplete="new-password" spellcheck="false" required></label>
         <p class="hint">La vérification lance un appel minimal du CLI : quelques tokens sont décomptés de ton abonnement.</p>
         <button class="btn primary" data-consent-submit disabled>Relier avec mon jeton</button>
       </form>
@@ -81,7 +81,7 @@ function openaiPanel(cliModeEnabled) {
         ${notice(OPENAI_CONSENT_TEXT)}
         ${consentBox()}
         <p class="hint">Sur ta propre machine, lance <code>codex login</code> et connecte-toi à ton compte ChatGPT, puis colle ci-dessous le contenu complet du fichier <code>~/.codex/auth.json</code>. Il est chiffré, utilisé uniquement pour tes jobs, et n'est jamais réaffiché.</p>
-        <label class="field"><span class="lbl">Contenu du fichier de connexion</span><textarea name="authJson" rows="5" autocomplete="off" spellcheck="false" required></textarea></label>
+        <label class="field"><span class="lbl">Contenu du fichier de connexion</span><textarea maxlength="20000" name="authJson" rows="5" autocomplete="off" spellcheck="false" required></textarea></label>
         <p class="hint">La vérification lance un appel minimal du CLI : quelques tokens sont décomptés de ton abonnement.</p>
         <button class="btn primary" data-consent-submit disabled>Relier avec mon fichier</button>
       </form>
@@ -117,7 +117,7 @@ function geminiPanel(googleEnabled = false, keyEnabled = true) {
         ${notice(GOOGLE_CONSENT_TEXT)}
         ${consentBox()}
         <p class="hint">Sur ta machine, lance <code>agy</code> et connecte-toi avec Google, puis colle ci-dessous le contenu complet du fichier <code>~/.gemini/antigravity-cli/antigravity-oauth-token</code>. Il est chiffré, utilisé uniquement pour tes tâches, et ne sera plus jamais affiché. Sous Windows et sur Mac, la connexion est rangée ailleurs : utilise la connexion guidée.</p>
-        <label class="field"><span class="lbl">Contenu du fichier de connexion</span><textarea name="authFile" rows="5" autocomplete="off" spellcheck="false" required></textarea></label>
+        <label class="field"><span class="lbl">Contenu du fichier de connexion</span><textarea maxlength="20000" name="authFile" rows="5" autocomplete="off" spellcheck="false" required></textarea></label>
         <p class="hint">La vérification lance un appel minimal du CLI : quelques milliers de tokens sont décomptés de ton abonnement.</p>
         <button class="btn primary" data-consent-submit disabled>Relier avec mon fichier</button>
       </form>
@@ -145,7 +145,7 @@ function googleDialog() {
       <p><strong>1.</strong> Ouvre Google et connecte-toi :</p>
       <p><a class="btn primary" data-google-link href="#" target="_blank" rel="noopener noreferrer">Ouvrir Google</a></p>
       <p><strong>2.</strong> Copie le code que Google affiche, puis colle-le ici :</p>
-      <label class="field"><span class="lbl">Code de Google</span><input name="code" autocomplete="off" spellcheck="false" required></label>
+      <label class="field"><span class="lbl">Code de Google</span><input maxlength="512" name="code" autocomplete="off" spellcheck="false" required></label>
       <p class="hint" role="timer" data-google-timer></p>
       <div class="modal-f"><button type="button" class="btn" data-close-dialog>Annuler</button><button type="button" class="btn" data-google-again hidden>Nouveau lien</button><button class="btn primary" data-google-send><span data-label>Valider le code</span></button></div>
       <p class="msg msg-err" role="alert" data-google-error2 hidden></p>
@@ -200,7 +200,7 @@ function claudeDialog(start) {
       <p><a class="btn primary" data-claude-link href="#" target="_blank" rel="noopener noreferrer">Ouvrir Claude</a></p></div>
       <p><strong>2.</strong> Copie le code que Claude affiche, puis reviens ici : il est reconnu tout seul (sinon, colle-le dans le champ).</p>
       <form class="cfg" data-claude-code>
-        <label class="field"><span class="lbl">Code affiché par Claude</span><input name="code" autocomplete="off" spellcheck="false" required></label>
+        <label class="field"><span class="lbl">Code affiché par Claude</span><input maxlength="512" name="code" autocomplete="off" spellcheck="false" required></label>
         <button class="btn primary"><span data-label>Terminer la connexion</span></button>
         ${pctBlock('Récupération de ton jeton')}
       </form>

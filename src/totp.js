@@ -73,7 +73,7 @@ export function newRecoveryCodes() {
 /** Si `input` est un code de secours encore valide : renvoie la liste d'empreintes sans lui ; sinon null. */
 export function consumeRecovery(hashes, input) {
   const h = hashCode(input);
-  if (normalizeRecovery(input).length < 10) return null;
+  if (normalizeRecovery(input).length !== 10 || String(input ?? '').length > 32) return null; // exactement 10 caractères utiles, jamais plus
   const i = hashes.findIndex((x) => same(x, h));
   return i < 0 ? null : hashes.filter((_, j) => j !== i);
 }
