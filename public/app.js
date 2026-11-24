@@ -934,7 +934,7 @@
   // ---------- Rendu d'un job ----------
   // Un modèle de mail ou de relance rédigé, ou une analyse : le résultat est affiché juste au-dessus (le texte du modèle, la fiche projet), donc ni « Voir » ni tokens
   // en pleine largeur sous les onglets ; la tâche reste visible dans « Activité ». « Voir » reste à côté d'un bouton d'action : tâche en cours (Annuler), échec (Réessayer).
-  const QUIET_WHEN_DONE = ['template', 'followup_template', 'analyze'];
+  const QUIET_WHEN_DONE = ['template', 'followup_template', 'analyze', 'implement'];
   function renderJob(box, job, type) {
     if (box && job && job.status === 'done' && QUIET_WHEN_DONE.includes(type)) { box.innerHTML = ''; box._sig = ''; return; }
     renderJobContent(box, job, type);
@@ -1061,7 +1061,7 @@
     }
     const st = state.get(id) || {};
     const jobs = s.jobs;
-    for (const type of ['analyze', 'prospect', 'template', 'send', 'evolution', 'audit', 'followup_template', 'followup', 'linkedin_post', 'instagram_post', 'newsletter', 'promo_video']) renderJob($(`[data-job="${type}"]`, el), jobs[type], type);
+    for (const type of ['analyze', 'prospect', 'template', 'send', 'evolution', 'implement', 'audit', 'followup_template', 'followup', 'linkedin_post', 'instagram_post', 'newsletter', 'promo_video']) renderJob($(`[data-job="${type}"]`, el), jobs[type], type);
     for (const box of $$('[data-job^="poste_"]', el)) renderJob(box, jobs[box.dataset.job], box.dataset.job);
     // « En-tête » est replié une fois le projet analysé : une analyse qui échoue y affiche son erreur, on l'ouvre (une fois par échec, pour ne pas rouvrir ce qu'on vient de fermer)
     const analyzeJob = jobs.analyze;
@@ -1939,7 +1939,24 @@
   every(async () => {
     for (const box of $$('.evo-decide')) {
       if (!$('[data-evo-running]', box)) continue;
-      try { const r = await api(evoUrl(box, 'decision')); if (box.isConnected) evoReplace(box, r.html); } catch { /* prochain tour */ }
+      try {
+        const r = await api(evoUrl(box, 'decision'));
+        if (!box.isConnected) continue;
+        if (!r.done) { evoReplace(box, r.html); continue; }
+        // Implémentation terminée : l'idée quitte la liste et son récapitulatif s'affiche en haut de la zone
+        const li = box.closest('.evo');
+        const list = li?.closest('.evos');
+        const zone = (list?.parentElement || document).querySelector('.evo-recaps');
+        zone?.insertAdjacentHTML('afterbegin', r.recap);
+        li?.remove();
+        if (list && !list.children.length) {
+          const empty = document.createElement('p');
+          empty.className = 'muted small evo-empty';
+          empty.textContent = "Toutes les idées ont été traitées : lance une nouvelle recherche pour en recevoir d'autres.";
+          list.replaceWith(empty);
+        }
+        toast('Idée implémentée');
+      } catch { /* prochain tour */ }
     }
   }, 3000);
   listen(document, 'submit', async (e) => {

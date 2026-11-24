@@ -50,9 +50,27 @@ export async function implChoiceOf(db, userId) {
 
 const ACTIVE = ['queued', 'running'];
 
+/** Numéros des idées dont l'implémentation est terminée : elles quittent la liste (un récapitulatif les remplace). */
+export const implementedOf = (impls) => new Set([...impls].filter(([, i]) => i.status === 'done' && i.result).map(([n]) => n));
+
+/** Récapitulatif d'une idée implémentée (texte échappé) : la fonctionnalité, la branche, le commit, les fichiers. */
+export function recapLine(title, impl) {
+  const r = impl.result || {};
+  const where = r.target === 'default' ? `la branche principale <code>${esc(r.branch)}</code>` : `la branche <code>${esc(r.branch)}</code>`;
+  const files = (r.files || []).slice(0, 40).map((f) => `<li><code>${esc(f)}</code></li>`).join('');
+  return `<div class="evo-recap" role="status" data-recap-n="${Number(impl.n ?? 0)}">
+  <p><strong>La fonctionnalité « ${esc(title)} » est bien implémentée</strong> sur ${where} (commit <code>${esc(String(r.commit ?? '').slice(0, 7))}</code>, ${(r.files || []).length} fichier(s)).${r.url ? ` <a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">Voir sur ton serveur Git</a>` : ''}</p>
+  ${r.summary ? `<p class="small">${esc(r.summary)}</p>` : ''}${files ? `<details class="small"><summary>Fichiers modifiés</summary><ul class="evo-files">${files}</ul></details>` : ''}
+  <p class="muted small">Code écrit par l'IA : relis-le et lance tes tests avant de le fusionner.</p>
+</div>`;
+}
+
+/** Tous les récapitulatifs d'une liste, dans l'ordre des idées. */
+export const recapsHtml = (ideas, impls) => ideas.filter((e) => impls.get(e.n)?.status === 'done' && impls.get(e.n).result).map((e) => recapLine(e.title, { ...impls.get(e.n), n: e.n })).join('');
+
 /** État de l'implémentation d'une idée acceptée (texte échappé). Elle se lance à l'acceptation ; pour recommencer après un échec, on clique de nouveau sur « Accepter ». */
 function implHtml(impl) {
-  if (impl && ACTIVE.includes(impl.status)) return `<p class="evo-impl s-running" data-evo-running>Implémentation en cours : l'IA écrit le code, puis il est poussé sur ton dépôt…</p>`;
+  if (impl && ACTIVE.includes(impl.status)) return `<p class="evo-impl s-running" data-evo-running><span class="loading small" role="status"><span class="spin-inline" aria-hidden="true"></span><span>Implémentation en cours : l'IA écrit le code, puis il est poussé sur ton dépôt…</span></span></p>`;
   if (impl?.status === 'done' && impl.result) {
     const r = impl.result;
     const where = r.target === 'default' ? `la branche principale <code>${esc(r.branch)}</code>` : `la nouvelle branche <code>${esc(r.branch)}</code>`;

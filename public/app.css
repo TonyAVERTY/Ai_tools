@@ -2107,3 +2107,8 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 7px; text-align: cen
 .evo-target legend { font-weight: 600; padding: 0; margin-bottom: 4px; }
 .toast-fix { display: inline-block; margin-top: 6px; color: var(--accent-text); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
 .evo-fix { color: var(--accent-text); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
+.evo-recaps { display: grid; gap: 10px; margin-bottom: 10px; }
+.evo-recaps:empty { display: none; }
+.evo-recap { padding: 10px 14px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--ok-bg); display: grid; gap: 6px; }
+.evo-recap p { margin: 0; }
+.evo-recap summary { cursor: pointer; }

@@ -89,6 +89,16 @@ test('réglage activé : une implémentation déjà en cours ou l\'absence de to
   await s.db.prepare("UPDATE jobs SET status = 'done', result_json = ? WHERE type = 'implement'").run(JSON.stringify({ branch: 'iaboss/x-1', target: 'branch', commit: 'abcdef123456', files: ['a.js'], summary: '' }));
   assert.equal((await accept(A, 4)).next, null);
   assert.equal((await implJobs()).length, 2, 'pas de relance après une réussite');
+  // Terminée : l'idée quitte la liste et un récapitulatif (échappé) dit que la fonctionnalité est bien implémentée
+  await s.db.prepare("UPDATE jobs SET result_json = ? WHERE type = 'implement'").run(JSON.stringify({ branch: 'iaboss/<b>x-1', target: 'branch', commit: 'abcdef123456', files: ['a.js'], summary: 'Ajouté.', url: 'https://github.com/o/r/tree/iaboss/x-1' }));
+  const list = (await (await A.get(`/api/projects/${pa}/status`)).json()).jobs.evolution.result.html;
+  assert.doesNotMatch(list, /data-n="4"/, 'l\'idée implémentée quitte la liste');
+  assert.match(list, /<div class="evo-recaps">[\s\S]*La fonctionnalité « Export PDF » est bien implémentée/);
+  assert.match(list, /iaboss\/&lt;b&gt;x-1/, 'branche échappée');
+  assert.doesNotMatch(list, /<b>x-1/);
+  const live = await (await A.get(url(4, 'decision'))).json();
+  assert.equal(live.done, true);
+  assert.match(live.recap, /Export PDF/);
 });
 
 test('un simple membre accepte sans question ni implémentation, même réglage activé', async () => {
