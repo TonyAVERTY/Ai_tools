@@ -126,6 +126,7 @@ export function privacyPage({ appUrl, apple = false, captcha = false, inactiveMo
   <tbody>
     <tr><th scope="row">Compte</th><td>Email et nom fournis par ${apple ? 'Google ou Apple' : 'Google'}, fournisseur de connexion et identifiant chez lui, plan, dates de création et de dernière connexion.</td><td>Créer ton compte et te connecter. Exécution du contrat.</td></tr>
     <tr><th scope="row">Session</th><td>Un identifiant de session aléatoire (cookie), un cookie de liaison pendant la connexion.</td><td>Te garder connecté et sécuriser la connexion. Exécution du contrat, intérêt légitime.</td></tr>
+    <tr><th scope="row">Sécurité du compte (A2F)</th><td>Si tu actives l'authentification à deux facteurs : ta clé de configuration et tes codes de secours (chiffrée pour la première, empreintes seulement pour les seconds), l'empreinte des appareils de confiance et leur date d'expiration. Journal de sécurité : événements (code erroné, A2F activée ou désactivée, export de tes données…) avec ton numéro de compte et une adresse IP tronquée (dernier groupe mis à zéro), jamais de code, de secret ni d'adresse e-mail.</td><td>Protéger ton compte contre une connexion frauduleuse et repérer les abus. Intérêt légitime, exécution du contrat.</td></tr>
     <tr><th scope="row">Liaison de ton IA (Claude, ChatGPT ou Gemini)</th><td>Ta clé API, ton jeton d'abonnement ou ton fichier de connexion (ChatGPT, Google), chiffrés. Les 4 derniers caractères d'une clé API, les dates de liaison et de test, la date et la version du texte d'avertissement accepté pour le mode abonnement.</td><td>Lancer tes jobs avec ton accès, garder la preuve de ton acceptation. Exécution du contrat, intérêt légitime.</td></tr>
     <tr><th scope="row">Projets</th><td>Nom, adresse du dépôt Git, fiche projet, cible, modèles de mail, copie du dépôt sur le serveur.</td><td>Fournir le service. Exécution du contrat.</td></tr>
     <tr><th scope="row">Configuration</th><td>Identifiants SMTP et IMAP, accès à la base de données de ton projet (récapitulatif), jeton Forgejo, adresse du webhook Discord, plafonds et budgets. Les mots de passe, jetons et adresses de webhook sont chiffrés.</td><td>Envoyer, lire les réponses, notifier. Exécution du contrat.</td></tr>
@@ -140,7 +141,7 @@ export function privacyPage({ appUrl, apple = false, captcha = false, inactiveMo
     <tr><th scope="row">Liste d'opposition</th><td>Adresse email, motif (désinscription, refus, mail rejeté) et date.</td><td>Ne plus jamais contacter une personne qui s'y est opposée, pour tous les comptes. Obligation légale, intérêt légitime.</td></tr>
   </tbody>
 </table></div>
-<p>iaboss ne collecte ni statistiques de visite, ni identifiant publicitaire, et ne charge aucun pixel de suivi.</p>`,
+<p>iaboss ne collecte aucune statistique permettant de te reconnaître (seulement des compteurs anonymes de pages vues, sans cookie : voir « Cookies et traceurs »), ni identifiant publicitaire, et ne charge aucun pixel de suivi.</p>`,
       },
       {
         id: 'durees', title: 'Combien de temps',
@@ -155,6 +156,7 @@ export function privacyPage({ appUrl, apple = false, captcha = false, inactiveMo
     <tr><th scope="row">Compte inactif</th><td>${inactiveMonths ? `Suppression automatique après ${inactiveMonths} mois sans connexion ni job, avec un mail d'avertissement 30 jours avant. Un compte suspendu ou administrateur n'est pas concerné.` : 'Aucune suppression automatique pour inactivité.'}</td></tr>
     <tr><th scope="row">Journal d'administration</th><td>12 mois. Il note les actions des administrateurs (suspension, changement de plan, suppression) et les pauses d'envoi, avec un identifiant et une adresse masquée.</td></tr>
     <tr><th scope="row">Session</th><td>30 jours au plus, effacée à la déconnexion. Les états de connexion durent 10 minutes.</td></tr>
+    <tr><th scope="row">A2F et appareils de confiance</th><td>La clé et les codes de secours jusqu'à ce que tu désactives l'A2F ou supprimes ton compte. Un appareil de confiance : 30 jours. Journal de sécurité : 12 mois au plus.</td></tr>
     <tr><th scope="row">Clé API, jeton ou connexion de ton IA</th><td>Jusqu'à ce que tu le délies ou supprimes ton compte.</td></tr>
     <tr><th scope="row">Prospects, notes et journaux d'envoi</th><td>Jusqu'à la suppression du projet ou du compte. Le journal d'envoi garde le texte de chaque mail envoyé (sans le pied de page) et, pour un mail rejeté, la raison donnée par le serveur du destinataire : tu les relis dans la page Mails. En tant que responsable de traitement, ne garde pas une fiche plus de 3 ans après le dernier contact.</td></tr>
     <tr><th scope="row">Comptabilité et justificatifs</th><td>Jusqu'à ce que tu supprimes la ligne ou ton compte. Les documents comptables se conservent en principe 10 ans : exporte-les avant de supprimer.</td></tr>
