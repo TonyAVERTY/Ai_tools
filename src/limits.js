@@ -39,6 +39,8 @@ export const RATE_LIMITS = {
   // Connexion : démarrage (Google, Apple) et retours des fournisseurs
   auth_start: { ip: { max: 20, windowMs: 10 * MIN } },
   auth_callback: { ip: { max: 40, windowMs: 10 * MIN } },
+  // Évolution : accepter ou refuser une idée (écriture légère, mais jamais en rafale)
+  evo_decision: { user: { max: 120, windowMs: 10 * MIN } },
   // Export complet du compte : 3 par heure et par compte (une requête lit toutes les tables du compte)
   account_export: { user: { max: 3, windowMs: 60 * MIN } },
   // A2F : saisie du code (à la connexion et dans Mon compte) ; la session en attente tombe en plus après 5 essais ratés

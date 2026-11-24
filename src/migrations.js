@@ -1408,4 +1408,38 @@ export const MIGRATIONS = [
       `CREATE TABLE IF NOT EXISTS page_referrers (day INT NOT NULL, host VARCHAR(100) NOT NULL, views BIGINT NOT NULL DEFAULT 0, PRIMARY KEY (day, host)) ${T}`,
     ],
   },
+  {
+    // Évolution : le propriétaire ou un membre accepte ou refuse chaque idée, avec une justification (texte libre, 500 caractères au plus).
+    // Rattachée au job qui a produit la liste : supprimée avec lui, avec le projet ou avec le compte.
+    name: 'evolution_decisions',
+    sqlite: [
+      `CREATE TABLE evolution_decisions (
+        job_id INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+        n INTEGER NOT NULL,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        status TEXT NOT NULL,          -- accepted | refused
+        reason TEXT NOT NULL DEFAULT '',
+        decided_by INTEGER, decided_at INTEGER NOT NULL,
+        PRIMARY KEY (job_id, n)
+      )`,
+      'CREATE INDEX evolution_decisions_user ON evolution_decisions(user_id)',
+    ],
+    mysql: [
+      `CREATE TABLE IF NOT EXISTS evolution_decisions (
+        job_id BIGINT NOT NULL,
+        n INT NOT NULL,
+        user_id BIGINT NOT NULL,
+        project_id BIGINT NOT NULL,
+        status VARCHAR(10) NOT NULL,
+        reason TEXT NOT NULL,
+        decided_by BIGINT NULL, decided_at BIGINT NOT NULL,
+        PRIMARY KEY (job_id, n),
+        KEY evolution_decisions_user (user_id),
+        CONSTRAINT evolution_decisions_job_fk FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE,
+        CONSTRAINT evolution_decisions_user_fk FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        CONSTRAINT evolution_decisions_project_fk FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+      ) ${T}`,
+    ],
+  },
 ];

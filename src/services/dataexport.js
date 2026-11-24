@@ -15,6 +15,7 @@ export const EXPORTED = {
   mail_log: { where: `project_id IN ${OWN}` },
   replies: { where: `project_id IN ${OWN}` },
   jobs: { where: 'user_id = ?' },
+  evolution_decisions: { where: 'user_id = ?' },
   usage_events: { where: 'user_id = ?' },
   api_tokens: { where: 'user_id = ?' },
   calendar_events: { where: 'user_id = ?' },

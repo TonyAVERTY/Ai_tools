@@ -19,6 +19,7 @@ export const LEN = {
   search: 100,        // champ de recherche
   subject: 200,       // objet d'un mail
   description: 300,   // courte description
+  reason: 500,        // justification d'une décision (idée acceptée ou refusée)
   mailBody: 5000,     // corps d'un mail modèle
   list: 2000,         // une liste saisie à la ligne (secteurs, requêtes)
   authFile: 20000,    // fichier de connexion collé (auth.json)

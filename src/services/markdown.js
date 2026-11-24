@@ -101,7 +101,8 @@ export function parseEvolutions(md) {
 export const EFFORTS = { S: 'Rapide', M: 'Moyen', L: 'Gros chantier' };
 
 /** Fiches d'évolution pour le panel (classes CSS, pas de style inline : CSP stricte). */
-export function evolutionHtml(md) {
+/** `decide(idée)` : bloc HTML ajouté sous chaque fiche (décision acceptée / refusée), absent pour l'audit. */
+export function evolutionHtml(md, decide = null) {
   const items = parseEvolutions(md);
   if (!items.length) return `<div class="md">${renderMarkdown(md)}</div>`;
   return `<ol class="evos">${items.map((e) => `<li class="evo">
@@ -110,6 +111,6 @@ export function evolutionHtml(md) {
     <h5>${inlineMd(e.title)}</h5>
     ${e.effort ? `<span class="effort e-${e.effort}"${e.effortNote ? ` title="${esc(e.effortNote)}"` : ''}>${e.effort} · ${EFFORTS[e.effort]}</span>` : ''}
   </div>
-  <div class="md">${renderMarkdown(e.body)}</div>
+  <div class="md">${renderMarkdown(e.body)}</div>${decide ? decide(e) : ''}
 </li>`).join('')}</ol>`;
 }
