@@ -281,7 +281,7 @@
   };
   const ACTIVE = ['queued', 'running'];
   const LABELS = {
-    analyze: 'Analyse', prospect: 'Recherche', template: 'Modèle', send: 'Envoi', evolution: 'Évolutions',
+    analyze: 'Analyse', prospect: 'Recherche', template: 'Modèle', send: 'Envoi', evolution: 'Évolutions', implement: 'Implémentation',
     followup_template: 'Modèle de relance', followup: 'Relances', linkedin_post: 'Post LinkedIn', instagram_post: 'Post Instagram', newsletter: 'Newsletter', promo_video: 'Vidéo de promotion', audit: 'Audit', hook: 'Accroche',
     billing_quotes: 'Facturation : exemples de devis', billing_refine: 'Facturation : affinage', billing_docs: 'Facturation : documents',
   };
@@ -1649,6 +1649,10 @@
       $('textarea', form).focus();
       return;
     }
+    // Idée acceptée : « Implémenter » ouvre le choix de la branche ; le formulaire lance le job
+    const implOpen = e.target.closest('[data-evo-impl-open]');
+    if (implOpen) { $('[data-evo-impl-form]', implOpen.closest('.evo-decide')).hidden = false; return; }
+    if (e.target.closest('[data-evo-impl-cancel]')) { e.target.closest('[data-evo-impl-form]').hidden = true; return; }
     if (e.target.closest('[data-evo-cancel]')) { const f = e.target.closest('[data-evo-form]'); f.hidden = true; return; }
     const evoClear = e.target.closest('[data-evo-clear]');
     if (evoClear) { await evoDecide(evoClear.closest('.evo-decide'), 'pending', ''); return; }
@@ -1834,16 +1838,52 @@
   // ---------- Formulaires ----------
   // Évolution : enregistre la décision d'une idée et remplace son bloc par celui que renvoie le serveur (déjà échappé)
   async function evoDecide(box, status, reason) {
-    const { job, n } = box.dataset;
-    const projectId = location.pathname.match(/\/p\/(\d+)/)?.[1];
     try {
-      const r = await api(`/api/projects/${projectId}/evolution/${job}/${n}/decision`, { status, reason });
-      const tmp = document.createElement('div');
-      tmp.innerHTML = r.html;
-      box.replaceWith(tmp.firstElementChild);
-      toast(status === 'accepted' ? 'Idée acceptée' : status === 'refused' ? 'Idée refusée' : 'Idée remise en attente');
+      const r = await api(evoUrl(box, 'decision'), { status, reason });
+      if (r.removed) {
+        // Refusée : l'idée quitte la liste (le serveur garde le titre et la raison pour ne plus la proposer)
+        const list = box.closest('.evos');
+        box.closest('.evo').remove();
+        if (list && !list.children.length) {
+          const empty = document.createElement('p');
+          empty.className = 'muted small evo-empty';
+          empty.textContent = 'Toutes les idées ont été traitées : lance une nouvelle recherche pour en recevoir d\'autres.';
+          list.replaceWith(empty);
+        }
+        toast('Idée refusée et retirée de la liste');
+        return;
+      }
+      evoReplace(box, r.html);
+      toast(status === 'accepted' ? 'Idée acceptée' : 'Idée remise en attente');
     } catch (err) { toast(err.message, 'error'); }
   }
+  const evoUrl = (box, what) => `/api/projects/${location.pathname.match(/\/p\/(\d+)/)?.[1]}/evolution/${box.dataset.job}/${box.dataset.n}/${what}`;
+  // Remplace un bloc d'idée par le HTML (échappé) du serveur
+  function evoReplace(box, html) {
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html;
+    box.replaceWith(tmp.firstElementChild);
+  }
+  listen(document, 'submit', async (e) => {
+    const form = e.target.closest('form[data-evo-impl-form]');
+    if (!form) return;
+    e.preventDefault();
+    const box = form.closest('.evo-decide');
+    const target = form.elements.target.value;
+    if (target === 'default' && !(await confirmBox("Pousser directement sur la branche principale ?\nLe code écrit par l'IA y arrive sans branche de relecture.", { confirm: 'Pousser sur la branche principale', danger: true }))) return;
+    try {
+      const r = await api(evoUrl(box, 'implement'), { target, confirm: target === 'default' });
+      evoReplace(box, r.html);
+      toast(r.budgetBlocked ? `En file, mais ${r.budgetBlocked}` : 'Implémentation lancée', r.budgetBlocked ? 'error' : 'ok');
+    } catch (err) { toast(err.message, 'error'); }
+  });
+  // Une implémentation en cours se suit toute seule : le bloc de l'idée est relu toutes les 3 secondes tant qu'elle tourne
+  every(async () => {
+    for (const box of $$('.evo-decide')) {
+      if (!$('[data-evo-running]', box)) continue;
+      try { const r = await api(evoUrl(box, 'decision')); if (box.isConnected) evoReplace(box, r.html); } catch { /* prochain tour */ }
+    }
+  }, 3000);
   listen(document, 'submit', async (e) => {
     const form = e.target.closest('form[data-evo-form]');
     if (!form) return;

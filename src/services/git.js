@@ -88,7 +88,7 @@ export function dirSize(dir, limit = Infinity) {
 }
 
 // Lance git avec délai et taille bornés : au-delà, le processus est tué et le dossier surveillé effacé par l'appelant
-function runGit(args, { token, scheme, user, cwd, watchDir, timeoutMs = GIT_TIMEOUT_MS, maxBytes = GIT_MAX_BYTES, gitBin = 'git' }) {
+export function runGit(args, { token, scheme, user, cwd, watchDir, timeoutMs = GIT_TIMEOUT_MS, maxBytes = GIT_MAX_BYTES, gitBin = 'git' }) {
   return new Promise((resolve, reject) => {
     const child = spawn(gitBin, args, { env: gitEnv(token, { scheme, user }), cwd, stdio: ['ignore', 'pipe', 'pipe'] });
     let stdout = '', stderr = '', killed = null;

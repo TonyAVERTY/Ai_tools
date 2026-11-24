@@ -47,6 +47,9 @@ export function probeClaudeFlags(bin = 'claude') {
  * @param {object} o.sandbox        cfg.sandbox (obligatoire : voir services/sandbox.js)
  * @param {Record<string,string>} [o.secretEnv]  secret de l'utilisateur du job (ANTHROPIC_API_KEY ou CLAUDE_CODE_OAUTH_TOKEN), transmis au seul processus enfant
  * @param {string} [o.allowedRoot]  dossier des clones de l'utilisateur : `cwd` doit s'y trouver
+ * @param {boolean} [o.allowEdit]   EXCEPTION unique à « pas d'Edit ni de Write » : seule la tâche `implement`, sur le réglage « Écriture directe du code » du
+ *                                  propriétaire, l'active. L'IA écrit alors dans `cwd`, une COPIE jetable sans `.git`, montée en écriture dans le bac à sable ;
+ *                                  Bash reste interdit, et tout ce qu'elle a écrit est revérifié par le code de l'application avant d'être poussé.
  */
 export function runClaude(o) {
   const args = [
@@ -55,8 +58,11 @@ export function runClaude(o) {
     '--model', o.model || 'haiku',
     '--max-turns', String(o.maxTurns || 10),
     '--allowedTools', (o.tools || []).join(','),
-    '--disallowedTools', 'Bash,Edit,Write,MultiEdit,NotebookEdit,Task',
+    '--disallowedTools', o.allowEdit ? 'Bash,NotebookEdit,Task' : 'Bash,Edit,Write,MultiEdit,NotebookEdit,Task',
   ];
+  if (o.allowEdit && (!o.cwd || (o.tools || []).some((t) => !['Read', 'Glob', 'Grep', 'Edit', 'Write'].includes(t)))) {
+    throw new Error("Écriture directe refusée : un dossier de travail et les outils Read, Glob, Grep, Edit et Write seulement");
+  }
   if (o.system) args.push('--append-system-prompt', o.system);
   // `--tools` : seuls les outils demandés existent pour le modèle. Sans lui, la définition de chaque outil intégré (Bash, WebFetch, Task, TodoWrite…)
   // part à CHAQUE appel et à chaque tour (mesuré : ~15 000 tokens d'entrée pour un « ok » contre ~3 400 avec `--tools ""`). `--allowedTools` n'ôte rien
@@ -71,6 +77,8 @@ export function runClaude(o) {
   const launch = prepareLaunch({
     bin: o.bin || 'claude', args, cwd: o.cwd, allowedRoot: o.allowedRoot,
     secretEnv: o.secretEnv, sandbox: o.sandbox, extraDirs: o.extraDirs, extraRoot: o.extraRoot,
+    // Seul le dossier de travail est écrit (monté par-dessus sa version en lecture seule) ; rien d'autre n'est jamais montée en écriture
+    ...(o.allowEdit ? { rwDirs: [o.cwd] } : {}),
   });
   const secrets = Object.values(o.secretEnv || {}).filter((v) => v && v.length >= 8);
   // Aucune trace du secret dans les erreurs, stderr ou textes remontés (journaux, base, réponses HTTP)

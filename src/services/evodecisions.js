@@ -13,6 +13,9 @@ export async function decisionsOf(db, jobId) {
   return new Map(rows.map((r) => [Number(r.n), r]));
 }
 
+/** Numéros des idées refusées : elles ne sont plus affichées (leur titre et leur raison restent gardés pour ne pas être reproposées). */
+export const refusedOf = (decided) => new Set([...decided].filter(([, d]) => d.status === 'refused').map(([n]) => n));
+
 export async function saveDecision(db, { jobId, projectId, ownerId, userId, n, status, reason }) {
   await db.prepare('DELETE FROM evolution_decisions WHERE job_id = ? AND n = ?').run(jobId, n);
   if (!status) return;
@@ -20,8 +23,49 @@ export async function saveDecision(db, { jobId, projectId, ownerId, userId, n, s
     .run(jobId, n, ownerId, projectId, status, reason, userId, now());
 }
 
-/** Bloc « décision » d'une idée : état, justification, boutons et formulaire de justification (replié). */
-export function decisionHtml(jobId, n, d) {
+/** Dernière implémentation de chaque idée d'une liste : n → { id, status, error, result }. */
+export async function implementationsOf(db, projectId, evoJobId) {
+  const rows = await db.prepare("SELECT id, status, error, params_json, result_json FROM jobs WHERE project_id = ? AND type = 'implement' ORDER BY id DESC LIMIT 60").all(projectId);
+  const out = new Map();
+  for (const r of rows) {
+    let params = {}, result = null;
+    try { params = JSON.parse(r.params_json || '{}'); } catch { /* ignoré */ }
+    if (Number(params.evo) !== Number(evoJobId) || out.has(Number(params.n))) continue;
+    try { result = r.result_json ? JSON.parse(r.result_json) : null; } catch { /* ignoré */ }
+    out.set(Number(params.n), { id: r.id, status: r.status, error: r.error, result });
+  }
+  return out;
+}
+
+const ACTIVE = ['queued', 'running'];
+
+/** État de l'implémentation d'une idée acceptée (texte échappé), et boutons pour la lancer. */
+function implHtml(jobId, n, impl, canImplement) {
+  if (impl && ACTIVE.includes(impl.status)) return `<p class="evo-impl s-running" data-evo-running>Implémentation en cours : l'IA écrit le code, puis il est poussé sur ton dépôt…</p>`;
+  if (impl?.status === 'done' && impl.result) {
+    const r = impl.result;
+    const where = r.target === 'default' ? `la branche principale <code>${esc(r.branch)}</code>` : `la nouvelle branche <code>${esc(r.branch)}</code>`;
+    const files = (r.files || []).slice(0, 40).map((f) => `<li><code>${esc(f)}</code></li>`).join('');
+    return `<div class="evo-impl s-done"><p><strong>Implémentée</strong> sur ${where} (commit <code>${esc(String(r.commit).slice(0, 7))}</code>, ${(r.files || []).length} fichier(s)).${r.url ? ` <a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">Voir sur ton serveur Git</a>` : ''}</p>
+  ${r.summary ? `<p class="small">${esc(r.summary)}</p>` : ''}<ul class="small evo-files">${files}</ul>
+  <p class="muted small">Code écrit par l'IA : relis-le et lance tes tests avant de le fusionner.</p></div>`;
+  }
+  const failed = impl?.status === 'error' ? `<p class="evo-impl s-error error small">Implémentation en échec : ${esc(impl.error || 'erreur inconnue')}</p>` : impl?.status === 'cancelled' ? '<p class="muted small">Implémentation annulée.</p>' : '';
+  if (!canImplement) return failed;
+  const label = impl ? 'Réessayer l\'implémentation' : 'Implémenter';
+  return `${failed}<div class="evo-actions"><button type="button" class="btn small primary" data-evo-impl-open>${label}</button></div>
+  <form class="evo-form" data-evo-impl-form hidden>
+    <fieldset class="evo-target"><legend>Où pousser le code ?</legend>
+      <label class="check"><input type="radio" name="target" value="branch" checked> Sur une nouvelle branche (recommandé)</label>
+      <label class="check"><input type="radio" name="target" value="default"> Directement sur la branche principale</label>
+    </fieldset>
+    <p class="hint">L'IA écrit le code, l'application le vérifie (aucun secret, aucun fichier sensible), puis le commite et le pousse avec le token Git de Réglages → Dépôts Git, qui doit avoir le droit d'écrire.</p>
+    <div class="evo-actions"><button type="submit" class="btn small primary">Lancer l'implémentation</button><button type="button" class="btn small" data-evo-impl-cancel>Annuler</button></div>
+  </form>`;
+}
+
+/** Bloc « décision » d'une idée : état, justification, boutons, formulaire de justification (replié) et, si acceptée, implémentation. */
+export function decisionHtml(jobId, n, d, impl = null, canImplement = false) {
   const state = d
     ? `<p class="evo-state s-${d.status}"><strong>${DECISIONS[d.status]}</strong>${d.reason ? ` : ${esc(d.reason)}` : ''}</p>`
     : '';
@@ -33,6 +77,7 @@ export function decisionHtml(jobId, n, d) {
     <label>Pourquoi ?<textarea name="reason" rows="2" maxlength="${LEN.reason}"></textarea></label>
     <div class="evo-actions"><button type="submit" class="btn small primary">Enregistrer</button><button type="button" class="btn small" data-evo-cancel>Annuler</button></div>
   </form>
+  ${d?.status === 'accepted' ? implHtml(jobId, n, impl, canImplement) : ''}
 </div>`;
 }
 
@@ -50,4 +95,15 @@ export async function decisionHistory(db, projectId, limit = HISTORY_MAX) {
     return titles.get(r.job_id).get(Number(r.n));
   };
   return rows.map((r) => ({ title: titleOf(r), status: r.status, reason: r.reason })).filter((d) => d.title);
+}
+
+/** L'idée n° `n` de la liste du job `evoJobId`, si elle est ACCEPTÉE sur ce projet : { title, body, reason }. */
+export async function acceptedIdea(db, projectId, evoJobId, n) {
+  const row = await db.prepare(`SELECT d.reason, j.result_json FROM evolution_decisions d JOIN jobs j ON j.id = d.job_id
+    WHERE d.job_id = ? AND d.n = ? AND d.project_id = ? AND j.project_id = ? AND d.status = 'accepted' AND j.type = 'evolution'`).get(evoJobId, n, projectId, projectId);
+  if (!row) return null;
+  let md = '';
+  try { md = JSON.parse(row.result_json || '{}').markdown; } catch { return null; }
+  const idea = parseEvolutions(md).find((e) => e.n === n);
+  return idea ? { title: idea.title, body: idea.body, reason: row.reason } : null;
 }
