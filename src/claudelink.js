@@ -138,7 +138,8 @@ export async function aiRefusal(db, userId, { cliModeEnabled = true } = {}) {
 
 export async function assertCanRunAi(db, userId, opts) {
   const msg = await aiRefusal(db, userId, opts);
-  if (msg) throw new HttpError(403, msg);
+  // `fix` : l'écran ajoute un bouton vers la page qui règle le problème
+  if (msg) throw new HttpError(403, msg, { data: { fix: { label: 'Relier mon IA', href: '/link' } } });
 }
 
 /** L'utilisateur a-t-il une liaison utilisable ? Sert à l'onboarding bloquant. */

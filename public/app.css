@@ -2105,3 +2105,5 @@ kbd { display: inline-block; min-width: 1.6em; padding: 1px 7px; text-align: cen
 .evo-files { margin: 0; padding-left: 18px; columns: 2; }
 .evo-target { border: 0; padding: 0; margin: 0; display: grid; gap: 6px; }
 .evo-target legend { font-weight: 600; padding: 0; margin-bottom: 4px; }
+.toast-fix { display: inline-block; margin-top: 6px; color: var(--accent-text); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
+.evo-fix { color: var(--accent-text); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }

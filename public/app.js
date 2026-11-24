@@ -114,6 +114,9 @@
     if (r.status === 401) { toLogin(); throw new Error('Session expirée'); }
     const data = await r.json().catch(() => ({}));
     if (r.status === 403 && data.code === 'link_required') showReconnect();
+    // Une erreur qui a un remède (jeton Git, liaison de l'IA, budget) : la notification porte un lien vers la page qui le règle. Le toast que l'appelant
+    // affiche ensuite avec le même texte est dédoublonné par `toast`.
+    if (!r.ok && data.fix?.href && /^\/[a-z]/.test(data.fix.href)) toast(sentence(data.error || httpErrorText(r.status)), 'error', { fix: data.fix });
     if (!r.ok) throw new Error(sentence(data.error || httpErrorText(r.status))); // tout ce qui affiche err.message (toast, bloc « Réessayer », formulaire, chat) reçoit une phrase
     return data;
   }
@@ -210,11 +213,11 @@
     else if (e.animationName === 'fx-flash') t.classList.remove('row-new');
   });
 
-  function toast(msg, kind = 'ok') {
+  function toast(msg, kind = 'ok', { fix } = {}) {
     let box = document.querySelector('.toasts');
     if (!box) { box = document.createElement('div'); box.className = 'toasts'; document.body.append(box); }
     const key = `${kind}|${msg}`;
-    const arm = (t) => { clearTimeout(t._timer); t._timer = setTimeout(() => close(t), kind === 'error' ? 8000 : 4200); };
+    const arm = (t) => { clearTimeout(t._timer); t._timer = setTimeout(() => close(t), fix ? 14000 : kind === 'error' ? 8000 : 4200); };
     const close = (t) => { clearTimeout(t._timer); t.classList.add('out'); setTimeout(() => t.remove(), 300); };
     const same = [...box.children].find((t) => t.dataset.key === key);
     if (same) { arm(same); return; }
@@ -229,6 +232,12 @@
     const x = document.createElement('button');
     x.type = 'button'; x.className = 'toast-x'; x.setAttribute('aria-label', 'Fermer la notification'); x.textContent = '×';
     x.addEventListener('click', () => close(t));
+    // Bouton vers la page qui règle le problème (adresse de l'application seulement)
+    if (fix?.href && /^\/[a-z]/.test(fix.href)) {
+      const go = document.createElement('a');
+      go.className = 'toast-fix'; go.href = fix.href; go.textContent = fix.label || 'Corriger';
+      text.append(document.createElement('br'), go);
+    }
     t.append(text, x);
     box.append(t);
     arm(t);
@@ -1651,10 +1660,6 @@
       $('textarea', form).focus();
       return;
     }
-    // Idée acceptée : « Implémenter » ouvre le choix de la branche ; le formulaire lance le job
-    const implOpen = e.target.closest('[data-evo-impl-open]');
-    if (implOpen) { $('[data-evo-impl-form]', implOpen.closest('.evo-decide')).hidden = false; return; }
-    if (e.target.closest('[data-evo-impl-cancel]')) { e.target.closest('[data-evo-impl-form]').hidden = true; return; }
     if (e.target.closest('[data-evo-cancel]')) { const f = e.target.closest('[data-evo-form]'); f.hidden = true; return; }
     const evoClear = e.target.closest('[data-evo-clear]');
     if (evoClear) { await evoDecide(evoClear.closest('.evo-decide'), 'pending', ''); return; }
@@ -1856,7 +1861,7 @@
         return;
       }
       evoReplace(box, r.html);
-      if (r.warn) toast(`Idée acceptée, mais ${r.warn.charAt(0).toLowerCase()}${r.warn.slice(1)}`, 'error');
+      if (r.warn) toast(`Idée acceptée, mais ${r.warn.charAt(0).toLowerCase()}${r.warn.slice(1)}`, 'error', { fix: r.fix });
       else toast(r.next === 'started' ? 'Idée acceptée, implémentation lancée' : status === 'accepted' ? 'Idée acceptée' : 'Idée remise en attente');
       // Réglage « Implémenter automatiquement » absent : on demande si l'IA doit écrire le code
       if (r.next === 'ask') await evoAsk(evoBlock(box, r.html));
@@ -1887,7 +1892,15 @@
       dlg.append(fs);
       const hideLab = document.createElement('label'); hideLab.className = 'check';
       const hide = document.createElement('input'); hide.type = 'checkbox'; hide.name = 'hide';
-      hideLab.append(hide, ' Ne plus afficher ce message'); dlg.append(hideLab);
+      hideLab.append(hide, ' Ne plus afficher ce message : retenir mon choix'); dlg.append(hideLab);
+      // Un choix retenu s'applique sans question : jamais pour la branche principale, qui demande toujours une confirmation
+      const syncHide = () => {
+        const main = dlg.querySelector('input[name=target]:checked')?.value === 'default';
+        hide.disabled = main;
+        if (main) hide.checked = false;
+        hideLab.classList.toggle('muted', main);
+      };
+      fs.addEventListener('change', syncHide);
       const row = document.createElement('div'); row.className = 'modal-f';
       const no = document.createElement('button'); no.type = 'button'; no.className = 'btn'; no.textContent = 'Non';
       const yes = document.createElement('button'); yes.type = 'button'; yes.className = 'btn primary'; yes.textContent = "Oui, l'implémenter";
@@ -1908,7 +1921,7 @@
     if (!box) return;
     const c = await implementChoice();
     try {
-      if (c.hide) await api('/api/evolution/implement-hint', { hide: true });
+      if (c.hide) { await api('/api/evolution/implement-choice', { choice: c.yes ? 'yes' : 'no' }); toast('Choix enregistré'); }
       if (!c.yes) return;
       if (c.target === 'default' && !(await confirmBox("Pousser directement sur la branche principale ?\nLe code écrit par l'IA y arrive sans branche de relecture.", { confirm: 'Pousser sur la branche principale', danger: true }))) return;
       const r = await api(evoUrl(box, 'implement'), { target: c.target, confirm: c.target === 'default' });
@@ -1922,19 +1935,6 @@
     tmp.innerHTML = html;
     box.replaceWith(tmp.firstElementChild);
   }
-  listen(document, 'submit', async (e) => {
-    const form = e.target.closest('form[data-evo-impl-form]');
-    if (!form) return;
-    e.preventDefault();
-    const box = form.closest('.evo-decide');
-    const target = form.elements.target.value;
-    if (target === 'default' && !(await confirmBox("Pousser directement sur la branche principale ?\nLe code écrit par l'IA y arrive sans branche de relecture.", { confirm: 'Pousser sur la branche principale', danger: true }))) return;
-    try {
-      const r = await api(evoUrl(box, 'implement'), { target, confirm: target === 'default' });
-      evoReplace(box, r.html);
-      toast(r.budgetBlocked ? `En file, mais ${r.budgetBlocked}` : 'Implémentation lancée', r.budgetBlocked ? 'error' : 'ok');
-    } catch (err) { toast(err.message, 'error'); }
-  });
   // Une implémentation en cours se suit toute seule : le bloc de l'idée est relu toutes les 3 secondes tant qu'elle tourne
   every(async () => {
     for (const box of $$('.evo-decide')) {

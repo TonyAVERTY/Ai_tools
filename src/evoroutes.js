@@ -4,7 +4,7 @@
 import { HttpError, json, readBody } from './http.js';
 import { LEN } from './inputlimits.js';
 import { parseEvolutions } from './services/markdown.js';
-import { DECISIONS, acceptedIdea, decisionHtml, decisionsOf, implementationsOf, saveDecision } from './services/evodecisions.js';
+import { DECISIONS, FIX_GIT, acceptedIdea, decisionHtml, decisionsOf, implChoiceOf, implementationsOf, saveDecision } from './services/evodecisions.js';
 import { enqueue } from './services/jobs.js';
 import { assertCanRunAi } from './claudelink.js';
 import { budgetState } from './services/budget.js';
@@ -29,7 +29,7 @@ export function registerEvolutionRoutes(router, app, { project, aiOpts }) {
   async function blockOf({ p, jobId, n }) {
     const d = (await decisionsOf(db, jobId)).get(n) || null;
     const impl = (await implementationsOf(db, p.id, jobId)).get(n) || null;
-    return decisionHtml(jobId, n, d, impl, ['owner', 'admin'].includes(p.access));
+    return decisionHtml(jobId, n, d, impl);
   }
 
   router.get('/api/projects/:id/evolution/:job/:n/decision', async (ctx) => {
@@ -40,7 +40,7 @@ export function registerEvolutionRoutes(router, app, { project, aiOpts }) {
   async function startImplementation(p, jobId, n, target) {
     if (!(await acceptedIdea(db, p.id, jobId, n))) throw new HttpError(400, "Accepte d'abord l'idée", { expose: true });
     const cred = await gitCredentialFor(app, p.userId, p.gitUrl);
-    if (!cred?.token) throw new HttpError(400, "Aucun token Git pour ce dépôt : ajoute-en un, avec le droit d'écriture, dans Réglages → Dépôts Git", { expose: true });
+    if (!cred?.token) throw new HttpError(400, "Aucun token Git pour ce dépôt : ajoute-en un, avec le droit d'écriture, dans Réglages → Dépôts Git", { expose: true, data: { fix: FIX_GIT } });
     await assertCanRunAi(db, p.userId, aiOpts);
     const r = await enqueue(db, { userId: p.userId, projectId: p.id, type: 'implement', params: { evo: jobId, n, target } }, aiOpts);
     if (r.existing) throw new HttpError(409, 'Une implémentation est déjà en cours sur ce projet : attends sa fin', { expose: true });
@@ -58,34 +58,39 @@ export function registerEvolutionRoutes(router, app, { project, aiOpts }) {
     if (reason.length > LEN.reason) throw new HttpError(400, `Justification trop longue : ${LEN.reason} caractères au plus`, { expose: true });
     if (status === 'refused' && !reason) throw new HttpError(400, 'Justification manquante : dis pourquoi tu refuses cette idée', { expose: true });
     const userId = ctx.session.userId;
-    const before = (await decisionsOf(db, jobId)).get(n);
     await saveDecision(db, { jobId, projectId: p.id, ownerId: p.userId, userId, n, status, reason: status ? reason : '' });
     // Une idée refusée quitte la liste (sa raison reste gardée)
     if (status === 'refused') return json(ctx.res, { ok: true, removed: true });
-    // Une idée acceptée : réglage du propriétaire « Implémenter automatiquement » → le code est écrit et poussé tout de suite (nouvelle branche) ;
-    // sinon `next: 'ask'` : l'écran demande « Veux-tu que l'IA écrive le code ? » (sauf si cette personne a coché « Ne plus afficher »).
-    // Seuls le propriétaire et les administrateurs implémentent (le code est écrit dans le dépôt) ; ré-accepter ne relance rien.
-    let next = null, warn = null;
-    if (status === 'accepted' && ['owner', 'admin'].includes(p.access) && before?.status !== 'accepted') {
-      if ((await getSetting(db, p.userId, 'ai_code_edit', '0')) === '1') {
-        try {
-          const r = await startImplementation(p, jobId, n, 'branch');
-          next = 'started';
-          if (r.budgetBlocked) warn = `En file, mais ${r.budgetBlocked}`;
-        } catch (e) { if (!(e instanceof HttpError)) throw e; warn = e.message; }
-      } else if ((await getSetting(db, userId, 'evo_impl_hint', '0')) !== '1') next = 'ask';
+    // Une idée acceptée : l'implémentation démarre toute seule (nouvelle branche) si le propriétaire a activé « Implémenter automatiquement » ou si cette
+    // personne a retenu « oui » ; elle n'est jamais lancée si elle a retenu « non » ; sinon `next: 'ask'` : l'écran demande « Veux-tu que l'IA écrive le code ? ».
+    // Seuls le propriétaire et les administrateurs implémentent (le code est écrit dans le dépôt). Une implémentation en cours ou terminée n'est pas relancée ;
+    // après un échec, un nouveau clic sur « Accepter » la relance.
+    let next = null, warn = null, fix = null;
+    if (status === 'accepted' && ['owner', 'admin'].includes(p.access)) {
+      const impl = (await implementationsOf(db, p.id, jobId)).get(n);
+      if (!impl || !['queued', 'running', 'done'].includes(impl.status)) {
+        const choice = (await getSetting(db, p.userId, 'ai_code_edit', '0')) === '1' ? 'yes' : await implChoiceOf(db, userId);
+        if (choice === 'yes') {
+          try {
+            const r = await startImplementation(p, jobId, n, 'branch');
+            next = 'started';
+            if (r.budgetBlocked) { warn = `En file, mais ${r.budgetBlocked}`; fix = { label: 'Ouvrir les Réglages', href: '/settings#budget' }; }
+          } catch (e) { if (!(e instanceof HttpError)) throw e; warn = e.message; fix = e.data?.fix ?? null; }
+        } else if (choice === 'ask') next = 'ask';
+      }
     }
-    json(ctx.res, { ok: true, html: await blockOf(ref), next, warn });
+    json(ctx.res, { ok: true, html: await blockOf(ref), next, warn, fix });
   }, { limit: 'evo_decision' });
 
-  // « Ne plus afficher ce message » (et sa remise en route dans Réglages) : préférence de CETTE personne
-  router.post('/api/evolution/implement-hint', async (ctx) => {
+  // « Ne plus afficher ce message » retient le choix de CETTE personne (et le réglage des Réglages le change) : 'yes', 'no' ou 'ask'
+  router.post('/api/evolution/implement-choice', async (ctx) => {
     const b = await readBody(ctx.req);
-    await setSetting(db, ctx.session.userId, 'evo_impl_hint', b.hide === true ? '1' : '0');
+    if (!['ask', 'yes', 'no'].includes(b.choice)) throw new HttpError(400, 'Choix inconnu : oui, non ou demander', { expose: true });
+    await setSetting(db, ctx.session.userId, 'evo_impl_choice', b.choice);
     json(ctx.res, { ok: true });
   }, { limit: 'evo_decision' });
 
-  // Implémentation d'une idée ACCEPTÉE (bouton « Implémenter », ou « Oui » de la question posée à l'acceptation)
+  // Implémentation d'une idée ACCEPTÉE (« Oui » de la question posée à l'acceptation)
   router.post('/api/projects/:id/evolution/:job/:n/implement', async (ctx) => {
     const ref = await idea(ctx);
     const { p, jobId, n } = ref;

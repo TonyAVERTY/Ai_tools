@@ -31,7 +31,9 @@ test('implémenter : refus sans compte, pour un autre compte, sans origine, sans
   await A.post(url(1, 'decision'), { status: 'accepted', reason: 'ok' });
   const noToken = await A.post(url(1, 'implement'), { target: 'branch' });
   assert.equal(noToken.status, 400);
-  assert.match((await noToken.json()).error, /Aucun token Git/);
+  const body = await noToken.json();
+  assert.match(body.error, /Aucun token Git/);
+  assert.deepEqual(body.fix, { label: 'Ouvrir les Réglages', href: '/settings#git' }, 'le serveur dit où régler le problème');
   assert.equal((await s.db.prepare("SELECT COUNT(*) n FROM jobs WHERE type = 'implement'").get()).n, 0, 'aucun job lancé');
 });
 
