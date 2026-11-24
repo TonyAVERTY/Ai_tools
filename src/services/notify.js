@@ -172,7 +172,7 @@ const DONE = {
     };
   },
 };
-const LABEL = { analyze: 'Analyse', prospect: 'Recherche', template: 'Modèle de mail', followup_template: 'Modèle de relance', send: 'Envoi', followup: 'Relances', evolution: 'Évolutions' };
+const LABEL = { analyze: 'Analyse', prospect: 'Recherche', template: 'Modèle de mail', followup_template: 'Modèle de relance', send: 'Envoi', followup: 'Relances', evolution: 'Évolutions', implement: 'Implémentation' };
 
 // Durée et coût réels, relus en base une fois le job clos (absents dans les tests unitaires)
 async function jobMeta(app, job) {

@@ -342,3 +342,12 @@ Mon compte → **Mes données** → **Télécharger mes données** : tu reçois 
 
 ## Je ne peux pas refuser une idée d'évolution
 Le refus exige une justification : écris pourquoi dans le champ « Pourquoi tu refuses ? » (500 caractères au plus), puis clique sur **Enregistrer**. Le message « Justification manquante : dis pourquoi tu refuses cette idée » vient de là. « Idée introuvable » veut dire que la liste a été remplacée par une nouvelle recherche : recharge la page. Une idée refusée disparaît de la liste et ne revient pas ; pour annuler une acceptation, clique sur **Remettre en attente**.
+
+## L'implémentation d'une idée a échoué
+Le message dit pourquoi :
+- « Aucun token Git pour ce dépôt » : ajoute un token dans **Réglages → Dépôts Git**, avec le droit d'écrire.
+- « le token n'a pas le droit d'écrire dans ce dépôt » : le token est en lecture seule. Sur GitHub, donne-lui « Contents : Read and write » sur ce dépôt (ou un token classique avec `repo`), puis clique sur **Réessayer l'implémentation**.
+- « la branche refuse le push (protégée ou modifiée entre-temps) » : choisis **Sur une nouvelle branche**.
+- « Modifications refusées » : l'application a bloqué ce que l'IA avait écrit (fichier interdit comme `.env`, `.github/workflows` ou `.git`, secret détecté, trop de fichiers ou fichier trop gros, passage à remplacer introuvable). Rien n'a été poussé : relance, ou précise l'idée.
+- « Une implémentation est déjà en cours sur ce projet » : une seule à la fois ; attends sa fin.
+- « Réponse de l'IA illisible » : relance l'implémentation.

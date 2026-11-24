@@ -4,6 +4,8 @@ Une ligne par correction, la plus récente en haut. Le détail technique est dan
 
 ## 24 novembre 2026 (PR « audit complet »)
 
+- **N1** Implémentation d'une idée acceptée : écriture dans le dépôt de l'utilisateur. Exception unique et bornée à « pas d'Edit ni de Write pour l'IA » (voir `.claude/rules/donnees-personnelles.md`) : réglage de compte décoché par défaut, Claude seulement, copie jetable sans `.git`, `Bash` toujours interdit, vérification de tout ce qui est écrit (chemins, secrets, volume, liens symboliques), commit et push faits par le code de l'application, jamais de push forcé, token Git de l'utilisateur seulement, propriétaire ou administrateur du projet, limite de débit, un seul job à la fois par projet.
+
 - **V13** Sauvegarde MySQL chiffrée et test de restauration (`deploy/aitools-backup-mysql.sh`, `deploy/aitools-restore-check.sh`), jouée pour de vrai en CI sur MariaDB.
 - **V14** A2F obligatoire pour accéder à `/admin` (variable `ADMIN_REQUIRE_MFA`, actif par défaut).
 - **V15** Plafond de 10 codes A2F par compte et par 15 minutes.

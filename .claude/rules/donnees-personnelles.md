@@ -18,6 +18,7 @@ Applicables à toute fonctionnalité qui collecte, stocke, affiche, exporte ou t
 ## IA et données
 - Ne transmets au fournisseur d'IA que ce qui est nécessaire ; jamais un secret. Le contenu externe (site, dépôt, réponse) est donné comme **donnée**, jamais comme instruction.
 - Une IA ne contourne jamais une règle d'autorisation de l'application : ses outils restent limités (pas de `Bash`, pas d'`Edit` dans l'application).
+  **Seule exception, décidée par le propriétaire du produit (24 novembre 2026)** : la tâche `implement` (idée d'évolution acceptée), uniquement si le compte a coché « Écriture directe du code par l'IA » (`ai_code_edit`, décoché par défaut) et uniquement avec Claude. `Edit` et `Write` (jamais `Bash`) s'exercent alors dans une **copie jetable du dépôt sans `.git`**, seul dossier monté en écriture dans le bac à sable. Tout ce que l'IA écrit est revérifié par `src/services/codepatch.js` (chemins, secrets, volume, liens symboliques) puis commité et poussé par le code de l'application (`src/services/gitwrite.js`), jamais par l'IA. N'étends pas cette exception à une autre tâche.
 - Tout nouveau contenu généré par IA (texte, image, voix, vidéo) : examiner les obligations de transparence (`docs/security/LEGAL_COMPLIANCE.md`, AI Act).
 
 ## Impacts réglementaires

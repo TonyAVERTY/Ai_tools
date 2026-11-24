@@ -41,6 +41,8 @@ export const RATE_LIMITS = {
   auth_callback: { ip: { max: 40, windowMs: 10 * MIN } },
   // Évolution : accepter ou refuser une idée (écriture légère, mais jamais en rafale)
   evo_decision: { user: { max: 120, windowMs: 10 * MIN } },
+  // Évolution : lancer l'implémentation d'une idée (un appel d'IA lourd et un push sur le dépôt de l'utilisateur)
+  evo_impl: { user: { max: 20, windowMs: HOUR } },
   // Export complet du compte : 3 par heure et par compte (une requête lit toutes les tables du compte)
   account_export: { user: { max: 3, windowMs: 60 * MIN } },
   // A2F : saisie du code (à la connexion et dans Mon compte) ; la session en attente tombe en plus après 5 essais ratés
