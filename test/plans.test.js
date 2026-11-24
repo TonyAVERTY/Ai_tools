@@ -9,7 +9,7 @@ import { makeHandlers } from '../src/handlers.js';
 import { createProject, saveSecretConfig } from '../src/projects.js';
 import { getUser } from '../src/users.js';
 import { PLAN_LIMITS } from '../src/limits.js';
-import { weekBounds, usageOf, quotaFor, assertRoom, recordUsage, planOf, usageView } from '../src/services/plans.js';
+import { weekBounds, usageOf, quotaFor, assertRoom, recordUsage, planOf, usageView, isApproaching } from '../src/services/plans.js';
 import { encrypt } from '../src/crypto.js';
 import { importProspects } from '../src/services/csv.js';
 import { startApp } from './helpers/server.js';
@@ -126,11 +126,20 @@ test('jobs IA : le plafond d\'un compte ne touche pas un autre compte', async ()
   await assert.doesNotReject(enqueue(w.db, { userId: b, projectId: pb, type: 'analyze' }));
 });
 
+test('alerte de quota : approche à moins de 20 % restants, plus une fois le plafond atteint, jamais sans plafond', () => {
+  assert.equal(isApproaching(39, 50), false, '22 % restants : pas encore');
+  assert.equal(isApproaching(41, 50), true, '18 % restants : approche');
+  assert.equal(isApproaching(50, 50), false, 'plafond atteint : « atteint », pas « approche »');
+  assert.equal(isApproaching(5, null), false, 'sans plafond : jamais');
+});
+
 test('mails : 50 par semaine, le 51e refusé à la limite exacte ; un lot est tronqué à ce qui reste, sans perte', async () => {
   const w = await world();
   const u = await free(w.db);
   const user = await getUser(w.db, u);
-  for (let i = 0; i < 49; i++) await recordUsage(w.db, u, 'mail');
+  for (let i = 0; i < 40; i++) await recordUsage(w.db, u, 'mail');
+  assert.equal((await quotaFor(w.db, user, 'mails')).approaching, true, '10 restants sur 50 : approche du plafond');
+  for (let i = 0; i < 9; i++) await recordUsage(w.db, u, 'mail');
   assert.equal((await quotaFor(w.db, user, 'mails')).remaining, 1);
   await assert.doesNotReject(assertRoom(w.db, user, 'mails', 1));
   await assert.rejects(assertRoom(w.db, user, 'mails', 2), (e) => /Il te reste 1 mail cette semaine sur 50/.test(e.message));
@@ -225,7 +234,13 @@ test('Mon compte et tableau de bord : barres d\'usage de la semaine, plafond att
   try {
     const u = await s.newUser({ admin: false, link: LINK });
     const pid = await proj({ db: s.db }, u.id);
-    for (let i = 0; i < 50; i++) await recordUsage(s.db, u.id, 'mail');
+    for (let i = 0; i < 41; i++) await recordUsage(s.db, u.id, 'mail');
+    // Mon compte : à 80 % du plafond, une alerte avant d'être bloqué, sans dire « atteint »
+    const warn = await (await u.get('/account', { headers: { accept: 'text/html' } })).text();
+    assert.match(warn, /<div class="bar usage warn"[^>]*>/);
+    assert.match(warn, /class="ban ban-warn"[^>]*>.*Tu approches du plafond : .*mails cette semaine/s);
+    assert.doesNotMatch(warn, /Plafond atteint/);
+    for (let i = 0; i < 9; i++) await recordUsage(s.db, u.id, 'mail');
     // Mon compte : le détail, une barre par plafond
     const acc = await (await u.get('/account', { headers: { accept: 'text/html' } })).text();
     assert.match(acc, /Usage de la semaine/);
