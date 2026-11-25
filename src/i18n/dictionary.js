@@ -45,8 +45,11 @@ import fix5 from './dict/fix5.js';
 import contact from './dict/contact.js';
 import c2 from './dict/c2.js';
 import clang from './dict/clang.js';
+import bill from './dict/bill.js';
+import v1 from './dict/v1.js';
+import v2 from './dict/v2.js';
 
-export const AREAS = { clang, c2, contact, fix5, acc, legal5, fix4, fix3, admin, jobs1, fix2, console, cl2, cl1, legal4, legal3, legal2, legal0, legal1, fix1, compta2, tour, srv1, toasts, tabs2, tabs1, misc2, misc1, project, welcome, docs_api, docs_mcp, docs, chat, link, fonctionnement, tarifs, accueil, account, settings, core, shell, today, checklist };
+export const AREAS = { v2, v1, bill, clang, c2, contact, fix5, acc, legal5, fix4, fix3, admin, jobs1, fix2, console, cl2, cl1, legal4, legal3, legal2, legal0, legal1, fix1, compta2, tour, srv1, toasts, tabs2, tabs1, misc2, misc1, project, welcome, docs_api, docs_mcp, docs, chat, link, fonctionnement, tarifs, accueil, account, settings, core, shell, today, checklist };
 export const ROWS = Object.values(AREAS).flat();
 
 const INDEX = { en: 1, es: 2 };

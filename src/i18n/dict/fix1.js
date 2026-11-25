@@ -20,7 +20,6 @@ export default [
   ["Tu l'as choisi en créant ton activité. Sans réponse, on part sur le trimestre, le choix le plus courant ; tu le retrouves sur ton compte URSSAF.", "You chose it when creating your business. Without an answer, we assume quarterly, the most common choice; you can find it in your URSSAF account.", "Lo elegiste al crear tu actividad. Sin respuesta, partimos del trimestre, la elección más habitual; lo encuentras en tu cuenta de la URSSAF."],
   ["Pas encore disponible sur ce serveur", "Not yet available on this server", "Aún no disponible en este servidor"],
   ["Crée une clé sur console.anthropic.com puis colle-la ici. Elle est vérifiée sans consommer de tokens, chiffrée, et ne sera plus jamais affichée (seuls ses 4 derniers caractères le seront). Tu paies à l'usage, directement chez Anthropic.", "Create a key on console.anthropic.com then paste it here. It is checked without using tokens, encrypted, and will never be shown again (only its last 4 characters will be). You pay as you go, directly with Anthropic.", "Crea una clave en console.anthropic.com y pégala aquí. Se verifica sin consumir tokens, se cifra y no se volverá a mostrar (solo sus 4 últimos caracteres). Pagas por uso, directamente a Anthropic."],
-  ["{n} étapes sur {m}", "{n} steps out of {m}", "{n} pasos de {m}"],
   ["1 étape sur {m}", "1 step out of {m}", "1 paso de {m}"],
   ["Recherche de prospects", "Prospect search", "Búsqueda de prospectos"],
   ["Affichage des prospects", "Prospect display", "Visualización de prospectos"],

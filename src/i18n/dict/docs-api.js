@@ -38,8 +38,6 @@ export default [
   ["Erreurs", "Errors", "Errores"],
   ["Limites", "Limits", "Límites"],
   ["Compte", "Account", "Cuenta"],
-  ["Prospects", "Prospects", "Prospectos"],
-  ["Réponses", "Replies", "Respuestas"],
   ["Mails envoyés", "Sent emails", "Correos enviados"],
   ["Tâches", "Tasks", "Tareas"],
   ["Bonnes pratiques", "Best practices", "Buenas prácticas"],

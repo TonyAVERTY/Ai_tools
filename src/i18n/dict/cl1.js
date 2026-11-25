@@ -125,7 +125,6 @@ export default [
   ["Une vidéo est déjà en cours de production", "A video is already being produced", "Ya hay un vídeo en producción"],
   ["· échec : {a}", "· failure: {a}", "· fallo: {a}"],
   ["sans objet", "no subject", "sin asunto"],
-  ["Réponse reçue", "Reply received", "Respuesta recibida"],
   ["désinscription", "unsubscribe", "baja"],
   ["Sur la liste d'opposition ({a}) : ne plus contacter.", "On the opt-out list ({a}): do not contact again.", "En la lista de oposición ({a}): no volver a contactar."],
   ["Pas d'accroche pour ce prospect.", "No hook for this prospect.", "Sin gancho para este prospecto."],
