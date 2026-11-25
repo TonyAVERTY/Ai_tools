@@ -59,3 +59,20 @@ test('worker : même avec une offre qui permet plusieurs jobs, deux implémentat
   assert.equal(next?.project_id, pid, 'la 2e idée du projet démarre après la 1re');
   assert.equal(started.length, 1);
 });
+
+test('continuer : « Réessayer » une implémentation la reprend ; le contenu gardé ne part pas à l\'écran ; la reprise reste dans son projet', async () => {
+  const { retryJob } = await import('../src/services/jobs.js');
+  const { loadResume } = await import('../src/handlers.js');
+  const failed = Number((await s.db.prepare("INSERT INTO jobs(user_id, project_id, type, status, error, params_json, result_json, created_at) VALUES(?, ?, 'implement', 'error', 'délai dépassé', ?, ?, ?)")
+    .run(u.id, pid2, JSON.stringify({ evo: 9, n: 3, target: 'branch' }), JSON.stringify({ partial: { files: [{ path: 'src/a.js', content: 'SECRET-CONTENU-DE-FICHIER' }] } }), now())).lastInsertRowid);
+  await s.db.prepare("UPDATE jobs SET status = 'done' WHERE project_id = ? AND type = 'implement' AND status IN ('running','queued')").run(pid2);
+  const view = (await latestJobs(s.db, pid2)).implement;
+  assert.deepEqual(view.result, { partial: { files: ['src/a.js'] } }, 'seuls les chemins sortent');
+  assert.ok(!JSON.stringify(view).includes('SECRET-CONTENU'));
+  const r = await retryJob(s.db, u.id, failed, { cliModeEnabled: true });
+  assert.equal(r.existing, false);
+  assert.equal(JSON.parse((await s.db.prepare('SELECT params_json FROM jobs WHERE id = ?').get(r.id)).params_json).resume, failed);
+  assert.deepEqual(await loadResume(s.db, pid2, failed), { files: [{ path: 'src/a.js', content: 'SECRET-CONTENU-DE-FICHIER' }], reason: 'délai dépassé' });
+  assert.equal(await loadResume(s.db, pid, failed), null, 'jamais la reprise d\'un autre projet');
+  assert.equal(await loadResume(s.db, pid2, 999999), null);
+});

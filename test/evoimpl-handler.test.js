@@ -97,7 +97,7 @@ test('implémentation : une IA qui s\'arrête avant la fin : message clair, rien
   const s = await setup();
   const r = await s.run(await s.evo('IMPLMAXTURNS'));
   assert.equal(r.status, 'error');
-  assert.match(r.error, /s'est arrêtée avant d'avoir fini.*Accepter/);
+  assert.match(r.error, /s'est arrêtée avant d'avoir fini.*Continuer/);
   assert.doesNotMatch(r.error, /error_max_turns|45/, 'pas de jargon technique ni de limite chiffrée');
   assert.equal(s.pushes.length, 0);
 });

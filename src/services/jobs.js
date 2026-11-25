@@ -122,7 +122,16 @@ export async function retryJob(db, userId, jobId, opts = {}, { fix = false } = {
     if (!verdict) throw new HttpError(409, 'Cette erreur ne se corrige pas automatiquement : utilise « Réessayer »', { expose: true });
     Object.assign(params, { fix: verdict, fixScene: job.id });
   }
+  // Une implémentation relancée reprend le travail de la tentative en échec (« Continuer »)
+  if (job.type === 'implement') params.resume = job.id;
   return enqueue(db, { userId, projectId: job.project_id, type: job.type, params }, opts);
+}
+
+/** Résultat d'un job pour l'écran. Le travail gardé d'une implémentation en échec (contenu des fichiers) ne part pas à chaque rafraîchissement : seuls les chemins. */
+function publicResult(r) {
+  const result = r.result_json ? JSON.parse(r.result_json) : null;
+  if (r.type === 'implement' && result?.partial?.files) return { partial: { files: result.partial.files.map((f) => f.path) } };
+  return result;
 }
 
 /** Derniers jobs d'un projet (le projet doit déjà avoir été vérifié comme appartenant à l'utilisateur). */
@@ -146,7 +155,7 @@ export async function latestJobs(db, projectId) {
       tokensUsed: Number(r.tokens_in || 0) + Number(r.tokens_out || 0),
       eta:r.eta||null,
       progress: r.progress_json ? JSON.parse(r.progress_json) : null,
-      result: r.result_json ? JSON.parse(r.result_json) : null,
+      result: publicResult(r),
       createdAt: r.created_at, startedAt: r.started_at, finishedAt: r.finished_at, runAfter: r.run_after,
     };
   }

@@ -84,6 +84,7 @@ test('réglage activé : une implémentation déjà en cours ou l\'absence de to
   await s.db.prepare("UPDATE jobs SET status = 'error', error = 'Git : le token n''a pas le droit d''écrire' WHERE type = 'implement'").run();
   const failedBlock = await (await A.get(url(4, 'decision'))).json();
   assert.match(failedBlock.html, /Implémentation en échec/);
+  assert.match(failedBlock.html, /<button type="button" class="btn small primary" data-retry="\d+" data-stay>Continuer<\/button>/, 'bouton « Continuer » pour le propriétaire');
   assert.match(failedBlock.html, /<a class="evo-fix" href="\/settings#git">Ouvrir les Réglages<\/a>/, 'un lien (pas un bouton) vers les Réglages');
   const retry = await accept(A, 4);
   assert.equal(retry.next, 'started');
@@ -115,4 +116,9 @@ test('un simple membre accepte sans question ni implémentation, même réglage 
   assert.equal(r.next, null);
   assert.equal(r.warn, null);
   assert.equal((await implJobs()).length, before);
+  // Un simple membre ne voit pas « Continuer » (la reprise passe par la tâche du propriétaire)
+  await s.db.prepare("UPDATE jobs SET status = 'error', error = 'Git : le token n''a pas le droit d''écrire' WHERE type = 'implement'").run();
+  const memberBlock = await (await M.get(url(4, 'decision'))).json();
+  assert.match(memberBlock.html, /Implémentation en échec/);
+  assert.doesNotMatch(memberBlock.html, /data-retry/);
 });

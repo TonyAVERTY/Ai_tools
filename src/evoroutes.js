@@ -30,7 +30,7 @@ export function registerEvolutionRoutes(router, app, { project, aiOpts }) {
   async function blockOf({ p, jobId, n }) {
     const d = (await decisionsOf(db, jobId)).get(n) || null;
     const impl = (await implementationsOf(db, p.id, jobId)).get(n) || null;
-    return decisionHtml(jobId, n, d, impl);
+    return decisionHtml(jobId, n, d, impl, p.access === 'owner');
   }
 
   router.get('/api/projects/:id/evolution/:job/:n/decision', async (ctx) => {

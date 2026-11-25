@@ -103,6 +103,17 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   await p.reload(); await p.waitForSelector('.evo-decide .evo-impl', { timeout: 8000 }).catch(() => {});
   ok((await p.locator('.evo-decide[data-n="2"] .evo-impl').textContent()).includes('Implémentation en attente'), `${tag} une implémentation en file se dit « en attente »`);
   await s.db.prepare("UPDATE jobs SET status = 'running', started_at = ? WHERE type = 'implement'").run(now());
+  // En échec : « Continuer » dans la zone des tâches et sous l'idée ; un clic reprend sur place (le bloc passe à « en attente »)
+  await s.db.prepare("UPDATE jobs SET status = 'error', error = ?, finished_at = ? WHERE type = 'implement'").run("L'IA s'est arrêtée avant d'avoir fini : l'idée est sans doute trop grosse", now());
+  await p.reload(); await p.waitForSelector('.evo-decide .evo-impl.s-error', { timeout: 8000 }).catch(() => {});
+  ok(await p.locator('.job[data-job="implement"]').getByRole('button', { name: 'Continuer' }).count() === 1, `${tag} « Continuer » dans la zone des tâches en cas d'échec`);
+  ok(await p.locator('.evo-decide[data-n="2"]').getByRole('button', { name: 'Continuer' }).count() === 1, `${tag} « Continuer » sous l'idée en échec`);
+  await p.locator('.evo-decide[data-n="2"]').getByRole('button', { name: 'Continuer' }).click();
+  await p.waitForFunction(() => document.querySelector('.evo-decide[data-n="2"] [data-evo-running]'), null, { timeout: 8000 }).catch(() => {});
+  ok(await p.locator('.evo-decide[data-n="2"] [data-evo-running]').count() === 1, `${tag} « Continuer » relance sur place : l'idée passe à « en attente »`);
+  ok(await s.db.prepare("SELECT COUNT(*) n FROM jobs WHERE type = 'implement' AND status = 'queued'").get().then((r) => Number(r.n)) === 1, `${tag} une reprise est en file`);
+  await s.db.prepare("UPDATE jobs SET status = 'running', started_at = ? WHERE type = 'implement' AND status = 'queued'").run(now());
+  await s.db.prepare("UPDATE jobs SET status = 'error' WHERE type = 'implement' AND status = 'running' AND id < (SELECT MAX(id) FROM (SELECT id FROM jobs WHERE type = 'implement') x)").run();
   // Terminée : l'idée quitte la liste (en direct, sans recharger) et un récapitulatif dit que la fonctionnalité est bien implémentée
   const before = await p.locator('.evo-decide').count();
   await s.db.prepare("UPDATE jobs SET status = 'done', finished_at = ?, result_json = ? WHERE type = 'implement'").run(now(), JSON.stringify({ branch: 'iaboss/modeles-2', target: 'branch', commit: 'abcdef1234567', files: ['src/a.js', 'README.md'], summary: 'Modèles partagés ajoutés.', url: 'https://github.com/o/r/tree/iaboss/modeles-2' }));

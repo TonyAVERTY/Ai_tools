@@ -144,3 +144,36 @@ test('limite d\'étapes : absente avec maxTurns null (implémentation), toujours
   const set = await argsOf({ maxTurns: 25 });
   assert.equal(set[set.indexOf('--max-turns') + 1], '25');
 });
+
+test('continuer : le travail déjà écrit est gardé (texte seulement, chemins sûrs) puis remis dans la nouvelle copie', async () => {
+  const { snapshotChanges, applySnapshot } = await import('../src/services/codepatch.js');
+  const repo = tmp(), work = join(tmp(), 'w');
+  mkdirSync(join(repo, '.git'));
+  writeFileSync(join(repo, 'a.js'), '1'); writeFileSync(join(repo, 'b.js'), '2');
+  copyWithoutGit(repo, work);
+  writeFileSync(join(work, 'a.js'), 'modifié'); writeFileSync(join(work, 'neuf.js'), 'x'); rmSync(join(work, 'b.js'));
+  writeFileSync(join(work, '.env'), 'A=1'); writeFileSync(join(work, 'bin.dat'), Buffer.from([1, 0, 2]));
+  const snap = snapshotChanges(repo, work);
+  assert.deepEqual(snap.map((f) => f.path).sort(), ['a.js', 'b.js', 'neuf.js'], 'ni .env, ni fichier non texte');
+  assert.equal(snap.find((f) => f.path === 'b.js').deleted, true);
+  const fresh = join(tmp(), 'f');
+  copyWithoutGit(repo, fresh);
+  const n = applySnapshot(fresh, [...snap, { path: '../evil.js', content: 'x' }, { path: '.github/workflows/ci.yml', content: 'x' }]);
+  assert.equal(n, 3, 'les chemins interdits sont ignorés');
+  assert.equal(readFileSync(join(fresh, 'a.js'), 'utf8'), 'modifié');
+  assert.equal(existsSync(join(fresh, 'b.js')), false);
+  assert.equal(existsSync(join(fresh, '../evil.js')), false);
+  // un lien symbolique dans la copie : rien n'est gardé
+  symlinkSync('/etc', join(work, 'lien'));
+  assert.deepEqual(snapshotChanges(repo, work), []);
+});
+
+test('continuer : l\'invite dit à l\'IA ce qui est déjà fait', () => {
+  const idea = { title: 'T', body: 'B' };
+  const direct = implementPrompt({ projectName: 'P', profile: null, idea, reason: '', mode: 'direct', resume: { files: ['src/a.js'], reason: 'délai dépassé' } });
+  assert.match(direct.prompt, /DÉJÀ dans ta copie[\s\S]*« src\/a\.js »[\s\S]*termine l'idée/);
+  assert.match(direct.prompt, /délai dépassé/);
+  const patch = implementPrompt({ projectName: 'P', profile: null, idea, reason: '', mode: 'patch', resume: { files: [], reason: 'illisible' } });
+  assert.match(patch.prompt, /tentative précédente n'a pas abouti/);
+  assert.doesNotMatch(implementPrompt({ projectName: 'P', profile: null, idea, reason: '', mode: 'direct' }).prompt, /tentative précédente/);
+});

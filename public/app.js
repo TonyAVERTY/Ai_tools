@@ -951,7 +951,8 @@
       usage.textContent = tokenText(job.tokensUsed, job.status);
       if (job.status === 'error' && job.canViewLogs !== false && !$('[data-retry]', box)) {
         const retry = document.createElement('button');
-        retry.type = 'button'; retry.className = 'btn small primary'; retry.dataset.retry = job.id; retry.textContent = 'Réessayer';
+        retry.type = 'button'; retry.className = 'btn small primary'; retry.dataset.retry = job.id; retry.textContent = type === 'implement' ? 'Continuer' : 'Réessayer';
+        if (type === 'implement') retry.dataset.stay = ''; // la reprise se suit sur place : pas de page de journal
         box.append(retry);
         if (type === 'promo_video' && /^La scène écrite par .+? ne passe pas au rendu/.test(job.error || '')) {
           const fix = document.createElement('button');
@@ -1639,6 +1640,12 @@
       if (failure) failure.hidden = true;
       try {
         const result = await api(`/api/jobs/${retry.dataset.retry}/retry`, fix ? { fix: true } : {});
+        if ('stay' in retry.dataset) { // la reprise se suit sur place : le bloc de l'idée passe à « en attente / en cours » et le suivi en direct prend le relais
+          toast('Implémentation reprise');
+          const idea = retry.closest('.evo-decide');
+          if (idea) evoReplace(idea, (await api(evoUrl(idea, 'decision'))).html);
+          return;
+        }
         location.href = `/jobs/${result.id}`;
       } catch (err) {
         if (failure) { failure.textContent = err.message; failure.hidden = false; }
