@@ -69,8 +69,11 @@ export function recapLine(title, impl) {
 export const recapsHtml = (ideas, impls) => ideas.filter((e) => impls.get(e.n)?.status === 'done' && impls.get(e.n).result).map((e) => recapLine(e.title, { ...impls.get(e.n), n: e.n })).join('');
 
 /** État de l'implémentation d'une idée acceptée (texte échappé). Elle se lance à l'acceptation ; pour recommencer après un échec, on clique de nouveau sur « Accepter ». */
-function implHtml(impl) {
-  if (impl && ACTIVE.includes(impl.status)) return `<p class="evo-impl s-running" data-evo-running><span class="loading small" role="status"><span class="spin-inline" aria-hidden="true"></span><span>Implémentation en cours : l'IA écrit le code, puis il est poussé sur ton dépôt…</span></span></p>`;
+function implHtml(impl, canContinue = false) {
+  if (impl && ACTIVE.includes(impl.status)) {
+    const text = impl.status === 'queued' ? "Implémentation en attente : elle démarre quand la précédente est terminée…" : "Implémentation en cours : l'IA écrit le code, puis il est poussé sur ton dépôt…";
+    return `<p class="evo-impl s-running" data-evo-running><span class="loading small" role="status"><span class="spin-inline" aria-hidden="true"></span><span>${text}</span></span></p>`;
+  }
   if (impl?.status === 'done' && impl.result) {
     const r = impl.result;
     const where = r.target === 'default' ? `la branche principale <code>${esc(r.branch)}</code>` : `la nouvelle branche <code>${esc(r.branch)}</code>`;
@@ -82,13 +85,13 @@ function implHtml(impl) {
   if (impl?.status === 'error') {
     // Un problème de jeton Git se règle dans les Réglages : un bouton y mène
     const fix = /token/i.test(impl.error || '') ? ` <a class="evo-fix" href="${FIX_GIT.href}">${FIX_GIT.label}</a>` : '';
-    return `<p class="evo-impl s-error error small">Implémentation en échec : ${esc(impl.error || 'erreur inconnue')}${fix}</p><p class="muted small">Clique sur « Accepter » pour la relancer.</p>`;
+    return `<p class="evo-impl s-error error small">Implémentation en échec : ${esc(impl.error || 'erreur inconnue')}${fix}</p>${canContinue ? `<div class="evo-actions"><button type="button" class="btn small primary" data-retry="${Number(impl.id)}" data-stay>Continuer</button></div>` : ''}`;
   }
   return impl?.status === 'cancelled' ? '<p class="muted small">Implémentation annulée. Clique sur « Accepter » pour la relancer.</p>' : '';
 }
 
 /** Bloc « décision » d'une idée : état, boutons, formulaire de justification d'un refus (replié) et, si acceptée, état de l'implémentation. */
-export function decisionHtml(jobId, n, d, impl = null) {
+export function decisionHtml(jobId, n, d, impl = null, canContinue = false) {
   const state = d
     ? `<p class="evo-state s-${d.status}"><strong>${DECISIONS[d.status]}</strong>${d.reason ? ` : ${esc(d.reason)}` : ''}</p>`
     : '';
@@ -100,7 +103,7 @@ export function decisionHtml(jobId, n, d, impl = null) {
     <label>Pourquoi ?<textarea name="reason" rows="2" maxlength="${LEN.reason}"></textarea></label>
     <div class="evo-actions"><button type="submit" class="btn small primary">Enregistrer</button><button type="button" class="btn small" data-evo-cancel>Annuler</button></div>
   </form>
-  ${d?.status === 'accepted' ? implHtml(impl) : ''}
+  ${d?.status === 'accepted' ? implHtml(impl, canContinue) : ''}
 </div>`;
 }
 

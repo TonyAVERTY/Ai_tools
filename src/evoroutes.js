@@ -30,7 +30,7 @@ export function registerEvolutionRoutes(router, app, { project, aiOpts }) {
   async function blockOf({ p, jobId, n }) {
     const d = (await decisionsOf(db, jobId)).get(n) || null;
     const impl = (await implementationsOf(db, p.id, jobId)).get(n) || null;
-    return decisionHtml(jobId, n, d, impl);
+    return decisionHtml(jobId, n, d, impl, p.access === 'owner');
   }
 
   router.get('/api/projects/:id/evolution/:job/:n/decision', async (ctx) => {
@@ -48,9 +48,11 @@ export function registerEvolutionRoutes(router, app, { project, aiOpts }) {
     if (!cred?.token) throw new HttpError(400, "Aucun token Git pour ce dépôt : ajoute-en un, avec le droit d'écriture, dans Réglages → Dépôts Git", { expose: true, data: { fix: FIX_GIT } });
     await assertCanRunAi(db, p.userId, aiOpts);
     const r = await enqueue(db, { userId: p.userId, projectId: p.id, type: 'implement', params: { evo: jobId, n, target } }, aiOpts);
-    if (r.existing) throw new HttpError(409, 'Une implémentation est déjà en cours sur ce projet : attends sa fin', { expose: true });
+    if (r.existing) throw new HttpError(409, 'Cette idée est déjà en cours d\'implémentation', { expose: true });
     const budget = await budgetState(db, p.userId);
-    return { id: r.id, budgetBlocked: budget?.blocked ? budget.reason : null };
+    // Les implémentations s'enchaînent : s'il y en a avant celle-ci, elle attend son tour
+    const ahead = Number((await db.prepare("SELECT COUNT(*) n FROM jobs WHERE project_id = ? AND type = 'implement' AND status IN ('queued','running') AND id < ?").get(p.id, r.id)).n);
+    return { id: r.id, ahead, budgetBlocked: budget?.blocked ? budget.reason : null };
   }
 
   router.post('/api/projects/:id/evolution/:job/:n/decision', async (ctx) => {
@@ -78,7 +80,7 @@ export function registerEvolutionRoutes(router, app, { project, aiOpts }) {
         if (choice === 'yes') {
           try {
             const r = await startImplementation(p, jobId, n, 'branch');
-            next = 'started';
+            next = r.ahead ? 'queued' : 'started';
             if (r.budgetBlocked) { warn = `En file, mais ${r.budgetBlocked}`; fix = { label: 'Ouvrir les Réglages', href: '/settings#budget' }; }
           } catch (e) { if (!(e instanceof HttpError)) throw e; warn = e.message; fix = e.data?.fix ?? null; }
         } else if (choice === 'ask') next = 'ask';
@@ -104,6 +106,6 @@ export function registerEvolutionRoutes(router, app, { project, aiOpts }) {
     const target = b.target === 'default' ? 'default' : 'branch';
     if (target === 'default' && b.confirm !== true) throw new HttpError(400, 'Confirmation requise pour pousser sur la branche principale', { expose: true });
     const r = await startImplementation(p, jobId, n, target);
-    json(ctx.res, { ok: true, id: r.id, budgetBlocked: r.budgetBlocked, html: await blockOf(ref) });
+    json(ctx.res, { ok: true, id: r.id, queued: r.ahead > 0, budgetBlocked: r.budgetBlocked, html: await blockOf(ref) });
   }, { limit: 'evo_impl' });
 }

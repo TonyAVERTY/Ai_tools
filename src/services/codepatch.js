@@ -115,6 +115,46 @@ export function diffTrees(repo, work) {
   return changed;
 }
 
+/**
+ * Ce que l'IA a déjà écrit dans sa copie `work` (fichiers ajoutés, modifiés ou supprimés), gardé quand elle échoue pour que « Continuer » reparte de là.
+ * Jamais bloquant : un chemin interdit, un lien symbolique ou un fichier non texte est ignoré ; le volume est plafonné.
+ * @returns {{path:string, content?:string, deleted?:true}[]}
+ */
+export function snapshotChanges(repo, work) {
+  let before, after;
+  try { before = walk(repo); after = walk(work); } catch { return []; }
+  const out = [];
+  let total = 0;
+  for (const [rel, p] of after) {
+    try { safeRel(rel); } catch { continue; }
+    const buf = readFileSync(p);
+    if (before.has(rel) && buf.equals(readFileSync(before.get(rel)))) continue;
+    if (buf.includes(0) || buf.length > MAX_FILE_BYTES) continue;
+    total += buf.length;
+    if (total > MAX_TOTAL_BYTES || out.length >= MAX_FILES) break;
+    out.push({ path: rel, content: buf.toString('utf8') });
+  }
+  for (const rel of before.keys()) if (!after.has(rel)) { try { safeRel(rel); out.push({ path: rel, deleted: true }); } catch { /* ignoré */ } }
+  return out.slice(0, MAX_FILES);
+}
+
+/** Remet dans la copie `work` ce qu'une tentative précédente avait écrit (mêmes contrôles de chemin que partout : rien hors de la copie). */
+export function applySnapshot(work, files) {
+  let n = 0;
+  for (const f of Array.isArray(files) ? files.slice(0, MAX_FILES) : []) {
+    let rel;
+    try { rel = safeRel(f?.path); } catch { continue; }
+    const abs = inside(work, rel);
+    if (f.deleted === true) { rmSync(abs, { force: true }); n++; continue; }
+    if (typeof f.content !== 'string' || Buffer.byteLength(f.content) > MAX_FILE_BYTES) continue;
+    mkdirSync(dirname(abs), { recursive: true });
+    inside(work, rel);
+    writeFileSync(abs, f.content);
+    n++;
+  }
+  return n;
+}
+
 /** Dernier contrôle avant le commit : volume et secrets dans ce qui a été écrit. Les valeurs trouvées ne sont jamais affichées. */
 export function checkChanges(dir, files) {
   if (!files.length) throw new PatchError("L'IA n'a modifié aucun fichier");

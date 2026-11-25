@@ -35,7 +35,7 @@ import { sendPause, pauseMessage, evaluateSending } from './services/abuse.js';
 import { verifyAddress, defaultMx } from './services/verify.js';
 import { evolutionMail } from './services/mailhtml.js';
 import { decisionHistory, acceptedIdea } from './services/evodecisions.js';
-import { PatchError, applyEdits, checkChanges, copyWithoutGit, diffTrees } from './services/codepatch.js';
+import { PatchError, applyEdits, applySnapshot, checkChanges, copyWithoutGit, diffTrees, snapshotChanges } from './services/codepatch.js';
 import { branchUrl, commitAndPush, defaultBranch, newBranchName } from './services/gitwrite.js';
 import { gitCredentialFor } from './gitservers.js';
 import { ROLE_TASKS, roleById, MAX_NOTES } from './services/roles.js';
@@ -103,8 +103,20 @@ export function toolActivity(name, input = {}) {
 }
 
 // Avancement d'une phase Claude : de `from` à `to` % au fil des messages, sur `maxTurns` au plus (estimation)
-// Étapes d'une implémentation : lire le code voisin, écrire, relire (plus qu'une analyse, qui ne fait que lire)
-const IMPLEMENT_TURNS = 45;
+/** Reprise d'une implémentation en échec de CE projet : ce qu'elle avait écrit (mode direct) et la raison de l'arrêt. null si ce n'est pas une reprise. */
+export async function loadResume(db, projectId, jobId) {
+  if (!jobId) return null;
+  const row = await db.prepare("SELECT error, result_json FROM jobs WHERE id = ? AND project_id = ? AND type = 'implement' AND status = 'error'").get(Number(jobId), projectId);
+  if (!row) return null;
+  let files = [];
+  try { files = JSON.parse(row.result_json || '{}').partial?.files; } catch { /* aucune reprise de fichiers */ }
+  return { files: (Array.isArray(files) ? files : []).filter((f) => typeof f?.path === 'string').slice(0, 60), reason: String(row.error ?? '').slice(0, 300) };
+}
+
+// Une implémentation n'a pas de limite d'étapes (lire le code voisin, écrire, relire : la durée dépend de l'idée) ; seul ce délai l'arrête, et « Annuler » à tout moment
+const IMPLEMENT_TIMEOUT_MS = 60 * 60_000;
+// Sans nombre d'étapes connu, la barre d'avancement monte de plus en plus lentement vers 80 % (jamais 100 % avant la fin)
+const implementPct = (n) => Math.round(12 + 68 * (1 - Math.exp(-n / 40)));
 const turnPct = (from, to, n, maxTurns) => Math.round(from + (to - from) * Math.min(1, n / Math.max(1, maxTurns)));
 
 /**
@@ -1154,23 +1166,35 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
         await ctx.progress({ message: 'Clone du dépôt…', pct: 5 });
         await sync(userId, project.gitUrl, dir);
         copyWithoutGit(dir, work);
+        // « Continuer » : la tentative précédente (en échec, de CE projet) a laissé ce qu'elle avait écrit ; on le remet dans la copie
+        const resume = await loadResume(db, project.id, ctx.params.resume);
+        if (resume && direct) applySnapshot(work, resume.files);
         await ctx.progress({ message: direct ? 'Écriture du code par l\'IA…' : 'Rédaction des modifications par l\'IA…', pct: 12 });
-        const { prompt, system } = implementPrompt({ projectName: project.name, profile: project.profile, idea, reason: idea.reason, mode: direct ? 'direct' : 'patch', repoFacts: factsOf(work) });
+        const { prompt, system } = implementPrompt({ projectName: project.name, profile: project.profile, idea, reason: idea.reason, mode: direct ? 'direct' : 'patch', repoFacts: factsOf(work), resume: resume && { files: resume.files.map((f) => f.path), reason: resume.reason } });
         const level = LEVELS.normal;
         const model = tierEquivalent(level.model, provider);
-        const sink = makeSink();
-        const r = await claude(userId, {
-          prompt, system, cwd: work, model, maxTurns: IMPLEMENT_TURNS, signal: ctx.signal,
-          tools: direct ? ['Read', 'Glob', 'Grep', 'Edit', 'Write'] : ['Read', 'Glob', 'Grep'], ...(direct ? { allowEdit: true } : {}),
-          onTurn: (n) => sink.push(() => ctx.progress({ message: `${direct ? 'Écriture du code' : 'Rédaction des modifications'} · étape ${n}…`, pct: turnPct(12, 80, n, IMPLEMENT_TURNS) })),
-        });
-        await sink.flush();
-        addUsage(ctx, r);
-        assertAnswered(r, 'Implémentation non faite');
-        // Limite d'étapes atteinte : le travail est incomplet, rien n'est poussé (la copie jetable est effacée)
-        if (r.subtype === 'error_max_turns') throw new Error(`L'IA n'a pas fini dans la limite de ${IMPLEMENT_TURNS} étapes : l'idée est sans doute trop grosse. Clique de nouveau sur « Accepter » pour réessayer, ou découpe l'idée`);
-        if (!r.text?.trim()) throw new Error(`Pas de résultat (${r.subtype})`);
-
+        let r;
+        try {
+          const sink = makeSink();
+          r = await claude(userId, {
+            prompt, system, cwd: work, model, maxTurns: null, timeoutMs: IMPLEMENT_TIMEOUT_MS, signal: ctx.signal,
+            tools: direct ? ['Read', 'Glob', 'Grep', 'Edit', 'Write'] : ['Read', 'Glob', 'Grep'], ...(direct ? { allowEdit: true } : {}),
+            onTurn: (n) => sink.push(() => ctx.progress({ message: `${direct ? 'Écriture du code' : 'Rédaction des modifications'} · étape ${n}…`, pct: implementPct(n) })),
+          });
+          await sink.flush();
+          addUsage(ctx, r);
+          assertAnswered(r, 'Implémentation non faite');
+          // Une IA qui s'arrête avant d'avoir fini (limite propre à son service) : le travail est incomplet, rien n'est poussé (la copie jetable est effacée)
+          if (r.subtype === 'error_max_turns') throw new Error("L'IA s'est arrêtée avant d'avoir fini : l'idée est sans doute trop grosse. Clique sur « Continuer » pour reprendre où elle s'est arrêtée, ou découpe l'idée");
+          if (!r.text?.trim()) throw new Error(`Pas de résultat (${r.subtype})`);
+        } catch (e) {
+          // L'IA s'est arrêtée (délai, limite de son service, erreur) : ce qu'elle avait déjà écrit est gardé pour « Continuer »
+          if (direct && !ctx.signal?.aborted) {
+            const files = snapshotChanges(dir, work);
+            if (files.length) await db.prepare('UPDATE jobs SET result_json = ? WHERE id = ?').run(JSON.stringify({ partial: { files } }), ctx.job.id);
+          }
+          throw e;
+        }
         await ctx.progress({ message: 'Vérification des modifications…', pct: 84 });
         let files, summary;
         try {

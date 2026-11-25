@@ -52,16 +52,23 @@ export async function enqueue(db, { userId, projectId, type, params = {}, runAft
     const pause = await sendPause(db, user.id);
     if (pause) throw new HttpError(403, pauseMessage(pause), { expose: true, code: 'send_paused' });
   }
-  // Deux écritures de la même condition : "= ?" ne marche pas avec NULL, et "IS ?" n'existe pas en MySQL
-  const running = projectId == null
-    ? await db.prepare("SELECT id FROM jobs WHERE user_id = ? AND project_id IS NULL AND type = ? AND status IN ('queued','running')").get(user.id, type)
-    : await db.prepare("SELECT id FROM jobs WHERE project_id = ? AND type = ? AND status IN ('queued','running')").get(projectId, type);
+  // Un job de ce type est-il déjà en file ou en cours ? Deux écritures de la même condition : "= ?" ne marche pas avec NULL, et "IS ?" n'existe pas en MySQL.
+  // Pour une implémentation d'idée, « déjà là » veut dire « la MÊME idée » : plusieurs idées acceptées s'empilent dans la file et passent l'une après l'autre.
+  const activeOf = async () => {
+    if (type === 'implement' && projectId != null) {
+      const rows = await db.prepare("SELECT id, params_json FROM jobs WHERE project_id = ? AND type = 'implement' AND status IN ('queued','running')").all(projectId);
+      const same = rows.find((r) => { try { const q = JSON.parse(r.params_json || '{}'); return Number(q.evo) === Number(params.evo) && Number(q.n) === Number(params.n); } catch { return false; } });
+      return same ? { id: same.id } : null;
+    }
+    return projectId == null
+      ? db.prepare("SELECT id FROM jobs WHERE user_id = ? AND project_id IS NULL AND type = ? AND status IN ('queued','running')").get(user.id, type)
+      : db.prepare("SELECT id FROM jobs WHERE project_id = ? AND type = ? AND status IN ('queued','running')").get(projectId, type);
+  };
+  const running = await activeOf();
   if (running) return { id: running.id, existing: true };
   // Plafonds du plan : compter puis écrire dans la même section critique (deux requêtes simultanées ne passent pas toutes deux)
   return withUserLock(user.id, async () => {
-    const active = projectId == null
-      ? await db.prepare("SELECT id FROM jobs WHERE user_id = ? AND project_id IS NULL AND type = ? AND status IN ('queued','running')").get(user.id, type)
-      : await db.prepare("SELECT id FROM jobs WHERE project_id = ? AND type = ? AND status IN ('queued','running')").get(projectId, type);
+    const active = await activeOf();
     if (active) return { id: active.id, existing: true };
     if (AI_JOBS.has(type)) await assertRoom(db, user, 'aiJobs');
     if (MAIL_JOBS.has(type)) {
@@ -115,7 +122,16 @@ export async function retryJob(db, userId, jobId, opts = {}, { fix = false } = {
     if (!verdict) throw new HttpError(409, 'Cette erreur ne se corrige pas automatiquement : utilise « Réessayer »', { expose: true });
     Object.assign(params, { fix: verdict, fixScene: job.id });
   }
+  // Une implémentation relancée reprend le travail de la tentative en échec (« Continuer »)
+  if (job.type === 'implement') params.resume = job.id;
   return enqueue(db, { userId, projectId: job.project_id, type: job.type, params }, opts);
+}
+
+/** Résultat d'un job pour l'écran. Le travail gardé d'une implémentation en échec (contenu des fichiers) ne part pas à chaque rafraîchissement : seuls les chemins. */
+function publicResult(r) {
+  const result = r.result_json ? JSON.parse(r.result_json) : null;
+  if (r.type === 'implement' && result?.partial?.files) return { partial: { files: result.partial.files.map((f) => f.path) } };
+  return result;
 }
 
 /** Derniers jobs d'un projet (le projet doit déjà avoir été vérifié comme appartenant à l'utilisateur). */
@@ -125,7 +141,11 @@ export async function latestJobs(db, projectId) {
     SELECT j.id, j.user_id, j.type, j.status, j.error, j.params_json, j.progress_json, j.result_json, j.tokens_in, j.tokens_out,
       j.created_at, j.started_at, j.finished_at, j.run_after, CASE WHEN j.status = 'running' THEN j.log_json END log_json
     FROM jobs j
-    JOIN (SELECT type, MAX(id) id FROM jobs WHERE project_id = ? GROUP BY type) lj ON lj.id = j.id
+    JOIN (SELECT jj.type, CASE WHEN jj.type = 'implement'
+        THEN COALESCE((SELECT MIN(a.id) FROM jobs a WHERE a.project_id = jj.project_id AND a.type = 'implement' AND a.status = 'running'),
+                      (SELECT MIN(b.id) FROM jobs b WHERE b.project_id = jj.project_id AND b.type = 'implement' AND b.status = 'queued'), MAX(jj.id))
+        ELSE MAX(jj.id) END id
+      FROM jobs jj WHERE jj.project_id = ? GROUP BY jj.type, jj.project_id) lj ON lj.id = j.id
   `).all(projectId);
   const out = {};
   await attachJobEta(db, rows);
@@ -135,7 +155,7 @@ export async function latestJobs(db, projectId) {
       tokensUsed: Number(r.tokens_in || 0) + Number(r.tokens_out || 0),
       eta:r.eta||null,
       progress: r.progress_json ? JSON.parse(r.progress_json) : null,
-      result: r.result_json ? JSON.parse(r.result_json) : null,
+      result: publicResult(r),
       createdAt: r.created_at, startedAt: r.started_at, finishedAt: r.finished_at, runAfter: r.run_after,
     };
   }
@@ -309,6 +329,8 @@ export class Worker {
       const seen = new Map();
       const once = (key, read) => { if (!seen.has(key)) seen.set(key, read()); return seen.get(key); };
       const capFor = (userId) => once(`cap/${userId}`, () => this.capOf(userId));
+      // Projets dont une implémentation tourne déjà : la suivante attend (elles s'enchaînent, sinon deux branches partiraient de la même base et se marcheraient dessus)
+      const implementing = new Set([...this.running.values()].filter((r) => r.job.type === 'implement' && r.job.project_id != null).map((r) => Number(r.job.project_id)));
       const candidates = []; // un seul candidat par utilisateur : son premier job exécutable
       for (const [userId, jobs] of byUser) {
         const cap = await capFor(userId);
@@ -322,6 +344,7 @@ export class Worker {
         let budgetReason = null, quotaReason = null, cand = null;
         for (const j of jobs) {
           if (MAIL_JOBS.has(j.type) && this.busyMail.has(Number(userId))) continue; // un seul envoi de mails à la fois pour ce compte
+          if (j.type === 'implement' && j.project_id != null && implementing.has(Number(j.project_id))) { await hold(j, "une autre implémentation de ce projet est en cours (elles passent l'une après l'autre)"); continue; }
           // Compte suspendu ou supprimé, job IA sans liaison Claude valide : refusé sans exécution
           const refusal = await once(`refus/${userId}/${AI_JOBS.has(j.type)}`, () => jobRefusal(this.db, j, { cliModeEnabled: this.cliModeEnabled }));
           if (refusal) {
@@ -381,8 +404,12 @@ export class Worker {
    */
   async reserve(job, cap = 1) {
     const n = Math.max(1, Math.floor(Number(cap)) || 1);
+    // Une implémentation ne démarre pas tant qu'une autre du MÊME projet tourne (vérifié dans la même requête : deux claims concurrents ne passent pas tous deux)
+    const alone = job.type === 'implement' && job.project_id != null
+      ? ` AND (SELECT COUNT(*) FROM (SELECT id FROM jobs WHERE project_id = ${Number(job.project_id)} AND type = 'implement' AND status = 'running' LIMIT 1) other) = 0`
+      : '';
     const r = await this.db.prepare(`UPDATE jobs SET status = 'running', started_at = ? WHERE id = ? AND status = 'queued'
-      AND (SELECT COUNT(*) FROM (SELECT id FROM jobs WHERE user_id = ? AND status = 'running' LIMIT ${n}) busy) < ${n}`)
+      AND (SELECT COUNT(*) FROM (SELECT id FROM jobs WHERE user_id = ? AND status = 'running' LIMIT ${n}) busy) < ${n}${alone}`)
       .run(now(), job.id, job.user_id);
     return r.changes === 1;
   }

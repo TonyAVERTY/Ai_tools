@@ -635,7 +635,7 @@ export function registerRoutes(router, app) {
     if (jobs.evolution?.result?.markdown) {
       const decided = await decisionsOf(db, jobs.evolution.id);
       const impls = await implementationsOf(db, p.id, jobs.evolution.id);
-      jobs.evolution.result.html = evolutionHtml(jobs.evolution.result.markdown, (e) => decisionHtml(jobs.evolution.id, e.n, decided.get(e.n), impls.get(e.n)),
+      jobs.evolution.result.html = evolutionHtml(jobs.evolution.result.markdown, (e) => decisionHtml(jobs.evolution.id, e.n, decided.get(e.n), impls.get(e.n), p.access === 'owner'),
         new Set([...refusedOf(decided), ...implementedOf(impls)]), (ideas) => recapsHtml(ideas, impls));
     }
     if (jobs.audit?.result?.markdown) jobs.audit.result.html = evolutionHtml(jobs.audit.result.markdown);

@@ -48,7 +48,7 @@ export function allowedTools(tools = []) {
 export function settingsFor(o) {
   return {
     tools: { core: allowedTools(o.tools) },
-    model: { maxSessionTurns: o.maxTurns || 10 },
+    model: { maxSessionTurns: o.maxTurns === null ? -1 : (o.maxTurns || 10) }, // -1 : aucune limite
     privacy: { usageStatisticsEnabled: false },
     telemetry: { enabled: false },
     general: { enableAutoUpdate: false, enableAutoUpdateNotification: false },
