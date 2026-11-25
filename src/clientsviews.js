@@ -8,9 +8,10 @@ import { STATUSES } from './services/crm.js';
 import { DOC_BY_KEY } from './services/billing.js';
 import { banner } from './banner.js';
 import { loadingBlock } from './loading.js';
+import { localeOf } from './i18n/locale.js';
 
-const day = (ts) => (ts ? new Date(ts * 1000).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Europe/Paris' }) : '—');
-const dayTime = (ts) => (ts ? new Date(ts * 1000).toLocaleString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' }) : '—');
+const day = (ts) => (ts ? new Date(ts * 1000).toLocaleDateString(localeOf(), { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Europe/Paris' }) : '—');
+const dayTime = (ts) => (ts ? new Date(ts * 1000).toLocaleString(localeOf(), { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' }) : '—');
 const money = (c) => fmtEur(c);
 const host = (u) => String(u || '').replace(/^https?:\/\//, '').replace(/\.git$/, '').slice(0, 80);
 const INTENTS = { interested: ['Intéressé', 'ok'], question: ['Question', 'info'], later: ['Plus tard', ''], refused: ['Refus', 'err'], other: ['Réponse', ''] };

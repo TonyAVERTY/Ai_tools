@@ -6,9 +6,11 @@ import { lookupFor } from './index.js';
 
 /** Un texte mérite-t-il une traduction ? (au moins une lettre ; ni adresse e-mail ou web, ni suite de chiffres et de signes) */
 export function isCandidate(s) {
-  if (!/\p{L}/u.test(s)) return false;
+  if (s.length < 2 || !/\p{L}/u.test(s)) return false; // une lettre seule : initiale d'un avatar
   if (/^[\w.+-]+@[\w-]+\.[\w.-]+$/.test(s) || /^https?:\/\/\S+$/i.test(s)) return false;
   if (/^[\d\s.,:;%€$£+\-–/()]+$/.test(s)) return false;
+  // Dates : l'application les écrit dans la langue choisie (src/i18n/locale.js), elles ne passent pas par le dictionnaire
+  if (/^(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)?\.?\s*\d{1,2}\s+(janv|févr|mars|avr|mai|juin|juil|août|sept|oct|nov|déc)[a-zéû]*\.?(\s+\d{4})?$/i.test(s)) return false;
   return s.length <= 1200;
 }
 
@@ -25,7 +27,7 @@ export function collectTexts(html) {
 }
 
 /** Les clés sans traduction dans une langue (en ou es). */
-export function missingIn(keys, lang) {
+export function missingIn(keys, lang, ignore = new Set()) {
   const lookup = lookupFor(lang);
-  return [...keys].filter((k) => (k.includes('<') ? lookup.inline(k) : lookup.text(k)) == null);
+  return [...keys].filter((k) => !ignore.has(k) && (k.includes('<') ? lookup.inline(k) : lookup.text(k)) == null);
 }

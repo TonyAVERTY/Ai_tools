@@ -2,8 +2,25 @@
 // langues restent ensemble (test/i18n.test.js vérifie qu'aucune n'est vide et que les { trous } sont les mêmes partout). Le français est la clé de recherche :
 // il doit être écrit EXACTEMENT comme dans l'interface (« » et apostrophes comprises, balises sans attributs pour une phrase qui en contient).
 import core from './dict/core.js';
+import shell from './dict/shell.js';
+import today from './dict/today.js';
+import checklist from './dict/checklist.js';
+import settings from './dict/settings.js';
+import account from './dict/account.js';
+import accueil from './dict/accueil.js';
+import tarifs from './dict/tarifs.js';
+import fonctionnement from './dict/fonctionnement.js';
+import link from './dict/link.js';
+import chat from './dict/chat.js';
+import docs from './dict/docs.js';
+import docs_mcp from './dict/docs-mcp.js';
+import docs_api from './dict/docs-api.js';
+import welcome from './dict/welcome.js';
+import project from './dict/project.js';
+import misc1 from './dict/misc1.js';
+import misc2 from './dict/misc2.js';
 
-export const AREAS = { core };
+export const AREAS = { misc2, misc1, project, welcome, docs_api, docs_mcp, docs, chat, link, fonctionnement, tarifs, accueil, account, settings, core, shell, today, checklist };
 export const ROWS = Object.values(AREAS).flat();
 
 const INDEX = { en: 1, es: 2 };

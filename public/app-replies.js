@@ -2,6 +2,7 @@
 // « Mails ». Chargé après app.js, qui expose ses outils communs dans window.AiTools ; ajax.js relance ce script à chaque navigation,
 // comme app.js. Aucune fonction n'est appelée de l'extérieur : tout passe par des écouteurs et par la consultation périodique.
 (() => {
+  const LOCALE = { en: 'en-GB', es: 'es-ES' }[document.documentElement.lang] || 'fr-FR'; // format des dates et des nombres : la langue choisie
   const { $, $$, api, every, listen, toast, unlinked, loadingHtml, loadFailed } = window.AiTools;
 
   // ---------- Réponses des prospects : popup d'arrivée, page « Mails » ----------
@@ -124,7 +125,7 @@
   // Onglet Envoi : les derniers mails partis, dépliables (texte exact, rejet, réponse). Chargé à l'arrivée et dès qu'un envoi ou des relances se terminent.
   // Tout le texte vient de la base et passe par textContent.
   const STATE_TXT = { sent: ['Envoyé', ''], read: ['Lu', 'info'], replied: ['Répondu', 'ok'], bounced: ['Rejeté', 'err'], refused: ['Refus', 'err'], failed: ['Non envoyé', 'err'] };
-  const when = (ts) => new Date(ts * 1000).toLocaleString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
+  const when = (ts) => new Date(ts * 1000).toLocaleString(LOCALE, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
   const MISSING = 'Contenu non conservé : ce mail est parti avant que iaboss ne garde le texte des mails envoyés.';
   async function loadRecentMails(box) {
     const id = box.dataset.project;

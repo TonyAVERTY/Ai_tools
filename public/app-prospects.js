@@ -2,13 +2,14 @@
 // suppression) et aperçu du mail. Chargé après app.js, qui expose ses outils communs dans window.AiTools ;
 // ajax.js relance ce script à chaque navigation, comme app.js. Aucune fonction n'est appelée de l'extérieur : tout passe par des écouteurs.
 (() => {
+  const LOCALE = { en: 'en-GB', es: 'es-ES' }[document.documentElement.lang] || 'fr-FR'; // format des dates et des nombres : la langue choisie
   const { $, $$, aiName, api, confirmBox, esc, formData, icon, listen, loadingHtml, toast } = window.AiTools;
 
   // ---------- Liste des prospects (mini CRM) ----------
   const STATUS = { new: 'À contacter', sent: 'Contacté', replied: 'A répondu', client: 'Client', refused: 'Refus', bounced: 'Rejeté', invalid: 'Adresse invalide' };
   // Seuls les liens http(s) sont cliquables : un "javascript:" venu d'une page web scrapée ne doit jamais s'exécuter ici
   const safeUrl = (u) => (/^https?:\/\//i.test(String(u || '')) ? String(u) : '');
-  const fmtDate = (ts) => new Date(ts * 1000).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' });
+  const fmtDate = (ts) => new Date(ts * 1000).toLocaleString(LOCALE, { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' });
   const isoDay = (ts) => (ts ? new Date(ts * 1000).toLocaleDateString('sv-SE', { timeZone: 'Europe/Paris' }) : '');
 
   // ---------- Fiche prospect ----------
@@ -452,7 +453,7 @@
     if (b) openProspect(b.dataset.openProspect);
   });
 
-  const fmtDay = (ts) => (ts ? new Date(ts * 1000).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', timeZone: 'Europe/Paris' }) : '');
+  const fmtDay = (ts) => (ts ? new Date(ts * 1000).toLocaleDateString(LOCALE, { day: '2-digit', month: '2-digit', timeZone: 'Europe/Paris' }) : '');
 
   // `fresh` : l'identifiant du prospect qu'on vient d'ajouter ; sa ligne est surlignée un instant et amenée à l'écran si elle est cachée (vue liste ; le kanban n'est pas concerné)
   async function loadProspects(d, page = 1, fresh = null) {

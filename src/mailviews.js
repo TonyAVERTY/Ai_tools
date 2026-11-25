@@ -3,13 +3,14 @@ import { esc } from './http.js';
 import { layout } from './views.js';
 import { ic } from './icons.js';
 import { INTENTS } from './services/replies.js';
+import { localeOf } from './i18n/locale.js';
 
 const STATE_LABELS = { sent: 'Envoyé', read: 'Lu (accusé)', replied: 'Répondu', bounced: 'Rejeté', refused: 'Refus', failed: 'Non envoyé' };
 const STATE_BADGE = { sent: '', read: 'ok', replied: 'ok', bounced: 'err', refused: 'warn', failed: 'err' };
 const INTENT_BADGE = { interested: 'ok', question: '', later: 'warn', refused: 'err', other: '' };
 const KIND = { initial: 'Premier mail', followup: 'Relance' };
 
-const when = (ts) => new Date(ts * 1000).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' });
+const when = (ts) => new Date(ts * 1000).toLocaleString(localeOf(), { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' });
 
 /** Proposition d'ajout à l'agenda (ou événement déjà ajouté) pour une réponse. */
 export function suggestBlock(r) {
@@ -40,7 +41,7 @@ export function mailsPage(d) {
   const total = Object.values(d.counts).reduce((a, b) => a + b, 0);
   const BAD = new Set(['bounced', 'refused', 'failed']);
   const stats = [['', 'Tous', total], ...Object.entries(labels).map(([k, l]) => [k, l, d.counts[k] || 0])]
-    .map(([k, l, n]) => `<a class="mstat${(d.filter || '') === k ? ' on' : ''}${BAD.has(k) && n ? ' bad' : ''}" href="${esc(link(d, { filter: k }))}"${(d.filter || '') === k ? ' aria-current="true"' : ''}><b>${n.toLocaleString('fr-FR')}</b><span>${esc(l)}</span></a>`).join('');
+    .map(([k, l, n]) => `<a class="mstat${(d.filter || '') === k ? ' on' : ''}${BAD.has(k) && n ? ' bad' : ''}" href="${esc(link(d, { filter: k }))}"${(d.filter || '') === k ? ' aria-current="true"' : ''}><b>${n.toLocaleString(localeOf())}</b><span>${esc(l)}</span></a>`).join('');
 
   const projectSelect = d.projects.length > 1 ? `<form class="inline-form" method="get" action="/mails">
       ${d.view === 'sent' ? '<input type="hidden" name="v" value="sent">' : ''}

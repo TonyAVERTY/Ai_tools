@@ -1,10 +1,11 @@
 // Communication d'un projet : posts Instagram (légende, hashtags, image dessinée d'après le design du projet) et newsletters.
 // Rien n'est publié ni envoyé par iaboss : on relit, on copie, on télécharge. Chargé après app.js (window.AiTools) ; ajax.js relance ce script à chaque navigation.
 (() => {
+  const LOCALE = { en: 'en-GB', es: 'es-ES' }[document.documentElement.lang] || 'fr-FR'; // format des dates et des nombres : la langue choisie
   const { $, $$, aiName, api, confirmBox, esc, listen, loadFailed, refreshProject, toast } = window.AiTools;
 
   const picked = new Map(); // `${projet}:${type}` → brouillon affiché (sinon le plus récent)
-  const day = (ts) => new Date(ts * 1000).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
+  const day = (ts) => new Date(ts * 1000).toLocaleDateString(LOCALE, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
   const base = (id, kind) => `/api/projects/${id}/content/${kind}`;
 
   async function loadContent(proj, kind) {

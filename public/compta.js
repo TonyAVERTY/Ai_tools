@@ -1,6 +1,7 @@
 // Page Comptabilité : fenêtre d'ajout et de modification d'une ligne (le justificatif part avec la ligne), calcul de la TVA, boutons « Copier ».
 // Relancé à chaque navigation (public/ajax.js) : tout est branché sur les éléments de la page, remplacés à chaque fois.
 (() => {
+  const LOCALE = { en: 'en-GB', es: 'es-ES' }[document.documentElement.lang] || 'fr-FR'; // format des dates et des nombres : la langue choisie
   const root = document.querySelector('[data-compta]');
   if (!root) return;
   const $ = (s, el = root) => el.querySelector(s);
@@ -20,7 +21,7 @@
   let editing = null; // données de la ligne en cours de modification
 
   const kindNow = () => form.elements.kind.value;
-  const eur = (n) => n.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
+  const eur = (n) => n.toLocaleString(LOCALE, { style: 'currency', currency: 'EUR' });
   const parse = (v) => {
     const s = String(v || '').replace(/[\s  €]/g, '').replace(',', '.');
     return /^\d{1,9}(\.\d{1,2})?$/.test(s) && Number(s) > 0 ? Number(s) : null;

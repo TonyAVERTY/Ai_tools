@@ -7,8 +7,9 @@ import { layout } from './views.js';
 import { suggestBlock } from './mailviews.js';
 import { STATUSES } from './services/crm.js';
 import { INTENTS } from './services/replies.js';
+import { localeOf } from './i18n/locale.js';
 
-const day = (ts) => new Date(ts * 1000).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', timeZone: 'Europe/Paris' });
+const day = (ts) => new Date(ts * 1000).toLocaleDateString(localeOf(), { day: 'numeric', month: 'short', timeZone: 'Europe/Paris' });
 const isoDay = (ts) => (ts ? new Date(ts * 1000).toLocaleDateString('sv-SE', { timeZone: 'Europe/Paris' }) : '');
 const when = (ts) => {
   const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Paris' });

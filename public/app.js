@@ -1,5 +1,6 @@
 // Front vanilla, sans build. Polling léger uniquement sur les projets dépliés.
 (() => {
+  const LOCALE = { en: 'en-GB', es: 'es-ES' }[document.documentElement.lang] || 'fr-FR'; // format des dates et des nombres : la langue choisie
   // Ce script peut être relancé sans recharger la page (public/ajax.js remplace le contenu, puis le ré-exécute) : la précédente exécution
   // est d'abord arrêtée. Tout ce qui est branché sur document, window ou un minuteur passe par listen / every / later, pour pouvoir être retiré.
   window.AiTools?.dispose?.();
@@ -30,7 +31,7 @@
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const formData = (form) => Object.fromEntries(new FormData(form));
   const icon = (name) => `<svg class="ic" aria-hidden="true" viewBox="0 0 24 24"><use href="#i-${name}"></use></svg>`;
-  const liDay = (ts) => new Date(ts * 1000).toLocaleDateString('fr-FR', { dateStyle: 'medium', timeZone: 'Europe/Paris' });
+  const liDay = (ts) => new Date(ts * 1000).toLocaleDateString(LOCALE, { dateStyle: 'medium', timeZone: 'Europe/Paris' });
 
   // Montée en charge : un conseil (jamais un blocage) pendant la première semaine d'envois d'un projet
   const warmupLine = (w) => (w?.active ? ` · conseil : ${w.perDay / 2} à ${w.perDay} par jour cette première semaine` : '');
@@ -286,7 +287,7 @@
   const tokenText = (value, status) => {
     const n = Math.max(0, Number(value) || 0);
     if (!n && (status === 'running' || status === 'queued') && aiName() !== 'Claude') return 'Tokens comptés à la fin de la tâche';
-    return `${n.toLocaleString('fr-FR')} tokens`;
+    return `${n.toLocaleString(LOCALE)} tokens`;
   };
   const ACTIVE = ['queued', 'running'];
   const LABELS = {
@@ -604,7 +605,7 @@
   // remonté par la CLI à chaque appel. Permet de décider en amont si une tâche vaut le coup.
   function resetLabel(ts) {
     if (!ts) return '';
-    return new Date(ts * 1000).toLocaleString('fr-FR', { weekday: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
+    return new Date(ts * 1000).toLocaleString(LOCALE, { weekday: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
   }
   const WHY = {
     denied: "Anthropic refuse le relevé en direct avec ce jeton (relie-toi avec « Se connecter avec Claude »)",
@@ -618,7 +619,7 @@
   const jobsBtn = jobsBox && $('.jobs-btn', jobsBox);
   const jobsPop = jobsBox && $('.jobs-pop', jobsBox);
   const jobsOpen = () => jobsBtn?.getAttribute('aria-expanded') === 'true';
-  const fmtWhen = (ts) => new Date(ts * 1000).toLocaleString('fr-FR', { weekday: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
+  const fmtWhen = (ts) => new Date(ts * 1000).toLocaleString(LOCALE, { weekday: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
   const plural = (n, w) => `${n} ${w}${n > 1 ? 's' : ''}`;
 
   function jobItem(j, isNew = false) {
@@ -717,10 +718,10 @@
   // « Remise à zéro aujourd'hui à 18:42 » / « demain à 09:00 » / « lundi à 09:00 » (heure de Paris)
   function resetNote(ts) {
     if (!ts) return '';
-    const day = (t) => new Date(t).toLocaleDateString('fr-FR', { timeZone: 'Europe/Paris' });
+    const day = (t) => new Date(t).toLocaleDateString(LOCALE, { timeZone: 'Europe/Paris' });
     const at = new Date(ts * 1000);
-    const hm = at.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
-    const d = day(at) === day(Date.now()) ? "aujourd'hui" : day(at) === day(Date.now() + 864e5) ? 'demain' : at.toLocaleDateString('fr-FR', { weekday: 'long', timeZone: 'Europe/Paris' });
+    const hm = at.toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
+    const d = day(at) === day(Date.now()) ? "aujourd'hui" : day(at) === day(Date.now() + 864e5) ? 'demain' : at.toLocaleDateString(LOCALE, { weekday: 'long', timeZone: 'Europe/Paris' });
     return `Remise à zéro ${d} à ${hm}`;
   }
   function usageRow(label, value, { ratio = null, tip = '', cls = '', note = '' } = {}) {
@@ -736,7 +737,7 @@
     unavailable: 'le relevé en direct est indisponible chez OpenAI',
     format: 'réponse inattendue du relevé en direct',
   };
-  const tokensOf = (x) => `${((x?.tin || 0) + (x?.tout || 0)).toLocaleString('fr-FR')} tokens`;
+  const tokensOf = (x) => `${((x?.tin || 0) + (x?.tout || 0)).toLocaleString(LOCALE)} tokens`;
   // Fiabilité des générations sur 30 jours : nombre de tâches IA terminées, échecs, durée moyenne (détail au survol)
   function usageStats(s) {
     const a = s.usage?.ai;
@@ -744,7 +745,7 @@
     const secs = a.avgSeconds;
     const dur = secs == null ? '' : secs >= 90 ? `${Math.round(secs / 60)} min` : `${secs} s`;
     const tip = `Tâches IA terminées sur 30 jours : ${a.jobs}, dont ${a.failed} en échec (${Math.round((a.failureRate || 0) * 100)} %).${dur ? ` Durée moyenne d'une tâche : ${dur}.` : ''} Réponses de la page IA : ${a.chatAnswers}.`;
-    return usageRow('Tâches IA 30 j', `${a.jobs.toLocaleString('fr-FR')}${a.failed ? ` · ${a.failed} en échec` : ''}`, { tip });
+    return usageRow('Tâches IA 30 j', `${a.jobs.toLocaleString(LOCALE)}${a.failed ? ` · ${a.failed} en échec` : ''}`, { tip });
   }
   function usageOtherAi(s) {
     const rows = [];
@@ -882,7 +883,7 @@
       article.dataset.kind = Object.hasOwn(types, entry.kind) ? entry.kind : 'status';
       const head = document.createElement('div'); head.className = 'console-entry-head';
       const label = document.createElement('strong'); label.textContent = types[entry.kind] || 'Activité';
-      const time = document.createElement('time'); time.textContent = new Date(entry.at).toLocaleTimeString('fr-FR', { timeZone: 'Europe/Paris' });
+      const time = document.createElement('time'); time.textContent = new Date(entry.at).toLocaleTimeString(LOCALE, { timeZone: 'Europe/Paris' });
       head.append(label, time); article.append(head);
       const text = document.createElement(['delta', 'output'].includes(entry.kind) ? 'pre' : 'p'); text.textContent = entry.text;
       if (entry.kind === 'output' && entry.text.length > 1200) {
@@ -903,7 +904,7 @@
         setText('[data-console-model]', r.progress?.model || '—');
         const elapsed = r.startedAt ? Math.max(0, Math.floor(((r.finishedAt || Date.now() / 1000) - r.startedAt))) : 0;
         setText('[data-console-elapsed]', r.startedAt ? `${Math.floor(elapsed / 60)} min ${String(elapsed % 60).padStart(2, '0')} s` : 'En attente');
-        setText('[data-console-updated]', 'Actualisé à ' + new Date().toLocaleTimeString('fr-FR'));
+        setText('[data-console-updated]', 'Actualisé à ' + new Date().toLocaleTimeString(LOCALE));
         const meter = $('[data-console-progress]', consoleBox);
         if (meter) { if (typeof r.progress?.pct === 'number') meter.value = Math.max(0, Math.min(100, r.progress.pct)); else if (r.status === 'done') meter.value = 100; else meter.removeAttribute('value'); }
         consoleBox.dataset.status = r.status;
@@ -974,7 +975,7 @@
     if (box._sig === sig) return;
     box._sig = sig;
     if (later) {
-      const at = new Date(job.runAfter * 1000).toLocaleString('fr-FR', { weekday: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
+      const at = new Date(job.runAfter * 1000).toLocaleString(LOCALE, { weekday: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
       box.innerHTML = `<div class="running scheduled"><span class="moon" aria-hidden="true"></span>
         <div><div>${name} programmé(e) : ${esc(at)}</div><div class="small muted">Démarrage la nuit, quand ton quota ${esc(aiName())} est libre.</div></div>
         ${job.canViewLogs !== false ? `<a class="btn small" href="/jobs/${job.id}">Voir</a>` : ''}<button class="btn small" data-cancel="${job.id}">Annuler</button></div>`;
@@ -1006,7 +1007,7 @@
       if (type === 'send') txt = `Envoi terminé : ${r.sent} envoyé(s), ${r.failed} échec(s).`;
       if (type === 'followup') txt = r.postponed ? 'Relances reportées au prochain créneau (lun-ven 9h-18h).' : `Relances terminées : ${r.sent} envoyée(s), ${r.failed} échec(s).`;
       if (type === 'evolution') {
-        const when = job.finishedAt ? new Date(job.finishedAt * 1000).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' }) : '';
+        const when = job.finishedAt ? new Date(job.finishedAt * 1000).toLocaleString(LOCALE, { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' }) : '';
         // r.html est rendu et échappé par le serveur (src/services/markdown.js)
         box.innerHTML = `<div class="evo-done"><p class="ok small">Envoyé à ${esc(r.sentTo)}${when ? ` · ${esc(when)}` : ''}</p>
           <button type="button" class="btn small" data-copy-md>Copier le Markdown</button></div>
@@ -1015,7 +1016,7 @@
         return;
       }
       if (type === 'audit') {
-        const when = job.finishedAt ? new Date(job.finishedAt * 1000).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' }) : '';
+        const when = job.finishedAt ? new Date(job.finishedAt * 1000).toLocaleString(LOCALE, { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' }) : '';
         // r.html est rendu et échappé par le serveur (src/services/markdown.js)
         box.innerHTML = `<div class="evo-done"><p class="ok small">Audit terminé${when ? ` · ${esc(when)}` : ''}</p>
           <button type="button" class="btn small" data-copy-md>Copier le rapport (Markdown)</button></div>
@@ -1024,7 +1025,7 @@
         return;
       }
       if (type.startsWith('poste_')) {
-        const when = job.finishedAt ? new Date(job.finishedAt * 1000).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' }) : '';
+        const when = job.finishedAt ? new Date(job.finishedAt * 1000).toLocaleString(LOCALE, { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' }) : '';
         box.innerHTML = `<div class="evo-done"><p class="ok small">Terminé${when ? ` · ${esc(when)}` : ''}</p>
           <button type="button" class="btn small" data-poste-view="${esc(type.slice(6))}">${icon('eye')}Voir le résultat</button></div>`;
         return;
@@ -1809,7 +1810,7 @@
         });
       }
       posteMd = r.markdown;
-      const when = r.finishedAt ? new Date(r.finishedAt * 1000).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' }) : '';
+      const when = r.finishedAt ? new Date(r.finishedAt * 1000).toLocaleString(LOCALE, { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' }) : '';
       // r.html est rendu et échappé par le serveur (src/services/markdown.js)
       dlg.setAttribute('aria-label', r.label);
       dlg.innerHTML = `<div class="dlg-head"><div><h3>${esc(r.label)}</h3><p class="muted small">${esc(r.role)}${when ? ` · ${esc(when)}` : ''}${r.notes ? ` · précisions : ${esc(r.notes)}` : ''}</p></div>

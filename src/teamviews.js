@@ -4,8 +4,9 @@ import { layout } from './views.js';
 import { ic } from './icons.js';
 import { ROLES, ROLE_LABELS } from './teams.js';
 import { banner } from './banner.js';
+import { localeOf } from './i18n/locale.js';
 
-const fmt = (ts) => (ts ? new Date(ts * 1000).toLocaleDateString('fr-FR', { dateStyle: 'medium', timeZone: 'Europe/Paris' }) : '—');
+const fmt = (ts) => (ts ? new Date(ts * 1000).toLocaleDateString(localeOf(), { dateStyle: 'medium', timeZone: 'Europe/Paris' }) : '—');
 const roleSelect = (value, name = 'role') => `<select name="${name}">${ROLES.map((r) => `<option value="${r}"${r === value ? ' selected' : ''}>${ROLE_LABELS[r]}</option>`).join('')}</select>`;
 
 // Rôles et droits réels (voir src/teams.js, needAccess) : un tableau plutôt qu'une liste, pour comparer d'un coup d'œil

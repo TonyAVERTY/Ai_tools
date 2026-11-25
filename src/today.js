@@ -8,6 +8,10 @@ import { isApproaching, usageView, weekBounds } from './services/plans.js';
 import {
   fmtEur, todayIso, periodToDeclare, deadlineOf, daysLeft, periodRange, rowsInRange, computeTotals, dayLabel,
 } from './services/accounting.js';
+import { localeOf } from './i18n/locale.js';
+import { currentLang } from './i18n/index.js';
+// « 9 h 30 » : une écriture française de l'heure ; dans les autres langues, l'heure reste « 09:30 »
+const hourText = (t) => (currentLang() === 'fr' ? t.replace(':00', ' h').replace(':', ' h ') : t);
 
 const TZ = 'Europe/Paris';
 const DAY = 86400;
@@ -68,7 +72,7 @@ export function weekStarts(at, count = 8) {
   return out; // count + 1 bornes : la dernière ferme la dernière semaine
 }
 const bucket = (ts, starts) => { for (let i = starts.length - 2; i >= 0; i--) if (ts >= starts[i]) return ts < starts[i + 1] ? i : -1; return -1; };
-const shortDay = (ts) => new Date(ts * 1000).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', timeZone: TZ });
+const shortDay = (ts) => new Date(ts * 1000).toLocaleDateString(localeOf(), { day: 'numeric', month: 'short', timeZone: TZ });
 
 async function weekly(db, userId, ids, starts) {
   const counts = { sent: Array(starts.length - 1).fill(0), rep: Array(starts.length - 1).fill(0), rdv: Array(starts.length - 1).fill(0) };
@@ -165,7 +169,7 @@ async function toDo(db, userId, ids, names, at, doneKeys) {
     const key = `act:${r.id}:${r.next_action_at}`;
     if (doneKeys.has(key)) continue;
     const late = Number(r.next_action_at) < startOfToday;
-    const hhmm = new Date(Number(r.next_action_at) * 1000).toLocaleTimeString('fr-FR', { hour: 'numeric', minute: '2-digit', timeZone: TZ }).replace(':00', ' h').replace(':', ' h ');
+    const hhmm = hourText(new Date(Number(r.next_action_at) * 1000).toLocaleTimeString(localeOf(), { hour: 'numeric', minute: '2-digit', timeZone: TZ }));
     items.push({
       key, kind: 'act', icon: 'clock', title: `${r.next_action} : ${r.company}`, badge: late ? 'En retard' : "Prévu aujourd'hui", tone: 'warn', badgeIcon: 'clock',
       meta: `${late ? shortDay(Number(r.next_action_at)) : hhmm} · ${p(r.project_id)}`, text: late ? "L'action prévue n'a pas été marquée comme faite." : 'Action notée sur la fiche du prospect.',
@@ -193,7 +197,7 @@ async function agendaOf(db, userId, ids, names, at) {
   const p = parisParts(new Date(at * 1000));
   const list = (await monthEvents(db, ids, p.year, p.month, userId)).get(p.day) || [];
   return list.map((e) => ({
-    time: new Date(e.at * 1000).toLocaleTimeString('fr-FR', { hour: 'numeric', minute: '2-digit', timeZone: TZ }).replace(/^(\d+):/, '$1:'),
+    time: new Date(e.at * 1000).toLocaleTimeString(localeOf(), { hour: 'numeric', minute: '2-digit', timeZone: TZ }).replace(/^(\d+):/, '$1:'),
     title: e.label, meta: e.kind === 'event' ? 'Événement' : e.project || '', kind: e.kind, past: e.at < at - 3600, at: e.at,
   }));
 }
@@ -228,7 +232,7 @@ const USAGE_LABEL = { mails: 'Mails envoyés', aiJobs: 'Tâches IA', prospects: 
 const USAGE_ORDER = ['mails', 'aiJobs', 'prospects', 'projects'];
 export function usageRows(u, at = now()) {
   if (!u) return [];
-  const nextMonday = new Date(weekBounds(at).end * 1000).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: TZ });
+  const nextMonday = new Date(weekBounds(at).end * 1000).toLocaleDateString(localeOf(), { weekday: 'long', day: 'numeric', month: 'long', timeZone: TZ });
   return USAGE_ORDER.map((k) => u.items.find((i) => i.kind === k)).filter(Boolean).map((i) => {
     const warn = i.full || isApproaching(i.used, i.limit);
     const note = i.limit == null ? 'Sans plafond' : i.full ? 'Plafond atteint pour ton offre'
@@ -262,7 +266,7 @@ export async function todayData(db, user, { projects, onboarding = new Map(), se
   const mails = usage.items.find((i) => i.kind === 'mails');
   const repOpen = items.filter((i) => i.kind === 'rep').length;
   const last = wk.weeks.at(-1);
-  const monthName = (m) => cap(new Date(`${m}-15T12:00:00Z`).toLocaleDateString('fr-FR', { month: 'long', timeZone: 'UTC' }));
+  const monthName = (m) => cap(new Date(`${m}-15T12:00:00Z`).toLocaleDateString(localeOf(), { month: 'long', timeZone: 'UTC' }));
   const nextEvent = agenda.find((e) => e.kind === 'event' && !e.past);
   const bits = [
     repOpen ? plural(repOpen, 'réponse à traiter', 'réponses à traiter') : null,
@@ -271,12 +275,12 @@ export async function todayData(db, user, { projects, onboarding = new Map(), se
   ].filter(Boolean);
   const name = String(user.name || '').trim().split(/\s+/)[0] || cap(String(user.email || '').split('@')[0]);
   return {
-    name, dateLabel: cap(new Date(at * 1000).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: TZ })),
+    name, dateLabel: cap(new Date(at * 1000).toLocaleDateString(localeOf(), { weekday: 'long', day: 'numeric', month: 'long', timeZone: TZ })),
     summary: bits.length ? `${bits.join(', ')}.` : "Rien d'urgent. Bonne journée.",
     onboarding: [...onboarding.entries()].map(([id, c]) => ({ id, name: names.get(id) || '', ...c })).find((c) => !c.ready) || null,
     kpis: [
       { label: 'Réponses à traiter', value: String(repOpen), sub: repOpen ? 'à lire et à traiter' : 'rien en attente', href: '/mails', tone: '' },
-      { label: 'Mails cette semaine', value: last.sent.toLocaleString('fr-FR'), sub: mails ? `${mails.used.toLocaleString('fr-FR')}${mails.limit == null ? '' : ` sur ${mails.limit.toLocaleString('fr-FR')}`} cette semaine` : '', href: '/mails', tone: '' },
+      { label: 'Mails cette semaine', value: last.sent.toLocaleString(localeOf()), sub: mails ? `${mails.used.toLocaleString(localeOf())}${mails.limit == null ? '' : ` sur ${mails.limit.toLocaleString(localeOf())}`} cette semaine` : '', href: '/mails', tone: '' },
       { label: 'À encaisser', value: fmtEur(cash.toCollect), sub: cash.invoices.length ? `${plural(cash.invoices.length, 'facture', 'factures')}${cash.lateCount ? `, ${cash.lateCount} en retard` : ''}` : 'aucune facture en attente', href: '/compta', tone: cash.lateCount ? 'warn' : '' },
       { label: `Encaissé en ${monthName(cash.month).toLowerCase()}`, value: fmtEur(cash.collected), sub: `${fmtEur(cash.previous)} le mois dernier`, href: '/compta', tone: '' },
     ],

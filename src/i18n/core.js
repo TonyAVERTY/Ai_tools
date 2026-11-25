@@ -59,30 +59,34 @@ export function makeLookup(entries) {
   for (const [fr, tr] of Object.entries(entries)) {
     const key = fr.includes('<') ? canonInline(fr) : normalize(fr);
     if (/\{[a-zA-Z0-9_]+\}/.test(key)) patterns.push(compile(key, tr));
-    else exact.set(key, tr);
+    else {
+      exact.set(key, tr);
+      // L'application met le nom de l'IA de la personne à la place de « Claude » (ChatGPT, Gemini) : la même phrase, avec un autre nom, se traduit aussi
+      if (key !== 'Claude' && key.includes('Claude') && String(tr).includes('Claude')) patterns.push(compile(key.split('Claude').join('{aiName}'), String(tr).split('Claude').join('{aiName}')));
+    }
   }
   patterns.sort((a, b) => b.literal - a.literal); // le modèle le plus précis d'abord
   const cache = new Map();
 
-  function find(key) {
+  // Les valeurs d'un modèle sont traduites à leur tour : « Étape {n} sur {m} : {étape} » traduit aussi l'étape (3 niveaux au plus)
+  function find(key, depth) {
     if (exact.has(key)) return exact.get(key);
     for (const p of patterns) {
       const m = p.re.exec(key);
       if (!m) continue;
       let out = p.tr;
-      p.names.forEach((n, i) => { out = out.split(`{${n}}`).join(m[i + 1]); });
+      p.names.forEach((n, i) => { const v = m[i + 1]; out = out.split(`{${n}}`).join((depth < 3 && resolve(v, depth + 1)) || v); });
       return out;
     }
     return null;
   }
-  function resolve(key) {
+  function resolve(key, depth = 0) {
     if (!key) return null;
-    if (cache.has(key)) return cache.get(key);
-    let r = find(key);
+    if (depth === 0 && cache.has(key)) return cache.get(key);
+    let r = find(key, depth);
     // « Erreur. » : le point final est ajouté à l'affichage, la clé est écrite sans lui
-    if (r == null && key.length > 1 && key.endsWith('.') && !key.endsWith('..')) { const base = find(key.slice(0, -1)); if (base != null) r = base.endsWith('.') ? base : `${base}.`; }
-    if (cache.size > 20000) cache.clear();
-    cache.set(key, r);
+    if (r == null && key.length > 1 && key.endsWith('.') && !key.endsWith('..')) { const base = find(key.slice(0, -1), depth); if (base != null) r = base.endsWith('.') ? base : `${base}.`; }
+    if (depth === 0) { if (cache.size > 20000) cache.clear(); cache.set(key, r); }
     return r;
   }
   return {

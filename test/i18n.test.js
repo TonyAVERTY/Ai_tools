@@ -26,6 +26,14 @@ test('noyau : texte exact, espaces réduits, point final ajouté par l\'applicat
   assert.equal(normalize(' a   b\n'), 'a b');
 });
 
+test('noyau : le nom de l\'IA de la personne remplace « Claude » (ChatGPT, Gemini) ; les valeurs d\'un modèle sont traduites à leur tour', () => {
+  const l = makeLookup({ 'Claude lit ton code': 'Claude reads your code', 'Étape {n} : {step}': 'Step {n}: {step}', 'valider la cible': 'confirm the target' });
+  assert.equal(l.text('Claude lit ton code'), 'Claude reads your code');
+  assert.equal(l.text('ChatGPT lit ton code'), 'ChatGPT reads your code');
+  assert.equal(l.text('Étape 4 : valider la cible'), 'Step 4: confirm the target', 'la valeur « valider la cible » est traduite');
+  assert.equal(l.text('Étape 4 : une chose inconnue'), 'Step 4: une chose inconnue', 'une valeur inconnue reste telle quelle');
+});
+
 test('noyau : une phrase avec balises se cherche sans les attributs et les remet ensuite', () => {
   assert.equal(canonInline('Clique sur <strong class="x">Accepter</strong>  pour continuer'), 'Clique sur <strong>Accepter</strong> pour continuer');
   const original = 'Clique sur <strong class="x">Accepter</strong> pour continuer';
@@ -92,6 +100,6 @@ test('dictionnaire : trois langues par ligne, rien de vide, clés uniques, même
   assert.deepEqual(LANGS, ['fr', 'en', 'es']);
   assert.equal(isLang('de'), false);
   assert.equal(lookupFor('fr'), null);
-  assert.ok(lookupFor('en').size === Object.keys(entriesFor('en')).length);
+  assert.ok(lookupFor('en').size >= Object.keys(entriesFor('en')).length, 'les variantes « nom de l\'IA » s\'ajoutent aux lignes');
   assert.equal(lookupFor('es').text('Annuler'), 'Cancelar');
 });

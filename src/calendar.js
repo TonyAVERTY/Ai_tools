@@ -10,6 +10,7 @@ import { parisParts, parisTime } from './services/paris-time.js';
 import { eventLinks, DURATIONS } from './events.js';
 import { createFeed, deleteFeed, feedToken, feedUrl, userOfFeed, buildIcs, eventsFor } from './services/ical.js';
 import { banner } from './banner.js';
+import { localeOf } from './i18n/locale.js';
 
 const MONTHS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
 const DAYS = ['lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.', 'dim.'];
@@ -54,7 +55,7 @@ export async function agendaUpcoming(db, ids, userId, { at = now(), limit = 8 } 
   for (const [y, m] of [[t.year, t.month], [ny, nm]]) for (const list of (await monthEvents(db, ids, y, m, userId)).values()) out.push(...list);
   return out.filter((e) => e.at >= at - 3600).sort((a, b) => a.at - b.at).slice(0, limit);
 }
-const dayHead = (ts) => new Date(ts * 1000).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Paris' });
+const dayHead = (ts) => new Date(ts * 1000).toLocaleDateString(localeOf(), { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Paris' });
 
 export function calendarPage({ email, year, month, byDay, feed, today, agenda = [], error = null, fresh = null }) {
   const first = parisParts(parisTime(year, month, 1, 12));

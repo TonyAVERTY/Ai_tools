@@ -1,6 +1,7 @@
 // Récap d'un projet : indicateurs et courbes d'historique (SVG maison : pas de lib externe, CSP stricte).
 // Chargé après app.js, qui expose ses outils communs dans window.AiTools ; ajax.js relance ce script à chaque navigation, comme app.js.
 (() => {
+  const LOCALE = { en: 'en-GB', es: 'es-ES' }[document.documentElement.lang] || 'fr-FR'; // format des dates et des nombres : la langue choisie
   const { $, $$, api, esc, every, listen, loadFailed, loadingHtml } = window.AiTools;
 
   // ---------- Courbes (SVG maison : pas de lib externe, CSP stricte) ----------
@@ -8,8 +9,8 @@
   const M = { l: 46, r: 56, t: 12, b: 24, h: 150 };
   const niceMax = (v) => { if (!(v > 0)) return 1; const p = 10 ** Math.floor(Math.log10(v)); const m = v / p; return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 5 ? 5 : 10) * p; };
   const fmtVal = (v, unit) => (unit === '€'
-    ? v.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })
-    : v.toLocaleString('fr-FR', { maximumFractionDigits: 1 }));
+    ? v.toLocaleString(LOCALE, { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })
+    : v.toLocaleString(LOCALE, { maximumFractionDigits: 1 }));
   const shortDay = (d) => { const [, m, dd] = d.split('-'); return `${dd}/${m}`; };
   const yGrid = (w, max, unit, Y) => [0, 0.5, 1].map((f) => `<line class="grid" x1="${M.l}" x2="${w - M.r}" y1="${Y(max * f)}" y2="${Y(max * f)}"/>
     <text class="axis" x="${M.l - 6}" y="${Y(max * f) + 4}" text-anchor="end">${esc(fmtVal(max * f, unit))}</text>`).join('');
@@ -165,7 +166,7 @@
       const r = await api(`/api/projects/${proj.dataset.id}/recap${force ? '?force' : ''}`);
       const b = r.business;
       const s = r.stats;
-      const eur = (v) => (typeof v === 'number' ? v.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' }) : esc(v ?? '—'));
+      const eur = (v) => (typeof v === 'number' ? v.toLocaleString(LOCALE, { style: 'currency', currency: 'EUR' }) : esc(v ?? '—'));
       box.innerHTML = `
         <div class="kpis">
           <div class="kpi"><span>Utilisateurs</span><strong>${esc(b?.users ?? '—')}</strong></div>

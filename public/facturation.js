@@ -1,6 +1,7 @@
 // Page Facturation d'un projet : tant que Claude prépare quelque chose (exemples de devis, affinage, documents), on suit l'avancement
 // et la page se recharge toute seule à la fin. Relancé à chaque navigation (public/ajax.js) : l'ancien minuteur est arrêté d'abord.
 (() => {
+  const LOCALE = { en: 'en-GB', es: 'es-ES' }[document.documentElement.lang] || 'fr-FR'; // format des dates et des nombres : la langue choisie
   clearInterval(window.__billTimer);
   const root = document.querySelector('[data-bill-project]');
 
@@ -17,7 +18,7 @@
     const totalEl = $('[data-lines-total]');
     const num = (v) => { const n = Number(String(v || '').replace(/\s/g, '').replace(',', '.')); return Number.isFinite(n) ? n : 0; };
     const kind = () => kindSel.selectedOptions[0]?.dataset.kind || '';
-    const euro = (n) => n.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
+    const euro = (n) => n.toLocaleString(LOCALE, { style: 'currency', currency: 'EUR' });
     const total = () => {
       if (!totalEl) return;
       const ht = [...linesBox.querySelectorAll('[data-line]')].reduce((a, row) => a + num(row.querySelector('[name$="_qty"]').value) * num(row.querySelector('[name$="_price"]').value), 0);

@@ -17,8 +17,9 @@ import { goAttr } from './shortcutdata.js';
 import { PLAN_PRICES, PLAN_LABELS, FEATURES, annualPrice } from './limits.js';
 import { banner } from './banner.js';
 import { loadingBlock } from './loading.js';
+import { localeOf } from './i18n/locale.js';
 
-const fmtDate = (ts) => (ts ? new Date(ts * 1000).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' }) : '—');
+const fmtDate = (ts) => (ts ? new Date(ts * 1000).toLocaleString(localeOf(), { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' }) : '—');
 
 // Icônes de la section : noms du sprite (src/icons.js), une seule fois par page
 const SECTION_ICONS = { target: 'target', search: 'search', spark: 'spark', chart: 'chart', mail: 'mail', linkedin: 'pen', send: 'send', repeat: 'repeat', users: 'users', gear: 'gear', git: 'git', computer: 'computer', film: 'film', image: 'image' };
@@ -138,8 +139,8 @@ export function usageKpis(u) {
   if (!u) return '';
   const cell = (i) => {
     const level = i.full ? ' full' : i.limit != null && i.used / i.limit >= 0.8 ? ' warn' : '';
-    const sub = [KPI_SUB[i.kind], i.limit == null ? '' : `sur ${i.limit.toLocaleString('fr-FR')}`].filter(Boolean).join(' · ');
-    return `<div class="ukpi-c${level}"><dt>${ic(KPI_ICON[i.kind] || 'chart', 'ic-s')}${esc(KPI_LABEL[i.kind] || i.label)}</dt><dd><b>${i.used.toLocaleString('fr-FR')}</b><span>${esc(sub)}${i.full ? ' · plafond atteint' : ''}</span></dd></div>`;
+    const sub = [KPI_SUB[i.kind], i.limit == null ? '' : `sur ${i.limit.toLocaleString(localeOf())}`].filter(Boolean).join(' · ');
+    return `<div class="ukpi-c${level}"><dt>${ic(KPI_ICON[i.kind] || 'chart', 'ic-s')}${esc(KPI_LABEL[i.kind] || i.label)}</dt><dd><b>${i.used.toLocaleString(localeOf())}</b><span>${esc(sub)}${i.full ? ' · plafond atteint' : ''}</span></dd></div>`;
   };
   const full = u.items.filter((i) => i.full);
   return `<section class="ukpis" aria-labelledby="h-kpis">
@@ -159,7 +160,7 @@ export function claudePanel() {
 }
 
 // Usage de la semaine : une barre par plafond du plan (largeurs par classes w-N, la CSP interdit le style en ligne)
-const frDay = (ts) => new Date(ts * 1000).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Paris' });
+const frDay = (ts) => new Date(ts * 1000).toLocaleDateString(localeOf(), { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Paris' });
 
 /** Bloc « Ton offre » de Mon compte : abonnement en cours, fin, paiement à régulariser, ou invitation à passer à une offre payante. Rien si les paiements ne sont pas ouverts. */
 export function offerBlock(bl) {
@@ -219,7 +220,7 @@ const CHATGPT_WHY = {
   unavailable: 'Le relevé en direct est indisponible chez OpenAI.',
   format: 'Réponse inattendue du relevé en direct.',
 };
-const fmtReset = (ts) => new Date(ts * 1000).toLocaleString('fr-FR', { weekday: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
+const fmtReset = (ts) => new Date(ts * 1000).toLocaleString(localeOf(), { weekday: 'long', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
 
 // Limites d'utilisation du compte Claude : session glissante de 5 h et semaine de 7 j (abonnement seulement ; une clé API n'a pas ces limites).
 function claudeLimits(quota, link) {

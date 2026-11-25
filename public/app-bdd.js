@@ -2,9 +2,10 @@
 // (lecture seule) ; les listes se remplissent avec les vraies tables, la bonne est présélectionnée et marquée « (recommandé) », et un aperçu chiffré s'affiche.
 // Changer une liste relance l'aperçu. Chargé après app.js (outils communs dans window.AiTools) ; ajax.js relance ce script à chaque navigation.
 (() => {
+  const LOCALE = { en: 'en-GB', es: 'es-ES' }[document.documentElement.lang] || 'fr-FR'; // format des dates et des nombres : la langue choisie
   const { $, $$, api, listen } = window.AiTools;
-  const nf = new Intl.NumberFormat('fr-FR');
-  const eur = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' });
+  const nf = new Intl.NumberFormat(LOCALE);
+  const eur = new Intl.NumberFormat(LOCALE, { style: 'currency', currency: 'EUR' });
   const loaded = new WeakSet(); // formulaires dont les listes viennent d'être remplies par une analyse
   const timers = new WeakMap();
 

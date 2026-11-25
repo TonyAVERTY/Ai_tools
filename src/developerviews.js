@@ -6,6 +6,7 @@ import { SCOPES } from './apitokens.js';
 import { API_ENDPOINTS } from './apiv1.js';
 import { banner } from './banner.js';
 import { lockedCard } from './lockviews.js';
+import { localeOf } from './i18n/locale.js';
 
 /** Une valeur à copier telle quelle (adresse, commande) : monospace, bouton « Copier » (public/app.js, [data-copy-cmd]). */
 const cmd = (label, text) => `<div class="cmd"><span class="lbl">${label}</span><div class="cmd-b"><pre><code>${esc(text)}</code></pre><button type="button" class="btn small" data-copy-cmd aria-label="Copier : ${esc(label)}">${ic('copy')}Copier</button></div></div>`;
@@ -13,7 +14,7 @@ const cmd = (label, text) => `<div class="cmd"><span class="lbl">${label}</span>
 /** Tout ce qu'on montre d'un jeton après sa création : jamais un caractère du secret, seulement le préfixe commun à tous les jetons. */
 const TOKEN_MASK = 'iaboss_*************';
 
-const day = (ts) => (ts ? new Date(ts * 1000).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' }) : 'jamais');
+const day = (ts) => (ts ? new Date(ts * 1000).toLocaleString(localeOf(), { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' }) : 'jamais');
 
 export function developerPage({ user, enabled, tokens = [], newToken = null, error = null, appUrl, max, locked = false }) {
   const body = locked ? lockedCard('api', 'Mode développeur') : !enabled ? `<section class="card">

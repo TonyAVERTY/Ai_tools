@@ -9,6 +9,7 @@ import {
   KINDS, KIND_BY_KEY, CATEGORIES, METHODS, VAT_RATES, REGIMES, ACTIVITIES, VAT_MODES, FREQUENCIES, REFERENCE,
   categoryLabel, methodLabel, fmtEur, dayLabel,
 } from './services/accounting.js';
+import { localeOf } from './i18n/locale.js';
 
 const dmy = (iso) => `${iso.slice(8)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
 const cents = (c) => (Number(c) / 100).toFixed(2).replace('.', ',');
@@ -263,7 +264,7 @@ export function accountingPage(d) {
 
   <section class="card cmp-faq" aria-labelledby="t-help"><div class="card-h"><h2 id="t-help">Questions fréquentes</h2><p>Les réponses aux questions que se pose tout le monde en débutant.</p></div>
     <div class="faq">${HELP.map(([q, a]) => `<details class="faq-i"><summary><span>${esc(q)}</span>${ic('chev')}</summary><div class="faq-a">${a}</div></details>`).join('')}</div>
-    <p class="muted small">Espace utilisé par tes justificatifs : ${(d.usedBytes / 1048576).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} Mo sur ${Math.round(d.limits.perUserBytes / 1048576)} Mo.</p>
+    <p class="muted small">Espace utilisé par tes justificatifs : ${(d.usedBytes / 1048576).toLocaleString(localeOf(), { maximumFractionDigits: 1 })} Mo sur ${Math.round(d.limits.perUserBytes / 1048576)} Mo.</p>
   </section>
   ${dialog(d)}
 </div>`;

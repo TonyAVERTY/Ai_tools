@@ -21,16 +21,20 @@ export async function seedAccount(s) {
   return { user, projectId };
 }
 
+/** Textes écrits par la personne (noms de projet, de prospects…) dans le compte garni : pas à traduire. */
+export const SEED_TEXTS = new Set(['Atelier', 'Boulangerie Martin', 'Pâtisserie Durand', 'Café Leroy', 'Export CSV', 'Mode sombre', 'Une idée pour {{entreprise}}', 'github.com/o/atelier', 'Cartes de fidélité digitales.']);
+
 /** Pages publiques à lire (les textes juridiques restent en français : ils ne sont pas dans cette liste). */
 export const PUBLIC_PATHS = ['/accueil', '/fonctionnement', '/tarifs', '/login', '/docs', '/docs/api', '/docs/mcp'];
 
 /** Toutes les pages HTML de l'application connectée, d'après le routeur (les routes à paramètres reçoivent l'identifiant du projet). */
-export function appPaths(s, projectId) {
+export function appPaths(s, projectId, tabs = []) {
   const out = new Set(['/']);
   for (const r of s.app.router.routes) {
     if (r.method !== 'GET' || r.public) continue;
-    if (/^\/(api|static|auth|u|cal|admin|logout|link\/|developer\/mcp)/.test(r.path) || /\.(json|csv|xml|txt|ics|pdf)$/.test(r.path)) continue;
+    if (/^\/(api|static|auth|u|cal\/|admin|logout|link\/|developer\/mcp)/.test(r.path) || /\.(json|csv|xml|txt|ics|pdf)$/.test(r.path)) continue;
     const params = r.path.match(/:\w+/g) || [];
+    if (r.path === '/p/:id/:tab') { for (const t of tabs) out.add(`/p/${projectId}/${t}`); continue; }
     if (params.some((p) => p !== ':id')) continue;
     out.add(r.path.replace(':id', String(projectId)));
   }

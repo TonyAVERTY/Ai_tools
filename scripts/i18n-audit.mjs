@@ -7,8 +7,9 @@
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { startApp } from '../test/helpers/server.js';
-import { seedAccount, appPaths, readPage, PUBLIC_PATHS } from '../test/helpers/i18n-pages.js';
+import { seedAccount, appPaths, readPage, PUBLIC_PATHS, SEED_TEXTS } from '../test/helpers/i18n-pages.js';
 import { collectTexts, missingIn } from '../src/i18n/audit.js';
+import { tabSlugs } from '../src/projectviews.js';
 import { ROWS } from '../src/i18n/dictionary.js';
 
 const args = process.argv.slice(2);
@@ -40,12 +41,12 @@ const s = await startApp();
 const { user, projectId } = await seedAccount(s);
 const pages = new Map(); // texte → pages
 let scanned = 0;
-for (const [who, paths] of [[null, PUBLIC_PATHS], [user, appPaths(s, projectId)]]) {
+for (const [who, paths] of [[null, PUBLIC_PATHS], [user, appPaths(s, projectId, tabSlugs())]]) {
   for (const path of paths) {
     const html = await readPage(s, who, path);
     if (html == null) continue;
     scanned++;
-    for (const k of missingIn(collectTexts(html), 'en')) {
+    for (const k of missingIn(collectTexts(html), 'en', SEED_TEXTS)) {
       if (!pages.has(k)) pages.set(k, new Set());
       pages.get(k).add(path);
     }

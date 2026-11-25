@@ -4,8 +4,9 @@ import { esc } from './http.js';
 import { ic } from './icons.js';
 import { layout, claudePanel } from './views.js';
 import { FILTERS } from './today.js';
+import { localeOf } from './i18n/locale.js';
 
-const fr = (n) => Number(n).toLocaleString('fr-FR');
+const fr = (n) => Number(n).toLocaleString(localeOf());
 
 const header = (d) => `<header class="td-head">
   <div class="td-hello">

@@ -6,6 +6,7 @@ import { brandMark, assetUrl } from '../assets.js';
 import { siteLayout, ic, guest, CONTACT_EMAIL } from './layout.js';
 import { PLAN_LIMITS, PLAN_PRICES, PLAN_LABELS, PLAN_ORDER, FEATURES, ANNUAL_FREE_MONTHS, annualPrice } from '../limits.js';
 import { PERIODS } from '../services/stripe.js';
+import { localeOf } from '../i18n/locale.js';
 
 const FREE = PLAN_LIMITS.free;
 /** Montant en euros à la française (« 8,33 € ») ; entier sans décimales. */
@@ -17,7 +18,7 @@ const PLAN_BLURBS = {
   business: 'Pour une activité qui repose sur la prospection.',
   intensive: 'Pour le plus gros volume que le service permet.',
 };
-const fr = (n) => n.toLocaleString('fr-FR');
+const fr = (n) => n.toLocaleString(localeOf());
 const LIMIT_COLS = [['Projets', (l) => l.projects], ['Contacts', (l) => fr(l.prospects)], ['Mails par semaine', (l) => fr(l.mails)], ['Tâches IA par semaine', (l) => l.aiJobs], ['Jobs IA simultanés', (l) => l.parallelJobs], ["Places d'équipe", (l) => l.seats]];
 const limitCells = (l) => LIMIT_COLS.map(([label, f]) => `<td data-label="${label}"><b>${f(l)}</b></td>`).join('');
 

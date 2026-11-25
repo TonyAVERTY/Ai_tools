@@ -2,8 +2,9 @@
 import { esc } from './http.js';
 import { layout } from './views.js';
 import { banner } from './banner.js';
+import { localeOf } from './i18n/locale.js';
 
-const fmt = (ts) => (ts ? new Date(ts * 1000).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' }) : '—');
+const fmt = (ts) => (ts ? new Date(ts * 1000).toLocaleString(localeOf(), { dateStyle: 'short', timeStyle: 'short', timeZone: 'Europe/Paris' }) : '—');
 const PROVIDERS = { google: 'Google', apple: 'Apple' };
 const PLANS = { free: 'gratuit', pro: 'pro', admin: 'administrateur' };
 
@@ -69,10 +70,10 @@ ${error ? banner('err', error) : ''}
   });
 }
 
-const int = (n) => Number(n).toLocaleString('fr-FR');
-const usd = (n) => `${Number(n).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} $`;
+const int = (n) => Number(n).toLocaleString(localeOf());
+const usd = (n) => `${Number(n).toLocaleString(localeOf(), { minimumFractionDigits: 2, maximumFractionDigits: 2 })} $`;
 const secs = (n) => (n == null ? '—' : n < 90 ? `${Math.round(n)} s` : `${Math.floor(n / 60)} min ${String(Math.round(n % 60)).padStart(2, '0')} s`);
-const pct = (n) => (n == null ? '—' : `${(n * 100).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} %`);
+const pct = (n) => (n == null ? '—' : `${(n * 100).toLocaleString(localeOf(), { maximumFractionDigits: 1 })} %`);
 
 /** Page /admin/stats : totaux de toute l'application, sans aucune donnée d'un compte en particulier. */
 export function adminStatsPage({ user, stats, periods }) {
