@@ -18,7 +18,7 @@ const marks = (ids) => ids.map(() => '?').join(',');
 /** Types de tâche IA qui méritent une ligne dans « À traiter » quand elles se terminent (les conversations n'en font pas). */
 export const JOB_LABELS = {
   analyze: "Analyse du projet", prospect: 'Recherche de prospects', template: 'Mail de prospection', followup_template: 'Mail de relance',
-  linkedin: 'Post LinkedIn', evolution: 'Idées d\'évolution', implement: 'Idée d\'évolution implémentée', billing_quotes: 'Exemples de devis', billing_docs: 'Devis, acompte, facture et avoir',
+  linkedin: 'Post LinkedIn', evolution: 'Idées d\'évolution', implement: 'Implémentation d\'une idée', billing_quotes: 'Exemples de devis', billing_docs: 'Devis, acompte, facture et avoir',
   billing_refine: 'Affinage d\'un document', instagram_post: 'Post Instagram', newsletter: 'Newsletter', promo: 'Vidéo de promotion', audit: 'Audit du projet', poste: 'Tâches des postes',
 };
 /** Où vit le résultat de chaque tâche IA : [onglet du projet, section]. `?vu=1` fait grossir la section à l'arrivée. */
