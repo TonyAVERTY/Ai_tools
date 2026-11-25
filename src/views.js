@@ -184,14 +184,17 @@ export function offerBlock(bl) {
 
 export function usagePanel(u) {
   if (!u) return '';
-  const rows = u.items.map((i) => `<li class="g"><div class="g-h"><span>${esc(i.label)}</span><span class="g-v">${i.used}${i.limit == null ? '' : ` / ${i.limit}`}</span></div>${i.limit == null ? '' : `<div class="bar usage${i.full ? ' full' : ''}" role="progressbar" aria-label="${esc(i.label)}" aria-valuemin="0" aria-valuemax="${i.limit}" aria-valuenow="${i.used}"><span class="w-${Math.round(i.pct / 5) * 5}"></span></div>`}</li>`).join('');
+  const rows = u.items.map((i) => `<li class="g"><div class="g-h"><span>${esc(i.label)}</span><span class="g-v">${i.used}${i.limit == null ? '' : ` / ${i.limit}`}</span></div>${i.limit == null ? '' : `<div class="bar usage${i.full ? ' full' : i.approaching ? ' warn' : ''}" role="progressbar" aria-label="${esc(i.label)}" aria-valuemin="0" aria-valuemax="${i.limit}" aria-valuenow="${i.used}"><span class="w-${Math.round(i.pct / 5) * 5}"></span></div>`}</li>`).join('');
   const full = u.items.filter((i) => i.full);
+  const approaching = u.items.filter((i) => i.approaching);
   return `<section class="panel usage-card" aria-labelledby="h-usage">
   <div class="panel-h"><h2 id="h-usage">Usage de la semaine</h2><span class="badge">plan ${esc(u.planLabel)}</span></div>
   <ul class="usage-list">${rows}</ul>
   ${offerBlock(u.billing ? { ...u.billing, flash: u.flash } : null)}
   <div data-claude-card hidden><ul class="usage-list usage-claude" data-usage-claude aria-label="Usage de ${esc(aiName())}"></ul></div>
-  ${full.length ? `<p class="cap" role="alert">${ic('alert')}<span>Plafond atteint : ${full.map((i) => esc(i.label.toLowerCase())).join(', ')}. Rien n'est perdu. <a href="/tarifs">Voir les tarifs</a></span></p>` : u.plan === 'free' ? '<p class="foot-n">Les plafonds se renouvellent le 1er du mois (heure de Paris). <a href="/tarifs">Voir les tarifs</a></p>' : ''}
+  ${full.length ? `<p class="cap" role="alert">${ic('alert')}<span>Plafond atteint : ${full.map((i) => esc(i.label.toLowerCase())).join(', ')}. Rien n'est perdu. <a href="/tarifs">Voir les tarifs</a></span></p>`
+    : approaching.length ? `<p class="ban ban-warn" role="status">${ic('alert')}<span>Tu approches du plafond : ${approaching.map((i) => esc(i.label.toLowerCase())).join(', ')}. <a href="/tarifs">Voir les tarifs</a></span></p>`
+    : u.plan === 'free' ? '<p class="foot-n">Les plafonds se renouvellent le 1er du mois (heure de Paris). <a href="/tarifs">Voir les tarifs</a></p>' : ''}
 </section>`;
 }
 
