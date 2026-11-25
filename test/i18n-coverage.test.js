@@ -52,6 +52,19 @@ test('traduction (en, es) : les pages dépendant de l\'offre (Démarrage à Éch
   assert.deepEqual([...new Set(miss)], []);
 });
 
+test('traduction (en, es) : le back-office est traduit', async () => {
+  const admin = await s.newUser({ admin: true });
+  const miss = [];
+  for (const lang of ['en', 'es']) miss.push(...(await missingOn(admin, ['/admin', '/admin/stats'], lang)));
+  assert.deepEqual([...new Set(miss)], []);
+});
+
+test('traduction : un message d\'erreur de tâche enregistré en français est traduit à l\'affichage', async () => {
+  const { lookupFor } = await import('../src/i18n/index.js');
+  assert.match(lookupFor('en').text('Tâche en échec : Le mail fait 250 mots : au-delà de 200 mots, la réponse devient plus rare.'), /^Task failed: The email is 250 words long/);
+  assert.match(lookupFor('es').text('Implémentation en échec : Chemin refusé : « .env »'), /^Implementación fallida: Ruta rechazada/);
+});
+
 test('traduction : une page lue avec la langue choisie sort bien traduite (cookie lang)', async () => {
   const r = await fetch(`${s.base}/accueil`, { headers: { cookie: 'lang=en', accept: 'text/html' } });
   const html = await r.text();
