@@ -37,8 +37,11 @@ import console from './dict/console.js';
 import fix2 from './dict/fix2.js';
 import jobs1 from './dict/jobs1.js';
 import admin from './dict/admin.js';
+import fix3 from './dict/fix3.js';
+import fix4 from './dict/fix4.js';
+import legal5 from './dict/legal5.js';
 
-export const AREAS = { admin, jobs1, fix2, console, cl2, cl1, legal4, legal3, legal2, legal0, legal1, fix1, compta2, tour, srv1, toasts, tabs2, tabs1, misc2, misc1, project, welcome, docs_api, docs_mcp, docs, chat, link, fonctionnement, tarifs, accueil, account, settings, core, shell, today, checklist };
+export const AREAS = { legal5, fix4, fix3, admin, jobs1, fix2, console, cl2, cl1, legal4, legal3, legal2, legal0, legal1, fix1, compta2, tour, srv1, toasts, tabs2, tabs1, misc2, misc1, project, welcome, docs_api, docs_mcp, docs, chat, link, fonctionnement, tarifs, accueil, account, settings, core, shell, today, checklist };
 export const ROWS = Object.values(AREAS).flat();
 
 const INDEX = { en: 1, es: 2 };

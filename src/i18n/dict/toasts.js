@@ -70,7 +70,6 @@ export default [
   ["La vérification n'a pas pu se charger (réseau ou bloqueur de pubs ?). Réessaie.", "The check could not load (network or ad blocker?). Try again.", "La verificación no se ha podido cargar (¿red o bloqueador de anuncios?). Inténtalo de nuevo."],
   ["La vérification a échoué : réessaie.", "The check failed: try again.", "La verificación ha fallado: inténtalo de nuevo."],
   ["{n} pièces jointes au plus par message.", "{n} attachments at most per message.", "{n} adjuntos como máximo por mensaje."],
-  ["{name} : {message}", "{name}: {message}", "{name}: {message}"],
   ["Pas de conversation en cours : écris d'abord un message", "No conversation in progress: write a message first", "No hay conversación en curso: escribe primero un mensaje"],
   ["Modèle inconnu « {arg} » : tape /modele pour voir la liste", "Unknown model \"{arg}\": type /modele to see the list", "Modelo desconocido «{arg}»: escribe /modele para ver la lista"],
   ["Donne un titre : /renommer Mon nouveau titre", "Give a title: /renommer My new title", "Da un título: /renommer Mi nuevo título"],

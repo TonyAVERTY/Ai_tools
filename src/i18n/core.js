@@ -44,10 +44,17 @@ function compile(fr, tr) {
     if (!m) return reEscape(part);
     names.push(m[1]);
     // {n} et {m} : des nombres (« 3 », « 1 200 », « 2,5 ») ; les autres trous prennent n'importe quel texte
+    // {aiName} : seulement le nom d'une IA (Claude, ChatGPT, Gemini), pour que « Ouvrir Claude » n'avale pas « Ouvrir ou fermer… »
+    if (m[1] === 'aiName') return '(Claude|ChatGPT|Gemini)';
     return /^[nm]$/.test(m[1]) ? '(\\d[\\d\\s.,]*?)' : '(.+?)';
   }).join('');
   const literal = fr.replace(/\{[a-zA-Z0-9_]+\}/g, '').length;
-  return { re: new RegExp(`^${source}$`, 's'), names, tr, literal };
+  // Un modèle avec très peu de mots fixes (« À {a} », « sur {a} », « {a} : {b} ») ne s'applique qu'à une valeur courte, sans phrase :
+  // sinon il avalerait n'importe quel texte inconnu (« À quoi sert… ? », « Siège : … ») et l'abîmerait sans qu'on le voie
+  const letters = fr.replace(/\{[a-zA-Z0-9_]+\}/g, '').replace(/<[^>]*>/g, '').replace(/[^\p{L}]/gu, '').length;
+  const numericOnly = names.every((n) => /^[nm]$/.test(n));
+  const loose = letters < 4 && !numericOnly;
+  return { re: new RegExp(`^${source}$`, 's'), names, tr, literal, loose };
 }
 
 /**
@@ -75,6 +82,7 @@ export function makeLookup(entries) {
     for (const p of patterns) {
       const m = p.re.exec(key);
       if (!m) continue;
+      if (p.loose && m.slice(1).some((v) => v.length > 40 || /[.:;!?…]/.test(v))) continue;
       let out = p.tr;
       p.names.forEach((n, i) => { const v = m[i + 1]; out = out.split(`{${n}}`).join((depth < 3 && resolve(v, depth + 1)) || v); });
       return out;

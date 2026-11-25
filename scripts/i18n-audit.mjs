@@ -56,6 +56,35 @@ for (const [who, paths] of [[null, PUBLIC_PATHS], [user, appPaths(s, projectId, 
   }
 }
 await s.close();
+if (flag('leftover')) {
+  // Contrôle de secours : dans la page TRADUITE, tout texte qui ressemble encore à du français (accents, mots courants) est suspect
+  const { translateHtml } = await import('../src/i18n/html.js');
+  const { lookupFor } = await import('../src/i18n/index.js');
+  const { collectTexts: collect } = await import('../src/i18n/audit.js');
+  const FRW = /\b(les|des|une|pour|avec|dans|ton|tes|vous|nous|sont|est|que|qui|pas|du|au|ou|et|sur)\b/gi; // mots français qui ne sont ni anglais ni espagnols
+  const FRW_ES = /\b(les|des|une|pour|avec|dans|ton|tes|vous|nous|sont|est|du|au|ou)\b/gi;
+  const bad = new Map();
+  const s2 = await startApp();
+  const seeded = await seedAccount(s2);
+  const lists = [[null, PUBLIC_PATHS], [seeded.user, appPaths(s2, seeded.projectId, tabSlugs())]];
+  for (const lang of ['en', 'es']) {
+    for (const [who, paths] of lists) for (const path of paths) {
+      const html = await readPage(s2, who, path); if (html == null) continue;
+      const out = translateHtml(html, lookupFor(lang), lang);
+      for (const k of collect(out)) {
+        const t = k.replace(/<[^>]*>/g, ' ');
+        if (SEED_TEXTS.has(k) || /@/.test(t)) continue;
+        const n = (t.match(lang === 'en' ? FRW : FRW_ES) || []).length;
+        const accents = lang === 'en' ? /[àâçéèêëîïôùûüœ]/.test(t.replace(/Français|Español|Liffré|Mérignac|Francia/g, '')) : /[èêçùœâîôûëï]/.test(t.replace(/Français|Liffré|Mérignac/g, ''));
+        if (accents || n >= 2 || (n >= 1 && t.split(' ').length <= 3)) { if (!bad.has(k)) bad.set(k, `${lang} ${path}`); }
+      }
+    }
+  }
+  await s2.close();
+  console.log(`${bad.size} textes suspects dans les pages traduites`);
+  for (const [k, v] of bad) console.log(`  ${v} · ${k.slice(0, 160)}`);
+  process.exit(0);
+}
 console.log(`${scanned} pages lues, ${pages.size} textes sans traduction`);
 if (opt('json')) writeFileSync(opt('json'), JSON.stringify(Object.fromEntries([...pages].map(([k, v]) => [k, [...v]])), null, 1));
 else {

@@ -65,6 +65,25 @@ test('traduction : un message d\'erreur de tâche enregistré en français est t
   assert.match(lookupFor('es').text('Implémentation en échec : Chemin refusé : « .env »'), /^Implementación fallida: Ruta rechazada/);
 });
 
+test('traduction (en) : aucun texte de page traduite ne ressemble encore à du français (contrôle de secours contre les modèles trop larges)', async () => {
+  const { translateHtml } = await import('../src/i18n/html.js');
+  const { lookupFor } = await import('../src/i18n/index.js');
+  const FRW = /\b(les|des|une|pour|avec|dans|ton|tes|vous|nous|sont|est|que|qui|pas|du|au|ou|et|sur)\b/gi;
+  const ok = /Français|Español|Liffré|Mérignac|Kiné|Agenda Kiné/g;
+  const bad = [];
+  const lists = [[null, [...PUBLIC_PATHS]], [user, appPaths(s, projectId, tabSlugs())]];
+  for (const [who, paths] of lists) for (const path of paths) {
+    const html = await readPage(s, who, path);
+    if (html == null) continue;
+    for (const k of collectTexts(translateHtml(html, lookupFor('en'), 'en'))) {
+      const t = k.replace(/<[^>]*>/g, ' ').replace(ok, '');
+      if (SEED_TEXTS.has(k) || /@/.test(t)) continue;
+      if (/[àâçéèêëîïôùûüœ]/.test(t) || (t.match(FRW) || []).length >= 2) bad.push(`${path} : ${k.slice(0, 100)}`);
+    }
+  }
+  assert.deepEqual(bad, []);
+});
+
 test('traduction : une page lue avec la langue choisie sort bien traduite (cookie lang)', async () => {
   const r = await fetch(`${s.base}/accueil`, { headers: { cookie: 'lang=en', accept: 'text/html' } });
   const html = await r.text();
