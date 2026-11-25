@@ -1862,7 +1862,7 @@
       }
       evoReplace(box, r.html);
       if (r.warn) toast(`Idée acceptée, mais ${r.warn.charAt(0).toLowerCase()}${r.warn.slice(1)}`, 'error', { fix: r.fix });
-      else toast(r.next === 'started' ? 'Idée acceptée, implémentation lancée' : status === 'accepted' ? 'Idée acceptée' : 'Idée remise en attente');
+      else toast(r.next === 'started' ? 'Idée acceptée, implémentation lancée' : r.next === 'queued' ? 'Idée acceptée, implémentation en attente' : status === 'accepted' ? 'Idée acceptée' : 'Idée remise en attente');
       // Réglage « Implémenter automatiquement » absent : on demande si l'IA doit écrire le code
       if (r.next === 'ask') await evoAsk(evoBlock(box, r.html));
     } catch (err) { toast(err.message, 'error'); }
@@ -1926,7 +1926,7 @@
       if (c.target === 'default' && !(await confirmBox("Pousser directement sur la branche principale ?\nLe code écrit par l'IA y arrive sans branche de relecture.", { confirm: 'Pousser sur la branche principale', danger: true }))) return;
       const r = await api(evoUrl(box, 'implement'), { target: c.target, confirm: c.target === 'default' });
       evoReplace(box, r.html);
-      toast(r.budgetBlocked ? `En file, mais ${r.budgetBlocked}` : 'Implémentation lancée', r.budgetBlocked ? 'error' : 'ok');
+      toast(r.budgetBlocked ? `En file, mais ${r.budgetBlocked}` : r.queued ? 'Implémentation en attente' : 'Implémentation lancée', r.budgetBlocked ? 'error' : 'ok');
     } catch (err) { toast(err.message, 'error'); }
   }
   // Remplace un bloc d'idée par le HTML (échappé) du serveur

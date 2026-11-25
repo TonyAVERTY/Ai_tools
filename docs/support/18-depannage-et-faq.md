@@ -350,5 +350,5 @@ Si tu as accepté une idée et que le message « Idée acceptée, mais … » s'
 - « la branche refuse le push (protégée ou modifiée entre-temps) » : choisis **Sur une nouvelle branche**.
 - « Modifications refusées » : l'application a bloqué ce que l'IA avait écrit (fichier interdit comme `.env`, `.github/workflows` ou `.git`, secret détecté, trop de fichiers ou fichier trop gros, passage à remplacer introuvable). Rien n'a été poussé : relance, ou précise l'idée.
 - « L'IA n'a pas fini dans la limite de 45 étapes » : l'idée est trop grosse pour une seule passe. Clique de nouveau sur **Accepter** pour réessayer, ou découpe l'idée en plus petites. Rien n'a été poussé.
-- « Une implémentation est déjà en cours sur ce projet » : une seule à la fois ; attends sa fin.
+- « Cette idée est déjà en cours d'implémentation » : elle est déjà dans la file ; attends sa fin. Les autres idées que tu acceptes attendent leur tour, elles ne sont pas refusées.
 - « Réponse de l'IA illisible » : relance l'implémentation.

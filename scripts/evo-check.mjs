@@ -98,6 +98,11 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   ok(await zone.getByRole('button', { name: 'Annuler' }).count() === 1, `${tag} elle peut être annulée comme les autres tâches`);
   ok(await p.locator('.evo-decide[data-n="2"] .evo-impl .spin-inline').count() === 1, `${tag} le rond animé est aussi sous l'idée`);
   ok(await p.locator('[data-state]').first().textContent().then((x) => x.includes('Implémentation')), `${tag} l'en-tête du projet la compte dans les tâches en cours`);
+  // Une implémentation en file se dit « en attente » (elle démarre quand la précédente est terminée), pas « en cours »
+  await s.db.prepare("UPDATE jobs SET status = 'queued', started_at = NULL WHERE type = 'implement'").run();
+  await p.reload(); await p.waitForSelector('.evo-decide .evo-impl', { timeout: 8000 }).catch(() => {});
+  ok((await p.locator('.evo-decide[data-n="2"] .evo-impl').textContent()).includes('Implémentation en attente'), `${tag} une implémentation en file se dit « en attente »`);
+  await s.db.prepare("UPDATE jobs SET status = 'running', started_at = ? WHERE type = 'implement'").run(now());
   // Terminée : l'idée quitte la liste (en direct, sans recharger) et un récapitulatif dit que la fonctionnalité est bien implémentée
   const before = await p.locator('.evo-decide').count();
   await s.db.prepare("UPDATE jobs SET status = 'done', finished_at = ?, result_json = ? WHERE type = 'implement'").run(now(), JSON.stringify({ branch: 'iaboss/modeles-2', target: 'branch', commit: 'abcdef1234567', files: ['src/a.js', 'README.md'], summary: 'Modèles partagés ajoutés.', url: 'https://github.com/o/r/tree/iaboss/modeles-2' }));

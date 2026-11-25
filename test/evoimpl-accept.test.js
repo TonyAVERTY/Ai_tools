@@ -68,15 +68,17 @@ test('réglage activé : une implémentation déjà en cours ou l\'absence de to
   assert.equal((await implJobs()).length, 1);
   await A.post(url(2, 'decision'), { status: 'pending' });
   const second = await accept(A, 2);
-  assert.match(second.warn, /déjà en cours/);
+  assert.equal(second.next, 'queued', 'une autre idée attend son tour au lieu d\'être refusée');
+  assert.equal(second.warn, null);
   assert.match(second.html, /Acceptée/);
-  assert.equal((await implJobs()).length, 1, 'une seule à la fois');
+  assert.match(second.html, /Implémentation en attente/);
+  assert.equal((await implJobs()).length, 2, 'les implémentations s\'empilent dans la file');
   await s.db.prepare("UPDATE jobs SET status = 'done' WHERE type = 'implement'").run();
   await setSetting(s.db, A.id, 'github_token_enc', '');
   await A.post(url(3, 'decision'), { status: 'pending' });
   const noToken = await accept(A, 3);
   assert.match(noToken.warn, /Aucun token Git/);
-  assert.equal((await implJobs()).length, 1, 'rien de plus lancé');
+  assert.equal((await implJobs()).length, 2, 'rien de plus lancé');
   // Après un échec, un nouveau clic sur « Accepter » relance ; après une réussite, non
   await setSetting(s.db, A.id, 'github_token_enc', encrypt(TEST_SECRET_KEY, 'ghp_AbCdEfTestTokenNotReal'));
   await s.db.prepare("UPDATE jobs SET status = 'error', error = 'Git : le token n''a pas le droit d''écrire' WHERE type = 'implement'").run();
@@ -85,10 +87,10 @@ test('réglage activé : une implémentation déjà en cours ou l\'absence de to
   assert.match(failedBlock.html, /<a class="evo-fix" href="\/settings#git">Ouvrir les Réglages<\/a>/, 'un lien (pas un bouton) vers les Réglages');
   const retry = await accept(A, 4);
   assert.equal(retry.next, 'started');
-  assert.equal((await implJobs()).length, 2, 'relancée');
+  assert.equal((await implJobs()).length, 3, 'relancée');
   await s.db.prepare("UPDATE jobs SET status = 'done', result_json = ? WHERE type = 'implement'").run(JSON.stringify({ branch: 'iaboss/x-1', target: 'branch', commit: 'abcdef123456', files: ['a.js'], summary: '' }));
   assert.equal((await accept(A, 4)).next, null);
-  assert.equal((await implJobs()).length, 2, 'pas de relance après une réussite');
+  assert.equal((await implJobs()).length, 3, 'pas de relance après une réussite');
   // Terminée : l'idée quitte la liste et un récapitulatif (échappé) dit que la fonctionnalité est bien implémentée
   await s.db.prepare("UPDATE jobs SET result_json = ? WHERE type = 'implement'").run(JSON.stringify({ branch: 'iaboss/<b>x-1', target: 'branch', commit: 'abcdef123456', files: ['a.js'], summary: 'Ajouté.', url: 'https://github.com/o/r/tree/iaboss/x-1' }));
   const list = (await (await A.get(`/api/projects/${pa}/status`)).json()).jobs.evolution.result.html;

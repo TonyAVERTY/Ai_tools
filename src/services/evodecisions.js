@@ -70,7 +70,10 @@ export const recapsHtml = (ideas, impls) => ideas.filter((e) => impls.get(e.n)?.
 
 /** État de l'implémentation d'une idée acceptée (texte échappé). Elle se lance à l'acceptation ; pour recommencer après un échec, on clique de nouveau sur « Accepter ». */
 function implHtml(impl) {
-  if (impl && ACTIVE.includes(impl.status)) return `<p class="evo-impl s-running" data-evo-running><span class="loading small" role="status"><span class="spin-inline" aria-hidden="true"></span><span>Implémentation en cours : l'IA écrit le code, puis il est poussé sur ton dépôt…</span></span></p>`;
+  if (impl && ACTIVE.includes(impl.status)) {
+    const text = impl.status === 'queued' ? "Implémentation en attente : elle démarre quand la précédente est terminée…" : "Implémentation en cours : l'IA écrit le code, puis il est poussé sur ton dépôt…";
+    return `<p class="evo-impl s-running" data-evo-running><span class="loading small" role="status"><span class="spin-inline" aria-hidden="true"></span><span>${text}</span></span></p>`;
+  }
   if (impl?.status === 'done' && impl.result) {
     const r = impl.result;
     const where = r.target === 'default' ? `la branche principale <code>${esc(r.branch)}</code>` : `la nouvelle branche <code>${esc(r.branch)}</code>`;
