@@ -93,6 +93,15 @@ test('implémentation : fichier interdit, secret, réponse illisible ou idée no
   assert.equal(s.pushes.length, 0, 'aucun push');
 });
 
+test('implémentation : limite d\'étapes atteinte : message clair, rien n\'est poussé', async () => {
+  const s = await setup();
+  const r = await s.run(await s.evo('IMPLMAXTURNS'));
+  assert.equal(r.status, 'error');
+  assert.match(r.error, /n'a pas fini dans la limite de 45 étapes.*Accepter/);
+  assert.doesNotMatch(r.error, /error_max_turns/, 'pas de jargon technique');
+  assert.equal(s.pushes.length, 0);
+});
+
 test('implémentation sans token Git : refus clair', async () => {
   const s = await setup({ token: false });
   const r = await s.run(await s.evo('Export CSV'));
