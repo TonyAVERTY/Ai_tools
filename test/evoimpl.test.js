@@ -177,3 +177,21 @@ test('continuer : l\'invite dit à l\'IA ce qui est déjà fait', () => {
   assert.match(patch.prompt, /tentative précédente n'a pas abouti/);
   assert.doesNotMatch(implementPrompt({ projectName: 'P', profile: null, idea, reason: '', mode: 'direct' }).prompt, /tentative précédente/);
 });
+
+test('résumé : la conclusion de l\'IA en français, jamais sa narration ; sinon la liste des fichiers', async () => {
+  const { finalSummary } = await import('../src/services/codepatch.js');
+  const narration = "Good, `.bar.usage.warn` CSS already exists. Now let's check the account view. Now implement the flag.";
+  assert.equal(finalSummary(`${narration}\n\nRÉSUMÉ : Ajout d'un indicateur dans plans.js.\nÀ vérifier : le rendu.`, ['a.js']), "Ajout d'un indicateur dans plans.js.\nÀ vérifier : le rendu.");
+  assert.equal(finalSummary("Fini.\nRésumé : premier\n\nRÉSUMÉ : dernier", ['a.js']), 'dernier', 'le DERNIER résumé');
+  assert.equal(finalSummary(narration, ['src/a.js', 'README.md']), 'Fichiers modifiés : src/a.js, README.md.', 'sans conclusion : jamais la narration');
+  assert.ok(!finalSummary(narration, ['a.js']).includes('Good,'));
+  assert.equal(finalSummary('', Array.from({ length: 15 }, (_, i) => `f${i}.js`)).endsWith('…'), false, 'liste tronquée avec …');
+  assert.match(finalSummary('', Array.from({ length: 15 }, (_, i) => `f${i}.js`)), /f11\.js…\.$/);
+});
+
+test('récapitulatif : un ancien résumé (narration brute) n\'est plus affiché, un résumé récent oui', async () => {
+  const { recapLine } = await import('../src/services/evodecisions.js');
+  const base = { branch: 'iaboss/x-1', target: 'branch', commit: 'abcdef1234', files: ['a.js'], summary: 'Good, now let us look at it.' };
+  assert.doesNotMatch(recapLine('T', { result: base }), /Good, now/);
+  assert.match(recapLine('T', { result: { ...base, summary: 'Ajouté en français.', summaryV: 2 } }), /Ajouté en français\./);
+});

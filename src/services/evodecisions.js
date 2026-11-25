@@ -60,7 +60,7 @@ export function recapLine(title, impl) {
   const files = (r.files || []).slice(0, 40).map((f) => `<li><code>${esc(f)}</code></li>`).join('');
   return `<div class="evo-recap" role="status" data-recap-n="${Number(impl.n ?? 0)}">
   <p><strong>La fonctionnalité « ${esc(title)} » est bien implémentée</strong> sur ${where} (commit <code>${esc(String(r.commit ?? '').slice(0, 7))}</code>, ${(r.files || []).length} fichier(s)).${r.url ? ` <a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">Voir sur ton serveur Git</a>` : ''}</p>
-  ${r.summary ? `<p class="small">${esc(r.summary)}</p>` : ''}${files ? `<details class="small"><summary>Fichiers modifiés</summary><ul class="evo-files">${files}</ul></details>` : ''}
+  ${r.summary && r.summaryV === 2 ? `<p class="small">${esc(r.summary)}</p>` : ''}${files ? `<details class="small"><summary>Fichiers modifiés</summary><ul class="evo-files">${files}</ul></details>` : ''}
   <p class="muted small">Code écrit par l'IA : relis-le et lance tes tests avant de le fusionner.</p>
 </div>`;
 }
@@ -79,7 +79,7 @@ function implHtml(impl, canContinue = false) {
     const where = r.target === 'default' ? `la branche principale <code>${esc(r.branch)}</code>` : `la nouvelle branche <code>${esc(r.branch)}</code>`;
     const files = (r.files || []).slice(0, 40).map((f) => `<li><code>${esc(f)}</code></li>`).join('');
     return `<div class="evo-impl s-done"><p><strong>Implémentée</strong> sur ${where} (commit <code>${esc(String(r.commit).slice(0, 7))}</code>, ${(r.files || []).length} fichier(s)).${r.url ? ` <a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">Voir sur ton serveur Git</a>` : ''}</p>
-  ${r.summary ? `<p class="small">${esc(r.summary)}</p>` : ''}<ul class="small evo-files">${files}</ul>
+  ${r.summary && r.summaryV === 2 ? `<p class="small">${esc(r.summary)}</p>` : ''}<ul class="small evo-files">${files}</ul>
   <p class="muted small">Code écrit par l'IA : relis-le et lance tes tests avant de le fusionner.</p></div>`;
   }
   if (impl?.status === 'error') {

@@ -76,12 +76,18 @@ export async function recordUsage(db, userId, kind, { ref = null, at = now() } =
   await db.prepare('INSERT INTO usage_events(user_id, kind, ref, at) VALUES(?, ?, ?, ?)').run(Number(userId), kind, ref, at);
 }
 
-/** @returns {{kind: string, used: number, limit: number|null, remaining: number|null, unlimited: boolean}} */
+/** Proche du plafond (80 % utilisés ou plus) mais pas encore atteint : de quoi réagir avant d'être bloqué. */
+export const isApproaching = (used, limit) => limit != null && used < limit && (limit - used) / limit <= 0.2;
+
+/** @returns {{kind: string, used: number, limit: number|null, remaining: number|null, unlimited: boolean, approaching: boolean}} */
 export async function quotaFor(db, user, kind, { at = now() } = {}) {
   if (!USAGE_KINDS.includes(kind)) throw new Error(`Plafond inconnu : ${kind}`);
   const limit = limitsFor(user)[kind];
   const used = (await usageOf(db, user.id, { at }))[kind];
-  return { kind, used, limit, remaining: limit == null ? null : Math.max(0, limit - used), unlimited: limit == null };
+  return {
+    kind, used, limit, remaining: limit == null ? null : Math.max(0, limit - used),
+    unlimited: limit == null, approaching: isApproaching(used, limit),
+  };
 }
 
 const plural = (n, kind) => NOUNS[kind][n > 1 ? 1 : 0];
@@ -138,7 +144,10 @@ export async function usageView(db, user, { at = now() } = {}) {
     plan: planOf(user), planLabel: PLAN_LABELS[planOf(user)],
     items: USAGE_KINDS.map((kind) => {
       const used = usage[kind], limit = limits[kind];
-      return { kind, label: KIND_LABELS[kind], used, limit, pct: limit == null ? 0 : Math.min(100, Math.round((used / limit) * 100)), full: limit != null && used >= limit };
+      return {
+        kind, label: KIND_LABELS[kind], used, limit, pct: limit == null ? 0 : Math.min(100, Math.round((used / limit) * 100)),
+        full: limit != null && used >= limit, approaching: isApproaching(used, limit),
+      };
     }),
     period: usage.period,
   };
