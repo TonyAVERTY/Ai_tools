@@ -45,6 +45,8 @@ export const RATE_LIMITS = {
   evo_impl: { user: { max: 20, windowMs: HOUR } },
   // Choix de la langue d'affichage : une préférence, mais jamais en rafale (compte ou adresse selon la page)
   lang: { user: { max: 60, windowMs: 10 * MIN } },
+  // Formulaire de contact du site public : un message part par e-mail, donc peu par adresse et par heure
+  contact_ip: { ip: { max: 5, windowMs: 60 * MIN } },
   lang_ip: { ip: { max: 60, windowMs: 10 * MIN } },
   // Export complet du compte : 3 par heure et par compte (une requête lit toutes les tables du compte)
   account_export: { user: { max: 3, windowMs: 60 * MIN } },

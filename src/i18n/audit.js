@@ -19,12 +19,15 @@ export function isCandidate(s) {
 }
 
 /** Tous les textes qu'une page demanderait à traduire : { clé → true }. Une phrase à balises compte pour UNE clé (ses morceaux ne sont pas listés en plus). */
+/** Les pages portent déjà « IaBoss » (marque) ; le dictionnaire est écrit avec « iaboss ». */
+export const unbrand = (s) => s.replace(/(?<![\w@./_-])IaBoss(?![\w@_-]|\.[a-z]|\/)/g, 'iaboss');
+
 export function collectTexts(html) {
   const keys = new Set();
   const recorder = {
-    text(raw) { const k = normalize(decodeEntities(raw)); if (k && isCandidate(k)) keys.add(k); return null; },
+    text(raw) { const k = unbrand(normalize(decodeEntities(raw))); if (k && isCandidate(k)) keys.add(k); return null; },
     // une phrase à balises : sa traduction « identité » la fait passer pour traduite, donc ses morceaux ne sont pas redemandés
-    inline(inner) { const k = canonInline(inner); if (isCandidate(k.replace(/<[^>]+>/g, ''))) keys.add(k); return k; },
+    inline(inner) { const k = unbrand(canonInline(inner)); if (isCandidate(k.replace(/<[^>]+>/g, ''))) keys.add(k); return k; },
   };
   translateHtml(html, recorder, 'fr');
   return keys;

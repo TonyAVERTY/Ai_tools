@@ -565,3 +565,12 @@ x-guest { display: contents; }
 .lang-pick { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; margin: 18px 0 6px; }
 .lang-pick button { background: none; border: 0; padding: 0; min-height: 44px; min-width: 44px; color: var(--muted); font: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
 .lang-pick button[aria-pressed="true"] { color: var(--text); font-weight: 600; text-decoration: none; }
+
+/* Page Contact */
+.narrow-page { max-width: 680px; }
+.ct-form { display: grid; gap: 16px; margin-top: 18px; }
+.ct-f { display: grid; gap: 6px; font-weight: 600; }
+.ct-f small { font-weight: 400; color: var(--muted); }
+.ct-f input, .ct-f select, .ct-f textarea { min-height: 44px; padding: 10px 14px; border: 1px solid var(--control); border-radius: var(--radius); background: var(--bg); color: var(--text); font: inherit; font-weight: 400; }
+.ct-f textarea { min-height: 160px; resize: vertical; }
+.hp { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }

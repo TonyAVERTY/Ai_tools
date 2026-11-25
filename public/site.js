@@ -65,14 +65,22 @@
       (li?.parentElement.closest('li') || li)?.setAttribute('data-open', '');
     };
     const heads = links.map((a) => document.getElementById(a.getAttribute('href').slice(1))).filter(Boolean);
-    if ('IntersectionObserver' in window && heads.length) {
-      const seen = new Set();
-      const io = new IntersectionObserver((entries) => {
-        for (const e of entries) { if (e.isIntersecting) seen.add(e.target.id); else seen.delete(e.target.id); }
-        const first = heads.find((h) => seen.has(h.id));
-        if (first) mark(first.id);
-      }, { rootMargin: '0px 0px -70% 0px' });
-      heads.forEach((h) => io.observe(h));
+    if (heads.length) {
+      // Rubrique active : la dernière dont le titre a passé le tiers haut de l'écran ; tout en bas de la page, la dernière (sinon une courte
+      // dernière section ne devient jamais « active », son titre n'atteignant jamais le haut de l'écran)
+      let queued = false;
+      const update = () => {
+        queued = false;
+        const atBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4;
+        const line = window.innerHeight * 0.33;
+        let current = heads[0];
+        for (const h of heads) { if (h.getBoundingClientRect().top <= line) current = h; }
+        mark((atBottom ? heads[heads.length - 1] : current).id);
+      };
+      const queue = () => { if (!queued) { queued = true; requestAnimationFrame(update); } };
+      addEventListener('scroll', queue, { passive: true });
+      addEventListener('resize', queue);
+      update();
     }
     if (location.hash) mark(location.hash.slice(1));
   }

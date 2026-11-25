@@ -3,7 +3,7 @@
 // rien ici ne promet un résultat, rien n'est chiffré au-delà de ce que le code fait réellement.
 import { esc } from '../http.js';
 import { brandMark, assetUrl } from '../assets.js';
-import { siteLayout, ic, guest, CONTACT_EMAIL } from './layout.js';
+import { siteLayout, ic, guest } from './layout.js';
 import { PLAN_LIMITS, PLAN_PRICES, PLAN_LABELS, PLAN_ORDER, FEATURES, ANNUAL_FREE_MONTHS, annualPrice } from '../limits.js';
 import { PERIODS } from '../services/stripe.js';
 import { localeOf } from '../i18n/locale.js';
@@ -179,7 +179,7 @@ const planCard = (billing) => (k) => `<article class="v-plan${k === 'growth' ? '
         <p class="v-plan-p"><span class="when-month">${euros(PLAN_PRICES[k])}<small>par mois, TTC</small></span><span class="when-year">${euros(annualPrice(k))}<small>par an, TTC (${12 - ANNUAL_FREE_MONTHS} mois payés)</small></span></p>
         <p class="v-plan-t">${PLAN_BLURBS[k]}</p>
         <dl class="v-plim">${planLimits(PLAN_LIMITS[k]).map(([lab, v]) => `<div><dt>${lab}</dt><dd>${v}</dd></div>`).join('')}</dl>
-        ${billing ? buyForms(k) : `<a class="btn btn-secondary" href="mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(`Me prévenir : offre ${PLAN_LABELS[k]}`)}">Me prévenir à l'ouverture</a>`}
+        ${billing ? buyForms(k) : `<a class="btn btn-secondary" href="/contact?plan=${encodeURIComponent(PLAN_LABELS[k])}">Me prévenir à l'ouverture</a>`}
       </article>`;
 const HOME_FAQ = [
   ['Faut-il une carte bancaire ?', "Non. Le plan Gratuit s'ouvre sans carte bancaire et sans limite de durée."],
@@ -412,7 +412,7 @@ export function pricingPage({ appUrl, billing = false }) {
         <td data-label="Prix"><span class="price when-month">${euros(PLAN_PRICES[k])} <small>par mois, TTC</small></span><span class="price when-year">${euros(annualPrice(k))} <small>par an, TTC</small></span>
           <small class="sub when-month">Sans engagement, résiliable à tout moment</small><small class="sub when-year">soit ${euros(annualPrice(k) / 12)} par mois, ${ANNUAL_FREE_MONTHS} mois offerts</small></td>
         ${limitCells(PLAN_LIMITS[k])}
-        <td class="plan-act">${billing ? buyForms(k) : `<a class="btn btn-secondary" href="mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(`Me prévenir : offre ${PLAN_LABELS[k]}`)}">Me prévenir à l'ouverture</a>`}</td>
+        <td class="plan-act">${billing ? buyForms(k) : `<a class="btn btn-secondary" href="/contact?plan=${encodeURIComponent(PLAN_LABELS[k])}">Me prévenir à l'ouverture</a>`}</td>
       </tr>`;
   return siteLayout({
     appUrl, path: '/tarifs',

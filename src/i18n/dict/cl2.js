@@ -101,7 +101,6 @@ export default [
   ["Modèle", "Model", "Modelo"],
   ["Évolutions", "Evolutions", "Evoluciones"],
   ["Modèle de relance", "Follow-up template", "Plantilla de seguimiento"],
-  ["Question {a} sur {b}", "Question {a} of {b}", "Pregunta {a} de {b}"],
   ["Réponse prise en compte", "Answer taken into account", "Respuesta tenida en cuenta"],
   ["Merci, ton espace est prêt", "Thanks, your workspace is ready", "Gracias, tu espacio está listo"],
   ["Je récupère ton jeton…", "I'm retrieving your token…", "Recupero tu token…"],

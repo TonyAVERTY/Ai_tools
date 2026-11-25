@@ -131,3 +131,18 @@ export function restoreTags(translated, originalHtml) {
   const leftover = [...queues.values()].some((q) => q.length);
   return ok && !leftover ? out : null;
 }
+
+// La marque s'écrit « IaBoss » dans le texte visible ; les adresses, fichiers, jetons et noms techniques (iaboss.fr, iaboss-mcp.js, iaboss_…) ne changent pas
+const BRAND = /(?<![\w@./_-])iaboss(?![\w@_-]|\.[a-z]|\/)/g;
+export const brand = (s) => String(s).replace(BRAND, 'IaBoss');
+
+/** Ajoute la marque à un dictionnaire : un texte sans traduction mais qui contient « iaboss » est tout de même renvoyé avec « IaBoss ». */
+export function withBrand(lookup) {
+  const wrap = (fn) => (arg) => {
+    const t = fn(arg);
+    const base = t ?? String(arg ?? '');
+    const b = brand(base);
+    return t == null && b === base ? null : b;
+  };
+  return { ...lookup, text: wrap((x) => lookup.text(x)), inline: wrap((x) => lookup.inline(x)) };
+}

@@ -72,7 +72,7 @@ ${newToken ? `<section class="card" role="status">
   const ready = enabled && !locked;
   // Mode actif : même mise en page que les pages de tâches (barre à gauche qui suit la lecture, blocs à droite, API et MCP côte à côte). Sinon, une seule carte.
   const nav = `<nav class="tools-nav" data-spy aria-label="Développeur"><p class="tools-grp">Accès</p><a href="#jetons" aria-current="true">Jetons d'API</a>
-  <p class="tools-grp">Intégrations</p><a href="#api">API</a><a href="#mcp">Serveur MCP</a><a href="/docs/api">Référence de l'API</a><a href="/docs/mcp">Documentation MCP</a>
+  <p class="tools-grp">Intégrations</p><a href="#api">API</a><a href="#mcp">Serveur MCP</a><a href="/docs">Documentation développeur</a><a href="/docs/api">Référence de l'API</a><a href="/docs/mcp">Documentation MCP</a>
   <p class="tools-grp">Réglage</p><a href="#desactiver">Désactiver</a></nav>`;
   return layout({ title: 'Développeur', email: user.email, body: ready
     ? `<div class="pj-page dev"><div class="ph"><div class="t"><h1>Développeur</h1><span class="muted small">Jetons d'API, API et serveur MCP pour piloter iaboss depuis tes outils</span></div></div>\n<div class="pj-tools">${nav}<div class="pj-flat tools-main">${body}</div></div></div>`

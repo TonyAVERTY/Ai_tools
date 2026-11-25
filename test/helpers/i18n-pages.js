@@ -25,7 +25,7 @@ export async function seedAccount(s) {
 export const SEED_TEXTS = new Set(['Atelier', 'Boulangerie Martin', 'Pâtisserie Durand', 'Café Leroy', 'Export CSV', 'Mode sombre', 'Une idée pour {{entreprise}}', 'github.com/o/atelier', 'Cartes de fidélité digitales.', 'Boulangeries', 'Boulangeries, Bretagne.']);
 
 /** Pages publiques à lire (y compris les pages juridiques). */
-export const PUBLIC_PATHS = ['/accueil', '/fonctionnement', '/tarifs', '/login', '/docs', '/docs/api', '/docs/mcp', '/mentions-legales', '/confidentialite', '/cgu'];
+export const PUBLIC_PATHS = ['/accueil', '/fonctionnement', '/tarifs', '/login', '/docs', '/docs/api', '/docs/mcp', '/mentions-legales', '/confidentialite', '/cgu', '/contact'];
 
 /** Toutes les pages HTML de l'application connectée, d'après le routeur (les routes à paramètres reçoivent l'identifiant du projet). */
 export function appPaths(s, projectId, tabs = []) {

@@ -1,0 +1,6 @@
+// c2 : [français, anglais, espagnol]
+export default [
+  ["Formulaire de contact", "Contact form", "Formulario de contacto"],
+  ["Ton nom, ton adresse e-mail, le sujet et ton message, si tu écris via la page Contact. Ils ne sont pas enregistrés dans la base du site : le message part par e-mail dans la boîte de l'éditeur, qui le garde le temps de te répondre (3 ans au plus pour une demande sur tes données personnelles).", "Your name, your email address, the subject and your message, if you write via the Contact page. They are not stored in the site's database: the message goes by email to the publisher's mailbox, who keeps it as long as needed to reply to you (3 years at most for a request about your personal data).", "Tu nombre, tu dirección de correo, el asunto y tu mensaje, si escribes a través de la página Contacto. No se guardan en la base de datos del sitio: el mensaje sale por correo al buzón del editor, que lo conserva el tiempo necesario para responderte (3 años como máximo para una solicitud sobre tus datos personales)."],
+  ["Te répondre. Intérêt légitime (ta demande).", "Reply to you. Legitimate interest (your request).", "Responderte. Interés legítimo (tu solicitud)."],
+];

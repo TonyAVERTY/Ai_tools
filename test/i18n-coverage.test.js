@@ -4,7 +4,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { startApp } from './helpers/server.js';
 import { seedAccount, appPaths, readPage, legalVariants, plannedAccounts, PUBLIC_PATHS, SEED_TEXTS } from './helpers/i18n-pages.js';
-import { collectTexts, missingIn } from '../src/i18n/audit.js';
+import { collectTexts, missingIn, unbrand } from '../src/i18n/audit.js';
 import { tabSlugs } from '../src/projectviews.js';
 
 let s;
@@ -75,7 +75,7 @@ test('traduction (en) : aucun texte de page traduite ne ressemble encore à du f
   for (const [who, paths] of lists) for (const path of paths) {
     const html = await readPage(s, who, path);
     if (html == null) continue;
-    for (const k of collectTexts(translateHtml(html, lookupFor('en'), 'en'))) {
+    for (const k of collectTexts(translateHtml(unbrand(html), lookupFor('en'), 'en'))) {
       const t = k.replace(/<[^>]*>/g, ' ').replace(ok, '');
       if (SEED_TEXTS.has(k) || /@/.test(t)) continue;
       if (/[àâçéèêëîïôùûüœ]/.test(t) || (t.match(FRW) || []).length >= 2) bad.push(`${path} : ${k.slice(0, 100)}`);

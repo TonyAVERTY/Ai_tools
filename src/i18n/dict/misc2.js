@@ -41,7 +41,6 @@ export default [
   ["Question", "Question", "Pregunta"],
   ["Plus tard", "Later", "Más tarde"],
   ["Refus", "Refusal", "Rechazo"],
-  ["Autre", "Other", "Otro"],
   ["<b>Aucune réponse pour l'instant.</b> Elles s'affichent ici dès que la boîte de réception du projet (IMAP) en détecte une.", "<b>No replies yet.</b> They show up here as soon as the project's inbox (IMAP) detects one.", "<b>Ninguna respuesta por ahora.</b> Aparecen aquí en cuanto el buzón de entrada del proyecto (IMAP) detecta una."],
   ["Régler la boîte de réception", "Set up the inbox", "Configurar el buzón de entrada"],
   ["Projets · iaboss", "Projects · iaboss", "Proyectos · iaboss"],

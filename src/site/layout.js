@@ -114,7 +114,7 @@ ${body}
         <li><a href="/mentions-legales"${here('/mentions-legales')}>Mentions légales</a></li>
         <li><a href="/confidentialite"${here('/confidentialite')}>Confidentialité</a></li>
         <li><a href="/cgu"${here('/cgu')}>CGU</a></li>
-        <li><a href="mailto:${CONTACT_EMAIL}">Contact</a></li>
+        <li><a href="/contact"${here('/contact')}>Contact</a></li>
       </ul></nav>
     </div>
     <form method="post" action="/lang" class="lang-pick" aria-label="Langue" data-noajax>

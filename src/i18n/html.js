@@ -1,7 +1,7 @@
 // Traduction d'une page HTML déjà écrite en français : les textes et les attributs visibles sont remplacés par leur traduction (src/i18n/core.js), le reste est
 // recopié à l'identique. Ce qui n'est pas dans le dictionnaire reste en français (repli). Jamais traduit : scripts, styles, code, texte préformaté, champs de saisie
 // (ce que la personne a écrit), dessins SVG.
-import { canonInline, decodeEntities, escapeAttr, escapeText, normalize, restoreTags } from './core.js';
+import { canonInline, decodeEntities, escapeAttr, escapeText, normalize, restoreTags, withBrand } from './core.js';
 
 const VOID = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track', 'wbr']);
 const RAW_TEXT = new Set(['script', 'style', 'textarea']);
@@ -72,7 +72,7 @@ function translateOpen(open, lookup, name) {
       const raw = dq ?? sq;
       if (name === 'meta' && a === 'content') {
         const key = `${attrValue(open, 'name') || attrValue(open, 'property') || ''}`.toLowerCase();
-        if (!/^(description|og:title|og:description|twitter:title|twitter:description)$/.test(key)) return whole;
+        if (!/^(description|og:title|og:description|og:site_name|twitter:title|twitter:description)$/.test(key)) return whole;
       }
       const tr = lookup.text(decodeEntities(raw));
       return tr == null ? whole : `${pre}"${escapeAttr(tr)}"`;
@@ -107,7 +107,7 @@ function walk(el, lookup) {
 /** @param {string} html page en français  @param {{text:Function, inline:Function}} lookup  @param {string} lang code de la langue (fr, en, es) */
 export function translateHtml(html, lookup, lang) {
   const tree = parse(String(html));
-  walk(tree, lookup);
+  walk(tree, withBrand(lookup || { text: () => null, inline: () => null }));
   return serialize(tree).replace(/(<html\b[^>]*?\blang=)(["'])[a-zA-Z-]+\2/i, `$1"${lang}"`);
 }
 

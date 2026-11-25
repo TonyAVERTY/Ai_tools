@@ -17,6 +17,8 @@ import { loginPage } from './site/pages.js';
 import { registerMfaRoutes, securityHtml } from './mfaroutes.js';
 import { themeCard } from './themeviews.js';
 import { securityLog } from './securitylog.js';
+import { contactFormPage } from './site/contact.js';
+import { formToken, checkToken, readContact, sendContact } from './services/contact.js';
 import { clientIp } from './ratelimit.js';
 import { exportAccount } from './services/dataexport.js';
 import { themeOf } from './theme.js';
@@ -348,6 +350,24 @@ export function registerRoutes(router, app) {
     const back = typeof b.back === 'string' && /^\/(?![/\\])[\w\-./?=&%#]{0,200}$/.test(b.back) ? b.back : '/';
     redirect(res, back);
   }, { public: true, limit: 'lang_ip' });
+
+  // Formulaire de contact du site public (voir src/services/contact.js) : l'adresse de l'éditeur n'est écrite nulle part
+  router.post('/contact', async ({ req, res }) => {
+    checkOrigin(req, cfg);
+    const b = await readBody(req);
+    const failed = (error, values = {}) => html(res, contactFormPage({ appUrl: cfg.appUrl, token: formToken(cfg.secretKey), values, error }), 400);
+    // Champ piège rempli : c'est un robot. Même réponse qu'un succès, rien n'est envoyé.
+    if (typeof b.website === 'string' && b.website.trim()) return html(res, contactFormPage({ appUrl: cfg.appUrl, sent: true }));
+    const age = checkToken(cfg.secretKey, b.ts);
+    if (age === 'trop-tot') return failed('Trop rapide : relis ton message puis envoie-le de nouveau.', readContact(b).values);
+    if (age !== 'ok') return failed('Le formulaire a expiré : envoie ton message de nouveau.', readContact(b).values);
+    const c = readContact(b);
+    if (!c.ok) return failed(c.error, c.values);
+    const r = await sendContact(app, c.values, { ipHint: clientIp(req).split('.').slice(0, 2).join('.') });
+    securityLog('contact_form', { ip: clientIp(req), detail: r.sent ? 'sent' : r.reason });
+    if (!r.sent) return failed('Le message n\'a pas pu partir pour le moment : réessaie dans quelques minutes.', c.values);
+    html(res, contactFormPage({ appUrl: cfg.appUrl, sent: true }));
+  }, { public: true, limit: 'contact_ip' });
 
   router.post('/settings', async ({ req, res, session }) => {
     const userId = session.userId;

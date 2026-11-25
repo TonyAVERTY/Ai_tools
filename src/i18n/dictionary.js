@@ -40,8 +40,12 @@ import admin from './dict/admin.js';
 import fix3 from './dict/fix3.js';
 import fix4 from './dict/fix4.js';
 import legal5 from './dict/legal5.js';
+import acc from './dict/acc.js';
+import fix5 from './dict/fix5.js';
+import contact from './dict/contact.js';
+import c2 from './dict/c2.js';
 
-export const AREAS = { legal5, fix4, fix3, admin, jobs1, fix2, console, cl2, cl1, legal4, legal3, legal2, legal0, legal1, fix1, compta2, tour, srv1, toasts, tabs2, tabs1, misc2, misc1, project, welcome, docs_api, docs_mcp, docs, chat, link, fonctionnement, tarifs, accueil, account, settings, core, shell, today, checklist };
+export const AREAS = { c2, contact, fix5, acc, legal5, fix4, fix3, admin, jobs1, fix2, console, cl2, cl1, legal4, legal3, legal2, legal0, legal1, fix1, compta2, tour, srv1, toasts, tabs2, tabs1, misc2, misc1, project, welcome, docs_api, docs_mcp, docs, chat, link, fonctionnement, tarifs, accueil, account, settings, core, shell, today, checklist };
 export const ROWS = Object.values(AREAS).flat();
 
 const INDEX = { en: 1, es: 2 };

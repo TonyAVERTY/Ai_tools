@@ -46,7 +46,8 @@ import { gitVersionNotes } from './services/git.js';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 // Les pages sont écrites en français ; dans une autre langue, elles sont traduites au moment de partir (src/i18n/html.js)
-setPageTransform((body) => { const lang = currentLang(); return lang === DEFAULT_LANG ? body : translateHtml(body, lookupFor(lang), lang); });
+// Même en français, la marque est écrite « IaBoss » dans le texte visible (translateHtml sans dictionnaire)
+setPageTransform((body) => { const lang = currentLang(); return translateHtml(body, lang === DEFAULT_LANG ? null : lookupFor(lang), lang); });
 
 // Fichiers statiques chargés une fois en mémoire (quelques Ko), avec ETag : un rechargement coûte un 304
 function asset(file, type, maxAge) {

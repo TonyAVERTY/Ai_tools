@@ -31,4 +31,4 @@ export function lookupFor(lang) {
 }
 
 /** Balise du script de traduction du navigateur : seulement dans une autre langue que le français. */
-export const i18nScript = () => (currentLang() === DEFAULT_LANG ? '' : `<script src="${assetUrl('/static/i18n.js')}" defer></script>`);
+export const i18nScript = () => `<script src="${assetUrl('/static/i18n.js')}" defer></script>`;

@@ -16,6 +16,8 @@ const PUBLIC = new Set([
   'GET /u/:email/:token', 'POST /u/:email/:token',
   // Choix de la langue depuis le site public : un cookie de préférence, rien d'autre (l'origine est vérifiée dans la route)
   'POST /lang',
+  // Formulaire de contact du site public (relu : origine vérifiée, limite par adresse IP, plafond du jour, champ piège, délai minimal, aucune donnée du visiteur dans les en-têtes du mail ; test/contact.test.js)
+  'GET /contact', 'POST /contact',
   // Abonnement des agendas (jeton secret de 256 bits dans l'adresse), événements Stripe (signature vérifiée)
   'GET /cal/:file', 'POST /stripe/webhook',
 ]);

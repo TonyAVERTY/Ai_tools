@@ -2,13 +2,13 @@
 // serveur (src/i18n/html.js) ; ce script traduit le reste avec EXACTEMENT les mêmes règles (/static/i18n-core.js). Il ne s'active que dans une autre langue que le français.
 (() => {
   const lang = document.documentElement.lang;
-  if (!/^(en|es)$/.test(lang)) return;
   const SKIP = new Set(['SCRIPT', 'STYLE', 'PRE', 'CODE', 'KBD', 'SAMP', 'TEXTAREA', 'SVG', 'TEMPLATE', 'NOSCRIPT']);
   const INLINE = new Set(['A', 'ABBR', 'B', 'BR', 'CODE', 'EM', 'I', 'KBD', 'MARK', 'SMALL', 'SPAN', 'STRONG', 'SUB', 'SUP', 'TIME', 'U', 'S']);
   const ATTRS = ['title', 'placeholder', 'aria-label', 'alt', 'data-confirm', 'data-confirm-label', 'data-label', 'data-tip', 'data-empty', 'data-text', 'data-title', 'data-ok'];
 
-  Promise.all([import('/static/i18n-core.js'), fetch(`/static/i18n/${lang}.json`, { credentials: 'same-origin' }).then((r) => r.json())]).then(([core, dict]) => {
-    const lookup = core.makeLookup(dict);
+  // Français : pas de dictionnaire, seulement la marque (« IaBoss ») dans les textes ajoutés après coup
+  Promise.all([import('/static/i18n-core.js'), /^(en|es)$/.test(lang) ? fetch(`/static/i18n/${lang}.json`, { credentials: 'same-origin' }).then((r) => r.json()) : Promise.resolve({})]).then(([core, dict]) => {
+    const lookup = core.withBrand(core.makeLookup(dict));
     const skipped = (el) => SKIP.has(el.tagName?.toUpperCase());
 
     const text = (node) => {

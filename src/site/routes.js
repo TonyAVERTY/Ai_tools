@@ -7,6 +7,8 @@ import { homePage, howPage, pricingPage } from './pages.js';
 import { mentionsPage, privacyPage, termsPage } from './legal.js';
 import { docsHomePage, docsApiPage, docsMcpPage } from './docs.js';
 import { robotsTxt, sitemapXml } from './seo.js';
+import { contactFormPage } from './contact.js';
+import { formToken } from '../services/contact.js';
 
 export function registerSiteRoutes(router, { cfg, db }) {
   const apple = !!cfg.apple;
@@ -26,6 +28,12 @@ export function registerSiteRoutes(router, { cfg, db }) {
   router.get('/mentions-legales', async ({ req, res }) => show(req, res, mentionsPage(ctx)), open);
   router.get('/confidentialite', async ({ req, res }) => show(req, res, privacyPage(ctx)), open);
   router.get('/cgu', async ({ req, res }) => show(req, res, termsPage(ctx)), open);
+  router.get('/contact', async ({ req, res, url }) => {
+    const plan = url.searchParams.get('plan');
+    const values = plan === null ? {} : { topic: 'plan', message: `Prévenez-moi à l'ouverture de l'offre ${String(plan).replace(/[^\p{L}\p{N} -]/gu, '').slice(0, 30)}.` };
+    res.setHeader('Cache-Control', 'no-store');
+    await show(req, res, contactFormPage({ appUrl: cfg.appUrl, token: formToken(cfg.secretKey), values }));
+  }, open);
   router.get('/docs', async ({ req, res }) => show(req, res, docsHomePage(ctx)), open);
   router.get('/docs/api', async ({ req, res }) => show(req, res, docsApiPage(ctx)), open);
   router.get('/docs/mcp', async ({ req, res }) => show(req, res, docsMcpPage(ctx)), open);

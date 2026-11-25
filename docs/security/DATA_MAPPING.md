@@ -45,6 +45,8 @@ Rôles RGPD annoncés dans la politique de confidentialité : **iaboss est respo
 
 ## 4. Données qui ne sont jamais enregistrées
 
+Formulaire de contact (page publique `/contact`) : nom, e-mail et message transitent par le SMTP du serveur vers la boîte de l'éditeur ; rien n'est enregistré en base ; limite par IP et plafond du jour en mémoire.
+
 Adresse IP (en mémoire seulement, pour limiter le débit), numéro de carte (Stripe), mot de passe (aucun), clés et jetons en clair (chiffrés ou en empreinte).
 
 ## 5. Données sensibles (art. 9) et mineurs

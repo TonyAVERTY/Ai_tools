@@ -36,7 +36,6 @@ export default [
   ["Joindre un projet iaboss", "Attach an iaboss project", "Adjuntar un proyecto de iaboss"],
   ["Projets iaboss", "iaboss projects", "Proyectos de iaboss"],
   ["Chargement…", "Loading…", "Cargando…"],
-  ["Ton message", "Your message", "Tu mensaje"],
   ["Écris à Claude… (Entrée pour envoyer, Maj+Entrée pour un retour à la ligne, / pour les commandes)", "Write to Claude… (Enter to send, Shift+Enter for a new line, / for commands)", "Escribe a Claude… (Intro para enviar, Mayús+Intro para un salto de línea, / para los comandos)"],
   ["Envoyer", "Send", "Enviar"],
   ["Arrêter", "Stop", "Detener"],

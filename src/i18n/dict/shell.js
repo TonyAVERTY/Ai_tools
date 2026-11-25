@@ -36,7 +36,6 @@ export default [
   ['Mentions légales', 'Legal notice', 'Aviso legal'],
   ['Confidentialité', 'Privacy', 'Privacidad'],
   ['CGU', 'Terms of use', 'Condiciones de uso'],
-  ['Contact', 'Contact', 'Contacto'],
   ['Connexion', 'Log in', 'Iniciar sesión'],
   ['Accueil', 'Home', 'Inicio'],
   ['Dashboard', 'Dashboard', 'Panel'],

@@ -2,7 +2,7 @@
 // Textes rédigés d'après le code (données réellement collectées, cookies réellement posés) pour l'entrepreneur
 // individuel Tony AVERTY. Ce sont des modèles sérieux, pas un avis juridique : voir docs/JOURNAL.md pour ce qui reste
 // à compléter (marqueurs visibles) et à faire relire.
-import { siteLayout, ic, CONTACT_EMAIL } from './layout.js';
+import { siteLayout, ic } from './layout.js';
 import { currentLang } from '../i18n/index.js';
 import { PLAN_LIMITS, PLAN_PRICES, PLAN_LABELS, ANNUAL_FREE_MONTHS, annualPrice, SUBSCRIPTION } from '../limits.js';
 
@@ -70,7 +70,7 @@ export function mentionsPage({ appUrl }) {
   <dt>SIRET</dt><dd>100 142 819 00018</dd>
   <dt>Code APE</dt><dd>62.01Z (programmation informatique)</dd>
   <dt>Siège</dt><dd>${ADDRESS}</dd>
-  <dt>Email</dt><dd><a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a></dd>
+  <dt>Contact</dt><dd><a href="/contact">formulaire de contact</a></dd>
   <dt>TVA</dt><dd>TVA non applicable, art. 293 B du CGI</dd>
   <dt>Directeur de la publication</dt><dd>Tony AVERTY</dd>
 </dl>`,
@@ -95,7 +95,7 @@ export function mentionsPage({ appUrl }) {
       },
       {
         id: 'signalement', title: 'Contact et signalement',
-        html: `<p>Pour toute question, ou pour signaler un contenu illicite ou un mail reçu à tort depuis iaboss : <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a>.</p>
+        html: `<p>Pour toute question, ou pour signaler un contenu illicite ou un mail reçu à tort depuis iaboss : <a href="/contact">formulaire de contact</a>.</p>
 <p>Droit applicable : le droit français.</p>`,
       },
     ],
@@ -114,7 +114,7 @@ export function privacyPage({ appUrl, apple = false, captcha = false, inactiveMo
     sections: [
       {
         id: 'roles', title: 'Qui est responsable de quoi',
-        html: `<p>iaboss est édité par Tony AVERTY, entrepreneur individuel (SIRET 100 142 819 00018), siège : ${ADDRESS}. Contact : <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a>. Il n'y a pas de délégué à la protection des données.</p>
+        html: `<p>iaboss est édité par Tony AVERTY, entrepreneur individuel (SIRET 100 142 819 00018), siège : ${ADDRESS}. Contact : <a href="/contact">formulaire de contact</a>. Il n'y a pas de délégué à la protection des données.</p>
 <ul>
   <li><strong>Pour ton compte</strong> (identité, connexion, liaison de ton IA, réglages), iaboss est <strong>responsable de traitement</strong>.</li>
   <li><strong>Pour les données de tes prospects</strong> (entreprises et adresses professionnelles que tu recherches, importes ou contactes), c'est <strong>toi le responsable de traitement</strong> : tu décides à qui tu écris et pourquoi. iaboss agit comme <strong>sous-traitant</strong> : il les traite uniquement pour faire fonctionner le service que tu utilises, sur tes instructions, avec les garanties de sécurité décrites plus bas, et les supprime avec ton compte.</li>
@@ -137,6 +137,7 @@ export function privacyPage({ appUrl, apple = false, captcha = false, inactiveMo
     <tr><th scope="row">Conversations IA</th><td>Titre, messages (les tiens et les réponses de ton IA), modèle utilisé et coût de chaque réponse, pour la page IA. Elles ne sont visibles que de ton compte.</td><td>Fournir le service (reprendre une conversation). Exécution du contrat.</td></tr>
     <tr><th scope="row">Pièces jointes de la page IA</th><td>Les photos, PDF, fichiers texte et vidéos que tu joins à un message (avec leur nom, leur type et leur taille), et, pour une vidéo, quelques images qui en sont tirées (sans le son). Si tu joins un projet, ton IA lit une copie de son code, en lecture seule ; rien n'est modifié. Elles ne sont visibles que de ton compte.</td><td>Permettre à ton IA de répondre à partir de ce que tu lui montres. Exécution du contrat.</td></tr>
     <tr><th scope="row">Vidéos de promotion</th><td>Les vidéos que tu fais produire depuis l'onglet Promotion d'un projet : le fichier MP4, le sujet que tu as saisi, les réglages choisis (images par seconde, durée, format) et la date. Elles sont visibles de ton compte et des personnes qui ont accès au projet (équipe).</td><td>Te fournir la vidéo demandée. Exécution du contrat.</td></tr>
+    <tr><th scope="row">Formulaire de contact</th><td>Ton nom, ton adresse e-mail, le sujet et ton message, si tu écris via la page Contact. Ils ne sont pas enregistrés dans la base du site : le message part par e-mail dans la boîte de l'éditeur, qui le garde le temps de te répondre (3 ans au plus pour une demande sur tes données personnelles).</td><td>Te répondre. Intérêt légitime (ta demande).</td></tr>
     <tr><th scope="row">Adresse IP</th><td>Ton adresse IP sert à limiter le nombre de requêtes (protection contre les abus). Elle reste en mémoire du serveur, quelques minutes à quelques heures, et n'est pas enregistrée en base de données.</td><td>Sécurité du service. Intérêt légitime.</td></tr>
     <tr><th scope="row">Modération</th><td>Actions d'administration sur un compte (suspension, plan, suppression) et pauses d'envoi décidées quand trop de mails sont rejetés : date, action, identifiant du compte et adresse masquée.</td><td>Sécurité du service et lutte contre les abus. Intérêt légitime.</td></tr>
     <tr><th scope="row">Comptabilité</th><td>Les lignes que tu saisis (date, libellé, montant, TVA, client ou fournisseur, projet, note) et le justificatif que tu joins (PDF ou image), ainsi que ta situation (statut, activité, TVA, rythme de déclaration) et les périodes marquées « déclarées ». Visibles de toi seul.</td><td>Te permettre de ranger tes pièces et de préparer tes déclarations. Exécution du service que tu demandes.</td></tr>
@@ -216,7 +217,7 @@ ${captcha
 <ul>
   <li><strong>Suppression :</strong> directement dans Mon compte. Elle efface ton compte et ses données, immédiatement.</li>
   <li><strong>Accès et export :</strong> dans Mon compte, le bouton « Télécharger mes données » te donne un fichier JSON avec toutes les données de ton compte (sans aucun secret). Tes prospects et ta comptabilité s'exportent aussi en CSV. Les fichiers (justificatifs, pièces jointes, vidéos) ne sont pas dans ce fichier : écris-nous pour les recevoir.</li>
-  <li><strong>Autres demandes :</strong> par email à <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a>. Réponse sous un mois au plus. Nous pouvons demander une preuve que la demande vient bien de toi.</li>
+  <li><strong>Autres demandes :</strong> par email à <a href="/contact">formulaire de contact</a>. Réponse sous un mois au plus. Nous pouvons demander une preuve que la demande vient bien de toi.</li>
 </ul>
 <p>Tu peux aussi saisir la CNIL : <a href="https://www.cnil.fr/fr/plaintes" rel="noopener noreferrer">cnil.fr/fr/plaintes</a>.</p>`,
       },
@@ -225,7 +226,7 @@ ${captcha
         html: `<p>L'expéditeur est un utilisateur d'iaboss : c'est lui le responsable du traitement de ton adresse professionnelle. Le pied du mail indique la page publique où elle a été trouvée.</p>
 <ul>
   <li><strong>Ne plus recevoir de messages :</strong> clique sur le lien de désinscription du mail. Ton adresse entre dans une liste d'opposition respectée par tous les utilisateurs d'iaboss.</li>
-  <li><strong>Accès, effacement, opposition :</strong> adresse-toi à l'expéditeur. Tu peux aussi écrire à <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a> : nous inscrivons ton adresse en liste d'opposition et transmettons ta demande.</li>
+  <li><strong>Accès, effacement, opposition :</strong> adresse-toi à l'expéditeur. Tu peux aussi écrire à <a href="/contact">formulaire de contact</a> : nous inscrivons ton adresse en liste d'opposition et transmettons ta demande.</li>
 </ul>`,
       },
       {
@@ -336,7 +337,7 @@ ${billing ? `<p>Les plans payants sont ouverts : ${Object.keys(PLAN_PRICES).map(
       },
       {
         id: 'droit', title: 'Droit applicable et litiges',
-        html: `<p>Ces conditions sont soumises au droit français. En cas de difficulté, écris d'abord à <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a> : nous cherchons une solution amiable. À défaut, les tribunaux français sont compétents.</p>`,
+        html: `<p>Ces conditions sont soumises au droit français. En cas de difficulté, écris d'abord à <a href="/contact">formulaire de contact</a> : nous cherchons une solution amiable. À défaut, les tribunaux français sont compétents.</p>`,
       },
     ],
   });

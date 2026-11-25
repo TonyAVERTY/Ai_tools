@@ -10,10 +10,11 @@ after(() => s.close());
 const cookiesOf = (r) => (r.headers.getSetCookie?.() ?? []).filter((c) => c.startsWith('lang='));
 const page = async (user, path, cookie = '') => (await fetch(s.base + path, { headers: { cookie: [user?.cookie, cookie].filter(Boolean).join('; '), accept: 'text/html' } })).text();
 
-test('par défaut le site reste en français : aucune langue devinée, aucun script de traduction', async () => {
+test('par défaut le site reste en français : aucune langue devinée, la marque s\'écrit IaBoss', async () => {
   const home = await page(null, '/accueil');
   assert.match(home, /<html lang="fr"/);
-  assert.doesNotMatch(home, /static\/i18n\.js/);
+  assert.match(home, />IaBoss</, 'la marque est écrite avec ses majuscules, même en français');
+  assert.doesNotMatch(home, /Choisis ton IA|Create my account/);
   const r = await fetch(s.base + '/accueil', { headers: { 'accept-language': 'en-US,en;q=0.9', accept: 'text/html' } });
   assert.match(await r.text(), /<html lang="fr"/, 'la langue du navigateur ne change rien');
 });

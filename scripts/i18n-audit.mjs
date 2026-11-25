@@ -70,7 +70,7 @@ if (flag('leftover')) {
   for (const lang of ['en', 'es']) {
     for (const [who, paths] of lists) for (const path of paths) {
       const html = await readPage(s2, who, path); if (html == null) continue;
-      const out = translateHtml(html, lookupFor(lang), lang);
+      const out = translateHtml((await import('../src/i18n/audit.js')).unbrand(html), lookupFor(lang), lang);
       for (const k of collect(out)) {
         const t = k.replace(/<[^>]*>/g, ' ');
         if (SEED_TEXTS.has(k) || /@/.test(t)) continue;
