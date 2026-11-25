@@ -1,6 +1,6 @@
 // La documentation du Support (docs/support/*.md) doit suivre l'application : tout bouton, toute section, toute page et toute tâche IA
 // doit y figurer. Le test relève ces éléments dans le code et dans les pages rendues, et échoue tant qu'un nouvel élément n'est pas documenté.
-// Règle de travail (voir CLAUDE.md) : une nouvelle fonctionnalité ou un nouveau bouton = une mise à jour de docs/support dans le même commit.
+// Règle de travail (voir docs/REGLES-DE-TRAVAIL.md) : une nouvelle fonctionnalité ou un nouveau bouton = une mise à jour de docs/support dans le même commit.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';

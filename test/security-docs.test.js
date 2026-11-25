@@ -31,15 +31,15 @@ test('les documents internes et les règles ne sont servis par aucune route, que
   const s = await startApp();
   try {
     const u = await s.newUser({ admin: true });
-    for (const p of ['/docs/security/SECURITY_AUDIT.md', '/docs/security/', '/security/SECURITY_AUDIT.md', '/SECURITY_AUDIT.md', '/CLAUDE.md', '/.claude/rules/securite.md', '/static/../docs/security/SECURITY_AUDIT.md']) {
+    for (const p of ['/docs/security/SECURITY_AUDIT.md', '/docs/security/', '/security/SECURITY_AUDIT.md', '/SECURITY_AUDIT.md', '/docs/REGLES-DE-TRAVAIL.md', '/.claude/rules/securite.md', '/static/../docs/security/SECURITY_AUDIT.md']) {
       for (const c of [s.anon, u]) assert.equal((await c.get(p, { headers: { accept: 'text/html' } })).status, 404, p);
     }
   } finally { await s.close(); }
 });
 
-test('les règles permanentes existent et CLAUDE.md y renvoie', () => {
-  for (const f of ['securite', 'donnees-personnelles', 'dependances-et-deploiement']) { assert.ok(existsSync(new URL(`../.claude/rules/${f}.md`, import.meta.url)), f); assert.ok(read('CLAUDE.md').includes(f), `CLAUDE.md cite ${f}`); }
-  assert.match(read('CLAUDE.md'), /Règle n° 3/);
+test('les règles permanentes existent et le fichier de règles du dépôt y renvoie', () => {
+  for (const f of ['securite', 'donnees-personnelles', 'dependances-et-deploiement']) { assert.ok(existsSync(new URL(`../.claude/rules/${f}.md`, import.meta.url)), f); assert.ok(read('docs/REGLES-DE-TRAVAIL.md').includes(f), `le fichier de règles cite ${f}`); }
+  assert.match(read('docs/REGLES-DE-TRAVAIL.md'), /Règle n° 3/);
 });
 
 test('tout cookie posé par le code est déclaré dans la politique de confidentialité', () => {
