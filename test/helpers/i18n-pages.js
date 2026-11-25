@@ -22,7 +22,7 @@ export async function seedAccount(s) {
 }
 
 /** Textes écrits par la personne (noms de projet, de prospects…) dans le compte garni : pas à traduire. */
-export const SEED_TEXTS = new Set(['Atelier', 'Boulangerie Martin', 'Pâtisserie Durand', 'Café Leroy', 'Export CSV', 'Mode sombre', 'Une idée pour {{entreprise}}', 'github.com/o/atelier', 'Cartes de fidélité digitales.']);
+export const SEED_TEXTS = new Set(['Atelier', 'Boulangerie Martin', 'Pâtisserie Durand', 'Café Leroy', 'Export CSV', 'Mode sombre', 'Une idée pour {{entreprise}}', 'github.com/o/atelier', 'Cartes de fidélité digitales.', 'Boulangeries', 'Boulangeries, Bretagne.']);
 
 /** Pages publiques à lire (les textes juridiques restent en français : ils ne sont pas dans cette liste). */
 export const PUBLIC_PATHS = ['/accueil', '/fonctionnement', '/tarifs', '/login', '/docs', '/docs/api', '/docs/mcp'];

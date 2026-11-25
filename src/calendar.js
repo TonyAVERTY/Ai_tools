@@ -12,8 +12,10 @@ import { createFeed, deleteFeed, feedToken, feedUrl, userOfFeed, buildIcs, event
 import { banner } from './banner.js';
 import { localeOf } from './i18n/locale.js';
 
-const MONTHS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
-const DAYS = ['lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.', 'dim.'];
+// Noms des mois et des jours dans la langue choisie (le 1er janvier 2024 est un lundi)
+const monthName = (i) => new Date(Date.UTC(2024, i, 15)).toLocaleDateString(localeOf(), { month: 'long', timeZone: 'UTC' });
+const dayName = (i) => new Date(Date.UTC(2024, 0, 1 + i)).toLocaleDateString(localeOf(), { weekday: 'short', timeZone: 'UTC' });
+const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
 const pad = (n) => String(n).padStart(2, '0');
 const hhmm = (ts) => { const p = parisParts(new Date(ts * 1000)); return `${pad(p.hour)}:${pad(p.minute)}`; };
 
@@ -68,7 +70,7 @@ export function calendarPage({ email, year, month, byDay, feed, today, agenda = 
   const isToday = (d) => today.year === year && today.month === month && today.day === d;
   const isPast = (d) => year < today.year || (year === today.year && (month < today.month || (month === today.month && d < today.day)));
   const grid = cells.map((d, i) => (d === null ? '<div class="cal-cell off"></div>' : `<div class="cal-cell${isToday(d) ? ' today' : isPast(d) ? ' past' : ''}${(byDay.get(d) || []).length ? ' has' : ''}"${isToday(d) ? ' aria-current="date"' : ''}>
-      <span class="cal-d">${d}<span class="cal-wd"> ${DAYS[i % 7]} ${MONTHS[month - 1]}</span>${isToday(d) ? '<span class="sr-only"> (aujourd\'hui)</span>' : ''}</span>
+      <span class="cal-d">${d}<span class="cal-wd"> ${dayName(i % 7)} ${monthName(month - 1)}</span>${isToday(d) ? '<span class="sr-only"> (aujourd\'hui)</span>' : ''}</span>
       ${(byDay.get(d) || []).map((e) => `<div class="cal-ev ${e.kind}" title="${esc(`${e.project} · ${e.label}`)}"><span class="cal-t">${esc(hhmm(e.at))}</span> ${esc(e.label)}</div>`).join('')}</div>`)).join('');
 
   // « À venir » : regroupé par jour ; un événement ajouté à la main garde ses actions (agenda externe, suppression)
@@ -90,9 +92,9 @@ export function calendarPage({ email, year, month, byDay, feed, today, agenda = 
     body: `<div class="cal-page">
 <div class="cal-layout">
 <section class="card cal-main" aria-labelledby="h-cal">
-  <div class="row-between cal-top"><h1 id="h-cal">${MONTHS[month - 1].charAt(0).toUpperCase()}${MONTHS[month - 1].slice(1)} ${year}</h1>
-    <nav class="row cal-nav" aria-label="Mois"><a class="btn small" href="/calendar?m=${prev[0]}-${pad(prev[1])}" aria-label="${MONTHS[prev[1] - 1]}">‹</a><a class="btn small" href="/calendar">Aujourd'hui</a><a class="btn small" href="/calendar?m=${next[0]}-${pad(next[1])}" aria-label="${MONTHS[next[1] - 1]}">›</a><a class="btn primary small" href="#evenements">${ic('plus')}Ajouter un événement</a></nav></div>
-  <div class="cal"><div class="cal-head">${DAYS.map((d) => `<span>${d}</span>`).join('')}</div><div class="cal-grid">${grid}</div></div>
+  <div class="row-between cal-top"><h1 id="h-cal">${cap(monthName(month - 1))} ${year}</h1>
+    <nav class="row cal-nav" aria-label="Mois"><a class="btn small" href="/calendar?m=${prev[0]}-${pad(prev[1])}" aria-label="${monthName(prev[1] - 1)}">‹</a><a class="btn small" href="/calendar">Aujourd'hui</a><a class="btn small" href="/calendar?m=${next[0]}-${pad(next[1])}" aria-label="${monthName(next[1] - 1)}">›</a><a class="btn primary small" href="#evenements">${ic('plus')}Ajouter un événement</a></nav></div>
+  <div class="cal"><div class="cal-head">${Array.from({ length: 7 }, (_, i) => `<span>${dayName(i)}</span>`).join('')}</div><div class="cal-grid">${grid}</div></div>
   <p class="muted small">Heures de Paris. Les posts LinkedIn se programment depuis le projet (section LinkedIn).</p>
 </section>
 <aside class="cal-side">

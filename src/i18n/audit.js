@@ -10,7 +10,11 @@ export function isCandidate(s) {
   if (/^[\w.+-]+@[\w-]+\.[\w.-]+$/.test(s) || /^https?:\/\/\S+$/i.test(s)) return false;
   if (/^[\d\s.,:;%€$£+\-–/()]+$/.test(s)) return false;
   // Dates : l'application les écrit dans la langue choisie (src/i18n/locale.js), elles ne passent pas par le dictionnaire
-  if (/^(lundi|mardi|mercredi|jeudi|vendredi|samedi|dimanche)?\.?\s*\d{1,2}\s+(janv|févr|mars|avr|mai|juin|juil|août|sept|oct|nov|déc)[a-zéû]*\.?(\s+\d{4})?$/i.test(s)) return false;
+  if (/^(lun|mar|mer|jeu|ven|sam|dim)\.$/i.test(s)) return false;
+  const bare = s.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  const DAY = '(lun|mar|mer|jeu|ven|sam|dim)[a-zé]*\\.?';
+  const MONTH = '(janv|févr|mars|avr|mai|juin|juil|août|sept|oct|nov|déc)[a-zéû]*\\.?';
+  if (new RegExp(`^(${DAY}\\s+)?(\\d{1,2}\\s+)?(${DAY}\\s+)?(${MONTH})?(\\s+\\d{4})?(\\s*\\((aujourd'hui)\\))?$`, 'i').test(bare) && !/^(mar|mai|mars)$/i.test(bare)) return false;
   return s.length <= 1200;
 }
 
