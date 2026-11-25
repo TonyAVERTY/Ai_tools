@@ -93,12 +93,12 @@ test('implémentation : fichier interdit, secret, réponse illisible ou idée no
   assert.equal(s.pushes.length, 0, 'aucun push');
 });
 
-test('implémentation : limite d\'étapes atteinte : message clair, rien n\'est poussé', async () => {
+test('implémentation : une IA qui s\'arrête avant la fin : message clair, rien n\'est poussé', async () => {
   const s = await setup();
   const r = await s.run(await s.evo('IMPLMAXTURNS'));
   assert.equal(r.status, 'error');
-  assert.match(r.error, /n'a pas fini dans la limite de 45 étapes.*Accepter/);
-  assert.doesNotMatch(r.error, /error_max_turns/, 'pas de jargon technique');
+  assert.match(r.error, /s'est arrêtée avant d'avoir fini.*Accepter/);
+  assert.doesNotMatch(r.error, /error_max_turns|45/, 'pas de jargon technique ni de limite chiffrée');
   assert.equal(s.pushes.length, 0);
 });
 

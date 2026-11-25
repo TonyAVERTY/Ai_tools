@@ -121,7 +121,7 @@ export function runCodex(o) {
   const secrets = [...Object.values(o.secretEnv || {}), ...(o.secrets || [])].filter((v) => v && v.length >= 8);
   const redact = (t) => secrets.reduce((acc, s) => acc.split(s).join('***'), String(t ?? ''));
   const child = spawn(launch.command, launch.args, { cwd: launch.cwd, env: launch.env, stdio: ['ignore', 'pipe', 'pipe'] });
-  const maxActions = o.maxTurns || 10;
+  const maxActions = o.maxTurns === null ? Infinity : (o.maxTurns || 10);
 
   return new Promise((resolve, reject) => {
     let usage = null, completed = false, failed = null, actions = 0, tooMany = false, turns = 0;

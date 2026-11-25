@@ -132,3 +132,15 @@ test('implementPrompt : l\'idée et la raison sont des données, le mode texte d
   assert.doesNotMatch(direct.prompt, /"edits"/);
   assert.match(direct.prompt, /Ne touche jamais à : \.git, \.github\/workflows/);
 });
+
+test('limite d\'étapes : absente avec maxTurns null (implémentation), toujours là par défaut', async () => {
+  const bin = resolve('test/fixtures/fake-claude.js');
+  const sandbox = { enabled: false, production: false };
+  const argsOf = async (o) => extractJson((await runClaude({ bin, sandbox, prompt: 'hello', ...o })).text).args;
+  const none = await argsOf({ maxTurns: null });
+  assert.ok(!none.includes('--max-turns'), 'aucune limite d\'étapes envoyée');
+  const dflt = await argsOf({});
+  assert.equal(dflt[dflt.indexOf('--max-turns') + 1], '10', 'les autres tâches gardent leur borne');
+  const set = await argsOf({ maxTurns: 25 });
+  assert.equal(set[set.indexOf('--max-turns') + 1], '25');
+});
