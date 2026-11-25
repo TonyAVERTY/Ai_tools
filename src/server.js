@@ -6,11 +6,14 @@ import { execFileSync } from 'node:child_process';
 import { join, dirname, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadConfig } from './config.js';
-import { openDb } from './db.js';
-import { Router, json, redirect, html, esc, HttpError } from './http.js';
+import { openDb, getSetting } from './db.js';
+import { Router, json, redirect, html, esc, HttpError, setPageTransform } from './http.js';
 import { RateLimiter, clientIp } from './ratelimit.js';
 import { getSession, checkOrigin, purgeExpired } from './auth.js';
 import { withTheme, themeOf } from './theme.js';
+import { withLang, langOfCookie, setCurrentLang, currentLang, lookupFor, DEFAULT_LANG } from './i18n/index.js';
+import { entriesFor } from './i18n/dictionary.js';
+import { translateHtml } from './i18n/html.js';
 import { securityLog } from './securitylog.js';
 import { countView, purgeAudience } from './services/audience.js';
 import { authenticateApi } from './apitokens.js';
@@ -42,16 +45,29 @@ import { gitVersionNotes } from './services/git.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
+// Les pages sont écrites en français ; dans une autre langue, elles sont traduites au moment de partir (src/i18n/html.js)
+setPageTransform((body) => { const lang = currentLang(); return lang === DEFAULT_LANG ? body : translateHtml(body, lookupFor(lang), lang); });
+
 // Fichiers statiques chargés une fois en mémoire (quelques Ko), avec ETag : un rechargement coûte un 304
 function asset(file, type, maxAge) {
   const body = readFileSync(join(ROOT, 'public', file));
   const etag = '"' + createHash('sha1').update(body).digest('base64url').slice(0, 20) + '"';
   return { type, body, etag, cache: `public, max-age=${maxAge}` };
 }
+// Fichiers de la traduction : le noyau (partagé avec le serveur), le script du navigateur et les dictionnaires (revalidés à chaque chargement : ils changent à chaque mise à jour)
+function inline(body, type) {
+  const buf = Buffer.from(body);
+  return { type, body: buf, etag: '"' + createHash('sha1').update(buf).digest('base64url').slice(0, 20) + '"', cache: 'public, max-age=0, must-revalidate' };
+}
+const i18nCore = inline(readFileSync(join(ROOT, 'src', 'i18n', 'core.js')), 'text/javascript; charset=utf-8');
 const IMG_TYPES = { '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg' };
 const FONT_TYPE = { '.woff2': 'font/woff2' };
 const STATIC = {
   '/static/tokens.css': asset('tokens.css', 'text/css; charset=utf-8', 3600),
+  '/static/i18n-core.js': i18nCore,
+  '/static/i18n.js': asset('i18n.js', 'text/javascript; charset=utf-8', 3600),
+  '/static/i18n/en.json': inline(JSON.stringify(entriesFor('en')), 'application/json; charset=utf-8'),
+  '/static/i18n/es.json': inline(JSON.stringify(entriesFor('es')), 'application/json; charset=utf-8'),
   '/static/app.css': asset('app.css', 'text/css; charset=utf-8', 3600),
   '/static/site.css': asset('site.css', 'text/css; charset=utf-8', 3600),
   '/static/responsive.css': asset('responsive.css', 'text/css; charset=utf-8', 3600),
@@ -99,7 +115,7 @@ export async function createApp(cfg, { db, worker = true, createTransport, fetch
 
   const server = createServer(async (req, res) => {
     // Un défaut imprévu dans un gestionnaire ne doit jamais arrêter le serveur pour tous les utilisateurs
-    try { await withTheme(themeOf(req), () => handle(req, res)); } catch (e) {
+    try { await withTheme(themeOf(req), () => withLang(langOfCookie(req), () => handle(req, res))); } catch (e) {
       console.error('[http]', e);
       reportError(app, e, { method: req.method, path: req.url });
       if (!res.headersSent) res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
@@ -145,6 +161,8 @@ export async function createApp(cfg, { db, worker = true, createTransport, fetch
       }
       if (route.public && route.limit) app.limiter.enforce(route.limit, { ip });
       session = route.public ? null : await getSession(db, req);
+      // Pas de cookie de langue (autre appareil) : la langue enregistrée sur le compte s'applique
+      if (session && !langOfCookie(req)) setCurrentLang(await getSetting(db, session.userId, 'lang').catch(() => null));
       // Back-office : 404 pour tout autre que les administrateurs (visiteurs compris), sans rien révéler
       if (route.admin && !session?.user.isAdmin) {
         if (url.pathname.startsWith('/api/') || !isRead || req.headers.accept?.includes('json')) throw new HttpError(404, 'Page introuvable');

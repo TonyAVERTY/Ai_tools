@@ -66,7 +66,12 @@ export async function readBody(req, { max = MAX_BODY } = {}) {
   return body;
 }
 
+// Les pages HTML passent par ce crochet avant de partir : le serveur y branche la traduction (src/i18n). Sans crochet, rien ne change.
+let pageTransform = null;
+export const setPageTransform = (fn) => { pageTransform = fn; };
+
 export function send(res, status, body, type = 'text/html; charset=utf-8') {
+  if (pageTransform && typeof body === 'string' && type.startsWith('text/html')) body = pageTransform(body);
   res.writeHead(status, { 'Content-Type': type });
   res.end(body);
 }

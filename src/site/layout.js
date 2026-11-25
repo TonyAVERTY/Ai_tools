@@ -2,6 +2,7 @@
 // lien d'évitement, en-tête, pied de page. Aucune ressource externe : CSS, images, icônes (sprite SVG en ligne) et favicon sont
 // servis par l'application ; un seul script, site.js, pour les petits plus (période des tarifs, sommaire légal, onglets de code).
 import { themeAttr } from '../theme.js';
+import { i18nScript, currentLang, LANGS, LANG_LABELS } from '../i18n/index.js';
 import { esc } from '../http.js';
 import { assetUrl, brandMark, iconLinks } from '../assets.js';
 import { SPRITE, ic } from '../icons.js';
@@ -81,7 +82,7 @@ ${iconLinks()}
 <link rel="stylesheet" href="${assetUrl('/static/tokens.css')}">
 <link rel="stylesheet" href="${assetUrl('/static/site.css')}">
 <link rel="stylesheet" href="${assetUrl('/static/responsive.css')}">
-${['/static/console-warning.js', '/static/code-field.js', '/static/site.js', '/static/responsive.js', ...scripts].map((src) => `<script src="${esc(assetUrl(src))}" defer></script>\n`).join('')}${jsonLd ? `<script type="application/ld+json">${JSON.stringify(jsonLd).replace(/</g, '\\u003c')}</script>\n` : ''}</head>
+${i18nScript()}${['/static/console-warning.js', '/static/code-field.js', '/static/site.js', '/static/responsive.js', ...scripts].map((src) => `<script src="${esc(assetUrl(src))}" defer></script>\n`).join('')}${jsonLd ? `<script type="application/ld+json">${JSON.stringify(jsonLd).replace(/</g, '\\u003c')}</script>\n` : ''}</head>
 <body class="site">
 <a class="skip" href="#contenu">Aller au contenu</a>
 ${SPRITE}
@@ -116,6 +117,10 @@ ${body}
         <li><a href="mailto:${CONTACT_EMAIL}">Contact</a></li>
       </ul></nav>
     </div>
+    <form method="post" action="/lang" class="lang-pick" aria-label="Langue">
+      <input type="hidden" name="back" value="${esc(path)}">
+      ${LANGS.map((code) => `<button name="lang" value="${code}" aria-pressed="${code === currentLang()}" lang="${code}">${LANG_LABELS[code]}</button>`).join('\n      ')}
+    </form>
     <p class="legal">Édité par Tony AVERTY, entrepreneur individuel. © ${year}</p>
   </div>
 </footer>

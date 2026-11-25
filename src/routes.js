@@ -4,7 +4,7 @@ import { reviewMail } from './services/mailcheck.js';
 import { projectChecklist } from './checklist.js';
 import { now, getSetting, setSetting } from './db.js';
 import { encrypt, decrypt, encryptJson, decryptJson, verifyUnsubToken } from './crypto.js';
-import { html, json, redirect, readBody, HttpError, asBool } from './http.js';
+import { html, json, redirect, readBody, HttpError, asBool, setCookie } from './http.js';
 import { startLogin, finishLogin, destroySession, getSession, checkOrigin } from './auth.js';
 import { verifyCaptcha } from './captcha.js';
 import { deleteUser, normalizeEmail, getUser } from './users.js';
@@ -87,6 +87,7 @@ import { quotaFor, planLimitError, withUserLock, assertRoom, usageView, lockedFe
 import { lockedCard } from './lockviews.js';
 import { history, saveSnapshot } from './services/metrics.js';
 import { evolutionHtml } from './services/markdown.js';
+import { isLang, LANG_COOKIE } from './i18n/index.js';
 import { decisionsOf, decisionHtml, refusedOf, implementationsOf, implementedOf, recapsHtml, implChoiceOf } from './services/evodecisions.js';
 import { registerEvolutionRoutes } from './evoroutes.js';
 import {
@@ -329,6 +330,24 @@ export function registerRoutes(router, app) {
     await setSetting(db, session.userId, 'mail_footer', enabled ? '1' : '0');
     json(res, { ok: true, enabled });
   }, { limit: 'prospect_write' });
+
+  // Langue d'affichage : le cookie (cet appareil) ET le réglage du compte (les autres appareils). Une langue inconnue est refusée, jamais devinée.
+  router.post('/settings/lang', async ({ req, res, session }) => {
+    const lang = (await readBody(req)).lang;
+    if (!isLang(lang)) throw new HttpError(400, 'Langue inconnue : choisis Français, English ou Español', { expose: true });
+    await setSetting(db, session.userId, 'lang', lang);
+    setCookie(res, LANG_COOKIE, lang, { maxAge: 365 * 24 * 3600 });
+    redirect(res, '/settings?ok=1#langue');
+  }, { limit: 'lang' });
+  // Le même choix depuis le site public (sans compte) : seulement le cookie. La page de retour est une adresse de CE site (jamais une adresse reçue telle quelle).
+  router.post('/lang', async ({ req, res }) => {
+    checkOrigin(req, cfg);
+    const b = await readBody(req);
+    if (!isLang(b.lang)) throw new HttpError(400, 'Langue inconnue : choisis Français, English ou Español', { expose: true });
+    setCookie(res, LANG_COOKIE, b.lang, { maxAge: 365 * 24 * 3600 });
+    const back = typeof b.back === 'string' && /^\/(?![/\\])[\w\-./?=&%#]{0,200}$/.test(b.back) ? b.back : '/';
+    redirect(res, back);
+  }, { public: true, limit: 'lang_ip' });
 
   router.post('/settings', async ({ req, res, session }) => {
     const userId = session.userId;

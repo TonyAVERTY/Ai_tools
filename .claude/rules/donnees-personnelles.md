@@ -11,7 +11,7 @@ Applicables à toute fonctionnalité qui collecte, stocke, affiche, exporte ou t
 
 ## Cookies et traceurs
 - **Aucun cookie, stockage local de suivi, pixel, SDK d'analyse, script ou police tiers** sans décision explicite du propriétaire. La CSP (`default-src 'self'`) l'interdit : ne l'élargis pas.
-- Cookies actuels (tous exemptés de consentement, voir `docs/security/RGPD_COMPLIANCE.md` §6) : `sid`, `oauth_b`, `li_oauth_b`, `mfa_td`, `theme`. Tout nouveau cookie : `HttpOnly; Secure; SameSite` ; durée minimale ; **mis à jour dans le tableau des cookies de la politique de confidentialité**.
+- Cookies actuels (tous exemptés de consentement, voir `docs/security/RGPD_COMPLIANCE.md` §6) : `sid`, `oauth_b`, `li_oauth_b`, `mfa_td`, `theme`, `lang`. Tout nouveau cookie : `HttpOnly; Secure; SameSite` ; durée minimale ; **mis à jour dans le tableau des cookies de la politique de confidentialité**.
 - Un traceur qui exige un consentement impose un bandeau complet (refus aussi facile que l'acceptation, choix détaillés, retrait, preuve, rien avant consentement). Ne le crée pas sans l'accord du propriétaire.
 - La mesure d'audience reste **sans identifiant** (`src/services/audience.js`) et respecte « Ne pas me suivre ».
 

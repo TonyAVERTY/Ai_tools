@@ -4,6 +4,7 @@ import { themeAttr } from './theme.js';
 import { STATUSES } from './services/crm.js';
 import { icalBox } from './icalview.js';
 import { devLinks } from './devlinks.js';
+import { i18nScript, currentLang, LANGS, LANG_LABELS } from './i18n/index.js';
 import { assetUrl, brandMark, iconLinks } from './assets.js';
 import { SPRITE, ic } from './icons.js';
 import { GIT_SERVER_TYPES, MAX_GIT_SERVERS } from './gitservers.js';
@@ -74,6 +75,7 @@ ${iconLinks()}
 <script src="${assetUrl('/static/console-warning.js')}" defer></script>
 <script src="${assetUrl('/static/code-field.js')}" defer></script>
 <script src="${assetUrl('/static/ajax.js')}" defer></script>
+${i18nScript()}
 ${scripts.map((src) => `<script src="${assetUrl(src)}" defer></script>`).join('\n')}
 </head>
 <body class="app" data-ai="${esc(aiName())}" data-go="${goAttr()}">
@@ -665,7 +667,7 @@ function uncovered(d, channels = {}) {
   return missing.length ? `<p class="hint">Ajoute un canal pour recevoir aussi : ${missing.join(' · ')}.</p>` : '';
 }
 
-const SETTINGS_TOC = [['notif', 'Notifications'], ['git', 'Dépôts Git'], ['garde', 'Garde-fous'], ['budget', 'Budget et modèles IA'], ['prompts', 'Prompts IA']];
+const SETTINGS_TOC = [['langue', 'Langue'], ['notif', 'Notifications'], ['git', 'Dépôts Git'], ['garde', 'Garde-fous'], ['budget', 'Budget et modèles IA'], ['prompts', 'Prompts IA']];
 
 export function settingsPage({ email, s, saved }) {
   // Sélecteur de modèle en deux listes : les recommandés (avec une estimation relative du coût), puis tous les autres, plus compacts et sans estimation
@@ -701,6 +703,12 @@ export function settingsPage({ email, s, saved }) {
 <div class="settings-main">
 <h1 class="h1">Réglages</h1>
 ${saved ? banner('ok', 'Réglages enregistrés', { strong: true }) : ''}
+<section class="card" id="langue" aria-labelledby="t-langue">
+  <div class="card-h"><h2 id="t-langue">Langue</h2><p>Choisis la langue d'affichage du site. Ton choix est gardé sur ce navigateur et sur ton compte.</p></div>
+  <form method="post" action="/settings/lang" class="cfg"><div class="row" role="group" aria-label="Langue">
+    ${LANGS.map((code) => `<button class="btn${code === currentLang() ? ' primary' : ''}" name="lang" value="${code}" aria-pressed="${code === currentLang()}">${code === currentLang() ? ic('check') : ''}${LANG_LABELS[code]}</button>`).join('\n    ')}
+  </div></form>
+</section>
 <form method="post" action="/settings" class="settings-form">
 
 <section class="card" id="notif" aria-labelledby="t-notif">

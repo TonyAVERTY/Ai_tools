@@ -52,6 +52,7 @@ Conclusion (à valider) : **aucun consentement n'est requis, aucun bandeau n'est
 | `oauth_b` (liaison de la connexion Google/Apple, 10 min), `li_oauth_b` (liaison LinkedIn, 10 min, posé seulement si l'utilisateur relie LinkedIn) | Strictement nécessaire | Non |
 | `mfa_td` (appareil de confiance A2F, 30 jours), posé seulement si la case est cochée | Sécurité demandée par la personne | Non |
 | `theme` (clair/sombre, 1 an), posé seulement sur choix de la personne | Préférence d'interface choisie | Non |
+| `lang` (langue d'affichage : fr, en ou es, 1 an), posé seulement sur choix de la personne | Préférence d'interface choisie | Non |
 | Compteurs d'audience par jour et par page, **sans cookie** | Mesure statistique anonyme | Non, sous conditions de la CNIL (finalité statistique, aucun identifiant, pas de recoupement, information, opposition possible) |
 | Google reCAPTCHA (page de connexion, si activé) | Sécurité du formulaire ; dépose des cookies Google | Position de la CNIL à vérifier : mentionné dans la politique, **à valider** |
 
