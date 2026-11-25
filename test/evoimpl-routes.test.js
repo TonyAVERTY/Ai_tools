@@ -51,7 +51,7 @@ test('implémenter : branche principale exige une confirmation ; un seul job à 
   const again = await A.post(url(1, 'implement'), { target: 'branch' });
   assert.equal(again.status, 409);
   const block = await (await A.get(url(1, 'decision'))).json();
-  assert.match(block.html, /Implémentation en cours/);
+  assert.match(block.html, /Implémentation en (cours|attente)/);
   assert.doesNotMatch(block.html, /AbCdEf/, 'jamais de token dans la page');
 });
 

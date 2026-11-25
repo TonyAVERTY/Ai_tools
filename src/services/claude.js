@@ -30,7 +30,7 @@ export function probeClaudeFlags(bin = 'claude') {
  * @param {string} o.prompt
  * @param {string} [o.cwd]          dossier de travail (clone du repo pour l'analyse)
  * @param {string} [o.model]        haiku | sonnet | opus
- * @param {number} [o.maxTurns]     borne dure sur le nombre d'allers-retours (= tokens)
+ * @param {number|null} [o.maxTurns]  borne dure sur le nombre d'allers-retours (= tokens) ; `null` : aucune limite d'étapes (seul le délai `timeoutMs` arrête la tâche)
  * @param {string[]} [o.tools]      outils autorisés, tout le reste est refusé
  * @param {boolean} [o.excludeDynamic]  voir probeClaudeFlags
  * @param {string} [o.system]       consignes ajoutées au prompt système
@@ -56,7 +56,7 @@ export function runClaude(o) {
     '-p', o.prompt,
     '--output-format', 'stream-json', '--verbose',
     '--model', o.model || 'haiku',
-    '--max-turns', String(o.maxTurns || 10),
+    ...(o.maxTurns === null ? [] : ['--max-turns', String(o.maxTurns || 10)]),
     '--allowedTools', (o.tools || []).join(','),
     '--disallowedTools', o.allowEdit ? 'Bash,NotebookEdit,Task' : 'Bash,Edit,Write,MultiEdit,NotebookEdit,Task',
   ];

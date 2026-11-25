@@ -126,7 +126,7 @@ export function runAgy(o) {
   const secrets = [...(o.secrets || []), ...tokenSecrets(o.authFile)].filter((v) => v && v.length >= 8);
   const redact = (t) => secrets.reduce((acc, s) => acc.split(s).join('***'), String(t ?? ''));
   const child = spawn(launch.command, launch.args, { cwd: launch.cwd, env: launch.env, stdio: ['ignore', 'pipe', 'pipe'] });
-  const maxActions = o.maxTurns || 10;
+  const maxActions = o.maxTurns === null ? Infinity : (o.maxTurns || 10);
 
   return new Promise((resolve, reject) => {
     let result = null, turns = 0, tooMany = false, needLogin = false;
