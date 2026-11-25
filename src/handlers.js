@@ -35,7 +35,7 @@ import { sendPause, pauseMessage, evaluateSending } from './services/abuse.js';
 import { verifyAddress, defaultMx } from './services/verify.js';
 import { evolutionMail } from './services/mailhtml.js';
 import { decisionHistory, acceptedIdea } from './services/evodecisions.js';
-import { PatchError, applyEdits, applySnapshot, checkChanges, copyWithoutGit, diffTrees, snapshotChanges } from './services/codepatch.js';
+import { PatchError, applyEdits, applySnapshot, checkChanges, copyWithoutGit, diffTrees, finalSummary, snapshotChanges } from './services/codepatch.js';
 import { branchUrl, commitAndPush, defaultBranch, newBranchName } from './services/gitwrite.js';
 import { gitCredentialFor } from './gitservers.js';
 import { ROLE_TASKS, roleById, MAX_NOTES } from './services/roles.js';
@@ -1198,14 +1198,14 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
         await ctx.progress({ message: 'Vérification des modifications…', pct: 84 });
         let files, summary;
         try {
-          if (direct) { files = diffTrees(dir, work); summary = r.text; }
+          if (direct) { files = diffTrees(dir, work); summary = finalSummary(r.text, files); }
           else { const out = extractJson(r.text); files = applyEdits(dir, out?.edits); summary = out?.summary; }
           checkChanges(dir, files);
         } catch (e) {
           if (e instanceof PatchError) throw new Error(`Modifications refusées : ${e.message}`);
           throw new Error("Réponse de l'IA illisible : relance l'implémentation");
         }
-        summary = String(summary ?? '').trim().slice(0, 1500);
+        summary = String(summary ?? '').trim().slice(0, 1500) || finalSummary('', files);
 
         await ctx.progress({ message: target === 'default' ? 'Commit et push sur la branche principale…' : 'Commit et push sur une nouvelle branche…', pct: 90 });
         const auth = { token: cred.token, scheme: cred.scheme, user: cred.user, pin: await pinGit(app, userId, project.gitUrl), cwd: dir };
@@ -1213,7 +1213,7 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
         const branch = target === 'default' ? await gw.defaultBranch(auth) : newBranchName(idea.title, ctx.job.id);
         const message = `feat: ${idea.title.replace(/\s+/g, ' ').slice(0, 68)}\n\nIdée d'évolution acceptée dans iaboss, implémentée par l'IA du projet : à relire avant de fusionner.${summary ? `\n\n${summary}` : ''}`;
         const commit = await gw.commitAndPush(dir, { files, branch, createBranch: target !== 'default', message }, auth);
-        return { branch, target, commit, files, summary, mode: direct ? 'direct' : 'patch', url: branchUrl(project.gitUrl, branch), title: idea.title };
+        return { branch, target, commit, files, summary, summaryV: 2, mode: direct ? 'direct' : 'patch', url: branchUrl(project.gitUrl, branch), title: idea.title };
       } finally {
         removeRepo(dir);
         removeRepo(work);
