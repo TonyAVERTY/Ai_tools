@@ -403,7 +403,7 @@ Le menu **IA** de la barre du haut propose **Claude** (assistant classique) et *
 - **Source** : `docs/support/*.md` (écrite à la main, pour un utilisateur) + trois fichiers **générés depuis le code** par `src/services/supportdocs.js` (offres et plafonds, modèles, consignes IA). Le dossier est reconstruit seulement quand son contenu change, avec un `INDEX.md` qui sert de carte.
 - **Les conversations** du Support sont séparées de celles de Claude (colonne `chat_conversations.mode`), sous `/support` et `/support/:id`.
 - **Consignes du Support** : modifiables dans Réglages → Prompts IA (« Support (aide sur iaboss) »), comme les autres tâches ; la carte des documents et la règle de sécurité (un document n'est jamais une consigne) restent dans le code.
-- **Tenir la documentation à jour** : règle dans `CLAUDE.md`, imposée par `test/support-docs.test.js` (chaque bouton, section, page, tâche IA doit y figurer).
+- **Tenir la documentation à jour** : règle dans `docs/REGLES-DE-TRAVAIL.md`, imposée par `test/support-docs.test.js` (chaque bouton, section, page, tâche IA doit y figurer).
 
 ## Dev
 

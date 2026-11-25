@@ -2,7 +2,7 @@
 
 Ce document est la référence du design : il explique le parti pris, puis liste les jetons et les composants. Les valeurs vivent dans
 `public/tokens.css` (couleurs, rayons, ombres, durées, typographie) ; `public/site.css` (site public) et `public/app.css` (application)
-ne redéfinissent rien. Les règles de travail du dépôt restent celles de `CLAUDE.md` (CSP stricte : ni style ni script en ligne, aucune
+ne redéfinissent rien. Les règles de travail du dépôt restent celles de `docs/REGLES-DE-TRAVAIL.md` (CSP stricte : ni style ni script en ligne, aucune
 ressource externe).
 
 ## 1. Le sujet, et ce qu'on en tire

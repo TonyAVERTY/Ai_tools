@@ -20,7 +20,7 @@ Comment t'en servir (page par page) :
 ```
 Tu es designer produit et développeur senior sur iaboss. Tu as carte blanche : tu analyses le produit, tu retravailles toute la charte graphique (trois couleurs : deux dominantes et une d'accent), tu décides de la mise en page de TOUTE l'application, et tu proposes les pages et fonctionnalités qui, selon toi, manquent.
 
-Lis dans cet ordre : docs/PRODUIT.md (l'inventaire complet de ce qu'iaboss fait), CLAUDE.md (règles du dépôt, à suivre à la lettre), docs/DESIGN.md (direction artistique), docs/UX.md (retours d'action, rédaction, animations), docs/support/*.md, public/tokens.css. Prends des captures de chaque page à 1280 px et 390 px (scripts/responsive-audit.mjs, mode « shots ») et regarde-les vraiment.
+Lis dans cet ordre : docs/PRODUIT.md (l'inventaire complet de ce qu'iaboss fait), docs/REGLES-DE-TRAVAIL.md (règles du dépôt, à suivre à la lettre), docs/DESIGN.md (direction artistique), docs/UX.md (retours d'action, rédaction, animations), docs/support/*.md, public/tokens.css. Prends des captures de chaque page à 1280 px et 390 px (scripts/responsive-audit.mjs, mode « shots ») et regarde-les vraiment.
 
 Tu travailles en quatre temps. À la fin de CHAQUE temps tu t'arrêtes, tu me rends le document et tu attends ma validation. Tu n'écris aucun code d'application avant la fin du temps 3.
 
@@ -59,7 +59,7 @@ Règles : le prompt 0 (CSP stricte, rédaction, jetons de couleur, AUCUNE animat
 ```
 Tu es directeur artistique et développeur front sur iaboss. Tu retravailles TOUTE la charte graphique, sans toucher à la mise en page des pages.
 
-Lis : CLAUDE.md (règles du dépôt), docs/DESIGN.md (la charte actuelle), docs/UX.md, docs/PRODUIT.md (ce que fait l'application), public/tokens.css (où vivent les valeurs), public/app.css et public/site.css (où elles servent). Prends des captures de toutes les pages à 1280 px et 390 px, en clair et en sombre.
+Lis : docs/REGLES-DE-TRAVAIL.md (règles du dépôt), docs/DESIGN.md (la charte actuelle), docs/UX.md, docs/PRODUIT.md (ce que fait l'application), public/tokens.css (où vivent les valeurs), public/app.css et public/site.css (où elles servent). Prends des captures de toutes les pages à 1280 px et 390 px, en clair et en sombre.
 
 La contrainte : TROIS COULEURS. Deux dominantes (l'identité : surfaces, titres, action principale, navigation) et une d'accent (de petites touches de couleur qui guident l'œil). Les neutres (blanc, gris, texte) ne comptent pas : dérive-les des deux dominantes. Les couleurs d'état (succès, avertissement, erreur) et celles des graphiques sont un point à trancher avec moi : propose des solutions, ne choisis pas seul, et ne code jamais un état par la couleur seule.
 
@@ -130,9 +130,9 @@ Le public : des gens proches du code, pas commerciaux, qui veulent savoir en dix
 
 Ce que je veux : retravailler l'UI/UX pour qu'elle soit PLUS LÉGÈRE (moins d'informations affichées en même temps, aucune répétition, une seule action principale par écran) et plus claire. Principe : tout ce qui est validé devient un résumé grisé en lecture seule avec un bouton « Modifier » (déjà fait pour les modèles de mail, la cible du projet et les documents de facturation) ; ce qui est fait se replie, ce qui reste à faire se montre.
 
-Lis d'abord, dans cet ordre : CLAUDE.md (règles du dépôt, à suivre à la lettre), docs/DESIGN.md (direction artistique), docs/UX.md (retours d'action, rédaction, animations), docs/support/*.md (ce que l'application fait, écrit pour l'utilisateur), public/tokens.css.
+Lis d'abord, dans cet ordre : docs/REGLES-DE-TRAVAIL.md (règles du dépôt, à suivre à la lettre), docs/DESIGN.md (direction artistique), docs/UX.md (retours d'action, rédaction, animations), docs/support/*.md (ce que l'application fait, écrit pour l'utilisateur), public/tokens.css.
 
-Règles non négociables (détail dans CLAUDE.md) :
+Règles non négociables (détail dans docs/REGLES-DE-TRAVAIL.md) :
 - CSP stricte : aucun style="…" ni <script> en ligne, aucune ressource externe. Les couleurs viennent des jetons de public/tokens.css, jamais en dur dans app.css ou site.css.
 - Charte graphique : une fois validée, docs/CHARTE-GRAPHIQUE.md fait foi (trois couleurs : deux dominantes et une d'accent, plus des neutres dérivés). Tu n'ajoutes jamais une quatrième couleur ni une valeur en dur.
 - Rédaction : on tutoie ; un succès se dit « Nom + participe passé » sans point ni « ! » ; une erreur dit ce qui n'a pas marché puis la suite après « : » ; boutons à l'infinitif. test/wording.test.js échoue sinon.
