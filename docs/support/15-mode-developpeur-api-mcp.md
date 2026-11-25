@@ -1,5 +1,5 @@
 # Mode développeur : API, jetons et serveur MCP
-Résumé : activer le mode développeur, créer des jetons, utiliser l'API REST et le serveur MCP pour piloter iaboss depuis ses scripts ou depuis Claude, et où lire la documentation technique.
+Résumé : activer le mode développeur, créer des jetons, utiliser l'API REST et le serveur MCP pour piloter IaBoss depuis ses scripts ou depuis Claude, et où lire la documentation technique.
 
 ## Activer
 Avatar → **Mon compte** → carte « Mode développeur » → bouton **Activer** (ou la page **Développeur**) puis **Activer le mode développeur**. Tant qu'il est désactivé, aucun jeton ne fonctionne ni sur l'API ni sur le MCP. Une fois activé, la page affiche les adresses de l'API et du serveur MCP, les liens vers leur documentation et les **jetons**.

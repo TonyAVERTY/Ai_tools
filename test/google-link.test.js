@@ -1,3 +1,4 @@
+import { brand } from '../src/i18n/core.js';
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, readFileSync, existsSync } from 'node:fs';
@@ -34,7 +35,7 @@ test('page de liaison : l\'option « compte Google » n\'existe que si l\'admini
   assert.match(on, /Avec ton abonnement Google AI \(Plus, Pro, Ultra\)/);
   assert.match(on, /Se connecter avec Google/);
   assert.match(on, /Clé API ou compte Google/);
-  for (const t of GOOGLE_CONSENT_TEXT) assert.ok(on.includes(t.replace(/'/g, "'")), 'le texte complet du consentement est affiché');
+  for (const t of GOOGLE_CONSENT_TEXT) assert.ok(on.includes(brand(t.replace(/'/g, "'"))), 'le texte complet du consentement est affiché');
   assert.match(on, /n'est pas clairement autorisé par Google/);
   assert.match(on, /id="google-dialog"/);
   setGoogleAccountEnabled(false);

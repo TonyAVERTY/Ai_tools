@@ -169,9 +169,9 @@ export function registerProspectRoutes(router, app, { project }) {
       const first = await getTemplate(db, p.id, 'initial');
       subject = followupSubject(template, { subject: fillTemplate(first?.subject || '', { entreprise: person.company, ville: person.city || '', accroche: person.hook || '', expediteur: smtp.fromName, site: p.siteUrl }) });
     }
-    const unsubUrl = prospect ? `${cfg.appUrl}/u/${encodeURIComponent(person.email)}/${unsubToken(cfg.secretKey, person.email)}` : `${cfg.appUrl}/u/exemple`;
+    const unsubUrl = prospect ? `${cfg.appUrl}/u/${encodeURIComponent(person.email)}/${unsubToken(cfg.secretKey, person.email)}${p.contentLang !== 'fr' ? `?l=${p.contentLang}` : ''}` : `${cfg.appUrl}/u/exemple`;
     const footer = (await getSetting(db, p.userId, 'mail_footer', '1')) !== '0'; // l'aperçu montre ce qui partira, pied de page compris ou non
-    const mail = buildProspectMail({ template: { ...template, subject }, prospect: person, smtp, site: p.siteUrl, unsubUrl, subject, readReceipt: false, footer, html: asBool(b.html) });
+    const mail = buildProspectMail({ template: { ...template, subject }, prospect: person, smtp, site: p.siteUrl, unsubUrl, subject, readReceipt: false, footer, html: asBool(b.html), lang: p.contentLang });
     // Points d'attention : ce qu'on ne voit pas toujours à la relecture
     const warnings = [];
     const used = [...String(template.subject + ' ' + body).matchAll(/\{\{\s*(\w+)\s*\}\}/g)].map((m) => m[1]);
@@ -182,7 +182,7 @@ export function registerProspectRoutes(router, app, { project }) {
     if (used.includes('site') && !p.siteUrl) warnings.push("Aucun site n'est renseigné pour ce projet (section En-tête) : {{site}} restera vide.");
     if (!p.smtp?.fromEmail) warnings.push("Aucune adresse d'envoi n'est réglée pour ce projet : l'expéditeur affiché est un exemple.");
     if (!mail.subject) warnings.push("L'objet est vide.");
-    const review = reviewMail({ subject: template.subject, body, facts: JSON.stringify([p.profile, p.target]) });
+    const review = reviewMail({ subject: template.subject, body, facts: JSON.stringify([p.profile, p.target]), lang: p.contentLang });
     warnings.push(...review.errors, ...review.warnings);
     if (!footer) warnings.push('Le pied de page est retiré (Réglages → Garde-fous) : ce mail part sans lien « Ne plus recevoir de messages » ni origine de l\'adresse.');
     json(ctx.res, {

@@ -8,8 +8,8 @@ Ton accès à l'IA (Claude, ChatGPT ou Gemini) n'est **pas** compris : il est fa
 
 ## Choisir une offre
 1. Va sur **Tarifs** (ou sur l'accueil du site) et choisis **Au mois** ou **À l'année**.
-2. Clique **Choisir cette offre** sous l'offre voulue. Si tu n'es pas connecté, iaboss te demande d'abord de te connecter ; reviens ensuite sur Tarifs.
-3. Tu arrives sur la page de paiement de **Stripe** : iaboss ne voit jamais ton numéro de carte. Paye.
+2. Clique **Choisir cette offre** sous l'offre voulue. Si tu n'es pas connecté, IaBoss te demande d'abord de te connecter ; reviens ensuite sur Tarifs.
+3. Tu arrives sur la page de paiement de **Stripe** : IaBoss ne voit jamais ton numéro de carte. Paye.
 4. Tu reviens sur **Mon compte** : « Paiement reçu : ton offre est activée dans quelques secondes ». Si le plan affiché (badge « plan … » dans « Usage de la semaine ») n'a pas changé, recharge la page.
 
 Un administrateur du service et un compte au plan « pro » n'ont pas besoin d'offre : le bouton les renvoie vers Mon compte avec ce message.

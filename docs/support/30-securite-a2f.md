@@ -2,13 +2,13 @@
 Résumé : activer l'A2F dans Mon compte, se connecter avec un code, utiliser et renouveler les codes de secours, désactiver l'A2F, et que faire si on perd son téléphone.
 
 ## À quoi ça sert
-La connexion se fait avec Google ou Apple, sans mot de passe. L'A2F ajoute un second contrôle : après le retour de Google ou d'Apple, iaboss demande un **code à 6 chiffres** qui change toutes les 30 secondes et que seule ton application d'authentification connaît. Quelqu'un qui aurait accès à ton compte Google ou Apple ne peut donc pas entrer dans iaboss sans ton téléphone.
+La connexion se fait avec Google ou Apple, sans mot de passe. L'A2F ajoute un second contrôle : après le retour de Google ou d'Apple, IaBoss demande un **code à 6 chiffres** qui change toutes les 30 secondes et que seule ton application d'authentification connaît. Quelqu'un qui aurait accès à ton compte Google ou Apple ne peut donc pas entrer dans IaBoss sans ton téléphone.
 
 ## L'activer (Mon compte → Sécurité : A2F)
 1. Ouvre **Mon compte** (avatar → Mon compte), rubrique **Sécurité : A2F**, puis clique sur **Activer l'A2F**.
 2. Dans ton application d'authentification (Google Authenticator, Authy, 1Password, Bitwarden…), **scanne le QR code** affiché. Tu ne peux pas scanner ? Clique sur **Clé de configuration** sous le QR code : une fenêtre affiche la clé avec un bouton **Copier**, à saisir dans l'application (type de clé : temporelle, 6 chiffres, 30 secondes). Sur téléphone, le lien « ouvre directement l'application » l'ajoute sans scanner.
 3. Saisis le code que l'application affiche dans « Code à 6 chiffres », puis clique sur **Activer l'A2F**.
-4. iaboss affiche alors **10 codes de secours**, une seule fois. Copie-les (bouton **Copier**) et range-les dans un gestionnaire de mots de passe, puis clique sur **J'ai conservé mes codes**.
+4. IaBoss affiche alors **10 codes de secours**, une seule fois. Copie-les (bouton **Copier**) et range-les dans un gestionnaire de mots de passe, puis clique sur **J'ai conservé mes codes**.
 Le bouton **Annuler** abandonne l'activation en cours (la clé affichée est effacée).
 
 ## Se connecter avec l'A2F

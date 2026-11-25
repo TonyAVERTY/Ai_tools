@@ -1,5 +1,5 @@
 # Instagram et newsletter : posts, images et lettres d'information
-Résumé : générer un post Instagram (légende, hashtags, texte alternatif et image dessinée d'après le vrai design du projet) et une newsletter (objet, aperçu, texte) depuis l'onglet Communication d'un projet ; relire, modifier, copier, télécharger. Rien n'est publié ni envoyé par iaboss.
+Résumé : générer un post Instagram (légende, hashtags, texte alternatif et image dessinée d'après le vrai design du projet) et une newsletter (objet, aperçu, texte) depuis l'onglet Communication d'un projet ; relire, modifier, copier, télécharger. Rien n'est publié ni envoyé par IaBoss.
 
 ## Où les trouver
 Page du projet → onglet **Communication** : les sections **Instagram** et **Newsletter**, à côté de **LinkedIn** et **Promotion**. Elles n'existent plus dans l'onglet **Outils IA** (ni la tâche « Posts pour Instagram, X et Facebook », ni la tâche « Newsletter » des postes). Il faut que le projet soit **analysé** : sinon la section dit « Analyse le projet d'abord ». Un membre de l'équipe peut générer et modifier.
@@ -21,7 +21,7 @@ Page du projet → onglet **Communication** : les sections **Instagram** et **Ne
    - **Supprimer** : retire le post et son image (après confirmation).
 7. **Régénérer un autre post** crée un nouveau brouillon avec un autre angle : les légendes déjà produites sont données à l'IA pour qu'elle ne les reprenne pas. Les 20 derniers brouillons sont gardés ; **Brouillons précédents** liste les autres : **Reprendre** en rouvre un, **Supprimer** (à côté de « Reprendre », après confirmation) le retire avec son image sans toucher au post affiché.
 
-**iaboss ne publie pas sur Instagram** : télécharge l'image, copie la légende et publie depuis l'application Instagram.
+**IaBoss ne publie pas sur Instagram** : télécharge l'image, copie la légende et publie depuis l'application Instagram.
 
 Si, au troisième essai, l'image n'atteint toujours pas le niveau demandé, elle est quand même livrée avec une bannière **À vérifier avant de publier** qui liste les points faibles relevés : corrige-les (tu peux régénérer) avant de publier. Si le contrôle du directeur artistique est lui-même en panne, la bannière le dit.
 
@@ -31,7 +31,7 @@ Si, au troisième essai, l'image n'atteint toujours pas le niveau demandé, elle
 3. Modifie, puis **Enregistrer**, **Copier le texte** (l'objet puis le texte) ou **Télécharger en HTML** (une version prête à coller dans un outil d'envoi ou à ouvrir dans un navigateur, avec des styles en ligne, sans script).
 4. **Régénérer une autre newsletter** change le sujet, l'objet et la structure. **Brouillons précédents**, **Reprendre** et **Supprimer** : comme pour Instagram.
 
-**iaboss n'envoie pas la newsletter** : colle le texte dans ton outil d'envoi (ou télécharge la version HTML). Pense au consentement des destinataires et au lien de désinscription obligatoire dans tout envoi commercial.
+**IaBoss n'envoie pas la newsletter** : colle le texte dans ton outil d'envoi (ou télécharge la version HTML). Pense au consentement des destinataires et au lien de désinscription obligatoire dans tout envoi commercial.
 
 ## Combien ça coûte
 Chaque génération est une **tâche IA** : elle compte dans « Jobs IA cette semaine » de ton offre et dans ton budget (voir « Mon compte → Usage et offre »). Le post Instagram en consomme plus que la newsletter : recherche web, lecture du dépôt, jusqu'à trois dessins et trois contrôles. Elle utilise le modèle choisi dans « Réglages → Budget et modèles IA » (modèle d'analyse), mais **jamais un modèle plus petit que Sonnet** pour le post Instagram : si tu as choisi Haiku, c'est Sonnet qui dessine l'image, parce qu'un petit modèle produit des mises en page sans finition (cette montée de gamme compte dans ton budget). Un modèle plus puissant (Opus) est gardé. Les consignes de rédaction se modifient dans « Réglages → Prompts IA » (« Post Instagram » et « Newsletter ») ; le format de réponse, la recherche du design et le contrat technique de l'image restent imposés.

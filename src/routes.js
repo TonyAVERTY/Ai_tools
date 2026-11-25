@@ -18,6 +18,7 @@ import { registerMfaRoutes, securityHtml } from './mfaroutes.js';
 import { themeCard } from './themeviews.js';
 import { securityLog } from './securitylog.js';
 import { contactFormPage } from './site/contact.js';
+import { isContentLang } from './services/contentlang.js';
 import { formToken, checkToken, readContact, sendContact } from './services/contact.js';
 import { clientIp } from './ratelimit.js';
 import { exportAccount } from './services/dataexport.js';
@@ -89,7 +90,7 @@ import { quotaFor, planLimitError, withUserLock, assertRoom, usageView, lockedFe
 import { lockedCard } from './lockviews.js';
 import { history, saveSnapshot } from './services/metrics.js';
 import { evolutionHtml } from './services/markdown.js';
-import { isLang, LANG_COOKIE } from './i18n/index.js';
+import { isLang, withLang, LANG_COOKIE } from './i18n/index.js';
 import { decisionsOf, decisionHtml, refusedOf, implementationsOf, implementedOf, recapsHtml, implChoiceOf } from './services/evodecisions.js';
 import { registerEvolutionRoutes } from './evoroutes.js';
 import {
@@ -180,18 +181,20 @@ export function registerRoutes(router, app) {
 
   // Désinscription (RGPD). GET = page de confirmation (évite les désinscriptions par les scanners de liens),
   // POST = désinscription effective, compatible "one-click" (RFC 8058).
-  router.get('/u/:email/:token', async ({ res, params }) => {
+  // La page est dans la langue du mail reçu (?l=en ou ?l=es dans le lien : liste blanche, jamais une valeur reçue telle quelle)
+  const unsubLang = (url) => { const l = url.searchParams.get('l'); return isLang(l) ? l : 'fr'; };
+  router.get('/u/:email/:token', async ({ res, params, url }) => {
     const valid = verifyUnsubToken(cfg.secretKey, params.email, params.token);
-    html(res, unsubPage({ email: params.email, valid, done: false }), valid ? 200 : 400);
+    withLang(unsubLang(url), () => html(res, unsubPage({ email: params.email, valid, done: false }), valid ? 200 : 400));
   }, { public: true, limit: 'unsub' });
-  router.post('/u/:email/:token', async ({ res, params }) => {
+  router.post('/u/:email/:token', async ({ res, params, url }) => {
     const email = params.email.toLowerCase();
     const valid = verifyUnsubToken(cfg.secretKey, email, params.token);
     if (valid) {
       await db.prepare("INSERT OR IGNORE INTO blacklist(email, reason, created_at) VALUES(?, 'unsubscribe', ?)").run(email, now());
       await db.prepare("UPDATE prospects SET status = 'refused' WHERE email = ? AND status IN ('new','sent')").run(email);
     }
-    html(res, unsubPage({ email, valid, done: valid }), valid ? 200 : 400);
+    withLang(unsubLang(url), () => html(res, unsubPage({ email, valid, done: valid }), valid ? 200 : 400));
   }, { public: true, limit: 'unsub' });
 
   // ---------- Privé ----------
@@ -643,7 +646,8 @@ export function registerRoutes(router, app) {
     const exists = () => db.prepare('SELECT 1 FROM projects WHERE user_id = ? AND git_url = ?').get(userId, gitUrl);
     if (await exists()) throw new HttpError(409, 'Ce dépôt est déjà un projet');
     let id;
-    try { id = await createProject(app, { userId, name, gitUrl }); }
+    if (b.content_lang !== undefined && !isContentLang(b.content_lang)) throw new HttpError(400, 'Langue des contenus inconnue : choisis Français, English ou Español', { expose: true });
+    try { id = await createProject(app, { userId, name, gitUrl, contentLang: b.content_lang }); }
     catch (e) { if (await exists()) throw new HttpError(409, 'Ce dépôt est déjà un projet'); throw e; }
     // Plafond de jobs IA atteint : le projet est créé quand même (rien n'est perdu), seule l'analyse attend
     let notice = null;
@@ -713,6 +717,15 @@ export function registerRoutes(router, app) {
     if (!target.description || !target.secteurs.length) throw new HttpError(400, 'Description et au moins un secteur requis');
     await db.prepare('UPDATE projects SET target_json = ?, target_validated = 1 WHERE id = ?').run(JSON.stringify(target), p.id);
     json(res, { ok: true });
+  });
+
+  // Langue des contenus du projet (celle dans laquelle l'IA écrit aux prospects et aux clients)
+  router.post('/api/projects/:id/content-lang', async (ctx) => {
+    const p = await project(ctx, { need: 'admin' });
+    const b = await readBody(ctx.req);
+    if (!isContentLang(b.content_lang)) throw new HttpError(400, 'Langue des contenus inconnue : choisis Français, English ou Español', { expose: true });
+    await db.prepare('UPDATE projects SET content_lang = ? WHERE id = ?').run(b.content_lang, p.id);
+    json(ctx.res, { ok: true, contentLang: b.content_lang });
   });
 
   // Site du produit : écrit dans les mails de prospection par {{site}}. Vide = retiré. Seules les adresses http(s) sont acceptées.

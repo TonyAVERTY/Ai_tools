@@ -1,4 +1,5 @@
 import { RECOMMENDED, OTHERS, modelLabel } from './services/models.js';
+import { contentLangOptions } from './services/contentlang.js';
 import { esc } from './http.js';
 import { themeAttr } from './theme.js';
 import { STATUSES } from './services/crm.js';
@@ -472,6 +473,11 @@ export function projectBlocks(p, smtp, dbCfg, imap) {
     <label class="field"><span class="lbl">Site du produit</span><input name="site_url" maxlength="300" inputmode="url" autocomplete="off" placeholder="https://monproduit.fr" value="${esc(p.siteUrl || '')}"></label>
     <p class="muted small">Cette adresse est ajoutée dans les mails de prospection à la place de <code>{{site}}</code>. Laisse vide pour ne pas en mettre.</p>
     <div class="row"><button class="btn small">Enregistrer le site</button></div>
+  </form>` : ''}
+  ${p.access !== 'member' ? `<form data-action="content-lang" data-id="${p.id}" class="site-form">
+    <label class="field"><span class="lbl">Langue des contenus</span><span class="sel"><select name="content_lang">${contentLangOptions(p.contentLang)}</select>${ic('chev')}</span></label>
+    <p class="muted small">La langue dans laquelle l'IA écrit à tes prospects et à tes clients : mails de prospection et de relance, posts, newsletter, vidéo, et le pied de page des mails. Elle ne change pas la langue du site.</p>
+    <div class="row"><button class="btn small">Enregistrer la langue</button></div>
   </form>` : ''}
   ${profile ? `<section class="profile fiche">
     <div class="fiche-h"><b>Fiche projet</b></div>

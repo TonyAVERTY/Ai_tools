@@ -179,16 +179,16 @@ const linkify = (escaped) => escaped.replace(/https?:\/\/[^\s<]+[^\s<.,;:!?)]/g,
  * (pas de bannière ni d'images : c'est ce qui passe le mieux les filtres anti-spam).
  */
 /** `footer: false` : sans le pied de désinscription (réglage « Pied de page des mails » désactivé par l'utilisateur). */
-export function prospectHtml({ body, notice, unsubUrl, footer = true }) {
+export function prospectHtml({ body, notice, unsubUrl, footer = true, lang = 'fr', unsubLabel = 'Ne plus recevoir de messages' }) {
   const paras = String(body).split(/\n{2,}/).map((p) => p.trim()).filter(Boolean)
     .map((p) => `<p style="margin:0 0 14px;">${linkify(esc(p)).replace(/\n/g, '<br>')}</p>`).join('\n');
   return `<!doctype html>
-<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head>
+<html lang="${esc(lang)}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head>
 <body style="margin:0;padding:0;background:#ffffff;">
 <div style="max-width:600px;margin:0 auto;padding:20px 18px;font-family:${FONT};font-size:15px;line-height:1.6;color:#1f2328;">
 ${paras}
 ${footer ? `<div style="margin-top:28px;padding-top:12px;border-top:1px solid #eceef1;font-size:12px;line-height:1.5;color:#8a9099;">
-${esc(notice)}<br><a href="${esc(unsubUrl)}" style="color:#8a9099;">Ne plus recevoir de messages</a>
+${esc(notice)}<br><a href="${esc(unsubUrl)}" style="color:#8a9099;">${esc(unsubLabel)}</a>
 </div>
 ` : ''}</div>
 </body></html>`;

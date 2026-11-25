@@ -15,7 +15,7 @@ export function contactFormPage({ appUrl, token, values = {}, error = '', sent =
   ${error ? `<p class="msg msg-err" role="alert">${esc(error)}</p>` : ''}
   <form method="post" action="/contact" class="ct-form" data-noajax>
     <input type="hidden" name="ts" value="${esc(token)}">
-    <p class="hp" aria-hidden="true"><label>Ne pas remplir ce champ<input type="text" name="website" tabindex="-1" autocomplete="off"></label></p>
+    <p class="hp" aria-hidden="true"><label>Ne pas remplir ce champ<input type="text" name="website" tabindex="-1" autocomplete="off" maxlength="200"></label></p>
     <label class="ct-f"><span>Ton nom</span><input type="text" name="name" required maxlength="${CONTACT_LEN.name}" autocomplete="name" value="${esc(v.name)}"></label>
     <label class="ct-f"><span>Ton adresse e-mail <small>(pour te répondre, jamais affichée ni partagée)</small></span><input type="email" name="email" required maxlength="${LEN.email}" autocomplete="email" inputmode="email" value="${esc(v.email)}"></label>
     <label class="ct-f"><span>Sujet</span><select name="topic">${Object.entries(TOPICS).map(([k, label]) => `<option value="${k}"${k === v.topic ? ' selected' : ''}>${esc(label)}</option>`).join('')}</select></label>

@@ -21,9 +21,9 @@ C'est voulu pour alléger la page : sous une recherche, un envoi ou une relance 
 - **Mon compte Google est limité** : Google n'a pas tranché la règle sur l'usage depuis une autre application. Repasse à la clé API Google AI Studio.
 
 ## Avec ChatGPT, la carte « Consommation ChatGPT » dit « indisponible » ou ne montre pas mes limites
-- **« ton accès ChatGPT sera renouvelé au prochain job iaboss »** : l'accès enregistré a expiré. iaboss ne le renouvelle pas tout seul (le renouvellement appartient à Codex) : lance une tâche IA, la carte revient ensuite.
+- **« ton accès ChatGPT sera renouvelé au prochain job IaBoss »** : l'accès enregistré a expiré. IaBoss ne le renouvelle pas tout seul (le renouvellement appartient à Codex) : lance une tâche IA, la carte revient ensuite.
 - **« OpenAI refuse le relevé en direct »** : relie-toi de nouveau avec « Se connecter avec ChatGPT ».
-- **« le relevé en direct est indisponible » / « réponse inattendue »** : la lecture des limites passe par une adresse interne d'OpenAI qui peut changer. Les tokens « via iaboss » restent exacts ; tes vraies limites se lisent aussi dans ChatGPT ou avec « /status » dans Codex.
+- **« le relevé en direct est indisponible » / « réponse inattendue »** : la lecture des limites passe par une adresse interne d'OpenAI qui peut changer. Les tokens « via IaBoss » restent exacts ; tes vraies limites se lisent aussi dans ChatGPT ou avec « /status » dans Codex.
 
 ## Avec ChatGPT ou Gemini, je ne vois pas les tokens pendant la tâche
 C'est normal : ChatGPT et Gemini ne communiquent leurs tokens qu'**à la fin** de la tâche, contrairement à Claude qui les envoie au fil de l'eau. Pendant la tâche, la ligne dit « Tokens comptés à la fin de la tâche » (dans « Activité » et dans « Voir »). Le total apparaît dès que la tâche est terminée, et reste affiché même si elle échoue. Si le total reste à 0 après la fin d'une tâche réussie, signale-le à l'administrateur : l'IA n'a pas renvoyé sa mesure.
@@ -57,13 +57,13 @@ L'envoi vérifie le sens de chaque mail avec ton IA : quand elle ne peut pas ré
 - **Une ligne a disparu après « Marquer traité »** : c'est voulu, elle disparaît au rechargement. Clique sur **Annuler** avant de quitter la page pour la garder.
 - **Une tâche IA en échec n'est plus là** : la liste ne montre que les 48 dernières heures ; l'historique complet est dans le menu « Activité ».
 - **Le message « Ligne non mise à jour »** : le serveur n'a pas pu enregistrer ; la ligne est revenue à son état d'avant, réessaie.
-- **Pas de rendez-vous dans l'agenda du jour** : seul le calendrier d'iaboss est lu, pas un agenda externe.
+- **Pas de rendez-vous dans l'agenda du jour** : seul le calendrier d'IaBoss est lu, pas un agenda externe.
 
 ## Mon job reste « En attente »
 Lire le message « En attente : … » dans le menu **Activité**. Raisons possibles : budget IA atteint (clé API) ; quota Claude serré (au-delà du seuil de « Réglages → Garde-fous → Pause des tâches IA à partir de », 85 % par défaut) ; charge élevée du serveur ; job programmé « Cette nuit » ; déjà un job IA en cours pour le compte. Il repart seul. On peut l'**Annuler** depuis Activité.
 
 ## Une section ou une liste n'a pas pu se charger : « Réessayer »
-Quand une partie de la page se charge après coup (la section **LinkedIn**, **Promotion** ou **Récapitulatif** d'un projet, la liste de la page **Clients**, le menu **Joindre un projet iaboss** de la page IA), un petit cercle accompagne « Chargement… ». Si la requête échoue, le cercle laisse la place à **un message et un bouton « Réessayer »** : le cercle ne tourne jamais pour toujours.
+Quand une partie de la page se charge après coup (la section **LinkedIn**, **Promotion** ou **Récapitulatif** d'un projet, la liste de la page **Clients**, le menu **Joindre un projet IaBoss** de la page IA), un petit cercle accompagne « Chargement… ». Si la requête échoue, le cercle laisse la place à **un message et un bouton « Réessayer »** : le cercle ne tourne jamais pour toujours.
 1. Lis le message : « **Connexion impossible : réessaie dans un instant.** » (réseau coupé), « **Erreur interne : réessaie dans un instant.** » (problème du serveur), « **Tu n'as pas accès à cette action.** » (ton rôle sur le projet ne le permet pas) ou « **Introuvable : recharge la page.** ».
 2. Clique sur **Réessayer** : le cercle revient et la demande repart. Si elle échoue encore, le message revient et tu peux recliquer.
 3. Si le message persiste après plusieurs essais, recharge la page ; s'il revient, signale-le avec l'heure et le nom de la section.
@@ -94,7 +94,7 @@ Sous **Se connecter et analyser** (Configuration du projet → Base de données)
 - L'aperçu affiche « indisponible » pour un chiffre : le compte ne peut pas lire cette table, ou la colonne choisie n'est pas un nombre.
 
 ## Une fenêtre me demande de confirmer
-Avant une action difficile à défaire (supprimer un projet, un prospect, une vidéo ou une conversation, retirer le pied de page des mails, publier un post, envoyer un lot de mails…), iaboss ouvre une fenêtre : le titre est la question, la ligne dessous dit la conséquence. Le bouton porte le nom de l'action (« Supprimer le projet », « Publier »…) et il est **rouge** quand elle supprime ou retire quelque chose. **Annuler**, la touche Échap ou un clic en dehors de la fenêtre abandonnent sans rien changer. Pour une action qui se rattrape facilement, il n'y a pas de confirmation.
+Avant une action difficile à défaire (supprimer un projet, un prospect, une vidéo ou une conversation, retirer le pied de page des mails, publier un post, envoyer un lot de mails…), IaBoss ouvre une fenêtre : le titre est la question, la ligne dessous dit la conséquence. Le bouton porte le nom de l'action (« Supprimer le projet », « Publier »…) et il est **rouge** quand elle supprime ou retire quelque chose. **Annuler**, la touche Échap ou un clic en dehors de la fenêtre abandonnent sans rien changer. Pour une action qui se rattrape facilement, il n'y a pas de confirmation.
 
 ## « Trop de requêtes : réessaie dans … »
 Le serveur limite le rythme des actions pour se protéger d'une boucle ou d'un abus. Une action isolée n'est jamais concernée : le message apparaît seulement après un très grand nombre d'enregistrements ou de clics en peu de temps (plus de 600 écritures en 10 minutes pour un même compte, avec des seuils plus bas sur certaines actions comme les vidéos, le chat ou la liaison de l'IA). Attends la durée indiquée dans le message, puis recommence. Les lectures (consulter une page, une liste) ne sont pas limitées. Si le message revient en usage normal, signale-le à l'administrateur.
@@ -103,7 +103,7 @@ Le serveur limite le rythme des actions pour se protéger d'une boucle ou d'un a
 Vérifier dans l'ordre : 1) SMTP enregistré (« Configuration du projet ») ; 2) modèle de mail **validé** (« Valider le modèle ») ; 3) des prospects au statut « À contacter » ; 4) pas de bandeau rouge de pause d'envoi sur la page Projets ; 5) plafond de mails du projet (24 h), plafond global (Réglages → Garde-fous) et plafond de mails de la semaine de l'offre ; 6) pas de job d'envoi déjà en cours ; 7) le message d'erreur du job dans Activité (erreur SMTP : identifiants, port).
 
 ## Mes mails arrivent en spam
-Configurer SPF, DKIM et DMARC pour le domaine d'envoi ; envoyer de petits lots au début et augmenter progressivement ; garder des délais entre les mails ; éviter les liens et pièces jointes dans le premier mail ; soigner l'accroche. iaboss ajoute déjà un lien de désinscription dans le pied de page des mails.
+Configurer SPF, DKIM et DMARC pour le domaine d'envoi ; envoyer de petits lots au début et augmenter progressivement ; garder des délais entre les mails ; éviter les liens et pièces jointes dans le premier mail ; soigner l'accroche. IaBoss ajoute déjà un lien de désinscription dans le pied de page des mails.
 
 ## Où est passé le filtre par poste, ou une section que je cherche ?
 Le filtre « Poste » de la page Projets n'existe plus. Un projet a maintenant des onglets (**Vue d'ensemble**, **Prospection**, **Envoi**, **Clients**, **Facturation**, **Communication**, **Outils IA**, **Récapitulatif**, **Réglages du projet**), chacun avec ses sections déjà ouvertes : Cible, Recherche de prospects et Prospects dans Prospection ; Modèle de mail, Envoi et Relance automatique dans Envoi ; LinkedIn et Promotion dans Communication ; Évolution, Audit du projet et Postes et tâches IA dans Outils IA ; SMTP, IMAP, base de données et suppression dans Réglages du projet. Voir « Les projets : cartes, pages à onglets, création, suppression ».
@@ -119,7 +119,7 @@ Le filtre « Poste » de la page Projets n'existe plus. Un projet a maintenant d
 **Réglages → Garde-fous → Pied de page des mails de prospection → Retirer le pied de page des mails** (confirmation demandée). Lis l'avertissement : sans lien de désinscription ni origine de l'adresse, tu t'exposes à des problèmes légaux (RGPD, CNIL) et à des blocages par Gmail ou Outlook. **Remettre le pied de page** le rétablit en un clic. Si des destinataires se plaignent de ne pas pouvoir se désinscrire, c'est la première chose à remettre.
 
 ## « Cette adresse ne peut pas être ajoutée » en ajoutant ou modifiant un prospect
-L'adresse existe déjà dans ce projet (cherche-la dans la liste, avec la recherche) ou elle ne doit pas être contactée (désinscription ou refus enregistrés, tous comptes confondus). Le message est le même dans les deux cas : iaboss ne dit pas lequel. Autres refus : « Adresse email invalide », « Score : un nombre de 1 à 10 », « Adresse du site invalide » (attendu : https://exemple.fr), plafond de prospects de l'offre atteint (voir « Offres, plafonds et limites »).
+L'adresse existe déjà dans ce projet (cherche-la dans la liste, avec la recherche) ou elle ne doit pas être contactée (désinscription ou refus enregistrés, tous comptes confondus). Le message est le même dans les deux cas : IaBoss ne dit pas lequel. Autres refus : « Adresse email invalide », « Score : un nombre de 1 à 10 », « Adresse du site invalide » (attendu : https://exemple.fr), plafond de prospects de l'offre atteint (voir « Offres, plafonds et limites »).
 
 ## Je ne peux pas modifier l'adresse email d'un prospect
 Elle est verrouillée dès que le prospect a été contacté (statut autre que « À contacter ») : les mails, relances et réponses y sont rattachés. Ajoute un nouveau prospect avec la bonne adresse. Les autres informations restent modifiables.
@@ -176,22 +176,22 @@ Lire le message du job : outils manquants sur le serveur (Chromium, ffmpeg), pla
 ## L'agenda externe ne se met pas à jour
 Les agendas se rafraîchissent tout seuls mais lentement (Google : 12 à 24 heures). Pour voir un changement tout de suite, retirer puis rajouter l'abonnement, ou régénérer le lien (Créer mon lien d'agenda).
 
-## Une question hors du cadre d'iaboss
+## Une question hors du cadre d'IaBoss
 Pour rédiger un mail, trouver des idées de posts, réfléchir à une stratégie commerciale : menu **Assistant** (l'entrée de ton IA).
 
 ## FAQ rapide
-- **Qui paie l'IA ?** La personne, directement chez son fournisseur d'IA : Anthropic, OpenAI ou Google (clé API : à l'usage ; abonnement ou compte : son abonnement Claude, ChatGPT ou Google AI, ce dernier seulement si le service l'a activé). iaboss facture seulement son offre.
-- **iaboss modifie-t-il mon code ?** Non : le dépôt est cloné et lu en lecture seule.
+- **Qui paie l'IA ?** La personne, directement chez son fournisseur d'IA : Anthropic, OpenAI ou Google (clé API : à l'usage ; abonnement ou compte : son abonnement Claude, ChatGPT ou Google AI, ce dernier seulement si le service l'a activé). IaBoss facture seulement son offre.
+- **IaBoss modifie-t-il mon code ?** Non : le dépôt est cloné et lu en lecture seule.
 - **Puis-je changer le dépôt d'un projet ?** Non : créer un nouveau projet.
 - **Combien de temps dure une recherche ou une vidéo ?** Quelques minutes ; l'avancement est dans Activité.
 - **Où voir ce que j'ai consommé ?** « Mon compte → Usage de la semaine », la carte « Consommation » de la page Projets (suivie du nom de ton IA : « Consommation Gemini », par exemple) et « Mon compte → Mon IA → Limites d'utilisation ».
 - **Comment arrêter les notifications ?** Réglages → Notifications : décocher les événements ou retirer le canal.
 - **Comment supprimer mes données ?** « Mon compte → Zone de danger → Supprimer mon compte et mes données ».
 - **Y a-t-il une application mobile ?** Non : le site s'adapte aux téléphones. Sur un écran étroit, les cinq onglets de la barre du haut (Aujourd'hui, Projets, Mails, Agenda, Compta) tiennent sur une ligne. Facturation, Clients et Équipe sont dans le menu de l'avatar.
-- **Qui contacter si la documentation ne répond pas ?** L'administrateur du service d'iaboss.
+- **Qui contacter si la documentation ne répond pas ?** L'administrateur du service d'IaBoss.
 
 ## L'IA ignore la méthode attendue ou la réponse sort du cadre
-Les fiches de méthode (voir « Savoir-faire de l'IA dans iaboss ») sont des repères : la consigne de la tâche dans « Réglages → Prompts IA » l'emporte en cas de contradiction.
+Les fiches de méthode (voir « Savoir-faire de l'IA dans IaBoss ») sont des repères : la consigne de la tâche dans « Réglages → Prompts IA » l'emporte en cas de contradiction.
 1. Vérifie la consigne de la tâche dans « Réglages → Prompts IA » : une consigne modifiée peut aller à l'encontre de la méthode.
 2. Clique « Revenir au texte par défaut » pour comparer.
 3. Choisis un modèle plus capable pour cette tâche dans « Réglages → Budget et modèles IA » si le résultat reste approximatif.
@@ -236,7 +236,7 @@ Les fiches de méthode (voir « Savoir-faire de l'IA dans iaboss ») sont des re
 - **« L'adresse e-mail n'est pas valide. » / « Le SIRET compte 14 chiffres. »** : corrige le champ, ou laisse-le vide.
 - **J'ai retiré un client par erreur** : ajoute-le de nouveau (**Ajouter un client**). Ses documents n'ont pas été supprimés : ils sont dans « Facturation » (et dans la Comptabilité s'ils y avaient été joints).
 
-## Les mails d'iaboss (invitations, rapports, alertes) : de quelle adresse partent-ils ?
+## Les mails d'IaBoss (invitations, rapports, alertes) : de quelle adresse partent-ils ?
 Ils partent de l'adresse d'envoi du serveur (noreply@iaboss.fr). Si tu réponds à l'un d'eux, ta réponse arrive sur l'adresse de contact (contact@iaboss.fr). Les alertes d'erreur envoyées aux administrateurs partent de la boîte dédiée (erreur@iaboss.fr). Les trois boîtes partagent le même mot de passe, réglé par l'administrateur du serveur : tu n'as rien à configurer dans l'application. Les mails de prospection, eux, partent toujours du SMTP du projet.
 
 ## Je ne vois plus le bouton « Enregistrer les réglages »
@@ -249,7 +249,7 @@ Le résultat s'affiche dans une petite bulle en bas à droite, pendant quelques 
 Non. Les clics répétés sur un même bouton (double clic, rafale) sont ignorés : une seule demande part. Pendant l'envoi, le bouton est grisé, puis il redevient cliquable une fois la réponse reçue. Si une action ne part pas, attends la fin de l'envoi précédent, puis reclique une seule fois.
 
 ## « Analyse en échec : Git : EACCES: permission denied, mkdir '/data/repos/…' »
-Le serveur ne peut pas écrire dans son dossier de données (réglage `DATA_DIR` de l'administrateur) : les dépôts ne peuvent donc pas être clonés. C'est à l'administrateur du serveur de pointer `DATA_DIR` vers un dossier qui appartient à l'utilisateur qui fait tourner iaboss, puis de redémarrer. Une fois corrigé, clique de nouveau sur **Analyser**.
+Le serveur ne peut pas écrire dans son dossier de données (réglage `DATA_DIR` de l'administrateur) : les dépôts ne peuvent donc pas être clonés. C'est à l'administrateur du serveur de pointer `DATA_DIR` vers un dossier qui appartient à l'utilisateur qui fait tourner IaBoss, puis de redémarrer. Une fois corrigé, clique de nouveau sur **Analyser**.
 
 ## « Analyse en échec : Secret de liaison illisible : relie de nouveau ton accès à l'IA »
 Le serveur ne peut pas déchiffrer ton accès à l'IA : le plus souvent, l'administrateur a changé la clé de chiffrement (`SECRET_KEY`) après ta liaison. Avec ChatGPT ou Gemini, le message porte le nom de ton IA à la place de « Claude ». La fenêtre « Claude est déconnecté » (au nom de ton IA) apparaît alors : clique sur **Reconnecter Claude** (« Reconnecter ChatGPT », « Reconnecter Gemini ») et relie de nouveau ton accès (clé API, jeton d'abonnement ou connexion), puis relance l'analyse. Rien d'autre n'est perdu.
@@ -323,7 +323,7 @@ Certaines fonctionnalités sont réservées à une offre (posts et devis dès D�
 L'onglet n'apparaît que si le **mode développeur est activé** (Mon compte → Mode développeur → Activer) **et** que ton offre est **Croissance ou plus**. Vérifie ces deux points : avec une offre plus basse, le mode ne peut pas être activé (un compte dont l'offre est redescendue perd aussi l'onglet). Après l'activation, l'onglet est à la fin de la barre, après Compta ; recharge la page si tu ne le vois pas encore. Tu peux toujours ouvrir la page par Mon compte → « Mode développeur ».
 
 ## J'ai perdu mon jeton d'API : comment le retrouver ?
-On ne peut pas le retrouver : iaboss ne garde qu'une empreinte du jeton, jamais le jeton, et la liste ne montre que `iaboss_*************`. Sur la page **Développeur**, supprime le jeton perdu (bouton **Supprimer**), crée-en un nouveau, copie-le dans la fenêtre « Jeton créé : conserve-le maintenant » avant de la fermer, puis mets-le à jour dans tes scripts ou dans la configuration de Claude.
+On ne peut pas le retrouver : IaBoss ne garde qu'une empreinte du jeton, jamais le jeton, et la liste ne montre que `iaboss_*************`. Sur la page **Développeur**, supprime le jeton perdu (bouton **Supprimer**), crée-en un nouveau, copie-le dans la fenêtre « Jeton créé : conserve-le maintenant » avant de la fermer, puis mets-le à jour dans tes scripts ou dans la configuration de Claude.
 
 ## Le code de vérification (A2F) est refusé à la connexion
 Un code ne sert qu'une fois et dure 30 secondes : attends qu'un nouveau code s'affiche dans ton application et saisis-le. Vérifie que l'heure de ton téléphone est réglée sur « automatique » (un décalage de plus d'une minute fait refuser les codes). Après 5 erreurs la connexion est annulée : repasse par Google ou Apple. Tu as perdu ton téléphone ? Saisis un **code de secours** à la place du code (voir « Sécurité : l'authentification à deux facteurs »).

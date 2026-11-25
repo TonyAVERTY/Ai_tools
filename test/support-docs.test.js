@@ -69,7 +69,7 @@ const PAGES = {
   '/': "Aujourd'hui", '/projets': 'Projets', '/chat': 'Claude', '/support': 'Support', '/settings': 'Réglages', '/account': 'Mon compte', '/mails': 'Mails', '/calendar': 'Calendrier',
   '/team': 'Équipe', '/compta': 'Comptabilité', '/facturation': 'Facturation', '/clients': 'Clients', '/developer': 'Développeur', '/link': 'Relier mon IA', '/admin': 'Administration', '/accueil': 'Site internet',
   '/login': 'Connexion', '/fonctionnement': 'Fonctionnement', '/tarifs': 'Tarifs', '/docs': 'Documentation', '/mentions-legales': 'Mentions légales',
-  '/confidentialite': 'Politique de confidentialité', '/cgu': 'CGU',
+  '/confidentialite': 'Politique de confidentialité', '/cgu': 'CGU', '/contact': 'Contact',
 };
 // Routes techniques : jamais une page à documenter pour un utilisateur
 const TECHNICAL = /^\/(developer\/mcp|api|auth|static|u|cal|robots\.txt|sitemap\.xml|logout|favicon|linkedin|developer\/tokens|link\/|docs\/|team\/|chat\/|support\/|calendar\/|compta\/|facturation\/|clients\/|mails\/|admin\/|account\/|settings\/|mcp|health|status|unsub|invite|join|i\/|r\/)/;

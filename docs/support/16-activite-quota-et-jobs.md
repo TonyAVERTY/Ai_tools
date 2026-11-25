@@ -17,14 +17,14 @@ La recherche de prospects, l'évolution et l'audit proposent « Maintenant » ou
 
 ## La carte « Consommation Claude » (page Projets)
 - **Claude session 5 h** et **Claude semaine** (abonnement) : le taux d'utilisation du compte Claude. Un petit texte grisé sous chaque barre indique quand la limite se réinitialise (par exemple « Remise à zéro aujourd'hui à 18:42 » ou « Remise à zéro lundi à 09:00 », heure de Paris). Orange à 80 %, rouge à 100 %. Relevé en direct chez Anthropic quand c'est possible, sinon dernière mesure faite pendant un job.
-- **IA via iaboss 24 h / 30 j** (**uniquement avec une clé API**) : ce que les jobs lancés par iaboss ont consommé, en $ équivalent API. Ce que la personne fait ailleurs avec Claude n'y est pas compté.
+- **IA via IaBoss 24 h / 30 j** (**uniquement avec une clé API**) : ce que les jobs lancés par IaBoss ont consommé, en $ équivalent API. Ce que la personne fait ailleurs avec Claude n'y est pas compté.
 - **Avec un abonnement Claude, aucun montant en dollars n'est affiché** (ni dans la carte « Consommation Claude », ni dans la carte « Usage de la semaine », ni dans le récapitulatif d'un projet, ni dans le rapport hebdomadaire ou les notifications) : rien n'est facturé en plus de l'abonnement, le seul repère est le quota Claude (session 5 h, semaine).
 - Avec une clé API : pas de quota d'abonnement, seulement le coût.
 
 ## La carte « Consommation ChatGPT » (compte ChatGPT) ou « Consommation Gemini »
-- **ChatGPT session 5 h** et **ChatGPT semaine** (compte ChatGPT) : le taux d'utilisation de ton abonnement ChatGPT, avec « Remise à zéro … » (heure de Paris). Le relevé est lu en direct chez OpenAI avec ton accès ChatGPT (il compte aussi ce que tu fais hors iaboss) ; il se rafraîchit au plus toutes les 2 minutes. Cette lecture passe par une adresse interne d'OpenAI, non documentée : si elle ne répond pas, la carte garde la dernière mesure et le dit, et si aucune mesure n'existe elle écrit « indisponible » avec la raison dans l'infobulle.
-- **ChatGPT via iaboss 24 h / 30 j** (ou le nom de ton IA) : les tokens (entrée + sortie) des jobs lancés par iaboss. Ce que tu fais ailleurs n'y est pas compté, et ce n'est pas la limite de ton abonnement.
-- Aucun montant en dollars n'est affiché avec un abonnement. Gemini n'a pas de relevé de limites : seuls les tokens via iaboss s'affichent.
+- **ChatGPT session 5 h** et **ChatGPT semaine** (compte ChatGPT) : le taux d'utilisation de ton abonnement ChatGPT, avec « Remise à zéro … » (heure de Paris). Le relevé est lu en direct chez OpenAI avec ton accès ChatGPT (il compte aussi ce que tu fais hors IaBoss) ; il se rafraîchit au plus toutes les 2 minutes. Cette lecture passe par une adresse interne d'OpenAI, non documentée : si elle ne répond pas, la carte garde la dernière mesure et le dit, et si aucune mesure n'existe elle écrit « indisponible » avec la raison dans l'infobulle.
+- **ChatGPT via IaBoss 24 h / 30 j** (ou le nom de ton IA) : les tokens (entrée + sortie) des jobs lancés par IaBoss. Ce que tu fais ailleurs n'y est pas compté, et ce n'est pas la limite de ton abonnement.
+- Aucun montant en dollars n'est affiché avec un abonnement. Gemini n'a pas de relevé de limites : seuls les tokens via IaBoss s'affichent.
 - **Tâches IA 30 j** (toutes les IA, dès qu'une tâche IA est terminée) : le nombre de tâches IA terminées sur 30 jours et, s'il y en a, combien sont « en échec ». Au survol : le taux d'échec en %, la durée moyenne d'une tâche et le nombre de réponses de la page IA. Les envois de mails n'y comptent pas. Beaucoup d'échecs : ouvre une tâche en échec depuis **Activité**, le message dit ce que ton IA a répondu (quota, crédit, accès).
 
 ## Reports automatiques et budget

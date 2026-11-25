@@ -314,7 +314,7 @@ test('pages : Tarifs propose « Choisir cette offre » quand les paiements sont 
   assert.match(open, /name="period" value="month"/);
   assert.match(open, /name="period" value="year"/);
   assert.doesNotMatch(open, /Bientôt|Me prévenir à l'ouverture/);
-  assert.match(open, /iaboss ne voit jamais ton numéro de carte/);
+  assert.match(open, /IaBoss ne voit jamais ton numéro de carte/);
   assert.match(open, /Comment résilier un abonnement ?[^]*Gérer mon abonnement/);
   assert.doesNotMatch(open, /plans payants ouvriront prochainement/, 'la FAQ ne dit plus que ce n\'est pas ouvert');
   const closed = await page(off, '/tarifs');
@@ -360,7 +360,7 @@ test('compte Stripe partagé : les abonnements et paiements d\'un autre produit 
   const co = event('checkout.session.completed', { mode: 'subscription', customer: 'cus_autre', subscription: 'sub_autre', client_reference_id: String(u.id), metadata: { user_id: String(u.id), plan: 'business' } });
   assert.equal((await webhook(co)).status, 200);
   assert.equal((await s.db.prepare('SELECT COUNT(*) n FROM subscriptions WHERE user_id = ?').get(u.id)).n, 0, 'paiement d\'un autre produit : aucun abonnement créé');
-  // Le client Stripe d'un abonnement iaboss ne sert pas à rattacher un abonnement étranger
+  // Le client Stripe d'un abonnement IaBoss ne sert pas à rattacher un abonnement étranger
   assert.equal((await webhook(event('customer.subscription.created', withUser(u, { id: 'sub_ok', customer: 'cus_ok' })))).status, 200);
   assert.equal((await dbUser(u.id)).plan, 'starter');
   const sameCustomer = withUser(u, { id: 'sub_etranger', customer: 'cus_ok', status: 'canceled', metadata: { plan: 'growth' } });

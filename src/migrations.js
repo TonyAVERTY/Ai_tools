@@ -1442,4 +1442,11 @@ export const MIGRATIONS = [
       ) ${T}`,
     ],
   },
+  {
+    // Langue des contenus d'un projet : celle dans laquelle l'IA s'adresse aux prospects et aux clients (mails, relances, posts, newsletter, vidéo, accroches).
+    // Indépendante de la langue d'affichage du site. fr par défaut : les projets existants ne changent pas.
+    name: 'project_content_lang',
+    sqlite: ["ALTER TABLE projects ADD COLUMN content_lang TEXT NOT NULL DEFAULT 'fr'"],
+    mysql: [{ sql: "ALTER TABLE projects ADD COLUMN content_lang VARCHAR(2) NOT NULL DEFAULT 'fr'", when: colMissing('projects', 'content_lang') }],
+  },
 ];

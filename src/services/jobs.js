@@ -16,6 +16,8 @@ import { attachJobEta } from './jobeta.js';
 import { assertRoom, recordUsage, withUserLock, MAIL_JOBS } from './plans.js';
 import { sendPause, pauseMessage } from './abuse.js';
 import { AUTO_RETRY } from './autoretry.js';
+import { withLang } from '../i18n/index.js';
+import { withContentLang } from './contentlang.js';
 
 // Job en cours d'exécution, retrouvé par le wrapper claude() : c'est lui qui dit quel modèle a réellement servi (affiché dans l'avancement et le résultat)
 export const jobContext = new AsyncLocalStorage();
@@ -449,7 +451,10 @@ export class Worker {
         return;
       }
       try {
-        const out = await jobContext.run(ctx, () => handler(ctx));
+        // Langues du travail : celle du site choisie par la personne (les consignes sont écrites dans cette langue) et celle des contenus du projet
+        const ui = (await this.db.prepare("SELECT value FROM user_settings WHERE user_id = ? AND `key` = 'lang'").get(job.user_id))?.value;
+        const content = job.project_id ? (await this.db.prepare('SELECT content_lang FROM projects WHERE id = ?').get(job.project_id))?.content_lang : null;
+        const out = await withLang(ui, () => withContentLang(content, () => jobContext.run(ctx, () => handler(ctx))));
         journal.append('status', (await this.isCancelled(job.id)) ? 'Tâche annulée' : 'Tâche terminée');
         await journal.flush();
         await usageWrite.catch(() => {});

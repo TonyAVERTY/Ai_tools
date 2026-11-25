@@ -7,6 +7,7 @@ import { extractJson } from './services/claude.js';
 import { getProvider } from './services/providers/index.js';
 import { withUserLock } from './services/userlock.js';
 import { tidyTemplateText, acceptReview, fillBody, fillSubject, styleProblems } from './services/mailcheck.js';
+import { currentContentLang } from './services/contentlang.js';
 import { checkSense, acceptSenseFix, SenseUnavailable, SENSE_BATCH } from './services/mailsense.js';
 import { addUsage, jobContext, liveJobUsage } from './services/jobs.js';
 import { syncRepo, removeRepo } from './services/git.js';
@@ -378,14 +379,14 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
   }
 
   async function mendStyle(ctx, userId, model, kind, body) {
-    const problems = styleProblems(body);
+    const problems = styleProblems(body, currentContentLang());
     if (!problems.length) return { body, fixed: [] };
     try {
       const { prompt, system } = fixStylePrompt({ kind, body, problems });
       const r = await claude(userId, { prompt, system, model, maxTurns: 1, tools: [], signal: ctx.signal });
       addUsage(ctx, r);
       const fixed = tidyTemplateText(String(extractJson(r.text)?.body ?? ''));
-      const left = fixed ? styleProblems(fixed) : problems;
+      const left = fixed ? styleProblems(fixed, currentContentLang()) : problems;
       if (fixed && left.length < problems.length && acceptSenseFix(body, fixed, { slack: 12 })) return { body: fixed, fixed: problems.filter((p) => !left.includes(p)) };
     } catch (e) {
       if (ctx.signal?.aborted || e.status === 403) throw e;
@@ -548,7 +549,7 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
           continue;
         }
         unclearRow = 0;
-        const unsubUrl = `${cfg.appUrl}/u/${encodeURIComponent(p.email)}/${unsubToken(cfg.secretKey, p.email)}`;
+        const unsubUrl = `${cfg.appUrl}/u/${encodeURIComponent(p.email)}/${unsubToken(cfg.secretKey, p.email)}${project.contentLang && project.contentLang !== 'fr' ? `?l=${project.contentLang}` : ''}`;
         let variant = null, subject, inReplyTo;
         if (kind === 'initial') {
           variant = await pickVariant(db, project.id, template);
@@ -560,7 +561,7 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
         }
         const mail = buildProspectMail({
           template, prospect: p, smtp: project.smtp, site: project.siteUrl, unsubUrl, subject, inReplyTo,
-          messageId: makeMessageId(project.smtp.fromEmail), readReceipt, footer, html: !!template.html,
+          messageId: makeMessageId(project.smtp.fromEmail), readReceipt, footer, html: !!template.html, lang: project.contentLang,
         });
         try {
           await transport.sendMail(mail);

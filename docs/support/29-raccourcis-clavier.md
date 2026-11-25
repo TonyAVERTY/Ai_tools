@@ -1,5 +1,5 @@
 # Raccourcis clavier
-Résumé : les raccourcis clavier d'iaboss (aller à une page avec « g » puis une lettre, rechercher avec « / », ouvrir l'Activité avec « j ») et la page « Raccourcis clavier » qui les liste.
+Résumé : les raccourcis clavier d'IaBoss (aller à une page avec « g » puis une lettre, rechercher avec « / », ouvrir l'Activité avec « j ») et la page « Raccourcis clavier » qui les liste.
 
 ## Où les voir
 Menu du compte (ton initiale, en haut à droite) → **Raccourcis clavier**, ou tape **?** sur n'importe quelle page. La page (`/raccourcis`) liste tous les raccourcis. Elle s'ouvre même si ton IA n'est pas encore reliée.

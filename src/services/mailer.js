@@ -48,18 +48,25 @@ export const mailVars = (prospect, smtp, site = '') => ({
   site: site || '', // adresse du site du produit (En-tête du projet)
 });
 
-export function buildProspectMail({ template, prospect, smtp, site = '', unsubUrl, subject = template.subject, messageId, inReplyTo, readReceipt = false, footer: withFooter = true, html: asHtml = false }) {
+// Pied de page des mails de prospection, dans la langue des contenus du projet (celle du destinataire)
+const FOOTERS = {
+  fr: { notice: (email, src) => `Vous recevez ce message car l'adresse ${email} est publiée publiquement${src ? ` (${src})` : ''}.`, unsub: 'Pour ne plus être contacté', label: 'Ne plus recevoir de messages' },
+  en: { notice: (email, src) => `You are receiving this message because the address ${email} is publicly published${src ? ` (${src})` : ''}.`, unsub: 'To stop being contacted', label: 'Stop receiving messages' },
+  es: { notice: (email, src) => `Recibes este mensaje porque la dirección ${email} está publicada públicamente${src ? ` (${src})` : ''}.`, unsub: 'Para no ser contactado más', label: 'Dejar de recibir mensajes' },
+};
+export function buildProspectMail({ template, prospect, smtp, site = '', unsubUrl, subject = template.subject, messageId, inReplyTo, readReceipt = false, footer: withFooter = true, html: asHtml = false, lang = 'fr' }) {
   const vars = mailVars(prospect, smtp, site);
   const body = fillBody(template.body, vars).replace(/\n{3,}/g, '\n\n').trim();
-  const notice = `Vous recevez ce message car l'adresse ${prospect.email} est publiée publiquement${prospect.source ? ` (${prospect.source})` : ''}.`;
-  const footer = ['', '—', notice, `Pour ne plus être contacté : ${unsubUrl}`].join('\n');
+  const F = FOOTERS[lang] || FOOTERS.fr;
+  const notice = F.notice(prospect.email, prospect.source);
+  const footer = ['', '—', notice, `${F.unsub} : ${unsubUrl}`].join('\n');
   return {
     from: smtp.fromName ? `"${smtp.fromName.replace(/"/g, '')}" <${smtp.fromEmail}>` : smtp.fromEmail,
     to: prospect.email,
     subject: fillSubject(subject, vars),
     text: withFooter ? body + '\n' + footer : body,
     // Mail classique (texte) par défaut ; HTML seulement si le modèle a été validé avec la case « Envoyer en HTML »
-    ...(asHtml ? { html: prospectHtml({ body, notice, unsubUrl, footer: withFooter }) } : {}),
+    ...(asHtml ? { html: prospectHtml({ body, notice, unsubUrl, footer: withFooter, lang, unsubLabel: F.label }) } : {}),
     ...(messageId ? { messageId } : {}),
     ...(inReplyTo ? { inReplyTo, references: [inReplyTo] } : {}),
     headers: {

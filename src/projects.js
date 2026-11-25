@@ -2,6 +2,7 @@ import { join } from 'node:path';
 import { now, getSetting } from './db.js';
 import { encryptJson, decryptJson } from './crypto.js';
 import { HttpError } from './http.js';
+import { contentLangOf, DEFAULT_CONTENT_LANG } from './services/contentlang.js';
 import { getUser } from './users.js';
 import { assertRoom, withUserLock } from './services/plans.js';
 import { accessOn, needAccess, memberTeamIds } from './teams.js';
@@ -36,7 +37,7 @@ export async function getProject(app, id, { userId, secrets = false, need = null
     access, teamId: p.team_id == null ? null : Number(p.team_id),
     profile: parse(p.profile_json), profileCommit: p.profile_commit, profileAt: p.profile_at,
     target: parse(p.target_json), targetValidated: !!p.target_validated,
-    dailyMailCap: p.daily_mail_cap, createdAt: p.created_at, siteUrl: p.site_url || '',
+    dailyMailCap: p.daily_mail_cap, createdAt: p.created_at, siteUrl: p.site_url || '', contentLang: contentLangOf(p.content_lang),
     // Les mails d'un projet partent de SON adresse : pas de repli sur un SMTP commun (celui du serveur ne sert qu'aux mails d'iaboss)
     hasSmtp: !!p.smtp_enc, hasOwnSmtp: !!p.smtp_enc,
     smtpSource: p.smtp_enc ? 'project' : null,
@@ -84,12 +85,12 @@ export async function listProjects(app, userId) {
   return Promise.all(rows.map((r) => getProject(app, r.id, { userId })));
 }
 
-export async function createProject(app, { userId, name, gitUrl }) {
+export async function createProject(app, { userId, name, gitUrl, contentLang = DEFAULT_CONTENT_LANG }) {
   const user = await getUser(app.db, userId);
   if (!user) throw new HttpError(404, 'Compte introuvable');
   return withUserLock(user.id, async () => {
     await assertRoom(app.db, user, 'projects', 1, { note: 'Supprime un projet pour en créer un autre.' });
-    const r = await app.db.prepare('INSERT INTO projects(user_id, name, git_url, created_at) VALUES(?, ?, ?, ?)').run(user.id, name, gitUrl, now());
+    const r = await app.db.prepare('INSERT INTO projects(user_id, name, git_url, content_lang, created_at) VALUES(?, ?, ?, ?, ?)').run(user.id, name, gitUrl, contentLangOf(contentLang), now());
     return Number(r.lastInsertRowid);
   });
 }

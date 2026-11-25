@@ -10,6 +10,8 @@ import { aiName } from './services/ainame.js';
 import { clientProjectBlock } from './clientsviews.js';
 import { lockedCard } from './lockviews.js';
 import { localeOf } from './i18n/locale.js';
+import { currentLang } from './i18n/index.js';
+import { contentLangOptions } from './services/contentlang.js';
 
 const fr = (n) => Number(n).toLocaleString(localeOf());
 const shortDay = (ts) => new Date(ts * 1000).toLocaleDateString(localeOf(), { day: 'numeric', month: 'short', timeZone: 'Europe/Paris' });
@@ -79,6 +81,7 @@ ${projects.length ? `<div class="pj-cards">${projects.map((x) => card(x, d)).joi
     <label class="field"><span class="lbl">Nom</span><input name="name" required maxlength="80" placeholder="Ex. Atelier Exemple"></label>
     <label class="field"><span class="lbl">Dépôt Git</span><input maxlength="500" name="gitUrl" required placeholder="https://github.com/utilisateur/projet.git"></label>
     <label class="field"><span class="lbl">Site du produit (facultatif)</span><input name="site_url" maxlength="300" inputmode="url" autocomplete="off" placeholder="https://monproduit.fr"></label>
+    <label class="field"><span class="lbl">Langue des contenus</span><span class="sel"><select name="content_lang">${contentLangOptions(currentLang())}</select>${ic('chev')}</span><span class="hint">La langue dans laquelle l'IA écrit à tes prospects et à tes clients (mails, relances, posts, newsletter, vidéo). Tu peux la changer plus tard dans le projet.</span></label>
   </div>
   <div class="form-b"><button class="btn primary">Créer et analyser</button><button type="button" class="btn linklike" data-new-toggle>Annuler</button></div>
   <p class="hint">Le site est demandé dès la création (il remplit <code>{{site}}</code> dans les mails). Le lien du dépôt ne se modifie plus ensuite. ${gitHosts.length ? `GitHub et ${gitHosts.map(esc).join(', ')} sont acceptés.` : 'GitHub est accepté.'} Dépôt privé ou autre serveur Git : ajoute un token dans <a href="/settings">Réglages</a>.</p>

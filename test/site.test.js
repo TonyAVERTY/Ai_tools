@@ -181,7 +181,7 @@ test('aucune ressource externe : tout est servi par l\'application, rien en lign
       for (const p of [...PUBLIC_PAGES, '/login', '/inexistant']) {
         const h = await (await client.get(p, { headers: { accept: 'text/html' } })).text();
         // Seuls scripts permis : ceux de l'application (mouvement du site, vérification de la connexion), jamais en ligne
-        for (const m of h.matchAll(/<script[^>]*\ssrc="([^"]+)"/gi)) assert.ok(['/static/console-warning.js', '/static/code-field.js', '/static/site.js', '/static/responsive.js', '/static/captcha.js'].includes(m[1].split('?')[0]), `${p} : script ${m[1]}`);
+        for (const m of h.matchAll(/<script[^>]*\ssrc="([^"]+)"/gi)) assert.ok(['/static/i18n.js', '/static/console-warning.js', '/static/code-field.js', '/static/site.js', '/static/responsive.js', '/static/captcha.js'].includes(m[1].split('?')[0]), `${p} : script ${m[1]}`);
         assert.doesNotMatch(h, /<script(?![^>]*(ld\+json|\ssrc=))/i, `${p} : aucun script en ligne`);
         assert.doesNotMatch(h, /<style[\s>]/i, `${p} : pas de <style>`);
         assert.doesNotMatch(h, /\sstyle="/i, `${p} : pas de style en ligne (CSP)`);
@@ -203,7 +203,7 @@ test('aucune ressource externe : tout est servi par l\'application, rien en lign
 
 test('textes : faits réels du statut, tarifs sans prix inventé, aucun terme interdit', async () => {
   const mentions = await text('/mentions-legales');
-  for (const f of ['Tony AVERTY', '100 142 819 00018', '62.01Z', 'contact@iaboss.fr', 'TVA non applicable, art. 293 B du CGI', 'Directeur de la publication']) {
+  for (const f of ['Tony AVERTY', '100 142 819 00018', '62.01Z', 'formulaire de contact', 'TVA non applicable, art. 293 B du CGI', 'Directeur de la publication']) {
     assert.ok(mentions.includes(f), f);
   }
   const tarifs = await text('/tarifs');

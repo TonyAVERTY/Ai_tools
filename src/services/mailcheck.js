@@ -66,13 +66,28 @@ export function readyMadeAnswers(text) {
  * Défauts de FORME d'un mail (jamais bloquants, le ton reste au choix de la personne) : pas d'appel, appel adressé à l'entreprise, pas de politesse avant la
  * signature, réponses toutes faites. Une seule source : l'aperçu les signale, et la génération d'un modèle les fait corriger par l'IA (handlers.js).
  */
-export function styleProblems(body = '') {
+// Formules d'appel et de politesse par langue du mail (celle des contenus du projet) : un mail en anglais ne doit pas être signalé faute de « Bonjour »
+const GREET_RE = {
+  fr: /^(bonjour|bonsoir|madame|monsieur|cher|chère|hello|salut)\b/i,
+  en: /^(hi|hello|hey|dear|good (morning|afternoon|evening)|greetings)\b/i,
+  es: /^(hola|buenos|buenas|estimad[oa]s?|apreciad[oa]s?|querid[oa]s?|saludos)\b/i,
+};
+const CLOSING_RE = {
+  fr: /cordialement|bien à vous|bonne journée|bonne soirée|bonne continuation|à bientôt|salutations|sincèrement|respectueusement|merci/i,
+  en: /regards|best|sincerely|thanks|thank you|cheers|yours|looking forward|have a (great|good|nice)/i,
+  es: /saludos?|atentamente|cordialmente|gracias|un abrazo|cordial|hasta pronto|que tengas|le saluda/i,
+};
+const GREET_EXAMPLE = { fr: 'Bonjour,', en: 'Hello,', es: 'Hola,' };
+export function styleProblems(body = '', lang = 'fr') {
   const out = [];
   const filled = String(body).split('\n').map((l) => l.trim()).filter(Boolean);
+  const l = GREET_RE[lang] ? lang : 'fr';
+  const g = GREET_EXAMPLE[l];
+  const bare = g.replace(',', '');
   if (filled.length) {
-    if (!/^(bonjour|bonsoir|madame|monsieur|cher|chère|hello|salut)\b/i.test(filled[0])) out.push("Le mail ne commence pas par une formule d'appel (« Bonjour, »).");
-    if (/^(bonjour|bonsoir|hello|salut)[ \t,]*\{\{\s*entreprise\s*\}\}/i.test(filled[0])) out.push("« Bonjour {{entreprise}}, » salue une entreprise comme une personne (« Bonjour Une Bonne Bouteille, ») : écris « Bonjour, » tout court.");
-    if (!/cordialement|bien à vous|bonne journée|bonne soirée|bonne continuation|à bientôt|salutations|sincèrement|respectueusement|merci/i.test(filled.slice(-4).join(' '))) out.push('Aucune formule de politesse avant la signature (« Bien cordialement, »).');
+    if (!GREET_RE[l].test(filled[0])) out.push(`Le mail ne commence pas par une formule d'appel (« ${g} »).`);
+    if (/^(bonjour|bonsoir|hello|hi|hola|salut|dear)[ \t,]*\{\{\s*entreprise\s*\}\}/i.test(filled[0])) out.push(`« ${bare} {{entreprise}}, » salue une entreprise comme une personne (« ${bare} Une Bonne Bouteille, ») : écris « ${g} » tout court.`);
+    if (!CLOSING_RE[l].test(filled.slice(-4).join(' '))) out.push('Aucune formule de politesse avant la signature (« Bien cordialement, »).');
   }
   if (readyMadeAnswers(body)) out.push('Le mail propose des réponses toutes faites (« oui, non ou plus tard », « maintenant, plus tard ou pas du tout ») : pose plutôt une question simple, à laquelle on répond avec ses mots.');
   return out;
@@ -82,7 +97,7 @@ export function styleProblems(body = '') {
  * Contrôle d'un modèle : `errors` bloquent la validation, `warnings` informent (aperçu).
  * `facts` : texte de la fiche du projet ; une promesse du mail dont la fiche ne parle pas est signalée (le mail ne doit proposer que ce qui existe).
  */
-export function reviewMail({ subject = '', body = '', facts = '' } = {}) {
+export function reviewMail({ subject = '', body = '', facts = '', lang = 'fr' } = {}) {
   const errors = [];
   const warnings = [];
   for (const k of new Set([...countVars(`${subject}\n${body}`).keys()])) if (!KNOWN_VARS.includes(k)) errors.push(`La variable {{${k}}} n'existe pas (variables : ${KNOWN_VARS.map((v) => `{{${v}}}`).join(' ')}).`);
@@ -98,7 +113,7 @@ export function reviewMail({ subject = '', body = '', facts = '' } = {}) {
       if (hit && !re.test(facts)) warnings.push(`Le mail parle de ${label} (« ${hit[0]} ») alors que la fiche du projet n'en parle pas : retire-le si ce n'est pas disponible.`);
     }
   }
-  warnings.push(...styleProblems(body));
+  warnings.push(...styleProblems(body, lang));
   const n = words(body);
   if (n > 220) warnings.push(`Le mail fait ${n} mots : au-delà de 200 mots, la réponse devient plus rare.`);
   if (SPAM_WORDS.test(subject)) warnings.push("L'objet contient un mot que les filtres anti-spam repèrent (gratuit, offre, urgent, promo, garanti).");

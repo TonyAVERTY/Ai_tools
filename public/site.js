@@ -77,7 +77,7 @@
         for (const h of heads) { if (h.getBoundingClientRect().top <= line) current = h; }
         mark((atBottom ? heads[heads.length - 1] : current).id);
       };
-      const queue = () => { if (!queued) { queued = true; requestAnimationFrame(update); } };
+      const queue = () => { if (!queued) { queued = true; setTimeout(update, 60); } };
       addEventListener('scroll', queue, { passive: true });
       addEventListener('resize', queue);
       update();

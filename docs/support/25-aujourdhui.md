@@ -41,4 +41,4 @@ Elle démarre sur cette page : voir le fichier « Visite guidée du tableau de b
 - **La liste « À traiter » est vide alors que j'attends une réponse** : les réponses ne sont lues que si la boîte de réception (IMAP) du projet est connectée ; voir « Connecter ta boîte de réception » dans la liste de mise en route.
 - **Une tâche IA en échec n'apparaît plus** : seules les 48 dernières heures sont montrées ; l'historique complet est dans le menu « Activité ».
 - **Le message « Ligne non mise à jour » apparaît quand je clique sur « Marquer traité »** : la connexion avec le serveur a échoué, la ligne revient à son état d'avant ; réessaie.
-- **Il n'y a pas de rendez-vous alors que j'en ai un** : la page montre les événements du jour de **ton** calendrier iaboss (ajoute-les depuis Calendrier) ; un rendez-vous pris ailleurs n'y est pas.
+- **Il n'y a pas de rendez-vous alors que j'en ai un** : la page montre les événements du jour de **ton** calendrier IaBoss (ajoute-les depuis Calendrier) ; un rendez-vous pris ailleurs n'y est pas.

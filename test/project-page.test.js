@@ -18,7 +18,7 @@ test('la page d\'un projet : nom, dépôt, fil d\'Ariane, neuf onglets avec une 
   assert.match(h, /<h1 id="h-projet">Agenda Kiné<\/h1>/);
   assert.match(h, /<nav class="crumb"[^]*?href="\/projets">Projets<\/a>/);
   assert.match(h, /github\.com\/atelier\/agenda-kine/);
-  assert.match(h, /<title>Agenda Kiné · Vue d(?:'|&#39;)ensemble · iaboss<\/title>/);
+  assert.match(h, /<title>Agenda Kiné · Vue d(?:'|&#39;)ensemble · IaBoss<\/title>/);
   const tabs = h.match(/<nav class="ptabs"[^]*?<\/nav>/)[0];
   const hrefs = [...tabs.matchAll(/href="([^"]+)"/g)].map((m) => m[1]);
   assert.deepEqual(hrefs, ['', '/prospection', '/envoi', '/clients', '/facturation', '/communication', '/outils', '/recap', '/reglages'].map((x) => `/p/${a}${x}`));
@@ -43,7 +43,7 @@ test('chaque onglet répond avec son titre ; un onglet inconnu est introuvable ;
   for (const [slug, label] of [['prospection', 'Prospection'], ['envoi', 'Envoi'], ['clients', 'Clients'], ['facturation', 'Facturation'], ['communication', 'Communication'], ['outils', 'Outils IA'], ['recap', 'Récapitulatif'], ['reglages', 'Réglages du projet']]) {
     const r = await u.get(`/p/${a}/${slug}`, { headers: { accept: 'text/html' } });
     assert.equal(r.status, 200, slug);
-    assert.match(await r.text(), new RegExp(`<title>Alpha · ${label} · iaboss</title>`), slug);
+    assert.match(await r.text(), new RegExp(`<title>Alpha · ${label} · IaBoss</title>`), slug);
   }
   assert.equal((await u.get(`/p/${a}/nimportequoi`, { headers: { accept: 'text/html' } })).status, 404);
   const old = await u.get(`/projets/${a}`, { redirect: 'manual' });

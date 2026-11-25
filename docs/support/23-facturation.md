@@ -2,9 +2,9 @@
 Résumé : la page « Facturation » (menu de l'avatar) : le récapitulatif de tes projets, tes informations légales, les trois exemples de devis générés par l'IA, le choix et l'affinage du devis, puis les quatre documents (Devis, Acompte, Facture finale, Avoir) à valider un par un.
 
 ## À quoi sert la page
-« Facturation » (menu de l'avatar → Facturation) prépare, **projet par projet**, des modèles de documents de facturation écrits avec l'IA : un **Devis**, un **Acompte**, une **Facture finale** et un **Avoir**. Quand les quatre sont validés, ils sont prêts à être utilisés dans iaboss.
+« Facturation » (menu de l'avatar → Facturation) prépare, **projet par projet**, des modèles de documents de facturation écrits avec l'IA : un **Devis**, un **Acompte**, une **Facture finale** et un **Avoir**. Quand les quatre sont validés, ils sont prêts à être utilisés dans IaBoss.
 La page est **personnelle** : tu ne vois que tes projets, et le projet d'un autre compte répond « introuvable ». Chaque génération est une **tâche IA** (dans « Activité » : « Facturation : exemples de devis », « Facturation : affinage » et « Facturation : documents ») (elle compte dans le plafond de ton offre, voir « Offres, plafonds et limites »).
-**Qui écrit quoi ?** l'IA rédige les textes (introduction, désignations, conditions, modalités). Les **mentions légales** (identité, SIRET, TVA, pénalités de retard, indemnité de 40 €…) et les **totaux** (HT, TVA, TTC, reste à payer) sont fixés par iaboss d'après tes informations : l'IA ne les écrit pas et ne peut pas les changer. Fais tout de même relire les documents par un expert-comptable avant un usage officiel.
+**Qui écrit quoi ?** l'IA rédige les textes (introduction, désignations, conditions, modalités). Les **mentions légales** (identité, SIRET, TVA, pénalités de retard, indemnité de 40 €…) et les **totaux** (HT, TVA, TTC, reste à payer) sont fixés par IaBoss d'après tes informations : l'IA ne les écrit pas et ne peut pas les changer. Fais tout de même relire les documents par un expert-comptable avant un usage officiel.
 
 ## 1. Le récapitulatif des projets
 En arrivant sur « Facturation », tu vois une carte par projet avec son état :
@@ -39,7 +39,7 @@ Clique **Enregistrer les informations**. Même incomplètes, elles sont **enregi
 ## 4. Les quatre documents
 Après la validation du devis, l'IA prépare les quatre documents avec **la même mise en page, les mêmes lignes et les mêmes prix** : « Devis », « Acompte », « Facture finale » et « Avoir ». Chacun affiche « À valider » puis « Validé ».
 - **Affiner ce document** (via « Affiner avec Claude ») modifie un document à valider. Un document **validé** est grisé et réduit à un résumé (badge « Validé », « Voir en grand », « Modèle en PDF », « Émettre ce document ») : pour le changer, clique **Modifier**, écris ce que tu veux changer, et il repasse à « À valider ». Si tu modifies le **Devis**, l'**Acompte** et la **Facture finale** sont mis à jour avec lui et sont aussi à revalider.
-- **Valider ce document** valide un document. Quand les quatre sont validés, « Tes documents sont prêts » s'affiche : ils peuvent être utilisés dans iaboss.
+- **Valider ce document** valide un document. Quand les quatre sont validés, « Tes documents sont prêts » s'affiche : ils peuvent être utilisés dans IaBoss.
 - Les parties qui changent à chaque émission (numéro, date, client…) restent sous forme de variables (« Rempli à l'émission : `{{client_nom}}` … ») : elles sont remplies à l'émission du document.
 - **Recommencer depuis le début** (avec confirmation) efface les exemples et les documents du projet ; tes informations légales sont conservées.
 Si tu modifies tes informations légales plus tard, les mentions légales des documents suivent automatiquement.
