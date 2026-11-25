@@ -103,6 +103,8 @@ export function toolActivity(name, input = {}) {
 }
 
 // Avancement d'une phase Claude : de `from` à `to` % au fil des messages, sur `maxTurns` au plus (estimation)
+// Étapes d'une implémentation : lire le code voisin, écrire, relire (plus qu'une analyse, qui ne fait que lire)
+const IMPLEMENT_TURNS = 45;
 const turnPct = (from, to, n, maxTurns) => Math.round(from + (to - from) * Math.min(1, n / Math.max(1, maxTurns)));
 
 /**
@@ -1158,13 +1160,15 @@ export function makeHandlers(app, { claude = makeClaude(app) } = {}) {
         const model = tierEquivalent(level.model, provider);
         const sink = makeSink();
         const r = await claude(userId, {
-          prompt, system, cwd: work, model, maxTurns: 30, signal: ctx.signal,
+          prompt, system, cwd: work, model, maxTurns: IMPLEMENT_TURNS, signal: ctx.signal,
           tools: direct ? ['Read', 'Glob', 'Grep', 'Edit', 'Write'] : ['Read', 'Glob', 'Grep'], ...(direct ? { allowEdit: true } : {}),
-          onTurn: (n) => sink.push(() => ctx.progress({ message: `${direct ? 'Écriture du code' : 'Rédaction des modifications'} · étape ${n}…`, pct: turnPct(12, 80, n, 30) })),
+          onTurn: (n) => sink.push(() => ctx.progress({ message: `${direct ? 'Écriture du code' : 'Rédaction des modifications'} · étape ${n}…`, pct: turnPct(12, 80, n, IMPLEMENT_TURNS) })),
         });
         await sink.flush();
         addUsage(ctx, r);
         assertAnswered(r, 'Implémentation non faite');
+        // Limite d'étapes atteinte : le travail est incomplet, rien n'est poussé (la copie jetable est effacée)
+        if (r.subtype === 'error_max_turns') throw new Error(`L'IA n'a pas fini dans la limite de ${IMPLEMENT_TURNS} étapes : l'idée est sans doute trop grosse. Clique de nouveau sur « Accepter » pour réessayer, ou découpe l'idée`);
         if (!r.text?.trim()) throw new Error(`Pas de résultat (${r.subtype})`);
 
         await ctx.progress({ message: 'Vérification des modifications…', pct: 84 });

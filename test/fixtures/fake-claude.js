@@ -110,6 +110,7 @@ const implementReply = () => {
   if (title.includes('IMPLBAD')) return JSON.stringify({ summary: 'x', edits: [{ path: '.env', content: 'A=1' }] });
   if (title.includes('IMPLSECRET')) return JSON.stringify({ summary: 'x', edits: [{ path: 'config.js', content: 'const k = "' + 'ghp_' + 'Zq9XmK2vL8'.repeat(4) + '";' }] });
   if (title.includes('IMPLJUNK')) return 'pas du json';
+  if (title.includes('IMPLMAXTURNS')) return 'travail commencé';
   return JSON.stringify({ summary: 'Export CSV ajouté.', edits: [{ path: 'README.md', find: '# MonEspacePro', replace: '# MonEspacePro\n\nExport CSV disponible.' }, { path: 'src/export.js', content: 'export const csv = () => "";\n' }] });
 };
 const lines = prompt.includes("Idée acceptée par l'utilisateur") ? [implementReply()]
@@ -150,4 +151,5 @@ out({ type: 'rate_limit_event', rate_limit_info: { status: 'allowed', unifiedWin
   seven_day: { utilization: Number(process.env.FAKE_SEVEN_DAY ?? 0.5), resetsAt: 4_000_300_000 },
 } } });
 await trace('end');
+if (prompt.includes('IMPLMAXTURNS')) { out({ type: 'result', subtype: 'error_max_turns', is_error: false, result: '', total_cost_usd: 0.01, num_turns: 45, usage: { input_tokens: 100, output_tokens: 20 } }); process.exit(0); }
 out({ type: 'result', subtype: 'success', is_error: false, result: lines[lines.length - 1], total_cost_usd: 0.0123, num_turns: 2, usage: { input_tokens: 100, cache_read_input_tokens: 50, output_tokens: 20 } });

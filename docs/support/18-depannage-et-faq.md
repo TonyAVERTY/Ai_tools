@@ -349,5 +349,6 @@ Si tu as accepté une idée et que le message « Idée acceptée, mais … » s'
 - « le token n'a pas le droit d'écrire dans ce dépôt » : le token est en lecture seule. Sur GitHub, donne-lui « Contents : Read and write » sur ce dépôt (ou un token classique avec `repo`), puis clique de nouveau sur **Accepter** pour relancer.
 - « la branche refuse le push (protégée ou modifiée entre-temps) » : choisis **Sur une nouvelle branche**.
 - « Modifications refusées » : l'application a bloqué ce que l'IA avait écrit (fichier interdit comme `.env`, `.github/workflows` ou `.git`, secret détecté, trop de fichiers ou fichier trop gros, passage à remplacer introuvable). Rien n'a été poussé : relance, ou précise l'idée.
+- « L'IA n'a pas fini dans la limite de 45 étapes » : l'idée est trop grosse pour une seule passe. Clique de nouveau sur **Accepter** pour réessayer, ou découpe l'idée en plus petites. Rien n'a été poussé.
 - « Une implémentation est déjà en cours sur ce projet » : une seule à la fois ; attends sa fin.
 - « Réponse de l'IA illisible » : relance l'implémentation.
