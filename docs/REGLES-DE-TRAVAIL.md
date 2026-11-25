@@ -1,4 +1,4 @@
-# iaboss : règles de travail pour Claude Code
+# iaboss : règles de travail du dépôt
 
 ## Règle n° 1 : la documentation du Support se met à jour avec chaque fonctionnalité
 
