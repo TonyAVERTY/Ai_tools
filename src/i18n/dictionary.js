@@ -21,8 +21,12 @@ import misc1 from './dict/misc1.js';
 import misc2 from './dict/misc2.js';
 import tabs1 from './dict/tabs1.js';
 import tabs2 from './dict/tabs2.js';
+import toasts from './dict/toasts.js';
+import srv1 from './dict/srv1.js';
+import tour from './dict/tour.js';
+import compta2 from './dict/compta2.js';
 
-export const AREAS = { tabs2, tabs1, misc2, misc1, project, welcome, docs_api, docs_mcp, docs, chat, link, fonctionnement, tarifs, accueil, account, settings, core, shell, today, checklist };
+export const AREAS = { compta2, tour, srv1, toasts, tabs2, tabs1, misc2, misc1, project, welcome, docs_api, docs_mcp, docs, chat, link, fonctionnement, tarifs, accueil, account, settings, core, shell, today, checklist };
 export const ROWS = Object.values(AREAS).flat();
 
 const INDEX = { en: 1, es: 2 };

@@ -21,6 +21,16 @@ La visite guidée du tableau de bord (`src/tour.js`, `TOUR_STEPS`) fait découvr
 - Ajoute le sélecteur de la cible dans le tableau `has` de `test/tour.test.js`, et relance `scripts/tour-check.mjs` (rendu dans Chromium).
 - La documentation du Support liste les étapes toute seule (générée depuis `TOUR_STEPS`) : ne la recopie pas.
 
+## Règle n° 2 bis : tout texte d'interface a sa traduction (anglais, espagnol)
+
+Le site s'affiche en français, anglais ou espagnol (choix dans Réglages → Langue, ou dans le pied de page du site public). Les pages restent **écrites en français** dans le code ; la traduction se fait à l'envoi (`src/i18n/`) et dans le navigateur (`public/i18n.js`) d'après le dictionnaire `src/i18n/dict/`.
+- **Un nouveau texte visible** (page, bouton, infobulle, message d'erreur, toast, étape de la visite…) **ajoute sa ligne `[français, anglais, espagnol]`** dans un fichier de `src/i18n/dict/` (créer un fichier et l'ajouter à `AREAS` de `src/i18n/dictionary.js` si la zone est nouvelle), dans le même commit. Le français sert de clé : il doit être écrit exactement comme dans la page.
+- Une valeur variable s'écrit `{nom}` des deux côtés (`Tu as {n} projets`) ; une phrase avec balises se met avec ses balises sans attributs ; les trois langues ont les mêmes `{trous}` et les mêmes balises (`test/i18n.test.js`).
+- **`test/i18n-coverage.test.js` échoue** si une page de l'application ou du site public a un texte sans traduction : ajoute la ligne, ne contourne pas le test. `node scripts/i18n-audit.mjs` liste ce qui manque, `--static` les textes écrits dans les scripts et les messages d'erreur.
+- Les dates et les nombres affichés utilisent `localeOf()` (`src/i18n/locale.js`) côté serveur et la constante `LOCALE` dans les scripts du navigateur, jamais `'fr-FR'` en dur. Les mails, factures, rapports et fichiers CSV restent en français (documents adressés à des tiers).
+- Les textes juridiques (CGU, confidentialité, mentions légales) restent en français jusqu'à validation juridique de leur traduction.
+- Un lien ou un bouton qui change la langue recharge toute la page (`data-noajax`) : `scripts/lang-check.mjs` le vérifie dans Chromium.
+
 ## Règle n° 3 : la sécurité et la conformité ne se négocient pas
 
 Le dossier `docs/security/` est l'état de l'audit de mise en production ; les règles détaillées sont dans **`.claude/rules/`** (`securite.md`, `donnees-personnelles.md`, `dependances-et-deploiement.md`) et s'appliquent à toute modification. En résumé :

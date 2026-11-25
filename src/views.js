@@ -706,7 +706,7 @@ export function settingsPage({ email, s, saved }) {
 ${saved ? banner('ok', 'Réglages enregistrés', { strong: true }) : ''}
 <section class="card" id="langue" aria-labelledby="t-langue">
   <div class="card-h"><h2 id="t-langue">Langue</h2><p>Choisis la langue d'affichage du site. Ton choix est gardé sur ce navigateur et sur ton compte.</p></div>
-  <form method="post" action="/settings/lang" class="cfg"><div class="row" role="group" aria-label="Langue">
+  <form method="post" action="/settings/lang" class="cfg" data-noajax><div class="row" role="group" aria-label="Langue">
     ${LANGS.map((code) => `<button class="btn${code === currentLang() ? ' primary' : ''}" name="lang" value="${code}" aria-pressed="${code === currentLang()}">${code === currentLang() ? ic('check') : ''}${LANG_LABELS[code]}</button>`).join('\n    ')}
   </div></form>
 </section>

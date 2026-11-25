@@ -66,6 +66,8 @@ Un formulaire que le serveur refuse **garde ses champs, reste à l'écran et le 
 
 ## Rédaction
 
+**Langues.** Le site existe en français, anglais et espagnol : tout texte visible a sa ligne dans `src/i18n/dict/` (voir `docs/REGLES-DE-TRAVAIL.md`, règle n° 2 bis). Écris le français comme d'habitude ; une phrase qui change selon une valeur utilise `{nom}` plutôt que d'être assemblée (« Tu as {n} projets », pas « Tu as » + n + « projets »), pour que la traduction reste possible.
+
 Tout ce que l'application écrit à l'utilisateur suit ces règles. `test/wording.test.js` vérifie celles qui se mesurent (marquées ✔) ; le reste se relit à la main.
 
 **Registre**

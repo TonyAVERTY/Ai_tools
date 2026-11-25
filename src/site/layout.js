@@ -117,7 +117,7 @@ ${body}
         <li><a href="mailto:${CONTACT_EMAIL}">Contact</a></li>
       </ul></nav>
     </div>
-    <form method="post" action="/lang" class="lang-pick" aria-label="Langue">
+    <form method="post" action="/lang" class="lang-pick" aria-label="Langue" data-noajax>
       <input type="hidden" name="back" value="${esc(path)}">
       ${LANGS.map((code) => `<button name="lang" value="${code}" aria-pressed="${code === currentLang()}" lang="${code}">${LANG_LABELS[code]}</button>`).join('\n      ')}
     </form>

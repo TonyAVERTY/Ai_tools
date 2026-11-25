@@ -68,7 +68,7 @@ test('site public : choix de la langue par un visiteur (cookie seulement), retou
   assert.equal((await s.anon.post('/lang', { lang: 'en' }, { form: true, origin: null })).status, 403, 'l\'origine est vérifiée');
   const es = await page(null, '/tarifs', 'lang=es');
   assert.match(es, /<html lang="es"/);
-  assert.match(es, /<form method="post" action="\/lang" class="lang-pick" aria-label="Idioma">/, 'le sélecteur du pied de page est traduit');
+  assert.match(es, /<form method="post" action="\/lang" class="lang-pick" aria-label="Idioma" data-noajax>/, 'le sélecteur du pied de page est traduit');
   assert.match(es, /<input type="hidden" name="back" value="\/tarifs">/);
 });
 
