@@ -42,7 +42,7 @@ for (const [who, u, priced] of [['abonnement', sub, false], ['clé API', api, tr
       // Clé API : la carte « Consommation Claude » montre le budget en $ équivalent API
       await p.waitForSelector('[data-claude-card]:not([hidden]) [data-usage-claude]:not([hidden])');
       const card = await p.locator('[data-usage-claude]').innerText();
-      ok(/\$/.test(card) && /IA via iaboss/.test(card), `${tag} carte « Consommation Claude » : lignes « IA via iaboss » en $`);
+      ok(/\$/.test(card) && /IA via IaBoss/.test(card), `${tag} carte « Consommation Claude » : lignes « IA via iaboss » en $`);
       ok(/Tâches IA 30 j\s*3 · 1 en échec/.test(card), `${tag} carte : bilan des tâches IA sur 30 jours (« ${card.split('\n').slice(-2).join(' ')} »)`);
       const tip = await p.locator('[data-usage-claude] .g-h', { hasText: 'Tâches IA 30 j' }).first().getAttribute('title');
       ok(/dont 1 en échec \(33 %\)/.test(tip) && /Durée moyenne d'une tâche : 60 s/.test(tip), `${tag} détail au survol : taux d'échec et durée moyenne (${tip})`);

@@ -32,7 +32,7 @@ for (const vp of [{ width: 1280, height: 800 }, { width: 390, height: 780 }]) {
   ok(/Consommation ChatGPT/.test(t), `${tag} carte « Consommation ChatGPT »`);
   ok(/ChatGPT session 5 h\s*61 %/.test(t) && /ChatGPT semaine\s*12 %/.test(t), `${tag} les deux fenêtres avec leur pourcentage`);
   ok((t.match(/Remise à zéro/g) || []).length === 2, `${tag} l'heure de remise à zéro de chaque fenêtre`);
-  ok(/ChatGPT via iaboss 24 h\s*378[\s  ]750 tokens/.test(t), `${tag} tokens mesurés par iaboss`);
+  ok(/ChatGPT via IaBoss 24 h\s*378[\s  ]750 tokens/.test(t), `${tag} tokens mesurés par iaboss`);
   ok(!/\$/.test(t), `${tag} aucun montant en $`);
   if (process.env.SHOT_DIR) await p.screenshot({ path: `${process.env.SHOT_DIR}/usage-chatgpt-${vp.width}.png` });
   ok(!(await p.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1)), `${tag} pas de défilement horizontal`);
