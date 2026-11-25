@@ -43,7 +43,8 @@ function compile(fr, tr) {
     const m = /^\{([a-zA-Z0-9_]+)\}$/.exec(part);
     if (!m) return reEscape(part);
     names.push(m[1]);
-    return '(.+?)';
+    // {n} et {m} : des nombres (« 3 », « 1 200 », « 2,5 ») ; les autres trous prennent n'importe quel texte
+    return /^[nm]$/.test(m[1]) ? '(\\d[\\d\\s.,]*?)' : '(.+?)';
   }).join('');
   const literal = fr.replace(/\{[a-zA-Z0-9_]+\}/g, '').length;
   return { re: new RegExp(`^${source}$`, 's'), names, tr, literal };

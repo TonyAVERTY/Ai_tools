@@ -3,6 +3,7 @@
 // individuel Tony AVERTY. Ce sont des modèles sérieux, pas un avis juridique : voir docs/JOURNAL.md pour ce qui reste
 // à compléter (marqueurs visibles) et à faire relire.
 import { siteLayout, ic, CONTACT_EMAIL } from './layout.js';
+import { currentLang } from '../i18n/index.js';
 import { PLAN_LIMITS, PLAN_PRICES, PLAN_LABELS, ANNUAL_FREE_MONTHS, annualPrice, SUBSCRIPTION } from '../limits.js';
 
 /**
@@ -32,6 +33,7 @@ function legalPage({ appUrl, path, title, description, h1, lead, sections }) {
     <h1 class="h1">${h1}</h1>
     <p class="maj">Dernière mise à jour : ${LEGAL_UPDATED}</p>
     <p class="lg-intro">${lead}</p>
+    ${currentLang() === 'fr' ? '' : '<p class="lg-intro"><strong>Traduction de courtoisie : seule la version française de ce document fait foi. [À COMPLÉTER : validation juridique de la traduction]</strong></p>'}
   </div>
 
   <div class="lg-body">

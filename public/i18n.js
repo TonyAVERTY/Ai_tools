@@ -64,5 +64,6 @@
     };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true }); else start();
     window.AiI18n = { lang, t: (fr) => lookup.text(fr) ?? fr };
+    document.dispatchEvent(new Event('ai-i18n-ready'));
   }).catch(() => { /* sans dictionnaire, tout reste en français */ });
 })();

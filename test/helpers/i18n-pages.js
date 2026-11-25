@@ -1,5 +1,5 @@
 // Pages utilisées par l'audit de la traduction : un compte garni (projet, prospects, modèles, idées d'évolution…) et la liste des pages à lire.
-import { now } from '../../src/db.js';
+import { now, setSetting } from '../../src/db.js';
 import { testTokenLink } from './users.js';
 
 /** Un compte avec de quoi remplir les écrans. @returns {{ user, projectId }} */
@@ -24,8 +24,8 @@ export async function seedAccount(s) {
 /** Textes écrits par la personne (noms de projet, de prospects…) dans le compte garni : pas à traduire. */
 export const SEED_TEXTS = new Set(['Atelier', 'Boulangerie Martin', 'Pâtisserie Durand', 'Café Leroy', 'Export CSV', 'Mode sombre', 'Une idée pour {{entreprise}}', 'github.com/o/atelier', 'Cartes de fidélité digitales.', 'Boulangeries', 'Boulangeries, Bretagne.']);
 
-/** Pages publiques à lire (les textes juridiques restent en français : ils ne sont pas dans cette liste). */
-export const PUBLIC_PATHS = ['/accueil', '/fonctionnement', '/tarifs', '/login', '/docs', '/docs/api', '/docs/mcp'];
+/** Pages publiques à lire (y compris les pages juridiques). */
+export const PUBLIC_PATHS = ['/accueil', '/fonctionnement', '/tarifs', '/login', '/docs', '/docs/api', '/docs/mcp', '/mentions-legales', '/confidentialite', '/cgu'];
 
 /** Toutes les pages HTML de l'application connectée, d'après le routeur (les routes à paramètres reçoivent l'identifiant du projet). */
 export function appPaths(s, projectId, tabs = []) {
@@ -46,4 +46,29 @@ export async function readPage(s, user, path) {
   const r = await fetch(s.base + path, { redirect: 'manual', headers: { cookie: user ? user.cookie : '', accept: 'text/html' } });
   if (r.status !== 200 || !(r.headers.get('content-type') || '').includes('text/html')) return null;
   return r.text();
+}
+
+/** Pages juridiques avec toutes leurs variantes (Apple, anti-robot, paiement, inactivité) : leurs textes en HTML, pour l'audit. */
+export async function legalVariants() {
+  const m = await import('../../src/site/legal.js');
+  const appUrl = 'https://exemple.test';
+  return [
+    m.privacyPage({ appUrl, apple: true, captcha: true, billing: true, inactiveMonths: 12 }),
+    m.privacyPage({ appUrl, inactiveMonths: 0 }),
+    m.termsPage({ appUrl, apple: true, billing: true }),
+    m.termsPage({ appUrl }),
+    m.mentionsPage({ appUrl }),
+  ];
+}
+
+/** Comptes sur chaque offre payante (les cartes « Offre X » et les fonctions réservées changent), avec le mode développeur actif. @returns {Promise<Array<{ plan, user }>>} */
+export async function plannedAccounts(s) {
+  const out = [];
+  for (const plan of ['starter', 'growth', 'business', 'scale']) {
+    const user = await s.newUser({ admin: false, link: testTokenLink() });
+    await s.db.prepare('UPDATE users SET plan = ? WHERE id = ?').run(plan, user.id);
+    await setSetting(s.db, user.id, 'developer_mode', '1');
+    out.push({ plan, user });
+  }
+  return out;
 }

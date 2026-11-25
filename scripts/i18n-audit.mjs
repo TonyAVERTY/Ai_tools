@@ -7,7 +7,7 @@
 import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { startApp } from '../test/helpers/server.js';
-import { seedAccount, appPaths, readPage, PUBLIC_PATHS, SEED_TEXTS } from '../test/helpers/i18n-pages.js';
+import { seedAccount, appPaths, readPage, plannedAccounts, legalVariants, PUBLIC_PATHS, SEED_TEXTS } from '../test/helpers/i18n-pages.js';
 import { collectTexts, missingIn } from '../src/i18n/audit.js';
 import { tabSlugs } from '../src/projectviews.js';
 import { ROWS } from '../src/i18n/dictionary.js';
@@ -41,7 +41,8 @@ const s = await startApp();
 const { user, projectId } = await seedAccount(s);
 const pages = new Map(); // texte → pages
 let scanned = 0;
-for (const [who, paths] of [[null, PUBLIC_PATHS], [user, appPaths(s, projectId, tabSlugs())]]) {
+const extra = (await plannedAccounts(s)).map((a) => [a.user, ['/', '/account', '/settings', '/projets', '/developer', '/facturation', '/compta', '/team', '/clients', '/calendar']]);
+for (const [who, paths] of [[null, PUBLIC_PATHS], [user, appPaths(s, projectId, tabSlugs())], ...extra]) {
   for (const path of paths) {
     const html = await readPage(s, who, path);
     if (html == null) continue;
