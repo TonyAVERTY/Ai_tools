@@ -4,7 +4,7 @@
 import { now } from './db.js';
 import { parisParts, parisTime } from './services/paris-time.js';
 import { monthEvents } from './calendar.js';
-import { usageView, weekBounds } from './services/plans.js';
+import { isApproaching, usageView, weekBounds } from './services/plans.js';
 import {
   fmtEur, todayIso, periodToDeclare, deadlineOf, daysLeft, periodRange, rowsInRange, computeTotals, dayLabel,
 } from './services/accounting.js';
@@ -230,7 +230,7 @@ export function usageRows(u, at = now()) {
   if (!u) return [];
   const nextMonday = new Date(weekBounds(at).end * 1000).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: TZ });
   return USAGE_ORDER.map((k) => u.items.find((i) => i.kind === k)).filter(Boolean).map((i) => {
-    const warn = i.full || (i.limit != null && i.used / i.limit >= 0.8);
+    const warn = i.full || isApproaching(i.used, i.limit);
     const note = i.limit == null ? 'Sans plafond' : i.full ? 'Plafond atteint pour ton offre'
       : i.kind === 'mails' ? `Repart de zéro ${nextMonday}` : i.kind === 'aiJobs' ? `${i.pct} % du plafond : ${plural(i.limit - i.used, 'restante', 'restantes')}`
         : i.kind === 'prospects' ? plural(i.limit - i.used, 'place libre', 'places libres') : `${plural(i.limit - i.used, 'place libre', 'places libres')}`;

@@ -983,10 +983,10 @@ Ne touche jamais à : .git, .github/workflows, fichiers .env, clés ou secrets, 
     ? `\nUne tentative précédente s'est arrêtée avant la fin${why}. Son travail est DÉJÀ dans ta copie, dans ces fichiers : ${resume.files.slice(0, 40).map((f) => `« ${String(f).slice(0, 120)} »`).join(', ')}. Relis-les, ne refais pas ce qui est fait, et termine l'idée.\n`
     : `\nUne tentative précédente n'a pas abouti${why} : va plus droit au but et termine l'idée.\n`;
   if (mode === 'direct') {
-    return { system, prompt: `${ctx}${again}\nModifie les fichiers directement avec les outils Edit et Write. Quand tu as fini, réponds par 3 à 6 lignes : ce que tu as changé, fichier par fichier, et ce qu'il reste à vérifier à la main. Aucune autre introduction.` };
+    return { system, prompt: `${ctx}${again}\nModifie les fichiers directement avec les outils Edit et Write. Tout ce que tu écris est en français, y compris pendant ton travail. Quand tu as fini, termine par un dernier message qui commence par « RÉSUMÉ : » suivi de 3 à 6 lignes : ce que tu as changé, fichier par fichier, et ce qu'il reste à vérifier à la main.` };
   }
   return { system, prompt: `${ctx}${again}\nTu ne peux pas écrire dans les fichiers : décris les modifications en JSON, et rien d'autre.
-{"summary":"3 à 6 lignes : ce qui change et ce qu'il reste à vérifier","edits":[
+{"summary":"3 à 6 lignes, en français : ce qui change et ce qu'il reste à vérifier","edits":[
   {"path":"src/fichier.js","find":"passage EXACT existant, unique dans le fichier","replace":"nouveau texte"},
   {"path":"src/nouveau.js","content":"contenu complet d'un fichier nouveau (ou entièrement réécrit)"}
 ]}

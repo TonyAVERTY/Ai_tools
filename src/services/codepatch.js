@@ -155,6 +155,19 @@ export function applySnapshot(work, files) {
   return n;
 }
 
+/**
+ * Résumé d'une implémentation écrite directement par l'IA : ce qui suit le DERNIER « RÉSUMÉ : » de sa réponse. Tout ce qu'elle a écrit pendant son travail
+ * (sa narration, souvent en anglais) n'est jamais repris. Sans conclusion exploitable : une phrase française avec la liste des fichiers.
+ */
+export function finalSummary(text, files = []) {
+  const t = String(text ?? '');
+  const last = [...t.matchAll(/R[ÉE]SUM[ÉE]\s*:/gi)].at(-1);
+  const after = last ? t.slice(last.index + last[0].length).trim() : '';
+  if (after) return after.slice(0, 1500);
+  const list = files.slice(0, 12).join(', ');
+  return `Fichiers modifiés : ${list}${files.length > 12 ? '…' : ''}.`;
+}
+
 /** Dernier contrôle avant le commit : volume et secrets dans ce qui a été écrit. Les valeurs trouvées ne sont jamais affichées. */
 export function checkChanges(dir, files) {
   if (!files.length) throw new PatchError("L'IA n'a modifié aucun fichier");
